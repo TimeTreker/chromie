@@ -296,3 +296,146 @@ def test_native_work_schema_conserves_declared_parallel_permission(parallel):
         "continuations": [], "confidence": 1, "unresolved": [], "reason_summary": "Direct walk."}
     errors = list(Draft202012Validator(schema).iter_errors(output))
     assert bool(errors) is not parallel
+
+
+@pytest.mark.parametrize("relation", ["before", "precedes", "after", "follows", "parallel_with"])
+@pytest.mark.parametrize("list_binding", [False, True])
+def test_native_work_timing_preserves_both_ends_of_typed_source_relation(relation, list_binding):
+    responsibilities = [CognitiveResponsibilityProposal(
+        local_ref=ref, outcome="perform bounded action", output_mode="body_action", confidence=1,
+        bindings={relation: ["second"] if list_binding else "second"} if ref == "first" else {},
+    ) for ref in ("first", "second", "independent")]
+    capability = {**_walk_capability(), "can_run_parallel": True}
+    schema = fast_streaming_advance_response_schema(
+        [item.local_ref for item in responsibilities], responsibilities=responsibilities, capabilities=[capability])
+    expected = "parallel" if relation == "parallel_with" else "sequential"
+    for ref in ("first", "second", "independent"):
+        for timing in ("sequential", "parallel"):
+            act = {"role": "capability", "activity_id": ref, "capability_id": capability["capability_id"],
+                   "args": {"duration_s": 10}, "timing": timing, "source_responsibility_refs": [ref]}
+            # Exercise the exact compiled item union, including native branches.
+            errors = list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(act))
+            assert bool(errors) == (ref != "independent" and timing != expected)
+
+
+def test_native_work_timing_keeps_escalation_when_no_provider_can_honor_concurrency():
+    responsibilities = [CognitiveResponsibilityProposal(
+        local_ref=ref, outcome="perform bounded action", output_mode="body_action", confidence=1,
+        bindings={"parallel_with": "second"} if ref == "first" else {},
+    ) for ref in ("first", "second")]
+    capability = {**_walk_capability(), "can_run_parallel": False}
+    schema = fast_streaming_advance_response_schema(
+        [item.local_ref for item in responsibilities], responsibilities=responsibilities, capabilities=[capability])
+    for timing in ("parallel", "sequential"):
+        act = {"role": "capability", "activity_id": "one", "capability_id": capability["capability_id"],
+               "args": {"duration_s": 10}, "timing": timing, "source_responsibility_refs": ["first"]}
+        assert list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(act))
+    escalation = {"activities": [], "disposition": "escalate", "coverage": "uncertain",
+        "covered_responsibility_refs": ["first", "second"], "confidence": 1,
+        "continuations": ["deep_planner"],
+        "unresolved": ["Concurrent composition unavailable."], "reason_summary": "Requires deeper source-based planning."}
+    Draft202012Validator(schema).validate(escalation)
+
+
+@pytest.mark.parametrize("count", [1, 2, 3, 6])
+def test_fast_native_visible_work_bounds_conserve_all_existing_response_assignments(count):
+    from agent.app.planner_schema import fast_multi_goal_response_schema
+    ids = [f"goal-{i}" for i in range(count)]
+    schema = fast_multi_goal_response_schema(
+        expected_goal_ids=ids, allowed_capability_ids=["test.action"],
+        capability_input_schemas={"test.action": {"type": "object", "properties": {}}},
+        response_only=False, response_goal_ids=ids)
+    fields = schema["properties"]
+    assert fields["steps"]["maxItems"] == 0
+    assert "execute" not in fields["disposition"]["enum"]
+    for goal in ids:
+        outcome = fields["goal_outcomes"]["properties"][goal]["properties"]
+        assert "execute" not in outcome["disposition"]["enum"]
+        assert outcome["step_ids"]["maxItems"] == 0
+    # An independent effect Goal keeps execution representable in the same DTO.
+    mixed = fast_multi_goal_response_schema(
+        expected_goal_ids=[*ids, "effect"][:6], allowed_capability_ids=["test.action"],
+        capability_input_schemas={"test.action": {"type": "object", "properties": {}}},
+        response_goal_ids=ids[:5], effectful_goal_ids=["effect"] if count < 6 else [])
+    if count < 6:
+        assert mixed["properties"]["steps"]["maxItems"] >= 1
+        assert "execute" in mixed["properties"]["goal_outcomes"]["properties"]["effect"]["properties"]["disposition"]["enum"]
+
+
+@pytest.mark.parametrize("mode", ["styled_speech", "recitation", "singing", "humming", "nonverbal_vocalization"])
+@pytest.mark.parametrize("provider_modes", [None, ["speech"], ["speech", "styled_speech", "recitation", "singing", "humming", "nonverbal_vocalization"]])
+def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_work(mode, provider_modes):
+    from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID, vocal_performance_input_schema
+    responsibilities = [
+        CognitiveResponsibilityProposal(local_ref="voice", outcome="perform requested vocal effect", output_mode=mode, confidence=1),
+        CognitiveResponsibilityProposal(local_ref="body", outcome="walk", output_mode="body_action", confidence=1),
+    ]
+    capabilities = [_walk_capability()]
+    if provider_modes is not None:
+        capabilities.append({"capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
+            "input_schema": vocal_performance_input_schema(provider_modes), "can_run_parallel": True})
+    schema = fast_streaming_advance_response_schema(
+        [x.local_ref for x in responsibilities], responsibilities=responsibilities, capabilities=capabilities)
+    validator = Draft202012Validator(schema["properties"]["activities"]["items"])
+    body = {"role": "capability", "activity_id": "act", "capability_id": capabilities[0]["capability_id"],
+        "args": {"duration_s": 10}, "timing": "sequential", "source_responsibility_refs": ["body"]}
+    validator.validate(body)
+    assert not validator.is_valid({**body, "source_responsibility_refs": ["voice"]})
+    for candidate_mode in ["speech", "styled_speech", "recitation", "singing", "humming", "nonverbal_vocalization"]:
+        vocal = {**body, "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
+            "args": {"text": "authored performance", "mode": candidate_mode}, "source_responsibility_refs": ["voice"]}
+        assert validator.is_valid(vocal) == (provider_modes is not None and mode in provider_modes and candidate_mode == mode)
+    # An unavailable mode can still delegate its unresolved work without inventing another effect.
+    Draft202012Validator(schema).validate({"activities": [], "disposition": "escalate", "coverage": "uncertain",
+        "covered_responsibility_refs": ["voice", "body"], "confidence": 0.5, "continuations": ["deep_planner"],
+        "unresolved": ["Requested composition needs deeper planning."], "reason_summary": "Unresolved composition."})
+
+
+def test_native_advance_keeps_distinct_and_shared_vocal_mode_composition():
+    from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID, vocal_performance_input_schema
+    responsibilities = [CognitiveResponsibilityProposal(local_ref=ref, outcome="requested vocal performance", output_mode=mode, confidence=1)
+        for ref, mode in [("song1", "singing"), ("song2", "singing"), ("hum", "humming")]]
+    schema = fast_streaming_advance_response_schema([x.local_ref for x in responsibilities], responsibilities=responsibilities,
+        capabilities=[{"capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID, "input_schema": vocal_performance_input_schema(), "can_run_parallel": True}])
+    validator = Draft202012Validator(schema["properties"]["activities"]["items"])
+    act = {"role": "capability", "activity_id": "voice", "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
+        "args": {"text": "authored performance", "mode": "singing"}, "timing": "parallel", "source_responsibility_refs": ["song1", "song2"]}
+    validator.validate(act)
+    assert not validator.is_valid({**act, "source_responsibility_refs": ["song1", "hum"]})
+    validator.validate({**act, "args": {**act["args"], "mode": "humming"}, "source_responsibility_refs": ["hum"]})
+
+
+def test_native_vocal_work_with_empty_catalog_cannot_invent_a_provider():
+    source = CognitiveResponsibilityProposal(local_ref="song", outcome="sing", output_mode="singing", confidence=1)
+    schema = fast_streaming_advance_response_schema([source.local_ref], responsibilities=[source], capabilities=[])
+    act = {"role": "capability", "activity_id": "voice", "capability_id": "unavailable.provider",
+        "args": {"mode": "singing", "text": "performance"}, "timing": "sequential", "source_responsibility_refs": ["song"]}
+    assert not Draft202012Validator(schema["properties"]["activities"]["items"]).is_valid(act)
+    Draft202012Validator(schema).validate({"activities": [], "disposition": "escalate", "coverage": "uncertain",
+        "covered_responsibility_refs": ["song"], "confidence": 0.5, "continuations": ["deep_planner"],
+        "unresolved": ["No qualified vocal provider."], "reason_summary": "Need source-based deeper planning."})
+
+
+@pytest.mark.parametrize("disposition,coverage,continuations,work,valid", [
+    ("execute", "complete", [], True, True),
+    ("execute", "partial", ["deep_planner"], True, False),
+    ("execute", "complete", ["deep_planner"], True, False),
+    ("execute", "partial", [], True, False),
+    ("mixed", "partial", [], True, False),
+    ("escalate", "uncertain", ["deep_planner"], False, True),
+    ("escalate", "partial", ["deep_planner"], True, False),
+    ("escalate", "uncertain", [], False, False),
+    ("escalate", "complete", ["deep_planner"], False, False),
+])
+def test_native_decision_alternatives_preserve_execution_delegation_boundary(disposition, coverage, continuations, work, valid):
+    request, source = _body_request()
+    capability = _walk_capability()
+    schema = fast_streaming_advance_response_schema([source.local_ref], responsibilities=[source], capabilities=[capability])
+    output = {"disposition": disposition, "coverage": coverage, "covered_responsibility_refs": [source.local_ref],
+        "activities": [{"role": "capability", "activity_id": "walk", "capability_id": capability["capability_id"],
+            "args": {"duration_s": 10}, "timing": "sequential", "source_responsibility_refs": [source.local_ref]}] if work else [],
+        "continuations": continuations, "confidence": 1, "unresolved": [], "reason_summary": "Bounded Work decision."}
+    # Exercise the native alternatives independently of the Host's conditional
+    # allOf checks, which the deployed decoder does not enforce.
+    assert Draft202012Validator({"oneOf": schema["oneOf"]}).is_valid(output) == valid
+    assert Draft202012Validator(schema).is_valid(output) == valid

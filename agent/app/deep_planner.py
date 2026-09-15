@@ -37,6 +37,7 @@ from .planner_schema import (
     deep_plan_response_schema,
 )
 from .planner_context import (
+    completed_work_step_evidence,
     auxiliary_social_capability_payloads,
     auxiliary_social_prompt_context,
     cancellation_capability_facts,
@@ -322,6 +323,8 @@ class DeepPlannerResolver:
                         planner_tier="deep",
                         plan_id=plan_id,
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                        completed_step_evidence=completed_work_step_evidence(
+                            context, reentry_scope=request.planner_reentry_scope),
                     )
                 )
             except (ValidationError, ValueError) as exc:

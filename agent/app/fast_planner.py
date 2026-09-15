@@ -33,6 +33,7 @@ from .planner_schema import (
     fast_streaming_advance_response_schema,
 )
 from .planner_context import (
+    completed_work_step_evidence,
     auxiliary_social_capability_payloads,
     auxiliary_social_prompt_context,
     cancellation_capability_facts,
@@ -461,6 +462,8 @@ class FastPlannerResolver:
                         plan_id=plan_id,
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                         fast_multi_goal_contract=multi_goal_contract,
+                        completed_step_evidence=completed_work_step_evidence(
+                            request.context, reentry_scope=request.planner_reentry_scope),
                     )
                     plan = CanonicalPlan.model_validate(normalized)
                     validate_work_reuse_selection(

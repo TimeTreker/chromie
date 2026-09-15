@@ -1,5 +1,596 @@
 # Chromie Latest Handoff
 
+## Source-backed lightweight handoff delivery — 2026-09-15 (current)
+
+Owner authorized commit/push and asked to finish quickly. Deliver the validated
+interface changes and earlier completed engineering work; do not continue tuning.
+Repo `/home/chromie/github/chromie`, branch `main`, pre-delivery base
+`a1ed4b4b22ee82ee846321b67df2d088d5226599`; resume at the latest commit carrying
+both handoff files. Paired Soridormi remains
+`fa6331f1344ce26154b197ca7d7c49badea292ad`. Upstream was fetched, divergence 0/0
+before editing; fetch/verify again immediately before push. No force push.
+
+Implemented workflow and boundary diagnosis are in the current checkpoint:
+Host immutable source + accepted GI → concurrent GA / Fast; GA inherits complete
+query without mandatory duplicate query_scope; Planner realizes literal source
+arguments with ownership/contradiction checks. Counts, measured values, activation
+and trusted target evidence keep their guards. SC still owns ordinary wording.
+GI default prompt simplification **was not promoted**: two frozen candidates
+regressed. Original GI prompt/interpreter are byte-identical to the before files.
+This delivery supports sparse GI results but does not establish a lighter default
+model output, latency gain or completed Qualification.
+
+J = `.chromie/acceptance/gi-source-handoff-20260915/`:
+
+- `canonical.log`: 3,510 tests / 1,164 subtests and 145 benchmark tests; legacy
+  completion recorded at the end. Policy, test ownership, Ruff, mypy, configuration
+  and docs gates are part of that command. Two existing FastAPI warnings.
+- `workflow-summary.json`: 6,000 expected outcomes; `workflow-full.tar.gz` fully
+  read-verified, SHA256 `b34f298f1d83363481bdb0d8123f3f241c690699d1c15f5d2c510477120690df`,
+  16,602 members. Owned `/dev/shm` replay directory removed after verification.
+- `level-a/summary.json`: 45/45. `focused-final.log`: 900 tests / 712 subtests before
+  five final canonical provenance tests; all are covered by the canonical run.
+- `request-refreeze-review.json`, `pre-request-refreeze.tar.gz`: 5,205 changed
+  request-only scenarios / 10,513 requests. No expected response/oracle changes.
+- `semantic-review.json`, `candidate/`, `final/`: 46 rejected GI responses; neither
+  candidate directory contains the delivered GI prompt. Baseline reused from I
+  after exact source/prompt byte verification. All training_eligible=false.
+- `native-downstream/`, `native-downstream-review.json`: controlled GI references
+  with no query bindings pass real GI Schema/Host; native GA 4/4 and pre-GA Fast
+  4/4 retain correct queries/arguments. Canonical Fast/Deep 0/8 semantic acceptance:
+  evidence absence mistaken for clarification, contradictory dispositions/steps.
+  No provider execution, SC, microphone, speaker or robot claim. Separate failed
+  URL preflight retained; no model inference in that preflight.
+- `runtime-source.json`: host source differs from running Agent; deployment was
+  not updated. The original mic/ASR owner acceptance stays closed.
+
+Commands to reproduce after checkout:
+
+```bash
+./scripts/run_tests.sh
+python scripts/general_ability_acceptance.py --mode level-a --evidence-dir /tmp/chromie-source-handoff-level-a
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir /dev/shm/chromie-source-handoff-next
+./scripts/start_voice_mujoco.sh --build
+```
+
+The last command is the owner's personal test entry point, with a rebuild needed
+for this checkout. The retained prior 51-case live cohort is incomplete and its
+GI/Planner/SC failures remain open. No further model/prompt/architecture optimization
+or training is authorized by this handoff alone. Native evidence archives are local
+retained artifacts; committed fixtures reproduce deterministic checks on another
+machine without those archives.
+
+## GI intent handoff experiment — 2026-09-15 (previous experiment)
+
+**Runtime simplification was not safely completed.** All trial prompt/Schema/DTO
+changes were rejected and rolled back. Current production behavior is the preceding
+Schema-deduplicated revision; no deployment or fixture rewrite occurred. The owner
+has already authorized the lighter intent-preserving direction, so do not ask for
+that same approval again. It still requires a non-regressing implementation.
+
+Read the current checkpoint for module I/O, precise failure classes and scope.
+Evidence: `.chromie/acceptance/gi-intent-handoff-20260915/`:
+
+- `frozen-manifest.json`, `corpus/`: 18 cases / 23 primary/Deep transactions.
+- `baseline/`: immutable native baseline; 21/23 mechanical acceptances.
+- `candidate*/`, `probe.log`, `semantic-review.json`: all 106 retained native
+  responses, including rejected/incomplete experiments. No candidate was promoted;
+  wrong atomic decomposition and invented constraints cannot be averaged away.
+- `focused-final.log`: 102 tests / 136 subtests. Controlled sparse-query path passes
+  GI Host → GA → Planner; explicit numeric omissions still reject.
+- `level-a/summary.json`: 45/45 Level A; no native robot claim.
+- `canonical-final.log`: 3,481 tests / 1,164 subtests, 145 benchmarks and 20 legacy
+  tests pass; two existing FastAPI deprecation warnings. Policy, ownership, static
+  analysis and docs checks pass.
+- `runtime-final.json`: restored host/deployed Agent both
+  `3e17a056a40e81dc199a5df3490ec102e47ba36e2917ce17577eed132699dd06`.
+- `prompt.before.txt`, `model_interpreter.before.py`: byte-identical to final
+  runtime source. `prompt.candidate-*` are rejected evidence, not resume targets.
+- `refreeze.py` was dry-run only; replay fixture responses/oracles are untouched.
+
+Retained changes are two GI tests, two downstream test variants and correction of
+one stale SC wording-owner sentence. No Git commit/push. Existing uncommitted work
+and Schema deduplication are preserved. Mic/ASR stay owner-accepted; whole
+Qualification stays open. No speedup or successful architecture migration is claimed.
+
+Next: owner checks Chromie using `./scripts/start_voice_mujoco.sh`, then decides the
+next data/training/architecture step. Do not keep broadening prompt rules without
+clear evidence; do not add a semantic reviewer or case-specific runtime rule.
+
+## GI Schema deduplication — 2026-09-15 (preceding)
+
+Owner authorized the reviewed bounded experiment. **Schema deduplication is
+implemented; model Qualification remains open.** Next work remains the owner's
+personal Chromie check and decision. No prompt rewrite, candidate pruning, weights,
+training promotion, commit or push. Microphone/ASR stay closed by owner-reported
+acceptance. Earlier sections retain their evidence and are superseded here.
+
+Base `a1ed4b4b22ee82ee846321b67df2d088d5226599`, uncommitted on `main`;
+origin fetched and divergence 0/0 before editing. Previous dirty work is preserved.
+Evidence root: `.chromie/acceptance/gi-schema-dedup-20260915/` (G below).
+
+### Implemented boundary and measured result
+
+GI primary and source-based Deep now reuse the existing
+`SourceBackedBindingString` definition for location/duration/speed. Every original
+character-slice value, applicability limit, context fallback, numeric alternative,
+field description and semantic owner remains unchanged. No new semantic decision
+or repair call is added. Tests preserve exact-source acceptance/rejection and
+numeric alternatives, and assert one serialized enum in the native request.
+
+| Boundary / evidence | Actual result and limit |
+| --- | --- |
+| Immutable example → GI Schema | The 39-character weather question previously copied one 748-value list three times. It now references one identical definition. Earliest redundant boundary repaired: request serialization, not human meaning. |
+| Frozen 12-case / 16-variant comparison | All 16 expanded schemas match exactly; messages/model/options unchanged. Baseline and candidate each pass Schema/DTO/Host 16/16, with byte-identical paired raw outputs. Four independent source-based Deep variant screens are not automatic repair calls. |
+| All 40 native calls | 32 full-cohort calls plus 8 interleaved warm calls pass mechanical checks. Model semantic failures remain identical. Partial rubric 8/16 is not complete acceptance: full review passes 1/16 under source-span, sparse-binding and uncertainty requirements. Cross-clause `parcel` vs `A parcel` preserves the same exact referent and is accepted. |
+| Actual weather request | 78,500 → 52,973 transmitted bytes (32.5% lower); compact Schema 58,409 → 32,882 bytes. Model input tokens remain 3,836. |
+| Measured execution cost | Request JSON serialization median 0.490 → 0.323 ms across 20 alternating blocks per arm. Four warm calls per arm: 4.3256 → 4.3312 s median; no end-to-end speedup established. First-observed latency is not proven cold compilation; no shared cache flush or model restart. |
+| Downstream scope | No GA/Planner/SC/Work/robot invocation in the role experiment. This is native GI evidence, not a whole-robot qualification or microphone proof. |
+
+Retain this small equivalent reduction in transmitted data/serialization cost; do
+not claim model-token, response-speed or accuracy gains, and stop before broader
+optimization. Full per-case review: G/`semantic-review.json`; comparison and source
+proof: `comparison.json`, `equivalence-proof.json`, `authority-audit.md`.
+The frozen corpus and requests contain no target labels during inference and
+remain training-ineligible. Review is not independent model qualification.
+
+### Validation and retained snapshots
+
+- Focused: **115 tests / 173 subtests** pass. Level A **45/45**.
+- Complete final workflow replay: **6,000/6,000 expected outcomes**, unchanged source;
+  `workflow-final-summary.json`. It does not measure model ability.
+- Final canonical gate: **3,477 tests / 1,161 subtests**, **145 benchmarks**,
+  **20 legacy tests** pass, including pinned static/policy/ownership/config checks;
+  two existing FastAPI warnings. G/`canonical-final.log` retains the result.
+  The earlier pre-refreeze gate was intentionally interrupted, not passed.
+- Final replay archive read-verified: **16,602 members**; owned temporary directory
+  removed. G/`workflow-archive-verification.json` retains this check.
+- First replay produced 4,585 exact GI request-snapshot mismatches, retained in
+  `workflow-before-refreeze-summary.json` and `workflow-before-refreeze.tar.gz`.
+  Only request Schema snapshots were then refrozen in **4,587 cases / 4,802
+  transactions**, with 505 artifact replacements. Expanded schemas match; all
+  messages, model outputs, expected outcomes, splits and training eligibility are
+  unchanged. `pre-schema-refreeze.tar.gz` retains originals;
+  `schema-refreeze-review.json` records proof. This extends the prior retained
+  request-only refreezes and never rewrites semantic answers to pass.
+
+### Runtime and resume
+
+Local Agent was rebuilt; host/container digest matches
+`3e17a056a40e81dc199a5df3490ec102e47ba36e2917ce17577eed132699dd06`
+in G/`agent-source-final.json`. Existing Agent/LLM/ASR/TTS remain healthy;
+no microphone or simulator was started in this pass. Paired Soridormi remains
+`fa6331f1344ce26154b197ca7d7c49badea292ad`. Native model stays
+`chromie-gemma4-12b`; GI prompts/budgets unchanged. The old exported GI example is
+an immutable pre-change snapshot; the new request is retained in
+G/`candidate/weather_en_today-primary.json`.
+
+For the owner's personal check, from the repository root:
+
+```bash
+./scripts/start_voice_mujoco.sh
+```
+
+Full Qualification is still blocked by the earlier native GI/Planner/SC failures
+and incomplete 51-case live coverage. This pass additionally retains exact GI
+source-span, time-field, capability-question-context and unresolved-referent
+failures; no semantic repair is claimed. Further prompt/data/training direction
+awaits the owner's decision. New current documents, environment variables and
+runtime flags: zero; no authority or architecture amendment.
+
+## Necessary engineering repair — 2026-09-15 (previous pass)
+
+**Bounded engineering repair is complete; full Qualification remains open.**
+The owner will personally check Chromie and decide subsequent work. Do not start
+another broad engineering/prompt optimization or training pass without that next
+instruction. Microphone/ASR remain **closed by owner-reported manual acceptance**.
+Earlier sections retain history and are superseded by this resume point.
+
+Uncommitted on `main`, base `a1ed4b4b22ee82ee846321b67df2d088d5226599`;
+origin fetched and upstream divergence 0/0 before editing. Paired Soridormi remains
+`fa6331f1344ce26154b197ca7d7c49badea292ad`. Prior dirty work, including the earlier
+request-only fixture refreezes, is preserved. Evidence root:
+`.chromie/acceptance/necessary-engineering-20260915/` (N below).
+
+### Implemented scope and evidence
+
+- Existing Fast native Schema now preserves GI-authored provider-required vocal
+  mode: only the qualified vocal provider with that exact supported mode may bind
+  that source. Missing/empty catalogs cannot substitute a body provider or invent
+  one. Independent body sources and valid same-mode composition remain available.
+- Existing Fast execution/delegation invariants are exposed as native state
+  alternatives. This Fast result cannot both commit new Capability Work and request
+  Deep for its unresolved decision. Complete execution and source-based delegation
+  remain different results; full Schema/DTO/Host checks remain independent.
+  This adds no semantic decision, retry, or authority. Already-committed other Work
+  is unaffected. It does not make Deep an execution-failure-only path: consequential
+  uncertainty may justify Deep before commitment; new execution Evidence can later
+  reactivate Planner. Invalid Fast output is not automatically repaired by Deep.
+- Seventeen mode/provider and nine execution/delegation regression cases were added.
+  Final focused checks: **347 tests / 68 subtests**. Final canonical
+  `canonical-decision.log`: **3,475 tests / 1,143 subtests**, **145 benchmarks**,
+  **20 legacy tests**, including pinned static/policy/ownership/config gates; two
+  existing FastAPI warnings. `workflow-decision-summary.json`: **6,000/6,000
+  expected outcomes**, unchanged source; archive read-verified (16,602 members).
+  `level-a-decision`: **45/45**. These do not establish model ability.
+- Final frozen native five-packet screen: **3/5** contract and semantic passes.
+  Reproduced provider substitution and execution/delegation contradictions disappear;
+  two cases still fail on upstream decomposition/Planner grounding or invalid input
+  questions. No prompts, model weights/profile/budget, corpus/oracles, current
+  documents, environment variables or runtime flags were added/changed in this pass
+  except the owned status documentation and Schema/tests described here.
+
+### Final real workflow and known failures
+
+Agent host/container source digest matches
+`3bf6b5fe26ca3b3218fcceecf3dc76f7ba8bdaa30c17fef6226d440919fa8a73`;
+`agent-source-decision.json` and `runtime-identity-decision.json` retain provenance.
+One complete directory-discovered 51-case cohort was attempted on that fixed image:
+**1/4 mechanical and 1/4 reviewed semantic passes; 47 unrun** after a contract failure.
+`decision-live-review.json` reviews all four cases, including the mechanical pass.
+All executed Work reached safe idle. All **10 SC calls** stopped normally (maximum
+**678 tokens**), with no repeated-output truncation or changed-words identity collision.
+This is injected-text/MuJoCo evidence with discarded playback, not physical proof.
+
+| Actual module / handoff | Input → actual output; expected output and verdict |
+| --- | --- |
+| Compound GI → GA → Fast, `a235ce54` | GI correctly preserves three ordered outcomes and left direction; GA preserves three Goals. Fast selects negative yaw `-0.12` for left, despite the provider direction contract. First wrong boundary: Planner realization. Expected positive-left command. |
+| Compound Runtime → Evidence → Planner/SC | Three selected commands complete, safe idle. Later cognition reports left complete; this is a downstream false outcome claim, not proof that the requested direction occurred. Ingress SC separately promised before planning. |
+| Gaze/blink GI → GA → Fast → Runtime → SC, `5d426735` | Two independent parallel outcomes → gaze 3 seconds and blink count 2 with correct bindings → both complete → supported final Chinese completion. Reviewed pass. |
+| Milk GI → GA → Fast, `2f4dc3ca` | Correct bring-milk outcome and available acquisition/delivery contract → Fast selects only walking at 0.15 m/s for 15 seconds as complete. Expected full resource outcome, or a grounded unresolved result. First wrong boundary: Fast selection/coverage. |
+| Milk Runtime → Evidence → Fast re-entry → SC | Only walking completes; acquisition/delivery provider never runs. Fast explicitly equates that Evidence with bringing milk; SC says it has the milk. Wrong semantic satisfaction and downstream false completion, plus an independent premature ingress promise. |
+| Singing GI → GA → Fast, `624a907a` | GI merges walking into one singing Responsibility; GA retains one Goal. Expected two independent outcomes. Fast invents a song-content gap tied to resource acquisition and omits required schema-inspection evidence. Full validation rejects before Work; no Deep call repairs it. |
+| Concurrent singing SC → playback | Without an established Plan/input Need, SC promises both actions and asks which song. Separate semantic overreach. Harness `cognitive_text_check_failure` text is not actual speech. |
+
+Exactly one final-aggregate debug bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260915_142752.tar.gz`.
+N/`root-cause-review.md`, `decision-native-review.json`, `decision-live-review.json`
+and `decision-native-llmcall_*.json` retain actual I/O and comparisons. The first
+mode-only aggregate stopped at 0/2 with bundle `chromie_debug_bundle_20260915_141612.tar.gz`;
+it diagnosed the native execution/delegation gap before the second repair.
+
+The previous R aggregate was 3/4 mechanical and 2/4 semantic; this final aggregate
+is worse. The frozen native milk control still passes, but stable aggregate semantic
+benefit/non-regression is **not established**. These are bounded existing-contract
+repairs, not evidence of general ability improvement or qualification closure.
+GI decomposition, Planner direction/whole-outcome satisfaction, SC promises and
+47 unrun cases remain open. Training/reference/hidden-family and #24/#32 closure
+are not inferred. No examples were promoted to training, and no commit/push occurred.
+Current-document/environment-variable/runtime-flag counts have no net growth.
+
+### Exact resume point: owner checks Chromie
+
+The owned headless simulator launcher was stopped only after retained safe-idle
+observations and the final bundle. Preexisting Agent/LLM/ASR/TTS remain healthy;
+Agent is rebuilt from the tested source. From the Chromie repository root, the
+normal personal test entrypoint starts the viewer and voice workflow:
+
+```bash
+./scripts/start_voice_mujoco.sh
+```
+
+No further microphone qualification is requested. Wait for the owner's experience
+and chosen next direction. Before any later source development, preserve this dirty
+work and fetch/check upstream again. Read N's reviews before choosing a repair;
+do not add phrase rules, automatic semantic repair calls or retry cases into a pass.
+Documentation updates after the aggregate only record results; its earlier captured
+source-tree hash does not represent those subsequent documentation edits.
+
+## Qualification repair — 2026-09-15 (previous pass)
+
+**Qualification remains open.** The general engineering changes pass the local
+checks, but the fixed Gemma model still fails semantic requirements in the native
+workflow. Microphone/ASR remain **closed by owner-reported manual acceptance**;
+they are not a blocker for this work. No fine-tuning, training-data promotion,
+commit or push occurred. Earlier sections are historical and superseded here.
+
+Uncommitted on `main`, base `a1ed4b4b22ee82ee846321b67df2d088d5226599`;
+upstream fetched/current before editing. Paired Soridormi remains
+`fa6331f1344ce26154b197ca7d7c49badea292ad`. Existing dirty work was preserved.
+Evidence root: `.chromie/acceptance/qualification-closure-20260915/` (R below).
+
+### Implemented and verified
+
+- SC generates reason and exact Need accounting before its Activity array, with
+  compact native JSON. Required questions use native ask branches consistent with
+  Host. The complete raw JSON Schema is validated before DTO/Host, including unions
+  and references skipped by the former argument-only validator.
+- The unchanged authoritative delivery ledger is presented before larger context.
+  With prior acts present, the native Schema offers eight fresh request-scoped IDs
+  and allows an old ID only with its original words. This preserves explicit
+  multi-act repetition and existing playback reuse; it does not select meaning.
+- Fast's aggregate disposition procedure uses distinct current per-Goal decisions.
+  Native timing branches preserve GI relations and provider compatibility. Bounds
+  common to every valid Work assignment are exposed before generation, preventing
+  completed response-only re-entry from reissuing Work.
+- Fast's selection procedure compares the whole requested terminal outcome with
+  Capability scope/effects; a prerequisite alone is not complete fulfillment.
+  Three stale GI/DTO descriptions now correctly name SC as the sole wording owner.
+- No case/phrase rules, second semantic judge/repair call, weights, budget, new
+  environment variable, runtime flag or current document were added. SC's semantic
+  system prompt is unchanged. Previous context/budget/order repairs are retained.
+
+### Current evidence and actual failure path
+
+- `canonical-final.log`: **3,449 tests / 1,143 subtests**, **145 benchmarks** and
+  **20 legacy tests** pass; pinned static, policy, ownership and config checks pass.
+  Two existing FastAPI warnings remain. SC focused: 157 tests / 40 subtests.
+- `workflow-final-summary.json`: **6,000/6,000 expected outcomes**, source unchanged.
+  `workflow-final.tar.gz` read-verified (16,602 members); Level A **45/45**.
+- SC native `sc-state-screen/identity-pool`: **10/10** structural and semantic passes;
+  `sc-owner-screen/identity-pool`: **12/12**, including actual EN/ZH conversation,
+  Work/Situation and direct-deep variants. These are bounded native screens.
+- Rebuilt Agent source matches host digest
+  `60a90b61f8067d39638f680f7e24acdcccdaf280bfd732422a5dd0299f86b935`.
+  `final-runtime-identity.json` binds exact source/corpus/services. Final full
+  51-case injected-text/MuJoCo aggregate: **3/4 mechanical passes**, **2/4 reviewed
+  semantic passes**, **47 unrun** after a hard failure. All completed Work reached
+  safe idle. No physical evidence is claimed; delivery uses a scripted provider mock.
+- All **10 SC calls** in that final aggregate stop normally (maximum **654 tokens**);
+  no repeated-output truncation or immutable-ID collision. Compound completion,
+  parallel gaze/blink and delivery all reach their final speech. Milk's initial
+  promise still exceeds its then-established planning facts.
+
+| Actual module / handoff | Input → actual output; expected boundary and verdict |
+| --- | --- |
+| Original SC primary → transport | Completed Work/Evidence + fresh Needs → repeated act until 1,024-token truncation. First wrong generation; transport correctly rejects partial JSON. Native decision order/compact format repairs the reproduced mechanism. |
+| Delivery SC → Host | Old acknowledgement in ledger + new terminal Evidence → reused old ID with new words, HTTP 422. Request-local ID/text branches repair this earliest mechanical gap; final delivery uses fresh ID and completes. |
+| Final GI, case `580989ad` | Exact walking-plus-singing source → one singing Responsibility, walking hidden in `comparison`; expected two independent outcomes and coordination. First semantic divergence. |
+| Final GA → Fast | One defective GI Responsibility → one Goal; GA preserves its authority and cannot invent the missing outcome. Fast selects walking for singing; existing typed-mode Host rejects before Work. |
+| Concurrent SC ingress → playback | No established Plan or input Need → promises both actions and asks which song. Separate semantic overreach; no repair call or literal phrase guard added. |
+| Final Runtime / Soridormi | Rejected Fast decision → no Work dispatch; aggregate stops incomplete. Retained source and failure evidence are not converted into a pass. |
+
+`root-cause-review.md` and `final-live-semantic-review.json` retain the complete
+module I/O review and prior iterations. Original/parallel/fetch final SIDs:
+`3e520d36`, `b583d3e7`, `3a1c7129`. Exactly one final-aggregate debug bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260915_134723.tar.gz`.
+
+### Review corrections and remaining blockers
+
+The previous SC completion screen's **5/10** semantic score is corrected to **7/10**:
+its two pending cases reused the exact existing identity/words; actual Host replay
+produced zero new syntheses. The three fresh-Need failures remain historical failures.
+The broad SC screen's initial **9/12** review is corrected to **12/12** because its
+frozen oracle permits useful conversation/question with Need pending. Host has no
+reverse covered-if-spoken invariant and pending metadata alone schedules no retry.
+Neither correction changes output, corpus or runtime state. See `pending-playback-proof.json`,
+`pending-review-correction.json` and `sc-owner-identity-review.json`.
+
+Native model qualification is still blocked by combined-outcome decomposition,
+exact modality/Capability preservation, premature promises/unestablished questions,
+and retained directional variation in earlier full iterations. Explicit existing
+contracts and complete source packets do not reliably produce the right semantics.
+The last 47 cases are unqualified. Fine-tuning/reference/hidden-family and #24/#32
+closure are not inferred from local passes. All retained cases remain training-ineligible.
+Do not add phrase patches or weaken these gates to obtain closure.
+
+Request-only fixture refreezes: aggregate prompt (4,605 cases), shared Work bounds
+(2,805), retired wording-owner descriptions (6,005). Responses, expected outcomes,
+scenario intent and training eligibility remain unchanged; originals are retained
+in `pre-prompt-refreeze.tar.gz`, `pre-bounds-refreeze.tar.gz` and
+`pre-owner-refreeze.tar.gz`, with per-change reviews. The large fixture diff is
+intentional. Failed identity/Need prompt trials, regex constraints and expanded
+Fast assignment schemas were not promoted.
+
+### Exact resume point
+
+Owned headless simulator launcher was stopped after retained safe-idle observations
+and the final bundle; preexisting LLM/Agent/ASR/TTS services remain. Agent is rebuilt
+from the tested source above. Documentation edits after the aggregate only record
+its results; they are not represented as part of the earlier captured tree hash.
+
+1. Read R/`root-cause-review.md`, `final-live-semantic-review.json` and the final
+   native packets before selecting another repair. The first unresolved boundary
+   is GI atomic decomposition; SC wording and Fast modality remain distinct owners.
+2. Preserve dirty work and fetch/check upstream before further source development.
+   Do not use a post-hoc model judge, literal utterance rules or automatic training
+   promotion. Model comparison/fine-tuning is not represented as a completed repair.
+3. For source changes, rerun the matching frozen native contrast cohort and the
+   complete live cohort on one rebuilt identity; do not retry isolated cases into
+   a revision pass. Retain one bundle at the aggregate stop and review every case.
+
+```bash
+python scripts/check_repository_policies.py
+./scripts/run_tests.sh
+python scripts/check_test_ownership.py
+python scripts/check_docs.py
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir /dev/shm/chromie-workflow-next
+python scripts/general_ability_acceptance.py --mode level-a --execute --evidence-dir .chromie/acceptance/level-a-next
+```
+
+Use new, unused evidence directories. To reproduce the broader native SC screen,
+run `python .chromie/acceptance/qualification-closure-20260915/sc_owner_screen.py
+next .chromie/acceptance/qualification-closure-20260915/sc-owner-screen/identity-pool/corpus`
+from repository root, with Gemma/SGLang at loopback 30000. Its original rubrics stay
+outside model packets. The ten-case script hardcodes its old output name; copy it
+with a new output name before re-execution so retained evidence is not overwritten.
+
+For full live evidence, start the paired Soridormi headless launcher from its repo,
+verify/rebuild Agent using `.env.runtime`, `docker-compose.yml`,
+`docker-compose.sglang.yml` and `.chromie/voice-runtime/compose.voice-mujoco.yaml`,
+then capture a fresh runtime identity. Retained Host input profile:
+`.chromie/acceptance/sc-completion-20260915/orchestrator.env` (text injection and
+ordered discarded playback). Run `scripts/general_ability_acceptance.py --mode
+live-text --stage must_pass --execute --runtime-identity <new-identity.json>
+--evidence-dir <new-directory>` with that profile; collect exactly one debug bundle
+after the aggregate. Do not rerun microphone/ASR as a prerequisite.
+
+## SC completion repair — 2026-09-15
+
+Microphone/ASR remain **closed by owner-reported manual acceptance**. This work
+uses native model calls and injected text/MuJoCo; it makes no physical claim.
+Uncommitted on `main`, base `a1ed4b4b22ee82ee846321b67df2d088d5226599`,
+upstream fetched/current before editing. Earlier sections retain prior iterations.
+
+Root cause of the retained failure: SC's primary result repeated an already
+complete communicative act, exhausting the 1,024-token output budget before JSON
+closure. Truncation was downstream containment. The original decoder permits a
+complete single-act response; an unchanged replay finished in 751 tokens. Thus
+neither insufficient budget nor mandatory act cardinality explains this case.
+
+The existing native Schema now presents disposition, reason and Need accounting
+before the variable-length Activity array. This changes generation order, not
+semantic authority, field meanings or allowed act count. The exact originating
+request reproduced duplicate-ID truncation before the repair, then completed with
+one unique act in 747 tokens in both ordered and final cohorts. This supports the
+field-order repair empirically; it does not prove universal model reliability.
+A separate native Schema gap exposed by the contrast run is closed: Memory arrays
+must be empty outside Situation ingress, matching existing Host validation.
+
+No semantic prompt, weights, output budget, retry/judge, case rule or single-act
+cap changed. Prompt-only and formatting-only trials did not qualify and were
+reverted. Explicit repetition with 2 or 8 distinct act IDs remains valid; duplicate
+IDs fail closed without a second model call. Situation Memory remains supported.
+
+| Module / actual handoff | Input → output and expected boundary |
+| --- | --- |
+| Origin GI/GA/Fast → Runtime | Three source Responsibilities and sequential actions → three completed simulator results with safe idle; observed correct |
+| Origin Fast → SC primary | Accepted return Plan, three fresh answer Needs and completion evidence → one complete act followed by identical ID/text/ref copies; first wrong boundary |
+| Origin transport → Host | 1,024 tokens of unfinished JSON → `output_truncated`, no partial resolution or playback; correct containment |
+| Repaired SC primary → Schema/DTO/Host | Same original packet with decision/coverage-first Schema → one act/747 tokens; valid multi-phase two-act controls retained |
+| Current live Fast evidence reentry | Three completed results → top-level `mixed` but every Goal `respond`; DTO rejects the contradiction before post-completion SC is invoked |
+| Current live Host → output | Retains completion evidence and safe idle; no TTS. The scenario fails; this is not evidence against or proof of post-completion SC behavior |
+
+Final evidence, rooted at `.chromie/acceptance/sc-completion-20260915/`:
+
+- `canonical-final.log`: **3,414 tests / 1,141 subtests**, 145 benchmarks and
+  20 legacy tests pass, including pinned static, policy, ownership and config gates.
+  Two existing FastAPI warnings remain. Focused SC: 120 pass.
+- `workflow-final-summary.json`: **6,000/6,000** expected outcomes, unchanged
+  source; `workflow-final.tar.gz` read-verified (10,601 members). Level A: **45/45**.
+- Frozen native `final/`: **10/10 mechanical Schema/DTO/Host passes**, versus
+  baseline 9/10. Semantic review is only **5/10**: fresh-Need silence and repetition
+  of already-queued speech remain failures. Language-selector contrasts do not
+  establish bilingual fidelity. No cases are training-eligible yet.
+- Rebuilt Agent's exact original request returns HTTP 200 with silence/pending:
+  no truncation, but required communication remains unqualified. Its packet matches
+  the direct call, demonstrating residual semantic variation.
+- Full 51-case native aggregate: **0/1 passed, 50 unrun**, stopped on the Fast
+  contradiction above (SID `246ded32`). All three simulator actions completed,
+  safe idle retained. Initial SC calls completed; post-completion SC was not called.
+  `live-semantic-review.json` judges the executed case. Exactly one debug bundle:
+  `/home/chromie/Downloads/chromie_debug_bundle_20260915_105607.tar.gz`.
+
+Agent source digest (host/container match):
+`cf147a18deb623c6b11fad69f91a7cc81b5b06313cb63924dbc4fd885bb8de22`.
+Paired Soridormi remains `fa6331f1344ce26154b197ca7d7c49badea292ad`.
+`runtime-identity.json`, `root-cause-review.json`, `semantic-review.json`, complete
+native packets and `tested-implementation.patch` retain the exact evidence.
+Owned simulator stopped after safe idle/bundle; preexisting services retained.
+No commit or push. No new current document, environment variable or runtime flag.
+
+Next: reproduce `live-fast-failed-native-call.json` at the Planner result boundary;
+repair the general top-level/per-Goal contract without rewriting model semantics.
+SC silence/queued-duplicate cases remain separate model-role qualification work.
+Use `PYTHONPATH=. python .chromie/acceptance/sc-completion-20260915/probe.py NAME`
+to rerun the frozen 10-case screen against the running native endpoint; review
+all outputs, not just mechanical passes. After another implementation change,
+rerun canonical gates and the complete live cohort with a fresh runtime identity.
+Fine-tuning/release readiness is not promoted by this targeted completion repair.
+
+## Engineering qualification — 2026-09-15
+
+Owner acceptance update (2026-09-15): microphone and ASR validation are closed
+for the current work based on the owner's report of personal testing and explicit
+acceptance. Do not schedule repeat microphone/ASR qualification as a prerequisite
+to continuing the engineering/fine-tuning preparation unless a new regression is
+reproduced. This is owner-reported manual acceptance, not an automated test artifact.
+The failed automated run below used injected text and bypassed microphone/ASR;
+its remaining SC generation and model/Runtime coverage failures are separate.
+
+Owner direction: move toward model fine-tuning by using cases to repair general
+engineering boundaries, without case-specific semantic rules. This is an
+uncommitted engineering pass on Chromie `main` at base
+`a1ed4b4b22ee82ee846321b67df2d088d5226599`; no commit or push was made. Upstream was
+fetched and current before development. Paired Soridormi was fast-forwarded to
+`fa6331f1344ce26154b197ca7d7c49badea292ad` on `codex/turn-count`, preserving its
+untracked submodule content. The earlier integration section is historical.
+
+Implemented at existing owners:
+
+- Planner required Goal, source, interaction and Evidence projections are lossless;
+  the existing transport admits the whole request, including output reserve.
+- Canonical Fast uses the existing request-local compact JSON format, preventing
+  the reproduced syntactic whitespace tail without changing shared model settings.
+- SC request construction reuses Context Assembly's current leaf projections,
+  removing the duplicate Conversation aggregate and retained Host task history.
+  Situation-selected relational memory is added after projection and retained.
+- Planner materialization can discharge an AFTER edge to completed source Work
+  only with exact source Plan/fingerprint, Goal/step and matching terminal Evidence.
+  The authored relation and proof remain in Need facts. Unknown, BEFORE and current
+  Work dependencies retain their checks; completion is not inferred Goal success.
+- SC native Schema now realizes its existing communicate/silence/deliberate states:
+  silence keeps needs pending; unresolved cognition commits no coverage or Memory.
+  SC still owns whether to speak and every word. No semantic retry/judge was added.
+
+No model weights, semantic prompt wording, global profile, case expectations,
+product switch or first-class architecture owner changed. No new current document
+or environment variable was introduced. A broader Fast native-assignment Schema
+experiment was reverted after the actual production schema failed compilation;
+its small decoder probe did not establish production validity.
+
+Observed workflow and responsible boundaries (same three-action probe, separate
+frozen revisions/iterations; all retained private artifacts under the path below):
+
+| Owner / handoff | Material input and observed output | Expected contract / disposition |
+| --- | --- | --- |
+| GI → GA and Fast; SC runs independently | Ordered walk at 0.2 for 10 seconds, two nods, left turn → three Responsibilities, canonical Goals and sequential Work; initial SC silent | Source bindings conserved and requested Work executed in the observed case; no speech delivery inferred |
+| Runtime / Soridormi → reentry | Three completed results, exact Plan/Goal/Evidence correlations and safe idle | Correct simulator completion; physical behavior unproven |
+| Planner projection | Baseline SID `fcc265bf`: 12,803-character Interaction context rejected by a 7,000-character section quota before inference | Fixed: complete request admission at transport; frozen 30-case contrast is lossless, including 20 formerly rejected cases |
+| CanonicalPlan materialization | SID `e17a70e4`: response-only Work referred to the exact completed `act_r1/r2/r3`; validation called them unknown new Work | Fixed mechanically from retained completion proof; bilingual Fast/Deep regressions also use a conditional information-acquisition episode |
+| Host → SC context | SID `97aa4cff`: repeated aggregate/leaf state produced 181,655 input characters and budget rejection before generation | Fixed at Context Assembly ingress; frozen request serialization 172,556 → 99,745 characters, retaining current owners and Evidence |
+| SC Schema → Host | SID `882fce75`: silence and three covered needs accepted by Schema, rejected by Host for absent verbal acts | Fixed existing decision-state invariant; 14 native contrasts pass in decoder field order. Exact frozen primary call now returns valid silence/pending, which still leaves the user update undelivered |
+| SC primary generation → transport | Final SID `a17ee0ea`: Fast return accepted; SC used 39,124 prompt tokens, repeated one Activity ID three times and reached the 1,024-token output cap | Remaining failure: incomplete primary result, correctly blocked as `output_truncated`; no post-result speech. Repetition is observed; its deeper cause remains unproven |
+
+Final automated evidence: `canonical-sc-final.log` passes 3,402 tests / 1,141
+subtests, 145 benchmarks and 20 legacy tests, including policy, test ownership,
+pinned static analysis, configuration and docs gates. Two existing FastAPI
+warnings remain. `workflow-sc-final-summary.json` passes all 6,000 expected outcomes
+with source unchanged (1,400 workflows, 1,800 states, 2,580 rejections, 220 expected
+nonexecution outcomes); archive contents were read back and verified.
+`level-a-sc-final/` passes 45/45. Focused SC tests pass 108; earlier context/order
+focused tests pass 169. These are not physical or model-ability qualification.
+
+Final native aggregate selected all 51 must-pass cases in one invocation and
+stopped on its first hard integrity failure: 0/1 passed, 50 unrun. The three
+simulator actions completed and safe idle was retained. Bundle collected exactly
+once at aggregate end:
+`/home/chromie/Downloads/chromie_debug_bundle_20260915_100642.tar.gz`.
+Earlier failed iterations and one disk-interrupted run are retained as failures;
+none were converted into passes. Bulk replay now uses temporary RAM storage and
+verified compressed retention to avoid repeating that disk interruption.
+
+Evidence root: `.chromie/acceptance/engineering-readiness-20260915/`.
+`engineering-review.json`, `manual-semantic-review.json`, frozen packets/corpora,
+`sc-final-truncated-native.json`, all logs and verified replay archives retain the
+case workflow and limits. Final live identity is `runtime-identity-sc-final.json`,
+SHA `db56da9f055ddb23af3a58a15115396142ca4050f5ad128c446600d29ad57303`, captured
+before these documentation updates. Agent packaged source matched host digest
+`9e777b256986bc982350ad38ef84275c8832b52bad97801b2903c681549b0c93`.
+`tested-implementation.patch` SHA is
+`62d293f059ede320c1ecbfb4b8dff7f3caf9fde5fb315fc780a5a2641fba2509`.
+The Agent remains rebuilt with these changes; the task-owned headless simulator/MCP
+launcher was gracefully stopped after observed safe idle. No operator Host was
+replaced. These are local observations, not portable process identities.
+
+Next: investigate SC primary Activity repetition and output-budget coverage from
+the retained complete request and partial response, preserving multi-act
+composability and independent wording authority. Do not force one act, rewrite
+semantic output, add case rules, or tune frozen expected results. A broader native
+cohort, independent reference review, hidden-family evaluation and #24/#32 closure
+remain open; fine-tuning/release readiness is not promoted. No training was run.
+
+Resume with fresh upstream verification and CHROMIE_RUNBOOK.md's machine-local
+profile/rebuild procedure. Recheck packaged Agent source and capture a fresh
+runtime identity. After any repair run `./scripts/run_tests.sh`,
+`python scripts/general_ability_acceptance.py --mode level-a --evidence-dir <new-path>`,
+and `python scripts/run_workflow_replay.py --workers 4 --evidence-dir <new-path>`
+(use sufficient temporary storage, then verify the retained archive). Follow focused
+proof with one complete `general_ability_acceptance.py --mode live-text --stage
+must_pass --execute --runtime-identity <new-identity> --evidence-dir <new-path>`
+invocation; keep source/services fixed through it, collect one debug bundle at its
+end, and judge every executed case. Private evidence does not accompany a clone.
+
 ## Integration delivery — 2026-09-15
 
 Owner authorization: integrate the newest remote SC design, resolve conflicts,

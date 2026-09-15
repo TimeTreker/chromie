@@ -447,7 +447,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "7b25e86b784e4479a84a7b45cda19ec73ef3a9c81fe2a762d58c8bf7b9fb90ab"
+          "$artifact": "0d4c719cfb6632d24180b2e66d38b5afbe85966b81ed63a6877e182f0f252cc5"
         }
       }
     }

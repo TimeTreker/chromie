@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from agent.app.social_cognition import SocialCognitionResolver
+from agent.app.social_cognition import SocialCognitionResolver, social_cognition_response_schema
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution, SocialCommunicativeAct
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy
@@ -605,7 +605,7 @@ async def test_goal_free_social_cognition_rejects_rewording_an_existing_activity
         "metadata": {"communicative_activity_ids": ["same-act"]},
     }]}
     model = FakeOllama({'disposition': 'communicate', 'activities': [{'activity_id': 'same-act', 'text': 'Changed words.', 'function': 'inform', 'truth_stage': 'context_grounded'}], 'reason_summary': 'Controlled SC decision.'})
-    with pytest.raises(ValueError, match="wording"):
+    with pytest.raises(ValueError, match="raw Schema rejected"):
         await SocialCognitionResolver(model, EmptyCatalog()).resolve(request)
     assert model.calls == 1
 
@@ -615,7 +615,7 @@ async def test_delegation_cannot_discard_an_authored_memory_result():
     request = request_for(goal_free_observation())
     fast = FakeOllama({'disposition': 'deliberate', 'activities': [], 'memory_candidates': [{'text': 'A shared event.', 'subject_refs': ['person:dad'], 'source_refs': request.opportunity.source_refs}], 'reason_summary': 'Controlled SC decision.'})
     deep = FakeOllama({'disposition': 'silence', 'activities': [], 'reason_summary': 'Controlled SC decision.'})
-    with pytest.raises(ValueError, match="cannot author a Memory decision"):
+    with pytest.raises(ValueError, match="raw Schema rejected"):
         await SocialCognitionResolver(fast, EmptyCatalog(), deep_model=deep).resolve(request)
     assert fast.calls == 1
     assert deep.calls == 0
@@ -627,8 +627,10 @@ async def test_goal_free_social_cognition_rejects_repair_of_unheard_activity():
     request.context["interaction_context"] = {"pending_speech": [{
         "text": "Unheard.", "metadata": {"communicative_activity_ids": ["pending"]},
     }]}
-    model = FakeOllama({'disposition': 'communicate', 'activities': [{'activity_id': 'repair-new', 'text': 'Correction.', 'function': 'repair', 'repair_of_activity_ids': ['pending'], 'truth_stage': 'context_grounded'}], 'reason_summary': 'Controlled SC decision.'})
-    with pytest.raises(ValueError, match="delivered"):
+    schema = social_cognition_response_schema(request, [])
+    fresh_id = schema['$defs']['SocialCommunicativeAct']['oneOf'][0]['properties']['activity_id']['enum'][0]
+    model = FakeOllama({'disposition': 'communicate', 'activities': [{'activity_id': fresh_id, 'text': 'Correction.', 'function': 'repair', 'repair_of_activity_ids': ['pending'], 'truth_stage': 'context_grounded'}], 'reason_summary': 'Controlled SC decision.'})
+    with pytest.raises(ValueError, match="raw Schema rejected"):
         await SocialCognitionResolver(model, EmptyCatalog()).resolve(request)
     assert model.calls == 1
 
@@ -673,7 +675,9 @@ async def test_goal_free_social_cognition_preserves_same_words_without_semantic_
     request.context["interaction_context"] = {"already_spoken": [{
         "text": "Hello.", "metadata": {"communicative_activity_ids": ["old-act"]},
     }]}
-    model = FakeOllama({'disposition': 'communicate', 'activities': [{'activity_id': 'old-act' if same_identity else 'new-act', 'text': 'Hello.', 'function': 'acknowledge', 'truth_stage': 'context_grounded'}], 'reason_summary': 'Controlled SC decision.'})
+    schema = social_cognition_response_schema(request, [])
+    fresh_id = schema['$defs']['SocialCommunicativeAct']['oneOf'][0]['properties']['activity_id']['enum'][0]
+    model = FakeOllama({'disposition': 'communicate', 'activities': [{'activity_id': 'old-act' if same_identity else fresh_id, 'text': 'Hello.', 'function': 'acknowledge', 'truth_stage': 'context_grounded'}], 'reason_summary': 'Controlled SC decision.'})
     result = await SocialCognitionResolver(model, EmptyCatalog()).resolve(request)
     assert result.activities[0].text == "Hello."
     assert model.calls == 1

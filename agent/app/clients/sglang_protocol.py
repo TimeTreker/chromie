@@ -84,10 +84,11 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         if schema.get("title") in {
             "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
-            "FastPlannerWorkAdvanceOutput",
+            "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
+            "FastPlannerWorkAdvanceOutput", "SocialCognitionOutput",
         }:
             # Formatting belongs to this request, never to the shared model's
-            # global settings. This also prevents the reproduced Deep/Skill JSON
+            # global settings. This also prevents the reproduced Planner/Skill JSON
             # whitespace loop; strings retain their exact model-authored content.
             schema["x-guidance"] = {"whitespace_flexible": False}
         return {

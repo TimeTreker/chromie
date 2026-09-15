@@ -9,7 +9,7 @@ import pytest
 from agent.app import deep_planner, fast_planner, planner_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
 from agent.app.planner_context import planner_goal_context
-from benchmarks.datasets.fast_planner_daily_life.qualification import CaptureModel, StaticCatalog
+from benchmarks.datasets.fast_planner_daily_life.qualification import StaticCatalog
 from shared.chromie_contracts.goal import GoalAssociation, GoalAssociationResolution
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.plan import FastPlannerStreamFailure
@@ -167,20 +167,16 @@ def test_fast_catalog_is_lossless_with_transport_owned_budget(variant):
 @pytest.mark.parametrize("variant", ["fast_plan_prompt", "fast_layered_prompt", "deep_plan_prompt", "deep_layered_prompt"])
 @pytest.mark.parametrize("language", ["en-US", "zh-CN"])
 @pytest.mark.parametrize("oversized", [False, True])
-def test_all_retained_goal_meanings_survive_or_prompt_rejects(variant, language, oversized):
+def test_all_retained_goal_meanings_survive_large_sections(variant, language, oversized):
     detail = ("Keep each qualification. " if language == "en-US" else "保留每个限定条件。") * (60 if oversized else 1)
     request = _retained_request(count=8, language=language, detail=detail)
     expected = list(planner_goal_context(request.context).authoritative_goals)
     original = copy.deepcopy(request)
-    if oversized:
-        with pytest.raises(ValueError, match="required prompt projection budget"):
-            _render_required(request, variant)
-    else:
-        prompt = _render_required(request, variant)
-        label = "FINAL CANONICAL GOALS JSON"
-        actual, _ = json.JSONDecoder().raw_decode(prompt.split(label + ":\n")[-1])
-        assert actual == expected
-        assert len(actual) == 8
+    prompt = _render_required(request, variant)
+    label = "FINAL CANONICAL GOALS JSON"
+    actual, _ = json.JSONDecoder().raw_decode(prompt.split(label + ":\n")[-1])
+    assert actual == expected
+    assert len(actual) == 8
     assert request == original
 
 
@@ -209,13 +205,10 @@ def test_required_planner_sections_keep_exact_boundary_payloads(
     empty_size = len(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
     record["data"] = ("界" if language == "zh-CN" else "x") * (budget + offset - empty_size)
     request.context[field] = payload
-    if offset > 0:
-        with pytest.raises(ValueError, match="required prompt projection budget"):
-            _render_required(request, variant)
-    else:
-        prompt = _render_required(request, variant)
-        actual, _ = json.JSONDecoder().raw_decode(prompt.split(label + ":\n")[-1])
-        assert actual == payload
+    prompt = _render_required(request, variant)
+    actual, _ = json.JSONDecoder().raw_decode(prompt.split(label + ":\n")[-1])
+    assert actual == payload
+
 
 
 @pytest.mark.parametrize("tier,field", [
@@ -224,40 +217,45 @@ def test_required_planner_sections_keep_exact_boundary_payloads(
     ("deep", "trusted_terminal_evidence"),
 ])
 @pytest.mark.parametrize("language", ["en-US", "zh-CN"])
-def test_required_context_rejection_prevents_inference_and_partial_commit(tier, language, field):
+def test_whole_request_budget_rejection_prevents_generation_and_partial_commit(tier, language, field):
     request = _retained_request(count=8, language=language)
-    # A small Goal scope plus one oversized required field distinguishes admission
-    # failure from malformed candidate output and preserves every fallback Goal ID.
+    from unittest.mock import patch
+    from agent.app.clients.ollama_client import OllamaClient
+
+    # Required context renders losslessly; the actual configured request budget
+    # remains enforced by the production client before any generation or commit.
     request.context[field] = {"correlation": "x" * 20000} if field == "interaction_context" else [{"data": "x" * 20000}]
-    model = CaptureModel()
+    model = OllamaClient(base_url="http://unused.invalid", model="fixed-test-model", purpose="fast_planner" if tier == "stream" else tier + "_planner")
     catalog = StaticCatalog([])
-    if tier == "stream":
-        async def stream():
-            return [frame async for frame in fast_planner.FastPlannerResolver(model, catalog).stream_advance(request)]
-        frames = asyncio.run(stream())
-        assert len(frames) == 1 and isinstance(frames[0], FastPlannerStreamFailure)
-        assert frames[0].failure_stage == "before_commit"
-        assert frames[0].presentation_commit_id is None
-        assert frames[0].failure_domain == "prompt_projection"
-        assert frames[0].retryable is False
-    else:
-        resolver = (fast_planner.FastPlannerResolver if tier == "fast" else deep_planner.DeepPlannerResolver)(model, catalog)
-        result = asyncio.run(resolver.resolve(request))
-        assert result.goal_ids == [f"goal-{index}" for index in range(8)]
-        assert result.steps == [] and result.response_text == ""
-        assert result.goal_outcomes == []
-        assert result.coverage == "uncertain"
-        assert result.metadata["attempt_count"] == 0
-        assert result.metadata["execution_allowed"] is False
-        assert result.metadata["failure_domain"] == "prompt_projection"
-        if tier == "fast":
-            assert result.metadata["path_classification"] == "contract_failure"
-    assert model.calls == []
+    with patch("agent.app.clients.ollama_client.httpx.AsyncClient") as http:
+        if tier == "stream":
+            async def stream():
+                return [frame async for frame in fast_planner.FastPlannerResolver(model, catalog, num_ctx=4096).stream_advance(request)]
+            frames = asyncio.run(stream())
+            assert len(frames) == 1 and isinstance(frames[0], FastPlannerStreamFailure)
+            assert frames[0].failure_stage == "before_commit"
+            assert frames[0].presentation_commit_id is None
+            assert frames[0].failure_domain == "llm_budget"
+            assert frames[0].retryable is False
+        else:
+            resolver = (fast_planner.FastPlannerResolver if tier == "fast" else deep_planner.DeepPlannerResolver)(model, catalog, num_ctx=4096)
+            result = asyncio.run(resolver.resolve(request))
+            assert result.goal_ids == [f"goal-{index}" for index in range(8)]
+            assert result.steps == [] and result.response_text == ""
+            assert result.goal_outcomes == []
+            assert result.coverage == "uncertain"
+            assert result.metadata["failure_class"] == "prompt_budget_exceeded"
+            assert result.metadata["failure_domain"] == "llm_budget"
+            assert result.metadata["retryable"] is False
+            if tier == "fast":
+                assert result.metadata["path_classification"] == "contract_failure"
+        http.assert_not_called()
+
 
 
 @pytest.mark.parametrize("language", ["en-US", "zh-CN"])
 @pytest.mark.parametrize("offset", [-1, 0, 1])
-def test_streaming_interaction_identity_is_complete_or_rejects(language, offset):
+def test_streaming_interaction_identity_survives_old_character_boundary(language, offset):
     request = _retained_request(language=language)
     payload = {"delivered_text": "", "activity_id": "last-delivery"}
     overhead = len(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
@@ -267,12 +265,9 @@ def test_streaming_interaction_identity_is_complete_or_rejects(language, offset)
         return str(planner_prompt.fast_advance_layered_prompt(
             request, responsibilities=request.responsibilities, capabilities=[], response_schema={},
         ))
-    if offset > 0:
-        with pytest.raises(ValueError, match="Interaction Context exceeds"):
-            render()
-    else:
-        # Verify the complete structured value, including the tail delivery identity.
-        assert json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) in render()
+    # Verify complete values, including the final delivery identity.
+    assert json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) in render()
+
 
 def test_streaming_capability_applicability_and_resource_tail_are_exact():
     capability = {
@@ -323,7 +318,43 @@ def test_deep_goal_snapshots_allocate_capacity_for_each_admitted_goal(count):
     assert actual == snapshots
     if count > 1:
         assert len(json.dumps(snapshots)) > 3200
-    # An oversized single Goal cannot borrow an unlimited fragment budget.
+    # A larger Goal preserves every qualification within the whole request.
     oversized = _retained_request(count=1, detail="qualification " * 500)
-    with pytest.raises(ValueError, match="required prompt projection budget"):
-        _render_required(oversized, "deep_plan_prompt")
+    prompt = _render_required(oversized, "deep_plan_prompt")
+    actual, _ = json.JSONDecoder().raw_decode(prompt.split("Active goals JSON:\n")[1])
+    assert actual == oversized.context["active_goal_snapshots"]
+
+
+@pytest.mark.parametrize("stage", ["advance", "fast", "deep"])
+def test_planner_source_handoff_survives_transport_without_truncation(stage):
+    import hashlib
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+
+    original = '  重庆：今天还是明天？\n' + ('保留标点、空格与原文。  ' * 180) + '\nlast detail: café ☔  '
+    request = cognitive_work_request(
+        sid="original-turn", text=original, outcome="Discuss the supplied comparison.",
+        context={"user_turn_envelope": {"turn_id": "original-turn",
+            "original_input": {"text": original}},
+            "goal_association_resolution": {"associations": [], "new_goals": [{
+                "goal_id": "goal-source", "description": "Discuss the supplied comparison.",
+                "metadata": {"output_mode": "speech"}, "bindings": [],
+            }]}},
+    )
+    transported = CognitiveWorkRequest.model_validate_json(request.model_dump_json())
+    if stage == "advance":
+        prompt = planner_prompt.fast_advance_layered_prompt(
+            transported, responsibilities=transported.responsibilities, capabilities=[],
+        )
+    elif stage == "fast":
+        prompt = planner_prompt.fast_plan_prompt(transported, [], response_schema={})
+    else:
+        prompt = planner_prompt.deep_plan_prompt(transported, [], response_schema={}, expected_goal_ids=["goal-source"])
+    tail = str(prompt).split("IMMUTABLE SOURCE TURN JSON", 1)[1]
+    header, body = tail.split("\n", 1)
+    source, _ = json.JSONDecoder().raw_decode(body)
+    assert source["original_text"] == original
+    assert source["original_text_sha256"] == hashlib.sha256(original.encode()).hexdigest()
+    assert source["turn_id"] == "original-turn"
+    assert source["authority"] == "read_only_source_provenance"
+    assert ("GI Responsibilities" if stage == "advance" else "FINAL CANONICAL GOALS") in header
+    assert str(prompt).count(json.dumps(original, ensure_ascii=False)) == 1

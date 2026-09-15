@@ -9,6 +9,7 @@ try:
     from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     from chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
+        VOCAL_MODES,
         VOCAL_PERFORMANCE_CAPABILITY_ID,
     )
     from chromie_contracts.plan import (
@@ -18,6 +19,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     from shared.chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
+        VOCAL_MODES,
         VOCAL_PERFORMANCE_CAPABILITY_ID,
     )
     from shared.chromie_contracts.plan import (
@@ -2095,6 +2097,21 @@ def fast_multi_goal_response_schema(
             }
             assignment_branches.append(branch)
         schema.setdefault("allOf", []).append({"anyOf": assignment_branches})
+        # Native decoders may ignore the cross-field intersection. Lift bounds
+        # shared by every already-valid assignment into the visible fields.
+        # This cannot select an assignment: every permitted judgment remains.
+        constraints = [branch["properties"] for branch in assignment_branches]
+        properties["disposition"]["enum"] = list(dict.fromkeys(
+            value for row in constraints for value in row["disposition"]["enum"]))
+        properties["steps"]["minItems"] = max(properties["steps"].get("minItems", 0), min(row["steps"]["minItems"] for row in constraints))
+        properties["steps"]["maxItems"] = min(properties["steps"].get("maxItems", 6), max(row["steps"]["maxItems"] for row in constraints))
+        for goal_id in allowed_goals:
+            fields = properties["goal_outcomes"]["properties"][goal_id]["properties"]
+            choices = [row["goal_outcomes"]["properties"][goal_id]["properties"] for row in constraints]
+            fields["disposition"]["enum"] = list(dict.fromkeys(
+                value for choice in choices for value in choice["disposition"]["enum"]))
+            fields["step_ids"]["minItems"] = min(choice["step_ids"].get("minItems", 0) for choice in choices)
+            fields["step_ids"]["maxItems"] = max(choice["step_ids"]["maxItems"] for choice in choices)
     elif len(allowed_goals) == 1 and requires_execution:
         # The single-Goal fast schema has no nested outcome map from which to
         # derive its aggregate.  Encode the same mechanical invariant directly:
@@ -2549,6 +2566,22 @@ def fast_advance_response_schema(
         item.local_ref for item in responsibility_items if item.output_mode == "speech"
     }
     capability_refs = [ref for ref in refs if ref not in ordinary_speech_refs]
+    vocal_modes = {item.local_ref: item.output_mode for item in responsibility_items
+                   if item.output_mode in set(VOCAL_MODES) - {"speech"}}
+    # Project already-authored GI timing onto both ends of each relation.
+    # Host validation enforces the same invariant; the decoder must not offer
+    # a contradictory label and rely on rejection after primary inference.
+    timing_choices = {ref: {"sequential", "parallel"} for ref in refs}
+    for item in responsibility_items:
+        for relation in ("before", "precedes", "after", "follows", "parallel_with"):
+            targets = item.bindings.get(relation, [])
+            targets = targets if isinstance(targets, list) else [targets]
+            for target in targets:
+                target = str(target).strip()
+                if item.local_ref in timing_choices and target in timing_choices:
+                    allowed = {"parallel" if relation == "parallel_with" else "sequential"}
+                    timing_choices[item.local_ref] &= allowed
+                    timing_choices[target] &= allowed
     covered = schema.get("properties", {}).get("covered_responsibility_refs")
     if isinstance(covered, dict):
         covered["items"] = {"type": "string", "enum": refs}
@@ -2749,18 +2782,44 @@ def fast_advance_response_schema(
                     "enum": [capability_id_value],
                 }
                 branch_properties["args"] = _ordered_capability_arguments(input_schema)
-                if capability.get("can_run_parallel") is False:
-                    branch_properties["timing"] = {"type": "string", "const": "sequential"}
-                branches.append(
-                    {
-                        "type": "object",
-                        "properties": branch_properties,
-                        "required": capability_required,
-                        "additionalProperties": False,
-                    }
-                )
+                # Match the Host's existing exact vocal-provider/mode invariant.
+                # GI has already authored the mode; this does not infer it from words.
+                modes: list[str | None] = [None]
+                if vocal_modes and capability_id_value == VOCAL_PERFORMANCE_CAPABILITY_ID:
+                    mode_contract = input_schema.get("properties", {}).get("mode", {})
+                    modes = list(mode_contract.get("enum", [mode_contract["const"]]
+                                 if "const" in mode_contract else VOCAL_MODES))
+                for mode in modes:
+                    timings_by_refs: dict[tuple[str, ...], list[str]] = {}
+                    for timing in ("sequential", "parallel"):
+                        if timing == "parallel" and capability.get("can_run_parallel") is False:
+                            continue
+                        compatible = tuple(ref for ref in capability_refs
+                            if timing in timing_choices[ref] and (ref not in vocal_modes or vocal_modes[ref] == mode))
+                        if compatible:
+                            timings_by_refs.setdefault(compatible, []).append(timing)
+                    for compatible, timings in timings_by_refs.items():
+                        properties = copy.deepcopy(branch_properties)
+                        if mode is not None:
+                            properties["args"]["properties"]["mode"] = {**mode_contract, "enum": [mode]}
+                        properties["timing"] = {"type": "string", "enum": timings}
+                        properties["source_responsibility_refs"]["items"] = {"type": "string", "enum": list(compatible)}
+                        properties["source_responsibility_refs"]["maxItems"] = len(compatible)
+                        branches.append({
+                            "type": "object", "properties": properties,
+                            "required": capability_required, "additionalProperties": False,
+                        })
             if branches:
                 capability_contract["oneOf"] = branches
+            elif isinstance(activity_items, dict):
+                # Contradictory source relations or incompatible providers leave
+                # clarification/escalation available, never executable leakage.
+                activity_items["oneOf"] = [branch for branch in activity_items.get("oneOf", [])
+                    if branch.get("$ref") != "#/$defs/FastPlannerCapabilityActivity"]
+    elif vocal_modes and isinstance(activity_items, dict):
+        # No catalog provider cannot become an invented vocal provider.
+        activity_items["oneOf"] = [branch for branch in activity_items.get("oneOf", [])
+            if branch.get("$ref") != "#/$defs/FastPlannerCapabilityActivity"]
     # Decide local Work before its redundant aggregate disposition.
     properties = schema["properties"]
     schema["properties"] = {
@@ -2935,6 +2994,31 @@ def fast_streaming_advance_response_schema(
     )
     compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
     compiled["title"] = "FastPlannerWorkAdvanceOutput"
+    # Native decoders do not enforce the conditional allOf contract. Keep that
+    # full validation and expose the same execution/delegation states as unions.
+    states = []
+    for disposition in compiled["properties"]["disposition"]["enum"]:
+        state = copy.deepcopy(compiled)
+        state.pop("allOf", None)
+        properties = state["properties"]
+        properties["disposition"] = {"type": "string", "enum": [disposition]}
+        if disposition in {"execute", "mixed", "respond"}:
+            properties["coverage"] = {"type": "string", "enum": ["complete"]}
+        if disposition == "escalate":
+            properties["coverage"] = {"type": "string", "enum": ["partial", "uncertain"]}
+            properties["continuations"] = {"type": "array", "items": {"enum": ["deep_planner"]},
+                                            "minItems": 1, "maxItems": 1}
+            items = properties["activities"]["items"]
+            alternatives = [item for item in items.get("oneOf", [items])
+                if item.get("properties", {}).get("role", {}).get("enum") != ["capability"]]
+            if alternatives:
+                properties["activities"]["items"] = {"oneOf": alternatives}
+            else:
+                properties["activities"]["maxItems"] = 0
+        else:
+            properties["continuations"] = {"type": "array", "enum": [[]]}
+        states.append(state)
+    compiled["oneOf"] = states
     return compiled
 
 

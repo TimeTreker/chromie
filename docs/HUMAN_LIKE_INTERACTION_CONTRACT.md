@@ -253,13 +253,20 @@ before its terminal planning member. Deep Goal Interpretation is reserved for ge
 in the person's intended outcome, scope, or referent; it is not an external-evidence
 lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
 For a conversational Responsibility, GI describes the communicative obligation or
-proposition and never the sentence Chromie will say; Planner remains the only exact-
-wording owner. Absence of accepted assistant dialogue is represented once by the empty
+proposition and never the sentence Chromie will say; Social Cognition remains the
+only exact-wording owner. Absence of accepted assistant dialogue is represented once by the empty
 bounded dialogue, never by a textual sentinel that a model could repeat as semantic
 content. A `prior_assistant_utterance` binding is available only when the same bounded
 request supplies a real accepted assistant utterance, and its value must equal the
 exact projected text. New item and repetition quantities cross GI under the single
 canonical positive-integer binding `count`.
+The complete GI outcome preserves material details and their attachment. The Host
+also passes the full immutable original input to Planner without asking GI to
+copy it. A clear information query can retain its subject, place and relative
+period in that outcome without duplicate entity/attribute/time classification;
+Planner maps it to provider parameters. Original wording is evidence, not permission
+to add an omitted Responsibility. Counts, measurements, activation and field-specific
+Goal updates still carry the typed evidence required by their mechanical guards.
 The primary GI result owns its complete Responsibility inventory and cites the
 authoritative admitted turn directly. Each Responsibility carries the inclusive
 source-token span grounding its complete positive predicate, its provider-neutral

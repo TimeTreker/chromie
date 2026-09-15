@@ -58,16 +58,19 @@ def _bounded_scalar(value: Any, max_chars: int) -> str:
 
 
 
-def required_json(value: Any, max_chars: int, *, label: str) -> str:
+def required_json(value: Any, max_chars: int | None, *, label: str) -> str:
     """Return one required prompt projection losslessly or fail explicitly.
 
     Use this for authoritative transaction inputs whose omission would change the
     model's decision surface. Optional/background prompt context may still use
-    ``bounded_json``.
+    ``bounded_json``. Pass ``None`` when the transport owns admission of the
+    complete request against the configured model context budget.
     """
 
-    max_chars = max(4, int(max_chars))
     text = _encode(value)
+    if max_chars is None:
+        return text
+    max_chars = max(4, int(max_chars))
     if len(text) > max_chars:
         raise RequiredPromptProjectionError(
             label=label, chars=len(text), max_chars=max_chars

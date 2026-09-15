@@ -816,10 +816,17 @@ The exact `original_input.text` is projected once and without truncation into th
 GI prompt. `CognitiveWorkRequest.source_turn_provenance` then computes a compact read-only
 projection from the same envelope for GA and Planner; it is not another persisted copy.
 The projection preserves the exact text and Host-verifiable digest while omitting the full
-Gateway envelope and runtime correlation IDs from model prompts. Visibility does not move
+Gateway envelope. Planner receives the source turn ID, text digest and provenance
+authority with the exact text; pre-GA Fast names GI Responsibilities, while canonical
+Fast/Deep names final Goals as WHAT authority. Visibility does not move
 semantic authority: GI owns current-turn WHAT, GA owns longitudinal association and
 canonical Goal continuity, and Planner owns HOW from accepted Responsibilities/Goals. A
 downstream mismatch is fail-closed evidence, not permission to reconstruct missing WHAT.
+The complete outcome can own query details without duplicate classified bindings.
+Planner may copy a required non-numeric string only when it occurs literally in both
+its owning outcome and original source, or satisfies the existing typed grounding
+contract. This check establishes provenance, not semantic correctness of the mapping.
+Counts, measurements, activation and field-specific Goal updates retain typed evidence.
 
 ## 5. Goal understanding and planning
 

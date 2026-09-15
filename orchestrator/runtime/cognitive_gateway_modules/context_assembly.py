@@ -46,7 +46,7 @@ class ContextAssembly:
         capture: GatewayTurnCapture,
         context: dict[str, Any] | None,
     ) -> GatewayContextSnapshot:
-        copied = self._project_context(context)
+        copied = self.project_context(context)
         captured_at = self._aware_now()
         references = self._references(copied, captured_at=captured_at)
         encoded = json.dumps(
@@ -67,7 +67,7 @@ class ContextAssembly:
         )
 
     @classmethod
-    def _project_context(
+    def project_context(
         cls,
         context: dict[str, Any] | None,
     ) -> dict[str, Any]:
@@ -77,8 +77,9 @@ class ContextAssembly:
         aggregate for downstream compatibility while also publishing the leaf
         projections used by the maintained Core. Copying both into the Gateway
         snapshot double-counts the same semantic state and lets a bounded
-        conversation grow past the snapshot byte contract. The Gateway owns the
-        ingress projection: top-level leaf owners win, while aggregate-only legacy
+        conversation grow past the snapshot byte contract. Context Assembly owns
+        this projection for Gateway and Social Cognition
+        ingress: top-level leaf owners win, while aggregate-only legacy
         callers are mechanically flattened without reinterpreting their meaning.
         """
 
@@ -102,13 +103,21 @@ class ContextAssembly:
                 "task_contexts",
             }
         }
-        if not isinstance(conversation, dict):
-            return projected
-
-        for key in cls.CONTEXT_SOURCES:
-            if key in projected or key not in conversation:
-                continue
-            projected[key] = deepcopy(conversation[key])
+        if isinstance(conversation, dict):
+            for key in cls.CONTEXT_SOURCES:
+                if key in projected or key not in conversation:
+                    continue
+                projected[key] = deepcopy(conversation[key])
+        # Legacy callers may supply these facts without their canonical owner.
+        # Removing an absent owner's only projection would lose required facts.
+        for owner, leaves in {
+            "mind": ("core_principles", "long_term_goals", "experience_tuning_policy"),
+            "session_memory": ("memory_summary", "extracted_memory"),
+        }.items():
+            if owner not in projected:
+                for key in leaves:
+                    if key in source:
+                        projected[key] = deepcopy(source[key])
         return projected
 
     def _references(

@@ -57,14 +57,80 @@ bounded `ValueError` on malformed input. Agent model paths now require their
 configured Ollama client through an explicit `RuntimeError` instead of a
 production `assert`.
 
-Planner required-context overflow is a projection admission failure. The existing
-`required_json` boundary raises `RequiredPromptProjectionError` with the section,
-actual character count and unchanged budget; no required payload is shortened.
-Fast/Deep resolvers retain `required_context_over_budget` in the
-`prompt_projection` failure domain, `attempt_count=0`, `retryable=False` and
-`execution_allowed=False`. Canonical Fast uses the existing `contract_failure`
-containment, so Host does not invoke Deep to repair an incomplete input. Deep
-uses its empty rejected-Plan materializer; it authors no clarification speech.
+Planner required Work inputs are serialized losslessly. Their accumulated Goal,
+interaction, source, dialogue and terminal-evidence context shares the configured
+whole-request model budget instead of fixed per-section character quotas. The
+transport owns admission, including output reservation and safety margin; SGLang
+verifies estimate overflow with its serving tokenizer. True overflow retains
+`prompt_budget_exceeded` in `llm_budget` and fails before generation. Independently
+bounded owners elsewhere still use `required_json` and retain
+`required_context_over_budget` in `prompt_projection`; they never shorten a required
+payload. Fast/Deep failures remain non-retryable and authorize no execution.
+Canonical Fast uses `contract_failure` containment, so Host cannot invoke Deep to
+repair a technical failure. Deep returns an empty rejected Plan, without invented
+clarification speech. Streaming returns a typed `before_commit` failure.
+
+SC uses the existing Context Assembly projection before inference: current leaf
+owners replace duplicate Conversation aggregate and retained Host task history.
+Situation-specific disclosure-safe relational memory is selected after that
+projection. The complete retained request still passes ordinary transport budget
+admission; no required fact is shortened to fit a local section quota.
+
+An AFTER dependency on completed source Work may be discharged only by Planner
+envelope materialization with matching source Plan identity/fingerprint, scoped
+Goal/step ownership and retained terminal observation/hash. The authored relation
+and completion proof remain in communication Need facts. Unknown references,
+BEFORE dependencies and references to new Work are not discharged; ordinary
+CanonicalPlan/Runtime ordering checks still reject invalid dependencies.
+
+GI's short-turn source-spelling constraints share one `SourceBackedBindingString`
+definition for location, duration and speed. The original character-slice values,
+40-character applicability bound and context-dependent fallback remain unchanged;
+references reduce repeated wire data without selecting meaning or relaxing Host
+provenance checks. Primary and source-based Deep use the same definition. Native
+Schema bytes are not necessarily model input tokens or inference latency savings.
+
+Canonical Fast uses the same request-local compact-JSON formatting as streaming
+Fast and Deep to prevent unbounded syntactic whitespace. No string postprocessing
+or shared model setting changes occur. Cross-field Work restrictions remain in
+the authoritative Schema and DTO/Host validators: native decoder acceptance alone
+is not proof of Schema, DTO, Host or semantic correctness. Bounds shared by every
+valid Fast Work assignment are also exposed in native-visible fields; a
+response-only re-entry cannot emit completed Work again. Advance branches preserve
+GI timing relations and provider compatibility before generation. Provider-required
+vocal sources may bind only the qualified vocal provider with the exact GI-authored
+supported mode; unavailable/empty catalogs cannot substitute another provider.
+Streaming decision-state alternatives also expose existing execution/delegation
+invariants: execute/respond/mixed have complete accounting, normal outcomes have
+no continuation, and escalation has one Deep continuation and no new Capability
+commitment. Already-committed Work and later Evidence-triggered re-entry are
+unchanged; this does not restrict Deep to execution failures. Full conditional
+Schema and DTO/Host validation remain independent. Expanding whole
+Fast Work assignments into native branches was rejected after production-schema
+compiler/contrast failures; the retained projection does not select an assignment
+or establish semantic qualification of general Work.
+
+SC's existing decision states are also explicit native alternatives: communicate
+contains acts, silence contains no acts and keeps needs pending, and deliberation
+commits neither coverage nor Memory. Host independently requires every covered
+Need to have an exact addressed verbal act. This mechanical Schema rule does not
+select speech or reinterpret a pending Need as fulfilled. Native generation presents
+reason, Need accounting and disposition before the Activity array and uses compact
+JSON; this preserves DTO meaning and multi-act outputs. Question-kind/phase branches
+match existing Host requirements. Outside Situation ingress, both Memory proposal
+arrays are constrained empty, matching Host authority. The complete raw JSON Schema
+is checked before DTO/Host, including references and native union alternatives.
+
+SC presents the unchanged delivery ledger before larger context without mutating
+the retained request/digest. If prior act identities exist, native alternatives
+offer fresh request-scoped IDs or reuse an existing ID only with its original
+normalized words. Runtime still owns atomic playback reuse and immutable identity
+validation. Distinct repeated acts remain expressible up to the existing eight-act
+bound. Reusing the same existing ID and words is not new playback; an explicitly
+distinct repeat is a separate act. Duplicate IDs within one result, changed words
+under an old ID, or output truncation fail closed. None permits a partial act,
+forced single act, semantic retry, or second model repair.
+
 The same containment applies to result, provider, time and Situation re-entry:
 returned technical failures and thrown call errors are retained as failed workflow
 stages before adaptation or commitment. A Fast technical failure cannot invoke

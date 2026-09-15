@@ -101,24 +101,15 @@ def immutable_source_turn_prompt(
         "\n\nGI unresolved-meaning evidence (exact strings or empty):\n"
         + required_json(
             request.interpretation_unresolved,
-            1200,
+            None,
             label="GI unresolved-meaning evidence",
         )
     )
-    if what_authority == "GI Responsibilities":
-        projection = json.dumps(
-            {"original_text": source["original_text"]},
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-        return (
-            "IMMUTABLE SOURCE TURN JSON (exact/read-only; GI Responsibilities "
-            "own WHAT):\n"
-            f"{projection}{unresolved}"
-        )
     projection = json.dumps(
         {
             "original_text": source["original_text"],
+            "turn_id": source["turn_id"],
+            "original_text_sha256": source["original_text_sha256"],
             "authority": source["authority"],
         },
         ensure_ascii=False,
@@ -126,8 +117,8 @@ def immutable_source_turn_prompt(
     )
     return (
         "IMMUTABLE SOURCE TURN JSON (read-only; "
-        f"{what_authority} own WHAT; Planner may preserve exact wording or realize "
-        "bound HOW, never reinterpret or repair WHAT):\n"
+        f"{what_authority} own WHAT; Planner may use complete intent and exact source "
+        "to realize HOW, never reinterpret or repair WHAT, add omitted outcomes or resolve GI ambiguity):\n"
         f"{projection}{unresolved}"
     )
 
@@ -149,7 +140,7 @@ def trusted_target_evidence_prompt_section(context: dict[str, Any]) -> str:
         return "No trusted semantic target evidence is available.\n"
     return (
         "Trusted semantic target evidence JSON:\n"
-        f"{required_json(target_evidence, 1400, label='Planner target Evidence')}\n"
+        f"{required_json(target_evidence, None, label='Planner target Evidence')}\n"
         "This evidence may ground a primary targeted Capability only when its exact "
         "semantic target matches the owning Responsibility and the Capability declares "
         "the corresponding argument_realization. Copy the supplied target_ref exactly. "
@@ -170,7 +161,7 @@ def future_readiness_contract(goal_context: PlannerGoalContext) -> str:
     reached_contract = (
         "The Host's clock comparison for this invocation confirms that these exact "
         "canonical ready_at times have ALREADY ARRIVED (Goal ID to due_at_ms): "
-        + required_json(reached_times, 3200, label="Planner reached Goal readiness")
+        + required_json(reached_times, None, label="Planner reached Goal readiness")
         + ". Their original source wording may still describe a future intention; "
         "that wording does not override the current Host readiness fact. Do not wait "
         "for or reschedule the same readiness time again. Evaluate the next Plan "
@@ -183,7 +174,7 @@ def future_readiness_contract(goal_context: PlannerGoalContext) -> str:
         return reached_contract
     return reached_contract + (
         "These exact canonical Goals are not yet ready; their typed ready_at is in the future: "
-        + required_json(goal_times, 3200, label="Planner future Goal readiness")
+        + required_json(goal_times, None, label="Planner future Goal readiness")
         + ". For each, author a respond outcome acknowledging future reconsideration and "
         "one time_condition with the exact goal_id and due_at_ms. Author no current step, "
         "reuse, cancellation, confirmation, or auxiliary action on that Goal's behalf. "
@@ -203,7 +194,7 @@ def cancellation_reporting_contract(context: dict[str, Any], goal_ids: frozenset
         return ""
     return (
         "This invocation reports trusted cancellation control only for these original Goals: "
-        + required_json(sorted(goal_ids), 3200, label="Planner cancellation scope")
+        + required_json(sorted(goal_ids), None, label="Planner cancellation scope")
         + ". Their WHAT remains unchanged. Use respond for the factual report, including "
         "an unsuccessful or uncertain cancellation. Complete coverage means the report "
         "accounts for the control result; it does not fulfill the original effect Goal. "
@@ -220,7 +211,7 @@ def cancellation_reporting_contract(context: dict[str, Any], goal_ids: frozenset
         "Distinguish cancelled, not_cancelled, and uncertain exactly as the trusted Evidence "
         "records; never claim a successful stop from an attempt or released token.\n"
         "Catalog facts for control reporting JSON:\n"
-        + required_json(context.get("planner_cancellation_capability_facts") or [], 24000,
+        + required_json(context.get("planner_cancellation_capability_facts") or [], None,
                         label="Planner cancellation catalog facts")
         + "\n"
     )
@@ -261,35 +252,35 @@ def _canonical_work_prompt(
         "Situation": situation_prompt_projection(context),
         "Future readiness": dict(goals.future_goal_times),
     }
-    # Required evidence and identity sections have independently bounded owners.
-    # Reject an oversized section before inference rather than truncating a tail
-    # qualifier or borrowing another section's unused capacity.
+    # Preserve required Work context, including accumulated execution evidence.
+    # The transport admits the complete prompt against the configured model
+    # context budget; independent character quotas reject valid re-entry inputs.
     required_sections = (
-        ("trusted_terminal_evidence", "Host-bound terminal Evidence JSON", 6000, 6000),
-        ("canonical_plan_resolution", "Authoritative source Plan JSON for exact re-entry correlation", 5000, 5000),
-        ("trusted_execution_outcome", "Trusted execution outcome truth JSON (mechanical status/qualification only; Planner owns meaning)", 5000, 5000),
-        ("planner_reentry_expectations", "Prior Planner-authored step expectations JSON (prospective hypotheses, never Evidence)", 3600, 3600),
-        ("trusted_goal_cancellation_evidence", "Host-bound Goal cancellation Evidence JSON", 3200, 3200),
-        ("active_task_snapshots", "Active and recoverable task bindings JSON", 5000, 6000),
-        ("existing_work_activities", "Existing retained or provisional Runtime Activities JSON", 3500, 4000),
-        ("interaction_context", "Goal-scoped Interaction Context JSON", 7000, 8000),
-        ("verified_tool_memory_index", "Verified tool-memory index JSON (provenance and bound arguments only; no result contents)", 5000, 6000),
+        ("trusted_terminal_evidence", "Host-bound terminal Evidence JSON"),
+        ("canonical_plan_resolution", "Authoritative source Plan JSON for exact re-entry correlation"),
+        ("trusted_execution_outcome", "Trusted execution outcome truth JSON (mechanical status/qualification only; Planner owns meaning)"),
+        ("planner_reentry_expectations", "Prior Planner-authored step expectations JSON (prospective hypotheses, never Evidence)"),
+        ("trusted_goal_cancellation_evidence", "Host-bound Goal cancellation Evidence JSON"),
+        ("active_task_snapshots", "Active and recoverable task bindings JSON"),
+        ("existing_work_activities", "Existing retained or provisional Runtime Activities JSON"),
+        ("interaction_context", "Goal-scoped Interaction Context JSON"),
+        ("verified_tool_memory_index", "Verified tool-memory index JSON (provenance and bound arguments only; no result contents)"),
     )
-    for key, label, fast_budget, deep_budget in required_sections:
+    for key, label in required_sections:
         if key in context:
             sections.append("\n" + label + ":\n" + required_json(
-                context[key], fast_budget if tier == "fast" else deep_budget, label=label,
+                context[key], None, label=label,
             ) + "\n")
     if context.get("active_goal_snapshots"):
         sections.append("\nActive goals JSON:\n" + required_json(
-            context["active_goal_snapshots"], max(3200, 3200 * len(scope)), label="Active goals",
+            context["active_goal_snapshots"], None, label="Active goals",
         ) + "\n")
     projections.update({key: context.get(key) for key in (
         "result_evidence_reentry", "planner_cancellation_capability_facts",
         "provisional_safe_work",
     )})
     sections.append("Trusted Work planning facts JSON:\n" + required_json(
-        projections, max(30000, 6000 * len(scope)), label=tier + " Planner complete Work facts",
+        projections, None, label=tier + " Planner complete Work facts",
     ))
     sections.append(
         "\n" + PLANNER_WORK_AUTHORITY_PROMPT +
@@ -316,9 +307,11 @@ def _canonical_work_prompt(
         "A missing provider or unsupported output mode is unavailable, not an input gap "
         "that the user can repair by selecting content. SC asks a genuine input question; "
         "do not write that question in rationale. unavailable/refused retain "
-        "the unmet requirement and its grounded limitation. Top-level disposition must aggregate "
-        "the per-Goal dispositions: execute plus respond is mixed, even if the response is "
-        "realized separately by SC. mixed accounts for independent siblings without dropping any. "
+        "the unmet requirement and its grounded limitation. Compute top-level disposition from "
+        "the set of current per-Goal dispositions: if the set has one value, use that value; "
+        "use mixed only when the set has multiple distinct values. Goal count, multiple "
+        "completed actions and earlier Work do not make current identical outcomes mixed. "
+        "This aggregate never changes a per-Goal judgment or drops an independent sibling. "
         "An input gap does not erase an independent answer obligation. No field authorizes user "
         "consent. Set user_confirmation_required=true for provider-gated Work or a material "
         "safe_adjustment/alternative; explain that material change as a planning fact, not a "
@@ -383,7 +376,7 @@ def _canonical_work_prompt(
         "tier, exact Goal IDs and communication-need identities after validation.\n\n"
         + immutable_source_turn_prompt(request)
         + "\nFINAL CANONICAL GOALS JSON:\n"
-        + required_json(list(goals.authoritative_goals), max(4500, 1800 * len(scope)), label="Planner exact final Goal scope")
+        + required_json(list(goals.authoritative_goals), None, label="Planner exact final Goal scope")
     )
     sections.append(future_readiness_contract(goals))
     sections.append(cancellation_reporting_contract(context, goals.cancellation_reentry_goal_ids))
@@ -405,7 +398,7 @@ def fast_advance_layered_prompt(
     contract = PLANNER_WORK_AUTHORITY_PROMPT + (
         "GI owns WHAT. This Fast invocation decides Work over exact Responsibility refs while "
         "GA independently binds canonical Goals. Produce one complete Work DTO. No presentation "
-        "frame, wording, progress act or optional social decoration. SC independently communicates. "
+        "wording or decoration; SC communicates independently. "
         "Use role=capability for direct executable task Work: activity_id, exact capability_id, "
         "args, source_responsibility_refs and timing. Use role=complete_response only for a "
         "language response. Use role=clarification only when a required input is actually missing; "
@@ -414,36 +407,39 @@ def fast_advance_layered_prompt(
         "response for a Responsibility already assigned an Activity. The top disposition is "
         "execute for capability-only Work, respond for response-only Work, clarify for input-only "
         "needs, mixed when distinct Responsibilities require different roles, or escalate. "
-        "A complete_response role establishes an ordinary speech obligation from context, not an "
-        "utterance or delivered result; include its grounding rationale. A clarification role "
-        "establishes exact missing inputs with typed information_gaps, not question wording. "
+        "complete_response establishes a context-grounded speech obligation, never delivered speech; "
+        "include its rationale. clarification supplies typed information_gaps, never wording. "
         "Only ordinary speech Responsibilities admit complete_response; information acquisition, "
         "physical/durable effects, vocal performance and media need their qualified providers. "
         "Do not confuse the person's intended activity with a robot action. "
-        "Use only available catalog Capabilities matching the full semantic scope and args schema. "
+        "Match each whole requested outcome against Capability semantic_scope, effects and "
+        "resource_contract; select only a complete realization with valid arguments. "
+        "A prerequisite is not fulfillment. If several steps are needed "
+        "and no listed Capability owns the complete workflow, delegate once to Deep before dispatch; "
+        "never mark a partial first action as complete or leave intended later Work only in reason_summary. "
         "Preserve every numeric and named binding through declared argument_realization; "
-        "repetition requires a supported count argument. Never invent an unbound required argument, "
+        "repetition requires a supported count argument. A required non-numeric string may "
+        "copy a literal in both its owning outcome and original input without a duplicate "
+        "binding; never borrow sibling values or contradict bindings. Realize the complete "
+        "query scope into provider date/period without changing meaning. Never invent an argument, "
         "target or low-level control. Target references require exact trusted target Evidence. "
         "Fresh information without Evidence requires an exact acquisition Capability, not asking "
         "the user for the result. Generic speech and stop/emergency are not task Capabilities. "
         "Clarification requires a real user-resolvable blocker after considering authoritative "
         "context, observation/query, preference, schema defaults and safe bounded defaults. "
-        "Each gap cites exact GI unresolved_meaning or execution_input Capability and required_for "
-        "keys; include resolution_sources_considered. A supplied binding or default is not missing. "
+        "Each gap cites exact unresolved_meaning or execution_input Capability, required_for and "
+        "resolution_sources_considered. Supplied bindings/defaults are not missing. "
         "Preserve every GI unresolved item; independent siblings may proceed as mixed. "
         "Cover every source ref exactly and give each terminal Responsibility one outcome. "
         "Preserve before/after/precedes/follows/parallel_with in Activity order and timing. "
-        "All ordered Activities explicitly use timing=sequential, including communication Needs. "
-        "Physical Work stays sequential. Parallel provider Work must form a genuine compatible "
-        "group. Requested speech before/after Work becomes an ordered obligation; do not erase "
-        "that order because SC realizes it later. Execute only direct, fully grounded Work within "
+        "Ordered Activities, including communication Needs, use timing=sequential. Physical Work "
+        "stays sequential; parallel Work requires a compatible group. Preserve requested speech "
+        "order even though SC realizes it later. Execute only direct, fully grounded Work within "
         "Fast budget; unsupported capability or unresolved composition delegates once to Deep "
         "with escalate, deep_planner continuation and no Activities. No same-decision reviewer. "
         "Runtime retains authorization, confirmation, resource safety and delivery authority. "
         "Planning or satisfaction is prospective, never proof of execution or delivery."
     )
-    if "interaction_context" in context:
-        required_json(context["interaction_context"], 1200, label="Fast Planner Interaction Context")
     facts = {
         "responsibilities": [item.model_dump(mode="json", exclude_defaults=True) for item in responsibilities],
         "interpretation_unresolved": list(request.interpretation_unresolved),
@@ -466,8 +462,8 @@ def fast_advance_layered_prompt(
         + "\n" + IDENTITY_SEMANTIC_CONTRACT + PERSONALITY_SEMANTIC_CONTRACT + STABLE_MIND_SEMANTIC_CONTRACT
         + agent_skill_prompt_section(context, agent_role="fast_planner")
         + trusted_target_evidence_prompt_section(context)
-        + "\nTrusted source facts JSON:\n" + required_json(facts, 48000, label="Fast complete Work source facts")
-        + "\n" + immutable_source_turn_prompt(request)
+        + "\nTrusted source facts JSON:\n" + required_json(facts, None, label="Fast complete Work source facts")
+        + "\n" + immutable_source_turn_prompt(request, what_authority="GI Responsibilities")
     )
     return LayeredPrompt.promote(rendered, operating_contract=(contract,))
 

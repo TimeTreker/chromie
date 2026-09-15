@@ -590,6 +590,58 @@ def acquisition_source_goal_ids(context: dict[str, Any] | None) -> set[str]:
     }
 
 
+def completed_work_step_evidence(
+    context: dict[str, Any] | None, *, reentry_scope: PlannerReentryScope | None,
+) -> dict[str, dict[str, Any]]:
+    """Bind already-finished ordering dependencies, never infer Goal success.
+
+    Only exact source-Plan/Goal/step correlations with matching retained terminal
+    observations can discharge an AFTER edge in a later Work result.
+    """
+    if reentry_scope is None:
+        return {}
+    current = context or {}
+    try:
+        bundle = ExecutionOutcomeBundle.model_validate(current.get("execution_outcome_bundle"))
+        terminal = {item.evidence_id: item for raw in current.get("trusted_terminal_evidence") or []
+                    for item in [ToolResultEvidence.model_validate(raw)]}
+    except (ValidationError, ValueError, TypeError):
+        return {}
+    plan = current.get("canonical_plan_resolution") or {}
+    if not isinstance(plan, dict) or (
+        bundle.canonical_plan_id != reentry_scope.source_plan_id
+        or bundle.canonical_plan_fingerprint != reentry_scope.source_plan_fingerprint
+        or plan.get("plan_id") != bundle.canonical_plan_id
+    ):
+        return {}
+    steps = {step["step_id"]: step for step in plan.get("steps") or []
+             if isinstance(step, dict) and step.get("step_id")}
+    refs, goals = set(reentry_scope.evidence_refs), set(reentry_scope.goal_ids)
+    proved = {}
+    for item in bundle.evidence:
+        step, observed = steps.get(item.step_id), terminal.get(item.evidence_id)
+        if not step or observed is None or item.observation is None:
+            continue
+        if (
+            item.status != "completed" or item.evidence_id not in refs
+            or not set(item.source_goal_ids).issubset(goals)
+            or set(step.get("source_goal_ids") or []) != set(item.source_goal_ids)
+            or step.get("capability_id") != item.capability_id
+            or observed.tool_id != item.capability_id or observed.status != item.status
+            or item.observation.status != "available" or not item.observation.schema_validated
+            or observed.data != item.observation.data
+            or observed.output_sha256 != item.observation.output_sha256
+        ):
+            continue
+        proved[item.step_id] = {
+            "step_id": item.step_id, "evidence_id": item.evidence_id,
+            "source_goal_ids": list(item.source_goal_ids), "status": item.status,
+            "source_plan_id": bundle.canonical_plan_id,
+            "source_plan_fingerprint": bundle.canonical_plan_fingerprint,
+        }
+    return proved
+
+
 def completed_acquisition_goal_ids(
     context: dict[str, Any] | None,
     *,

@@ -27,7 +27,7 @@ class SGLangProtocolTests(unittest.TestCase):
 
         for title in (
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
-            "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
+            "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
         ):
             with self.subTest(title=title):
                 schema = {
@@ -99,6 +99,7 @@ class SGLangProtocolTests(unittest.TestCase):
         for title in (
             "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+            "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
             "GoalInterpretationModelOutput", "FastPlannerOutput", "OtherOutput",
         ):
             with self.subTest(title=title):
@@ -114,6 +115,7 @@ class SGLangProtocolTests(unittest.TestCase):
                 if title in {
                     "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
                     "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+                    "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
                 }:
                     expected["x-guidance"] = {"whitespace_flexible": False}
                 self.assertEqual(wire, expected)

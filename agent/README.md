@@ -55,6 +55,14 @@ The existing provider preflight still checks the complete request's model budget
 
 ## Authority boundary
 
+GI hands off complete intended outcomes alongside Host-projected original input.
+Information-query details need no duplicate semantic classification; Fast Planner
+can realize exact non-numeric source strings present in their owning outcome.
+Counts, measurements, activation and field-specific Goal updates retain their typed
+conservation checks. Full source text is evidence and does not authorize Planner
+to add omitted outcomes or resolve GI uncertainty.
+
+
 GI, GA, execution events and trusted Situation can trigger independent Planner tasks.
 Goal-free Situation supplies no Responsibility, Goal or Capability Work permission,
 including safe reads. `SituationalPlannerResolver` keeps the existing endpoint/DTO

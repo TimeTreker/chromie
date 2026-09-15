@@ -4,6 +4,8 @@ from __future__ import annotations
 import copy
 from typing import Any, get_args
 
+from jsonschema import Draft202012Validator
+
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import OllamaClient
@@ -16,11 +18,13 @@ try:
     from chromie_contracts.social_cognition import (
         SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     )
+    from chromie_contracts.text import normalize_whitespace
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
     from shared.chromie_contracts.social_cognition import (
         SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     )
+    from shared.chromie_contracts.text import normalize_whitespace
 
 
 SOCIAL_COGNITION_AUTHORITY_PROMPT = (
@@ -98,11 +102,61 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
 )
 
 
+def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialCognitionRequest) -> None:
+    """Offer fresh opaque IDs and immutable reuse of known messages."""
+    known: dict[str, set[str]] = {}
+    context = request.context.get("interaction_context", {})
+    for key in ("events", "already_spoken", "pending_speech"):
+        for row in context.get(key, []):
+            ids = row.get("metadata", {}).get("communicative_activity_ids") or row.get("communicative_activity_ids") or []
+            if isinstance(ids, list):
+                for identity in ids:
+                    known.setdefault(str(identity).strip(), set()).add(normalize_whitespace(row.get("text") or ""))
+    if not known:
+        return
+    capacity = schema["properties"]["activities"]["maxItems"]
+    candidates = [f"sc:{request.snapshot_digest()[:24]}:{index}" for index in range(capacity + len(known))]
+    fresh_ids = [identity for identity in candidates if identity not in known][:capacity]
+    contract = schema["$defs"]["SocialCommunicativeAct"]
+    branches = []
+    for branch in contract.get("oneOf", [contract]):
+        fresh = copy.deepcopy(branch)
+        fresh["properties"]["activity_id"] = {"type": "string", "enum": fresh_ids}
+        variants = [fresh]
+        for identity, messages in known.items():
+            if len(messages) != 1:
+                continue  # Conflicting historical wording cannot be reused.
+            text = next(iter(messages))
+            text_contract = branch["properties"]["text"]
+            if ("const" in text_contract and text_contract["const"] != text) or not (
+                text_contract.get("minLength", 0) <= len(text) <= text_contract.get("maxLength", 2400)
+            ):
+                continue
+            reuse = copy.deepcopy(branch)
+            reuse["properties"]["activity_id"]["const"] = identity
+            reuse["properties"]["text"]["const"] = text
+            variants.append(reuse)
+        for variant in variants:
+            properties = variant["properties"]
+            # Choose words before their identity; old IDs cannot coerce new
+            # information into an old message. Distinct repeated acts stay valid.
+            variant["properties"] = {"text": properties["text"], **{
+                key: value for key, value in properties.items() if key != "text"
+            }}
+            branches.append(variant)
+    schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": branches}
+
+
 def social_cognition_response_schema(
     request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, deep: bool = False,
 ) -> dict[str, Any]:
     schema = copy.deepcopy(SocialCognitionOutput.model_json_schema())
     schema["required"] = ["disposition", "activities", "reason_summary"]
+    if request.trigger != "situation":
+        # Match the Host's existing ingress-specific Memory authority before
+        # generation, including when the ordinary communication is silence.
+        for name in ("memory_candidates", "self_memory_candidates"):
+            schema["properties"][name]["maxItems"] = 0
     need_ids = [item.need_id for item in request.communication_needs]
     schema["properties"]["need_outcomes"] = {
         "type": "object", "additionalProperties": False,
@@ -245,6 +299,67 @@ def social_cognition_response_schema(
             nonverbal["required"].append("auxiliary_activities")
             expression_branches.append(nonverbal)
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": expression_branches}
+    question_ids = {need.need_id for need in request.communication_needs
+                    if need.kind in {"input", "confirmation"}}
+    if question_ids:
+        # Realize the Host's existing Need-kind/function implication without
+        # requiring an extra act or selecting whether to communicate.
+        existing = schema["$defs"]["SocialCommunicativeAct"]
+        question_branches = []
+        for branch in existing.get("oneOf", [existing]):
+            function = branch["properties"]["function"]
+            functions = function.get("enum", [function.get("const")])
+            for is_question in (True, False):
+                allowed = [value for value in functions if (value == "ask") == is_question]
+                if not allowed:
+                    continue
+                variant = copy.deepcopy(branch)
+                properties = variant["properties"]
+                properties["function"] = {"type": "string", "enum": allowed}
+                if not is_question:
+                    addressed = properties["addressed_need_ids"]
+                    compatible = [key for key in addressed["items"].get("enum", []) if key not in question_ids]
+                    if compatible:
+                        addressed["items"] = {"type": "string", "enum": compatible}
+                    else:
+                        addressed["maxItems"] = 0
+                question_branches.append(variant)
+        schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": question_branches}
+    _constrain_social_activity_identity(schema, request)
+    # Native decoding does not enforce conditional decision-state dependencies.
+    # Realize the existing DTO/Host states without deciding whether speech is
+    # useful: silence leaves needs pending, and deliberation commits no result.
+    # Account for reasons/Needs before committing a disposition and its acts.
+    # JSON field order changes decoder presentation only, not the DTO meaning.
+    first = ("reason_summary", "need_outcomes", "disposition", "activities")
+    properties = schema["properties"]
+    schema["properties"] = {
+        **{name: properties[name] for name in first},
+        **{name: value for name, value in properties.items() if name not in first},
+    }
+    decisions = []
+    for disposition in schema["properties"]["disposition"]["enum"]:
+        branch = copy.deepcopy(schema)
+        branch.pop("$defs", None)
+        branch.pop("allOf", None)
+        properties = branch["properties"]
+        properties["disposition"] = {"type": "string", "const": disposition}
+        if disposition == "communicate":
+            properties["activities"]["minItems"] = 1
+        else:
+            properties["activities"]["maxItems"] = 0
+        if disposition == "deliberate":
+            properties["need_outcomes"] = {"type": "object", "maxProperties": 0}
+            for name in ("memory_candidates", "self_memory_candidates"):
+                properties[name]["maxItems"] = 0
+        else:
+            properties["need_outcomes"]["required"] = need_ids
+            if disposition == "silence":
+                properties["need_outcomes"]["properties"] = {
+                    key: {"type": "string", "const": "pending"} for key in need_ids
+                }
+        decisions.append(branch)
+    schema["oneOf"] = decisions
     return schema
 
 
@@ -287,6 +402,23 @@ def validate_social_cognition_output(
                 raise ValueError("an input or confirmation need requires a question")
 
 
+def social_cognition_prompt(
+    request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, num_ctx: int,
+) -> str:
+    payload = request.model_dump(mode="json")
+    # Present the authoritative delivery ledger before the larger Goal/Work
+    # snapshot. Relocate it once; retain all facts and the original request digest.
+    interaction = payload["context"].pop("interaction_context", {})
+    packet = {
+        "interaction_context": interaction,
+        "request": payload,
+        "social_expression": auxiliary_social_prompt_context(request.context, candidates),
+    }
+    return STABLE_MIND_SEMANTIC_CONTRACT + "\nTrusted interaction snapshot:\n" + required_json(
+        packet, max_chars=num_ctx * 3, label="Social Cognition complete snapshot",
+    )
+
+
 class SocialCognitionResolver:
     def __init__(
         self, model: OllamaClient, catalog: CapabilityCatalog, *,
@@ -306,11 +438,7 @@ class SocialCognitionResolver:
         digest = request.snapshot_digest()
         entries = await self.catalog.prompt_entries(scope="all", refresh=False)
         candidates = auxiliary_social_capability_payloads(entries)
-        social_context = auxiliary_social_prompt_context(request.context, candidates)
-        packet = {"request": request.model_dump(mode="json"), "social_expression": social_context}
-        prompt = STABLE_MIND_SEMANTIC_CONTRACT + "\nTrusted interaction snapshot:\n" + required_json(
-            packet, max_chars=self.num_ctx * 3, label="Social Cognition complete snapshot",
-        )
+        prompt = social_cognition_prompt(request, candidates, num_ctx=self.num_ctx)
         direct_deep = request.opportunity is not None and request.opportunity.recommended_cognition == "slow"
         output = await self._generate(request, candidates, prompt, deep=direct_deep)
         calls = 1
@@ -345,7 +473,7 @@ class SocialCognitionResolver:
             response_format=schema, prompt_family="social_cognition.deep" if deep else "social_cognition.primary",
             turn_id=request.request_id, attempt=1,
         )
-        schema_errors = validate_args_for_schema(raw, schema)
+        schema_errors = [error.message for error in Draft202012Validator(schema).iter_errors(raw)]
         if schema_errors:
             raise ValueError(f"Social Cognition raw Schema rejected: {schema_errors}")
         output = SocialCognitionOutput.model_validate(raw)

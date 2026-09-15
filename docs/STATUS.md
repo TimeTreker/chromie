@@ -1,5 +1,95 @@
 # Chromie Current Status
 
+## Source-backed lightweight GI handoff — 2026-09-15 (current)
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Complete Host-owned original source accompanies GI; pre-GA authority label fixed. GA accepts complete queries without duplicate classification; Planner supports owned literal source arguments. Earlier SC/Fast/Schema safeguards included. Default GI prompt unchanged after rejected candidates. | Canonical 3,510 tests / 1,164 subtests, 145 benchmarks; 6,000 expected workflow outcomes; Level A 45/45. Original-text fidelity and numeric/ownership/contradiction containment verified. | Controlled GI → native GA 4/4 and pre-GA Fast 4/4. Canonical Fast/Deep 0/8 semantic acceptance. Two GI candidates rejected; no latency, default-output simplification, deployment or robot improvement claim. | Development delivery only. Full Qualification open; microphone/ASR owner-accepted. Rebuild before owner's personal test, then await their next direction. |
+
+See [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md).
+Evidence `.chromie/acceptance/gi-source-handoff-20260915/`; rejected prompts are
+not delivery source. Earlier sections below are historical.
+
+## GI intent handoff experiment — 2026-09-15 (previous experiment)
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Requested runtime simplification remains unimplemented. Rejected trials restored byte-for-byte; retained sparse-query/numeric-conservation regressions and corrected stale SC wording ownership. Prior Schema deduplication remains. | Canonical 3,481 tests / 1,164 subtests, 145 benchmarks and 20 legacy tests pass. Focused 102 tests / 136 subtests and Level A 45/45 pass. Controlled GI Host → GA → Planner preserves query scope without duplicate time fields. | 18 frozen cases / 23 transactions; 106 retained native responses across baseline, full and interrupted trials. No candidate met non-regression criteria. Restored host/deployed source digests match. | Development only; Qualification remains open. Owner personal check next; microphone/ASR remain owner-accepted. No deployment, speedup or successful simplification claim. |
+
+See the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md)
+for exact I/O, candidate rejection reasons and validation. Evidence:
+`.chromie/acceptance/gi-intent-handoff-20260915/`. Do not promote rejected prompts or
+turn this evaluated cohort into training data.
+
+## GI Schema deduplication — 2026-09-15 (preceding)
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| GI primary/Deep source-spelling enums share one definition; original allowed values and prompts/models unchanged. Local Agent rebuilt and source verified. | 115 focused tests / 173 subtests; 6,000 expected replay outcomes and Level A 45/45. Final canonical 3,477 tests / 1,161 subtests, 145 benchmarks, 20 legacy pass. Request-only fixture refreeze proves expanded Schema equality; expected outputs unchanged. | Frozen 12-case/16-variant native pairs have identical raw outputs; all 40 calls including repeats pass mechanical checks. Full semantic review remains 1/16 each. Weather wire bytes fall 32.5%; input tokens unchanged and no end-to-end speedup established. | Development only; full Qualification and earlier semantic/live coverage blockers remain open. Bounded schema work ends for the owner's personal check. Microphone/ASR remain owner-accepted. |
+
+[Checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) retain the
+exact module I/O, comparisons, runtime identity and commands. Evidence:
+`.chromie/acceptance/gi-schema-dedup-20260915/`. No prompt rewrite, model change,
+training promotion, semantic repair call, new current document or runtime flag.
+
+## Necessary engineering repair — 2026-09-15 (previous pass)
+
+The owner will personally check Chromie before deciding next work. Microphone/ASR
+remain closed by owner-reported acceptance. Earlier rows are historical.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Fast native branches preserve typed vocal provider/mode and existing execution/delegation states; full Schema/DTO/Host checks remain. No prompt/weights changes, phrase rules or new semantic calls. Previous SC repairs preserved. | 3,475 tests / 1,143 subtests, 145 benchmarks, 20 legacy; 6,000 expected replay outcomes and Level A 45/45. Five-packet native screen 3/5. | Final fixed-image 51-case text/MuJoCo cohort stops at case four: 1/4 mechanical, 1/4 semantic, 47 unrun; safe idle retained. All 10 SC calls stop normally, max 678 tokens. Direction, whole-resource outcome/satisfaction, GI decomposition and SC promises remain wrong. | Development only; full Qualification remains open. Aggregate semantic non-regression is not established. Bounded engineering pass ends for the owner's personal check; further optimization/training awaits their next direction. |
+
+[Checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) retain exact
+I/O, image identity, commands and evidence in
+`.chromie/acceptance/necessary-engineering-20260915/`. Final evidence is injected
+text and simulation, not physical resource acquisition. The current Agent is rebuilt.
+
+## Qualification repair — 2026-09-15 (previous pass)
+
+Microphone/ASR remain closed by owner-reported personal acceptance. Earlier
+sections retain historical evidence and are superseded by this row.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| General SC native completion, question-kind, immutable identity and full raw Schema checks; delivery-ledger projection; Fast disposition/timing/shared Work bounds and whole-outcome selection; retired GI wording descriptions corrected to SC. No phrase rules, model weights/budget changes or second semantic repair call. | Canonical 3,449 tests / 1,143 subtests, 145 benchmarks, 20 legacy; 6,000 replays and Level A 45/45 pass. SC native screens 10/10 and 12/12 reviewed passes. | Final verified Agent full 51-case text/MuJoCo aggregate stops at case four: 3/4 mechanical, 2/4 semantic, 47 unrun. All ten SC calls complete (max 654 tokens); original compound, parallel action and simulated delivery reach final speech. GI collapses walking/singing; Fast picks wrong mode; SC premature promise/question remains. | Development only; qualification and fine-tuning readiness remain open. Earlier directional variation, unrun coverage, references/hidden families and #24/#32 are not closed by local passes. Microphone/ASR do not block this work. |
+
+[Checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) own exact
+module I/O, identities, safe-idle state and commands. Evidence:
+`.chromie/acceptance/qualification-closure-20260915/`. Previous queued-speech and
+pending-Need review mistakes are explicitly corrected there; no candidate or
+frozen expected answer was changed. Final delivery evidence is a scripted
+simulation mock, not physical resource acquisition.
+
+## SC completion repair — 2026-09-15
+
+Microphone/ASR remain closed by owner-reported personal acceptance.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Existing SC native Schema presents finite decision/Need accounting before acts; non-Situation Memory proposals excluded consistently with Host. Same prompt, weights, budget and multi-act contract. | Canonical 3,414 tests / 1,141 subtests, 145 benchmarks, 20 legacy; 6,000 replays and Level A 45/45 pass. Native 10/10 mechanical passes; original repeated-ID truncation becomes one complete act/747 tokens. Semantic screen only 5/10. | Rebuilt Agent verified. Original Agent replay completes silently, leaving its Need unresolved. Full 51-case injected-text/MuJoCo cohort stops at first Fast result contradiction: 0/1, 50 unrun; post-completion SC not invoked. Safe idle retained. | Development only. Targeted completion repair has empirical support; fresh-Need silence, queued-speech duplication and Fast result consistency remain open. No fine-tuning/release promotion. |
+
+[Checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) retain exact
+workflow, identities, limits and resume commands. Evidence:
+`.chromie/acceptance/sc-completion-20260915/`; earlier sections are historical.
+
+## Engineering qualification — 2026-09-15
+
+Microphone and ASR: **accepted by the owner after personal testing**, reported
+2026-09-15; closed for the current work. They are not a pending prerequisite for
+engineering/fine-tuning preparation. The automated failure below used injected
+text and bypassed both components; model/Runtime qualification remains separate.
+
+| Implementation | Automated verification | Target validation | Release readiness |
+| --- | --- | --- | --- |
+| Uncommitted general repairs: whole-request Planner budget admission, compact Fast JSON, SC context ownership projection, evidence-bound completed Work ordering and native SC decision-state invariants. Model weights and semantic prompts unchanged; no case rules. | Canonical 3,402 tests / 1,141 subtests, 145 benchmarks, 20 legacy; full 6,000 frozen replays with unchanged source and Level A 45/45 pass. SC native decision-state contrasts 14/14; these establish only their mechanical contract. | Current Agent rebuilt and source verified. Full 51-case simulator/text aggregate stopped after first case: 0/1, 50 unrun. Actions completed safely; SC repeated an Activity ID and exhausted its 1,024-token output cap. No physical-robot proof. | Development only; fine-tuning/release readiness remains false. SC primary completion, broader native coverage, independent references/hidden families and #24/#32 remain open. |
+
+[Checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) own exact
+revision identities, module I/O, failed experiments, retained evidence, safe-idle
+state and resume commands. Evidence root:
+`.chromie/acceptance/engineering-readiness-20260915/`. Earlier sections are historical.
+
 ## SC integration — 2026-09-15
 
 | Implementation | Automated verification | Target validation | Release readiness |

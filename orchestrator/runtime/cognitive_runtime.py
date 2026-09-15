@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .cognitive_gateway_modules.context_assembly import ContextAssembly
+
 import asyncio
 import hashlib
 import json
@@ -2197,10 +2199,10 @@ class GoalDrivenRuntimeCoordinator:
             language=work_request.language or "auto", responsibilities=list(work_request.responsibilities),
             interpretation_unresolved=list(work_request.interpretation_unresolved),
             source_turn=work_request.source_turn_provenance,
-            context={**work_request.context, "work_decision_pending": plan is None,
+            context=ContextAssembly.project_context({**work_request.context, "work_decision_pending": plan is None,
                      **({"canonical_plan_resolution": plan.prompt_projection(), "runtime_admission": "pending"} if plan is not None else {}),
                      "history": list(work_request.history),
-                     "interaction_context": self._interaction_context(sid=sid, context=work_request.context)},
+                     "interaction_context": self._interaction_context(sid=sid, context=work_request.context)}),
         )
         def current() -> bool:
             entry = self._social_turns.get(key)
@@ -2243,7 +2245,7 @@ class GoalDrivenRuntimeCoordinator:
         key = self._goal_association_lock_key(context, session_id)
         previous = self._social_turns.pop(key, None)
         await self._cancel_social_turn(previous)
-        source_context = dict(context)
+        source_context = ContextAssembly.project_context(context)
         # The delivery ledger distinguishes queued/started/completed speech.
         # Do not retain the retired, ambiguously named Planner history alias.
         source_context.pop("delivered_turn_speech", None)

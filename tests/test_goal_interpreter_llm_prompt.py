@@ -1315,8 +1315,53 @@ class GoalInterpreterPromptTests(unittest.TestCase):
 
         self.assertEqual(source_turn["speaker_role"], "user")
         self.assertEqual(source_turn["addressee"], "Chromie")
-        self.assertIn("重庆", location["enum"])
-        self.assertNotIn("Chongqing", location["enum"])
+        validator = Draft202012Validator({"$defs": payload["format"]["$defs"], **location})
+        validator.validate("重庆")
+        with self.assertRaises(JsonSchemaValidationError):
+            validator.validate("Chongqing")
+
+    def test_shared_source_spelling_preserves_string_and_numeric_acceptance(self) -> None:
+        for text, exact, translated in (
+            ("weather in Chongqing", "Chongqing", "重庆"),
+            ("移动三秒。", "三秒", "three seconds"),
+            ("Move at 0.2 m/s.", "0.2 m/s", "0.2 meters per second"),
+        ):
+            for build in (
+                self._interpreter().build_interpretation_payload,
+                self._interpreter().build_deep_interpretation_payload,
+            ):
+                schema = build(GoalInterpretationRequest(text=text))["format"]
+                fields = schema["$defs"]["CognitiveResponsibilityProposal"][
+                    "properties"
+                ]["binding_items"]["properties"]
+                for name in ("location", "duration", "speed"):
+                    with self.subTest(text=text, variant=build.__name__, field=name):
+                        validator = Draft202012Validator({"$defs": schema["$defs"], **fields[name]})
+                        validator.validate(exact)
+                        # Spelling constraints preserve every original source
+                        # fragment; they do not select the semantic dimension.
+                        validator.validate(exact[0])
+                        for invalid in (translated, "", text):
+                            with self.assertRaises(JsonSchemaValidationError):
+                                validator.validate(invalid)
+                        self.assertEqual(validator.is_valid(3), name != "location")
+
+    def test_native_payload_serializes_source_enum_once(self) -> None:
+        from agent.app.clients.sglang_protocol import build_sglang_chat_payload
+        from agent.app.inference_compute import goal_interpreter_compute_class
+
+        payload = self._interpreter().build_interpretation_payload(
+            GoalInterpretationRequest(text="weather in Chongqing")
+        )
+        schema = payload["format"]
+        values = schema["$defs"]["SourceBackedBindingString"]["enum"]
+        wire = build_sglang_chat_payload(
+            model=payload["model"], messages=payload["messages"],
+            compute_class=goal_interpreter_compute_class("goal_interpretation"),
+            options=payload["options"], response_format=schema,
+            stream=False, priority_step=100,
+        )
+        self.assertEqual(json.dumps(wire).count(json.dumps(values)), 1)
 
     def test_decoder_rejects_removed_readiness_fields(self) -> None:
         text = "weather in Chongqing"
@@ -1396,6 +1441,46 @@ class GoalInterpreterPromptTests(unittest.TestCase):
         )
         payload = interpreter.build_interpretation_payload(GoalInterpretationRequest(text="hello"))
         self.assertEqual(payload["options"]["num_predict"], 1400)
+
+    def test_complete_queries_need_no_attribute_or_temporal_taxonomy(self) -> None:
+        interpreter = self._interpreter()
+        for text, location in (
+            ("What is the weather today in Chongqing?", "Chongqing"),
+            ("What is the weather tomorrow in Chongqing?", "Chongqing"),
+            ("明天重庆天气怎么样？", "重庆"),
+        ):
+            with self.subTest(text=text):
+                request = GoalInterpretationRequest(text=text)
+                schema = interpreter.build_interpretation_payload(request)["format"]
+                raw = {"confidence": 1.0, "responsibilities": [{
+                    "local_ref": "r1", "outcome": text, "output_mode": "information",
+                    "binding_items": {"location": location}, "confidence": 1.0,
+                    "source_evidence": {
+                        "source_start_token_ref": "t0",
+                        "source_end_token_ref": _source_tokens(text)[-2]["ref"],
+                    },
+                }], "unresolved": [], "coordination": []}
+                Draft202012Validator(schema).validate(raw)
+                decision = interpreter._validate_interpretation_content(request, json.dumps(raw), response_schema=schema)
+                self.assertEqual(decision.responsibilities[0].outcome, text)
+                self.assertEqual(decision.responsibilities[0].bindings, {"location": location})
+                self.assertEqual(decision.unresolved, [])
+
+
+    def test_outcome_prose_does_not_bypass_numeric_conservation(self) -> None:
+        interpreter = self._interpreter()
+        request = GoalInterpretationRequest(text="Move for 3 seconds.")
+        schema = interpreter.build_interpretation_payload(request)["format"]
+        raw = {"confidence": 1.0, "responsibilities": [{
+            "local_ref": "r1", "outcome": request.text, "output_mode": "body_action",
+            "binding_items": {}, "confidence": 1.0,
+            "source_evidence": {"source_start_token_ref": "t0", "source_end_token_ref": "t3"},
+        }], "unresolved": [], "coordination": []}
+        Draft202012Validator(schema).validate(raw)
+        with self.assertRaises(_GoalInterpretationAuthorityViolation):
+            interpreter._validate_interpretation_content(request, json.dumps(raw), response_schema=schema)
+
+
 
 
 class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):

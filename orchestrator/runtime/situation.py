@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .cognitive_gateway_modules.context_assembly import ContextAssembly
+
 import asyncio
 import hashlib
 import json
@@ -705,7 +707,7 @@ async def resolve_goal_free_situation_response(
         return None
     revisions[observation.source_id] = identity
 
-    context = host.build_context(session_id)
+    context = ContextAssembly.project_context(host.build_context(session_id))
     context["situation"] = observation.projection.prompt_projection()
     context["cognitive_opportunity"] = opportunity.prompt_projection()
     situation_activation_texts: list[str] = []

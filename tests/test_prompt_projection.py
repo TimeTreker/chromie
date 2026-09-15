@@ -65,3 +65,8 @@ def test_required_json_fails_instead_of_truncating() -> None:
         assert "GI Responsibility evidence" in str(exc)
     else:
         raise AssertionError("required authoritative JSON must not be truncated")
+
+
+def test_required_json_with_transport_budget_preserves_large_payload() -> None:
+    payload = {"events": [{"text": "保留限定条件。" * 4000}], "last_evidence_ref": "terminal-result"}
+    assert json.loads(required_json(payload, None, label="Planner context")) == payload

@@ -115,19 +115,22 @@ class CognitiveResponsibilityProposal(BaseModel):
             "because the user coordinates them with while, simultaneously, at the "
             "same time, a conjunction, or an equivalent construction; each effect "
             "that can be independently accepted or rejected requires its own sibling "
-            "Responsibility. Preserve the "
+            "Responsibility. Preserve material details and their attachment in the "
+            "complete outcome; optional duplicate classification is not required. Preserve the "
             "requested answer or judgment and proposition polarity: a question about "
             "whether P is true must not be rewritten as the assertion that P is true. "
             "For conversational speech, describe the communicative obligation or "
             "proposition to convey; never write the exact words Chromie will say. "
-            "Planner alone authors the utterance."
+            "Social Cognition alone authors the utterance."
         ),
     )
     bindings: dict[str, Any] = Field(
         default_factory=dict,
         description=(
-            "Material user-semantic facts from the authoritative turn or bounded "
+            "Sparse material user-semantic facts from the authoritative turn or bounded "
             "semantic context only; never runtime/session identifiers or HOW fields. "
+            "Counts, measurements, activation and field-specific Goal updates retain "
+            "typed evidence; other details may remain solely in the complete outcome. "
             "Preserve an explicitly measured value and its unit together as one exact "
             "source/context surface; execution-unit normalization belongs downstream. "
             "Cross-Responsibility order uses before/after with exact sibling local_ref "
@@ -361,7 +364,10 @@ class CognitiveWorkRequest(BaseModel):
     """Typed WHAT→HOW handoff used by maintained cognitive work endpoints.
 
     This replaces RouteDecision-shaped requests in the Goal-driven runtime.  The
-    request carries Goal Interpretation responsibilities explicitly; canonical
+    request carries Goal Interpretation responsibilities explicitly together with
+    Host-owned immutable source wording. GI never regenerates that source copy;
+    Planner realizes complete intent into arguments without adding omitted outcomes.
+    Canonical
     Goal state and later Plan/Capability state remain in their own typed contracts.
     """
 

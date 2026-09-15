@@ -433,17 +433,17 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertEqual(parsed.output_mode, "information")
 
-    def test_information_resource_requires_typed_query_scope_not_description_only(self):
+    def test_information_resource_allows_query_in_inherited_complete_outcome(self):
         information = resource_responsibility(
             kind="information",
             description="Chongqing current weather",
             quantity="",
             source_status="provider_resolved",
         )
-        with self.assertRaisesRegex(ValueError, "query_scope"):
-            GoalAssociationModelGoal.model_validate(
-                goal("Check Chongqing weather.", "information", resource=information)
-            )
+        parsed = GoalAssociationModelGoal.model_validate(
+            goal("Check Chongqing weather.", "information", resource=information)
+        )
+        self.assertEqual(parsed.resource_responsibility.query_scope, [])
 
     def test_vocal_goal_cannot_claim_resource_authority(self):
         with self.assertRaisesRegex(ValueError, "output_mode=body_action"):
@@ -946,11 +946,11 @@ class GoalExecutionContractTests(unittest.TestCase):
             output_type=GoalSegmentationModelOutput,
         )
         self.assertIn(
-            "a resolved place is a query_scope binding named location",
+            "query_scope conserves the declared GI bindings",
             interpretation_prompt,
         )
         self.assertIn(
-            "time and requested result aspects as separate bindings",
+            "Host inherits the complete query from the GI outcome",
             interpretation_prompt,
         )
         self.assertNotIn(

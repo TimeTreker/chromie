@@ -43,6 +43,7 @@ from .planner_context import planner_goal_execution_requirements
 from .planner_grounding import (
     _argument_realization_contract,
     _material_values_equal,
+    literal_intent_argument,
     missing_argument_realizations,
     semantic_numeric_values,
 )
@@ -773,6 +774,19 @@ def validate_fast_advance_output(
                         )
                 continue
             if parameter not in authoritative_bindings:
+                # Planner owns the mapping to the selected Capability. GI need
+                # not duplicate an exact named value already in its complete
+                # outcome. Check both source provenance and Responsibility scope;
+                # raw text alone must not lend a sibling's value to this Activity.
+                if parameter_schema.get("type") == "string" and any(
+                    literal_intent_argument(
+                        activity.args.get(parameter),
+                        outcome=by_ref[ref].outcome,
+                        source_text=request.original_user_text,
+                    )
+                    for ref in activity.source_responsibility_refs
+                ):
+                    continue
                 raise AuthoritativeGroundingValidationError(
                     "Fast Planner cannot invent an unbound required Capability "
                     f"input before canonical Goal grounding: "

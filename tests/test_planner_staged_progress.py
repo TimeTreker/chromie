@@ -17,7 +17,7 @@ from pydantic import ValidationError
 
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
-from agent.app.planner_context import completed_acquisition_goal_ids
+from agent.app.planner_context import completed_acquisition_goal_ids, completed_work_step_evidence
 from agent.app.planner_model_contract import PlannerModelOutput
 from benchmarks.datasets.fast_planner_daily_life.deep_qualification import load_cases
 from benchmarks.datasets.fast_planner_daily_life.qualification import (
@@ -327,6 +327,65 @@ async def reenter(request, catalog, plan, adapter, response, bundle, raw):
         source_response=response, bundle=bundle, plan=plan, session_id=request.sid
     )
     return result, client.seen
+
+
+@pytest.mark.parametrize("language", ["en", "zh"])
+def test_completed_source_work_can_precede_a_new_answer_without_reexecution(language):
+    async def run():
+        request, catalog, plan, runtime, provider, adapter, response, _, bundle = await begin_episode(language, False)
+        raw = next_reply(request, False)
+        gid, step_id = plan.goal_ids[0], plan.steps[0].step_id
+        raw["goal_outcomes"][gid]["follows_step_ids"] = [step_id]
+        original = copy.deepcopy(raw)
+        followup, seen = await reenter(request, catalog, plan, adapter, response, bundle, raw)
+        assert followup is not None and followup.speech and not followup.capabilities
+        for tier in ("fast", "deep"):
+            resolved = await resolve(seen, catalog, raw, tier)
+            assert resolved.disposition == "respond", resolved.metadata
+            need = resolved.communication_needs[0]
+            assert need.after_step_ids == []
+            assert need.facts["follows_step_ids"] == [step_id]
+            assert need.facts["completed_work_dependencies"][0]["evidence_id"] == bundle.evidence[0].evidence_id
+        followup.metadata["turn_id"] = seen.sid
+        await submit_and_wait_terminal(runtime.runtime, followup)
+        assert [call.capability_id for call in provider.calls] == ["chromie.weather.lookup"]
+        assert raw == original
+    asyncio.run(run())
+
+
+@pytest.mark.parametrize("fault", ["missing_bundle", "missing_terminal", "foreign_plan", "foreign_fingerprint", "missing_ref", "wrong_tool", "wrong_data", "wrong_hash", "wrong_goal", "unknown_step", "before"])
+def test_unproved_prior_work_does_not_release_communication_order(fault):
+    async def run():
+        request, catalog, plan, _, _, adapter, response, _, bundle = await begin_episode("en", False)
+        _, seen = await reenter(request, catalog, plan, adapter, response, bundle, next_reply(request, False))
+        raw = next_reply(request, False)
+        step_id, gid = plan.steps[0].step_id, plan.goal_ids[0]
+        raw["goal_outcomes"][gid]["follows_step_ids"] = [step_id]
+        context = seen.context
+        if fault == "missing_bundle": context.pop("execution_outcome_bundle")
+        elif fault == "missing_terminal": context.pop("trusted_terminal_evidence")
+        elif fault == "foreign_plan": context["canonical_plan_resolution"]["plan_id"] = "foreign"
+        elif fault == "foreign_fingerprint": seen.planner_reentry_scope = seen.planner_reentry_scope.model_copy(update={"source_plan_fingerprint": "0" * 64})
+        elif fault == "missing_ref": seen.planner_reentry_scope = seen.planner_reentry_scope.model_copy(update={"evidence_refs": ()})
+        elif fault == "wrong_tool": context["trusted_terminal_evidence"][0]["tool_id"] = "other.tool"
+        elif fault == "wrong_data": context["trusted_terminal_evidence"][0]["data"] = {"rain_forecast": True}
+        elif fault == "wrong_hash": context["trusted_terminal_evidence"][0]["output_sha256"] = "0" * 64
+        elif fault == "wrong_goal": context["canonical_plan_resolution"]["steps"][0]["source_goal_ids"] = ["foreign"]
+        elif fault == "unknown_step": raw["goal_outcomes"][gid]["follows_step_ids"] = ["unknown"]
+        else:
+            raw["goal_outcomes"][gid]["follows_step_ids"] = []
+            raw["goal_outcomes"][gid]["precedes_step_ids"] = [step_id]
+        if fault not in {"unknown_step", "before"}:
+            assert completed_work_step_evidence(context, reentry_scope=seen.planner_reentry_scope) == {}
+        for tier in ("fast", "deep"):
+            if fault in {"missing_terminal", "wrong_data", "wrong_hash"}:
+                with pytest.raises(ValueError, match="result-Evidence re-entry context does not match typed scope"):
+                    await resolve(seen, catalog, raw, tier)
+                continue
+            resolved = await resolve(seen, catalog, raw, tier)
+            assert resolved.disposition != "respond", resolved.metadata
+            assert not resolved.steps and not resolved.communication_needs
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize("language", ["en", "zh"])

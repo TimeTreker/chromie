@@ -1868,10 +1868,15 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(result.disposition, "unavailable")
         self.assertEqual(result.activities, [])
-        self.assertIn(
-            "exact qualified vocal provider",
-            result.metadata["error"],
-        )
+        # The native Schema now rejects the substitution before DTO/Host.
+        self.assertIn("schema", result.metadata["error"])
+        with self.assertRaisesRegex(PlannerDTOContractError, "exact qualified vocal provider"):
+            planner_fast_validation.validate_fast_advance_output(
+                FastPlannerAdvanceModelOutput.model_validate(raw), request=run_request,
+                responsibilities=run_request.responsibilities,
+                capabilities=[{"capability_id": "soridormi.walk_forward",
+                    "input_schema": {"type": "object", "properties": {"duration_s": {"type": "number"}}}}],
+            )
 
     def test_fast_advance_cannot_omit_singing_from_compound_terminal_plan(self):
         raw = {
@@ -3406,12 +3411,12 @@ class FastPlannerResolverTests(unittest.TestCase):
             activity["timing"] = "sequential"
         run_request = _work_request(
             sid="turn-parallel-resource-revision",
-            text="Walk, then use velocity control.",
+            text="Walk and use velocity control at the same time.",
             responsibilities=[
                 {
                     "local_ref": "walk",
                     "outcome": "walk for one second",
-                    "bindings": {"duration_s": 1.0, "before": "velocity"},
+                    "bindings": {"duration_s": 1.0, "parallel_with": "velocity"},
                     "output_mode": "body_action",
                     "confidence": 0.95,
                 },
@@ -3495,7 +3500,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("must precede", advance.metadata["error"])
+        self.assertIn("not valid under any of the given schemas", advance.metadata["error"])
 
     def test_daytime_weather_can_check_and_speak_in_parallel(self):
         ollama = FakeOllama(

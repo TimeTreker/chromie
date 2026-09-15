@@ -1119,13 +1119,29 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 30. **Semantic decomposition must carry source-grounded Responsibility-coverage
    evidence in its primary result, not through a reviewer chain.** The model that owns a semantic stage
    must author the complete set of independently satisfiable outcomes, their
-   provider-neutral modes, material bindings, source-grounding evidence, and typed
+   provider-neutral modes, complete material constraints, source-grounding evidence, and typed
    order/concurrency relations in that stage's primary result. That result is the
    one model-authored semantic source of truth. A second LLM invocation must not be
    added merely to confirm, criticize, score, audit, resegment, or repair the same
    semantic decision. Calling such an invocation an auditor, verifier, critic,
    qualification pass, or fresh interpretation does not create a distinct
    authority and does not exempt it from this rule.
+
+   **Owner-approved GI handoff simplification (2026-09-15).** GI owns complete
+   intended outcomes with their referents, restrictions and scope attachment.
+   The Host passes the full immutable original input alongside that result; GI
+   must not regenerate the source copy. A complete information query need not
+   duplicate its subject, property, place or relative period into a semantic
+   classification table. Planner owns mapping that already-interpreted query to
+   the selected Capability's arguments. An absent duplicate binding is not itself
+   missing meaning. A required non-numeric string may use literal evidence present
+   in both its owning outcome and the original input; source text alone cannot
+   lend a sibling's value, override a binding, authorize new effects or resolve
+   GI's declared ambiguity. Literal provenance does not prove the model's semantic
+   mapping. Counts, measurements, explicit activation and field-specific updates
+   retain their existing typed conservation contracts. This amendment removes
+   mandatory redundant classification, not those execution-safety checks or GI's
+   completeness obligation. SC remains the sole ordinary response-wording owner.
 
    At a trusted validation boundary, **proof** means only the explicitly named
    invariant checked over the primary result and its authoritative input. It does

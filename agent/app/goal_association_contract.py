@@ -491,10 +491,11 @@ class GoalAssociationModelInformationResourceResponsibility(BaseModel):
     description: str = Field(min_length=1)
     quantity: str = ""
     query_scope: list[GoalAssociationModelBinding] = Field(
-        min_length=1,
+        min_length=0,
         max_length=12,
         description=(
-            "Every material human information-query constraint exactly once. Preserve "
+            "Each declared GI query binding exactly once; empty is valid when the complete "
+            "GI outcome owns the query without duplicate classification. Preserve "
             "source-grounded temporal wording as semantic scope; do not translate it "
             "into Capability argument names or values. A natural compound time scope "
             "may remain one binding with entity_type=temporal_scope."

@@ -354,10 +354,11 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
         run_request, raw = self.speech_outcomes("unavailable")
         run_request = run_request.model_copy(update={"history": [{"role": "assistant", "text": "x" * 32000}]})
         model = SequencedOllama([raw])
-        plan = asyncio.run(DeepPlannerResolver(model, FullCatalog()).resolve(run_request))
-        self.assertEqual(len(model.prompts), 0)
-        self.assertIn("deep Planner complete Work facts exceeds", plan.metadata["error"])
-        self.assertEqual(plan.steps, [])
+        asyncio.run(DeepPlannerResolver(model, FullCatalog()).resolve(run_request))
+        self.assertEqual(len(model.prompts), 1)
+        packet = str(model.prompts[0][0])
+        projected, _ = json.JSONDecoder().raw_decode(packet.split("Trusted Work planning facts JSON:\n", 1)[1])
+        self.assertEqual(projected["Prior dialogue"][0]["text"], "x" * 32000)
 
     def test_all_planner_packets_preserve_authoritative_unresolved_meaning(self):
         marker = "GI unresolved-meaning evidence (exact strings or empty):\n"
@@ -372,10 +373,6 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
                 }
                 for variant, render in renderers.items():
                     with self.subTest(sibling=sibling, unresolved=unresolved, variant=variant):
-                        if len(json.dumps(unresolved)) > 1200:
-                            with self.assertRaisesRegex(ValueError, "GI unresolved-meaning evidence exceeds required"):
-                                render()
-                            continue
                         packet = str(render())
                         self.assertEqual(packet.count(marker), 1)
                         projected, _ = json.JSONDecoder().raw_decode(packet.split(marker, 1)[1])

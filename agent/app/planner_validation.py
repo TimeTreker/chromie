@@ -62,6 +62,7 @@ from .planner_grounding import (
     _is_count_binding,
     _material_values_equal,
     _normalized_entity_type,
+    literal_intent_argument,
     missing_argument_realizations,
     semantic_numeric_values,
 )
@@ -1708,11 +1709,13 @@ def validate_user_supplied_parameter_provenance(
     *,
     authoritative_goals: list[dict[str, Any]],
 ) -> None:
-    """Require non-numeric ``user_supplied`` values to exist in typed Goals.
+    """Require non-numeric ``user_supplied`` values to have owned Goal evidence.
 
     A Planner may map a Goal binding to a differently named Capability argument,
     but it cannot manufacture a material string/entity value and label it as user
-    supplied. Numeric provenance retains its older dedicated validator because it
+    supplied. An exact literal in both the complete Goal and its source can also
+    establish provenance without a duplicate GI classification. Numeric provenance
+    retains its older dedicated validator because it
     also accounts for explicit numeric literals during the binding migration.
     """
 
@@ -1782,6 +1785,23 @@ def validate_user_supplied_parameter_provenance(
                 for binding in candidates
             ):
                 continue
+            if not preferred:
+                owned = {
+                    goal_id for step in output.steps
+                    if step.step_id == resolution.step_id
+                    for goal_id in step.source_goal_ids
+                }
+                if any(
+                    goal.get("goal_id") in source_goal_ids
+                    and goal.get("goal_id") in owned
+                    and literal_intent_argument(
+                        value,
+                        outcome=str(goal.get("description") or ""),
+                        source_text=str(goal.get("source_text") or ""),
+                    )
+                    for goal in authoritative_goals
+                ):
+                    continue
 
         raise ValueError(
             "user_supplied parameter resolution is not present in authoritative "

@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-09-14",
+  "frozen_on": "2026-09-15",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "0a13ad8fb969cc10781ffa4ea363d59681edf233a7c09ff4fc1b34a67059957d",
-    "workflow-conditional-dry.json": "cb79d6d025ae7d1d7fa870d2cd582cb3a0dbcffc3bf59b0b44df8305e69ce52d",
-    "workflow-conditional-rain.json": "5b1417ca989400f8b35b3dd38aa5838e463fc21df20f3358b45dbcfda19f6042",
-    "workflow-delayed.json": "d81cfacec33675e16e8363b81e4059c66acbdc73afb413ae24b348db98790a84",
-    "workflow-normal.json": "8a322e54ad4ea56c25d66dbbc3183e778bea29505a8986d0dcd23707baa7b58d"
+    "workflow-cancellation.json": "8b2a5bd94939698fb150aee2048861309ccaf76516273ff226d86afd1a37883c",
+    "workflow-conditional-dry.json": "b524d182533f7bd743fbae8eb50a9cb493e84c8c8264b7435b78a8d6171786ad",
+    "workflow-conditional-rain.json": "03532b661c5ef3986c18256c1a5fe3560b60fff278e45a8090d15b802095706d",
+    "workflow-delayed.json": "253d1cb2a7f62e1367d2904f44e89eca11aae03fad3588fbaee34c9a77a8d51e",
+    "workflow-normal.json": "3493faed0bab63f38b48acc0ed5ffb51686ccad5ab7783e4194f307da2954da6"
   },
-  "freeze_revision": 5,
-  "freeze_note": "Mechanical Schema alignment on the upstream Social Cognition/Work corpus: complete parameter-resolution branches and canonical Goal ownership. Only request format snapshots and hashes changed; all references, targets, splits and training eligibility unchanged.",
+  "freeze_revision": 10,
+  "freeze_note": "Source handoff/GA sparse query contract request-only rebind. All reference model outputs, fault injections, semantic expectations, source scenarios and splits unchanged. Review: gi-source-handoff-20260915.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

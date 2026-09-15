@@ -410,6 +410,7 @@ def materialize_planner_output(
     plan_id: str,
     expected_goal_ids_for_turn: list[str],
     fast_multi_goal_contract: bool = False,
+    completed_step_evidence: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Materialize only the Host-owned CanonicalPlan envelope."""
 
@@ -426,14 +427,25 @@ def materialize_planner_output(
     # The validated disposition establishes WHAT must be communicated, not words.
     # SC owns fulfillment; an answer need is prospective until actual delivery.
     needs = []
+    current_step_ids = {step.step_id for step in model_output.steps}
+    proved_steps = completed_step_evidence or {}
     for goal_id, outcome in model_output.goal_outcomes.items():
         kind = {"respond": "answer", "clarify": "input", "unavailable": "result", "refused": "result"}.get(outcome.disposition)
         if kind is not None:
+            facts = outcome.model_dump(mode="json", exclude_none=True)
+            completed = {key: proved_steps[key] for key in outcome.follows_step_ids
+                         if key not in current_step_ids and key in proved_steps}
+            if completed:
+                # Keep the model's original relation in facts. Only the already
+                # fulfilled scheduling edge disappears; no Work is replayed and
+                # no BEFORE edge or unproved reference is rewritten.
+                facts["completed_work_dependencies"] = list(completed.values())
             needs.append(SocialCommunicationNeed(
                 need_id=communication_need_id(plan_id, goal_id), owner="planner", kind=kind,
                 reference_id=plan_id, source_goal_ids=[goal_id],
-                facts=outcome.model_dump(mode="json", exclude_none=True),
-                before_step_ids=list(outcome.precedes_step_ids), after_step_ids=list(outcome.follows_step_ids),
+                facts=facts,
+                before_step_ids=list(outcome.precedes_step_ids),
+                after_step_ids=[key for key in outcome.follows_step_ids if key not in completed],
             ).model_dump(mode="python"))
     if model_output.user_confirmation_required:
         executing = [goal_id for goal_id, outcome in model_output.goal_outcomes.items() if outcome.disposition == "execute"]

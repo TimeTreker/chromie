@@ -2088,7 +2088,7 @@ class OllamaGoalInterpreter:
                     "'perform a body action'. For information, name the proposition or "
                     "subject to determine rather than only 'provide information'. For "
                     "speech, describe the communicative obligation or proposition; never "
-                    "write the exact utterance, which Planner alone authors."
+                    "write the exact utterance, which Social Cognition alone authors."
                 )
             local_ref = responsibility.get("properties", {}).get("local_ref")
             if isinstance(local_ref, dict):
@@ -2203,20 +2203,23 @@ class OllamaGoalInterpreter:
                     ),
                 }
                 if exact_source_surfaces:
-                    binding_properties["location"] = {
+                    # Reuse the same spelling constraint without repeating the
+                    # source enum for location, duration and speed on the wire.
+                    schema_definitions["SourceBackedBindingString"] = {
                         "type": "string",
                         "enum": list(exact_source_surfaces),
+                    }
+                    binding_properties["location"] = {
+                        "$ref": "#/$defs/SourceBackedBindingString",
                         "description": (
                             "If present, copy one exact contiguous surface from the "
                             "authoritative current turn. This closed spelling constraint "
                             "does not decide whether any surface is a location."
                         ),
                     }
-                measurement_string: dict[str, Any] = (
-                    {"type": "string", "enum": list(exact_source_surfaces)}
-                    if exact_source_surfaces
-                    else {"$ref": "#/$defs/SourceBackedBindingString"}
-                )
+                measurement_string: dict[str, Any] = {
+                    "$ref": "#/$defs/SourceBackedBindingString"
+                }
                 binding_properties["duration"] = {
                     "anyOf": [
                         copy.deepcopy(measurement_string),
@@ -2537,7 +2540,7 @@ class OllamaGoalInterpreter:
                 output_mode["description"] = (
                     "Provider-neutral WHAT category for this one atomic outcome. "
                     "Use speech for an ordinary conversational obligation whose semantic "
-                    "content is fixed by supplied bounded context. Planner alone authors "
+                    "content is fixed by supplied bounded context. Social Cognition alone authors "
                     "the exact utterance. "
                     "Use information for a factual answer not fixed by that semantic "
                     "context; this category does not decide whether or how Planner acquires "

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import copy
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -26,6 +27,52 @@ class Model:
 class Catalog:
     async def prompt_entries(self, **kwargs):
         return []
+
+
+@pytest.mark.parametrize("trigger", ["interpretation", "goal_state", "work_state", "evidence", "situation"])
+@pytest.mark.parametrize("memory_field", ["memory_candidates", "self_memory_candidates"])
+def test_native_memory_proposals_require_situation_authority(trigger, memory_field):
+    from tests.test_situational_cognition import request_for
+
+    current = request_for(goal_free_observation())
+    if trigger != "situation":
+        current = current.model_copy(update={"trigger": trigger, "source_turn": {"turn_id": "source"}})
+    schema = social_cognition_response_schema(current, [])
+    proposal = {"text": "A shared event.", "source_refs": current.source_refs,
+                "subject_refs": ["person:dad"]}
+    if memory_field == "self_memory_candidates":
+        proposal.update(kind="self_concern", subject_refs=["self:chromie"])
+    raw = {"disposition": "silence", "activities": [], "reason_summary": "No interruption needed.",
+           memory_field: [proposal]}
+    for contract in (schema, {"$defs": schema["$defs"], "oneOf": schema["oneOf"]}):
+        assert (not list(Draft202012Validator(contract).iter_errors(raw))) == (trigger == "situation")
+
+
+@pytest.mark.parametrize("need_count", [0, 1, 3])
+@pytest.mark.parametrize("deep", [False, True])
+def test_native_decision_states_preserve_pending_needs_and_unresolved_cognition(need_count, deep):
+    from shared.chromie_contracts.social_cognition import SocialCommunicationNeed
+
+    needs = [SocialCommunicationNeed(need_id=f"need:{i}", owner="planner", kind="answer",
+        reference_id="plan:1", source_goal_ids=["goal:1"]) for i in range(need_count)]
+    current = request(communication_needs=needs)
+    schema = social_cognition_response_schema(current, [], deep=deep)
+    # Exercise complete native alternatives without relying on if/then support.
+    native = {"$defs": schema["$defs"], "oneOf": schema["oneOf"]}
+    for state in ("communicate", "silence", "deliberate"):
+        for coverage in ("covered", "pending", "empty"):
+            raw = response(addressed_need_ids=[need.need_id for need in needs])
+            raw.update(disposition=state,
+                activities=raw["activities"] if state == "communicate" else [],
+                need_outcomes={} if coverage == "empty" else {need.need_id: coverage for need in needs})
+            expected = (not deep and (not need_count or coverage == "empty")) if state == "deliberate" else (
+                not need_count or (coverage != "empty" and (state == "communicate" or coverage == "pending")))
+            for contract in (schema, native):
+                assert (not list(Draft202012Validator(contract).iter_errors(raw))) == expected, (state, coverage)
+    # No unresolved decision may author memory, even when it has no needs.
+    unresolved = {"disposition": "deliberate", "activities": [], "reason_summary": "Unresolved.",
+                  "need_outcomes": {}, "memory_candidates": [{}]}
+    assert list(Draft202012Validator(native).iter_errors(unresolved))
 
 
 @pytest.mark.parametrize("phase", ["pre_action", "final"])
@@ -72,6 +119,28 @@ def response(**changes):
     return {"disposition": "communicate", "activities": [act], "reason_summary": "Meaningful progress."}
 
 
+@pytest.mark.parametrize("state", ["queued", "playing", "completed", "interrupted", "failed"])
+def test_delivery_projection_preserves_every_fact_and_request_identity(state):
+    from agent.app.social_cognition import social_cognition_prompt
+
+    ledger = {"events": [{"status": state, "text": "A grounded update.",
+                         "metadata": {"communicative_activity_ids": ["act:1"]}}]}
+    current = request(context={"interaction_context": ledger,
+                               "active_goal_snapshots": [{"goal_id": "goal:1", "status": "active"}],
+                               "other_evidence": {"status": "unknown", "value": "retain exactly"}})
+    before = current.model_dump(mode="json")
+    digest = current.snapshot_digest()
+    prompt = social_cognition_prompt(current, [], num_ctx=8192)
+    packet = json.loads(prompt.split("Trusted interaction snapshot:\n", 1)[1])
+    assert next(iter(packet)) == "interaction_context"
+    projected = packet["request"]
+    assert "interaction_context" not in projected["context"]
+    projected["context"]["interaction_context"] = packet["interaction_context"]
+    assert projected == before
+    assert current.model_dump(mode="json") == before
+    assert current.snapshot_digest() == digest
+
+
 @pytest.mark.asyncio
 async def test_shared_goal_state_is_read_only_input_and_complete_decision_is_one_call():
     current = request()
@@ -86,6 +155,29 @@ async def test_shared_goal_state_is_read_only_input_and_complete_decision_is_one
     assert deep.calls == []
     assert current.model_dump() == before
     assert "active_goal_snapshots" in model.calls[0][0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("count", [2, 8])
+async def test_repeated_words_keep_distinct_act_identity_without_a_single_act_cap(count):
+    current = request(context={"history": [{"role": "user", "text": f"Say hello {count} times."}]})
+    raw = {"disposition": "communicate", "reason_summary": "The person explicitly requested repetition.",
+        "activities": [response(activity_id=f"hello:{index}", text="Hello.")["activities"][0]
+                       for index in range(count)]}
+    model = Model(raw)
+    result = await SocialCognitionResolver(model, Catalog()).resolve(current)
+    assert [act.text for act in result.activities] == ["Hello."] * count
+    assert len({act.activity_id for act in result.activities}) == count
+    assert len(model.calls) == 1
+
+    # A repeated identity is an invalid complete result even when words match.
+    # It must never become partial delivery or a second semantic model call.
+    raw["activities"][1]["activity_id"] = raw["activities"][0]["activity_id"]
+    repeated = Model(raw)
+    deeper = Model(response())
+    with pytest.raises(ValueError, match="Activity IDs must be unique"):
+        await SocialCognitionResolver(repeated, Catalog(), deep_model=deeper).resolve(current)
+    assert len(repeated.calls) == 1 and deeper.calls == []
 
 
 @pytest.mark.asyncio
@@ -280,6 +372,7 @@ def test_silence_and_repair_have_distinct_schema_contracts():
         "text": "Previously delivered.", "metadata": {"communicative_activity_ids": ["earlier"]},
     }]}})
     schema = social_cognition_response_schema(current, [])
+    fresh_id = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]["enum"][0]
     assert Draft202012Validator(schema).is_valid({
         "disposition": "silence", "activities": [], "reason_summary": "No new interaction need.",
     })
@@ -287,8 +380,43 @@ def test_silence_and_repair_have_distinct_schema_contracts():
     assert not Draft202012Validator(schema).is_valid(response(text="...", function="repair"))
     assert not Draft202012Validator(schema).is_valid(response(repair_of_activity_ids=["earlier"]))
     assert Draft202012Validator(schema).is_valid(response(
-        text="A correction.", function="repair", repair_of_activity_ids=["earlier"],
+        activity_id=fresh_id, text="A correction.", function="repair", repair_of_activity_ids=["earlier"],
     ))
+
+
+@pytest.mark.parametrize("ledger_key", ["events", "already_spoken", "pending_speech"])
+@pytest.mark.parametrize("words", ["The task is complete.", "事情已经完成了。"])
+def test_native_identity_choices_preserve_reuse_and_explicit_repetition(ledger_key, words):
+    current = request(context={"interaction_context": {ledger_key: [{
+        "text": words, "metadata": {"communicative_activity_ids": ["existing"]},
+    }]}})
+    schema = social_cognition_response_schema(current, [])
+    fresh_ids = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]["enum"]
+    assert len(fresh_ids) == schema["properties"]["activities"]["maxItems"]
+    assert "existing" not in fresh_ids and len(set(fresh_ids)) == len(fresh_ids)
+    for contract in (schema, {"$defs": schema["$defs"], "oneOf": schema["oneOf"]}):
+        validator = Draft202012Validator(contract)
+        assert validator.is_valid(response(activity_id="existing", text=words))
+        assert not validator.is_valid(response(activity_id="existing", text="Different words."))
+        assert validator.is_valid(response(activity_id=fresh_ids[0], text="Different words."))
+        repeated = response()
+        repeated["activities"] = [response(activity_id=identity, text=words)["activities"][0]
+                                  for identity in fresh_ids]
+        assert validator.is_valid(repeated)
+
+
+@pytest.mark.asyncio
+async def test_raw_schema_rejects_nested_identity_violation_before_dto_or_retry():
+    current = request(context={"interaction_context": {"already_spoken": [{
+        "text": "Old words.", "metadata": {"communicative_activity_ids": ["old"]},
+    }]}})
+    # This is a valid free-standing DTO. The request-specific Schema excludes
+    # an unoffered fresh ID, while preserving all fresh message meanings.
+    raw = response(activity_id="unoffered", text="New words.")
+    model = Model(raw)
+    with pytest.raises(ValueError, match="raw Schema rejected"):
+        await SocialCognitionResolver(model, Catalog()).resolve(current)
+    assert len(model.calls) == 1
 
 
 def test_sglang_preserves_social_need_contract_through_decoder_intersections():
@@ -305,9 +433,11 @@ def test_sglang_preserves_social_need_contract_through_decoder_intersections():
         options={}, response_format=schema, stream=False, priority_step=100,
     )
     wire = payload["response_format"]["json_schema"]["schema"]
-    # XGrammar ignores sibling object shape around some conditional allOfs.
-    # The established transport projection must retain that shape explicitly.
-    assert wire["anyOf"][0]["required"] == schema["required"]
+    valid = response(addressed_need_ids=["answer:1"])
+    valid["need_outcomes"] = {"answer:1": "covered"}
+    Draft202012Validator(wire).validate(valid)
+    invalid = {**valid, "disposition": "silence", "activities": []}
+    assert list(Draft202012Validator(wire).iter_errors(invalid))
     assert payload["priority"] == 500
     assert validate_args_for_schema({"speech": "invented envelope"}, wire)
 
@@ -612,9 +742,18 @@ async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
     from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerStreamTerminal
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
     requests = []
+    history = [{"role": "user", "text": "Canonical recent turn"}]
+    source_context = {"history": history, "memory_summary": "Only available memory",
+        "conversation": {"history": [{"text": "Stale aggregate"}],
+                         "session_memory": {"memory_summary": "Owned memory"}},
+        "trusted_terminal_evidence": [{"evidence_id": "retained-fact"}]}
     class Agent:
         async def resolve_social_cognition(self, session, *, request, **kwargs):
             requests.append(request)
+            assert "conversation" not in request.context
+            assert request.context["history"] == history
+            assert request.context["session_memory"] == {"memory_summary": "Owned memory"}
+            assert request.context["trusted_terminal_evidence"] == [{"evidence_id": "retained-fact"}]
             if request.trigger == "interpretation":
                 return SocialCognitionResolution(request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
                     disposition="silence", activities=[], reason_summary="An answer can follow without filler.", model_call_count=1)
@@ -641,7 +780,7 @@ async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
         "local_ref": "r1", "outcome": "Return greeting", "bindings": {}, "output_mode": "speech", "confidence": 1,
     }])
     result = await coordinator.resolve(None, text="你好", sid="sc-greeting", core_interpretation=core,
-        turn_envelope=envelope, context={}, history=[], language="zh-CN")
+        turn_envelope=envelope, context=source_context, history=[], language="zh-CN")
     assert result.status == "applied", result.fallback_reason
     assert result.terminal_plan.response_text == ""
     assert result.terminal_plan.communicative_acts == []
@@ -649,6 +788,7 @@ async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
     assert result.interaction_response.speech[0].text == "你好呀。"
     assert result.interaction_response.speech[0].metadata["wording_owner"] == "social_cognition"
     assert len([item for item in requests if item.trigger == "work_state"]) == 1
+    assert "conversation" in source_context
     await asyncio.gather(*tuple(coordinator._auxiliary_execution_tasks), return_exceptions=True)
 
 
@@ -1076,3 +1216,26 @@ async def test_optional_provider_loss_does_not_suppress_anchored_speech():
     assert dispatch.runtime_response.capabilities == []
     assert dispatch.runtime_response.metadata["social_expression_admission_failures"][0]["reason_code"] == "social_expression_unavailable"
     assert any(event.event_type == "social_decoration_failed" for event in ledger.events("sid"))
+
+
+@pytest.mark.parametrize("kind", ["input", "confirmation"])
+@pytest.mark.parametrize("phase", [None, "immediate", "pre_action", "final"])
+def test_native_question_need_requires_question_function_without_forcing_optional_speech(kind, phase):
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    current = request(communication_needs=[SocialCommunicationNeed(
+        need_id="question", owner="planner", kind=kind, reference_id="plan:1",
+        source_goal_ids=["goal:1"], delivery_phase=phase)])
+    schema = social_cognition_response_schema(current, [])
+    valid = response(function="ask", delivery_phase=phase or "immediate", addressed_need_ids=["question"])
+    valid["need_outcomes"] = {"question": "covered"}
+    Draft202012Validator(schema).validate(valid)
+    for function in ("ask", "respond", "inform"):
+        act = {**valid["activities"][0], "function": function}
+        accepted = []
+        for branch in schema["$defs"]["SocialCommunicativeAct"]["oneOf"]:
+            native = copy.deepcopy(branch); native.pop("allOf", None); native["$defs"] = schema["$defs"]
+            accepted.append(Draft202012Validator(native).is_valid(act))
+        assert any(accepted) == (function == "ask")
+        # Optional communication remains a separate decision with no false coverage.
+        act["addressed_need_ids"] = []
+        Draft202012Validator(schema).validate({**valid, "activities": [act], "need_outcomes": {"question": "pending"}})

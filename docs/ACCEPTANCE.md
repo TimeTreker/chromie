@@ -3,6 +3,18 @@
 This document centralizes validation that was previously scattered across
 milestones and component notes.
 
+## Current owner acceptance — 2026-09-15
+
+The owner reports personally testing the microphone and ASR and accepts those
+components for the current work. Their qualification is closed on that manual
+acceptance; repeating microphone/ASR testing is not a prerequisite to continued
+engineering or fine-tuning preparation unless a new regression is reproduced.
+The report supplies no revision-bound automated artifact, so it is recorded as
+owner acceptance rather than a fabricated harness pass. Its scope is microphone
+and ASR; it does not clear the separately observed SC generation failure or the
+incomplete injected-text model/Runtime cohort. See the current
+[checkpoint](../DEVELOPMENT_CHECKPOINT.md) for those remaining failures.
+
 ## Scope of validation and semantic evidence
 
 For implementers, reviewers, and operators, this section owns the validation-claim

@@ -14,6 +14,27 @@ _NUMERIC_LITERAL_RE = re.compile(
 )
 _LIST_LITERAL_SEPARATOR_RE = re.compile(r"[,，;；、]")
 
+def literal_intent_argument(value: Any, *, outcome: str, source_text: str) -> bool:
+    """Check literal provenance, not the Planner's semantic argument mapping.
+
+    A non-numeric string may be copied from both the owning complete intent and
+    the immutable source without a duplicate GI classification. Measurements,
+    conversions and inferred values still require their existing typed evidence.
+    Latin substrings inside another word are not independent source values;
+    unsegmented scripts retain exact contiguous surface matching.
+    """
+
+    if not isinstance(value, str) or not value.strip() or value != value.strip():
+        return False
+    if _NUMERIC_LITERAL_RE.search(value):
+        return False
+    pattern = re.escape(value)
+    if value[0].isascii() and (value[0].isalnum() or value[0] == "_"):
+        pattern = r"(?<![A-Za-z0-9_])" + pattern
+    if value[-1].isascii() and (value[-1].isalnum() or value[-1] == "_"):
+        pattern += r"(?![A-Za-z0-9_])"
+    return bool(re.search(pattern, outcome) and re.search(pattern, source_text))
+
 def _normalized_material_value(value: Any) -> Any:
     """Normalize only representation details for exact semantic comparisons."""
 
