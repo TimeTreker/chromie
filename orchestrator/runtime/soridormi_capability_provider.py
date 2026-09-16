@@ -27,7 +27,9 @@ from agent.app.tool_invocation import (
     ToolCallOutcome,
     ToolInvocationContext,
 )
-from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityResult
+from shared.chromie_contracts.interaction import (
+    CapabilityRequest, CapabilityResult, CapabilityTraceEvent,
+)
 from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
 from shared.chromie_contracts.semantic_capability import (
     normalize_semantic_capability_facade,
@@ -298,10 +300,11 @@ class SoridormiCapabilityProvider:
             definition.metadata.get("upstream_skill_id")
             or request.capability_id.removeprefix("soridormi.")
         )
+        semantic_facade = definition.metadata.get("semantic_facade")
         try:
             provider_args = realize_semantic_capability_args(
                 request.args,
-                facade=definition.metadata.get("semantic_facade"),
+                facade=semantic_facade,
                 provider_input_schema=definition.metadata.get("provider_input_schema")
                 or definition.input_schema,
                 capability_id=request.capability_id,
@@ -316,6 +319,19 @@ class SoridormiCapabilityProvider:
                 reason_code="semantic_realization_failed",
                 message=str(exc),
             )
+        if semantic_facade:
+            # Diagnostic execution provenance only. The Planner/SC contracts retain
+            # semantic args; this trace records the trusted adapter realization so
+            # a live bundle can prove provider-frame mapping without moving it back
+            # into cognition.
+            context.trace.events.append(CapabilityTraceEvent(
+                type="provider_realization",
+                data={
+                    "semantic_args": dict(request.args),
+                    "provider_args": dict(provider_args),
+                    "semantic_facade_applied": True,
+                },
+            ))
         planned = await self.invoker.invoke(
             "soridormi.skill.create_plan",
             {

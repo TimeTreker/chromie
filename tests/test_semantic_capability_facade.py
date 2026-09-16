@@ -175,6 +175,11 @@ class SemanticCapabilityFacadeTests(unittest.IsolatedAsyncioTestCase):
         create = next(args for tool, args, _ in invoker.calls if tool == "soridormi.skill.create_plan")
         self.assertEqual(create["parameters"], {"duration_s": 1.5, "yaw_radps": -0.12})
         self.assertNotIn("direction", create["parameters"])
+        trace = execution.traces[0]
+        realization = next(event for event in trace.events if event.type == "provider_realization")
+        self.assertEqual(realization.data["semantic_args"], {"direction": "right", "duration_s": 1.5})
+        self.assertEqual(realization.data["provider_args"], {"duration_s": 1.5, "yaw_radps": -0.12})
+        self.assertTrue(realization.data["semantic_facade_applied"])
 
     async def test_provider_sign_change_does_not_change_planner_semantics(self) -> None:
         reversed_facade = {
