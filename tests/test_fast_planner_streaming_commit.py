@@ -445,3 +445,25 @@ def test_native_decision_alternatives_preserve_execution_delegation_boundary(dis
     # allOf checks, which the deployed decoder does not enforce.
     assert Draft202012Validator({"oneOf": schema["oneOf"]}).is_valid(output) == valid
     assert Draft202012Validator(schema).is_valid(output) == valid
+
+
+def test_planner_authority_forbids_confirmation_only_complete_response_for_work() -> None:
+    system = fast_streaming_advance_system_prompt()
+    assert "Do not create respond or a complete_response merely to acknowledge" in system
+    request = CognitiveWorkRequest(
+        sid="turn-physical-compound",
+        text="walk, nod, then turn left",
+        responsibilities=[
+            CognitiveResponsibilityProposal(
+                local_ref="r1",
+                outcome="walk, nod, then turn left",
+                output_mode="body_action",
+                confidence=1.0,
+            )
+        ],
+        interpretation_confidence=1.0,
+    )
+    prompt = fast_advance_layered_prompt(
+        request, responsibilities=request.responsibilities, capabilities=[]
+    ).render()
+    assert "Never add complete_response just to acknowledge" in prompt

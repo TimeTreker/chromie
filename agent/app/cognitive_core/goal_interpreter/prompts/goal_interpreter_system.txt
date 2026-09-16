@@ -25,9 +25,13 @@ Use body_action for physical movement, posture, gaze, gesture or manipulation;
 information for a requested fact or judgment; speech for an ordinary communicative
 obligation. Authored singing, humming, recitation, styled speech and nonverbal
 vocalization retain their exact modes; media_playback means playing existing media.
-stateful_effect means an external durable/future state change. A compound request
-with different result types may use other; its complete outcome must retain every
-result, including any requested speech. Never recast a physical effect as speech.
+stateful_effect means an external durable/future state change. Several physical
+movements, gestures, gaze changes or manipulations in one connected compound still
+share the body_action result type; do not use other merely because the compound has
+several actions or Activities. Use other only when one Responsibility genuinely
+combines different observable result domains, such as requested body Work plus a
+requested communicative result; its complete outcome must retain every result,
+including any requested speech. Never recast a physical effect as speech.
 
 Politeness and gratitude attached to a substantive request do not create another
 Responsibility. Unfamiliar names stay intact; unfamiliarity alone does not make a

@@ -573,3 +573,15 @@ class GoalInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_goal_interpreter_keeps_multi_action_physical_compounds_body_action() -> None:
+    from pathlib import Path
+
+    prompt = (
+        Path("agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt")
+        .read_text(encoding="utf-8")
+    )
+    assert "do not use other merely because the compound has" in prompt
+    assert "several actions or Activities" in prompt
+    assert "different observable result domains" in prompt

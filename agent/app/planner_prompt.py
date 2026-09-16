@@ -425,7 +425,7 @@ def fast_advance_layered_prompt(
         "needs, mixed when distinct Responsibilities require different roles, or escalate. "
         "complete_response establishes a context-grounded speech obligation, never delivered speech; "
         "include its rationale. clarification supplies typed information_gaps, never wording. "
-        "Ordinary speech admits complete_response; a mixed-mode other Responsibility may include it only alongside its Capability Work; information acquisition, "
+        "Ordinary requested speech admits complete_response; a mixed-mode other Responsibility may include it alongside Capability Work only when the source Responsibility itself explicitly contains a communicative result. Never add complete_response just to acknowledge, confirm, narrate or announce a physical Work sequence; SC decides that interaction independently. Information acquisition, "
         "physical/durable effects, vocal performance and media need their qualified providers. "
         "Do not confuse the person's intended activity with a robot action. "
         "Match each whole requested outcome against Capability semantic_scope, effects and "
