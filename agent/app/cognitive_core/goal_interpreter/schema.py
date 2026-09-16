@@ -6,8 +6,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 try:
     from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from chromie_contracts.user_turn import UserTurnEnvelope
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.user_turn import UserTurnEnvelope
 
 
 def _normalized_scalar_texts(value: Any) -> set[str]:
@@ -42,12 +44,38 @@ class GoalInterpretationRequest(BaseModel):
     sid: str | None = None
     text: str = Field(min_length=0, description="Already-admitted normalized user text")
     language: str | None = Field(default=None, description="Optional BCP-47 language hint")
+    turn_envelope: UserTurnEnvelope | None = Field(
+        default=None,
+        description=(
+            "The immutable admitted UserTurnEnvelope referenced by Goal Interpretation. "
+            "It is transport/source evidence, never another semantic author."
+        ),
+    )
     context: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("text")
     @classmethod
     def normalize_text(cls, value: str) -> str:
         return " ".join((value or "").strip().split())
+
+    @model_validator(mode="after")
+    def validate_turn_envelope_reference(self) -> "GoalInterpretationRequest":
+        envelope = self.turn_envelope
+        if envelope is None:
+            return self
+        if envelope.admission not in {"admit", "reflex_and_admit"}:
+            raise ValueError("Goal Interpretation requires an admitted UserTurnEnvelope")
+        if envelope.normalized_input.text != self.text:
+            raise ValueError("Goal Interpretation text does not match UserTurnEnvelope")
+        if self.sid is not None and str(self.sid).strip() and self.sid != envelope.session_id:
+            raise ValueError("Goal Interpretation session does not match UserTurnEnvelope")
+        if (
+            self.language is not None
+            and str(self.language).strip()
+            and self.language != envelope.normalized_input.language
+        ):
+            raise ValueError("Goal Interpretation language does not match UserTurnEnvelope")
+        return self
 
 
 class GoalInterpretationDecision(BaseModel):

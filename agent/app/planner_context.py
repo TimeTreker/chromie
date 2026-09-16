@@ -1023,6 +1023,10 @@ def evidence_bound_dialogue(
 def gateway_speech_act(request: Any) -> str:
     """Return immutable Gateway speech-act evidence from the admitted turn envelope."""
 
+    if getattr(request, "turn_envelope", None) is not None:
+        return " ".join(
+            str(request.turn_envelope.attention.speech_act or "").strip().split()
+        ).casefold()
     context = request.context if isinstance(request.context, dict) else {}
     envelope = context.get("user_turn_envelope")
     if not isinstance(envelope, dict):

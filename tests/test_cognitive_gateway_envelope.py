@@ -8,6 +8,9 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+from agent.app.goal_association_prompt import immutable_source_turn_prompt as ga_source_prompt
+from agent.app.planner_prompt import immutable_source_turn_prompt as planner_source_prompt
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.cognitive_gateway import (
     CognitiveGateway,
@@ -18,6 +21,10 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimePolicy,
     CognitiveRuntimeResolution,
     GoalDrivenRuntimeCoordinator,
+)
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    CognitiveWorkRequest,
 )
 from shared.chromie_contracts.reflex import ReflexOutcome
 from shared.chromie_contracts.user_turn import (
@@ -88,6 +95,74 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
                     text="Use the weather tool",
                     language="en-US",
                 )
+            )
+
+    def test_gi_ga_and_planner_reference_the_same_envelope_source(self) -> None:
+        envelope = self._envelope()
+        gi_request = GoalInterpretationRequest(
+            sid=envelope.session_id,
+            text=envelope.normalized_input.text,
+            language=envelope.normalized_input.language,
+            turn_envelope=envelope,
+        )
+        self.assertEqual(gi_request.turn_envelope, envelope)
+
+        work_request = CognitiveWorkRequest(
+            sid=envelope.session_id,
+            text=envelope.normalized_input.text,
+            language=envelope.normalized_input.language,
+            context={"user_turn_envelope": envelope.model_dump(mode="json")},
+            responsibilities=[
+                CognitiveResponsibilityProposal(
+                    local_ref="r1",
+                    outcome="Greet Chromie",
+                    output_mode="speech",
+                    confidence=1.0,
+                )
+            ],
+        )
+        self.assertEqual(work_request.turn_envelope, envelope)
+        work_wire = work_request.model_dump(mode="json")
+        self.assertNotIn("turn_envelope", work_wire)
+        self.assertEqual(
+            work_wire["context"]["user_turn_envelope"]["turn_id"],
+            envelope.turn_id,
+        )
+        provenance = work_request.source_turn_provenance
+        self.assertEqual(provenance["turn_id"], envelope.turn_id)
+        self.assertEqual(provenance["original_text"], envelope.original_input.text)
+
+        ga_prompt = ga_source_prompt(work_request)
+        planner_prompt = planner_source_prompt(work_request)
+        self.assertIn(envelope.original_input.text, ga_prompt)
+        self.assertIn(envelope.original_input.text, planner_prompt)
+        self.assertIn(envelope.turn_id, planner_prompt)
+        self.assertIn(provenance["original_text_sha256"], planner_prompt)
+        self.assertNotIn(provenance["original_text_sha256"], ga_prompt)
+
+    def test_semantic_requests_reject_envelope_transport_mismatch(self) -> None:
+        envelope = self._envelope()
+        with self.assertRaisesRegex(ValidationError, "text does not match UserTurnEnvelope"):
+            GoalInterpretationRequest(
+                sid=envelope.session_id,
+                text="Different words",
+                language=envelope.normalized_input.language,
+                turn_envelope=envelope,
+            )
+        with self.assertRaisesRegex(ValidationError, "session does not match UserTurnEnvelope"):
+            CognitiveWorkRequest(
+                sid="different-session",
+                text=envelope.normalized_input.text,
+                language=envelope.normalized_input.language,
+                context={"user_turn_envelope": envelope.model_dump(mode="json")},
+                responsibilities=[
+                    CognitiveResponsibilityProposal(
+                        local_ref="r1",
+                        outcome="Greet Chromie",
+                        output_mode="speech",
+                        confidence=1.0,
+                    )
+                ],
             )
 
     def test_admission_invariants_fail_closed(self) -> None:

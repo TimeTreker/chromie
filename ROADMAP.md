@@ -72,9 +72,13 @@ Work proceeds in this order:
 2. **Audit Planner and SC model-facing burden.** Inventory every material model-visible
    input and model-writable output field in the actual native transactions. Classify each
    as semantic decision, deterministic projection, provider realization, or
-   duplicate/compatibility representation. Reproduce the retained Fast provenance and SC
-   relevance failures against that inventory. Do not change prompts/models during the
-   audit. The deliverable is a smallest justified deletion/projection set plus red tests.
+   duplicate/compatibility representation. **First source slice implemented:** the original
+   user source is now explicitly anchored to the same typed `UserTurnEnvelope` across GI and
+   the GA/Planner work transaction, with fail-closed text/session/language correlation and no
+   new frozen Work-request field. Next, reproduce and remove the exact-quote copying burden
+   by changing Fast provenance to Envelope token/span references, then finish the SC relevance
+   burden inventory. Do not change models during this audit. The deliverable remains the
+   smallest justified deletion/projection set plus red tests.
 3. **Simplify the Planner/SC transactions without moving semantic authority.** Start with
    facts already known to be burdensome: model-retyped exact source text/strategy
    decoration, generated/correlation bookkeeping, decoder-shape-only fields, and SC

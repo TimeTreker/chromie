@@ -267,20 +267,24 @@ def _goal_interpretation_source_turn_provenance(
     """Return exact admitted wording once, without ambient Gateway metadata."""
 
     original_text = request.text
-    envelope = request.context.get("user_turn_envelope")
-    if isinstance(envelope, dict):
-        original_input = envelope.get("original_input")
-        candidate = (
-            original_input.get("text")
-            if isinstance(original_input, dict)
-            else None
-        )
-        if (
-            isinstance(candidate, str)
-            and candidate
-            and " ".join(candidate.strip().split()) == request.text
-        ):
-            original_text = candidate
+    envelope = request.turn_envelope
+    if envelope is not None:
+        original_text = envelope.original_input.text
+    else:
+        context_envelope = request.context.get("user_turn_envelope")
+        if isinstance(context_envelope, dict):
+            original_input = context_envelope.get("original_input")
+            candidate = (
+                original_input.get("text")
+                if isinstance(original_input, dict)
+                else None
+            )
+            if (
+                isinstance(candidate, str)
+                and candidate
+                and " ".join(candidate.strip().split()) == request.text
+            ):
+                original_text = candidate
     return {
         "original_text": original_text,
         "speaker_role": "user",
@@ -555,6 +559,8 @@ def _most_recent_assistant_utterance(
 
 def _admitted_turn_clock(request: GoalInterpretationRequest) -> str | None:
     """Project the trusted Gateway receipt instant, never a guessed local timezone."""
+    if request.turn_envelope is not None:
+        return request.turn_envelope.received_at.isoformat()
     envelope = request.context.get("user_turn_envelope")
     raw = envelope.get("received_at") if isinstance(envelope, dict) else None
     if raw is None:

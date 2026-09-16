@@ -543,11 +543,18 @@ discriminant is removed. Fast and Deep Planner now also close truth, Goal covera
 evidence scope, wording, and satisfaction in their primary results; the former
 same-owner qualification/coverage calls and dedicated truth-model role are removed.
 The existing frozen `UserTurnEnvelope` now remains the sole stored source of admitted
-wording. GI receives its exact original text explicitly; GA and Planner receive a compact
-read-only source projection; and scoped Planner re-entry carries the same digest-validated
-original wording while keeping `request.text`, Responsibilities, Goals, Plan, and Evidence
-restricted to the affected Goal subset. The source is visible for fidelity and correlation
-but grants no downstream authority to reinterpret or repair WHAT.
+wording. The current original-turn path also references that same envelope through typed
+semantic-owner boundaries: GI receives the admitted envelope directly, while GA and Planner
+resolve the full already-transported envelope from `CognitiveWorkRequest` through one typed
+accessor without adding another Work-request wire field. Text/session/language correlation is
+validated fail-closed. Their compact model-facing source projections are derived from that same
+envelope; trusted Work provenance retains the turn identity, exact original text and digest.
+Scoped Planner re-entry may instead carry the previously validated source projection while
+keeping `request.text`, Responsibilities, Goals,
+Plan, and Evidence restricted to the affected Goal subset. The source is visible for fidelity
+and correlation but grants no downstream authority to reinterpret or repair WHAT. Fast
+`argument_sources` still use exact model-retyped quotes in this revision; migration to
+Envelope span references is the next source slice, not an already-completed claim.
 This is source and automated-contract closure, not qualified target behavior. The current
 source starts Goal Association and one Fast Planner stream
 concurrently from the immutable GI result. The internal model output is one JSON object

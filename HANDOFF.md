@@ -1,5 +1,27 @@
 # Chromie Latest Handoff
 
+## UserTurnEnvelope source-identity handoff — 2026-09-16 (current)
+
+Continue from the owner-applied semantic-simplification design patch. The next implemented
+source slice makes `UserTurnEnvelope` the typed source reference across the original-turn
+GI/GA/Planner path without changing the frozen `CognitiveWorkRequest` wire. GI receives the
+typed envelope directly; GA/Planner resolve the full already-transported envelope through the
+request's typed accessor. Text/session/language mismatch fails closed, and model-facing source
+projections are derived from the same envelope identity/digest rather than another semantic
+summary. Re-entry may use its existing validated provenance projection and does not pretend to
+be a fresh user turn.
+
+Do **not** delete `argument_sources`: its purpose is valid end-to-end provenance. The next patch
+should replace model-authored exact-quote copying with an Envelope token/span reference and
+trusted exact materialization, while retaining Planner ownership of semantic realization and all
+Host grounding checks. Then finish the SC model-input burden audit; do not jump to model/SGLang
+optimization yet.
+
+Focused proof: 135 tests / 147 subtests passed. Missing `benchmarks/` in the supplied archive
+prevents benchmark-dependent test collection. One unrelated existing SC test expects the primary
+and deep prompt text to be identical, but the archive already appends different constrained
+output contracts for the two decoder schemas.
+
 ## Archive-baseline semantic simplification design handoff — 2026-09-16 (current)
 
 Use the owner-supplied `chromie_20260916_archive.zip` as the source baseline for this line.

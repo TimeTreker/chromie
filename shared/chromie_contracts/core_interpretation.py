@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .goal import GoalRelationship
 from .interaction import reject_forbidden_low_level_fields
-from .user_turn import normalize_turn_text
+from .user_turn import UserTurnEnvelope, normalize_turn_text
 
 
 _PLANNER_OWNED_BINDING_FIELDS = frozenset({
@@ -390,6 +390,49 @@ class CognitiveWorkRequest(BaseModel):
         return CoreInterpretationResult.normalize_unresolved(value)
 
     @property
+    def turn_envelope(self) -> UserTurnEnvelope | None:
+        """Return the full immutable source envelope when this is an original-turn request.
+
+        The envelope remains serialized inside the established context transport so this
+        accessor strengthens typing/correlation without changing the frozen Work request
+        wire. Re-entry requests may intentionally carry only validated source provenance.
+        """
+
+        context = self.context if isinstance(self.context, dict) else {}
+        raw = context.get("user_turn_envelope")
+        if isinstance(raw, UserTurnEnvelope):
+            return raw
+        if not isinstance(raw, dict):
+            return None
+        required = {
+            "turn_id", "session_id", "conversation_id", "channel", "received_at",
+            "original_input", "normalized_input", "quality", "reflex", "attention",
+            "admission",
+        }
+        if not required.issubset(raw):
+            return None
+        return UserTurnEnvelope.model_validate(raw)
+
+    @model_validator(mode="after")
+    def validate_turn_envelope_reference(self) -> "CognitiveWorkRequest":
+        envelope = self.turn_envelope
+        if envelope is None:
+            return self
+        if envelope.admission not in {"admit", "reflex_and_admit"}:
+            raise ValueError("Cognitive Work requires an admitted UserTurnEnvelope")
+        if envelope.normalized_input.text != self.text:
+            raise ValueError("Cognitive Work text does not match UserTurnEnvelope")
+        if self.sid is not None and str(self.sid).strip() and self.sid != envelope.session_id:
+            raise ValueError("Cognitive Work session does not match UserTurnEnvelope")
+        if (
+            self.language is not None
+            and str(self.language).strip()
+            and self.language != envelope.normalized_input.language
+        ):
+            raise ValueError("Cognitive Work language does not match UserTurnEnvelope")
+        return self
+
+    @property
     def source_turn_provenance(self) -> dict[str, Any]:
         """Project immutable source wording without granting semantic authority.
 
@@ -400,6 +443,20 @@ class CognitiveWorkRequest(BaseModel):
         another persisted copy.  A scoped Planner re-entry may supply the same
         projection without replaying the whole UserTurnEnvelope as a fresh turn.
         """
+
+        if self.turn_envelope is not None:
+            envelope = self.turn_envelope
+            original = envelope.original_input.text
+            return {
+                "schema_version": 1,
+                "turn_id": envelope.turn_id,
+                "original_text": original,
+                "original_text_sha256": hashlib.sha256(
+                    original.encode("utf-8")
+                ).hexdigest(),
+                "language": envelope.normalized_input.language,
+                "authority": "read_only_source_provenance",
+            }
 
         context = self.context if isinstance(self.context, dict) else {}
         projected = context.get("source_turn_provenance")

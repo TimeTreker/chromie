@@ -285,7 +285,11 @@ def _canonical_work_prompt(
         "\n" + PLANNER_WORK_AUTHORITY_PROMPT + CAPABILITY_LOOKUP_PROMPT +
         "Capability library index JSON:\n" + required_json(context.get("capability_index", []), None, label="Capability index") +
         "Loaded capability details JSON:\n" + json.dumps(context.get("capability_details_loaded", [])) +
-        "\nTrusted admitted clock JSON:\n" + json.dumps((context.get("user_turn_envelope") or {}).get("received_at")) +
+        "\nTrusted admitted clock JSON:\n" + json.dumps(
+            request.turn_envelope.received_at.isoformat()
+            if request.turn_envelope is not None
+            else (context.get("user_turn_envelope") or {}).get("received_at")
+        ) +
         "Read output_mode as provider-neutral WHAT, not permission or an execution lane. "
         "Ordinary language generation, creative/social responses and answers grounded in "
         "supplied context use respond with no Capability: SC will compose the actual words. "

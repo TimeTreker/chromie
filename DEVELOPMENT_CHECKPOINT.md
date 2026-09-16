@@ -1,5 +1,36 @@
 # Development Checkpoint
 
+## UserTurnEnvelope semantic-source transport slice — 2026-09-16 (current)
+
+The owner clarified the purpose of Planner argument provenance: the exact user input must
+survive transport without message loss. `UserTurnEnvelope` is therefore the single immutable
+source record referenced by GI, GA and Planner; downstream owners must not depend on one
+another retyping the user's words. This source slice implements that transport identity before
+changing `argument_sources`.
+
+Current-turn GI now receives the admitted typed `UserTurnEnvelope` directly in its internal
+request and validates normalized text, session and language against it. `CognitiveWorkRequest`
+does **not** add a new wire field: it resolves the already-transported full envelope from the
+existing context through one typed accessor, validates the same correlation, and uses that
+envelope as the primary source for GA/Planner provenance, admitted clock and Gateway speech-act
+evidence. Trusted Work provenance carries the same turn ID, exact original text and SHA-256
+digest, while model-facing source projections derive from that envelope without requiring GA
+to consume correlation bookkeeping. Re-entry remains distinct: it may carry a previously
+validated source-turn projection without fabricating a new user turn or widening Goal scope.
+
+This deliberately does not yet change Fast `argument_sources`. The next source slice should
+move that model burden from retyping exact quotes to selecting immutable Envelope token/span
+references, with trusted code materializing the exact quote/digest. Planner must still own the
+semantic mapping/conversion; Host must still reject an unowned, ambiguous or mismatched span.
+After that, continue the SC projection audit and semantic Capability facade work.
+
+Focused proof on the supplied archive after the design patch: **135 tests + 147 subtests pass**
+across Gateway envelope, GI prompt, GA and Planner re-entry suites. A wider selected run also
+passed 133 tests before one pre-existing SC assertion about primary/deep required-output-schema
+prompt identity; the current archive's SC decoder change already makes those prompts differ.
+Tests that import `benchmarks/` cannot collect/run because the supplied archive omits that tree;
+this remains the previously recorded archive limitation. No model/profile/provider change.
+
 ## Semantic transaction simplification design amendment — 2026-09-16 (current)
 
 The project owner supplied `chromie_20260916_archive.zip` as the new development

@@ -541,6 +541,7 @@ async def interpret_cognitive_turn(
                 sid=envelope.session_id,
                 text=envelope.normalized_input.text,
                 language=envelope.normalized_input.language,
+                turn_envelope=envelope,
                 context=context,
             )
         )
