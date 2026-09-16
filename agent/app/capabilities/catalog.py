@@ -22,6 +22,13 @@ except ModuleNotFoundError as exc:  # Repository-checkout fallback.
         normalize_soridormi_body_contract,
     )
 
+try:
+    from chromie_contracts.semantic_capability import normalize_semantic_capability_facade
+except ModuleNotFoundError as exc:  # Repository-checkout fallback.
+    if exc.name != "chromie_contracts":
+        raise
+    from shared.chromie_contracts.semantic_capability import normalize_semantic_capability_facade
+
 from .models import CapabilityRegistry, ToolCapability
 
 logger = logging.getLogger("chromie.agent.capability_catalog")
@@ -447,15 +454,28 @@ class CapabilityCatalog:
                         or safety_class in {"physical_motion", "safety_critical"}
                         or "physical_motion" in effects
                     )
-                    input_schema = (
+                    upstream_metadata = item.get("metadata")
+                    if not isinstance(upstream_metadata, dict):
+                        upstream_metadata = {}
+                    provider_input_schema = (
                         item.get("parameters_schema")
                         or item.get("input_schema")
                         or {}
                     )
-                    if not isinstance(input_schema, dict):
+                    if not isinstance(provider_input_schema, dict):
                         raise ValueError(
                             f"Soridormi skill {upstream_id!r} input schema must be an object"
                         )
+                    semantic_facade = normalize_semantic_capability_facade(
+                        upstream_metadata.get("semantic_facade"),
+                        capability_id=capability_id,
+                        provider_input_schema=provider_input_schema,
+                    )
+                    input_schema = (
+                        dict(semantic_facade["input_schema"])
+                        if semantic_facade
+                        else dict(provider_input_schema)
+                    )
                     body_contract = normalize_soridormi_body_contract(item)
                     can_run_parallel = body_contract["can_run_parallel"]
                     body_lane = body_contract["body_lane"]
@@ -463,9 +483,6 @@ class CapabilityCatalog:
                     resource_claims = body_contract["resource_claims"]
                     execution_constraints = body_contract["execution_constraints"]
                     canonical_concurrency = body_contract["canonical_concurrency"]
-                    upstream_metadata = item.get("metadata")
-                    if not isinstance(upstream_metadata, dict):
-                        upstream_metadata = {}
                     semantic_scope = upstream_metadata.get("semantic_scope")
                     if not isinstance(semantic_scope, dict):
                         semantic_scope = {}

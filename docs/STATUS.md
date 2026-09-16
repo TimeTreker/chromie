@@ -1,6 +1,21 @@
 # Chromie Current Status
 
 
+## Phase 2A declared semantic Capability facade — 2026-09-16
+
+**Source substrate implemented; paired provider declaration and native qualification remain open.**
+Soridormi live named capabilities may now publish a closed `metadata.semantic_facade` whose
+Core-facing `input_schema` contains provider-neutral semantic arguments while a trusted adapter
+realizes provider-local arguments only immediately before provider planning. The first qualified
+realization primitive is signed magnitude: e.g. Planner may author `direction=left|right` plus a
+positive turn-rate magnitude while the provider adapter alone maps that meaning to the local yaw
+sign. Runtime validates the semantic schema, not the provider encoding; provider-frame reversal
+therefore changes adapter realization without changing Planner meaning. Capabilities that do not
+declare a facade retain their current schema; Chromie does not infer a facade from names or user
+phrases. No current Soridormi deployment is claimed migrated until that provider publishes the
+declaration and target evidence is rerun.
+
+
 ## Phase 1E Social Cognition model-view diet — 2026-09-16
 
 **Source implemented; native semantic/latency qualification remains open.** The trusted

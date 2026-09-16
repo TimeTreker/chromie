@@ -29,6 +29,10 @@ from agent.app.tool_invocation import (
 )
 from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityResult
 from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
+from shared.chromie_contracts.semantic_capability import (
+    normalize_semantic_capability_facade,
+    realize_semantic_capability_args,
+)
 from shared.chromie_contracts.soridormi_body_contract import normalize_soridormi_body_contract
 
 from .capability_runtime import (
@@ -148,11 +152,21 @@ def import_soridormi_capability_catalog(
         upstream_metadata = item.get("metadata")
         if not isinstance(upstream_metadata, dict):
             upstream_metadata = {}
-        input_schema = item.get("parameters_schema") or item.get("input_schema") or {}
-        if not isinstance(input_schema, dict):
+        provider_input_schema = item.get("parameters_schema") or item.get("input_schema") or {}
+        if not isinstance(provider_input_schema, dict):
             raise ValueError(
                 f"Soridormi skill {upstream_skill_id!r} input schema must be an object"
             )
+        semantic_facade = normalize_semantic_capability_facade(
+            upstream_metadata.get("semantic_facade"),
+            capability_id=capability_id,
+            provider_input_schema=provider_input_schema,
+        )
+        input_schema = (
+            dict(semantic_facade["input_schema"])
+            if semantic_facade
+            else dict(provider_input_schema)
+        )
 
         definitions.append(
             CapabilityDefinition(
@@ -231,6 +245,8 @@ def import_soridormi_capability_catalog(
                         if isinstance(upstream_metadata.get("resource_contract"), dict)
                         else {}
                     ),
+                    "semantic_facade": dict(semantic_facade),
+                    "provider_input_schema": dict(provider_input_schema),
                 },
             )
         )
@@ -282,11 +298,29 @@ class SoridormiCapabilityProvider:
             definition.metadata.get("upstream_skill_id")
             or request.capability_id.removeprefix("soridormi.")
         )
+        try:
+            provider_args = realize_semantic_capability_args(
+                request.args,
+                facade=definition.metadata.get("semantic_facade"),
+                provider_input_schema=definition.metadata.get("provider_input_schema")
+                or definition.input_schema,
+                capability_id=request.capability_id,
+            )
+        except ValueError as exc:
+            return CapabilityResult(
+                request_id=request.request_id,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                reason_code="semantic_realization_failed",
+                message=str(exc),
+            )
         planned = await self.invoker.invoke(
             "soridormi.skill.create_plan",
             {
                 "skill_id": upstream_skill_id,
-                "parameters": request.args,
+                "parameters": provider_args,
                 "chromie_intent": self._chromie_intent_payload(
                     request,
                     definition,

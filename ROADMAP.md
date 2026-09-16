@@ -138,6 +138,8 @@ capability limitation from raw motor-control restrictions intended only for its 
 social expression. This completes the first SC contract-diet slice before the semantic
 Capability-facade line.
 
+Phase 2A now implements the provider-declared semantic Capability facade substrate: semantic input schemas can replace provider-local model-facing encodings, and the Soridormi adapter materializes declared signed-magnitude arguments only after Runtime validates the semantic request. This is source support, not evidence that the current live Soridormi catalog publishes a facade or that native direction qualification is closed.
+
 ## Social Cognition migration
 
 The owner approved the [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)

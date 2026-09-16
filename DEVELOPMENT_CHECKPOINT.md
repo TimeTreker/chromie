@@ -1,5 +1,19 @@
 # Development Checkpoint
 
+## Semantic Capability facade Phase 2A — 2026-09-16
+
+The owner-approved contract-diet line now has a first provider-boundary implementation.
+`metadata.semantic_facade` is an optional provider declaration, never inferred by Chromie.
+Agent catalog projection exposes its closed semantic `input_schema`; trusted Capability Runtime
+validates those semantic arguments; the Soridormi adapter materializes provider-local arguments
+only immediately before `soridormi.skill.create_plan`. The initial generic realization is a
+`signed_magnitude` mapping suitable for frame/sign conventions such as left/right body turning.
+Changing the provider's positive axis changes only the declaration/adapter result, not Planner
+meaning. Capabilities without a declaration remain unchanged. Focused tests cover facade
+validation, model-facing schema isolation, real Runtime execution materialization and reversed
+provider-frame invariance. Native/current-provider qualification remains open because this
+Chromie patch does not fabricate a Soridormi declaration.
+
 ## Social Cognition model-view diet — Phase 1E — 2026-09-16 (current)
 
 Phase 1E keeps the full `SocialCognitionRequest` as the trusted Host/Runtime truth but
