@@ -145,6 +145,8 @@ def test_delivery_projection_preserves_social_facts_without_mutating_trusted_req
     prompt = social_cognition_prompt(current, [], num_ctx=8192)
     packet = json.loads(prompt.split("Trusted interaction snapshot:\n", 1)[1])
     assert next(iter(packet)) == "interaction_context"
+    opportunity_text = prompt.split("Immediate interaction opportunity:\n", 1)[1].split("\nTrusted interaction snapshot:\n", 1)[0]
+    assert json.loads(opportunity_text)["kind"] == "trusted_state_change"
     projected = packet["request"]
     assert "interaction_context" not in projected["context"]
     assert packet["interaction_context"] == ledger
@@ -171,6 +173,56 @@ def test_social_authority_does_not_confuse_high_level_work_with_raw_motor_contro
     assert "high-level requested work such as walking, turning" in prompt
     assert "is not raw motor control" in prompt
     assert "must never be declared unavailable or unsafe" in prompt
+
+
+def test_fresh_turn_prompt_frontloads_social_opportunity_without_duplicate_source_or_empty_needs():
+    from agent.app.social_cognition import social_cognition_prompt
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    current = SocialCognitionRequest(
+        request_id="sc-fresh", trigger="interpretation", source_refs=["turn:1"],
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="turn left", confidence=1.0, output_mode="other",
+            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
+        )],
+        source_turn={
+            "schema_version": 1, "turn_id": "turn:1", "language": "en-US",
+            "original_text": "turn left", "original_text_sha256": "a" * 64,
+            "authority": "read_only_source_provenance",
+        },
+        context={
+            "user_turn_envelope": {"large": "trusted transport copy"},
+            "user_turn_schema_version": 1,
+            "work_decision_pending": True,
+            "interaction_context": {"already_spoken": [], "pending_speech": []},
+        },
+    )
+    prompt = social_cognition_prompt(current, [], num_ctx=8192)
+    packet = json.loads(prompt.split("Trusted interaction snapshot:\n", 1)[1])
+    opportunity = json.loads(
+        prompt.split("Immediate interaction opportunity:\n", 1)[1].split("\nTrusted interaction snapshot:\n", 1)[0]
+    )
+    assert opportunity == {
+        "fresh_addressed_turn": True,
+        "kind": "fresh_addressed_turn",
+        "reply_already_pending_or_delivered": False,
+        "work_decision_pending": True,
+    }
+    projected = packet["request"]
+    assert "communication_needs" not in projected
+    assert "user_turn_envelope" not in projected["context"]
+    assert "user_turn_schema_version" not in projected["context"]
+    assert projected["source_turn"]["original_text"] == "turn left"
+    assert current.context["user_turn_envelope"] == {"large": "trusted transport copy"}
+
+
+def test_social_authority_treats_fresh_task_request_as_interaction_not_silence_by_default():
+    from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
+
+    prompt = SOCIAL_COGNITION_AUTHORITY_PROMPT.lower()
+    assert "fresh addressed turn is itself an interaction opportunity" in prompt
+    assert "task-oriented content, physical work, or absence of a planner communication need" in prompt
+    assert "are never by themselves reasons for silence" in prompt
 
 
 @pytest.mark.asyncio

@@ -76,12 +76,16 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "the gap or proposal; SC owns expressing it. A fresh required question normally "
     "needs delivery unless actual pending/delivered interaction or current social "
     "conditions justify deferral. Explain any such deferral from supplied facts. "
-    "At the interpretation ingress with no established communication needs, acknowledge "
-    "understanding if useful or remain silent; the independent Work decision is still "
-    "pending. Do not answer a task or invent an input question before that decision. "
-    "An empty communication_needs list does not select silence: independently assess "
-    "whether the supplied Situation, shared goals or relationship context warrants "
-    "useful initiative. Never invent a task just to create an interaction need. "
+    "A fresh addressed turn is itself an interaction opportunity even when the person "
+    "did not explicitly ask for speech. When no reply is already pending or delivered for "
+    "that turn, a brief truthful acknowledgement or useful nonverbal acknowledgement is "
+    "ordinarily appropriate if it will not interrupt something more important. Task-oriented "
+    "content, physical Work, or absence of a Planner communication need are never by "
+    "themselves reasons for silence. At interpretation ingress the independent Work decision "
+    "is still pending, so do not answer the task or invent an input question before that "
+    "decision. Silence remains valid only for a positive supplied situational reason such as "
+    "duplicate/pending interaction, inappropriate interruption, or genuinely no useful social "
+    "change. Never invent a task just to create an interaction need. "
     "Use exact eligible social-expression Capability IDs and schema-valid arguments only "
     "when useful, with each proposal anchored to its own communicative act. The prohibition "
     "on raw motor, joint, actuator or controller fields applies only to optional social "
@@ -453,10 +457,30 @@ def _social_model_context(context: dict[str, Any]) -> dict[str, Any]:
     projected = copy.deepcopy(context)
     # Integrity lineage is trusted transport metadata rather than cognition.
     projected.pop("semantic_artifact_lineage", None)
+    # The exact admitted source is already present once as request.source_turn.
+    # Keeping another complete UserTurnEnvelope in model context adds transport
+    # bytes without adding semantic information and makes source bookkeeping
+    # compete with the social decision. The trusted request still retains it.
+    projected.pop("user_turn_envelope", None)
+    projected.pop("user_turn_schema_version", None)
     for key in ("canonical_plan_resolution", "source_canonical_plan"):
         if key in projected:
             projected[key] = _social_plan_facts(projected[key])
     return projected
+
+
+def _social_interaction_opportunity(
+    request: SocialCognitionRequest, interaction: dict[str, Any],
+) -> dict[str, Any]:
+    """Compact deterministic cue for SC; never a second social authority."""
+    already = interaction.get("already_spoken") or []
+    pending = interaction.get("pending_speech") or []
+    return {
+        "kind": "fresh_addressed_turn" if request.trigger == "interpretation" else "trusted_state_change",
+        "fresh_addressed_turn": request.trigger == "interpretation",
+        "reply_already_pending_or_delivered": bool(already or pending),
+        "work_decision_pending": bool(request.context.get("work_decision_pending")),
+    }
 
 
 def social_cognition_prompt(
@@ -464,16 +488,25 @@ def social_cognition_prompt(
 ) -> str:
     payload = request.model_dump(mode="json")
     payload["context"] = _social_model_context(payload.get("context", {}))
-    # Present the authoritative delivery ledger before the larger Goal/Work
-    # snapshot. Relocate it once without changing the trusted request itself.
+    # Empty external Needs are not a social fact and previously became a false
+    # silence cue in native inference. Non-empty Needs remain complete.
+    if not payload.get("communication_needs"):
+        payload.pop("communication_needs", None)
+    # Present the social opportunity and authoritative delivery ledger before
+    # the larger Goal/Work snapshot. This is a read-only projection only.
     interaction = payload["context"].pop("interaction_context", {})
+    opportunity = _social_interaction_opportunity(request, interaction)
     packet = {
         "interaction_context": interaction,
         "request": payload,
         "social_expression": auxiliary_social_prompt_context(request.context, candidates),
     }
-    return STABLE_MIND_SEMANTIC_CONTRACT + "\nTrusted interaction snapshot:\n" + required_json(
-        packet, max_chars=num_ctx * 3, label="Social Cognition complete snapshot",
+    return (
+        STABLE_MIND_SEMANTIC_CONTRACT
+        + "\nImmediate interaction opportunity:\n"
+        + required_json(opportunity, max_chars=2048, label="Social Cognition interaction opportunity")
+        + "\nTrusted interaction snapshot:\n"
+        + required_json(packet, max_chars=num_ctx * 3, label="Social Cognition complete snapshot")
     )
 
 
