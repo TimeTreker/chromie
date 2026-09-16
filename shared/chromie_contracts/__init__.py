@@ -27,6 +27,14 @@ from .agent_skill import (
     SelectedAgentSkill,
 )
 from .memory import MemoryUpdateProposal
+from .semantic_artifact import (
+    SemanticArtifactEnvelope,
+    SemanticArtifactKind,
+    SemanticArtifactPacket,
+    SemanticArtifactRef,
+    semantic_artifact_packet,
+    semantic_artifact_payload_sha256,
+)
 from .core_interpretation import (
     CognitiveResponsibilityProposal,
     CognitiveWorkRequest,
@@ -431,6 +439,12 @@ __all__ = [
     "canonical_plan_fingerprint",
     "ToolResultEvidence",
     "ToolResultStatus",
+    "SemanticArtifactEnvelope",
+    "SemanticArtifactKind",
+    "SemanticArtifactPacket",
+    "SemanticArtifactRef",
+    "semantic_artifact_packet",
+    "semantic_artifact_payload_sha256",
     "canonical_value_sha256",
 ]
 

@@ -1,5 +1,21 @@
 # Chromie Latest Handoff
 
+## Semantic Artifact Envelope handoff — 2026-09-16 (current)
+
+Continue after the UserTurnEnvelope source-identity slice. The owner explicitly extended the same
+message-conservation rule to accepted GI/GA/Goal/Planner/SC outputs and asked terminal Goals/
+Responsibilities/talk to land in retained history. The new generic `SemanticArtifactEnvelope` is
+a mechanical integrity/lineage wrapper, not another semantic owner or store. It protects the exact
+typed payload with a SHA-256 and parent refs rooted at `UserTurnEnvelope`; existing Cognitive
+Evidence JSONL archives immutable envelopes and, when text-retention policy permits, exact
+packets; existing lifecycle/Evidence records append terminal facts. Active Goal/Work/Interaction
+owners are unchanged.
+
+Next source slice: carry artifact refs across actual Agent↔Host GI/GA/Planner/SC boundaries without
+putting digest/ID bookkeeping into model prompts. After that, migrate Planner `argument_sources` to
+UserTurnEnvelope token/span refs and trusted quote materialization. Do not skip directly to prompt,
+model or SGLang tuning.
+
 ## UserTurnEnvelope source-identity handoff — 2026-09-16 (current)
 
 Continue from the owner-applied semantic-simplification design patch. The next implemented

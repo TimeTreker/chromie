@@ -554,7 +554,19 @@ keeping `request.text`, Responsibilities, Goals,
 Plan, and Evidence restricted to the affected Goal subset. The source is visible for fidelity
 and correlation but grants no downstream authority to reinterpret or repair WHAT. Fast
 `argument_sources` still use exact model-retyped quotes in this revision; migration to
-Envelope span references is the next source slice, not an already-completed claim.
+Envelope span references is not yet an already-completed claim. Before that migration, the
+owner generalized the same anti-loss requirement to accepted semantic outputs. The source now
+contains a model-neutral `SemanticArtifactEnvelope` / packet contract: existing artifact ID,
+canonical payload SHA-256, existing authority/correlation and immutable parent refs around the
+exact typed payload. `CognitiveEvidenceRecorder` always archives immutable envelopes for admitted
+UserTurn, GI and each Responsibility, GA/new Goals, canonical Planner Plans,
+SC/Communicative Activities when present, and trusted execution outcomes; exact packets are
+retained only when configured text retention permits. Payload mutation fails digest validation.
+Execution-outcome envelopes currently land as terminal history; exact Plan/Goal parent refs are
+not fabricated from IDs and become mandatory in the next live-ref transport slice. No prompt,
+model Schema, provider contract, active state owner or frozen Work-request field changes in this
+slice. Live cross-service artifact-ref enforcement comes next, followed by Envelope span
+`argument_sources` materialization.
 This is source and automated-contract closure, not qualified target behavior. The current
 source starts Goal Association and one Fast Planner stream
 concurrently from the immutable GI result. The internal model output is one JSON object

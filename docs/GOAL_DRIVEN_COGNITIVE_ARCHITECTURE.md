@@ -342,6 +342,35 @@ ordered/parallel sibling references let trusted code verify `before`/`after` or
 Goal Association or Planner consumes this accepted evidence within its distinct
 authority; neither calls a semantic reviewer to reinterpret GI WHAT.
 
+### Semantic artifacts travel with immutable lineage
+
+Message conservation is not only a UserTurn concern. Once an existing semantic owner has
+produced and trusted validation has accepted a result, transport must be able to prove that
+the next boundary received that exact artifact rather than a lossy restatement. Chromie
+therefore uses one mechanical **Semantic Artifact Envelope** substrate around accepted
+artifacts. It records the artifact's existing identity, canonical payload SHA-256, existing
+authority, turn/session/conversation correlation and immutable parent refs. A packet is the
+envelope plus the exact canonical typed payload; changing any payload byte invalidates the
+digest.
+
+The lineage begins with `UserTurnEnvelope` and may continue through accepted GI result and
+Responsibilities, GA resolution and newly committed Goals, Planner Plan, SC resolution and
+individual Communicative Activities. Trusted execution outcomes are enveloped as terminal
+history too; their Plan/Goal parent refs become mandatory when the live transport starts
+carrying those refs across the execution boundary. This lineage does not make the chain serial:
+GA, Planner and SC may still run concurrently from the same accepted source. Parent refs prove
+provenance; they do not transfer authority. In particular, a Planner envelope cannot rewrite GI
+WHAT and an SC envelope cannot authorize Work.
+
+Envelope construction is trusted-code bookkeeping after the semantic decision, never a model
+output field. It must not make prompts larger merely to expose IDs/digests that the model does
+not need. Active Goal/Work/Interaction truth remains in the existing stores. The current
+Cognitive Evidence JSONL and Interaction Ledger are the archival/lifecycle surfaces: immutable
+envelopes are retained for correlation, while exact packet payloads are retained only when the
+configured privacy/text-retention policy permits. Later completion, failure, cancellation or
+speech-delivery facts append new Evidence/events instead of mutating the original artifact.
+This is history conservation, not another persistent Mind.
+
 ### Model transactions carry semantic decisions, not protocol paperwork
 
 The model-facing wire is an **information boundary**, not a mirror of every field the

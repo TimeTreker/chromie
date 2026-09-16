@@ -1316,6 +1316,21 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    span. Ambiguous provenance remains unresolved and must pass ordinary Planner validation
    or fail closed.
 
+   The same conservation rule applies to accepted semantic artifacts themselves. The
+   immutable `UserTurnEnvelope` is the root source artifact. Accepted GI interpretation,
+   individual Responsibilities, GA resolution/new Goals, canonical Planner Plans, SC
+   resolution/Communicative Activities, and trusted execution outcomes may be paired with
+   one **Semantic Artifact Envelope** containing only existing artifact identity, exact
+   payload digest, existing authority, turn/session correlation and parent artifact refs.
+   Trusted code creates and verifies that envelope after the owning semantic result exists;
+   the model does not author its ID, digest, lineage, timestamp or archival policy. The
+   envelope cannot summarize, repair or reinterpret the payload, and it creates no second
+   Goal/Plan/Interaction store. Active state remains with its current owner. The existing
+   append-only cognitive-evidence/interaction records retain the immutable envelope; exact
+   packet payload may be retained only when normal privacy/text-retention policy permits.
+   Later terminal/delivery facts append independently. Completion appends lifecycle/Evidence
+   to immutable history; it does not rewrite the original artifact.
+
 32. **The best-known technical architecture is the default target.** Chromie
    should pursue the technically strongest architecture we can justify from current
    evidence, not merely the strongest architecture that fits the current codebase,

@@ -1,5 +1,32 @@
 # Development Checkpoint
 
+## Semantic Artifact Envelope substrate — 2026-09-16 (current)
+
+The owner generalized the anti-message-loss requirement beyond original user input: accepted GI,
+GA, Goal, Planner and Social Cognition/talk artifacts also need immutable transport identity and
+lineage, and completed work should land in retained history rather than disappear with active
+state. The implementation reuses existing truth owners and observability instead of adding an
+Artifact Manager or second Mind store.
+
+`shared/chromie_contracts/semantic_artifact.py` now defines a model-neutral artifact ref,
+envelope and exact packet. The envelope contains only existing artifact identity, canonical payload
+SHA-256, existing authority/session/turn/conversation correlation and immutable parent refs. The
+packet contains the exact canonical typed payload. Trusted code constructs it after owner output;
+payload mutation fails validation. `UserTurnEnvelope` is the lineage root.
+
+`CognitiveEvidenceRecorder` now archives immutable envelopes in the existing cognitive-runtime
+JSONL for the UserTurn, accepted GI result and each Responsibility, GA resolution/new Goals,
+canonical Fast/terminal Plans, SC resolution/each Communicative Activity when present, and
+terminal execution outcomes. Exact packets are retained only when configured text-retention policy
+permits. Goal/Work/Interaction active truth remains in existing stores. Completion/failure/
+cancellation/delivery is appended separately as outcome/Evidence/Interaction events; the original
+semantic artifact is never rewritten. Execution outcomes are already enveloped, while exact
+Plan/Goal parent refs remain part of the next live-ref transport slice. Privacy/retention remains
+the existing evidence policy.
+No model prompt, decoder Schema, provider contract, frozen Work-request field or semantic owner is
+changed in this slice. Live cross-service artifact-ref enforcement and then Envelope-span
+`argument_sources` migration remain next.
+
 ## UserTurnEnvelope semantic-source transport slice — 2026-09-16 (current)
 
 The owner clarified the purpose of Planner argument provenance: the exact user input must

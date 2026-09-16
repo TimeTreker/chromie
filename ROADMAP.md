@@ -75,25 +75,35 @@ Work proceeds in this order:
    duplicate/compatibility representation. **First source slice implemented:** the original
    user source is now explicitly anchored to the same typed `UserTurnEnvelope` across GI and
    the GA/Planner work transaction, with fail-closed text/session/language correlation and no
-   new frozen Work-request field. Next, reproduce and remove the exact-quote copying burden
-   by changing Fast provenance to Envelope token/span references, then finish the SC relevance
-   burden inventory. Do not change models during this audit. The deliverable remains the
-   smallest justified deletion/projection set plus red tests.
-3. **Simplify the Planner/SC transactions without moving semantic authority.** Start with
+   new frozen Work-request field. The generic semantic-artifact envelope substrate is also
+   implemented as the next anti-loss foundation. Carry its refs across live owner boundaries,
+   then reproduce/remove Fast exact-quote copying through Envelope token/span references and
+   finish the SC relevance burden inventory. Do not change models during this audit. The
+   deliverable remains the smallest justified deletion/projection set plus red tests.
+3. **Establish immutable semantic-artifact lineage before deleting provenance copies.**
+   **First substrate slice implemented:** a generic trusted-code `SemanticArtifactEnvelope` /
+   packet protects accepted UserTurn, GI, Responsibility, GA/new-Goal, Planner, SC/talk and
+   execution-outcome payloads with canonical SHA-256 plus parent refs. Existing Cognitive
+   Evidence JSONL always archives their immutable envelopes and retains exact packets when the
+   configured text-retention policy permits; active state remains in existing owners and later
+   completion/delivery appends lifecycle facts rather than rewriting history. This does not
+   yet change model-facing wires. Next, carry these refs across the live GI→GA/Planner/SC
+   transport boundaries, then use the established UserTurn lineage for argument source spans.
+4. **Simplify the Planner/SC transactions without moving semantic authority.** Start with
    facts already known to be burdensome: model-retyped exact source text/strategy
    decoration, generated/correlation bookkeeping, decoder-shape-only fields, and SC
    exposure to irrelevant task plumbing. Planner still chooses Capability, semantic
    argument values, source refs/spans, timing/dependencies and planning disposition; SC
    still chooses communication. Trusted code only materializes exact projections. Retain
    fail-closed provenance, scope, confirmation, safety and Evidence checks.
-4. **Raise provider-shaped Capability arguments to a semantic facade.** Audit the active
+5. **Raise provider-shaped Capability arguments to a semantic facade.** Audit the active
    catalog for coordinate signs/axes, provider frames, actuator/joint identifiers,
    calibration, transport encodings and other backend-shaped inputs. Migrate one coherent
    path at a time, beginning with the retained left/right turn failure: Core planning uses
    semantic direction (and human-meaningful magnitude where needed); Soridormi/provider
    adaptation owns yaw sign/frame realization. Preserve provider schemas/evidence below
    the semantic boundary and prove backend changes do not change Goal/Plan meaning.
-5. **Add generalization and continuous-episode qualification.** Extend existing scenario
+6. **Add generalization and continuous-episode qualification.** Extend existing scenario
    and general-ability infrastructure rather than adding a second benchmark framework.
    Add declared metamorphic families for paraphrase, bilingual equivalence, irrelevant
    context, catalog permutation, controlled semantic deltas, provider-realization
@@ -101,7 +111,7 @@ Work proceeds in this order:
    Mind/Goal/Interaction state across conversation, Work, waiting, Evidence, interruption,
    correction, re-entry and silence. Keep references target-blind and hard invariants
    non-averageable.
-6. **Requalify the existing model/profile on the reduced architecture.** Only after the
+7. **Requalify the existing model/profile on the reduced architecture.** Only after the
    above source and qualification gates pass should prompt/model selection be revisited.
    Compare models on the reduced semantic transactions, then qualify SGLang priority/
    contention and finally optimize first-meaningful-response/task-completion latency. A

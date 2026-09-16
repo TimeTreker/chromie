@@ -11,7 +11,7 @@ from collections import Counter, deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, AsyncIterator, Awaitable, Callable, Literal, Protocol
+from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, Literal, Protocol
 
 import aiohttp
 from agent.app.capabilities.validator import validate_args_for_schema
@@ -41,6 +41,12 @@ from shared.chromie_contracts.interaction import (
     validate_output_schema_declaration,
 )
 from shared.chromie_contracts.reflection import ReflectionResolution
+from shared.chromie_contracts.semantic_artifact import (
+    SemanticArtifactKind,
+    SemanticArtifactPacket,
+    SemanticArtifactRef,
+    semantic_artifact_packet,
+)
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.plan import (
@@ -208,6 +214,178 @@ class CognitiveEvidenceRecorder:
             path=self.run_identity_path,
         )
 
+    @classmethod
+    def semantic_artifact_packets(
+        cls,
+        resolution: "CognitiveRuntimeResolution",
+        *,
+        sid: str,
+    ) -> list[SemanticArtifactPacket]:
+        """Project accepted owner artifacts into immutable archival packets."""
+
+        packets: list[SemanticArtifactPacket] = []
+        seen: set[tuple[str, str, str]] = set()
+        source = resolution.turn_envelope
+        turn_id = source.turn_id if source is not None else str(sid or "")
+        session_id = source.session_id if source is not None else str(sid or "")
+        conversation_id = source.conversation_id if source is not None else ""
+
+        def pack(
+            payload: BaseModel | dict[str, Any],
+            *,
+            kind: SemanticArtifactKind,
+            artifact_id: str,
+            authority: str,
+            parents: Iterable[SemanticArtifactRef] = (),
+            artifact_session_id: str | None = None,
+            artifact_turn_id: str | None = None,
+        ) -> SemanticArtifactRef:
+            packet = semantic_artifact_packet(
+                payload,
+                artifact_kind=kind,
+                artifact_id=artifact_id,
+                authority=authority,
+                session_id=artifact_session_id or session_id,
+                turn_id=artifact_turn_id if artifact_turn_id is not None else turn_id,
+                conversation_id=conversation_id,
+                parent_refs=parents,
+            )
+            key = (packet.ref.artifact_kind, packet.ref.artifact_id, packet.ref.payload_sha256)
+            if key not in seen:
+                seen.add(key)
+                packets.append(packet)
+            return packet.ref
+
+        turn_ref = (
+            pack(
+                source,
+                kind="user_turn",
+                artifact_id=source.turn_id,
+                authority="cognitive_gateway",
+                artifact_session_id=source.session_id,
+                artifact_turn_id=source.turn_id,
+            )
+            if source is not None
+            else None
+        )
+
+        metadata = resolution.metadata if isinstance(resolution.metadata, dict) else {}
+        raw_core = metadata.get("core_interpretation")
+        gi_ref: SemanticArtifactRef | None = None
+        responsibility_refs: dict[str, SemanticArtifactRef] = {}
+        if isinstance(raw_core, dict):
+            core = CoreInterpretationResult.model_validate(raw_core)
+            gi_ref = pack(
+                core,
+                kind="goal_interpretation",
+                artifact_id=core.turn_id,
+                authority="goal_interpretation",
+                parents=[ref for ref in (turn_ref,) if ref is not None],
+                artifact_session_id=core.session_id,
+                artifact_turn_id=core.turn_id,
+            )
+            for item in core.responsibilities:
+                responsibility_refs[item.local_ref] = pack(
+                    item,
+                    kind="responsibility",
+                    artifact_id=f"{core.turn_id}:{item.local_ref}",
+                    authority="goal_interpretation",
+                    parents=[ref for ref in (turn_ref, gi_ref) if ref is not None],
+                    artifact_session_id=core.session_id,
+                    artifact_turn_id=core.turn_id,
+                )
+
+        association = resolution.goal_association
+        ga_ref: SemanticArtifactRef | None = None
+        goal_refs: dict[str, SemanticArtifactRef] = {}
+        if association is not None:
+            ga_ref = pack(
+                association,
+                kind="goal_association",
+                artifact_id=association.turn_id,
+                authority="goal_association",
+                parents=[
+                    *[ref for ref in (turn_ref, gi_ref) if ref is not None],
+                    *responsibility_refs.values(),
+                ],
+                artifact_turn_id=association.turn_id,
+            )
+            for index, goal in enumerate(association.new_goals):
+                goal_id = str(goal.goal_id or f"{association.turn_id}:new:{index}")
+                goal_refs[goal_id] = pack(
+                    goal,
+                    kind="goal",
+                    artifact_id=goal_id,
+                    authority="goal_association",
+                    parents=[
+                        ga_ref,
+                        *(
+                            responsibility_refs[ref]
+                            for ref in goal.source_responsibility_refs
+                            if ref in responsibility_refs
+                        ),
+                    ],
+                    artifact_turn_id=association.turn_id,
+                )
+
+        plan_refs: list[SemanticArtifactRef] = []
+        for plan in (resolution.fast_plan, resolution.terminal_plan):
+            if plan is None:
+                continue
+            plan_ref = pack(
+                plan,
+                kind="planner_plan",
+                artifact_id=plan.plan_id,
+                authority="planner",
+                parents=[
+                    *[ref for ref in (gi_ref, ga_ref) if ref is not None],
+                    *goal_refs.values(),
+                ],
+            )
+            if plan_ref not in plan_refs:
+                plan_refs.append(plan_ref)
+
+        response = resolution.interaction_response
+        raw_social = (
+            response.metadata.get("social_cognition_resolution")
+            if response is not None and isinstance(response.metadata, dict)
+            else None
+        )
+        if isinstance(raw_social, dict):
+            social = SocialCognitionResolution.model_validate(raw_social)
+            social_ref = pack(
+                social,
+                kind="social_cognition",
+                artifact_id=social.request_id,
+                authority="social_cognition",
+                parents=[
+                    *[ref for ref in (gi_ref, ga_ref) if ref is not None],
+                    *plan_refs,
+                ],
+            )
+            for act in social.activities:
+                pack(
+                    act,
+                    kind="communicative_act",
+                    artifact_id=act.activity_id,
+                    authority="social_cognition",
+                    parents=[
+                        social_ref,
+                        *(
+                            responsibility_refs[ref]
+                            for ref in act.source_responsibility_refs
+                            if ref in responsibility_refs
+                        ),
+                        *(
+                            goal_refs[goal_id]
+                            for goal_id in act.source_goal_ids
+                            if goal_id in goal_refs
+                        ),
+                    ],
+                )
+
+        return packets
+
     def record_gateway(
         self,
         envelope: UserTurnEnvelope,
@@ -283,6 +461,7 @@ class CognitiveEvidenceRecorder:
         self.total_latency_ms += total_ms
         if not self.enabled:
             return
+        artifact_packets = self.semantic_artifact_packets(resolution, sid=sid)
         payload = {
             "schema_version": 2,
             "event": "cognitive_runtime_resolution",
@@ -297,6 +476,9 @@ class CognitiveEvidenceRecorder:
                 else None
             ),
             "run_identity": self._identity_reference(),
+            "semantic_artifact_envelopes": [
+                item.envelope.model_dump(mode="json") for item in artifact_packets
+            ],
             "mode": resolution.mode,
             "status": resolution.status,
             "user_turn_envelope": (
@@ -331,6 +513,9 @@ class CognitiveEvidenceRecorder:
         }
         if self.include_text:
             payload["text"] = text
+            payload["semantic_artifact_packets"] = [
+                item.model_dump(mode="json") for item in artifact_packets
+            ]
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
@@ -352,6 +537,14 @@ class CognitiveEvidenceRecorder:
         self.counters[f"outcome_delivery:{delivery_status}"] += 1
         if not self.enabled:
             return
+        outcome_packet = semantic_artifact_packet(
+            bundle,
+            artifact_kind="execution_outcome",
+            artifact_id=bundle.outcome_id,
+            authority="trusted_runtime",
+            session_id=sid,
+            turn_id=bundle.turn_id,
+        )
         payload = {
             "schema_version": 2,
             "event": "cognitive_execution_outcome",
@@ -361,12 +554,19 @@ class CognitiveEvidenceRecorder:
             "interaction_id": bundle.interaction_id,
             "run_identity": self._identity_reference(),
             "outcome_fingerprint": execution_outcome_fingerprint(bundle),
+            "semantic_artifact_envelopes": [
+                outcome_packet.envelope.model_dump(mode="json")
+            ],
             "outcome_bundle": bundle.model_dump(mode="json", exclude_none=True),
             "goal_state_results": list(goal_state_results or []),
             "final_response": self._interaction_summary(final_response),
             "delivery_status": delivery_status,
             "suppression_reason": suppression_reason,
         }
+        if self.include_text:
+            payload["semantic_artifact_packets"] = [
+                outcome_packet.model_dump(mode="json")
+            ]
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
