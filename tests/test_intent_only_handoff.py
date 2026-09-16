@@ -110,15 +110,29 @@ async def test_fast_library_index_excludes_provider_catalog_introspection_capabi
         }, interaction_executable=True, prompt_tier="common", can_run_parallel=False,
         effects=["physical_motion"], hints={"semantic_type": "body_action"},
     )
-    introspection = CatalogCapability(
-        capability_id="soridormi.activity.get_capabilities", agent_id="capability_agent",
-        description="Provider catalog introspection", input_schema={
-            "type": "object", "properties": {}, "additionalProperties": False,
-        }, interaction_executable=True, prompt_tier="rare", can_run_parallel=True,
-        effects=[], hints={"semantic_type": "information"},
-    )
+    hidden_ids = [
+        "soridormi.activity.get_capabilities",
+        "soridormi.skill.list",
+        "soridormi.skill.create_plan",
+        "soridormi.skill.execute_plan",
+        "soridormi.activity.compile",
+        "soridormi.activity.execute",
+        "soridormi.activity.status",
+        "soridormi.motion.create_plan",
+        "soridormi.motion.execute_plan",
+    ]
+    provider_internal = [
+        CatalogCapability(
+            capability_id=capability_id, agent_id="capability_agent",
+            description="Provider-internal catalog or realization operation", input_schema={
+                "type": "object", "properties": {}, "additionalProperties": False,
+            }, interaction_executable=True, prompt_tier="rare", can_run_parallel=True,
+            effects=["planning_only"], hints={"semantic_type": "provider_internal"},
+        )
+        for capability_id in hidden_ids
+    ]
     current, common, entries = await fast_capability_context(
-        Catalog([action, introspection]), request_for("turn left"),
+        Catalog([action, *provider_internal]), request_for("turn left"),
     )
     assert [item.capability_id for item in common] == ["soridormi.turn_in_place"]
     assert [item.capability_id for item in entries] == ["soridormi.turn_in_place"]

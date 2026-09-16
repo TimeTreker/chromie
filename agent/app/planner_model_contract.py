@@ -47,7 +47,19 @@ PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
 NON_PLANNER_TRANSPORT_CAPABILITY_IDS = frozenset({"chromie.speak"})
 DETERMINISTIC_CONTROL_CAPABILITY_IDS = frozenset({"soridormi.stop"})
-PLANNER_LIBRARY_INTROSPECTION_SUFFIXES = (".get_capabilities",)
+PLANNER_LIBRARY_INTROSPECTION_SUFFIXES = (".get_capabilities", ".skill.list")
+# Provider-native plan compilation/execution is a realization detail beneath an
+# already selected semantic Capability. The trusted adapter may call these tools;
+# Planner must not choose or detail-lookup them as user Work.
+PLANNER_PROVIDER_REALIZATION_SUFFIXES = (
+    ".skill.create_plan",
+    ".skill.execute_plan",
+    ".activity.compile",
+    ".activity.execute",
+    ".activity.status",
+    ".motion.create_plan",
+    ".motion.execute_plan",
+)
 
 def is_planner_step_capability(capability_id: str) -> bool:
     normalized = str(capability_id or "").strip()
@@ -58,9 +70,12 @@ def is_planner_step_capability(capability_id: str) -> bool:
         return False
     # Fast Planner already receives a current provider-neutral Capability index
     # and has one bounded exact-detail lookup. Executing a provider's own catalog
-    # introspection tool to rediscover that same library adds a redundant model
-    # round trip and creates no user Work.
-    return not normalized.endswith(PLANNER_LIBRARY_INTROSPECTION_SUFFIXES)
+    # introspection or realization pipeline adds a redundant model round trip and
+    # creates no user Work.
+    return not normalized.endswith(
+        PLANNER_LIBRARY_INTROSPECTION_SUFFIXES
+        + PLANNER_PROVIDER_REALIZATION_SUFFIXES
+    )
 
 class PlannerModelStep(CapabilityIdentityModel):
     """Semantic plan leaf returned by a planner model.
