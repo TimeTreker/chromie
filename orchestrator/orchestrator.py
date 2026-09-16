@@ -4059,6 +4059,7 @@ class VoiceAssistant:
         delivery_status: str,
         suppression_reason: str = "",
         goal_state_results: list[dict[str, Any]] | None = None,
+        execution: CapabilityRuntimeResult | None = None,
     ) -> None:
         recorder = getattr(self, "cognitive_evidence", None)
         if recorder is None or not hasattr(recorder, "record_outcome"):
@@ -4071,6 +4072,9 @@ class VoiceAssistant:
                 delivery_status=delivery_status,
                 suppression_reason=suppression_reason,
                 goal_state_results=goal_state_results,
+                capability_traces=(
+                    execution.traces if execution is not None else ()
+                ),
             )
         except Exception as exc:
             self.session_log(
@@ -4455,6 +4459,7 @@ class VoiceAssistant:
                 final_response=None,
                 delivery_status="goal_state_commit_failed",
                 suppression_reason="goal_state_commit_failed",
+                execution=execution,
             )
             return "goal_state_commit_failed"
 
@@ -4530,6 +4535,7 @@ class VoiceAssistant:
                 delivery_status="suppressed",
                 suppression_reason="stale_turn",
                 goal_state_results=goal_state_results,
+                execution=execution,
             )
             return "suppressed_stale"
         if defer_for_ordinary_overlap:
@@ -4546,6 +4552,7 @@ class VoiceAssistant:
                 delivery_status="suppressed",
                 suppression_reason=suppress_final_reason,
                 goal_state_results=goal_state_results,
+                execution=execution,
             )
             return f"suppressed_{suppress_final_reason}"
         delivered_incremental_evidence = {
@@ -4588,6 +4595,7 @@ class VoiceAssistant:
                 delivery_status="incremental_result_delivery_completed",
                 suppression_reason="incremental_result_already_delivered",
                 goal_state_results=goal_state_results,
+                execution=execution,
             )
             return "incremental_result_delivery_completed"
         if (
@@ -4609,6 +4617,7 @@ class VoiceAssistant:
                 delivery_status="incremental_planner_reentry_handled",
                 suppression_reason="incremental_planner_reentry_already_handled",
                 goal_state_results=goal_state_results,
+                execution=execution,
             )
             return "incremental_planner_reentry_handled"
 
@@ -4639,6 +4648,7 @@ class VoiceAssistant:
                     delivery_status="planner_reentry_unavailable",
                     suppression_reason="planner_reentry_unavailable",
                     goal_state_results=goal_state_results,
+                    execution=execution,
                 )
                 return "planner_reentry_unavailable"
         except Exception as exc:
@@ -4655,6 +4665,7 @@ class VoiceAssistant:
                 delivery_status="response_planning_failed",
                 suppression_reason=type(exc).__name__,
                 goal_state_results=goal_state_results,
+                execution=execution,
             )
             return "response_planning_failed"
 
@@ -4705,6 +4716,7 @@ class VoiceAssistant:
                     delivery_status="suppressed",
                     suppression_reason=suppression_reason,
                     goal_state_results=goal_state_results,
+                    execution=execution,
                 )
                 return f"suppressed_{window.status}"
             final_response.metadata["deferred_outcome_delivery"] = {
@@ -4732,6 +4744,7 @@ class VoiceAssistant:
             final_response=final_response,
             delivery_status=delivery_status,
             goal_state_results=goal_state_results,
+            execution=execution,
         )
         return delivery_status
 

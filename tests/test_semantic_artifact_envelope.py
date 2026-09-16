@@ -197,12 +197,29 @@ def test_terminal_execution_outcome_lands_as_immutable_artifact() -> None:
     with tempfile.TemporaryDirectory() as directory:
         path = Path(directory) / "events.jsonl"
         recorder = CognitiveEvidenceRecorder(path, include_text=True)
+        from shared.chromie_contracts.interaction import CapabilityTrace, CapabilityTraceEvent
+
+        trace = CapabilityTrace(
+            interaction_id=bundle.interaction_id,
+            request_id="request-provider-realization",
+            capability_id="soridormi.turn_in_place",
+            provider_id="soridormi.mcp",
+            events=[CapabilityTraceEvent(
+                type="provider_realization",
+                data={
+                    "semantic_args": {"direction": "left"},
+                    "provider_args": {"yaw_radps": 0.12},
+                    "semantic_facade_applied": True,
+                },
+            )],
+        )
         recorder.record_outcome(
             bundle,
             sid="sid-artifact-outcome",
             final_response=None,
             delivery_status="not_required",
             goal_state_results=[{"goal_id": "goal-1", "state": "completed"}],
+            capability_traces=[trace],
         )
         payload = json.loads(path.read_text(encoding="utf-8"))
 
@@ -212,6 +229,16 @@ def test_terminal_execution_outcome_lands_as_immutable_artifact() -> None:
     assert packet.ref.artifact_id == bundle.outcome_id
     assert packet.payload == bundle.model_dump(mode="json", exclude_none=True)
     assert payload["goal_state_results"] == [{"goal_id": "goal-1", "state": "completed"}]
+    assert payload["provider_realizations"] == [{
+        "trace_id": trace.trace_id,
+        "request_id": trace.request_id,
+        "capability_id": "soridormi.turn_in_place",
+        "provider_id": "soridormi.mcp",
+        "timestamp": trace.events[0].timestamp.isoformat(),
+        "semantic_args": {"direction": "left"},
+        "provider_args": {"yaw_radps": 0.12},
+        "semantic_facade_applied": True,
+    }]
 
 
 def test_work_request_binds_exact_user_turn_gi_and_responsibility_lineage() -> None:

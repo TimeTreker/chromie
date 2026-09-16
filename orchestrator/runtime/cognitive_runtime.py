@@ -33,6 +33,7 @@ from shared.chromie_contracts.goal import (
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
+    CapabilityTrace,
     MEDIA_CAPABILITY_IDS,
     CapabilityRequest,
     VOCAL_MODES,
@@ -616,6 +617,32 @@ class CognitiveEvidenceRecorder:
         with self.path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
 
+    @staticmethod
+    def provider_realization_diagnostics(
+        traces: Iterable[CapabilityTrace],
+    ) -> list[dict[str, Any]]:
+        """Project trusted semantic->provider lowering for diagnostics only."""
+
+        rows: list[dict[str, Any]] = []
+        for trace in traces:
+            for event in trace.events:
+                if event.type != "provider_realization":
+                    continue
+                data = event.data if isinstance(event.data, dict) else {}
+                rows.append({
+                    "trace_id": trace.trace_id,
+                    "request_id": trace.request_id,
+                    "capability_id": trace.capability_id,
+                    "provider_id": trace.provider_id,
+                    "timestamp": event.timestamp.isoformat(),
+                    "semantic_args": dict(data.get("semantic_args") or {}),
+                    "provider_args": dict(data.get("provider_args") or {}),
+                    "semantic_facade_applied": bool(
+                        data.get("semantic_facade_applied")
+                    ),
+                })
+        return rows
+
     def record_outcome(
         self,
         bundle: ExecutionOutcomeBundle,
@@ -625,6 +652,7 @@ class CognitiveEvidenceRecorder:
         delivery_status: str,
         suppression_reason: str = "",
         goal_state_results: list[dict[str, Any]] | None = None,
+        capability_traces: Iterable[CapabilityTrace] = (),
     ) -> None:
         """Append the trusted post-execution half of a cognitive turn."""
 
@@ -658,6 +686,9 @@ class CognitiveEvidenceRecorder:
             "final_response": self._interaction_summary(final_response),
             "delivery_status": delivery_status,
             "suppression_reason": suppression_reason,
+            "provider_realizations": self.provider_realization_diagnostics(
+                capability_traces
+            ),
         }
         if self.include_text:
             payload["semantic_artifact_packets"] = [
