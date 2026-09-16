@@ -760,6 +760,7 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env"
       ]
     },
@@ -823,6 +824,7 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env"
       ]
     },
@@ -1320,6 +1322,7 @@
       "category": "public_choice",
       "key": "CHROMIE_COMPOSE_OVERRIDE_FILES",
       "owners": [
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "scripts/capture_runtime_identity.py"
       ]
@@ -2731,7 +2734,8 @@
       "key": "ORCH_LOCK_FILE",
       "owners": [
         "scripts/chromie_psm_live_text_console.py",
-        "scripts/general_ability_acceptance.py"
+        "scripts/general_ability_acceptance.py",
+        "scripts/interaction_text_mujoco_check.py"
       ]
     },
     {
@@ -2855,6 +2859,7 @@
       "key": "ORCH_PRESENTATION_COMPUTE_CONTROL_URL",
       "owners": [
         ".env.common",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -2865,6 +2870,7 @@
       "key": "ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED",
       "owners": [
         ".env.common",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -2875,6 +2881,7 @@
       "key": "ORCH_PRESENTATION_COMPUTE_LEASE_MODE",
       "owners": [
         ".env.common",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -2885,6 +2892,7 @@
       "key": "ORCH_PRESENTATION_COMPUTE_TIMEOUT_MS",
       "owners": [
         ".env.common",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
         "orchestrator/runtime/host_settings.py"
       ]
@@ -3986,6 +3994,7 @@
       "key": "WARM_OLLAMA_BEFORE_ORCH",
       "owners": [
         ".env.common",
+        "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env"
       ]
     }

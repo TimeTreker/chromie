@@ -12,8 +12,7 @@
   "ollama": {
     "agent_models": [
       "gemma4:e2b",
-      "gemma4:12b",
-      "qwen3.5:4b"
+      "gemma4:12b"
     ],
     "digest_source": "The active profile model digests are captured from /api/tags in build-provenance.json when provenance is collected",
     "goal_interpreter_models": [
@@ -28,6 +27,16 @@
   "schema_version": 2,
   "sglang": {
     "candidate_served_models": {
+      "qwen3.5:4b": {
+        "source_model_id": "cyankiwi/Qwen3.5-4B-AWQ-4bit",
+        "revision": "ef85d23bebaba87b3c4672ba11c449c79dbdb23e",
+        "weight_format": "safetensors",
+        "quantization": "compressed_tensors_w4a16_awq",
+        "dtype": "bfloat16",
+        "source_safetensors_sha256": "902477edf53bc6768bd1f212dd1866856fd5a0627def06887780c95900ffb013",
+        "runtime_image": "chromie-sglang:qwen35-4b-awq",
+        "runtime_build": "llm/sglang/Dockerfile"
+      },
       "chromie-qwen35-9b-sglang": {
         "source_model_id": "Qwen/Qwen3.5-9B",
         "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",

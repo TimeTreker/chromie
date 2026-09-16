@@ -62,6 +62,10 @@ class ReleaseProvenanceTests(unittest.TestCase):
         self.assertEqual(model["source_model_id"], "Qwen/Qwen3.5-9B")
         self.assertEqual(model["revision"], "c202236235762e1c871ad0ccb60c8ee5ba337b9a")
         self.assertEqual(lock["sglang"]["promotion_status"], "runtime_selected_release_unqualified")
+        laptop = lock["sglang"]["candidate_served_models"]["qwen3.5:4b"]
+        self.assertEqual(laptop["source_model_id"], "cyankiwi/Qwen3.5-4B-AWQ-4bit")
+        self.assertEqual(laptop["revision"], "ef85d23bebaba87b3c4672ba11c449c79dbdb23e")
+        self.assertEqual(laptop["quantization"], "compressed_tensors_w4a16_awq")
         gemma = lock["sglang"]["candidate_served_models"]["chromie-gemma4-12b"]
         self.assertEqual(gemma["source_model_id"], "google/gemma-4-12B-it")
         self.assertEqual(gemma["revision"], "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7")

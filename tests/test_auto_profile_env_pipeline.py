@@ -343,10 +343,17 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", values)
         self.assertEqual(values["OLLAMA_FLASH_ATTENTION"], "1")
         self.assertEqual(values["OLLAMA_KV_CACHE_TYPE"], "q8_0")
+        self.assertEqual(manifest["active_ollama_models"], [])
+        self.assertEqual(manifest["active_inference_models"], [shared_model])
+        self.assertEqual(values["AGENT_LLM_PROVIDER"], "sglang")
+        self.assertEqual(values["AGENT_SGLANG_URL"], "http://chromie-llm:30000/v1")
         self.assertEqual(
-            manifest["active_ollama_models"],
-            [shared_model],
+            values["CHROMIE_COMPOSE_OVERRIDE_FILES"],
+            "docker-compose.sglang-rtx4090-laptop.yml",
         )
+        self.assertEqual(values["WARM_OLLAMA_BEFORE_ORCH"], "0")
+        self.assertEqual(values["ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED"], "1")
+        self.assertEqual(values["ORCH_PRESENTATION_COMPUTE_LEASE_MODE"], "in_place")
         self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_CTX"], "16384")
         for key in (
             "OLLAMA_CONTEXT_LENGTH",
