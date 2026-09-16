@@ -26,6 +26,11 @@ try:
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.memory import role_memory_context
 
+try:
+    from chromie_contracts.user_turn import user_turn_source_tokens
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
 
 try:
     from chromie_runtime.ollama_non_thinking import (
@@ -212,53 +217,9 @@ def _extract_json_object(text: str) -> dict[str, Any]:
 
 
 def _source_tokens(text: str) -> list[dict[str, Any]]:
-    """Expose bounded exact source units for primary-result provenance.
+    """Compatibility-free shared transport tokenization for source provenance."""
 
-    Latin/digit runs stay readable as words, CJK characters remain independently
-    citable, and punctuation is retained. Whitespace is recovered from the source
-    slice between the first and last cited token; no semantic tokenization occurs.
-    """
-
-    source = " ".join(str(text or "").strip().split())
-    tokens: list[dict[str, Any]] = []
-    index = 0
-
-    def is_cjk(char: str) -> bool:
-        codepoint = ord(char)
-        return (
-            0x3400 <= codepoint <= 0x4DBF
-            or 0x4E00 <= codepoint <= 0x9FFF
-            or 0xF900 <= codepoint <= 0xFAFF
-        )
-
-    while index < len(source):
-        if source[index].isspace():
-            index += 1
-            continue
-        start = index
-        char = source[index]
-        if is_cjk(char):
-            index += 1
-        elif char.isalnum() or char == "_":
-            index += 1
-            while index < len(source):
-                candidate = source[index]
-                if is_cjk(candidate) or not (
-                    candidate.isalnum() or candidate in {"_", "'", "’"}
-                ):
-                    break
-                index += 1
-        else:
-            index += 1
-        tokens.append(
-            {
-                "ref": f"t{len(tokens)}",
-                "surface": source[start:index],
-                "start": start,
-                "end": index,
-            }
-        )
-    return tokens
+    return user_turn_source_tokens(text)
 
 
 def _goal_interpretation_source_turn_provenance(

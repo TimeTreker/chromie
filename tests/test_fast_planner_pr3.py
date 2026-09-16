@@ -31,6 +31,7 @@ from agent.app.planner_validation import (
 )
 from agent.app.capabilities.catalog import CatalogCapability
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
+from shared.chromie_contracts.user_turn import user_turn_source_tokens
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
@@ -405,9 +406,15 @@ def _work_request(**kwargs):
             }
         ]
     normalized_responsibilities = []
+    source_tokens = user_turn_source_tokens(str(kwargs.get("text") or ""))
     for item in responsibilities:
         payload = dict(item) if isinstance(item, dict) else item.model_dump(mode="json")
         payload.setdefault("output_mode", _test_what_mode(str(payload.get("outcome") or kwargs.get("text") or "")))
+        if source_tokens and not payload.get("source_evidence"):
+            payload["source_evidence"] = {
+                "source_start_token_ref": source_tokens[0]["ref"],
+                "source_end_token_ref": source_tokens[-1]["ref"],
+            }
         normalized_responsibilities.append(payload)
     return CognitiveWorkRequest(
         **kwargs,
@@ -3794,7 +3801,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                             "date": "today",
                             "period": "evening",
                         },
-                        "argument_sources": {"date": "tonight", "period": "tonight"},
+                        "argument_sources": {"date": {"source_start_token_ref": "t0", "source_end_token_ref": "t0"}, "period": {"source_start_token_ref": "t0", "source_end_token_ref": "t0"}},
                         "timing": "parallel",
                         "source_responsibility_refs": ["weather"],
                         "reason_summary": "Check the requested weather.",

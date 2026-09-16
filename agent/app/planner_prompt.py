@@ -21,6 +21,11 @@ try:
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.semantic_authority import PLANNER_WORK_AUTHORITY_PROMPT
 
+try:
+    from chromie_contracts.user_turn import user_turn_source_tokens
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
 from .prompt_projection import bounded_json, required_json
 from .planner_context import (
     PlannerGoalContext,
@@ -74,10 +79,11 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "Use exact numeric values when the Capability units agree; normalize number words "
     "and units only when the interpretation and conversion are unambiguous. Never "
     "substitute a default for an explicit requested value. For an intent-derived "
-    "argument, cite its exact owning intent excerpt: argument_sources[parameter] in "
-    "Fast Activities; source_quote with strategy=semantic_realization and exact "
-    "source_goal_ids in a canonical Plan parameter_resolution. The citation records "
-    "provenance; you remain responsible for correct mapping, conversion and coverage. "
+    "argument in Fast Activities, select its exact immutable source span as "
+    "argument_sources[parameter]={source_start_token_ref,source_end_token_ref} from "
+    "the supplied UserTurn source_tokens. Never copy or paraphrase the source wording. "
+    "Trusted code materializes the span into canonical source_quote and Goal provenance; "
+    "you remain responsible for correct mapping, conversion and coverage. "
     "Existing typed Goal constraints remain binding and cannot be overridden by a "
     "quote. Omit unspecified optional inputs or use their declared schema_default. "
     "Never borrow a sibling Goal's values. Missing consequential input must use "
@@ -104,12 +110,12 @@ def immutable_source_turn_prompt(
             label="GI unresolved-meaning evidence",
         )
     )
+    original_text = str(source["original_text"])
     projection = json.dumps(
         {
-            "original_text": source["original_text"],
-            "turn_id": source["turn_id"],
-            "original_text_sha256": source["original_text_sha256"],
-            "authority": source["authority"],
+            "original_text": original_text,
+            "source_tokens": user_turn_source_tokens(original_text),
+            "authority": "immutable_user_turn_source",
         },
         ensure_ascii=False,
         separators=(",", ":"),

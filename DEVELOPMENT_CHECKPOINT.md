@@ -1,5 +1,32 @@
 # Development Checkpoint
 
+## UserTurnEnvelope argument-span provenance — Phase 1D — 2026-09-16 (current)
+
+The owner approved removing model transcription work without weakening the original anti-message-loss
+contract. Fast `argument_sources` therefore no longer contain model-authored quote strings. Each
+intent-derived argument now cites a closed `{source_start_token_ref, source_end_token_ref}` span in
+the same immutable normalized `UserTurnEnvelope` coordinate system already used by GI source
+evidence. The Planner prompt receives the source token table; it chooses the semantic argument value
+and its source span, never a rewritten quote.
+
+Trusted validation resolves the span against the authoritative turn, requires it to remain inside at
+least one cited Responsibility's GI-owned source span, and rejects unknown/reversed/foreign refs.
+Host canonical Plan materialization dereferences the accepted span to `PlanParameterResolution.source_quote`
+and binds source Goal IDs mechanically from GA's exact Responsibility mapping. Retained Goal snapshot
+identity remains fail-closed. No model sees artifact hashes and no source text is removed.
+
+The shared source tokenizer/span resolver moved to `shared/chromie_contracts/user_turn.py`; GI reuses
+that same transport tokenization instead of owning a private copy. Production Fast constrained-decoder
+schemas close token-ref values over the current source token set. This is a wire change for Fast model
+output, not a compatibility dual-path: old string-valued `argument_sources` are invalid.
+
+Focused proof on the supplied archive plus owner-applied prior phases: selected
+Gateway/GI/GA/Fast/Runtime suites **443 passed + 232 subtests**, with **16** delayed-workflow
+cases deselected only because this archive omits their benchmark scenario files; full
+`test_fast_planner_pr3.py` contributes **128 passed + 68 subtests**. The supplied archive still lacks `benchmarks/`, so delayed-workflow tests
+that read those files remain unavailable here. Next: SC model-facing context diet, then semantic
+Capability facade work.
+
 ## Semantic artifact live-ref transport — Phase 1C — 2026-09-16 (current)
 
 The owner approved continuing the anti-message-loss design from Phase 1A/1B into live owner

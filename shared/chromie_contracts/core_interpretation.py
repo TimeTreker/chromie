@@ -11,7 +11,7 @@ from .semantic_artifact import (
     SemanticArtifactLineage,
     semantic_artifact_ref,
 )
-from .user_turn import UserTurnEnvelope, normalize_turn_text
+from .user_turn import UserTurnEnvelope, UserTurnSourceSpan, normalize_turn_text
 
 
 _PLANNER_OWNED_BINDING_FIELDS = frozenset({
@@ -75,23 +75,12 @@ class CoreInterpretationUnavailable(BaseModel):
         return normalize_turn_text(str(value or ""))[:500]
 
 
-class ResponsibilitySourceEvidence(BaseModel):
-    """Primary-result citation into the authoritative admitted turn.
+class ResponsibilitySourceEvidence(UserTurnSourceSpan):
+    """GI-owned semantic span into the authoritative admitted UserTurnEnvelope.
 
-    Goal Interpretation owns the semantic choice of the cited span. Trusted code
-    resolves the two closed token references back to the immutable turn and checks
-    only provenance, order, and non-overlap; it never retypes or resegments WHAT.
+    The shared span contract keeps all later semantic owners on the same immutable
+    source coordinate system. Trusted code resolves refs; GI selects only WHAT.
     """
-
-    model_config = ConfigDict(extra="forbid", frozen=True)
-
-    source_start_token_ref: str = Field(min_length=1, max_length=24)
-    source_end_token_ref: str = Field(min_length=1, max_length=24)
-
-    @field_validator("source_start_token_ref", "source_end_token_ref", mode="before")
-    @classmethod
-    def normalize_source_token_ref(cls, value: Any) -> str:
-        return normalize_turn_text(str(value or ""))
 
 
 class CognitiveResponsibilityProposal(BaseModel):

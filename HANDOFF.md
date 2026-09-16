@@ -1,5 +1,17 @@
 # Chromie Latest Handoff
 
+## Phase 1D UserTurn source-span handoff — 2026-09-16 (current)
+
+Continue after owner-applied Phase 1C. Fast model output now cites immutable UserTurn token spans in
+`argument_sources` rather than copying source strings. GI and Fast share the same deterministic source
+token coordinate system. Trusted validation enforces span existence/order and owning-Responsibility
+containment; Host materializes the exact canonical quote and Goal ownership. Old string-valued Fast
+argument sources are intentionally not accepted.
+
+Next coherent slice: simplify SC's model-facing snapshot so low-level/provider plumbing cannot be
+misread as a capability limitation, while keeping full authoritative request state for Host validation.
+After that begin the semantic Capability facade with the retained left/right turn failure.
+
 ## Phase 1C live semantic-artifact lineage handoff — 2026-09-16 (current)
 
 Continue from owner-applied Phases 1A/1B. Live original-turn Runtime now creates one

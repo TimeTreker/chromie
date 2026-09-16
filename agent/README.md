@@ -67,8 +67,10 @@ Planner owns Activity decomposition, capability choice, argument realization and
 waiting. Fast receives complete common contracts plus the full library index; one
 bounded detail request can precede its complete plan. Indexed rare entries do not
 by themselves require Deep. Locked or unavailable capabilities grant no execution.
-Exact `argument_sources` (Fast Activities) / `source_quote` (canonical parameter
-resolutions and time conditions) prove provenance, not semantic conversion accuracy.
+Fast `argument_sources` now carry closed `UserTurnEnvelope` token spans instead of
+model-retyped quotes. Trusted code materializes canonical `source_quote` text from those
+spans; canonical parameter resolutions and time conditions retain their existing quote
+forms. Provenance still does not prove semantic conversion accuracy.
 Runtime retains canonical binding, confirmation, sequential physical execution,
 cancellation, restart-safe timers and evidence.
 

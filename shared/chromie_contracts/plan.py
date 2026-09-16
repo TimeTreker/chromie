@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .text import normalize_whitespace
 from .agent_skill import PlanAgentSkillProvenance
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
+from .user_turn import UserTurnSourceSpan
 from .semantic_task import (
     InformationGap,
     InformationGapResolutionSource,
@@ -330,13 +331,14 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     role: Literal["capability"]
     activity_id: str = Field(min_length=1, max_length=160)
     args: dict[str, Any] = Field(default_factory=dict)
-    argument_sources: dict[str, str] = Field(
+    argument_sources: dict[str, UserTurnSourceSpan] = Field(
         default_factory=dict,
         description=(
-            "For each argument realized from user intent, cite an exact excerpt of "
-            "an owning Responsibility outcome. Planner owns the mapping and any "
-            "conversion; this records provenance, not a second semantic decision. "
-            "Omit declared defaults and trusted Runtime target references."
+            "For each argument realized from the current user turn, cite the closed "
+            "UserTurnEnvelope token span that grounds it. Planner owns the mapping "
+            "and conversion; trusted code materializes the exact source surface. "
+            "Never retype or paraphrase source text. Omit declared defaults and "
+            "trusted Runtime target references."
         ),
     )
     timing: PlanTiming = "sequential"

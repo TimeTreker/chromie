@@ -28,6 +28,23 @@ EPISODES = [
 ]
 
 
+
+def source_span(text, excerpt):
+    normalized = " ".join(str(text).strip().split())
+    start = normalized.index(excerpt)
+    end = start + len(excerpt)
+    tokens = _source_tokens(normalized)
+    covered = [item for item in tokens if item["start"] < end and item["end"] > start]
+    assert covered and covered[0]["start"] == start and covered[-1]["end"] == end
+    return {
+        "source_start_token_ref": covered[0]["ref"],
+        "source_end_token_ref": covered[-1]["ref"],
+    }
+
+
+def source_spans(text, values):
+    return {name: source_span(text, excerpt) for name, excerpt in values.items()}
+
 def intent_result(text, output_mode="body_action"):
     tokens = _source_tokens(text)
     return {
@@ -137,9 +154,9 @@ async def test_compound_intent_becomes_three_grounded_activities_and_one_goal():
         capability("turn", {"direction": {"type": "string"}}),
     ]
     activities = [
-        activity("walk", {"speed": .2, "duration_s": 10}, {"speed": "0.2 speed", "duration_s": "10 seconds"}),
-        activity("nod", {"count": 2}, {"count": "twice"}),
-        activity("turn", {"direction": "left"}, {"direction": "left"}),
+        activity("walk", {"speed": .2, "duration_s": 10}, source_spans(EPISODES[0], {"speed": "0.2 speed", "duration_s": "10 seconds"})),
+        activity("nod", {"count": 2}, source_spans(EPISODES[0], {"count": "twice"})),
+        activity("turn", {"direction": "left"}, source_spans(EPISODES[0], {"direction": "left"})),
     ]
     frames = [frame async for frame in FastPlannerResolver(Model([work(activities)]), Catalog(entries)).stream_advance(request)]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
@@ -164,7 +181,7 @@ async def test_indexed_capability_lookup_precedes_one_complete_plan(fault):
     request = request_for("turn left by 45 degrees")
     entry = capability("turn", {"rotation_degrees": {"type": "number", "maximum": 90}}, tier="rare")
     lookup = {"requested_capability_ids": ["test.turn"]}
-    final = work([activity("turn", {"rotation_degrees": 45}, {"rotation_degrees": "45 degrees"})])
+    final = work([activity("turn", {"rotation_degrees": 45}, source_spans("turn left by 45 degrees", {"rotation_degrees": "45 degrees"}))])
     if fault == "unknown_id":
         lookup["requested_capability_ids"] = ["test.missing"]
     elif fault == "second_lookup":
@@ -172,7 +189,7 @@ async def test_indexed_capability_lookup_precedes_one_complete_plan(fault):
     elif fault == "mixed_plan":
         lookup.update(final)
     elif fault == "invented_quote":
-        final["activities"][0]["argument_sources"]["rotation_degrees"] = "180 degrees"
+        final["activities"][0]["argument_sources"]["rotation_degrees"] = {"source_start_token_ref": "t999", "source_end_token_ref": "t999"}
     model = Model([lookup, final])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
     assert "test.turn" in model.packets[0][0]
@@ -366,7 +383,7 @@ async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp
 async def test_index_visibility_does_not_authorize_unavailable_or_locked_work(available, locked):
     entry = capability("turn", {"rotation_degrees": {"type": "number"}}, tier="rare")
     entry = entry.model_copy(update={"available": available, "prompt_tier_locked": locked})
-    final = work([activity("turn", {"rotation_degrees": 45}, {"rotation_degrees": "45 degrees"})])
+    final = work([activity("turn", {"rotation_degrees": 45}, source_spans("turn left by 45 degrees", {"rotation_degrees": "45 degrees"}))])
     model = Model([{"requested_capability_ids": ["test.turn"]}, final])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(
         request_for("turn left by 45 degrees"))]
@@ -431,7 +448,7 @@ def test_fast_quote_binding_includes_exact_retained_goal_owner(foreign):
     association = GoalAssociationResolution(turn_id="t",resolution_status="resolved",confidence=1.,
         associations=[{"association_id":"a","relationship":"continue","source_responsibility_refs":["r1"],
                        "target_goal_ids":["retained"],"confidence":1.}])
-    advance = FastPlannerAdvance(turn_id="t",**work([activity("nod",{"count":2},{"count":"twice"})]))
+    advance = FastPlannerAdvance(turn_id="t",**work([activity("nod",{"count":2},source_spans("Nod twice", {"count":"twice"}))]))
     kwargs = dict(advance=advance,association=association,user_text="Nod twice",
         retained_goals=[{"goal_id":"retained","goal":{
             "goal_id":"other" if foreign else "retained","description":"Nod twice"}}])
@@ -449,7 +466,7 @@ def test_intent_only_numeric_activity_requires_provenance_at_decoder():
     catalog = capability("walk", {"duration_s":{"type":"number"}})
     schema = fast_streaming_advance_response_schema(["r1"],responsibilities=request.responsibilities,
         capabilities=[catalog.model_dump(mode="json")])
-    raw = work([activity("walk",{"duration_s":10},{"duration_s":"ten seconds"})])
+    raw = work([activity("walk",{"duration_s":10},source_spans("walk for ten seconds", {"duration_s":"ten seconds"}))])
     validator = Draft202012Validator(schema)
     validator.validate(raw)
     del raw['activities'][0]['argument_sources']
@@ -467,7 +484,7 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
     schema = fast_streaming_advance_response_schema(["r1"], responsibilities=request.responsibilities,
         capabilities=capabilities)
     validator = Draft202012Validator(schema)
-    raw = work([activity("walk", {"duration_s":10}, {"duration_s":"ten seconds"})])
+    raw = work([activity("walk", {"duration_s":10}, source_spans("walk for ten seconds", {"duration_s":"ten seconds"}))])
     validator.validate(raw)
     validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
         responsibilities=request.responsibilities, capabilities=capabilities)
@@ -482,6 +499,31 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
     validator.validate(raw)
     validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
         responsibilities=request.responsibilities, capabilities=capabilities)
+
+
+def test_fast_argument_source_cannot_escape_owning_responsibility_span():
+    from agent.app.planner_fast_validation import validate_fast_advance_output
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
+
+    text = "walk for ten seconds then nod twice"
+    walk_span = source_span(text, "walk for ten seconds")
+    nod_span = source_span(text, "nod twice")
+    request = CognitiveWorkRequest(
+        sid="intent-handoff", text=text, interpretation_confidence=1.0,
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="walk for ten seconds", output_mode="body_action",
+            confidence=1.0, source_evidence=walk_span,
+        )],
+    )
+    entry = capability("walk", {"duration_s": {"type": "number"}})
+    raw = work([activity("walk", {"duration_s": 10}, {"duration_s": nod_span})])
+    with pytest.raises(ValueError, match="owning Responsibility source span"):
+        validate_fast_advance_output(
+            FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
+            responsibilities=request.responsibilities,
+            capabilities=[entry.model_dump(mode="json")],
+        )
 
 
 def test_optional_argument_citations_follow_native_argument_order():
@@ -512,5 +554,5 @@ def test_optional_argument_citations_follow_native_argument_order():
         # Ordered native object grammar cannot revisit an earlier optional key.
         assert list(fields["argument_sources"]["properties"]) == list(fields["args"]["properties"])
     raw = work([activity("walk", {"duration_s": 10, "vx_mps": .2},
-                         {"duration_s": "ten seconds", "vx_mps": "0.2 speed"})])
+                         source_spans("Walk at 0.2 speed for ten seconds", {"duration_s": "ten seconds", "vx_mps": "0.2 speed"}))])
     Draft202012Validator(schema).validate(raw)

@@ -67,8 +67,10 @@ from .planner_fast_validation import (
 from .planner_fallback import materialize_fast_escalation
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from chromie_contracts.user_turn import user_turn_source_tokens
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
@@ -185,6 +187,7 @@ class FastPlannerResolver:
                     [item.local_ref for item in responsibilities], responsibilities=responsibilities,
                     capabilities=capabilities, interpretation_unresolved=list(request.interpretation_unresolved),
                     language=str(request.language or ""),
+                    source_token_refs=[item["ref"] for item in user_turn_source_tokens(current.original_user_text)],
                 )
                 if not loaded_ids:
                     schema = capability_lookup_response_schema(schema, [

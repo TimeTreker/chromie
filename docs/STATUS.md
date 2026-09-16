@@ -552,10 +552,12 @@ envelope; trusted Work provenance retains the turn identity, exact original text
 Scoped Planner re-entry may instead carry the previously validated source projection while
 keeping `request.text`, Responsibilities, Goals,
 Plan, and Evidence restricted to the affected Goal subset. The source is visible for fidelity
-and correlation but grants no downstream authority to reinterpret or repair WHAT. Fast
-`argument_sources` still use exact model-retyped quotes in this revision; migration to
-Envelope span references is not yet an already-completed claim. Before that migration, the
-owner generalized the same anti-loss requirement to accepted semantic outputs. The source now
+and correlation but grants no downstream authority to reinterpret or repair WHAT. Fast `argument_sources` now use closed token spans on the same immutable source instead of
+model-retyped quotes. The Fast prompt receives deterministic source tokens, Host validates each
+span is inside an owning Responsibility source span, and canonical Plan materialization
+dereferences it to the exact source quote. Unknown/reversed/foreign spans fail closed. This
+removes transcription bookkeeping without weakening source access or Goal ownership. The owner
+also generalized the same anti-loss requirement to accepted semantic outputs. The source now
 contains a model-neutral `SemanticArtifactEnvelope` / packet contract: existing artifact ID,
 canonical payload SHA-256, existing authority/correlation and immutable parent refs around the
 exact typed payload. `CognitiveEvidenceRecorder` always archives immutable envelopes for admitted
@@ -568,8 +570,8 @@ existing Work-request context; GA/new-Goal refs are appended after continuity; P
 attached before SC and Capability Runtime; accepted SC/Communicative-Activity refs continue into
 interaction/capability metadata; and Cognitive Evidence checks transported refs against archived
 packets. The bookkeeping is omitted from model prompts and introduces no new semantic authority
-or frozen top-level Work-request field. Envelope span `argument_sources` materialization remains
-next; current Fast still retypes exact source strings.
+or frozen top-level Work-request field. Envelope-span `argument_sources` materialization is implemented for Fast current-turn Work;
+canonical time-condition `source_quote` remains a separate Planner semantic/time contract.
 This is source and automated-contract closure, not qualified target behavior. The current
 source starts Goal Association and one Fast Planner stream
 concurrently from the immutable GI result. The internal model output is one JSON object

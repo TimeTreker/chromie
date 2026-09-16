@@ -2160,9 +2160,11 @@ parameter table. Existing typed Goals remain supported as retained authority, no
 as a second live GI wire.
 
 Planner performs unit conversion, defaults, capability argument mapping and new
-future readiness. New intent-derived arguments carry exact owned quotations;
-retained typed values remain binding and cannot be overridden by a quote. These
-are mechanical provenance checks, not proof of meaning or semantic conversion.
+future readiness. Fast intent-derived arguments cite closed token spans on the immutable
+`UserTurnEnvelope`; trusted code, not the model, materializes exact owned quotations into
+canonical parameter provenance. Retained typed values remain binding and cannot be
+overridden by a span or quote. These are mechanical provenance checks, not proof of
+meaning or semantic conversion.
 Missing execution data is a Planner input gap; genuine ambiguous intent remains
 GI-owned. Host never extracts place names, chooses referents or rewrites meaning.
 

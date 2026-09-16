@@ -40,6 +40,26 @@ def normalize_turn_text(value: str) -> str:
     return " ".join((value or "").strip().split())
 
 
+
+
+class UserTurnSourceSpan(BaseModel):
+    """Closed token span into one immutable normalized UserTurnEnvelope source.
+
+    Semantic models may select these references, but they never retype the source
+    surface. Trusted code resolves the refs against the authoritative envelope.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    source_start_token_ref: str = Field(min_length=1, max_length=24)
+    source_end_token_ref: str = Field(min_length=1, max_length=24)
+
+    @field_validator("source_start_token_ref", "source_end_token_ref", mode="before")
+    @classmethod
+    def normalize_source_token_ref(cls, value: Any) -> str:
+        return normalize_turn_text(str(value or ""))
+
+
 def user_turn_prohibits_speech(envelope: Any) -> bool:
     """Read the trusted protective control without interpreting the utterance."""
 
@@ -402,3 +422,80 @@ __all__ = [
     "normalize_turn_text",
     "user_turn_prohibits_speech",
 ]
+
+def user_turn_source_tokens(source: str | UserTurnEnvelope) -> list[dict[str, Any]]:
+    """Return deterministic closed token refs over the normalized admitted source.
+
+    This is transport tokenization only: Latin/digit runs stay readable, CJK
+    characters remain independently citable, punctuation is retained, and no
+    semantic segmentation is attempted.
+    """
+
+    text = source.normalized_input.text if isinstance(source, UserTurnEnvelope) else normalize_turn_text(str(source or ""))
+    tokens: list[dict[str, Any]] = []
+    index = 0
+
+    def is_cjk(char: str) -> bool:
+        codepoint = ord(char)
+        return (
+            0x3400 <= codepoint <= 0x4DBF
+            or 0x4E00 <= codepoint <= 0x9FFF
+            or 0xF900 <= codepoint <= 0xFAFF
+        )
+
+    while index < len(text):
+        if text[index].isspace():
+            index += 1
+            continue
+        start = index
+        char = text[index]
+        if is_cjk(char):
+            index += 1
+        elif char.isalnum() or char == "_":
+            index += 1
+            while index < len(text):
+                candidate = text[index]
+                if is_cjk(candidate) or not (
+                    candidate.isalnum() or candidate in {"_", "'", "’"}
+                ):
+                    break
+                index += 1
+        else:
+            index += 1
+        tokens.append({
+            "ref": f"t{len(tokens)}",
+            "surface": text[start:index],
+            "start": start,
+            "end": index,
+        })
+    return tokens
+
+
+def resolve_user_turn_source_span(
+    source: str | UserTurnEnvelope, span: UserTurnSourceSpan,
+) -> str:
+    """Materialize one model-selected source span without copying model prose."""
+
+    text = source.normalized_input.text if isinstance(source, UserTurnEnvelope) else normalize_turn_text(str(source or ""))
+    tokens = user_turn_source_tokens(text)
+    by_ref = {str(item["ref"]): (index, item) for index, item in enumerate(tokens)}
+    start = by_ref.get(span.source_start_token_ref)
+    end = by_ref.get(span.source_end_token_ref)
+    if start is None or end is None:
+        raise ValueError("UserTurn source span cites an unknown token ref")
+    if start[0] > end[0]:
+        raise ValueError("UserTurn source span token endpoints are reversed")
+    return text[int(start[1]["start"]):int(end[1]["end"])]
+
+
+def user_turn_source_span_contains(
+    outer: UserTurnSourceSpan, inner: UserTurnSourceSpan, *, source: str | UserTurnEnvelope,
+) -> bool:
+    """Return whether ``inner`` is a closed subspan of ``outer`` on this turn."""
+
+    tokens = user_turn_source_tokens(source)
+    indexes = {str(item["ref"]): index for index, item in enumerate(tokens)}
+    refs = (outer.source_start_token_ref, outer.source_end_token_ref, inner.source_start_token_ref, inner.source_end_token_ref)
+    if any(ref not in indexes for ref in refs):
+        return False
+    return indexes[outer.source_start_token_ref] <= indexes[inner.source_start_token_ref] <= indexes[inner.source_end_token_ref] <= indexes[outer.source_end_token_ref]

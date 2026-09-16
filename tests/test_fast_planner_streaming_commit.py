@@ -315,7 +315,7 @@ def test_native_work_timing_preserves_both_ends_of_typed_source_relation(relatio
     for ref in ("first", "second", "independent"):
         for timing in ("sequential", "parallel"):
             act = {"role": "capability", "activity_id": ref, "capability_id": capability["capability_id"],
-                   "args": {"duration_s": 10}, "argument_sources": {"duration_s": "10 seconds"},
+                   "args": {"duration_s": 10}, "argument_sources": {"duration_s": {"source_start_token_ref": "t0", "source_end_token_ref": "t1"}},
                    "timing": timing, "source_responsibility_refs": [ref]}
             # Exercise the exact compiled item union, including native branches.
             errors = list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(act))
@@ -382,7 +382,7 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
         [x.local_ref for x in responsibilities], responsibilities=responsibilities, capabilities=capabilities)
     validator = Draft202012Validator(schema["properties"]["activities"]["items"])
     body = {"role": "capability", "activity_id": "act", "capability_id": capabilities[0]["capability_id"],
-        "args": {"duration_s": 10}, "argument_sources": {"duration_s": "10 seconds"},
+        "args": {"duration_s": 10}, "argument_sources": {"duration_s": {"source_start_token_ref": "t0", "source_end_token_ref": "t1"}},
         "timing": "sequential", "source_responsibility_refs": ["body"]}
     validator.validate(body)
     assert not validator.is_valid({**body, "source_responsibility_refs": ["voice"]})

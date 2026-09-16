@@ -83,6 +83,7 @@ from shared.chromie_contracts.user_turn import (
     AttentionReviewResult,
     GatewayContextSnapshot,
     UserTurnEnvelope,
+    resolve_user_turn_source_span,
     user_turn_prohibits_speech,
 )
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
@@ -3122,6 +3123,32 @@ class GoalDrivenRuntimeCoordinator:
             )
 
         goal_ids = cls._association_goal_ids(association)
+        has_argument_sources = any(
+            isinstance(activity, FastPlannerCapabilityActivity) and activity.argument_sources
+            for activity in advance.activities
+        )
+        if retained_goals is not None and has_argument_sources:
+            consistent_retained_ids: set[str] = set()
+            for snapshot in retained_goals:
+                if not isinstance(snapshot, dict):
+                    continue
+                snapshot_id = str(snapshot.get("goal_id") or "").strip()
+                for key in ("goal", "semantic_goal"):
+                    goal_payload = snapshot.get(key)
+                    if (
+                        snapshot_id
+                        and isinstance(goal_payload, dict)
+                        and str(goal_payload.get("goal_id") or "").strip() == snapshot_id
+                    ):
+                        consistent_retained_ids.add(snapshot_id)
+                        break
+            new_goal_ids = {goal.goal_id for goal in association.new_goals}
+            missing_retained = sorted(set(goal_ids) - new_goal_ids - consistent_retained_ids)
+            if missing_retained:
+                raise ValueError(
+                    "Fast argument source has no exact canonical Goal owner: inconsistent retained Goal snapshot: "
+                    + ",".join(missing_retained)
+                )
         activities_by_goal: dict[str, list[Any]] = {
             goal_id: [] for goal_id in goal_ids
         }
@@ -3153,29 +3180,22 @@ class GoalDrivenRuntimeCoordinator:
                     )
                 )
 
-        quote_owners = {
-            str(snapshot.get("goal_id")): str(snapshot["goal"].get("description") or "")
-            for snapshot in (retained_goals or [])
-            if isinstance(snapshot, dict) and isinstance(snapshot.get("goal"), dict)
-            and snapshot["goal"].get("goal_id") == snapshot.get("goal_id")
-        }
-        quote_owners.update({goal.goal_id: goal.description for goal in association.new_goals})
         parameter_resolutions = [
             PlanParameterResolution(
                 step_id=activity.activity_id, parameter=parameter,
                 strategy="semantic_realization", value=activity.args[parameter],
-                source_quote=quote, confidence=advance.confidence,
+                source_quote=resolve_user_turn_source_span(user_text, span),
+                confidence=advance.confidence,
                 source_goal_ids=list(dict.fromkeys(
                     goal_id for ref in activity.source_responsibility_refs
                     for goal_id in refs_to_goals[ref]
-                    if quote in quote_owners.get(goal_id, "")
                 )),
             )
             for activity in advance.activities if isinstance(activity, FastPlannerCapabilityActivity)
-            for parameter, quote in activity.argument_sources.items()
+            for parameter, span in activity.argument_sources.items()
         ]
         if any(not item.source_goal_ids for item in parameter_resolutions):
-            raise ValueError("Fast argument citation has no exact canonical Goal owner")
+            raise ValueError("Fast argument source has no canonical Goal owner")
 
         outcomes: list[Any] = []
         unresolved = list(advance.unresolved)
@@ -4721,7 +4741,7 @@ class GoalDrivenRuntimeCoordinator:
                 fast_plan = self._canonical_plan_from_fast_advance(
                     advance=fast_advance,
                     association=association,
-                    user_text=text,
+                    user_text=work_request.original_user_text,
                     retained_goals=planning_context.get("active_goal_snapshots", []),
                 )
                 terminal_plan = fast_plan

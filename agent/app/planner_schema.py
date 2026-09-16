@@ -2479,6 +2479,7 @@ def fast_advance_response_schema(
     capabilities: list[dict[str, Any]] | None = None,
     auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
     interpretation_unresolved: list[str] | None = None,
+    source_token_refs: list[str] | None = None,
     committed_communicative: bool = False,
     suppress_new_communicative: bool = False,
     suppress_new_progress: bool = False,
@@ -2813,7 +2814,21 @@ def fast_advance_response_schema(
                                 required.append("argument_sources")
                                 properties["argument_sources"] = {
                                     "type": "object", "properties": {
-                                        name: {"type": "string", "minLength": 1, "maxLength": 500}
+                                        name: {
+                                            "type": "object",
+                                            "properties": {
+                                                "source_start_token_ref": {
+                                                    "type": "string",
+                                                    **({"enum": list(source_token_refs)} if source_token_refs else {"minLength": 1, "maxLength": 24}),
+                                                },
+                                                "source_end_token_ref": {
+                                                    "type": "string",
+                                                    **({"enum": list(source_token_refs)} if source_token_refs else {"minLength": 1, "maxLength": 24}),
+                                                },
+                                            },
+                                            "required": ["source_start_token_ref", "source_end_token_ref"],
+                                            "additionalProperties": False,
+                                        }
                                         # Match args and the sorted catalog: native
                                         # decoding cannot revisit skipped keys.
                                         for name in sorted(input_properties)
@@ -3005,11 +3020,12 @@ def fast_streaming_advance_response_schema(
     auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
     interpretation_unresolved: list[str] | None = None,
     language: str = "",
+    source_token_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     """One complete Work result; independent SC owns communication latency."""
     schema = fast_advance_response_schema(
         responsibility_refs, responsibilities=responsibilities, capabilities=capabilities,
-        interpretation_unresolved=interpretation_unresolved,
+        interpretation_unresolved=interpretation_unresolved, source_token_refs=source_token_refs,
     )
     compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
     compiled["title"] = "FastPlannerWorkAdvanceOutput"

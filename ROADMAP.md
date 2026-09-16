@@ -79,8 +79,10 @@ Work proceeds in this order:
    implemented as the next anti-loss foundation. **Phase 1C is now implemented:** live
    UserTurn/GI/Responsibility refs travel to GA/Fast, GA/new-Goal refs are appended after
    continuity, Plan refs reach SC/Capability Runtime, and accepted SC/talk refs continue into
-   delivery/evidence without entering model prompts. Next reproduce/remove Fast exact-quote
-   copying through Envelope token/span references and finish the SC relevance burden inventory. Do not change models during this audit. The
+   delivery/evidence without entering model prompts. **Phase 1D is now implemented:** Fast
+   argument provenance uses closed `UserTurnEnvelope` token spans and Host quote materialization,
+   so the model no longer retypes exact source strings. Next finish the SC relevance/context
+   burden inventory. Do not change models during this audit. The
    deliverable remains the smallest justified deletion/projection set plus red tests.
 3. **Establish immutable semantic-artifact lineage before deleting provenance copies.**
    **First substrate slice implemented:** a generic trusted-code `SemanticArtifactEnvelope` /
@@ -91,8 +93,8 @@ Work proceeds in this order:
    completion/delivery appends lifecycle facts rather than rewriting history. This does not
    yet change model-facing semantic authority. **Live-ref transport is now implemented in
    Phase 1C** through the existing context/Runtime metadata: refs are content-bound and checked
-   at downstream boundaries while prompts omit the bookkeeping. Next use the established
-   UserTurn lineage for argument source spans.
+   at downstream boundaries while prompts omit the bookkeeping. Phase 1D now uses that
+   established UserTurn coordinate system for Fast argument source spans.
 4. **Simplify the Planner/SC transactions without moving semantic authority.** Start with
    facts already known to be burdensome: model-retyped exact source text/strategy
    decoration, generated/correlation bookkeeping, decoder-shape-only fields, and SC

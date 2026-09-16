@@ -19,6 +19,9 @@ try:
         CognitiveWorkRequest,
     )
     from chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
+    from chromie_contracts.user_turn import (
+        resolve_user_turn_source_span, user_turn_source_span_contains,
+    )
     from chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
@@ -31,6 +34,9 @@ except ImportError:  # pragma: no cover
         CognitiveWorkRequest,
     )
     from shared.chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
+    from shared.chromie_contracts.user_turn import (
+        resolve_user_turn_source_span, user_turn_source_span_contains,
+    )
     from shared.chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
@@ -44,7 +50,6 @@ from .planner_grounding import (
     _argument_realization_contract,
     _material_values_equal,
     literal_intent_argument,
-    intent_source_quote,
     missing_argument_realizations,
     semantic_numeric_values,
 )
@@ -702,13 +707,29 @@ def validate_fast_advance_output(
                         f"{activity.capability_id}.{name}; source_ref={source_ref} "
                         f"expected={expected!r} actual={actual!r}"
                     )
-        for parameter, quote in activity.argument_sources.items():
-            if parameter not in activity.args or not any(
-                intent_source_quote(quote, outcome=by_ref[ref].outcome)
+        source_text = request.original_user_text
+        for parameter, span in activity.argument_sources.items():
+            if parameter not in activity.args:
+                raise AuthoritativeGroundingValidationError(
+                    "Fast Planner argument source names a missing argument: "
+                    f"{activity.activity_id}.{parameter}"
+                )
+            try:
+                quote = resolve_user_turn_source_span(source_text, span)
+            except ValueError as exc:
+                raise AuthoritativeGroundingValidationError(
+                    "Fast Planner argument source must cite the immutable UserTurn: "
+                    f"{activity.activity_id}.{parameter}"
+                ) from exc
+            if not quote.strip() or not any(
+                by_ref[ref].source_evidence is not None
+                and user_turn_source_span_contains(
+                    by_ref[ref].source_evidence, span, source=source_text,
+                )
                 for ref in activity.source_responsibility_refs
             ):
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner argument source must cite an exact owned intent: "
+                    "Fast Planner argument source must stay inside an owning Responsibility source span: "
                     f"{activity.activity_id}.{parameter}"
                 )
         required_inputs = set(input_schema.get("required") or [])

@@ -33,6 +33,9 @@ from shared.chromie_contracts.user_turn import (
     NormalizedTurnInput,
     OriginalTurnInput,
     UserTurnEnvelope,
+    UserTurnSourceSpan,
+    resolve_user_turn_source_span,
+    user_turn_source_tokens,
 )
 
 
@@ -72,6 +75,30 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
             envelope.original_input.text = "rewritten"
         with self.assertRaises(ValidationError):
             envelope.reflex.action = "ignore"
+
+    def test_source_spans_dereference_the_same_immutable_envelope(self) -> None:
+        envelope = self._envelope(
+            original_input=OriginalTurnInput(text="Walk at 0.2 speed for ten seconds"),
+            normalized_input=NormalizedTurnInput(
+                text="Walk at 0.2 speed for ten seconds", language="en-US",
+            ),
+        )
+        tokens = user_turn_source_tokens(envelope)
+        normalized = envelope.normalized_input.text
+        start = normalized.index("0.2 speed")
+        end = start + len("0.2 speed")
+        covered = [item for item in tokens if item["start"] < end and item["end"] > start]
+        span = UserTurnSourceSpan(
+            source_start_token_ref=covered[0]["ref"],
+            source_end_token_ref=covered[-1]["ref"],
+        )
+        self.assertEqual(resolve_user_turn_source_span(envelope, span), "0.2 speed")
+        with self.assertRaisesRegex(ValueError, "unknown token ref"):
+            resolve_user_turn_source_span(
+                envelope, UserTurnSourceSpan(
+                    source_start_token_ref="t999", source_end_token_ref="t999",
+                ),
+            )
 
     def test_rejects_semantic_fields_and_input_substitution(self) -> None:
         payload = self._envelope().model_dump(mode="json")
@@ -136,8 +163,9 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
         planner_prompt = planner_source_prompt(work_request)
         self.assertIn(envelope.original_input.text, ga_prompt)
         self.assertIn(envelope.original_input.text, planner_prompt)
-        self.assertIn(envelope.turn_id, planner_prompt)
-        self.assertIn(provenance["original_text_sha256"], planner_prompt)
+        self.assertNotIn(envelope.turn_id, planner_prompt)
+        self.assertIn('"source_tokens"', planner_prompt)
+        self.assertNotIn(provenance["original_text_sha256"], planner_prompt)
         self.assertNotIn(provenance["original_text_sha256"], ga_prompt)
 
     def test_semantic_requests_reject_envelope_transport_mismatch(self) -> None:
