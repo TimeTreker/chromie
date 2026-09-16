@@ -101,19 +101,14 @@ human-facing interaction deadlines. Both profiles reserve each stage's complete
 declared output budget plus a 2048-token safety margin before inference and
 reject prompt or completion truncation as an LLM-budget failure. RTX 5090 keeps
 its declared shared Gemma4-12B SGLang profile. RTX 4090 Laptop assigns every LLM role to
-one `qwen3.5:4b` model, retains the 16K/512 Goal Interpretation request budget,
-and reserves 48K for Fast/Deep Planner, retaining 32K for other downstream roles.
-The shared runner is warmed at 48K. This admits retained complete re-entry packets
-requiring up to 42172 estimated tokens without dropping context or reducing the
-output allowance or safety margin. A resource probe with CosyVoice peaked at
-11397 MiB; this is capacity evidence, not live behavior qualification.
-One resident model avoids cross-role weight swaps; different request context
-sizes can still cause runner reloads. Ollama 0.32.14 creates only one sequence slot for the
-`qwen35` architecture even when configured for two, so the maintained profile
-retains one provider request slot. Current-revision qualification must prove GPU
-coexistence and latency with CosyVoice. The
-supervised launcher clears stale Ollama runners before the first TTS synthesis
-probe.
+one `qwen3.5:4b` model served by its own pinned SGLang AWQ override, retains the 16K/512
+Goal Interpretation request budget, reserves 48K for Fast/Deep Planner, and keeps 32K for
+other downstream roles. One resident engine avoids cross-role weight/context reloads while
+SGLang can queue up to two requests and apply the existing compute-class priority/preemption
+contract. Its 49152-token shared cache covers one maximum-size Planner request; it does not
+claim two simultaneous full-window requests. Earlier laptop SGLang+CosyVoice evidence proved
+a 32K cache topology only, so current-revision 49K GPU coexistence and latency remain a
+fresh qualification requirement rather than an inherited release claim.
 
 Foreground latency is owned by `env/modes/*.env`. The maintained `speech`,
 `services`, and `voice_mujoco` modes use interactive stage budgets, a 15-second
@@ -141,7 +136,7 @@ The quality model is normally used by Goal Association and Deep Planner. The fas
 model is normally used by Goal Interpretation, Fast Planner (including terminal
 Evidence re-entry), Task Continuity, and Social Attention unless the profile
 explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop assigns
-all of those roles to one `qwen3.5:4b` runner with one provider request slot.
+all of those roles to one `qwen3.5:4b` SGLang engine with two bounded running-request slots.
 That assignment is a maintained profile configuration, not a target-quality
 claim. Camera frames are not yet part of the runtime input contract.
 Input preflight

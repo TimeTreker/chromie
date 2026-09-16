@@ -1,5 +1,32 @@
 # Chromie Current Status
 
+## RTX 4090 Laptop SGLang source migration — 2026-09-17 (current)
+
+The owner identified that the maintained RTX 4090 Laptop still ran all cognition through
+Ollama's one sequence slot while RTX 5090 had already moved to the maintained SGLang
+service path. Current source now changes **serving runtime only** for the laptop: every
+semantic role remains `qwen3.5:4b` with the existing 16K GI, 32K ordinary-role and 49K
+Fast/Deep request limits, but the hardware profile selects a dedicated
+`docker-compose.sglang-rtx4090-laptop.yml` override and `AGENT_LLM_PROVIDER=sglang`.
+
+The laptop override pins the retained AWQ artifact
+`cyankiwi/Qwen3.5-4B-AWQ-4bit@ef85d23bebaba87b3c4672ba11c449c79dbdb23e`, uses the same
+pinned SGLang image build as the maintained 5090 path, retains priority scheduling and
+preemption with at most two running requests, and raises the shared token budget to 49152
+so one current maximum Planner transaction is representable. The older laptop SGLang
+resource evidence proved resident CosyVoice with a 32K cache/two 16K requests only; it
+does **not** qualify this new 49K production source topology. First startup may fetch only
+the pinned model revision into `hf_cache`; subsequent offline use may set the existing HF
+offline variables.
+
+Source/profile/Compose tests prove automatic laptop selection, no active Ollama inference
+model, preserved role budgets, pinned model identity and priority/preemption configuration.
+Target promotion remains open until the real 16GB machine proves SGLang readiness, Qwen
+contract behavior, 49K cache + CosyVoice coexistence, foreground contention/preemption and
+the retained text/MuJoCo compound case on one runtime identity. Ollama remains the fallback
+transport for other profiles and comparison evidence; it is not deleted.
+
+
 ## Successful semantic-facade E2E and bounded follow-up — 2026-09-16 (current)
 
 The owner-provided `chromie_debug_bundle_20260916_191920.tar.gz` proves the original

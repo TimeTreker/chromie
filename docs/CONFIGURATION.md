@@ -149,7 +149,7 @@ does not implement priority, preemption or a maximum queue wait.
 
 | Configuration | Actual support and qualification boundary |
 | --- | --- |
-| RTX 4090 Laptop / Ollama, one request slot | Logical GA/Planner concurrency; provider inference is serialized. No finite foreground queue-wait guarantee is established. Usable for development diagnostics; unqualified for the Charter's interactive responsiveness requirement. |
+| RTX 4090 Laptop / SGLang, two bounded running requests | One resident Qwen3.5-4B AWQ engine accepts independent role requests with priority/preemption. The 49K cache covers one current full Planner request; concurrent full-window requests are not claimed. Fresh 16GB+CosyVoice contention evidence is required before latency promotion. |
 | RTX 5090 / SGLang, configured scheduling and presentation lease | The adapter may use provider scheduling and the qualified speech lease. Source support alone does not establish a foreground-wait bound or the target latency budget; retain same-profile contention and real Agent/playback evidence before promotion. |
 | Other profiles/providers | Only capabilities actually verified on that exact configuration may be claimed. Missing scheduling telemetry or untested contention remains unknown. |
 
@@ -177,7 +177,7 @@ lifetime, not foreground service delay. Development use does not qualify promoti
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared `qwen3.5:4b` runner. Ollama 0.32.14 exposes only one sequence slot for the `qwen35` architecture even when configured for two, so the maintained profile truthfully retains one provider request slot. The maintained RTX 5090 profile also sets `0` and assigns all reasoning roles to one shared `chromie-gemma4-12b` SGLang FP8 model; ASR and TTS retain their specialized models. This topology is pending all-role qualification. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared `qwen3.5:4b` SGLang engine; RTX 5090 similarly assigns all reasoning roles to one shared `chromie-gemma4-12b` SGLang FP8 engine. ASR and TTS retain their specialized models. Each hardware profile owns its own model artifact and memory/context budget; source selection does not by itself qualify live contention or speech headroom. |
 | `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
@@ -185,19 +185,17 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `chromie_mixed` is the catalog default; `speaker_id=default` routes `zh` and
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
-The RTX 4090 Laptop profile warms one shared 49152-token `qwen3.5:4b` model with
-one provider request slot and quantized KV cache. Fast and Deep Planner use 48K;
-GI retains 16K and the other roles retain 32K. The complete retained Planner
-requests needed up to 42172 estimated tokens including output and safety margin,
-so the former 32K profile rejected them before inference. A 48K resource probe
-with resident CosyVoice peaked at 11397 MiB; full live qualification remains required.
-Generated role contexts remain authoritative. The RTX
-5090 profile opts out of compact cognition and assigns every reasoning role to
-one shared `chromie-gemma4-12b` SGLang FP8 model with a 65536-token context. This does not merge role
-authority or change ASR/TTS models; the all-role topology remains under qualification.
-Before the CosyVoice synthesis readiness probe, the supervised launcher restarts
-only `chromie-llm` to clear stale runners left by an earlier launch. Select a
-fallback explicitly with
+The RTX 4090 Laptop profile now selects one resident Qwen3.5-4B AWQ SGLang engine.
+GI retains its 16K request limit, the other ordinary roles retain 32K, and Fast/Deep
+retain 49152 so complete re-entry packets requiring up to 42172 estimated tokens still
+fit with their unchanged output allowance and safety margin. SGLang owns two bounded
+running-request slots, priority/preemption, and one 49152-token shared cache: this covers
+one maximum-size Planner request plus smaller concurrent work, not two simultaneous full
+49K requests. Earlier laptop SGLang+CosyVoice evidence proved only the 32K cache topology;
+the promoted source configuration therefore requires fresh 49K shared-GPU qualification.
+The RTX 5090 profile similarly assigns every reasoning role to one shared
+`chromie-gemma4-12b` SGLang FP8 model with a 65536-token context. Neither topology merges
+role authority or changes ASR/TTS models. Select a fallback explicitly with
 `--tts-backend oute` or `--tts-backend qwen3`; the selection is scoped to that
 launch and does not rewrite `.env.local`.
 
@@ -1068,7 +1066,13 @@ alias or boolean mode; it remains with the existing qualification service until 
 is promoted or removed. The RTX 5090 runtime configuration below supersedes the former Qwen candidate overlay.
 
 
-## RTX 5090 SGLang startup
+## Maintained SGLang startup
+
+The detected `env/profiles/rtx5090.env` selects `docker-compose.sglang.yml`; the RTX 4090
+Laptop profile selects `docker-compose.sglang-rtx4090-laptop.yml`. Both use the existing
+Compose override setting and keep the same `chromie-llm` service identity. The 5090 owner
+pins Gemma4-12B FP8/64K while the laptop owner pins Qwen3.5-4B AWQ/49K; their resource
+budgets and model artifacts are deliberately separate.
 
 The detected `env/profiles/rtx5090.env` selects `docker-compose.sglang.yml` through
 the existing Compose override setting. The existing `chromie-llm` service becomes
