@@ -1,5 +1,48 @@
 # Chromie Handoff
 
+## Successful semantic-facade E2E and bounded follow-up — 2026-09-16 (current)
+
+The owner-provided `chromie_debug_bundle_20260916_191920.tar.gz` proves the original
+compound text case now executes end to end on current source. Session `c9a2a253` keeps
+one complete Responsibility/Goal, Social Cognition independently acknowledges with
+`Okay, I'm on it!`, and Fast authors three sequential semantic Activities:
+`walk_velocity`, `nod_yes`, and `turn_in_place(direction=left)`. All three Runtime
+results are `completed` in sim. The turn Plan contains no provider-local yaw sign for
+`turn_in_place`; the earlier wrong-direction/Host-rejection failure is therefore closed
+at the Core/Runtime semantic boundary.
+
+The same evidence exposes four narrower follow-ups rather than reopening the architecture.
+GI labels the physical-only compound `output_mode=other`; Fast consequently invents a
+`complete_response` whose only purpose is to confirm/narrate the Work, causing another SC
+pass. Fast also spends one 6.8 s lookup on `soridormi.robot.get_status`, whose provider
+hint incorrectly recommends status before movement. The accepted direction provenance is
+valid but over-wide (`t7..t19` instead of the unique literal `t19`). Finally, Runtime
+already has a trusted `provider_realization` trace, but the debug evidence recorder does
+not retain that event body. Initial SC is correct but still expensive (about 9.7 s in the
+retained call); aggressive decoder/schema changes remain deferred.
+
+The bounded source follow-up keeps one authority per fact. GI now states that multiple
+physical actions remain `body_action` unless result domains genuinely differ, and Planner
+may not create `complete_response` merely to acknowledge/confirm/narrate Capability Work.
+Trusted provenance code may narrow an already-valid model-selected argument span only to
+one unique exact **string** literal inside that span; numeric spans retain units/modifiers,
+and absence/ambiguity preserves the original span. Cognitive outcome evidence now records
+diagnostic `provider_realizations[]` from existing Capability traces without exposing
+provider args to GI/GA/Planner/SC or adding them to semantic Evidence. SC receives a bounded
+owner-approved Mind projection that preserves identity, personality, worldview/values,
+social style, long-term goals and deliberation/experience policy while removing duplicate
+`prompt_summary`, reflex-policy and internal self-model material. A paired Soridormi
+manifest patch separately makes robot status an explicit observational capability rather
+than movement preflight.
+
+Focused source tests pass for each slice; native latency/semantic promotion is not claimed
+until the exact compound case is rerun with both repositories rebuilt. The next retained
+run must prove: no `get_status` detail lookup for ordinary movement; no confirmation-only
+`complete_response`/second SC pass; minimal unique string-literal direction provenance;
+`provider_realizations` showing semantic `direction=left` and provider-local signed yaw;
+and new initial-SC/Fast timings on one verified revision.
+
+
 ## Native follow-up repair after semantic-facade live success — 2026-09-16 (current)
 
 The owner-provided current-revision text/MuJoCo bundle proves the original compound
