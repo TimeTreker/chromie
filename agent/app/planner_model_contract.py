@@ -47,13 +47,20 @@ PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
 NON_PLANNER_TRANSPORT_CAPABILITY_IDS = frozenset({"chromie.speak"})
 DETERMINISTIC_CONTROL_CAPABILITY_IDS = frozenset({"soridormi.stop"})
+PLANNER_LIBRARY_INTROSPECTION_SUFFIXES = (".get_capabilities",)
 
 def is_planner_step_capability(capability_id: str) -> bool:
     normalized = str(capability_id or "").strip()
-    return normalized not in (
+    if normalized in (
         NON_PLANNER_TRANSPORT_CAPABILITY_IDS
         | DETERMINISTIC_CONTROL_CAPABILITY_IDS
-    )
+    ):
+        return False
+    # Fast Planner already receives a current provider-neutral Capability index
+    # and has one bounded exact-detail lookup. Executing a provider's own catalog
+    # introspection tool to rediscover that same library adds a redundant model
+    # round trip and creates no user Work.
+    return not normalized.endswith(PLANNER_LIBRARY_INTROSPECTION_SUFFIXES)
 
 class PlannerModelStep(CapabilityIdentityModel):
     """Semantic plan leaf returned by a planner model.

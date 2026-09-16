@@ -1,5 +1,33 @@
 # Chromie Handoff
 
+## Native follow-up repair after semantic-facade live success — 2026-09-16 (current)
+
+The owner-provided current-revision text/MuJoCo bundle proves the original compound
+walk/nod/left-turn request now reaches completed Work with Planner authoring semantic
+`direction=left`, not provider yaw sign. It also exposed three narrower remaining defects:
+SC twice justified silence from the absence of Planner communication needs; the live bundle
+did not retain the exact semantic-args -> provider-args materialization; and Fast spent one
+extra native call requesting `soridormi.activity.get_capabilities` despite already owning a
+current Capability index and bounded detail-lookup transaction.
+
+The source repair keeps authority unchanged. SC now receives a compact fresh-interaction
+opportunity before its larger snapshot, omits an empty `communication_needs` model field,
+and removes the duplicate full UserTurnEnvelope from model context while the trusted request
+retains it. A fresh addressed task is explicitly an interaction opportunity; task-oriented
+content or lack of a Planner Need is not itself a silence reason. Soridormi semantic-facade
+materialization is appended to the existing trusted CapabilityTrace as diagnostic execution
+provenance (`semantic_args`, `provider_args`) and never enters Planner/SC inference. Fast
+Planner's provider library now excludes `*.get_capabilities` introspection entries because
+its own current index/detail lookup already owns that discovery boundary.
+
+Focused verification passes 111 SC tests (one known archive assertion deselected), 21
+semantic-facade/provider tests plus 10 subtests, and 157 Fast/Runtime tests plus 17 subtests.
+Native requalification is still required: rerun the same compound text/MuJoCo episode and
+confirm SC no longer uses missing communication needs as its silence rationale, the trace
+records `direction=left` -> provider-local signed yaw, and Fast no longer performs the
+redundant catalog-introspection call. These changes reduce avoidable work but do not yet
+claim the final interaction-latency target.
+
 ## Relation-aware generalization Phase 2B — 2026-09-16
 
 The generalization contract now has an executable dependency-light adjudication surface at

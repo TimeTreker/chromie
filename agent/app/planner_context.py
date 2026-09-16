@@ -8,6 +8,7 @@ from typing import Any
 
 from pydantic import ValidationError
 from .planner_grounding import _goal_binding_map
+from .planner_model_contract import is_planner_step_capability
 
 try:
     from chromie_contracts.core_interpretation import PlannerReentryScope
@@ -1225,8 +1226,14 @@ async def fast_capability_context(catalog: Any, request: CognitiveWorkRequest, l
     runtime permission. The model may request one bounded detail batch before
     authoring its complete planning decision.
     """
-    common = await catalog.prompt_entries(scope="common", refresh=False)
-    entries = await catalog.prompt_entries(scope="index", refresh=False)
+    common = [
+        item for item in await catalog.prompt_entries(scope="common", refresh=False)
+        if is_planner_step_capability(item.capability_id)
+    ]
+    entries = [
+        item for item in await catalog.prompt_entries(scope="index", refresh=False)
+        if is_planner_step_capability(item.capability_id)
+    ]
     by_id = {item.capability_id: item for item in entries}
     if len(loaded_ids) != len(set(loaded_ids)) or any(key not in by_id for key in loaded_ids):
         raise ValueError("Capability lookup requires unique exact current catalog IDs")

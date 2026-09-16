@@ -12,6 +12,7 @@ from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
 from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner_context import fast_capability_context
 from agent.app.goal_association import GoalAssociationResolver
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -97,6 +98,33 @@ class Catalog:
 
     async def prompt_entries(self, *, scope, refresh=False):
         return [item for item in self.entries if scope != "common" or item.prompt_tier == "common"]
+
+
+@pytest.mark.asyncio
+async def test_fast_library_index_excludes_provider_catalog_introspection_capabilities():
+    action = CatalogCapability(
+        capability_id="soridormi.turn_in_place", agent_id="capability_agent",
+        description="Turn left or right", input_schema={
+            "type": "object", "properties": {"direction": {"type": "string", "enum": ["left", "right"]}},
+            "required": ["direction"], "additionalProperties": False,
+        }, interaction_executable=True, prompt_tier="common", can_run_parallel=False,
+        effects=["physical_motion"], hints={"semantic_type": "body_action"},
+    )
+    introspection = CatalogCapability(
+        capability_id="soridormi.activity.get_capabilities", agent_id="capability_agent",
+        description="Provider catalog introspection", input_schema={
+            "type": "object", "properties": {}, "additionalProperties": False,
+        }, interaction_executable=True, prompt_tier="rare", can_run_parallel=True,
+        effects=[], hints={"semantic_type": "information"},
+    )
+    current, common, entries = await fast_capability_context(
+        Catalog([action, introspection]), request_for("turn left"),
+    )
+    assert [item.capability_id for item in common] == ["soridormi.turn_in_place"]
+    assert [item.capability_id for item in entries] == ["soridormi.turn_in_place"]
+    assert [item["capability_id"] for item in current.context["capability_index"]] == [
+        "soridormi.turn_in_place"
+    ]
 
 
 class Model:
