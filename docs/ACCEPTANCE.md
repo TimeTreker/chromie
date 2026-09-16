@@ -632,6 +632,13 @@ the deployed model transaction; embodied-effect claims additionally require the 
 simulator/provider evidence level. Resetting the system between turns cannot satisfy a
 continuous-episode claim. Aggregate pass rates never override one hard episode invariant.
 
+The maintained dependency-light relation checker is
+`scripts/qualification/generalization_relations.py`. It consumes retained structured
+observations plus owner-declared `invariants`, `deltas` and side-specific assertions; it
+does not run cognition or contain phrase-to-answer rules. Use it to make relation failures
+first-class evidence instead of manually comparing two individually passing cases. Native
+qualification still owns how the paired observations are produced.
+
 Model-role qualification must also record the model-writable-field burden defined by
 `MODEL-SEMANTIC-BOUNDARY-001`. When failures cluster in exact quote copying, generated IDs,
 object ordering, provider coordinate signs or similar non-semantic representation, the

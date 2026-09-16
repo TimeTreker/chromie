@@ -1,6 +1,18 @@
 # Chromie Current Status
 
 
+## Phase 2B relation-aware generalization qualification — 2026-09-16
+
+**Dependency-light qualification substrate implemented; native relation corpus still open.**
+A maintained checker now evaluates retained structured observation pairs against declared
+metamorphic invariants, required deltas and side-specific assertions. It deliberately runs
+after inference and contains no phrase-to-answer mapping. Focused regressions cover provider-
+frame invariance, paraphrase with changed source spans, controlled left/right mutation and
+independent semantic drift. This makes relation failure first-class evidence but does not
+claim that current native GI/Planner/SC models pass those relations or that a continuous
+episode profile is complete.
+
+
 ## Phase 2A declared semantic Capability facade — 2026-09-16
 
 **Source substrate implemented; paired provider declaration and native qualification remain open.**

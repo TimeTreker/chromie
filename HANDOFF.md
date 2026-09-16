@@ -1,5 +1,16 @@
 # Chromie Handoff
 
+## Relation-aware generalization Phase 2B — 2026-09-16
+
+The generalization contract now has an executable dependency-light adjudication surface at
+`scripts/qualification/generalization_relations.py`. A spec supplies retained structured
+observations and predeclared metamorphic relations; the checker requires declared semantic
+invariants to remain equal, controlled deltas to change, and optional side assertions to
+hold. It does not invoke a model and does not map phrases to answers. Regressions cover
+provider-frame realization changes with invariant Core Plan, paraphrase/source-span change,
+left/right controlled mutation and rejection of unrelated capability drift. Native corpus
+production, bilingual breadth and continuous-episode qualification remain subsequent work.
+
 ## Semantic Capability facade Phase 2A — 2026-09-16
 
 The owner-approved contract-diet line now has a first provider-boundary implementation.

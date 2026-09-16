@@ -258,6 +258,13 @@ When an observed failure is concentrated in non-semantic paperwork, fix or redes
 boundary before trying to teach the model more paperwork. Rerun the same semantic cases
 after simplification so any remaining failure is attributable to the reduced transaction.
 
+For relation-aware comparisons, the maintained dependency-light checker
+`scripts/qualification/generalization_relations.py` evaluates already-produced structured
+observations against declared invariant and changed paths. It is an adjudication/reporting
+mechanism, not an inference oracle: corpus construction and native model calls remain
+separate, targets stay outside inference, and the checker may not encode phrase-to-answer
+rules.
+
 ### Phase 2 — design a frozen contrast corpus
 
 Build the corpus from the role's real input surface, not generic chatbot questions.
