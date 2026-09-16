@@ -1,5 +1,17 @@
 # Chromie Current Status
 
+
+## Phase 1E Social Cognition model-view diet — 2026-09-16
+
+**Source implemented; native semantic/latency qualification remains open.** The trusted
+`SocialCognitionRequest` still carries the complete validated Plan/context and content-
+addressed lineage. Only the model-facing projection is reduced: exact Capability IDs,
+provider arguments, parameter-resolution mechanics and selected Agent Skills stay outside
+SC inference, while high-level Plan/Goal/Work/Evidence/interaction facts remain. The SC
+authority contract now states that its raw motor-control prohibition applies to SC-authored
+social expression and is not evidence that high-level Work such as walking or turning is
+unavailable or unsafe.
+
 ## Semantic transaction simplification design — 2026-09-16 (design approved; source not migrated)
 
 The owner approved the next architecture line against the supplied 2026-09-16 archive:

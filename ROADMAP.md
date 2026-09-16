@@ -129,6 +129,15 @@ an updated checkpoint/handoff. Do not combine all phases into one rewrite. If a 
 looks mechanical actually requires semantic choice, keep it model-owned and document the
 reason rather than forcing the simplification.
 
+### Phase 1E — communication model-view diet
+
+Implemented after source-span provenance: the trusted SC request retains complete Plan and
+lineage truth, while the SC model projection omits provider/capability realization plumbing.
+SC receives the high-level facts needed to decide interaction but cannot infer a task
+capability limitation from raw motor-control restrictions intended only for its optional
+social expression. This completes the first SC contract-diet slice before the semantic
+Capability-facade line.
+
 ## Social Cognition migration
 
 The owner approved the [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)

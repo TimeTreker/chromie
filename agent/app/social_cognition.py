@@ -83,8 +83,14 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "whether the supplied Situation, shared goals or relationship context warrants "
     "useful initiative. Never invent a task just to create an interaction need. "
     "Use exact eligible social-expression Capability IDs and schema-valid arguments only "
-    "when useful, with each proposal anchored to its own communicative act. No raw motor "
-    "fields, inferred targets, extra task steps or gesture to satisfy requested Work. "
+    "when useful, with each proposal anchored to its own communicative act. The prohibition "
+    "on raw motor, joint, actuator or controller fields applies only to optional social "
+    "expression that YOU author. High-level requested Work such as walking, turning, nodding, "
+    "fetching or looking is not raw motor control and must never be declared unavailable or "
+    "unsafe merely because low-level control is forbidden. Treat supplied Planner/Runtime "
+    "Work state and explicit capability/authorization facts as authoritative. Do not infer "
+    "a capability limitation from implementation details omitted from your social view. "
+    "Do not invent targets, extra task steps or gestures to satisfy requested Work. "
     "Nonverbal-only interaction is allowed with function=nonverbal, empty text and an "
     "explicit expression; never invent speech just to anchor a gesture. Runtime may "
     "suppress optional expression and owns all delivery and safety checks. "
@@ -408,15 +414,58 @@ def validate_social_cognition_output(
                 raise ValueError("an input or confirmation need requires a question")
 
 
+def _social_plan_facts(value: Any) -> Any:
+    """Project a trusted Plan into communication-relevant facts only.
+
+    The full Canonical Plan remains on SocialCognitionRequest for Host validation.
+    SC does not need provider/capability realization details in order to decide what
+    to communicate, and seeing those details has caused high-level Work to be
+    confused with prohibited low-level control.
+    """
+    if not isinstance(value, dict):
+        return value
+    payload = copy.deepcopy(value)
+    steps: list[dict[str, Any]] = []
+    for row in payload.get("steps") or []:
+        if not isinstance(row, dict):
+            continue
+        steps.append({key: copy.deepcopy(row[key]) for key in (
+            "step_id", "timing", "source_goal_ids", "reuse_activity_id",
+            "step_purpose", "expected_outcome", "reason_summary",
+        ) if key in row})
+    if "steps" in payload:
+        payload["steps"] = steps
+    for key in (
+        "parameter_resolutions", "selected_agent_skills", "auxiliary_activities",
+        "communicative_acts", "response_text",
+    ):
+        payload.pop(key, None)
+    # Goal outcomes are already semantic Planner facts, but any historical
+    # response wording remains outside Planner's current communication authority.
+    for row in payload.get("goal_outcomes") or []:
+        if isinstance(row, dict):
+            row.pop("response_text", None)
+            row.pop("metadata", None)
+    return payload
+
+
+def _social_model_context(context: dict[str, Any]) -> dict[str, Any]:
+    projected = copy.deepcopy(context)
+    # Integrity lineage is trusted transport metadata rather than cognition.
+    projected.pop("semantic_artifact_lineage", None)
+    for key in ("canonical_plan_resolution", "source_canonical_plan"):
+        if key in projected:
+            projected[key] = _social_plan_facts(projected[key])
+    return projected
+
+
 def social_cognition_prompt(
     request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, num_ctx: int,
 ) -> str:
     payload = request.model_dump(mode="json")
-    # Semantic artifact lineage is trusted transport/integrity metadata. Models
-    # consume the authoritative payloads, not hashes/IDs that code can verify.
-    payload.get("context", {}).pop("semantic_artifact_lineage", None)
+    payload["context"] = _social_model_context(payload.get("context", {}))
     # Present the authoritative delivery ledger before the larger Goal/Work
-    # snapshot. Relocate it once; retain all facts and the original request digest.
+    # snapshot. Relocate it once without changing the trusted request itself.
     interaction = payload["context"].pop("interaction_context", {})
     packet = {
         "interaction_context": interaction,

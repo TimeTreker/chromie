@@ -120,14 +120,26 @@ def response(**changes):
 
 
 @pytest.mark.parametrize("state", ["queued", "playing", "completed", "interrupted", "failed"])
-def test_delivery_projection_preserves_every_fact_and_request_identity(state):
+def test_delivery_projection_preserves_social_facts_without_mutating_trusted_request(state):
     from agent.app.social_cognition import social_cognition_prompt
 
     ledger = {"events": [{"status": state, "text": "A grounded update.",
                          "metadata": {"communicative_activity_ids": ["act:1"]}}]}
+    plan = {
+        "plan_id": "plan:walk", "planner_tier": "fast", "disposition": "execute",
+        "coverage": "complete", "goal_ids": ["goal:1"], "goal_summary": "Walk left.",
+        "steps": [{"step_id": "walk", "capability_id": "soridormi.walk_velocity",
+                   "source_goal_ids": ["goal:1"], "args": {"yaw_radps": 0.4, "duration_s": 2},
+                   "timing": "sequential", "step_purpose": "achieve_effect",
+                   "reason_summary": "Carry out the requested walk."}],
+        "parameter_resolutions": [{"step_id": "walk", "parameter": "yaw_radps",
+                                   "strategy": "intent", "value": 0.4}],
+        "selected_agent_skills": [{"skill_id": "locomotion"}],
+    }
     current = request(context={"interaction_context": ledger,
                                "active_goal_snapshots": [{"goal_id": "goal:1", "status": "active"}],
-                               "other_evidence": {"status": "unknown", "value": "retain exactly"}})
+                               "other_evidence": {"status": "unknown", "value": "retain exactly"},
+                               "canonical_plan_resolution": plan})
     before = current.model_dump(mode="json")
     digest = current.snapshot_digest()
     prompt = social_cognition_prompt(current, [], num_ctx=8192)
@@ -135,10 +147,30 @@ def test_delivery_projection_preserves_every_fact_and_request_identity(state):
     assert next(iter(packet)) == "interaction_context"
     projected = packet["request"]
     assert "interaction_context" not in projected["context"]
-    projected["context"]["interaction_context"] = packet["interaction_context"]
-    assert projected == before
+    assert packet["interaction_context"] == ledger
+    assert projected["context"]["other_evidence"] == {"status": "unknown", "value": "retain exactly"}
+    social_plan = projected["context"]["canonical_plan_resolution"]
+    assert social_plan["plan_id"] == "plan:walk"
+    assert social_plan["goal_summary"] == "Walk left."
+    assert social_plan["steps"] == [{"step_id": "walk", "source_goal_ids": ["goal:1"],
+                                      "timing": "sequential", "step_purpose": "achieve_effect",
+                                      "reason_summary": "Carry out the requested walk."}]
+    rendered = json.dumps(social_plan, ensure_ascii=False)
+    assert "soridormi.walk_velocity" not in rendered
+    assert "yaw_radps" not in rendered
+    assert "parameter_resolutions" not in social_plan
+    assert "selected_agent_skills" not in social_plan
     assert current.model_dump(mode="json") == before
     assert current.snapshot_digest() == digest
+
+
+def test_social_authority_does_not_confuse_high_level_work_with_raw_motor_control():
+    from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
+
+    prompt = SOCIAL_COGNITION_AUTHORITY_PROMPT.lower()
+    assert "high-level requested work such as walking, turning" in prompt
+    assert "is not raw motor control" in prompt
+    assert "must never be declared unavailable or unsafe" in prompt
 
 
 @pytest.mark.asyncio

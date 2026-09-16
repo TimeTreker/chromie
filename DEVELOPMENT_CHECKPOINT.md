@@ -1,5 +1,26 @@
 # Development Checkpoint
 
+## Social Cognition model-view diet — Phase 1E — 2026-09-16 (current)
+
+Phase 1E keeps the full `SocialCognitionRequest` as the trusted Host/Runtime truth but
+projects only communication-relevant Plan facts into the SC model transaction. Exact
+Capability IDs, provider arguments, parameter-resolution mechanics, selected Agent Skills,
+and retired Planner wording are omitted from SC inference while Goal scope, Work timing,
+step purpose/outcome, communication needs, Evidence, Situation, Memory and delivery state
+remain available. This prevents provider realization details from becoming accidental
+social/capability authority.
+
+The SC authority prompt now scopes the raw motor/joint/controller prohibition only to
+optional social expression authored by SC. It explicitly forbids inferring that ordinary
+high-level Work such as walking, turning, nodding, fetching or looking is unavailable or
+unsafe from that prohibition. The trusted request/digest and Host validation remain
+unchanged; this is a model-view reduction, not source loss or a second Plan projection owner.
+
+Focused SC/Runtime/lineage/interaction verification passes except for the archive's
+pre-existing primary/deep byte-identical-prompt assertion, which already conflicts with
+the baseline's distinct primary/deep output schemas. No runtime/model profile is promoted.
+
+
 ## UserTurnEnvelope argument-span provenance — Phase 1D — 2026-09-16 (current)
 
 The owner approved removing model transcription work without weakening the original anti-message-loss

@@ -1,3 +1,22 @@
+# Chromie Handoff
+
+## Phase 1E Social Cognition model-view handoff — 2026-09-16 (current)
+
+The full trusted SC request remains unchanged and digest-validated. `social_cognition_prompt`
+now removes execution-realization plumbing from canonical/source Plan projections before
+model inference: Capability IDs and args, parameter resolutions, selected Agent Skills,
+auxiliary/retired communicative fields and Planner response wording do not enter SC. High-
+level Plan disposition/coverage/Goal scope plus step identity, timing, purpose, expected
+outcome and reason remain available alongside Work/Evidence/Situation/Memory/interaction
+facts.
+
+The authority prompt explicitly distinguishes prohibited raw motor fields in SC-authored
+social expression from legitimate high-level requested Work. This closes the reproduced
+architectural contributor to SC inventing a body-control capability/safety limitation.
+Host validation still sees the full Plan and semantic-artifact lineage. Next work may begin
+the semantic Capability facade; do not restore provider realization details to SC to make
+a prompt case pass.
+
 # Chromie Latest Handoff
 
 ## Phase 1D UserTurn source-span handoff — 2026-09-16 (current)
