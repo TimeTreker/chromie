@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import Any, get_args
 
 from jsonschema import Draft202012Validator
@@ -9,7 +10,12 @@ from jsonschema import Draft202012Validator
 from .capabilities.catalog import CapabilityCatalog
 from .capabilities.validator import validate_args_for_schema
 from .clients.ollama_client import OllamaClient
-from .cognitive_identity import STABLE_MIND_SEMANTIC_CONTRACT
+from .cognitive_identity import (
+    STABLE_MIND_SEMANTIC_CONTRACT,
+    bounded_identity_json,
+    bounded_personality_json,
+    bounded_stable_mind_json,
+)
 from .planner_context import auxiliary_social_capability_payloads, auxiliary_social_prompt_context
 from .prompt_projection import required_json
 
@@ -453,8 +459,54 @@ def _social_plan_facts(value: Any) -> Any:
     return payload
 
 
+def _social_mind_projection(context: dict[str, Any]) -> dict[str, Any]:
+    """Keep the owner-approved social Mind while removing redundant prompt copies."""
+
+    mind = context.get("mind")
+    if not isinstance(mind, dict) or mind.get("owner_approved") is not True:
+        return {}
+
+    def decoded(text: str) -> dict[str, Any]:
+        value = json.loads(text)
+        return value if isinstance(value, dict) else {}
+
+    identity = decoded(bounded_identity_json(context, max_chars=2600))
+    personality = decoded(bounded_personality_json(context, max_chars=2600))
+    stable = decoded(bounded_stable_mind_json(context, max_chars=2400))
+    projected: dict[str, Any] = {
+        "kind": mind.get("kind"),
+        "profile_id": mind.get("profile_id"),
+        "version": mind.get("version"),
+        "owner_approved": True,
+    }
+    if identity:
+        projected["identity"] = copy.deepcopy(identity.get("identity", {}))
+        projected["self_model"] = copy.deepcopy(identity.get("self_model", {}))
+    if personality:
+        projected["personality_expression"] = personality
+    if stable:
+        projected["worldview"] = copy.deepcopy(stable.get("worldview", {}))
+        projected["household_values"] = copy.deepcopy(
+            stable.get("household_values", {})
+        )
+        projected["core_principles"] = copy.deepcopy(
+            stable.get("core_principles", [])
+        )
+    for key in (
+        "social_interaction_style",
+        "long_term_goals",
+        "deliberation_policy",
+        "experience_tuning_policy",
+    ):
+        if key in mind:
+            projected[key] = copy.deepcopy(mind[key])
+    return projected
+
+
 def _social_model_context(context: dict[str, Any]) -> dict[str, Any]:
     projected = copy.deepcopy(context)
+    if "mind" in projected:
+        projected["mind"] = _social_mind_projection(context)
     # Integrity lineage is trusted transport metadata rather than cognition.
     projected.pop("semantic_artifact_lineage", None)
     # The exact admitted source is already present once as request.source_turn.

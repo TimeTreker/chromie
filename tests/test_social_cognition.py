@@ -1323,3 +1323,28 @@ def test_native_question_need_requires_question_function_without_forcing_optiona
         # Optional communication remains a separate decision with no false coverage.
         act["addressed_need_ids"] = []
         Draft202012Validator(schema).validate({**valid, "activities": [act], "need_outcomes": {"question": "pending"}})
+
+
+def test_social_model_context_compacts_redundant_mind_without_losing_social_self() -> None:
+    from agent.app.social_cognition import _social_model_context
+    from shared.chromie_contracts.mind import default_mind_profile
+
+    mind = default_mind_profile().prompt_context(max_chars=5000)
+    context = {"mind": mind}
+    projected = _social_model_context(context)["mind"]
+
+    assert projected["owner_approved"] is True
+    assert projected["identity"]["name"] == "Chromie"
+    assert "smart" in projected["personality_expression"]["core_traits"]
+    assert projected["worldview"]
+    assert projected["household_values"]
+    assert projected["social_interaction_style"] == mind["social_interaction_style"]
+    assert projected["long_term_goals"] == mind["long_term_goals"]
+    assert projected["deliberation_policy"] == mind["deliberation_policy"]
+    assert projected["experience_tuning_policy"] == mind["experience_tuning_policy"]
+    assert "prompt_summary" not in projected
+    assert "reflex_policy" not in projected
+    assert "internal_components" not in projected.get("self_model", {})
+    assert len(json.dumps(projected, ensure_ascii=False)) < len(
+        json.dumps(mind, ensure_ascii=False)
+    ) * 0.75
