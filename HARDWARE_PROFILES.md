@@ -104,9 +104,9 @@ its declared shared Gemma4-12B SGLang profile. RTX 4090 Laptop assigns every LLM
 one `qwen3.5:4b` model served by its own pinned SGLang AWQ override, retains the 16K/512
 Goal Interpretation request budget, reserves 48K for Fast/Deep Planner, and keeps 32K for
 other downstream roles. One resident engine avoids cross-role weight/context reloads while
-SGLang can queue up to two requests and apply the existing compute-class priority/preemption
+SGLang can run up to three requests and apply the existing compute-class priority/preemption
 contract. Its 49152-token shared cache covers one maximum-size Planner request; it does not
-claim two simultaneous full-window requests. Earlier laptop SGLang+CosyVoice evidence proved
+claim three simultaneous full-window requests. Earlier laptop SGLang+CosyVoice evidence proved
 a 32K cache topology only, so current-revision 49K GPU coexistence and latency remain a
 fresh qualification requirement rather than an inherited release claim.
 
@@ -136,7 +136,7 @@ The quality model is normally used by Goal Association and Deep Planner. The fas
 model is normally used by Goal Interpretation, Fast Planner (including terminal
 Evidence re-entry), Task Continuity, and Social Attention unless the profile
 explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop assigns
-all of those roles to one `qwen3.5:4b` SGLang engine with two bounded running-request slots.
+all of those roles to one `qwen3.5:4b` SGLang engine with three bounded running-request slots.
 That assignment is a maintained profile configuration, not a target-quality
 claim. Camera frames are not yet part of the runtime input contract.
 Input preflight

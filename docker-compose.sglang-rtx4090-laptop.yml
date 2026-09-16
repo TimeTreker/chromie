@@ -28,9 +28,9 @@ services:
       - --max-total-tokens
       - "49152"
       - --max-running-requests
-      - "2"
+      - "3"
       - --max-mamba-cache-size
-      - "10"
+      - "15"
       - --mem-fraction-static
       - "0.80"
       - --chunked-prefill-size

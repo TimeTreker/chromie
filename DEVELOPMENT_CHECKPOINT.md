@@ -12,7 +12,8 @@ Fast/Deep request limits, but the hardware profile selects a dedicated
 The laptop override pins the retained AWQ artifact
 `cyankiwi/Qwen3.5-4B-AWQ-4bit@ef85d23bebaba87b3c4672ba11c449c79dbdb23e`, uses the same
 pinned SGLang image build as the maintained 5090 path, retains priority scheduling and
-preemption with at most two running requests, and raises the shared token budget to 49152
+preemption with at most three running requests so SC, GA and Fast Planner can occupy the
+normal post-GI fan-out together, and keeps the shared token budget at 49152
 so one current maximum Planner transaction is representable. The older laptop SGLang
 resource evidence proved resident CosyVoice with a 32K cache/two 16K requests only; it
 does **not** qualify this new 49K production source topology. First startup may fetch only

@@ -28,7 +28,7 @@ services:
       - --max-total-tokens
       - "65536"
       - --max-running-requests
-      - "2"
+      - "3"
       - --swa-full-tokens-ratio
       - "0.125"
       - --mem-fraction-static

@@ -24,11 +24,12 @@ _ComposeLoader.add_constructor("!override", _override)
 
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPOSE = ROOT / "docker-compose.sglang-rtx4090-laptop.yml"
+LAPTOP_COMPOSE = ROOT / "docker-compose.sglang-rtx4090-laptop.yml"
+RTX5090_COMPOSE = ROOT / "docker-compose.sglang.yml"
 
 
-def _service() -> dict:
-    payload = yaml.load(COMPOSE.read_text(encoding="utf-8"), Loader=_ComposeLoader)
+def _service(compose: Path = LAPTOP_COMPOSE) -> dict:
+    payload = yaml.load(compose.read_text(encoding="utf-8"), Loader=_ComposeLoader)
     return payload["services"]["chromie-llm"]
 
 
@@ -51,11 +52,16 @@ def test_laptop_sglang_capacity_covers_current_single_request_planner_contract()
     command = _service()["command"]
     assert _value_after(command, "--context-length") == "49152"
     assert _value_after(command, "--max-total-tokens") == "49152"
-    assert _value_after(command, "--max-running-requests") == "2"
-    assert _value_after(command, "--max-mamba-cache-size") == "10"
+    assert _value_after(command, "--max-running-requests") == "3"
+    assert _value_after(command, "--max-mamba-cache-size") == "15"
     assert _value_after(command, "--mem-fraction-static") == "0.80"
     assert _value_after(command, "--chunked-prefill-size") == "2048"
     assert _value_after(command, "--cuda-graph-backend-prefill") == "breakable"
+
+
+def test_rtx5090_sglang_admits_the_same_three_way_post_gi_fanout() -> None:
+    command = _service(RTX5090_COMPOSE)["command"]
+    assert _value_after(command, "--max-running-requests") == "3"
 
 
 def test_laptop_sglang_enables_priority_and_preemption_without_new_semantic_owner() -> None:

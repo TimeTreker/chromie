@@ -149,7 +149,7 @@ does not implement priority, preemption or a maximum queue wait.
 
 | Configuration | Actual support and qualification boundary |
 | --- | --- |
-| RTX 4090 Laptop / SGLang, two bounded running requests | One resident Qwen3.5-4B AWQ engine accepts independent role requests with priority/preemption. The 49K cache covers one current full Planner request; concurrent full-window requests are not claimed. Fresh 16GB+CosyVoice contention evidence is required before latency promotion. |
+| RTX 4090 Laptop / SGLang, three bounded running requests | One resident Qwen3.5-4B AWQ engine can admit the normal post-GI SC + GA + Fast Planner fan-out with priority/preemption. The 49K cache covers one current full Planner request; three concurrent full-window requests are not claimed. Fresh 16GB+CosyVoice contention evidence is required before latency promotion. |
 | RTX 5090 / SGLang, configured scheduling and presentation lease | The adapter may use provider scheduling and the qualified speech lease. Source support alone does not establish a foreground-wait bound or the target latency budget; retain same-profile contention and real Agent/playback evidence before promotion. |
 | Other profiles/providers | Only capabilities actually verified on that exact configuration may be claimed. Missing scheduling telemetry or untested contention remains unknown. |
 
@@ -188,9 +188,10 @@ request for the singleton CosyVoice worker. Profiles with compact cognition enab
 The RTX 4090 Laptop profile now selects one resident Qwen3.5-4B AWQ SGLang engine.
 GI retains its 16K request limit, the other ordinary roles retain 32K, and Fast/Deep
 retain 49152 so complete re-entry packets requiring up to 42172 estimated tokens still
-fit with their unchanged output allowance and safety margin. SGLang owns two bounded
-running-request slots, priority/preemption, and one 49152-token shared cache: this covers
-one maximum-size Planner request plus smaller concurrent work, not two simultaneous full
+fit with their unchanged output allowance and safety margin. SGLang owns three bounded
+running-request slots, priority/preemption, and one 49152-token shared cache so the normal
+post-GI SC, GA and Fast Planner branches can be admitted together. This covers one
+maximum-size Planner request plus smaller concurrent work, not three simultaneous full
 49K requests. Earlier laptop SGLang+CosyVoice evidence proved only the 32K cache topology;
 the promoted source configuration therefore requires fresh 49K shared-GPU qualification.
 The RTX 5090 profile similarly assigns every reasoning role to one shared
