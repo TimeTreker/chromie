@@ -333,10 +333,10 @@ class InputSessionRuntime:
                             host.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
                         likely_echo, echo_ratio, echo_coverage = host._likely_tts_echo(
                             user_text,
-                            playback_generation_at_start=(
-                                playback_generation_at_start
-                                if started_during_playback
-                                else None
+                            playback_generation_at_start=playback_generation_at_start,
+                            started_during_playback=started_during_playback,
+                            capture_started_monotonic_ms=(
+                                asr_workflow_started_ms - duration_ms
                             ),
                         )
                         record_session_workflow_stage(

@@ -620,6 +620,10 @@ class PlaybackTransport:
                 )
             if state is not None:
                 state["played_tts"] = int(state.get("played_tts", 0)) + 1
+            playback_end_ms = now_ms()
+            playback_state = host._playback_state()
+            playback_state.last_completed_playback_generation = int(generation)
+            playback_state.last_playback_end_monotonic_ms = playback_end_ms
             host.session_log(session_id, "playback_end: order=%s playback_ms=%.1f played_tts=%s", order, playback_ms, state.get("played_tts", 0) if state else "unknown")
             completed = not (isinstance(audio, ProviderPcmStream) and audio.error_reason)
             host.save_audio(retained_audio, "output", session_id=session_id)

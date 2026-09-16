@@ -61,6 +61,11 @@ class PlaybackDeliveryLifecycle:
     output_duck_started_ms: float | None = None
     output_duck_released: asyncio.Event = field(default_factory=asyncio.Event)
     output_duck_timeout_task: asyncio.Task[Any] | None = None
+    # Echo correlation needs the final transport boundary, not merely the
+    # instantaneous ``is_playing_audio`` flag.  A microphone VAD segment can
+    # begin in the acoustic tail immediately after playback returns.
+    last_completed_playback_generation: int | None = None
+    last_playback_end_monotonic_ms: float | None = None
     transport: Any | None = None
 
     def __post_init__(self) -> None:

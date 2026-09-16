@@ -1003,6 +1003,40 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertFalse(likely)
 
+    def test_tts_echo_match_catches_exact_post_playback_acoustic_tail(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant._tts_text_by_generation = {8: ["Okay, I'll do that for you."]}
+        playback = assistant._playback_state()
+        playback.last_completed_playback_generation = 8
+        playback.last_playback_end_monotonic_ms = 1000.0
+
+        likely, ratio, coverage = assistant._likely_tts_echo(
+            "Okay, I'll do that for you.",
+            playback_generation_at_start=8,
+            started_during_playback=False,
+            capture_started_monotonic_ms=1250.0,
+        )
+
+        self.assertTrue(likely)
+        self.assertEqual(ratio, 1.0)
+        self.assertEqual(coverage, 1.0)
+
+    def test_tts_echo_match_does_not_suppress_late_user_repeat(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant._tts_text_by_generation = {8: ["Okay, I'll do that for you."]}
+        playback = assistant._playback_state()
+        playback.last_completed_playback_generation = 8
+        playback.last_playback_end_monotonic_ms = 1000.0
+
+        likely, _, _ = assistant._likely_tts_echo(
+            "Okay, I'll do that for you.",
+            playback_generation_at_start=8,
+            started_during_playback=False,
+            capture_started_monotonic_ms=1800.0,
+        )
+
+        self.assertFalse(likely)
+
     def test_planner_prompts_preserve_requested_concurrency(self) -> None:
         from tests.cognitive_work_test_support import cognitive_work_request
         request = cognitive_work_request(text="Run the independent actions together.", context={})

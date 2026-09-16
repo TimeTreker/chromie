@@ -1024,9 +1024,23 @@ class VoiceAssistant:
         transcript: str,
         *,
         playback_generation_at_start: int | None,
+        started_during_playback: bool = True,
+        capture_started_monotonic_ms: float | None = None,
+        post_playback_tail_ms: float = 500.0,
     ) -> tuple[bool, float, float]:
         if playback_generation_at_start is None:
             return False, 0.0, 0.0
+        if not started_during_playback:
+            playback_state = self._playback_state()
+            last_generation = playback_state.last_completed_playback_generation
+            playback_end_ms = playback_state.last_playback_end_monotonic_ms
+            if (
+                last_generation != int(playback_generation_at_start)
+                or playback_end_ms is None
+                or capture_started_monotonic_ms is None
+                or capture_started_monotonic_ms > playback_end_ms + max(0.0, float(post_playback_tail_ms))
+            ):
+                return False, 0.0, 0.0
         store = getattr(self, "_tts_text_by_generation", {})
         if not isinstance(store, dict):
             store = {}
@@ -1078,10 +1092,19 @@ class VoiceAssistant:
                 best_ratio = ratio
                 best_coverage = transcript_coverage
                 best_strength = strength
-        likely = bool(
-            best_ratio >= 0.78
-            or (best_coverage >= 0.88 and len(transcript_key) >= 6)
-        )
+        if started_during_playback:
+            likely = bool(
+                best_ratio >= 0.78
+                or (best_coverage >= 0.88 and len(transcript_key) >= 6)
+            )
+        else:
+            # Outside active playback require a much stronger textual match.
+            # This catches speaker/acoustic tails without swallowing an ordinary
+            # person who happens to respond with vaguely similar wording.
+            likely = bool(
+                best_ratio >= 0.94
+                or (best_coverage >= 0.98 and len(transcript_key) >= 6)
+            )
         return likely, best_ratio, best_coverage
 
     async def schedule_tts_sentence(
