@@ -277,3 +277,30 @@ class CognitiveGatewayTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_literal_source_span_canonicalization_stays_inside_selected_span() -> None:
+    from shared.chromie_contracts.user_turn import (
+        UserTurnSourceSpan, canonical_literal_user_turn_source_span,
+        resolve_user_turn_source_span,
+    )
+
+    source = "walk ahead at 0.2 speed for 10 seconds and then turn left"
+    broad = UserTurnSourceSpan(
+        source_start_token_ref="t6", source_end_token_ref="t13"
+    )
+    narrowed = canonical_literal_user_turn_source_span(source, broad, "left")
+    assert resolve_user_turn_source_span(source, narrowed) == "left"
+    assert narrowed.source_start_token_ref == narrowed.source_end_token_ref
+
+
+def test_literal_source_span_canonicalization_preserves_ambiguous_selection() -> None:
+    from shared.chromie_contracts.user_turn import (
+        UserTurnSourceSpan, canonical_literal_user_turn_source_span,
+    )
+
+    source = "left then left"
+    broad = UserTurnSourceSpan(
+        source_start_token_ref="t0", source_end_token_ref="t2"
+    )
+    assert canonical_literal_user_turn_source_span(source, broad, "left") == broad

@@ -20,7 +20,8 @@ try:
     )
     from chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
     from chromie_contracts.user_turn import (
-        resolve_user_turn_source_span, user_turn_source_span_contains,
+        canonical_literal_user_turn_source_span, resolve_user_turn_source_span,
+        user_turn_source_span_contains,
     )
     from chromie_contracts.plan import (
         CanonicalPlan,
@@ -35,7 +36,8 @@ except ImportError:  # pragma: no cover
     )
     from shared.chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
     from shared.chromie_contracts.user_turn import (
-        resolve_user_turn_source_span, user_turn_source_span_contains,
+        canonical_literal_user_turn_source_span, resolve_user_turn_source_span,
+        user_turn_source_span_contains,
     )
     from shared.chromie_contracts.plan import (
         CanonicalPlan,
@@ -993,3 +995,23 @@ def validated_fail_safe_progress(
         seen.add(key)
         retained.append(activity)
     return retained
+
+
+def canonicalize_fast_argument_source_spans(
+    output: FastPlannerAdvanceModelOutput, *, source: str
+) -> FastPlannerAdvanceModelOutput:
+    """Mechanically minimize unique literal provenance inside model-selected spans."""
+
+    activities: list[Any] = []
+    for activity in output.activities:
+        if activity.role != "capability" or not activity.argument_sources:
+            activities.append(activity)
+            continue
+        narrowed = {
+            parameter: canonical_literal_user_turn_source_span(
+                source, span, activity.args.get(parameter)
+            )
+            for parameter, span in activity.argument_sources.items()
+        }
+        activities.append(activity.model_copy(update={"argument_sources": narrowed}))
+    return output.model_copy(update={"activities": activities})

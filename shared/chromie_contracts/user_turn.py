@@ -419,8 +419,13 @@ __all__ = [
     "TurnAdmissionDisposition",
     "UserTurnChannel",
     "UserTurnEnvelope",
+    "UserTurnSourceSpan",
+    "canonical_literal_user_turn_source_span",
     "normalize_turn_text",
+    "resolve_user_turn_source_span",
     "user_turn_prohibits_speech",
+    "user_turn_source_span_contains",
+    "user_turn_source_tokens",
 ]
 
 def user_turn_source_tokens(source: str | UserTurnEnvelope) -> list[dict[str, Any]]:
@@ -486,6 +491,45 @@ def resolve_user_turn_source_span(
     if start[0] > end[0]:
         raise ValueError("UserTurn source span token endpoints are reversed")
     return text[int(start[1]["start"]):int(end[1]["end"])]
+
+
+
+
+def canonical_literal_user_turn_source_span(
+    source: str | UserTurnEnvelope,
+    span: UserTurnSourceSpan,
+    value: Any,
+) -> UserTurnSourceSpan:
+    """Narrow an already-valid span to one unique exact literal occurrence.
+
+    This is provenance canonicalization only.  Trusted code never searches outside
+    the model-selected span, never converts units/number words, and preserves the
+    original span when the literal is absent or ambiguous.
+    """
+
+    if not isinstance(value, str):
+        return span
+    literal = normalize_turn_text(value)
+    if not literal:
+        return span
+    tokens = user_turn_source_tokens(source)
+    indexes = {str(item["ref"]): index for index, item in enumerate(tokens)}
+    start = indexes.get(span.source_start_token_ref)
+    end = indexes.get(span.source_end_token_ref)
+    if start is None or end is None or start > end:
+        return span
+    matches: list[UserTurnSourceSpan] = []
+    for left in range(start, end + 1):
+        for right in range(left, end + 1):
+            candidate = UserTurnSourceSpan(
+                source_start_token_ref=str(tokens[left]["ref"]),
+                source_end_token_ref=str(tokens[right]["ref"]),
+            )
+            if normalize_turn_text(resolve_user_turn_source_span(source, candidate)) == literal:
+                matches.append(candidate)
+                if len(matches) > 1:
+                    return span
+    return matches[0] if len(matches) == 1 else span
 
 
 def user_turn_source_span_contains(

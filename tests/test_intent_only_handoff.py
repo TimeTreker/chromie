@@ -598,3 +598,23 @@ def test_optional_argument_citations_follow_native_argument_order():
     raw = work([activity("walk", {"duration_s": 10, "vx_mps": .2},
                          source_spans("Walk at 0.2 speed for ten seconds", {"duration_s": "ten seconds", "vx_mps": "0.2 speed"}))])
     Draft202012Validator(schema).validate(raw)
+
+
+def test_fast_argument_source_canonicalization_minimizes_unique_literal_only() -> None:
+    from agent.app.planner_fast_validation import canonicalize_fast_argument_source_spans
+    from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
+
+    raw = work([activity(
+        "turn", {"direction": "left"},
+        {"direction": {
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t3",
+        }},
+    )])
+    output = FastPlannerAdvanceModelOutput.model_validate(raw)
+    narrowed = canonicalize_fast_argument_source_spans(
+        output, source="please turn left now"
+    )
+    span = narrowed.activities[0].argument_sources["direction"]
+    assert span.source_start_token_ref == "t2"
+    assert span.source_end_token_ref == "t2"

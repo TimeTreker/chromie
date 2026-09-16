@@ -61,6 +61,7 @@ from .planner_fast_validation import (
     CapabilityArgumentValidationError,
     capability_argument_errors,
     qualify_fast_canonical_plan,
+    canonicalize_fast_argument_source_spans,
     validate_fast_advance_output,
     validate_work_reuse_selection,
 )
@@ -217,6 +218,9 @@ class FastPlannerResolver:
                 validate_fast_advance_output(output, request=current,
                     responsibilities=responsibilities, capabilities=capabilities)
                 Draft202012Validator(schema).validate(raw)
+                output = canonicalize_fast_argument_source_spans(
+                    output, source=current.original_user_text
+                )
                 break
             else:
                 raise PlannerDTOContractError("Capability detail lookup budget exhausted before a Plan")
