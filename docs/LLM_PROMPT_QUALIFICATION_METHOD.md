@@ -45,8 +45,14 @@ The unit under evaluation is therefore:
 
 ```text
 model + global prompt projection + local prompt + context projection
-+ DTO/Schema + decoder transport + deterministic Host boundary
++ model-writable field set + DTO/Schema + decoder transport
++ deterministic Host projection/validation boundary
 ```
+
+Before treating model failure as prompt or model weakness, qualification also asks whether
+the transaction is making the model author mechanically derivable or provider-specific
+representation. A smaller semantic transaction is preferred when it preserves the same
+authority and fail-closed invariants.
 
 A candidate model passing a simplified probe does not qualify the production prompt.
 A mechanically valid JSON object does not qualify semantics. A good semantic answer
@@ -90,6 +96,14 @@ crossed; otherwise retain the case and report the owner or authorization blocker
 10. **State the evidence ceiling.** Offline Codex inference, deployed live text,
     simulator evidence, voice evidence, and physical-robot evidence are different
     claims.
+11. **Audit model burden before prompt burden.** A model should not be trained or
+    prompted to reproduce IDs, exact quotes, key order, provider coordinate signs, or
+    other facts that trusted code can project exactly from an already-authored semantic
+    choice. Classify those fields before adding prompt instructions for them.
+12. **Qualify relations and episodes, not only examples.** Exact-case corpora prevent
+    regression; generalization claims require declared metamorphic relations and bounded
+    stateful episodes whose expected preserved/changed dimensions are reviewed before
+    inference.
 
 ### One primary result and bounded depth
 
@@ -160,6 +174,11 @@ Every qualification must retain or identify:
 - frozen candidate input packet for every case;
 - exact model, role, reasoning/decoding settings, provider/transport, timeout, and
   retry/repair policy;
+- a model-writable-field inventory classifying every material output/input field as
+  semantic decision, deterministic projection, provider realization, or duplicate/compatibility
+  representation, with justification for every non-semantic field that remains model-writable;
+- declared metamorphic relations and stateful-episode invariants when the claim includes
+  generalization or human-like continuity;
 - raw output, parsed output, Schema verdict, Host verdict, semantic verdict, failure
   classification, and evidence references per case;
 - aggregate summaries for baseline, focused reruns, and final full rerun;
@@ -210,6 +229,35 @@ Do not infer the prompt from a template alone. Runtime projections, dynamic cons
 catalog compaction, previous-turn state, and response Schema are part of the request.
 Do not infer model failure from the final spoken response alone.
 
+### Phase 1.5 — audit model-contract burden before changing the prompt
+
+Inventory every model-visible input and every model-writable output field in the failing
+transaction. Classify it using the canonical semantic-boundary categories:
+
+| Class | Question | Default action |
+|---|---|---|
+| `semantic_decision` | Does the role actually have to choose this meaning? | Keep model-visible/writable and qualify it. |
+| `deterministic_projection` | Can trusted code derive it exactly from an already-authoritative model choice or immutable source? | Materialize below the model; retain validation. |
+| `provider_realization` | Does it describe backend coordinates, signs, calibration, device IDs, transport, or another realization convention? | Move behind a semantic Capability facade/provider adapter. |
+| `duplicate_or_compat` | Does it restate an already-owned fact only for another consumer/legacy shape? | Remove, or project mechanically until the consumer is migrated. |
+
+Examples of likely projections include generated IDs, exact source text copied from a
+model-selected token/span reference, digests/fingerprints, request correlation, schema-key
+ordering, and deterministic defaults already owned by a Capability contract. Examples of
+provider realization include yaw sign convention, device frames and actuator identifiers.
+Semantic argument values, the source ref/span chosen to justify them, Capability choice,
+dependencies, timing, uncertainty and communication wording remain owned decisions.
+
+This phase is an **authority-preserving simplification audit**, not permission for Host code
+to infer meaning. If removing a field would require deterministic code to choose among two
+semantically plausible values, it is not a deterministic projection. If the current wire
+requires a non-semantic field for compatibility, record that debt explicitly rather than
+turning it into a prompt-quality requirement.
+
+When an observed failure is concentrated in non-semantic paperwork, fix or redesign that
+boundary before trying to teach the model more paperwork. Rerun the same semantic cases
+after simplification so any remaining failure is attributable to the reduced transaction.
+
 ### Phase 2 — design a frozen contrast corpus
 
 Build the corpus from the role's real input surface, not generic chatbot questions.
@@ -233,6 +281,24 @@ Useful axes include:
 - fresh turn, multi-turn continuation, execution Evidence re-entry, and Situation
   revision;
 - ordinary, boundary, adversarial, and retained historical-regression cases.
+
+For a generalization claim, add explicit relation families before choosing concrete
+phrasing:
+
+- paraphrase invariance within one language;
+- bilingual semantic equivalence where the source meaning is equivalent;
+- irrelevant-context and bounded-history stability;
+- Capability-catalog permutation and unrelated-candidate stability;
+- controlled semantic mutations such as left/right, count, duration, negation, target,
+  temporal condition, confirmation, or availability, with only the owned dimensions
+  expected to change;
+- provider-realization invariance, where backend frame/sign/transport changes must not
+  alter the Core semantic decision even though the final provider request may differ;
+- compositional recombination of already understood capabilities and independent
+  Responsibilities; and
+- stateful multi-turn/event episodes for continuity, progressive cognition, Stable Self/
+  relationship consistency, duplicate suppression, waiting/re-entry, correction and result
+  communication.
 
 For every scenario:
 
@@ -308,6 +374,7 @@ Use exactly one primary class unless independent evidence requires `mixed`:
 | `scenario_or_oracle` | Reference conflicts with canonical authority or overconstrains valid variation | Scenario/rubric/reference |
 | `prompt_or_profile` | Required instruction is absent, contradictory, badly ordered, wrongly projected, or truncated | Existing prompt/profile owner |
 | `context_or_harness` | Template is sound but supplied state is missing, stale, fabricated, or normalized incorrectly | Context projection/benchmark harness |
+| `model_contract_burden` | The model is required to author mechanically derivable or provider-specific representation and failures cluster there | Model-facing contract/projection/provider facade, with architecture authorization |
 | `contract_or_schema` | Valid meaning is impossible to express, forbidden shape is admitted, or normalization changes meaning | DTO/Schema/validator, with architecture authorization |
 | `runtime_or_provider` | Wrong endpoint/model/options, timeout, truncation, call mismatch, skipped stage, provider failure | Runtime/provider/profile |
 | `model_inference` | Exact request is complete and consistent, but raw output violates it | Model qualification/selection |
@@ -343,9 +410,14 @@ For a local prompt defect:
 
 For a Schema/contract defect:
 
-- make the earliest decoder boundary express the already authoritative invariant;
+- first remove model-writable deterministic projections, provider-realization details,
+  and duplicate compatibility fields that do not belong to the semantic decision;
+- make the earliest remaining decoder boundary express the already authoritative invariant;
 - reject missing semantic material before Host state mutation;
-- do not ask a later model or Host normalizer to invent the missing meaning;
+- let trusted code materialize only exact projections from already-authored choices; do
+  not ask a later model or Host normalizer to invent missing meaning;
+- move provider coordinate/sign/calibration conventions behind a qualified semantic
+  Capability facade instead of adding prompt examples for them;
 - if the current DTO cannot express a valid complete result, record a global blocker
   and obtain owner authorization before redesign.
 
@@ -365,6 +437,11 @@ After the minimal change:
 6. Compare baseline and candidate by category, language, hard failures, semantic
    dimensions, repair attempts, and latency.
 7. Run the applicable general-ability class and canonical repository gates.
+8. When the claim includes generalization, rerun every declared metamorphic family and
+   preserve per-relation verdicts rather than collapsing them into one percentage.
+9. When the claim includes human-like continuity, run the bounded episode with shared
+   durable state and retained intermediate Events/Evidence; do not reset each turn into
+   an independent fixture.
 
 If the focused rerun passes but the full cohort regresses, reject or revise the
 change. Do not declare the prompt qualified from the focused subset.

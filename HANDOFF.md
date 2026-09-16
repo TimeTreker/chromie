@@ -1,5 +1,35 @@
 # Chromie Latest Handoff
 
+## Archive-baseline semantic simplification design handoff — 2026-09-16 (current)
+
+Use the owner-supplied `chromie_20260916_archive.zip` as the source baseline for this line.
+The archive has no `.git` directory; do not infer a baseline commit from chat or remote
+`main`. Archive SHA-256: `885226c691dcd89aa83f9c71a1981bf2b4993113e5b0832ea73f985a45dad4ad`. The extracted tree already contains the latest
+Planner argument-source ordering and SC output-contract/empty-object decoder fixes.
+
+The owner approved this exact order before more prompt/model/backend optimization:
+
+`Planner/SC contract diet -> semantic Capability facade -> generalization + continuous
+episode qualification -> current-model requalification -> model/SGLang/latency work`.
+
+This handoff accompanies a documentation-only design patch. No runtime/source behavior is
+claimed. Canonical details are in `docs/PROJECT_CHARTER.md`,
+`docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md`,
+`docs/LLM_PROMPT_QUALIFICATION_METHOD.md`, `docs/ACCEPTANCE.md`, and `ROADMAP.md`.
+No new design document, service, flag, semantic owner or compatibility path is introduced.
+
+**Next implementation slice:** inspect the actual production Fast Planner and Social
+Cognition request/response contracts and produce a field-by-field burden inventory plus
+red regressions for the currently retained native failures. Do not alter prompt/model
+selection during that audit. The first intended code changes after the audit are only the
+mechanically justified projections/deletions; semantic decisions stay with their existing
+owners. The first Capability migration should make turn direction semantic at the Core
+boundary and keep Soridormi/provider yaw sign/frame realization below it.
+
+All prior evidence paths, native failures, target-evidence gaps and safe-idle containment
+recorded below remain historical/current evidence for the supplied tree; they are not
+converted into passes by this design amendment.
+
 ## Project audit delivery — 2026-09-16 (current)
 
 Owner authorized project-wide audit/repairs, at most 18 loops, commit and push.

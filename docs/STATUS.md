@@ -1,5 +1,25 @@
 # Chromie Current Status
 
+## Semantic transaction simplification design — 2026-09-16 (design approved; source not migrated)
+
+The owner approved the next architecture line against the supplied 2026-09-16 archive:
+reduce avoidable Planner/SC model protocol burden, move provider-shaped realization behind
+semantic Capability facades, then add metamorphic and continuous-episode qualification
+before resuming model/backend/latency optimization. The Charter and canonical cognitive
+architecture now define that target.
+
+**Implementation status:** not yet migrated. The current source still uses the existing
+Planner provenance/argument wire and current Capability schemas; the current API/turn-loop
+documents continue to describe that implemented wire until the corresponding source slice
+lands. This design amendment therefore creates no new source pass, native semantic pass,
+latency pass or release evidence. The retained Fast source-provenance/wrong-direction and SC
+relevance failures remain the initiating evidence for the next audit.
+
+The next source slice is limited to a field-by-field Planner/SC contract-burden audit and
+red regressions. Prompt/model changes are explicitly deferred. See the current
+[roadmap](../ROADMAP.md), [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and
+[handoff](../HANDOFF.md).
+
 ## Project audit and mixed readiness — 2026-09-16 (current)
 
 | Implementation | Automated verification | Target validation | Release readiness |

@@ -304,6 +304,44 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   authoring a competing reply. GI, GA, Social Cognition and Reflection keep their
   distinct semantic responsibilities; depth never
   transfers ownership or reopens an already-complete decision.
+- **MODEL-SEMANTIC-BOUNDARY-001** — A model-facing contract asks its semantic owner
+  to author decisions, not protocol paperwork that trusted code can derive exactly from
+  already-authoritative input. Model-owned choices include semantic Capability selection,
+  semantic argument values, Activity timing/dependencies, uncertainty/disposition, and the
+  source reference or source span that grounds a decision. Trusted code materializes
+  generated IDs, fingerprints, exact source excerpts/digests from those references,
+  version/correlation fields, decoder/property ordering, serialization boilerplate, and
+  other mechanically determined projections. Moving those mechanics below the model does
+  not transfer semantic authority to Host code: trusted code may project a chosen fact but
+  may not choose meaning, Capability, source, argument value, timing, wording, or Goal.
+- **CAPABILITY-SEMANTIC-FACADE-001** — The Cognitive Core plans against stable semantic
+  Capability contracts rather than provider coordinate systems or actuator encodings.
+  User-meaningful values such as `left|right`, semantic target, duration, distance, speed,
+  count, and requested effect may remain Planner decisions. Provider-specific signs,
+  axes/frames, joint or motor identifiers, calibration constants, transport fields, and
+  equivalent realization details belong below the Core Capability boundary and are mapped
+  deterministically by the owning provider/adapter. A backend change must not require
+  Chromie to relearn that `left` means a different numeric sign. If a provider exposes only
+  a lower-level primitive, its Chromie-facing adapter must provide the qualified semantic
+  facade or the primitive is not promoted as a general user-facing Capability.
+- **SC-CONTEXT-PROJECTION-001** — Social Cognition consumes established social/cognitive
+  facts, not raw task-provider plumbing from which it must infer those facts. It may receive
+  understood Responsibility, actual Goal/Work/Evidence/Situation state, established
+  capability/authorization/confirmation limitations, interaction history, and exact
+  eligible social-expression candidates. Raw task-coordinate conventions, actuator rules,
+  planner decoder constraints, or low-level-control prohibitions are not themselves proof
+  that a high-level requested action is impossible. Another owner must establish a task
+  limitation before SC communicates it as fact. This projection rule removes irrelevant
+  implementation burden without making SC a planner or Host code a social reasoner.
+- **GENERALIZATION-EVIDENCE-001** — Passing a frozen list of exact examples proves only
+  those declared cases. Generalization claims additionally require relation-preserving
+  qualification: paraphrase and bilingual invariance, irrelevant-context and catalog-order
+  stability, controlled semantic mutations whose corresponding output must change,
+  provider-realization invariance, compositional recombination, and bounded stateful
+  episodes that preserve one durable Mind/Goal/Interaction history across turns and
+  asynchronous events. The qualification harness may check these relations mechanically;
+  it must not implement the semantic answer. Hard safety, authority, truth, provenance, or
+  duplicate-effect violations cannot be averaged away by aggregate semantic scores.
 - **ASYNC-COGNITION-001** — Trusted asynchronous Runtime events report what happened;
   Host-bound Evidence records what is true; Responsibility/Goal records what is still
   owed; and a meaningful state transition may create an ephemeral CognitiveOpportunity
@@ -1259,21 +1297,24 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    then decides Work compatibility. A display description is never another WHAT
    authority. These guarantees do not add executable multi-Goal merge/split support.
 
-   The same rule applies to parameter provenance. Exact owned intent excerpts may
-   ground Planner argument realization without duplicated GI parameters. Host checks
-   citation ownership and argument consistency, not the correctness of natural-language
-   interpretation or unit conversion. Those remain primary Planner decisions requiring
-   semantic qualification. Planner owns Capability choice,
-   exact executable argument values, semantic realization, and step-to-Goal
-   ownership. When an already-authored argument has exactly one source in an
-   immutable non-resource Goal binding, or a selected Capability explicitly
-   declares how one typed Goal binding is realized into that argument, the duplicate
-   `PlanParameterResolution` is a Host projection rather than a second model-writable
-   semantic fact. Trusted code may add or correct only that mechanically duplicated provenance record;
-   an authored intent quote is validated unchanged and is never overwritten. It
-   may not change Capability, argument, step, timing, outcome, or wording. Ambiguous
-   provenance remains unprojected and must pass ordinary Planner validation or fail
-   closed.
+   The same rule applies to parameter provenance. An immutable source reference or
+   source span may ground Planner argument realization without duplicated GI parameters.
+   Planner owns the semantic decision that this source grounds this argument; trusted Host
+   code materializes the exact excerpt/digest from `UserTurnEnvelope.original_input` and
+   checks ownership and argument consistency. The model does not need to retype an exact
+   quote, source strategy label, digest, or other mechanically recoverable provenance.
+   Natural-language interpretation and semantic unit normalization remain primary Planner
+   decisions requiring semantic qualification. Planner owns Capability choice, Core-semantic
+   Capability argument values, semantic realization, and step-to-Goal ownership; provider-
+   specific coordinate/sign/frame/actuator encoding remains below that boundary. When an already-
+   authored argument has exactly one source in an immutable non-resource Goal binding, or
+   a selected Capability explicitly declares how one typed Goal binding is realized into
+   that argument, `PlanParameterResolution` and exact quote materialization are Host
+   projections rather than second model-writable semantic facts. Trusted code may add or
+   correct only those mechanically duplicated projections; it may not choose a source ref,
+   change Capability, argument, step, timing, outcome, wording, or interpret an ambiguous
+   span. Ambiguous provenance remains unresolved and must pass ordinary Planner validation
+   or fail closed.
 
 32. **The best-known technical architecture is the default target.** Chromie
    should pursue the technically strongest architecture we can justify from current

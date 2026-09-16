@@ -53,6 +53,62 @@ is rejected for new truncations; no model/profile is promoted. The audit's maxim
 regression success do not close the native Fast/SC and target-evidence blockers.
 The current checkpoint and audit retain failed iterations as well as passing gates.
 
+## Owner-approved semantic transaction simplification and generalization line — 2026-09-16
+
+The owner approved a new implementation order from the provided 2026-09-16 archive
+baseline: reduce avoidable model protocol burden, raise provider-shaped Capability inputs
+to stable semantic contracts, and then qualify generalization/continuous episodes **before**
+returning to model replacement, SGLang scheduling, or latency optimization. This is an
+authority-preserving architecture amendment, not a new semantic owner, service, runtime
+switch or compatibility mode. Existing safety, authorization, Evidence, Goal, SC and
+Planner ownership remain binding.
+
+Work proceeds in this order:
+
+1. **Land the design before source changes — this slice.** Record the semantic model
+   boundary, Capability semantic facade, SC context-projection rule, generalization
+   evidence contract and this delivery order in existing authority documents. No runtime
+   behavior is claimed by the design patch.
+2. **Audit Planner and SC model-facing burden.** Inventory every material model-visible
+   input and model-writable output field in the actual native transactions. Classify each
+   as semantic decision, deterministic projection, provider realization, or
+   duplicate/compatibility representation. Reproduce the retained Fast provenance and SC
+   relevance failures against that inventory. Do not change prompts/models during the
+   audit. The deliverable is a smallest justified deletion/projection set plus red tests.
+3. **Simplify the Planner/SC transactions without moving semantic authority.** Start with
+   facts already known to be burdensome: model-retyped exact source text/strategy
+   decoration, generated/correlation bookkeeping, decoder-shape-only fields, and SC
+   exposure to irrelevant task plumbing. Planner still chooses Capability, semantic
+   argument values, source refs/spans, timing/dependencies and planning disposition; SC
+   still chooses communication. Trusted code only materializes exact projections. Retain
+   fail-closed provenance, scope, confirmation, safety and Evidence checks.
+4. **Raise provider-shaped Capability arguments to a semantic facade.** Audit the active
+   catalog for coordinate signs/axes, provider frames, actuator/joint identifiers,
+   calibration, transport encodings and other backend-shaped inputs. Migrate one coherent
+   path at a time, beginning with the retained left/right turn failure: Core planning uses
+   semantic direction (and human-meaningful magnitude where needed); Soridormi/provider
+   adaptation owns yaw sign/frame realization. Preserve provider schemas/evidence below
+   the semantic boundary and prove backend changes do not change Goal/Plan meaning.
+5. **Add generalization and continuous-episode qualification.** Extend existing scenario
+   and general-ability infrastructure rather than adding a second benchmark framework.
+   Add declared metamorphic families for paraphrase, bilingual equivalence, irrelevant
+   context, catalog permutation, controlled semantic deltas, provider-realization
+   invariance and compositional recombination. Add bounded stateful episodes that retain
+   Mind/Goal/Interaction state across conversation, Work, waiting, Evidence, interruption,
+   correction, re-entry and silence. Keep references target-blind and hard invariants
+   non-averageable.
+6. **Requalify the existing model/profile on the reduced architecture.** Only after the
+   above source and qualification gates pass should prompt/model selection be revisited.
+   Compare models on the reduced semantic transactions, then qualify SGLang priority/
+   contention and finally optimize first-meaningful-response/task-completion latency. A
+   faster provider does not compensate for an unnecessarily difficult semantic wire.
+
+Each implementation phase must have one reproduced red boundary, the smallest general
+repair, focused proof, applicable metamorphic/episode non-regression, canonical gates and
+an updated checkpoint/handoff. Do not combine all phases into one rewrite. If a field that
+looks mechanical actually requires semantic choice, keep it model-owned and document the
+reason rather than forcing the simplification.
+
 ## Social Cognition migration
 
 The owner approved the [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
@@ -118,31 +174,33 @@ frozen staged/readiness oracle amendments. The coverage-designed 204 Fast/40 Dee
 corpora plus boundary contrasts replace #35's earlier numeric-size proposal; a
 surrogate pass is not a native provider or target claim.
 
-Then continue #24/#32 from the latest retained complete-workflow diagnosis.
-GI still has failures in its wider contrast cohort; in the latest original compound
-GI/GA are correct, while Fast provenance/direction and SC communication fail.
-The latest aggregate live cohort is incomplete; historical Qwen9b output-budget
-contrasts also retain semantic/binding/truncation failures. Do not bypass GI to reach
-downstream tests or promote a profile from isolated role results. Keep canonical
-source gate → narrow current-revision live voice → default target-evidence closure
-as the active delivery line. Numeric class/document sizes remain review measurements,
-and #57's reasoned no-extraction result does not authorize unrelated refactoring.
+Continue #24/#32 native/model work only after the semantic simplification and
+generalization line above reaches its requalification phase. GI still has failures in its
+wider contrast cohort; in the latest original compound GI/GA are correct, while Fast
+provenance/direction and SC communication fail. Those retained failures are the first
+contract-diet probes, not permission to bypass GI, hardcode direction, or force SC wording.
+The latest aggregate live cohort is incomplete; historical Qwen9b output-budget contrasts
+also retain semantic/binding/truncation failures. Keep canonical source gate → narrow
+current-revision live voice → default target-evidence closure as the release evidence line,
+but do not select a new model/backend to compensate for avoidable model-contract burden.
+Numeric class/document sizes remain review measurements, and #57's reasoned no-extraction
+result does not authorize unrelated refactoring.
 
 The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#2026-09-06-transaction-fidelity-source-closure). Continue in this order:
 
 1. **Preserve revision-bound full source qualification.** The latest observed source gate is recorded in Status/checkpoint; avoid duplicating revision-specific counts here. After a source change, rerun the documented policy, static, ownership, configuration, documentation and complete main-tree gates and retain their exact revision. A source pass does not supersede the failing qualification cohorts.
 2. **Freeze and qualify the complete model transaction on that exact source.** Re-run target-blind GI/GA/Fast/Deep cohorts with the production prompt projections, schemas/decoder transport, one-call topology, early commit guard, and failure-state reconciliation. A model or serving backend may be promoted only from revision-bound evidence.
 3. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
-   and retain bilingual/provider/simulator/live evidence for Planner-owned speech,
+   and retain bilingual/provider/simulator/live evidence for SC-owned communication,
    Evidence-bound result claims, WorkDAG revision/continuation, retry/alternative/silence
-   behavior, duplicate-effect prevention, Planner-owned auxiliary social decoration,
-   and latency.
-4. **Qualify the repaired Fast-Planner presentation boundary before final Prompt/model
-   promotion.** Issue [#32](https://github.com/TimeTreker/chromie/issues/32) owns the one
-   streaming Fast Planner invocation and early typed immutable presentation commit. The
-   separate endpoint/DTO/model path is removed; run source gates and measure the single
-   production path's provider/model integrity, latency, and resource behavior before
-   optimizing its Prompt or selecting the final Fast-Planner model.
+   behavior, duplicate-effect prevention, SC-owned auxiliary social expression, and
+   latency.
+4. **Qualify current SC communication and Work-Planner transaction boundaries before final
+   Prompt/model promotion.** Issue [#32](https://github.com/TimeTreker/chromie/issues/32)
+   retains historical evidence for the retired Planner-presentation topology; it must not
+   restore Planner wording authority. Run source gates and measure the current separate
+   semantic owners' provider/model integrity, latency and resource behavior only after the
+   model-contract simplification/generalization phases above.
 5. **Keep implementation, automated verification, target validation, and release readiness
    separate.** A source-closed architecture slice does not qualify microphone, provider,
    simulator, model quality, or latency behavior.

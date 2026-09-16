@@ -583,6 +583,61 @@ path differences as diagnostics. Use `--assertion-scope full` only when the
 internal path itself is the claim. See
 [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md).
 
+### Generalization and continuous-episode qualification
+
+Exact scenario passes remain necessary regression evidence but are insufficient for a
+claim that the underlying Chromie ability generalizes. A generalization-qualified ability
+class must declare **metamorphic relations** between source cases before inference. Each
+relation names which semantic/output dimensions must remain invariant and which must change.
+At minimum, the applicable set should cover:
+
+- paraphrase and bilingual-equivalent meaning;
+- irrelevant context/history additions that should not change the decision;
+- Capability-catalog ordering and unrelated-candidate changes;
+- controlled meaning changes such as direction, count, duration, negation, target, time,
+  confirmation or availability;
+- provider-realization changes such as coordinate/sign/transport conventions that should
+  not alter the Core semantic Plan; and
+- compositional recombination of independently understood Responsibilities/Capabilities.
+
+A relation fails if the unchanged dimensions drift or the required changed dimension does
+not change, even when both individual cases would otherwise be judged acceptable. Compare
+semantic ownership, truth and relation-aware provenance rather than incidental literal IDs:
+a paraphrase may legitimately use different source-token/span references while preserving
+the same grounded meaning. Likewise, provider realization may differ while the Core Plan
+remains semantically invariant. Safety, authority, evidence, provenance, duplicate-effect
+and false-reality violations remain hard failures. Relation summaries must retain the two
+source case IDs, transformation, expected invariants/deltas and observed verdict. The
+harness may compare owned fields and trusted outcomes; it must not contain phrase-to-answer
+rules that implement cognition.
+
+Human-like continuity additionally requires a bounded **continuous episode** profile. One
+episode preserves the same durable Mind/Goal/Interaction state while turns and trusted
+events progress through a realistic mixture of conversation, Work, waiting, evidence
+arrival, interruption/cancellation, clarification/correction, provisional communication,
+re-entry and later silence. The profile must verify at least:
+
+- unfinished Responsibilities survive until genuinely satisfied/cancelled;
+- planned, running and observed-complete states are not confused;
+- delivered/pending equivalent communication is not needlessly repeated;
+- completed Work is not duplicated merely because cognition re-enters;
+- a provisional statement can be extended or corrected forward without rewriting history;
+- Stable Self/relationship context remains coherent without switching into task-specific
+  personas or assistant modes;
+- irrelevant events do not wake or redirect unrelated Goals; and
+- Reflection may influence future bounded context without mutating the recorded episode.
+
+Fixture-backed episodes are Level A evidence only. A native-model continuity claim requires
+the deployed model transaction; embodied-effect claims additionally require the applicable
+simulator/provider evidence level. Resetting the system between turns cannot satisfy a
+continuous-episode claim. Aggregate pass rates never override one hard episode invariant.
+
+Model-role qualification must also record the model-writable-field burden defined by
+`MODEL-SEMANTIC-BOUNDARY-001`. When failures cluster in exact quote copying, generated IDs,
+object ordering, provider coordinate signs or similar non-semantic representation, the
+project must first decide whether that field belongs in the model transaction. Prompt/model
+optimization is not accepted as the default repair for avoidable protocol burden.
+
 Any critical LLM timeout, input/output truncation, incomplete stream, or
 incomplete structured output is a hard case failure even when a later fallback
 produces a correct final action. Architecture-validation timeouts remain long so

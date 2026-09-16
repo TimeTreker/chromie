@@ -342,6 +342,58 @@ ordered/parallel sibling references let trusted code verify `before`/`after` or
 Goal Association or Planner consumes this accepted evidence within its distinct
 authority; neither calls a semantic reviewer to reinterpret GI WHAT.
 
+### Model transactions carry semantic decisions, not protocol paperwork
+
+The model-facing wire is an **information boundary**, not a mirror of every field the
+Runtime eventually stores. Constrained decoding is valuable when it makes an owned
+semantic choice explicit and fail-closed. It becomes harmful when the model must copy or
+reconstruct facts that trusted code already knows exactly. Every Planner and Social
+Cognition output field should therefore be classified before it is kept model-writable:
+
+| Field kind | Correct owner |
+|---|---|
+| semantic choice — Capability, semantic argument value, source reference/span, timing/dependency, uncertainty/disposition, communication wording/function | the existing semantic model owner |
+| exact projection — generated IDs, source excerpt/digest from a selected ref/span, Goal/Plan/request fingerprints, versions/correlation, deterministic completion fields | trusted code from authoritative state |
+| provider realization — axis/sign convention, device frame, joint/motor identifier, calibration, provider transport encoding | provider/adapter below the Core semantic contract |
+| duplicate/compatibility representation of an already-owned fact | remove, or materialize mechanically if a current consumer still requires it |
+
+This is the **model-contract diet**. It does not make Host code smarter. Host code may
+materialize an exact quote from a model-selected source span, but it may not decide which
+span supports an argument. It may generate an Activity ID, but it may not choose the
+Activity. It may encode a semantic `left` turn into a provider frame, but it may not infer
+from user wording that the requested direction was left. When mechanical burden is removed,
+the remaining model contract should read like the decision a competent person actually has
+to make.
+
+Decoder limitations such as object-key order, grammar support for empty objects, or
+serialization-specific enums are transport facts. The Schema builder may satisfy those
+facts without creating new semantic fields or forcing the model to restate known truth.
+A model/provider that still cannot express the reduced semantic contract is then a much
+cleaner model-qualification failure.
+
+### Capability contracts are semantic at the Core boundary
+
+Planner should reason over a provider-neutral semantic facade whenever the human request is
+provider-neutral. For example, a turning Capability presented to the Core should prefer
+`direction=left|right` plus any human-meaningful angle/speed/duration over exposing
+`yaw_rad` whose sign depends on a particular robot frame. The owning provider/adapter can
+then realize `left` as positive or negative yaw according to its qualified frame without
+changing Goal meaning or Planner reasoning.
+
+The same rule applies to axis names, joint IDs, actuator ranges, device coordinates,
+calibration offsets, transport fields, and backend-specific enums. Canonical semantic units
+may remain model-visible when the quantity itself is part of WHAT/HOW; provider-specific
+units and encodings do not. A Capability that cannot offer a stable semantic facade may
+remain provider-internal, or expose a narrower explicitly technical Capability, but should
+not leak implementation conventions into ordinary natural-language planning merely because
+that is convenient for the current backend.
+
+This facade is not permission to hide meaningful limitations. Availability, supported
+semantic ranges, confirmation requirements, safety classes, concurrency/resource
+restrictions, and observable postconditions remain visible to Planner because they change
+what Work is possible. Only realization details that do not change the human-visible
+semantic choice move below the model boundary.
+
 ### Capability grounding requires semantic entailment
 
 A Capability is eligible only when its declared semantic scope can actually satisfy
@@ -369,6 +421,27 @@ epistemically unknown; a generic web or weather source is not silently promoted 
 Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, the typed streaming presentation/truth contract, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
 
 The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic validation shared across both passes; `planner_fast_validation.py` owns Fast reuse/fail-safe validation mechanics; `planner_deep_validation.py` owns Deep mechanical-repair/safety/diagnostic validation mechanics; and `planner_fallback.py` may only mechanically materialize a clarify/unavailable/escalate/fail-safe disposition that the enclosing Planner lifecycle has already selected. The model-assisted same-owner communication and coverage audit module is removed under Charter principles 30–31. The former `planner_contract.py` compatibility surface is also removed. Fast/Deep Resolvers retain the primary model invocation and HOW lifecycle decisions but do not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
+
+### SC consumes social facts, not task execution plumbing
+
+Social Cognition needs enough grounded state to decide whether and how to interact, but
+more raw implementation detail is not automatically better context. Its task-facing input
+should prefer established facts such as: the request is understood; Work is only planned,
+actually running, waiting for confirmation, blocked, unavailable, failed, or completed;
+a result is established by named Evidence; a clarification/confirmation/result Need exists;
+and a capability or policy limitation has already been established by its owning boundary.
+
+SC should not independently interpret task-provider coordinate conventions, actuator
+restrictions, Planner decoder rules, or generic low-level-control prohibitions to decide
+whether a high-level task can be done. Those details can cause false social conclusions such
+as treating a normal walking request as forbidden direct motor control. When a limitation is
+real, Planner/Runtime/Host exposes that limitation as an authoritative fact and SC decides
+how to communicate it. Exact eligible Social Attention candidates remain a deliberate
+exception because SC itself owns their semantic selection.
+
+The projection is therefore **fact-rich but plumbing-poor**: remove irrelevant mechanism,
+not relevant truth. This keeps communication grounded while reducing accidental coupling
+between conversational behavior and whichever Provider or decoder happens to be installed.
 
 ### SC owns how Chromie communicates established meaning
 
@@ -488,7 +561,7 @@ small set of questions:
 3. What Goal/Responsibility was retained?
 4. Why did Planner choose the current capability composition?
 5. Which Provider executed it and what trusted Evidence resulted?
-6. What still-needed meaning did Response express?
+6. What still-needed meaning did Social Cognition communicate, or why was silence correct?
 7. Did optional Social Attention add anything, and could its failure stay local?
 8. Is there anything worth learning later through Reflection?
 
@@ -503,6 +576,35 @@ make Chromie large. The dangerous complexity is accidental semantic complexity:
 code whose main purpose is to reconcile duplicate truths or repair previous
 repair stages. Capability complexity is allowed to grow; semantic recovery
 machinery must remain small and bounded.
+
+### Generalization is qualified by relations and episodes
+
+A large frozen corpus is valuable regression evidence, but exact-example success is not by
+itself evidence that Chromie learned the underlying ability. Generalization qualification
+must define **relations between cases**. A paraphrase or Chinese/English restatement should
+preserve the owned semantic decision; an irrelevant context sentence or Capability-catalog
+permutation should not change it; changing `left` to `right`, two nods to three, or now to a
+future time should change only the corresponding semantic dimensions; changing a provider's
+internal coordinate convention should not change the Core Plan at all.
+
+These metamorphic relations test the architecture as well as the model. If catalog order
+changes the Plan, if provider yaw sign changes Planner meaning, or if an exact quote-format
+change breaks an otherwise identical decision, the failure may expose model-contract burden
+rather than deficient intelligence. The harness records the relation and verdict; it never
+implements the missing semantic decision.
+
+Human-like continuity also requires bounded **stateful episodes**, not only independent
+turns reset to fixtures. An episode keeps the same durable Goal/Memory/Interaction state
+while conversation, Work, waiting, Evidence, interruption, correction, re-entry,
+provisional speech, and later silence overlap over time. Acceptance asks whether Chromie
+preserves unfinished responsibility, avoids duplicate speech/effects, distinguishes planned
+from observed reality, corrects herself forward when needed, and remains one continuous
+social individual. Reflection may learn from the episode but cannot rewrite its history.
+
+Only after the reduced transactions and semantic Capability facade pass these generalization
+checks should the project treat model replacement, SGLang scheduling, or latency tuning as
+the next optimization frontier. Faster inference over an unnecessarily difficult protocol is
+not the target architecture.
 
 ## 2. Motivation
 

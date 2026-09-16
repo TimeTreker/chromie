@@ -1,5 +1,46 @@
 # Development Checkpoint
 
+## Semantic transaction simplification design amendment — 2026-09-16 (current)
+
+The project owner supplied `chromie_20260916_archive.zip` as the new development
+baseline and explicitly authorized the next architecture line: first simplify Planner/SC
+model-facing contracts, then raise provider-shaped Capability arguments to semantic
+arguments, then add generalization and long-running human-like episode qualification. The
+archive contains no `.git` metadata, so this checkpoint does not invent a baseline commit
+SHA. Exact supplied archive SHA-256: `885226c691dcd89aa83f9c71a1981bf2b4993113e5b0832ea73f985a45dad4ad`. The extracted source includes the
+latest native-decoder repairs for Planner argument-source ordering and Social Cognition
+structured output.
+
+This delivery is **design-only**. It changes no executable runtime source, prompt, model
+profile, provider contract or scenario expectation. Existing authority remains GI=WHAT,
+GA=Goal continuity, Planner=Work HOW, SC=communication, Runtime/Host=trusted effects and
+Evidence. The design adds four explicit invariants: models author semantic decisions rather
+than mechanically recoverable protocol fields; the Core plans against semantic Capability
+facades rather than provider coordinate/actuator conventions; SC receives established
+social/task facts rather than raw execution plumbing; and generalization claims require
+metamorphic relations plus bounded stateful episodes, not only exact-case replay.
+
+Ordered implementation after this documentation patch:
+
+1. audit the exact native Planner and SC model-visible/model-writable field sets and label
+   each field `semantic_decision`, `deterministic_projection`, `provider_realization`, or
+   `duplicate_or_compat`; reproduce the retained Fast provenance and SC relevance failures
+   without changing prompts/models;
+2. implement the smallest Planner/SC contract diet, beginning with model-retyped source
+   text/strategy and irrelevant SC task plumbing while retaining semantic source refs,
+   Capability choice, arguments, timing/dependencies, wording, and all trusted validators;
+3. migrate provider-shaped Capability details behind semantic facades, starting with
+   left/right turn semantics versus provider yaw-sign/frame realization;
+4. extend existing general-ability/scenario tooling with declared metamorphic relations and
+   durable multi-turn/event episodes; and
+5. requalify the current model/profile on the reduced transactions before model replacement,
+   SGLang scheduling/preemption qualification, or latency optimization.
+
+Do not combine these phases into one rewrite. The next source patch should be Phase 1
+**audit plus red tests**, not a prompt tweak and not a model change. Current native/release
+blockers and all historical evidence below remain valid until superseded by new exact-source
+evidence.
+
 ## Project audit and mixed readiness repair — 2026-09-16 (current)
 
 The owner authorized a full project audit, design/Charter reconciliation, repairs,
