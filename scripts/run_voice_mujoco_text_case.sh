@@ -25,7 +25,10 @@ usage() {
 Usage: ./scripts/run_voice_mujoco_text_case.sh [options] "text request"
 
 Run a no-microphone text -> Chromie -> Soridormi/MuJoCo diagnostic case
-against an already-started voice-MuJoCo stack.
+using already-started services, with no other Chromie Host running.
+
+Start/keep Chromie services with --no-orchestrator. A simultaneous microphone
+Host is rejected because it can hear this runner's TTS and create a false user turn.
 
 Examples:
   ./scripts/run_voice_mujoco_text_case.sh "Please walk forward for ten seconds." --no-speaker

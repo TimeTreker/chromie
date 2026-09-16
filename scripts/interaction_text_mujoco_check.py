@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from contextlib import contextmanager
+import fcntl
 import hashlib
 import json
 import os
@@ -51,7 +53,33 @@ INTERNAL_SPEECH_PATTERNS = [
     r"\bExecute\s+soridormi\.",
     r"\bsoridormi\.[A-Za-z0-9_.-]+",
     r"\bchromie\.[A-Za-z0-9_.-]+",
-]
+ ]
+
+
+@contextmanager
+def _exclusive_host_lock():
+    """Refuse to run a second Host beside the microphone Orchestrator.
+
+    The text checker owns a complete in-process ``VoiceAssistant``.  Sharing
+    Agent/TTS/Soridormi services is intended; sharing the Host is not.  In
+    particular, an already-running microphone Host can hear this checker's TTS
+    and turn Chromie's own acknowledgement into a new user turn.
+    """
+
+    lock_path = Path(os.getenv("ORCH_LOCK_FILE", "/tmp/chromie-orchestrator.lock"))
+    descriptor = os.open(lock_path, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise RuntimeError(
+                "Another Chromie Host is running. Stop the microphone/text Host first; "
+                "keep services running with start_chromie.sh --keep-services --no-orchestrator, "
+                "then rerun this text-to-MuJoCo check."
+            ) from exc
+        yield
+    finally:
+        os.close(descriptor)
 
 
 def acceptance_id() -> str:
@@ -1657,7 +1685,8 @@ def main() -> int:
     if args.interrupt_text and args.preview_only:
         parser.error("--interrupt-text cannot be used with --preview-only")
     try:
-        summary = asyncio.run(run_check(args))
+        with _exclusive_host_lock():
+            summary = asyncio.run(run_check(args))
     except Exception as exc:
         print(f"[interaction-text-mujoco][error] {exc}", file=sys.stderr)
         return 1

@@ -177,7 +177,14 @@ Use this when you want to skip microphone and ASR while still testing routing,
 the maintained goal-driven runtime, the Trusted Capability Runtime, live Soridormi
 MCP, and MuJoCo execution.
 
-If the paired stack is already running, the compact no-microphone wrapper is:
+For an isolated text-to-MuJoCo run, keep Soridormi and Chromie services running but
+stop the microphone Host. For example, start Chromie services with:
+
+```bash
+./scripts/start_chromie.sh --mcp-url http://127.0.0.1:8000/mcp --keep-services --no-orchestrator
+```
+
+Then the compact no-microphone wrapper is:
 
 ```bash
 ./scripts/run_voice_mujoco_text_case.sh "Please nod twice." --speaker
@@ -188,7 +195,10 @@ If the paired stack is already running, the compact no-microphone wrapper is:
 ```
 
 The first command also checks speaker playback; the second is better for
-headless automation. The wrapper uses goal-driven apply by default; pass
+headless automation. The runner owns a complete in-process Host and therefore
+refuses to start while another Chromie Host holds the Orchestrator lock; sharing
+services is supported, sharing the microphone/text Host is not. The wrapper uses
+goal-driven apply by default; pass
 `--legacy-agent-runtime` only for an explicitly labelled compatibility check.
 
 The text request is the only input Chromie uses for routing and skill planning.
