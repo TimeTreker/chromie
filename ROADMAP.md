@@ -76,9 +76,11 @@ Work proceeds in this order:
    user source is now explicitly anchored to the same typed `UserTurnEnvelope` across GI and
    the GA/Planner work transaction, with fail-closed text/session/language correlation and no
    new frozen Work-request field. The generic semantic-artifact envelope substrate is also
-   implemented as the next anti-loss foundation. Carry its refs across live owner boundaries,
-   then reproduce/remove Fast exact-quote copying through Envelope token/span references and
-   finish the SC relevance burden inventory. Do not change models during this audit. The
+   implemented as the next anti-loss foundation. **Phase 1C is now implemented:** live
+   UserTurn/GI/Responsibility refs travel to GA/Fast, GA/new-Goal refs are appended after
+   continuity, Plan refs reach SC/Capability Runtime, and accepted SC/talk refs continue into
+   delivery/evidence without entering model prompts. Next reproduce/remove Fast exact-quote
+   copying through Envelope token/span references and finish the SC relevance burden inventory. Do not change models during this audit. The
    deliverable remains the smallest justified deletion/projection set plus red tests.
 3. **Establish immutable semantic-artifact lineage before deleting provenance copies.**
    **First substrate slice implemented:** a generic trusted-code `SemanticArtifactEnvelope` /
@@ -87,8 +89,10 @@ Work proceeds in this order:
    Evidence JSONL always archives their immutable envelopes and retains exact packets when the
    configured text-retention policy permits; active state remains in existing owners and later
    completion/delivery appends lifecycle facts rather than rewriting history. This does not
-   yet change model-facing wires. Next, carry these refs across the live GI→GA/Planner/SC
-   transport boundaries, then use the established UserTurn lineage for argument source spans.
+   yet change model-facing semantic authority. **Live-ref transport is now implemented in
+   Phase 1C** through the existing context/Runtime metadata: refs are content-bound and checked
+   at downstream boundaries while prompts omit the bookkeeping. Next use the established
+   UserTurn lineage for argument source spans.
 4. **Simplify the Planner/SC transactions without moving semantic authority.** Start with
    facts already known to be burdensome: model-retyped exact source text/strategy
    decoration, generated/correlation bookkeeping, decoder-shape-only fields, and SC

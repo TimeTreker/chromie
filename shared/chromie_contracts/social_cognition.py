@@ -13,6 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .core_interpretation import CognitiveResponsibilityProposal
 from .interaction import reject_forbidden_low_level_fields
+from .semantic_artifact import SemanticArtifactLineage, semantic_artifact_ref
 from .plan import (
     AuxiliaryPlanActivity, CommunicativeTruthStage, FastProgressKind, SocialCommunicationNeed,
     validate_communicative_activity_identity,
@@ -38,6 +39,13 @@ class SocialCognitionRequest(BaseModel):
     opportunity: CognitiveOpportunity | None = None
     communication_needs: list[SocialCommunicationNeed] = Field(default_factory=list)
     context: dict[str, Any] = Field(default_factory=dict)
+
+    @property
+    def semantic_artifact_lineage(self) -> SemanticArtifactLineage:
+        raw = self.context.get("semantic_artifact_lineage") if isinstance(self.context, dict) else None
+        if raw is None:
+            return SemanticArtifactLineage()
+        return SemanticArtifactLineage.model_validate(raw)
 
     @model_validator(mode="after")
     def validate_source_scope(self) -> "SocialCognitionRequest":
@@ -82,6 +90,25 @@ class SocialCognitionRequest(BaseModel):
         refs = {item.local_ref for item in self.responsibilities}
         if len(refs) != len(self.responsibilities):
             raise ValueError("Social Cognition Responsibility refs must be unique")
+        lineage = self.semantic_artifact_lineage
+        responsibility_lineage = lineage.by_kind("responsibility")
+        if responsibility_lineage and self.responsibilities:
+            turn_id = str(self.source_turn.get("turn_id") or "").strip()
+            if not turn_id:
+                raise ValueError("Social Cognition lineage requires source turn identity")
+            for item in self.responsibilities:
+                lineage.require(semantic_artifact_ref(
+                    item, artifact_kind="responsibility",
+                    artifact_id=f"{turn_id}:{item.local_ref}",
+                ))
+        plan_projection = self.context.get("canonical_plan_resolution")
+        if lineage.refs and isinstance(plan_projection, dict):
+            plan_id = str(plan_projection.get("plan_id") or "").strip()
+            if plan_id and not any(
+                item.artifact_kind == "planner_plan" and item.artifact_id == plan_id
+                for item in lineage.refs
+            ):
+                raise ValueError("Social Cognition lineage is missing its canonical Plan")
         need_ids = [need.need_id for need in self.communication_needs]
         if len(set(need_ids)) != len(need_ids):
             raise ValueError("communication need IDs must be unique")

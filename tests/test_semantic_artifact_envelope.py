@@ -212,3 +212,184 @@ def test_terminal_execution_outcome_lands_as_immutable_artifact() -> None:
     assert packet.ref.artifact_id == bundle.outcome_id
     assert packet.payload == bundle.model_dump(mode="json", exclude_none=True)
     assert payload["goal_state_results"] == [{"goal_id": "goal-1", "state": "completed"}]
+
+
+def test_work_request_binds_exact_user_turn_gi_and_responsibility_lineage() -> None:
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.semantic_artifact import (
+        merge_semantic_artifact_lineage,
+        semantic_artifact_ref,
+    )
+
+    core, envelope = admitted_core("walk left", sid="sid-lineage", language="en-US")
+    lineage = merge_semantic_artifact_lineage(
+        semantic_artifact_ref(envelope, artifact_kind="user_turn", artifact_id=envelope.turn_id),
+        semantic_artifact_ref(core, artifact_kind="goal_interpretation", artifact_id=core.turn_id),
+        [
+            semantic_artifact_ref(
+                item,
+                artifact_kind="responsibility",
+                artifact_id=f"{core.turn_id}:{item.local_ref}",
+            )
+            for item in core.responsibilities
+        ],
+    )
+    context = {
+        "user_turn_envelope": envelope.model_dump(mode="json"),
+        "core_interpretation": core.model_dump(mode="json"),
+        "semantic_artifact_lineage": lineage.model_dump(mode="json"),
+    }
+    request = CognitiveWorkRequest(
+        sid=envelope.session_id,
+        text=envelope.normalized_input.text,
+        language=envelope.normalized_input.language,
+        responsibilities=list(core.responsibilities),
+        interpretation_confidence=core.confidence,
+        interpretation_unresolved=list(core.unresolved),
+        context=context,
+    )
+    assert request.semantic_artifact_lineage == lineage
+
+    corrupted = core.model_dump(mode="json")
+    corrupted["responsibilities"][0]["outcome"] = "walk right"
+    with pytest.raises(ValueError, match="lineage digest mismatch"):
+        CognitiveWorkRequest(
+            sid=envelope.session_id,
+            text=envelope.normalized_input.text,
+            language=envelope.normalized_input.language,
+            responsibilities=list(core.responsibilities),
+            interpretation_confidence=core.confidence,
+            interpretation_unresolved=list(core.unresolved),
+            context={**context, "core_interpretation": corrupted},
+        )
+
+
+def test_social_lineage_is_transport_metadata_not_model_prompt_content() -> None:
+    from agent.app.social_cognition import social_cognition_prompt
+    from shared.chromie_contracts.semantic_artifact import (
+        merge_semantic_artifact_lineage,
+        semantic_artifact_ref,
+    )
+    from shared.chromie_contracts.social_cognition import SocialCognitionRequest
+
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="r1", outcome="Respond to the greeting.", output_mode="speech", confidence=1.0,
+    )
+    lineage = merge_semantic_artifact_lineage(
+        semantic_artifact_ref(
+            responsibility,
+            artifact_kind="responsibility",
+            artifact_id="turn-prompt:r1",
+        )
+    )
+    request = SocialCognitionRequest(
+        request_id="sc-prompt-lineage",
+        trigger="interpretation",
+        source_refs=["turn-prompt"],
+        responsibilities=[responsibility],
+        source_turn={
+            "schema_version": 1,
+            "turn_id": "turn-prompt",
+            "original_text": "hello",
+            "original_text_sha256": "0" * 64,
+            "language": "en-US",
+            "authority": "read_only_source_provenance",
+        },
+        context={
+            "interaction_context": {"events": [], "already_spoken": [], "pending_speech": []},
+            "semantic_artifact_lineage": lineage.model_dump(mode="json"),
+        },
+    )
+    prompt = social_cognition_prompt(request, [], num_ctx=8192)
+    assert "semantic_artifact_lineage" not in prompt
+    assert lineage.refs[0].payload_sha256 not in prompt
+
+
+def test_plan_lineage_reaches_interaction_and_capability_runtime() -> None:
+    import asyncio
+
+    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+    from shared.chromie_contracts.semantic_artifact import (
+        SemanticArtifactLineage,
+        semantic_artifact_ref,
+    )
+    from tests.test_cognitive_runtime_pr7 import FakeRuntime, blink_definition, execute_plan
+
+    plan = execute_plan()
+    response = asyncio.run(
+        CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])).build_execution_only_response(
+            plan=plan,
+            session_id="sid-plan-lineage",
+            language="en-US",
+            context={},
+        )
+    )
+    expected = semantic_artifact_ref(
+        plan, artifact_kind="planner_plan", artifact_id=plan.plan_id,
+    )
+    response_lineage = SemanticArtifactLineage.model_validate(
+        response.metadata["semantic_artifact_lineage"]
+    )
+    response_lineage.require(expected)
+    assert len(response.capabilities) == 1
+    capability_lineage = SemanticArtifactLineage.model_validate(
+        response.capabilities[0].metadata["semantic_artifact_lineage"]
+    )
+    capability_lineage.require(expected)
+
+
+def test_live_turn_lineage_reaches_final_interaction_without_model_bookkeeping() -> None:
+    import asyncio
+
+    from orchestrator.runtime.cognitive_runtime import (
+        CanonicalPlanRuntimeAdapter,
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from shared.chromie_contracts.semantic_artifact import SemanticArtifactLineage
+    from tests.test_cognitive_runtime_pr7 import (
+        FakeRuntime,
+        ScriptedClient,
+        admitted_core,
+        new_goal_association,
+        respond_plan,
+    )
+
+    client = ScriptedClient(
+        association=new_goal_association(),
+        fast_plans=[respond_plan()],
+    )
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=client,
+        adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
+    core, envelope = admitted_core("hello", sid="sid-live-lineage", language="zh-CN")
+    result = asyncio.run(
+        coordinator.resolve(
+            object(),
+            text="hello",
+            sid="sid-live-lineage",
+            core_interpretation=core,
+            context={"history": [], "active_goal_snapshots": []},
+            history=[],
+            language="zh-CN",
+            turn_envelope=envelope,
+        )
+    )
+
+    assert result.status == "applied"
+    assert result.interaction_response is not None
+    lineage = SemanticArtifactLineage.model_validate(
+        result.interaction_response.metadata["semantic_artifact_lineage"]
+    )
+    assert {item.artifact_kind for item in lineage.refs} == {
+        "user_turn",
+        "goal_interpretation",
+        "responsibility",
+        "goal_association",
+        "goal",
+        "planner_plan",
+        "social_cognition",
+        "communicative_act",
+    }

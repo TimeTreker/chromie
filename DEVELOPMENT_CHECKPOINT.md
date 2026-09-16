@@ -1,5 +1,44 @@
 # Development Checkpoint
 
+## Semantic artifact live-ref transport — Phase 1C — 2026-09-16 (current)
+
+The owner approved continuing the anti-message-loss design from Phase 1A/1B into live owner
+transport. This slice makes the already-defined content-bound semantic artifact refs travel with
+the existing cognitive context instead of existing only when evidence is archived. It adds no
+semantic owner and does not ask any model to author or copy hashes, IDs, envelopes or lineage.
+
+Trusted Host code now builds the initial lineage immediately after an admitted
+`UserTurnEnvelope` and accepted GI result: exact refs for the UserTurn, GI result and each
+Responsibility. The same existing `CognitiveWorkRequest.context` carries that lineage to
+concurrent GA and Fast Planner. `CognitiveWorkRequest` exposes a typed lineage accessor and,
+when lineage is present, recomputes the available canonical payload digests and fails closed if
+the transported UserTurn/GI/Responsibility identity no longer matches. No new frozen top-level
+Work-request field is introduced.
+
+After GA resolves, Host appends exact GA/new-Goal refs before any Goal-state-driven Planner call.
+After a Canonical Plan is accepted, Host appends its content-bound Plan ref before SC or
+Capability Runtime materialization. SC receives the same lineage in trusted context, validates
+Responsibility identity and the presence of its canonical Plan ref when applicable, then Host
+appends the accepted SC result and every Communicative Activity. Interaction and Capability
+requests retain the resulting lineage so execution/outcome code can preserve the same ancestry.
+`CognitiveEvidenceRecorder` cross-checks any transported final lineage against the exact packets
+it archives rather than silently reconstructing a contradictory history.
+
+The lineage is transport/integrity metadata, not cognition. SC prompt construction explicitly
+removes it before inference; Planner/GA prompts already consume selected semantic projections
+rather than this context key. Synthetic/unit requests that do not carry lineage remain valid, but
+once a live lineage is present, same artifact identity with different content is rejected.
+`argument_sources` still use model-retyped exact strings in this revision; Phase 1D remains the
+planned migration to immutable `UserTurnEnvelope` token/span refs plus trusted quote
+materialization.
+
+Focused proof on the supplied archive plus Phases 0/1A/1B: semantic-envelope tests **9/9**;
+`test_cognitive_runtime_pr7.py` **77 tests + 17 subtests**; the selected Gateway/GI/GA/Planner/SC
+suite passes **248 tests + 147 subtests** after excluding one previously documented baseline SC
+assertion whose primary/deep prompts already differ because the archive contains the later
+required-output-schema decoder contract. No model/profile/provider change.
+
+
 ## Semantic Artifact Envelope substrate — 2026-09-16 (current)
 
 The owner generalized the anti-message-loss requirement beyond original user input: accepted GI,

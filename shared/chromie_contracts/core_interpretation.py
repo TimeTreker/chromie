@@ -7,6 +7,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .goal import GoalRelationship
 from .interaction import reject_forbidden_low_level_fields
+from .semantic_artifact import (
+    SemanticArtifactLineage,
+    semantic_artifact_ref,
+)
 from .user_turn import UserTurnEnvelope, normalize_turn_text
 
 
@@ -390,6 +394,16 @@ class CognitiveWorkRequest(BaseModel):
         return CoreInterpretationResult.normalize_unresolved(value)
 
     @property
+    def semantic_artifact_lineage(self) -> SemanticArtifactLineage:
+        """Return trusted transport lineage without exposing it as model meaning."""
+
+        context = self.context if isinstance(self.context, dict) else {}
+        raw = context.get("semantic_artifact_lineage")
+        if raw is None:
+            return SemanticArtifactLineage()
+        return SemanticArtifactLineage.model_validate(raw)
+
+    @property
     def turn_envelope(self) -> UserTurnEnvelope | None:
         """Return the full immutable source envelope when this is an original-turn request.
 
@@ -416,20 +430,39 @@ class CognitiveWorkRequest(BaseModel):
     @model_validator(mode="after")
     def validate_turn_envelope_reference(self) -> "CognitiveWorkRequest":
         envelope = self.turn_envelope
-        if envelope is None:
+        if envelope is not None:
+            if envelope.admission not in {"admit", "reflex_and_admit"}:
+                raise ValueError("Cognitive Work requires an admitted UserTurnEnvelope")
+            if envelope.normalized_input.text != self.text:
+                raise ValueError("Cognitive Work text does not match UserTurnEnvelope")
+            if self.sid is not None and str(self.sid).strip() and self.sid != envelope.session_id:
+                raise ValueError("Cognitive Work session does not match UserTurnEnvelope")
+            if (
+                self.language is not None
+                and str(self.language).strip()
+                and self.language != envelope.normalized_input.language
+            ):
+                raise ValueError("Cognitive Work language does not match UserTurnEnvelope")
+
+        lineage = self.semantic_artifact_lineage
+        if not lineage.refs:
             return self
-        if envelope.admission not in {"admit", "reflex_and_admit"}:
-            raise ValueError("Cognitive Work requires an admitted UserTurnEnvelope")
-        if envelope.normalized_input.text != self.text:
-            raise ValueError("Cognitive Work text does not match UserTurnEnvelope")
-        if self.sid is not None and str(self.sid).strip() and self.sid != envelope.session_id:
-            raise ValueError("Cognitive Work session does not match UserTurnEnvelope")
-        if (
-            self.language is not None
-            and str(self.language).strip()
-            and self.language != envelope.normalized_input.language
-        ):
-            raise ValueError("Cognitive Work language does not match UserTurnEnvelope")
+        if envelope is not None:
+            lineage.require(semantic_artifact_ref(
+                envelope, artifact_kind="user_turn", artifact_id=envelope.turn_id,
+            ))
+        context = self.context if isinstance(self.context, dict) else {}
+        raw_core = context.get("core_interpretation")
+        if isinstance(raw_core, dict):
+            core = CoreInterpretationResult.model_validate(raw_core)
+            lineage.require(semantic_artifact_ref(
+                core, artifact_kind="goal_interpretation", artifact_id=core.turn_id,
+            ))
+            for item in core.responsibilities:
+                lineage.require(semantic_artifact_ref(
+                    item, artifact_kind="responsibility",
+                    artifact_id=f"{core.turn_id}:{item.local_ref}",
+                ))
         return self
 
     @property

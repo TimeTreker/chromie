@@ -562,11 +562,14 @@ exact typed payload. `CognitiveEvidenceRecorder` always archives immutable envel
 UserTurn, GI and each Responsibility, GA/new Goals, canonical Planner Plans,
 SC/Communicative Activities when present, and trusted execution outcomes; exact packets are
 retained only when configured text retention permits. Payload mutation fails digest validation.
-Execution-outcome envelopes currently land as terminal history; exact Plan/Goal parent refs are
-not fabricated from IDs and become mandatory in the next live-ref transport slice. No prompt,
-model Schema, provider contract, active state owner or frozen Work-request field changes in this
-slice. Live cross-service artifact-ref enforcement comes next, followed by Envelope span
-`argument_sources` materialization.
+Execution-outcome envelopes land as terminal history. Phase 1C now carries the same
+content-bound refs through the live original-turn path: UserTurn/GI/Responsibility refs enter the
+existing Work-request context; GA/new-Goal refs are appended after continuity; Plan refs are
+attached before SC and Capability Runtime; accepted SC/Communicative-Activity refs continue into
+interaction/capability metadata; and Cognitive Evidence checks transported refs against archived
+packets. The bookkeeping is omitted from model prompts and introduces no new semantic authority
+or frozen top-level Work-request field. Envelope span `argument_sources` materialization remains
+next; current Fast still retypes exact source strings.
 This is source and automated-contract closure, not qualified target behavior. The current
 source starts Goal Association and one Fast Planner stream
 concurrently from the immutable GI result. The internal model output is one JSON object

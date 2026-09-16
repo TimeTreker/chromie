@@ -43,9 +43,12 @@ from shared.chromie_contracts.interaction import (
 from shared.chromie_contracts.reflection import ReflectionResolution
 from shared.chromie_contracts.semantic_artifact import (
     SemanticArtifactKind,
+    SemanticArtifactLineage,
     SemanticArtifactPacket,
     SemanticArtifactRef,
+    merge_semantic_artifact_lineage,
     semantic_artifact_packet,
+    semantic_artifact_ref,
 )
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
 from shared.chromie_contracts.reflex import CancellationDirective
@@ -144,6 +147,91 @@ class CognitiveRuntimePolicy:
     goal_association_timeout_ms: int = 3500
     fast_planner_timeout_ms: int = 3000
     deep_planner_timeout_ms: int = 10000
+
+
+def _core_semantic_lineage(
+    *,
+    turn_envelope: UserTurnEnvelope,
+    core_interpretation: CoreInterpretationResult,
+) -> SemanticArtifactLineage:
+    """Bind one admitted turn and accepted GI output without copying semantics."""
+
+    refs: list[SemanticArtifactRef] = [
+        semantic_artifact_ref(
+            turn_envelope, artifact_kind="user_turn", artifact_id=turn_envelope.turn_id,
+        ),
+        semantic_artifact_ref(
+            core_interpretation, artifact_kind="goal_interpretation",
+            artifact_id=core_interpretation.turn_id,
+        ),
+    ]
+    refs.extend(
+        semantic_artifact_ref(
+            item, artifact_kind="responsibility",
+            artifact_id=f"{core_interpretation.turn_id}:{item.local_ref}",
+        )
+        for item in core_interpretation.responsibilities
+    )
+    return merge_semantic_artifact_lineage(refs)
+
+
+def _association_semantic_lineage(
+    base: SemanticArtifactLineage, association: GoalAssociationResolution,
+) -> SemanticArtifactLineage:
+    refs: list[SemanticArtifactRef] = [
+        semantic_artifact_ref(
+            association, artifact_kind="goal_association", artifact_id=association.turn_id,
+        )
+    ]
+    refs.extend(
+        semantic_artifact_ref(goal, artifact_kind="goal", artifact_id=goal.goal_id)
+        for goal in association.new_goals
+        if str(goal.goal_id or "").strip()
+    )
+    return merge_semantic_artifact_lineage(base, refs)
+
+
+def _plan_semantic_lineage(
+    base: SemanticArtifactLineage, plan: CanonicalPlan,
+) -> SemanticArtifactLineage:
+    return merge_semantic_artifact_lineage(
+        base, semantic_artifact_ref(
+            plan, artifact_kind="planner_plan", artifact_id=plan.plan_id,
+        ),
+    )
+
+
+def _social_semantic_lineage(
+    base: SemanticArtifactLineage, resolution: SocialCognitionResolution,
+) -> SemanticArtifactLineage:
+    refs: list[SemanticArtifactRef] = [
+        semantic_artifact_ref(
+            resolution, artifact_kind="social_cognition",
+            artifact_id=resolution.request_id,
+        )
+    ]
+    refs.extend(
+        semantic_artifact_ref(
+            act, artifact_kind="communicative_act", artifact_id=act.activity_id,
+        )
+        for act in resolution.activities
+    )
+    return merge_semantic_artifact_lineage(base, refs)
+
+
+def _semantic_lineage_from_context(context: dict[str, Any] | None) -> SemanticArtifactLineage:
+    raw = context.get("semantic_artifact_lineage") if isinstance(context, dict) else None
+    if raw is None:
+        return SemanticArtifactLineage()
+    return SemanticArtifactLineage.model_validate(raw)
+
+
+def _lineage_context(
+    context: dict[str, Any], lineage: SemanticArtifactLineage,
+) -> dict[str, Any]:
+    updated = dict(context)
+    updated["semantic_artifact_lineage"] = lineage.model_dump(mode="json")
+    return updated
 
 
 @dataclass(frozen=True)
@@ -383,6 +471,13 @@ class CognitiveEvidenceRecorder:
                         ),
                     ],
                 )
+
+        if response is not None and isinstance(response.metadata, dict):
+            raw_lineage = response.metadata.get("semantic_artifact_lineage")
+            if raw_lineage is not None:
+                transported = SemanticArtifactLineage.model_validate(raw_lineage)
+                for packet in packets:
+                    transported.require(packet.ref)
 
         return packets
 
@@ -1418,9 +1513,13 @@ class CanonicalPlanRuntimeAdapter:
             social_cognition_request=request, social_cognition=resolution,
             metadata={"authority": "social_cognition", "task_plan_immutable": True},
         )
+        social_context = _lineage_context(
+            dict(context or request.context),
+            _social_semantic_lineage(request.semantic_artifact_lineage, resolution),
+        )
         response = await self.build_response(
             plan=plan, planner_response=projection, session_id=session_id,
-            language=language, context=context,
+            language=language, context=social_context,
         )
         response.metadata["pending_communication_need_ids"] = [
             key for key, value in resolution.need_outcomes.items() if value == "pending"
@@ -1429,7 +1528,7 @@ class CanonicalPlanRuntimeAdapter:
         if any(act.auxiliary_activities for act in resolution.activities):
             response = await self.prepare_social_response(response, social_cognition=resolution,
                 session_id=session_id, turn_id=str(request.source_turn.get("turn_id") or request.request_id),
-                context=context or request.context)
+                context=social_context)
         return response
 
 
@@ -1497,6 +1596,11 @@ class CanonicalPlanRuntimeAdapter:
 
         fingerprint = canonical_plan_fingerprint(plan)
         runtime_context = context if isinstance(context, dict) else {}
+        runtime_lineage = _plan_semantic_lineage(
+            _semantic_lineage_from_context(runtime_context), plan,
+        )
+        runtime_context = _lineage_context(runtime_context, runtime_lineage)
+        lineage_payload = runtime_lineage.model_dump(mode="json")
         envelope = runtime_context.get("user_turn_envelope")
         turn_id = (
             str(envelope.get("turn_id") or session_id)
@@ -2166,6 +2270,7 @@ class CanonicalPlanRuntimeAdapter:
                             if safe_read_parallel and step.timing != "parallel"
                             else "none"
                         ),
+                        "semantic_artifact_lineage": lineage_payload,
                     },
                 )
             )
@@ -2243,8 +2348,8 @@ class CanonicalPlanRuntimeAdapter:
             "deterministic_interrupt_residual_effects_permitted": (
                 residual_effects_permitted
             ),
+            "semantic_artifact_lineage": lineage_payload,
         }
-        runtime_context = context if isinstance(context, dict) else {}
         if isinstance(runtime_context.get("user_turn_envelope"), dict):
             metadata["user_turn_envelope"] = runtime_context["user_turn_envelope"]
         mind_context = runtime_context.get("mind")
@@ -2388,6 +2493,14 @@ class GoalDrivenRuntimeCoordinator:
         previous = self._social_turns.get(key)
         if previous is not None:
             previous[1].cancel()
+        social_context = dict(work_request.context)
+        if plan is not None:
+            social_context = _lineage_context(
+                social_context,
+                _plan_semantic_lineage(
+                    _semantic_lineage_from_context(social_context), plan,
+                ),
+            )
         request = SocialCognitionRequest(
             request_id="sc:" + hashlib.sha256(("plan:" + plan.plan_id if plan is not None else "gi:" + turn_id).encode("utf-8")).hexdigest(),
             trigger="work_state" if plan is not None else "interpretation",
@@ -2396,10 +2509,10 @@ class GoalDrivenRuntimeCoordinator:
             language=work_request.language or "auto", responsibilities=list(work_request.responsibilities),
             interpretation_unresolved=list(work_request.interpretation_unresolved),
             source_turn=work_request.source_turn_provenance,
-            context=ContextAssembly.project_context({**work_request.context, "work_decision_pending": plan is None,
+            context=ContextAssembly.project_context({**social_context, "work_decision_pending": plan is None,
                      **({"canonical_plan_resolution": plan.prompt_projection(), "runtime_admission": "pending"} if plan is not None else {}),
                      "history": list(work_request.history),
-                     "interaction_context": self._interaction_context(sid=sid, context=work_request.context)}),
+                     "interaction_context": self._interaction_context(sid=sid, context=social_context)}),
         )
         def current() -> bool:
             entry = self._social_turns.get(key)
@@ -2443,6 +2556,12 @@ class GoalDrivenRuntimeCoordinator:
         previous = self._social_turns.pop(key, None)
         await self._cancel_social_turn(previous)
         source_context = ContextAssembly.project_context(context)
+        source_context = _lineage_context(
+            source_context,
+            _plan_semantic_lineage(
+                _semantic_lineage_from_context(source_context), plan,
+            ),
+        )
         # The delivery ledger distinguishes queued/started/completed speech.
         # Do not retain the retired, ambiguously named Planner history alias.
         source_context.pop("delivered_turn_speech", None)
@@ -2521,6 +2640,13 @@ class GoalDrivenRuntimeCoordinator:
         response = build_social_interaction_response(
             request, result, session_id=session_id, interaction_context=interaction_context,
         )
+        social_lineage = _social_semantic_lineage(request.semantic_artifact_lineage, result)
+        lineage_payload = social_lineage.model_dump(mode="json")
+        response.metadata["semantic_artifact_lineage"] = lineage_payload
+        for speech in response.speech:
+            speech.metadata["semantic_artifact_lineage"] = lineage_payload
+        for capability in response.capabilities:
+            capability.metadata["semantic_artifact_lineage"] = lineage_payload
         if any(act.auxiliary_activities for act in result.activities):
             response = await self.adapter.prepare_social_response(response, social_cognition=result,
                 session_id=session_id, turn_id=str(request.source_turn.get("turn_id") or request.request_id),
@@ -3622,6 +3748,10 @@ class GoalDrivenRuntimeCoordinator:
             )
             timings["goal_association"] = (time.perf_counter() - stage) * 1000.0
             association_status = association.resolution_status
+            association_lineage = _association_semantic_lineage(
+                work_request.semantic_artifact_lineage, association,
+            )
+            context = _lineage_context(context, association_lineage)
             planning_context = dict(context)
             planning_context["goal_association_resolution"] = (
                 association.prompt_projection()
@@ -3722,6 +3852,7 @@ class GoalDrivenRuntimeCoordinator:
         # Goal facts can wake their own planning call while the GI-triggered
         # Planner is still running. No candidate Plan is passed for review.
         context, history = self._refresh_continuity_context(context=context, sid=sid)
+        context = _lineage_context(context, association_lineage)
         planning_context = {**context, "goal_association_resolution": association.prompt_projection()}
         goal_ids = self._association_goal_ids(association)
         runtime = self.adapter.interaction_runtime.runtime
@@ -3823,6 +3954,13 @@ class GoalDrivenRuntimeCoordinator:
                 "turn_id": turn_envelope.turn_id,
                 "user_turn_schema_version": turn_envelope.schema_version,
             }
+            context = _lineage_context(
+                context,
+                _core_semantic_lineage(
+                    turn_envelope=turn_envelope,
+                    core_interpretation=core_interpretation,
+                ),
+            )
             envelope_history = context.get("history")
             if isinstance(envelope_history, list):
                 history = list(envelope_history)

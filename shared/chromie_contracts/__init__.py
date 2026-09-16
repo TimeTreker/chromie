@@ -30,9 +30,12 @@ from .memory import MemoryUpdateProposal
 from .semantic_artifact import (
     SemanticArtifactEnvelope,
     SemanticArtifactKind,
+    SemanticArtifactLineage,
     SemanticArtifactPacket,
     SemanticArtifactRef,
     semantic_artifact_packet,
+    semantic_artifact_ref,
+    merge_semantic_artifact_lineage,
     semantic_artifact_payload_sha256,
 )
 from .core_interpretation import (
@@ -441,9 +444,12 @@ __all__ = [
     "ToolResultStatus",
     "SemanticArtifactEnvelope",
     "SemanticArtifactKind",
+    "SemanticArtifactLineage",
     "SemanticArtifactPacket",
     "SemanticArtifactRef",
     "semantic_artifact_packet",
+    "semantic_artifact_ref",
+    "merge_semantic_artifact_lineage",
     "semantic_artifact_payload_sha256",
     "canonical_value_sha256",
 ]

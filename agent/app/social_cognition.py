@@ -412,6 +412,9 @@ def social_cognition_prompt(
     request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, num_ctx: int,
 ) -> str:
     payload = request.model_dump(mode="json")
+    # Semantic artifact lineage is trusted transport/integrity metadata. Models
+    # consume the authoritative payloads, not hashes/IDs that code can verify.
+    payload.get("context", {}).pop("semantic_artifact_lineage", None)
     # Present the authoritative delivery ledger before the larger Goal/Work
     # snapshot. Relocate it once; retain all facts and the original request digest.
     interaction = payload["context"].pop("interaction_context", {})

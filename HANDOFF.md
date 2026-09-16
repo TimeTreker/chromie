@@ -1,5 +1,21 @@
 # Chromie Latest Handoff
 
+## Phase 1C live semantic-artifact lineage handoff — 2026-09-16 (current)
+
+Continue from owner-applied Phases 1A/1B. Live original-turn Runtime now creates one
+content-addressed lineage from the admitted `UserTurnEnvelope`, accepted GI result and each
+Responsibility, carries it through the existing Work-request context to GA/Fast, appends GA/new
+Goal refs after continuity resolves, appends the accepted Plan before SC/Capability Runtime, and
+appends accepted SC/Communicative-Activity refs before interaction delivery. Runtime interaction
+and capability metadata retain the same lineage; Cognitive Evidence verifies the transported
+refs against archived packets. Model prompts do not receive digest/ID bookkeeping.
+
+Next: Phase 1D replaces Fast model-copied `argument_sources` strings with immutable
+`UserTurnEnvelope` token/span references and Host materialization of the exact excerpt/digest.
+Do not weaken provenance or remove original source access; remove only the model transcription
+burden. After that continue the SC projection diet and semantic Capability facade.
+
+
 ## Semantic Artifact Envelope handoff — 2026-09-16 (current)
 
 Continue after the UserTurnEnvelope source-identity slice. The owner explicitly extended the same
