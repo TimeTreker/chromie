@@ -482,3 +482,35 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
     validator.validate(raw)
     validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
         responsibilities=request.responsibilities, capabilities=capabilities)
+
+
+def test_optional_argument_citations_follow_native_argument_order():
+    from agent.app.planner_schema import fast_streaming_advance_response_schema
+
+    request = request_for("Walk at 0.2 speed for ten seconds")
+    entry = capability("walk", {"vx_mps": {"type": "number", "default": .12},
+                                "duration_s": {"type": "number", "default": 2}})
+    entry.input_schema["required"] = []
+    schema = fast_streaming_advance_response_schema(["r1"],
+        responsibilities=request.responsibilities, capabilities=[entry.model_dump(mode="json")])
+    contracts = []
+
+    def visit(node):
+        if isinstance(node, dict):
+            fields = node.get("properties", {})
+            if "args" in fields and "argument_sources" in fields:
+                contracts.append(fields)
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema)
+    assert contracts
+    for fields in contracts:
+        # Ordered native object grammar cannot revisit an earlier optional key.
+        assert list(fields["argument_sources"]["properties"]) == list(fields["args"]["properties"])
+    raw = work([activity("walk", {"duration_s": 10, "vx_mps": .2},
+                         {"duration_s": "ten seconds", "vx_mps": "0.2 speed"})])
+    Draft202012Validator(schema).validate(raw)

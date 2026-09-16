@@ -2814,7 +2814,9 @@ def fast_advance_response_schema(
                                 properties["argument_sources"] = {
                                     "type": "object", "properties": {
                                         name: {"type": "string", "minLength": 1, "maxLength": 500}
-                                        for name in input_properties
+                                        # Match args and the sorted catalog: native
+                                        # decoding cannot revisit skipped keys.
+                                        for name in sorted(input_properties)
                                     }, "required": numeric_sources, "additionalProperties": False,
                                 }
                         if mode is not None:

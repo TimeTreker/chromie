@@ -353,7 +353,9 @@ def social_cognition_response_schema(
         else:
             properties["activities"]["maxItems"] = 0
         if disposition == "deliberate":
-            properties["need_outcomes"] = {"type": "object", "maxProperties": 0}
+            # Native grammar ignores maxProperties. An empty literal preserves
+            # the unresolved state's existing ban on committing Need outcomes.
+            properties["need_outcomes"] = {"type": "object", "enum": [{}]}
             for name in ("memory_candidates", "self_memory_candidates"):
                 properties[name]["maxItems"] = 0
         else:
@@ -469,7 +471,9 @@ class SocialCognitionResolver:
             raise ValueError("Social Cognition model unavailable")
         schema = social_cognition_response_schema(request, candidates, deep=deep)
         raw = await model.generate(
-            prompt, system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
+            prompt + "\nRequired output contract JSON:\n" + required_json(
+                schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
+            ), system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
                 "This is the sole deeper pass; decide communicate or silence now." if deep else ""
             ),
             options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx,
