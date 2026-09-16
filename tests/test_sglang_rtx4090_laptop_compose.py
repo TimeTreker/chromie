@@ -26,6 +26,7 @@ _ComposeLoader.add_constructor("!override", _override)
 ROOT = Path(__file__).resolve().parents[1]
 LAPTOP_COMPOSE = ROOT / "docker-compose.sglang-rtx4090-laptop.yml"
 RTX5090_COMPOSE = ROOT / "docker-compose.sglang.yml"
+LAPTOP_PROFILE = ROOT / "env" / "profiles" / "rtx4090_laptop.env"
 
 
 def _service(compose: Path = LAPTOP_COMPOSE) -> dict:
@@ -35,6 +36,34 @@ def _service(compose: Path = LAPTOP_COMPOSE) -> dict:
 
 def _value_after(command: list[str], flag: str) -> str:
     return command[command.index(flag) + 1]
+
+
+def _profile_values() -> dict[str, str]:
+    values: dict[str, str] = {}
+    for raw in LAPTOP_PROFILE.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#") and "=" in line:
+            key, value = line.split("=", 1)
+            values[key] = value
+    return values
+
+
+def test_laptop_sglang_profile_uses_colon_free_served_alias() -> None:
+    values = _profile_values()
+    assert values["AGENT_MODEL"] == "chromie-qwen35-4b"
+    assert ":" not in values["AGENT_MODEL"]
+    for key in (
+        "AGENT_GOAL_INTERPRETER_MODEL",
+        "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
+        "AGENT_GOAL_ASSOCIATION_MODEL",
+        "AGENT_FAST_PLANNER_MODEL",
+        "AGENT_DEEP_PLANNER_MODEL",
+        "AGENT_TASK_CONTINUITY_MODEL",
+        "AGENT_SKILL_SELECTION_MODEL",
+    ):
+        assert values[key] == values["AGENT_MODEL"]
+    assert values["OLLAMA_MODEL"] == "qwen3.5:4b"
+    assert values["TTS_COSYVOICE_OLLAMA_MODEL"] == "qwen3.5:4b"
 
 
 def test_laptop_sglang_service_keeps_base_service_identity_and_pinned_model() -> None:

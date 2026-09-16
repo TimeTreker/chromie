@@ -319,23 +319,25 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx4090_laptop")
-        shared_model = "qwen3.5:4b"
+        served_model = "chromie-qwen35-4b"
+        ollama_fallback_model = "qwen3.5:4b"
         self.assertEqual(
             values["AGENT_GOAL_INTERPRETER_MODEL"],
-            shared_model,
+            served_model,
         )
         for key in (
             "AGENT_MODEL",
-            "OLLAMA_MODEL",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
             "AGENT_GOAL_ASSOCIATION_MODEL",
             "AGENT_FAST_PLANNER_MODEL",
             "AGENT_DEEP_PLANNER_MODEL",
             "AGENT_TASK_CONTINUITY_MODEL",
             "AGENT_SKILL_SELECTION_MODEL",
-            "TTS_COSYVOICE_OLLAMA_MODEL",
         ):
-            self.assertEqual(values[key], shared_model, key)
+            self.assertEqual(values[key], served_model, key)
+            self.assertNotIn(":", values[key], key)
+        self.assertEqual(values["OLLAMA_MODEL"], ollama_fallback_model)
+        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_MODEL"], ollama_fallback_model)
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
         self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "49152")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
@@ -344,7 +346,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["OLLAMA_FLASH_ATTENTION"], "1")
         self.assertEqual(values["OLLAMA_KV_CACHE_TYPE"], "q8_0")
         self.assertEqual(manifest["active_ollama_models"], [])
-        self.assertEqual(manifest["active_inference_models"], [shared_model])
+        self.assertEqual(manifest["active_inference_models"], [served_model])
         self.assertEqual(values["AGENT_LLM_PROVIDER"], "sglang")
         self.assertEqual(values["AGENT_SGLANG_URL"], "http://chromie-llm:30000/v1")
         self.assertEqual(
