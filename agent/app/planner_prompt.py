@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from typing import Any
 
@@ -88,8 +89,10 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "quote. Omit every optional input that is not bound by the Responsibility, canonical "
     "Goal, exact source evidence, or trusted context, even when its schema declares a "
     "default. Do not copy, choose, modify or restate schema defaults in model-authored "
-    "Work; trusted Runtime/provider realization applies declared defaults after Planner "
-    "output. Never borrow a sibling Goal's values. Missing consequential input must use "
+    "Work, and do not replace omission with a minimum, maximum, conservative, guessed, "
+    "or otherwise ungrounded value for a default-owned optional input. Trusted Runtime/"
+    "provider realization applies declared defaults after Planner output. Never borrow a "
+    "sibling Goal's values. Missing consequential input must use "
     "a genuine Planner gap or the declared depth path, without invented Work. "
 )
 
@@ -524,19 +527,56 @@ def fast_advance_semantic_capability_projection(
     ]
 
 
+def _fast_streaming_prompt_input_schema(input_schema: dict[str, Any]) -> dict[str, Any]:
+    """Hide Runtime-owned optional default values from Fast's semantic view.
+
+    The exact schema still drives constrained decoding and trusted validation. The prompt
+    needs to know which optional controls exist and their legal type/range, but exposing a
+    concrete provider default encourages small models to restate or dodge that value even
+    when the source never requested an override. Mark that omission is Runtime-owned while
+    preserving every non-default constraint needed to author an explicit grounded override.
+    """
+
+    projected = copy.deepcopy(input_schema)
+    required = {str(item) for item in projected.get("required") or []}
+    properties = projected.get("properties")
+    if not isinstance(properties, dict):
+        return projected
+    for name, contract in properties.items():
+        if (
+            str(name) in required
+            or not isinstance(contract, dict)
+            or "default" not in contract
+        ):
+            continue
+        contract.pop("default", None)
+        contract["x-chromie-default-owner"] = "trusted_runtime"
+        guidance = (
+            "Optional default-owned input. Omit unless the Responsibility, canonical Goal, "
+            "exact source evidence, or trusted context grounds an explicit override."
+        )
+        prior = str(contract.get("description") or "").strip()
+        contract["description"] = f"{prior} {guidance}".strip()
+    return projected
+
+
 def fast_advance_streaming_capability_prompt_projection(
     capabilities: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Keep one exact argument contract beside each semantic catalog entry.
+    """Keep one argument contract beside each semantic catalog entry.
 
-    The native streaming schema keeps a compact common Activity shape. The prompt
-    catalog carries each exact input schema once; strict runtime validation checks
-    arguments against that authoritative catalog after the JSON document is parsed.
+    The native streaming response schema retains the exact Capability contract. The prompt
+    projection differs only by withholding concrete optional defaults that belong to trusted
+    Runtime/provider realization; it preserves names, requiredness, types, enums and bounds.
     """
 
     return [
-        {**{key: value for key, value in capability.items() if key != "input_schema"},
-         "args_schema": dict(capability.get("input_schema") or {})}
+        {
+            **{key: value for key, value in capability.items() if key != "input_schema"},
+            "args_schema": _fast_streaming_prompt_input_schema(
+                capability.get("input_schema") or {}
+            ),
+        }
         for capability in capabilities
     ]
 

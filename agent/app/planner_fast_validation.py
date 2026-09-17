@@ -770,9 +770,11 @@ def validate_fast_advance_output(
             parameter_schema = properties.get(parameter)
             if not isinstance(parameter_schema, dict):
                 continue
-            if "default" in parameter_schema and (
-                parameter not in activity.args or activity.args[parameter] == parameter_schema["default"]
-            ):
+            # Omitted declared defaults are already executable below Planner. A
+            # present value must still prove semantic ownership first; otherwise an
+            # exact redundant default may be removed by the representation cleanup
+            # below, while a different ungrounded override remains fail-closed.
+            if parameter not in activity.args and "default" in parameter_schema:
                 continue
             # target_ref is not authored from a GI scalar binding.  GI owns the
             # person/addressee meaning; the Planner realizes that meaning against

@@ -533,7 +533,7 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
     del raw["activities"][0]["argument_sources"]
     assert list(validator.iter_errors(raw))
     raw["activities"][0]["argument_sources"] = {}
-    with pytest.raises(ValueError, match="unbound required Capability input"):
+    with pytest.raises(ValueError, match="unbound Capability input"):
         validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
             responsibilities=request.responsibilities, capabilities=capabilities)
     # Omitting an optional input still permits the provider's authoritative default.

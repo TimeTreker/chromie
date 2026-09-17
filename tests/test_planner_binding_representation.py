@@ -283,7 +283,11 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         )
         self.assertIn(
-            "Omit unspecified optional inputs or use their declared schema_default",
+            "Omit every optional input",
+            EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
+        )
+        self.assertNotIn(
+            "use their declared schema_default",
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         )
 
