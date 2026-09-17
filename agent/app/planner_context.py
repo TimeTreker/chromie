@@ -1038,6 +1038,25 @@ def gateway_speech_act(request: Any) -> str:
     return " ".join(str(attention.get("speech_act") or "").strip().split()).casefold()
 
 
+def planner_context_capability_eligible(item: Any, context: dict[str, Any]) -> bool:
+    """Honor provider-declared nonempty Planner context prerequisites.
+
+    This is a catalog projection guard, not semantic capability selection. A
+    Capability that can operate only over already-supplied trusted context must
+    not be advertised when that context is absent, because the Planner may not
+    invent future Evidence to satisfy the prerequisite.
+    """
+
+    hints = getattr(item, "hints", None) or {}
+    requirements = hints.get("planner_context_requirements")
+    if not isinstance(requirements, dict):
+        return True
+    required_nonempty = requirements.get("nonempty") or []
+    if not isinstance(required_nonempty, list):
+        return False
+    return all(bool(context.get(str(key))) for key in required_nonempty)
+
+
 def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False) -> dict[str, Any]:
     """Project one catalog entry onto Fast Planner's read-only capability surface."""
 
@@ -1226,13 +1245,16 @@ async def fast_capability_context(catalog: Any, request: CognitiveWorkRequest, l
     runtime permission. The model may request one bounded detail batch before
     authoring its complete planning decision.
     """
+    context = request.context if isinstance(request.context, dict) else {}
     common = [
         item for item in await catalog.prompt_entries(scope="common", refresh=False)
         if is_planner_step_capability(item.capability_id)
+        and planner_context_capability_eligible(item, context)
     ]
     entries = [
         item for item in await catalog.prompt_entries(scope="index", refresh=False)
         if is_planner_step_capability(item.capability_id)
+        and planner_context_capability_eligible(item, context)
     ]
     by_id = {item.capability_id: item for item in entries}
     if len(loaded_ids) != len(set(loaded_ids)) or any(key not in by_id for key in loaded_ids):

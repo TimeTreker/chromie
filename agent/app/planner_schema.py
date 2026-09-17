@@ -3036,6 +3036,16 @@ def fast_streaming_advance_response_schema(
     )
     compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
     compiled["title"] = "FastPlannerWorkAdvanceOutput"
+    # Streaming Fast is the latency-critical provisional Work pass. One
+    # Responsibility may need up to four executable Activities plus one terminal
+    # communication/clarification Activity. Larger compositions belong to Deep;
+    # do not let native constrained decoding spend its whole deadline filling the
+    # DTO's broad retained compatibility bound.
+    activities = compiled.get("properties", {}).get("activities")
+    if isinstance(activities, dict):
+        retained_bound = int(activities.get("maxItems", 24))
+        fast_bound = max(1, len(responsibility_refs)) * 5
+        activities["maxItems"] = min(retained_bound, fast_bound)
     # Native decoders do not enforce the conditional allOf contract. Keep that
     # full validation and expose the same execution/delegation states as unions.
     states = []

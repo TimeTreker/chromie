@@ -44,6 +44,7 @@ from .planner_context import (
     cancellation_capability_facts,
     deep_capability_payload,
     planner_goal_context,
+    planner_context_capability_eligible,
     planner_provider_media_goal_operations,
     planner_provider_vocal_goal_ids,
 )
@@ -169,6 +170,7 @@ class DeepPlannerResolver:
             if item.available
             and item.interaction_executable
             and is_planner_step_capability(item.capability_id)
+            and planner_context_capability_eligible(item, context)
         ]
         if response_only:
             executable = []
