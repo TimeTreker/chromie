@@ -223,6 +223,9 @@ def test_social_authority_treats_fresh_task_request_as_interaction_not_silence_b
     assert "fresh addressed turn is itself an interaction opportunity" in prompt
     assert "task-oriented content, physical work, or absence of a planner communication need" in prompt
     assert "are never by themselves reasons for silence" in prompt
+    assert "planner never grants or withholds your communication authority" in prompt
+    assert "do not explain a communication or silence decision by saying planner authorized" in prompt
+
 
 
 @pytest.mark.asyncio

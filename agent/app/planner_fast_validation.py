@@ -104,6 +104,32 @@ def _contains_exact_material_value(container: Any, expected: Any) -> bool:
     return False
 
 
+def _drop_redundant_unbound_schema_default(
+    args: dict[str, Any],
+    *,
+    parameter: str,
+    parameter_schema: dict[str, Any],
+    required_inputs: set[str],
+) -> bool:
+    """Remove only an exact optional default after semantic grounding found no owner.
+
+    This is representation cleanup, not semantic repair. Callers reach this helper
+    only after authoritative bindings, exact source spans and source-entailing literal
+    mappings have failed to own the argument. Required inputs are never removed and a
+    model-authored value that differs from the declared default remains visible so the
+    normal fail-closed grounding error rejects it.
+    """
+
+    if parameter in required_inputs or parameter not in args:
+        return False
+    if "default" not in parameter_schema:
+        return False
+    if not _material_values_equal(args[parameter], parameter_schema["default"]):
+        return False
+    args.pop(parameter, None)
+    return True
+
+
 def _is_physical_resource_structured_realization(
     definition: dict[str, Any],
     parameter_schema: dict[str, Any],
@@ -827,9 +853,16 @@ def validate_fast_advance_output(
                     for ref in activity.source_responsibility_refs
                 ):
                     continue
+                if _drop_redundant_unbound_schema_default(
+                    activity.args,
+                    parameter=parameter,
+                    parameter_schema=parameter_schema,
+                    required_inputs=required_inputs,
+                ):
+                    continue
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner cannot invent an unbound required Capability "
-                    f"input before canonical Goal grounding: "
+                    "Fast Planner cannot invent an unbound Capability input before "
+                    "canonical Goal grounding: "
                     f"{activity.capability_id}.{parameter}"
                 )
             actual = activity.args.get(parameter)

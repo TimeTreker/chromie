@@ -73,7 +73,7 @@ CAPABILITY_LOOKUP_PROMPT = (
 
 EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "Planner owns decomposition of complete intent into Activities, Capability choice, "
-    "arguments, units, defaults, dependencies and scheduling. GI supplies complete "
+    "arguments, units, dependencies and scheduling. GI supplies complete "
     "natural-language intent, not an argument table. Preserve every requested action, "
     "modifier and relation. One Responsibility may require several Activities. "
     "Use exact numeric values when the Capability units agree; normalize number words "
@@ -85,8 +85,11 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "Trusted code materializes the span into canonical source_quote and Goal provenance; "
     "you remain responsible for correct mapping, conversion and coverage. "
     "Existing typed Goal constraints remain binding and cannot be overridden by a "
-    "quote. Omit unspecified optional inputs or use their declared schema_default. "
-    "Never borrow a sibling Goal's values. Missing consequential input must use "
+    "quote. Omit every optional input that is not bound by the Responsibility, canonical "
+    "Goal, exact source evidence, or trusted context, even when its schema declares a "
+    "default. Do not copy, choose, modify or restate schema defaults in model-authored "
+    "Work; trusted Runtime/provider realization applies declared defaults after Planner "
+    "output. Never borrow a sibling Goal's values. Missing consequential input must use "
     "a genuine Planner gap or the declared depth path, without invented Work. "
 )
 
