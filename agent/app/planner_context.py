@@ -1076,7 +1076,8 @@ def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False
         "hints": dict(item.hints),
     }
     if include_side_effect_free:
-        payload["side_effect_free"] = (item.hints or {}).get("side_effect_free") is True
+        payload["idempotent"] = bool(getattr(item, "idempotent", False))
+        payload["side_effect_free"] = bool(getattr(item, "side_effect_free", False))
     return payload
 
 

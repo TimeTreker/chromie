@@ -183,6 +183,11 @@ class CatalogCapability(BaseModel):
     exclusive_group: str | None = None
     resource_claims: list[str] = Field(default_factory=list)
     execution_constraints: dict[str, Any] = Field(default_factory=dict)
+    # Mechanical execution facts retained from the provider/registry contract.
+    # Planner-facing normalization may use these only to collapse exact duplicate
+    # read Activities; they never grant execution or semantic authority.
+    idempotent: bool = False
+    side_effect_free: bool = False
 
 class CapabilityMatch(CatalogCapability):
     score: float = Field(ge=0.0, le=1.0)
@@ -647,6 +652,8 @@ class CapabilityCatalog:
                 execution_constraints=dict(
                     tool.llm_hints.get("execution_constraints") or {}
                 ),
+                idempotent=bool(tool.execution.idempotent),
+                side_effect_free=bool(tool.execution.side_effect_free),
             )
             entries.append(self._apply_prompt_tier_policy(capability))
         return entries

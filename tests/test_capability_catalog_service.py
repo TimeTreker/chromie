@@ -612,6 +612,8 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("tool", weather.tags)
         self.assertEqual(weather.prompt_tier, "common")
         self.assertEqual(weather.hints.get("tool_name"), "weather")
+        self.assertTrue(weather.idempotent)
+        self.assertTrue(weather.side_effect_free)
 
     async def test_local_clock_is_indexed_safe_read_without_polluting_common_schema(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])

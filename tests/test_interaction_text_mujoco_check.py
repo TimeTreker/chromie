@@ -89,6 +89,39 @@ def test_failed_preflight_retains_evidence_without_entering_turn(
     assert (tmp_path / "status_before.json").exists()
 
 
+def test_execution_preflight_rejects_host_dry_run(tmp_path):
+    args = build_parser().parse_args(["check weather", "--evidence-dir", str(tmp_path)])
+    args.preview_only = False
+    assistant = SimpleNamespace(
+        action_dry_run=True,
+        get_http_session=AsyncMock(return_value=object()),
+        agent_client=SimpleNamespace(
+            health=AsyncMock(return_value={"capability_sources": ["soridormi"]})
+        ),
+        interaction_runtime=SimpleNamespace(soridormi_invoker=object()),
+        create_session=Mock(side_effect=AssertionError("dry-run preflight entered turn")),
+    )
+    status = {
+        "mode": "sim",
+        "safe_idle": True,
+        "active_task": None,
+        "fallen": False,
+        "emergency_stop": False,
+    }
+    with patch(
+        "scripts.interaction_text_mujoco_check._invoke_soridormi_status",
+        AsyncMock(return_value=status),
+    ):
+        result = asyncio.run(
+            run_check(args, assistant=assistant, configure_environment=False)
+        )
+
+    assistant.create_session.assert_not_called()
+    assert result["ok"] is False
+    assert result["harness_failure"]["failure_domain"] == "preflight"
+    assert any("ORCH_ACTION_DRY_RUN=false" in error for error in result["errors"])
+
+
 @pytest.mark.parametrize("preview,mode,allow_non_sim", [
     (True, "sim", False), (False, "sim", False), (False, "physical", True),
 ])

@@ -910,6 +910,14 @@ async def run_check(
     interrupt_payload: dict[str, Any] | None = None
 
     try:
+        if bool(getattr(assistant, "action_dry_run", False)) and not args.preview_only:
+            errors.append(
+                "Text-MuJoCo execution requires ORCH_ACTION_DRY_RUN=false; the current "
+                "Host is dry-run and would synthesize Capability results instead of "
+                "starting the real provider. Restart Chromie in voice_mujoco mode or "
+                "pass --preview-only for an explicit planning-only check."
+            )
+
         health_start = time.perf_counter()
         session = await assistant.get_http_session()
         agent_health = await assistant.agent_client.health(session)

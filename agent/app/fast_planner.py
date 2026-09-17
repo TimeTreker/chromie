@@ -62,6 +62,7 @@ from .planner_fast_validation import (
     capability_argument_errors,
     qualify_fast_canonical_plan,
     canonicalize_fast_argument_source_spans,
+    collapse_redundant_idempotent_read_activities,
     validate_fast_advance_output,
     validate_work_reuse_selection,
 )
@@ -214,10 +215,19 @@ class FastPlannerResolver:
                     Draft202012Validator(schema).validate(raw)
                     loaded_ids = tuple(raw["requested_capability_ids"])
                     continue
+                Draft202012Validator(schema).validate(raw)
                 output = FastPlannerAdvanceModelOutput.model_validate(raw)
+                output, duplicate_read_repairs = collapse_redundant_idempotent_read_activities(
+                    output, capabilities=capabilities
+                )
+                if duplicate_read_repairs:
+                    logger.info(
+                        "fast_planner_duplicate_idempotent_reads_collapsed sid=%s repairs=%s",
+                        request.sid,
+                        bounded_json(duplicate_read_repairs, 2400),
+                    )
                 validate_fast_advance_output(output, request=current,
                     responsibilities=responsibilities, capabilities=capabilities)
-                Draft202012Validator(schema).validate(raw)
                 output = canonicalize_fast_argument_source_spans(
                     output, source=current.original_user_text
                 )
@@ -228,6 +238,7 @@ class FastPlannerResolver:
                 "semantic_authority": "fast_planner_model", "phase": "responsibility_work_plan",
                 "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,
                 "capability_detail_lookups": int(bool(loaded_ids)),
+                "mechanical_duplicate_activity_collapses": duplicate_read_repairs,
             })
             yield FastPlannerStreamTerminal(turn_id=turn_id, advance=advance)
         except Exception as exc:

@@ -1032,6 +1032,72 @@ def validated_fail_safe_progress(
     return retained
 
 
+def collapse_redundant_idempotent_read_activities(
+    output: FastPlannerAdvanceModelOutput,
+    *,
+    capabilities: list[dict[str, Any]],
+) -> tuple[FastPlannerAdvanceModelOutput, list[dict[str, Any]]]:
+    """Collapse exact duplicate read Activities without changing Planner meaning.
+
+    Only a Capability whose authoritative catalog contract is both idempotent and
+    side-effect-free is eligible.  Two Activities are duplicates only when their
+    capability, args, argument provenance, timing, and Responsibility ownership are
+    identical; model-authored IDs and rationale are representation-only.  Distinct
+    arguments, provenance, timing, ownership, or any effectful/non-idempotent Work
+    remain untouched.
+    """
+
+    by_id = {
+        str(item.get("capability_id") or ""): item
+        for item in capabilities
+        if isinstance(item, dict) and str(item.get("capability_id") or "")
+    }
+    retained: list[Any] = []
+    seen: dict[str, str] = {}
+    repairs: list[dict[str, Any]] = []
+    for activity in output.activities:
+        if activity.role != "capability":
+            retained.append(activity)
+            continue
+        definition = by_id.get(activity.capability_id) or {}
+        if not (definition.get("idempotent") is True and definition.get("side_effect_free") is True):
+            retained.append(activity)
+            continue
+        signature = json.dumps(
+            {
+                "capability_id": activity.capability_id,
+                "args": activity.args,
+                "argument_sources": {
+                    name: span.model_dump(mode="json")
+                    for name, span in sorted(activity.argument_sources.items())
+                },
+                "timing": activity.timing,
+                "source_responsibility_refs": sorted(activity.source_responsibility_refs),
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+        retained_id = seen.get(signature)
+        if retained_id is None:
+            seen[signature] = activity.activity_id
+            retained.append(activity)
+            continue
+        repairs.append(
+            {
+                "normalization": "duplicate_idempotent_read_activity_removed",
+                "retained_activity_id": retained_id,
+                "removed_activity_id": activity.activity_id,
+                "capability_id": activity.capability_id,
+                "source_responsibility_refs": sorted(activity.source_responsibility_refs),
+            }
+        )
+    if not repairs:
+        return output, []
+    return output.model_copy(update={"activities": retained}), repairs
+
+
 def canonicalize_fast_argument_source_spans(
     output: FastPlannerAdvanceModelOutput, *, source: str
 ) -> FastPlannerAdvanceModelOutput:
