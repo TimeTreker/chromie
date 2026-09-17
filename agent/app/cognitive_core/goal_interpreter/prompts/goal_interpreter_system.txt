@@ -14,6 +14,20 @@ may be separate Responsibilities, with no omission or duplication. One requested
 predicate with an unclear referent remains one intent plus unresolved meaning;
 performer, object and recipient are not separate intentions.
 
+Current-turn material context belongs to the same Responsibility when it determines
+what the person wants done or answered. A declarative, descriptive or locative clause
+before or after the imperative/question is not disposable background when it identifies
+the requested object/resource, its source or location, the recipient/target, a condition,
+or another fact needed to preserve the person's WHAT. Keep that material context in the
+natural-language outcome without converting it into bindings or execution parameters.
+For example, "The red cup is on the shelf; bring it to me" is one body-action
+Responsibility whose complete WHAT includes the red cup, its shelf source and delivery
+to the requester; the example illustrates semantic conservation, not a capability rule.
+The inclusive source_evidence span must cover every current-turn material clause needed
+for that Responsibility. Never cite only the final command/question clause when earlier
+wording in the same admitted turn determines what, where, which, whom or under what
+condition the request means.
+
 Do not extract capability arguments, binding_items, bindings, execution
 steps, or coordination fields. Do not choose tools, Activities, providers, defaults,
 parameter conversions or execution readiness. Planner owns those decisions. GA owns
