@@ -30,9 +30,17 @@ class CollectDebugBundleTest(unittest.TestCase):
                 / "cognitive-runtime"
                 / "session-workflows"
             )
+            text_mujoco_run = (
+                root
+                / ".chromie"
+                / "acceptance"
+                / "text-mujoco"
+                / "20260917T040443Z"
+            )
             scripts_dir.mkdir(parents=True)
             voice_logs.mkdir(parents=True)
             workflow_reports.mkdir(parents=True)
+            text_mujoco_run.mkdir(parents=True)
             home.mkdir()
             bin_dir.mkdir()
 
@@ -57,6 +65,24 @@ class CollectDebugBundleTest(unittest.TestCase):
                 "# Session workflow\n",
                 encoding="utf-8",
             )
+            (text_mujoco_run / "summary.json").write_text(
+                '{"ok":true,"sid":"live-turn"}\n', encoding="utf-8"
+            )
+            (text_mujoco_run / "cognitive_runtime_events.jsonl").write_text(
+                json.dumps({
+                    "event": "cognitive_execution_outcome",
+                    "sid": "live-turn",
+                    "provider_realizations": [{
+                        "capability_id": "soridormi.turn_in_place",
+                        "semantic_args": {"direction": "left"},
+                        "provider_args": {"yaw_radps": 0.12},
+                        "semantic_facade_applied": True,
+                    }],
+                }) + "\n",
+                encoding="utf-8",
+            )
+            (text_mujoco_run / "recordings").mkdir()
+            (text_mujoco_run / "recordings" / "private.wav").write_bytes(b"not copied")
 
             fake_docker = bin_dir / "docker"
             fake_docker.write_text(
@@ -139,8 +165,14 @@ class CollectDebugBundleTest(unittest.TestCase):
                     f"{bundle_root}/llm_calls.jsonl",
                     f"{bundle_root}/session-workflows/20260810-session1.json",
                     f"{bundle_root}/session-workflows/20260810-session1.md",
+                    f"{bundle_root}/text-mujoco-evidence/20260917T040443Z/summary.json",
+                    f"{bundle_root}/text-mujoco-evidence/20260917T040443Z/cognitive_runtime_events.jsonl",
                 }
                 self.assertTrue(expected.issubset(members))
+                self.assertNotIn(
+                    f"{bundle_root}/text-mujoco-evidence/20260917T040443Z/recordings/private.wav",
+                    members,
+                )
 
                 launcher = archive.extractfile(
                     f"{bundle_root}/soridormi-launcher.log"
@@ -180,6 +212,19 @@ class CollectDebugBundleTest(unittest.TestCase):
                     '{"decision":"continue"}',
                 )
                 self.assertIn("chromie-agent.log", llm_record["_bundle_sources"])
+
+                runtime_evidence = archive.extractfile(
+                    f"{bundle_root}/text-mujoco-evidence/20260917T040443Z/cognitive_runtime_events.jsonl"
+                )
+                self.assertIsNotNone(runtime_evidence)
+                runtime_record = json.loads(
+                    runtime_evidence.read().decode("utf-8").strip()
+                )
+                self.assertEqual(runtime_record["sid"], "live-turn")
+                self.assertEqual(
+                    runtime_record["provider_realizations"][0]["provider_args"],
+                    {"yaw_radps": 0.12},
+                )
 
 
 if __name__ == "__main__":

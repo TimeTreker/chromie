@@ -37,6 +37,40 @@ copy_recent_workflow_reports() {
   )
 }
 
+copy_recent_text_mujoco_evidence() {
+  local source_root="$ROOT/.chromie/acceptance/text-mujoco"
+  local destination_root="$WORK/text-mujoco-evidence"
+  [[ -d "$source_root" ]] || return 0
+  mkdir -p "$destination_root"
+
+  while IFS= read -r run_dir; do
+    [[ -d "$run_dir" ]] || continue
+    local run_name
+    run_name="$(basename "$run_dir")"
+    local destination_dir="$destination_root/$run_name"
+    mkdir -p "$destination_dir"
+    for name in \
+      summary.json \
+      core_interpretation.json \
+      cognitive_runtime_resolution.json \
+      interaction_response.json \
+      execution.json \
+      cognitive_runtime_events.jsonl \
+      events.jsonl \
+      status_before.json \
+      status_after.json; do
+      [[ -f "$run_dir/$name" ]] || continue
+      cp "$run_dir/$name" "$destination_dir/$name"
+    done
+  done < <(
+    find "$source_root" -mindepth 1 -maxdepth 1 -type d \
+      -printf '%T@ %p\n' \
+      | sort -nr \
+      | awk 'NR <= 3' \
+      | cut -d' ' -f2-
+  )
+}
+
 safe_filename() {
   printf '%s' "$1" | tr -c '[:alnum:]_.-' '_'
 }
@@ -192,6 +226,7 @@ copy_tail .chromie/experience/experience.jsonl experience.tail.jsonl 500
 copy_tail .chromie/experience/mind_update_proposals.jsonl mind_update_proposals.tail.jsonl 200
 copy_tail .chromie/evidence/cognitive-runtime/events.jsonl cognitive_runtime_events.tail.jsonl 1000
 copy_recent_workflow_reports
+copy_recent_text_mujoco_evidence
 copy_tail .chromie/voice-runtime/orchestrator-events.jsonl orchestrator_events.tail.jsonl 1000
 copy_tail .chromie/voice-mujoco/logs/orchestrator-events.jsonl voice_mujoco_orchestrator_events.tail.jsonl 1000
 copy_tail .chromie/voice-mujoco/logs/chromie.log chromie-launcher.log 5000
