@@ -2796,21 +2796,28 @@ def fast_advance_response_schema(
                     for compatible, timings in timings_by_refs.items():
                         properties = copy.deepcopy(branch_properties)
                         required = list(capability_required)
-                        # Optional numeric inputs need provenance too when the
-                        # Planner supplies a nondefault value. Give the decoder
-                        # an explicit closed map even when no input is required.
-                        # Defaults may keep it empty; Host checks actual coverage.
+                        # Intent-derived non-string values need provenance when
+                        # GI intentionally carries WHAT without canonical bindings.
+                        # Direct strings have a separate literal-grounding path; numeric
+                        # and structured values cannot be proven by string containment.
+                        # Keep optional/defaulted inputs representable without forcing a
+                        # source entry until the Planner actually overrides the default.
                         if responsibilities and all(
                             not item.bindings for item in responsibilities
                             if item.local_ref in compatible
                         ):
                             input_properties = input_schema.get("properties", {})
-                            numeric_inputs = [name for name, contract in input_properties.items()
-                                if contract.get("type") in ("number", "integer")]
-                            numeric_sources = [name for name in numeric_inputs
+                            source_span_inputs = [
+                                name
+                                for name, contract in input_properties.items()
+                                if isinstance(contract, dict)
+                                and contract.get("type")
+                                in ("number", "integer", "boolean", "object", "array")
+                            ]
+                            required_source_spans = [name for name in source_span_inputs
                                 if name in input_schema.get("required", [])
                                 and "default" not in input_properties[name]]
-                            if numeric_inputs:
+                            if source_span_inputs:
                                 required.append("argument_sources")
                                 properties["argument_sources"] = {
                                     "type": "object", "properties": {
@@ -2832,7 +2839,7 @@ def fast_advance_response_schema(
                                         # Match args and the sorted catalog: native
                                         # decoding cannot revisit skipped keys.
                                         for name in sorted(input_properties)
-                                    }, "required": numeric_sources, "additionalProperties": False,
+                                    }, "required": required_source_spans, "additionalProperties": False,
                                 }
                         if mode is not None:
                             properties["args"]["properties"]["mode"] = {**mode_contract, "enum": [mode]}

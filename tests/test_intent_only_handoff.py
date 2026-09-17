@@ -515,6 +515,46 @@ def test_intent_only_numeric_activity_requires_provenance_at_decoder():
     assert list(validator.iter_errors(raw))
 
 
+def test_intent_only_structured_activity_requires_provenance_at_decoder():
+    from agent.app.planner_schema import fast_streaming_advance_response_schema
+
+    text = (
+        "There is one bottle of milk in front of you about 50m ahead, "
+        "please bring it to me quickly"
+    )
+    request = request_for(text)
+    catalog = capability("delivery", {
+        "resource": {"type": "object"},
+        "source": {"type": "object"},
+        "recipient": {"type": "object"},
+    })
+    schema = fast_streaming_advance_response_schema(
+        ["r1"],
+        responsibilities=request.responsibilities,
+        capabilities=[catalog.model_dump(mode="json")],
+        source_token_refs=[item["ref"] for item in _source_tokens(text)],
+    )
+    raw = work([activity(
+        "delivery",
+        {
+            "resource": {"description": "one bottle of milk"},
+            "source": {"description": "in front of you about 50m ahead"},
+            "recipient": {"description": "me"},
+        },
+        source_spans(text, {
+            "resource": "one bottle of milk",
+            "source": "in front of you about 50m ahead",
+            "recipient": "me",
+        }),
+    )])
+    validator = Draft202012Validator(schema)
+    validator.validate(raw)
+
+    del raw["activities"][0]["argument_sources"]
+    errors = list(validator.iter_errors(raw))
+    assert errors
+
+
 def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
     from agent.app.planner_schema import fast_streaming_advance_response_schema
     from agent.app.planner_fast_validation import validate_fast_advance_output
