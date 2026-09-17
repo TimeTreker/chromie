@@ -26,6 +26,7 @@ from scripts.interaction_text_mujoco_check import (
     dispatch_initial_reflex,
     parse_expected_arg,
     record_execution_bindings,
+    print_result_summary,
     run_check,
     required_speech_delivery_errors,
     safe_idle_errors,
@@ -308,6 +309,11 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         parser = build_parser()
         parsed = parser.parse_args([])
         self.assertTrue(parsed.cognitive_runtime)
+        self.assertEqual(parsed.output_format, "human")
+        self.assertEqual(
+            parser.parse_args(["--output-format", "json"]).output_format,
+            "json",
+        )
         self.assertNotIn("--no-cognitive-runtime", parser._option_string_actions)
         self.assertEqual(
             build_parser()
@@ -606,6 +612,41 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertEqual(summary["capabilities"], ["soridormi.blink_eyes"])
         self.assertEqual(summary["speech_items"], 1)
         self.assertEqual(summary["errors"], ["example failure"])
+
+    def test_result_summary_does_not_dump_retained_workflow_evidence(self) -> None:
+        summary = {
+            "ok": True,
+            "sid": "sid-milk",
+            "evidence_dir": "/tmp/chromie-evidence",
+            "timings_ms": {"total_ms": 22843.2},
+            "session_state": {
+                "scheduled_tts": 1,
+                "played_tts": 1,
+                "interrupted": True,
+                "workflow_report": {
+                    "outcome": {
+                        "requested_work_provider_start_observed": False,
+                    }
+                },
+                "workflow_report_markdown": "very large private evidence",
+            },
+        }
+
+        with patch("builtins.print") as print_mock:
+            print_result_summary(summary)
+
+        rendered = "\n".join(
+            " ".join(str(arg) for arg in call.args)
+            for call in print_mock.call_args_list
+        )
+        self.assertIn("PASS", rendered)
+        self.assertIn("session=interrupted", rendered)
+        self.assertIn("requested_work_provider=not_started", rendered)
+        self.assertIn("tts=1/1", rendered)
+        self.assertIn("total=22.84s", rendered)
+        self.assertIn("/tmp/chromie-evidence/summary.json", rendered)
+        self.assertNotIn("very large private evidence", rendered)
+        self.assertNotIn("workflow_report_markdown", rendered)
 
     def test_validate_contract_reports_capability_and_argument_mismatch(self) -> None:
         errors = validate_contract(

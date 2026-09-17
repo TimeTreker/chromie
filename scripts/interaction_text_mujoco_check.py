@@ -341,6 +341,51 @@ def print_debug_summary(debug_summary: dict[str, Any]) -> None:
         )
 
 
+def print_result_summary(summary: dict[str, Any]) -> None:
+    """Print the operator result; full evidence remains in summary.json."""
+
+    session = summary.get("session_state")
+    session = session if isinstance(session, dict) else {}
+    report = session.get("workflow_report")
+    report = report if isinstance(report, dict) else {}
+    outcome = report.get("outcome")
+    outcome = outcome if isinstance(outcome, dict) else {}
+
+    if session.get("done_logged"):
+        terminal = "complete"
+    elif session.get("interrupted"):
+        terminal = "interrupted"
+    else:
+        terminal = "unfinished"
+
+    provider_started = outcome.get("requested_work_provider_start_observed")
+    provider = (
+        "started"
+        if provider_started is True
+        else "not_started"
+        if provider_started is False
+        else "unknown"
+    )
+    played = int(session.get("played_tts") or 0)
+    scheduled = int(session.get("scheduled_tts") or 0)
+    total_ms = float((summary.get("timings_ms") or {}).get("total_ms") or 0.0)
+    print(
+        "[interaction-text-mujoco][result] "
+        f"{'PASS' if summary.get('ok') else 'FAIL'} "
+        f"sid={summary.get('sid') or '-'} "
+        f"session={terminal} "
+        f"requested_work_provider={provider} "
+        f"tts={played}/{scheduled} "
+        f"total={total_ms / 1000.0:.2f}s"
+    )
+    evidence_dir = str(summary.get("evidence_dir") or "").strip()
+    if evidence_dir:
+        print(
+            "[interaction-text-mujoco][evidence] "
+            f"{Path(evidence_dir) / 'summary.json'}"
+        )
+
+
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -1672,6 +1717,16 @@ def build_parser() -> argparse.ArgumentParser:
             "Set to 0 to use catalog/default skill timeouts unchanged."
         ),
     )
+    parser.add_argument(
+        "--output-format",
+        choices=("human", "json"),
+        default="human",
+        help=(
+            "Terminal output format. Human is concise; json preserves the previous "
+            "full-summary stdout for machine consumers. Full summary.json evidence "
+            "is always retained."
+        ),
+    )
     return parser
 
 
@@ -1691,7 +1746,10 @@ def main() -> int:
         print(f"[interaction-text-mujoco][error] {exc}", file=sys.stderr)
         return 1
     print_debug_summary(summary["debug_summary"])
-    print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+    if args.output_format == "json":
+        print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
+    else:
+        print_result_summary(summary)
     return 0 if summary["ok"] else 1
 
 
