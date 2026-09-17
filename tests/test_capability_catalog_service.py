@@ -613,16 +613,21 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(weather.prompt_tier, "common")
         self.assertEqual(weather.hints.get("tool_name"), "weather")
 
-    async def test_local_clock_is_common_safe_read_without_invented_inputs(self) -> None:
+    async def test_local_clock_is_indexed_safe_read_without_polluting_common_schema(self) -> None:
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
         catalog = CapabilityCatalog(registry, live_invoker=None)
 
         common = await catalog.prompt_entries(scope="common")
-        clock = next(item for item in common if item.capability_id == "chromie.clock.local")
+        self.assertNotIn(
+            "chromie.clock.local",
+            {item.capability_id for item in common},
+        )
+        indexed = await catalog.prompt_entries(scope="index")
+        clock = next(item for item in indexed if item.capability_id == "chromie.clock.local")
         self.assertEqual(clock.agent_id, "chromie.clock")
         self.assertEqual(clock.safety_class, "safe_read")
         self.assertTrue(clock.interaction_executable)
-        self.assertEqual(clock.prompt_tier, "common")
+        self.assertEqual(clock.prompt_tier, "rare")
         self.assertEqual(clock.input_schema.get("required"), [])
         self.assertEqual(clock.input_schema.get("additionalProperties"), False)
         self.assertIn("clock_lookup", clock.effects)

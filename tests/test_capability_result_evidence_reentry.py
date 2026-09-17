@@ -333,7 +333,12 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             status="ok",
             metadata={
                 "user_turn_envelope": {
+                    "schema_version": 1,
                     "turn_id": "turn-weather-and-blink",
+                    "session_id": "session",
+                    "conversation_id": "conversation-weather",
+                    "channel": "text",
+                    "received_at": "2026-09-17T08:00:00+00:00",
                     "original_input": {
                         "text": "  今天上午会下雨吗？然后眨两次眼。  "
                     },
@@ -341,6 +346,23 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                         "text": "今天上午会下雨吗？然后眨两次眼。",
                         "language": "zh-CN",
                     },
+                    "quality": {
+                        "source": "text",
+                        "usable": True,
+                        "asr_confidence": None,
+                        "reason": "",
+                    },
+                    "reflex": {
+                        "language": "zh-CN",
+                    },
+                    "attention": {
+                        "disposition": "admit",
+                        "source": "test.attention",
+                        "confidence": 1.0,
+                        "reason": "",
+                    },
+                    "context_refs": [],
+                    "admission": "admit",
                 },
                 "goal_interpretation": {
                     "responsibilities": [
@@ -431,8 +453,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             request.text,
             "Determine whether rain is expected this morning.",
         )
-        self.assertEqual(request.context["user_turn_envelope"], source.metadata["user_turn_envelope"])
-        self.assertEqual(assistant.cognitive_runtime.adapter.context["user_turn_envelope"], source.metadata["user_turn_envelope"])
+        self.assertNotIn("user_turn_envelope", request.context)
+        self.assertNotIn("user_turn_envelope", assistant.cognitive_runtime.adapter.context)
         source_provenance = request.context["source_turn_provenance"]
         exact_source = "  今天上午会下雨吗？然后眨两次眼。  "
         self.assertEqual(source_provenance["original_text"], exact_source)

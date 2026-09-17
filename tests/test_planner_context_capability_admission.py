@@ -154,3 +154,28 @@ def test_fast_streaming_activity_budget_is_bounded_per_responsibility() -> None:
         interpretation_unresolved=[],
     )
     assert two["properties"]["activities"]["maxItems"] == 10
+
+
+def test_fast_catalog_keeps_rare_clock_indexed_until_explicitly_loaded() -> None:
+    weather = _capability("chromie.weather.lookup")
+    clock = _capability("chromie.clock.local").model_copy(
+        update={"prompt_tier": "rare"}
+    )
+    catalog = _Catalog([weather, clock])
+    request = _request()
+
+    _, common, entries = asyncio.run(fast_capability_context(catalog, request))
+
+    assert [item.capability_id for item in common] == ["chromie.weather.lookup"]
+    assert [item.capability_id for item in entries] == [
+        "chromie.weather.lookup",
+        "chromie.clock.local",
+    ]
+
+    _, loaded, _ = asyncio.run(
+        fast_capability_context(catalog, request, ("chromie.clock.local",))
+    )
+    assert [item.capability_id for item in loaded] == [
+        "chromie.weather.lookup",
+        "chromie.clock.local",
+    ]

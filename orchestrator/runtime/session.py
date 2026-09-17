@@ -1242,7 +1242,9 @@ class SessionTracker:
         trusted_runtime_stages = [
             item
             for item in retained_stages
-            if item.get("stage") == "trusted_capability_runtime"
+            if str(item.get("stage") or "").startswith(
+                "trusted_capability_runtime"
+            )
         ]
         dispatch_blocked = any(
             item.get("stage") == "canonical_plan_rejection"

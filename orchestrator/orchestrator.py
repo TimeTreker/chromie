@@ -5543,9 +5543,15 @@ class VoiceAssistant:
             observer=False,
         )
         context.update(context_updates)
+        # State re-entry deliberately uses a synthetic Work-request SID and may
+        # narrow one original multi-Goal turn to a strict Goal subset.  Carrying
+        # the full originating UserTurnEnvelope inside this new CognitiveWorkRequest
+        # would therefore assert a false transport identity: its session/text belong
+        # to the admitted source turn, not to this scoped state transition.  Keep the
+        # immutable envelope on source_response and project only read-only source
+        # provenance plus the scoped GI Responsibilities below.
+        context.pop("user_turn_envelope", None)
         source_envelope = metadata.get("user_turn_envelope")
-        if isinstance(source_envelope, dict):
-            context["user_turn_envelope"] = dict(source_envelope)
         source_original_input = (
             source_envelope.get("original_input")
             if isinstance(source_envelope, dict)

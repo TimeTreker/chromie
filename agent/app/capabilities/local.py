@@ -901,9 +901,12 @@ def chromie_manifests(
                 default_failure_policy=FailurePolicy(strategy="stop_and_report"),
                 llm_hints={
                     "interaction_executable": True,
-                    "prompt_tier": "common",
+                    "prompt_tier": "rare",
                     "prompt_tier_reason": (
-                        "Current local date and time are common spoken information requests."
+                        "Local clock is a zero-argument domain-specific read. Keep it in "
+                        "the indexed library so Fast Planner loads it only for an actual "
+                        "time/date need instead of exposing an attractive unrelated branch "
+                        "in every common Work schema."
                     ),
                     "when_to_use": (
                         "Use for the current local time, date, weekday, timezone, or UTC "

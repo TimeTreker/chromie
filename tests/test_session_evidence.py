@@ -256,6 +256,58 @@ class SessionEvidenceTests(unittest.TestCase):
         self.assertTrue(outcome["any_provider_start_observed"])
         self.assertTrue(outcome["dispatch_blocked_before_requested_provider"])
 
+    def test_workflow_report_recognizes_detached_runtime_completion_start(
+        self,
+    ) -> None:
+        tracker = SessionTracker()
+        sid = tracker.create()
+        started = now_ms()
+        response = InteractionResponse(
+            interaction_id="weather-inline",
+            capabilities=[
+                CapabilityRequest(
+                    request_id="weather-request",
+                    capability_id="chromie.weather.lookup",
+                    args={"location": "Chongqing"},
+                )
+            ],
+        )
+        execution = CapabilityRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="completed",
+            traces=[
+                self._started_trace(
+                    request_id="weather-request",
+                    capability_id="chromie.weather.lookup",
+                    provider_id="chromie.agent_tool",
+                )
+            ],
+        )
+        tracker.record_cognitive_stage(
+            sid,
+            stage="trusted_capability_runtime_dispatch",
+            started_monotonic_ms=started,
+            finished_monotonic_ms=started + 1.0,
+            status="terminal_before_dispatch",
+            metadata=summarize_provider_start_evidence(response),
+        )
+        tracker.record_cognitive_stage(
+            sid,
+            stage="trusted_capability_runtime_completion",
+            started_monotonic_ms=started + 1.0,
+            finished_monotonic_ms=started + 2.0,
+            status="completed",
+            metadata=summarize_provider_start_evidence(response, execution),
+        )
+
+        outcome = tracker._workflow_report(
+            sid, termination_state="complete"
+        )["outcome"]
+
+        self.assertTrue(outcome["trusted_runtime_observed"])
+        self.assertTrue(outcome["requested_work_provider_start_observed"])
+        self.assertTrue(outcome["any_provider_start_observed"])
+
     def test_conversation_workflow_rollup_combines_multiple_finished_sids(
         self,
     ) -> None:
