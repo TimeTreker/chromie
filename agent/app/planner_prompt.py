@@ -91,8 +91,12 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "default. Do not copy, choose, modify or restate schema defaults in model-authored "
     "Work, and do not replace omission with a minimum, maximum, conservative, guessed, "
     "or otherwise ungrounded value for a default-owned optional input. Trusted Runtime/"
-    "provider realization applies declared defaults after Planner output. Never borrow a "
-    "sibling Goal's values. Missing consequential input must use "
+    "provider realization applies declared defaults after Planner output. A non-default "
+    "optional override grounded only by the current UserTurn must cite "
+    "argument_sources for that exact same argument key. Source membership is not semantic "
+    "permission: cite only a span that actually expresses that parameter, never a sibling "
+    "value that merely has the same number or words. Never borrow a sibling Goal's values. "
+    "Missing consequential input must use "
     "a genuine Planner gap or the declared depth path, without invented Work. "
 )
 
@@ -892,7 +896,9 @@ def _fast_streaming_prompt_input_schema(input_schema: dict[str, Any]) -> dict[st
         contract["x-chromie-default-owner"] = "trusted_runtime"
         guidance = (
             "Optional default-owned input. Omit unless the Responsibility, canonical Goal, "
-            "exact source evidence, or trusted context grounds an explicit override."
+            "exact source evidence, or trusted context grounds an explicit override. "
+            "A UserTurn-only non-default override must carry same-key argument_sources "
+            "provenance; another argument's source never authorizes this input."
         )
         prior = str(contract.get("description") or "").strip()
         contract["description"] = f"{prior} {guidance}".strip()

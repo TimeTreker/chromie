@@ -2553,6 +2553,130 @@ def _fast_terminal_activity_contract() -> dict[str, Any]:
     }
 
 
+def _fast_source_span_contract(
+    source_token_refs: list[str] | None,
+) -> dict[str, Any]:
+    token_ref = (
+        {"type": "string", "enum": list(source_token_refs)}
+        if source_token_refs
+        else {"type": "string", "minLength": 1, "maxLength": 24}
+    )
+    return {
+        "type": "object",
+        "properties": {
+            "source_start_token_ref": copy.deepcopy(token_ref),
+            "source_end_token_ref": copy.deepcopy(token_ref),
+        },
+        "required": ["source_start_token_ref", "source_end_token_ref"],
+        "additionalProperties": False,
+    }
+
+
+def _fast_capability_activity_variants(
+    *,
+    properties: dict[str, Any],
+    required: list[str],
+    input_schema: dict[str, Any],
+    grounded_parameters: set[str],
+    source_token_refs: list[str] | None,
+) -> list[dict[str, Any]]:
+    """Compile optional-default provenance into native-visible object branches.
+
+    XGrammar does not reliably enforce cross-field if/then/allOf relations. An
+    optional provider default therefore gets two structural states during Fast
+    decoding: omitted/exact-default with no same-key UserTurn provenance, or an
+    explicit override whose argument and source-span key are both required.
+
+    Direct Responsibility bindings plus declared/trusted realization parameters
+    stay outside this branching and remain validated by the existing Host rules.
+    The power set is bounded in practice by the audited Capability schemas
+    (currently at most five non-grounded optional defaults in one capability).
+    """
+
+    input_properties = input_schema.get("properties")
+    if not isinstance(input_properties, dict):
+        return [{
+            "type": "object",
+            "properties": copy.deepcopy(properties),
+            "required": list(required),
+            "additionalProperties": False,
+        }]
+
+    required_inputs = {str(name) for name in input_schema.get("required") or []}
+    grounded = {str(name) for name in grounded_parameters}
+    default_owned = [
+        str(name)
+        for name, contract in sorted(
+            input_properties.items(), key=lambda item: str(item[0])
+        )
+        if str(name) not in required_inputs
+        and str(name) not in grounded
+        and isinstance(contract, dict)
+        and "default" in contract
+    ]
+    required_source_inputs = {
+        str(name)
+        for name in required_inputs
+        if str(name) not in grounded
+        and isinstance(input_properties.get(name), dict)
+        and input_properties[name].get("type")
+        in ("number", "integer", "boolean", "object", "array")
+    }
+    span_contract = _fast_source_span_contract(source_token_refs)
+    variants: list[dict[str, Any]] = []
+
+    for mask in range(1 << len(default_owned)):
+        overrides = {
+            name
+            for index, name in enumerate(default_owned)
+            if mask & (1 << index)
+        }
+        variant_properties = copy.deepcopy(properties)
+        args_schema = copy.deepcopy(variant_properties["args"])
+        args_properties = args_schema.get("properties")
+        if not isinstance(args_properties, dict):
+            continue
+        args_required = list(args_schema.get("required") or [])
+        for name in default_owned:
+            contract = input_properties[name]
+            if name in overrides:
+                if name not in args_required:
+                    args_required.append(name)
+            else:
+                args_properties[name] = {
+                    "const": copy.deepcopy(contract["default"])
+                }
+        args_schema["required"] = args_required
+        variant_properties["args"] = args_schema
+
+        # Non-selected default-owned keys are intentionally absent here. With
+        # additionalProperties=false this makes the alternatives disjoint and
+        # prevents a source citation from silently authorizing a sibling default.
+        allowed_source_names = sorted(
+            (set(input_properties) - set(default_owned)) | overrides
+        )
+        required_source_names = sorted(required_source_inputs | overrides)
+        variant_properties["argument_sources"] = {
+            "type": "object",
+            "properties": {
+                name: copy.deepcopy(span_contract)
+                for name in allowed_source_names
+            },
+            "required": required_source_names,
+            "additionalProperties": False,
+        }
+        variant_required = list(required)
+        if required_source_names and "argument_sources" not in variant_required:
+            variant_required.append("argument_sources")
+        variants.append({
+            "type": "object",
+            "properties": variant_properties,
+            "required": variant_required,
+            "additionalProperties": False,
+        })
+
+    return variants
+
 def fast_advance_response_schema(
     responsibility_refs: list[str],
     *,
@@ -2858,6 +2982,21 @@ def fast_advance_response_schema(
                     "enum": [capability_id_value],
                 }
                 branch_properties["args"] = _ordered_capability_arguments(input_schema)
+                hints = capability.get("hints")
+                derivation_targets: set[str] = set()
+                realization_contracts: dict[str, Any] = {}
+                if isinstance(hints, dict):
+                    raw_realizations = hints.get("argument_realization")
+                    if isinstance(raw_realizations, dict):
+                        realization_contracts = raw_realizations
+                    raw_derivations = hints.get("argument_derivation")
+                    if isinstance(raw_derivations, dict):
+                        derivation_targets = {
+                            str(name) for name in raw_derivations
+                        }
+                trusted_grounded_parameters = {"target_ref"} | derivation_targets
+                if capability_id_value == VOCAL_PERFORMANCE_CAPABILITY_ID:
+                    trusted_grounded_parameters.add("mode")
                 # Match the Host's existing exact vocal-provider/mode invariant.
                 # UMI has already authored the mode; this does not infer it from words.
                 modes: list[str | None] = [None]
@@ -2877,60 +3016,39 @@ def fast_advance_response_schema(
                     for compatible, timings in timings_by_refs.items():
                         properties = copy.deepcopy(branch_properties)
                         required = list(capability_required)
-                        # Intent-derived non-string values need provenance when
-                        # UMI intentionally carries WHAT without canonical bindings.
-                        # Direct strings have a separate literal-grounding path; numeric
-                        # and structured values cannot be proven by string containment.
-                        # Keep optional/defaulted inputs representable without forcing a
-                        # source entry until the Planner actually overrides the default.
-                        if responsibilities and all(
-                            not item.bindings for item in responsibilities
+                        bound_parameters = {
+                            str(name)
+                            for item in responsibility_items
                             if item.local_ref in compatible
-                        ):
-                            input_properties = input_schema.get("properties", {})
-                            source_span_inputs = [
-                                name
-                                for name, contract in input_properties.items()
-                                if isinstance(contract, dict)
-                                and contract.get("type")
-                                in ("number", "integer", "boolean", "object", "array")
-                            ]
-                            required_source_spans = [name for name in source_span_inputs
-                                if name in input_schema.get("required", [])
-                                and "default" not in input_properties[name]]
-                            if source_span_inputs:
-                                required.append("argument_sources")
-                                properties["argument_sources"] = {
-                                    "type": "object", "properties": {
-                                        name: {
-                                            "type": "object",
-                                            "properties": {
-                                                "source_start_token_ref": {
-                                                    "type": "string",
-                                                    **({"enum": list(source_token_refs)} if source_token_refs else {"minLength": 1, "maxLength": 24}),
-                                                },
-                                                "source_end_token_ref": {
-                                                    "type": "string",
-                                                    **({"enum": list(source_token_refs)} if source_token_refs else {"minLength": 1, "maxLength": 24}),
-                                                },
-                                            },
-                                            "required": ["source_start_token_ref", "source_end_token_ref"],
-                                            "additionalProperties": False,
-                                        }
-                                        # Match args and the sorted catalog: native
-                                        # decoding cannot revisit skipped keys.
-                                        for name in sorted(input_properties)
-                                    }, "required": required_source_spans, "additionalProperties": False,
-                                }
+                            for name in item.bindings
+                        }
+                        realized_parameters: set[str] = set()
+                        for binding_name in bound_parameters:
+                            realization = realization_contracts.get(binding_name)
+                            if isinstance(realization, dict):
+                                realized_parameters.update(
+                                    str(name)
+                                    for name in realization.get("arguments") or []
+                                )
+                        grounded_parameters = (
+                            trusted_grounded_parameters
+                            | bound_parameters
+                            | realized_parameters
+                        )
                         if mode is not None:
                             properties["args"]["properties"]["mode"] = {**mode_contract, "enum": [mode]}
                         properties["timing"] = {"type": "string", "enum": timings}
                         properties["source_responsibility_refs"]["items"] = {"type": "string", "enum": list(compatible)}
                         properties["source_responsibility_refs"]["maxItems"] = len(compatible)
-                        branches.append({
-                            "type": "object", "properties": properties,
-                            "required": required, "additionalProperties": False,
-                        })
+                        branches.extend(
+                            _fast_capability_activity_variants(
+                                properties=properties,
+                                required=required,
+                                input_schema=input_schema,
+                                grounded_parameters=grounded_parameters,
+                                source_token_refs=source_token_refs,
+                            )
+                        )
             if branches:
                 capability_contract["oneOf"] = branches
             elif isinstance(activity_items, dict):

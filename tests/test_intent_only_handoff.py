@@ -574,6 +574,8 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
     del raw["activities"][0]["argument_sources"]
     assert list(validator.iter_errors(raw))
     raw["activities"][0]["argument_sources"] = {}
+    # Native-visible branch expansion must reject the same invalid shape as Host.
+    assert list(validator.iter_errors(raw))
     with pytest.raises(ValueError, match="unbound Capability input"):
         validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
             responsibilities=request.responsibilities, capabilities=capabilities)
@@ -583,6 +585,84 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
     validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
         responsibilities=request.responsibilities, capabilities=capabilities)
 
+
+def test_provider_style_defaults_compile_to_native_visible_provenance_branches():
+    from agent.app.clients.sglang_protocol import build_sglang_chat_payload
+    from agent.app.inference_compute import CognitionComputeClass
+    from agent.app.planner_schema import fast_streaming_advance_response_schema
+
+    text = "nod your head 5 times"
+    request = CognitiveWorkRequest(
+        sid="provider-style-nod-defaults",
+        text=text,
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": text,
+            "bindings": {"count": 5},
+            "output_mode": "body_action",
+            "continuity_scope": "goal",
+            "confidence": 1.0,
+            "source_evidence": source_span(text, text),
+        }],
+        interpretation_confidence=1.0,
+    )
+    entry = capability("nod", {
+        "count": {"type": "integer", "minimum": 2, "maximum": 8, "default": 2},
+        "amplitude": {
+            "type": "string",
+            "enum": ["small", "medium"],
+            "default": "small",
+        },
+        "duration_s": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 4,
+        },
+    })
+    entry.input_schema["required"] = []
+    schema = fast_streaming_advance_response_schema(
+        ["r1"],
+        responsibilities=request.responsibilities,
+        capabilities=[entry.model_dump(mode="json")],
+    )
+    validator = Draft202012Validator(schema)
+
+    count_only = work([activity("nod", {"count": 5}, {})])
+    exact_defaults = work([activity(
+        "nod",
+        {"count": 5, "amplitude": "small", "duration_s": 4},
+        {},
+    )])
+    bad_duration = work([activity(
+        "nod",
+        {"count": 5, "duration_s": 5},
+        {},
+    )])
+    bad_amplitude = work([activity(
+        "nod",
+        {"count": 5, "amplitude": "medium"},
+        {},
+    )])
+    validator.validate(count_only)
+    validator.validate(exact_defaults)
+    assert list(validator.iter_errors(bad_duration))
+    assert list(validator.iter_errors(bad_amplitude))
+
+    # SGLang's wire projection must preserve the structural alternatives. This
+    # deliberately tests the provider-facing schema, not only the canonical one.
+    wire = build_sglang_chat_payload(
+        model="fixed",
+        messages=[],
+        compute_class=CognitionComputeClass.INTERACTIVE,
+        options={},
+        response_format=schema,
+        stream=True,
+        priority_step=100,
+    )["response_format"]["json_schema"]["schema"]
+    wire_validator = Draft202012Validator(wire)
+    wire_validator.validate(count_only)
+    assert list(wire_validator.iter_errors(bad_duration))
 
 def test_fast_argument_source_cannot_escape_owning_responsibility_span():
     from agent.app.planner_fast_validation import validate_fast_advance_output
