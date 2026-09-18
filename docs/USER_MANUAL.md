@@ -72,7 +72,7 @@ paired launcher from the Chromie repository:
 ./scripts/start_voice_mujoco.sh --soridormi-repo ../soridormi
 ```
 
-This starts Soridormi MuJoCo, Soridormi runtime MCP, Chromie ASR/TTS/Agent (including the embedded Goal Interpreter),
+This starts Soridormi MuJoCo, Soridormi runtime MCP, Chromie ASR/TTS/Agent (including the embedded User Meaning Interpreter),
 and the host Orchestrator. After it prints `Chromie voice-to-MuJoCo is ready`,
 say a supervised request such as:
 

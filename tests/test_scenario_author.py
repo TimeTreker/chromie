@@ -14,7 +14,7 @@ from scripts.behavior_scenarios import load_scenario_file
 class ScenarioAuthorTests(unittest.TestCase):
     def test_new_creates_scenarios_from_templates(self) -> None:
         cases = ({
-            "suite": "goal_interpretation",
+            "suite": "user_meaning_interpretation",
             "scenario_id": "draft_greeting",
             "text": "Hello there.",
             "extra_args": [
@@ -60,7 +60,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                 [
                     "new",
                     "--suite",
-                    "goal_interpretation",
+                    "user_meaning_interpretation",
                     "--id",
                     "Bad-ID",
                     "--scenario-root",
@@ -70,14 +70,14 @@ class ScenarioAuthorTests(unittest.TestCase):
 
         self.assertEqual(code, 2)
 
-    def test_validate_all_discovers_created_goal_interpretation_scenario(self) -> None:
+    def test_validate_all_discovers_created_user_meaning_interpretation_scenario(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             scenario_author.main(
                 [
                     "new",
                     "--suite",
-                    "goal_interpretation",
+                    "user_meaning_interpretation",
                     "--id",
                     "draft_chat",
                     "--text",
@@ -91,7 +91,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                 [
                     "validate-all",
                     "--suite",
-                    "goal_interpretation",
+                    "user_meaning_interpretation",
                     "--scenario-root",
                     str(root),
                 ]
@@ -106,7 +106,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                 [
                     "new",
                     "--suite",
-                    "goal_interpretation",
+                    "user_meaning_interpretation",
                     "--id",
                     "draft_edit",
                     "--text",
@@ -122,7 +122,7 @@ class ScenarioAuthorTests(unittest.TestCase):
                     [
                         "edit",
                         "--suite",
-                        "goal_interpretation",
+                        "user_meaning_interpretation",
                         "--id",
                         "draft_edit",
                         "--scenario-root",
@@ -147,14 +147,14 @@ class ScenarioAuthorTests(unittest.TestCase):
 
     def test_prompt_mentions_suite_specific_expectations(self) -> None:
         cases = ({
-            "suite": "goal_interpretation",
+            "suite": "user_meaning_interpretation",
             "count": "3",
             "focus": "normal greetings and ambiguous commands",
             "expected": (
                 "Generate 3 candidate JSON scenario files",
                 "deterministic expectations",
                 "provider-neutral responsibilities",
-                "scenarios/goal_interpretation/<id>.json",
+                "scenarios/user_meaning_interpretation/<id>.json",
             ),
         },)
 

@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1280" viewBox="0 0 1800 1280" role="img" aria-labelledby="title desc">
   <title id="title">Chromie Cognitive and Capability Flow — Detailed Reference</title>
-  <desc id="desc">A light, event-driven architecture diagram showing Goal Interpretation, Planner and Goal Association, the Trusted Capability Runtime, Providers, runtime events, trusted Evidence, bounded state, CognitiveOpportunity, Planner re-entry, and deterministic Protective Reflex.</desc>
+  <desc id="desc">A light, event-driven architecture diagram showing User Meaning Interpretation, Planner and Goal Association, the Trusted Capability Runtime, Providers, runtime events, trusted Evidence, bounded state, CognitiveOpportunity, Planner re-entry, and deterministic Protective Reflex.</desc>
   <defs>
     <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="#2563eb"/></marker>
     <marker id="arrow-violet" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 Z" fill="#7c3aed"/></marker>

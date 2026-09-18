@@ -78,17 +78,17 @@ from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.planner_response import PlannerResponseProjection
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
 from shared.chromie_contracts.semantic_task import ResponsePlan
-from agent.app.cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
-from agent.app.cognitive_core.goal_interpreter.schema import (
-    GoalInterpretationDecision,
-    GoalInterpretationRequest,
+from agent.app.cognitive_core.user_meaning_interpreter.errors import InterpretationUnavailableError
+from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
+from agent.app.cognitive_core.user_meaning_interpreter.schema import (
+    UserMeaningInterpretationDecision,
+    UserMeaningInterpretationRequest,
 )
 
 DEFAULT_SCENARIO_ROOT = ROOT / "scenarios"
 DEFAULT_REPORT_ROOT = ROOT / ".chromie" / "reports" / "behavior-scenarios"
 SUPPORTED_SUITES = {
-    "goal_interpretation", "cognitive_core_dialogue",
+    "user_meaning_interpretation", "cognitive_core_dialogue",
     "cognitive_runtime", "cognitive_turn_loop",
 }
 
@@ -112,27 +112,27 @@ class BehaviorScenario:
         return f"{self.suite}/{self.scenario_id}"
 
 
-class _GoalInterpretationLlm:
-    def __init__(self, decision: GoalInterpretationDecision | None) -> None:
+class _UserMeaningInterpretationLlm:
+    def __init__(self, decision: UserMeaningInterpretationDecision | None) -> None:
         self.decision = decision
         self.calls = 0
         self.stages: list[str] = []
 
-    async def interpret_goal(
-        self, request: GoalInterpretationRequest
-    ) -> GoalInterpretationDecision:
+    async def interpret_user_meaning(
+        self, request: UserMeaningInterpretationRequest
+    ) -> UserMeaningInterpretationDecision:
         self.calls += 1
-        self.stages.append("goal_interpretation")
+        self.stages.append("user_meaning_interpretation")
         if self.decision is None:
-            raise AssertionError(f"Goal Interpretation model should not be called for {request.text!r}")
+            raise AssertionError(f"User Meaning Interpretation model should not be called for {request.text!r}")
         return self.decision
 
 
-class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
-    """Run the bounded Goal Interpretation transaction with scripted model output.
+class _ScriptedUserMeaningInterpreter(OllamaUserMeaningInterpreter):
+    """Run the bounded User Meaning Interpretation transaction with scripted model output.
 
     The primary interpretation, normalization, and deterministic validators run
-    through ``OllamaGoalInterpreter.interpret_goal()``. Invalid primary DTOs fail
+    through ``OllamaUserMeaningInterpreter.interpret_user_meaning()``. Invalid primary DTOs fail
     closed without a second same-authority model call.
     Only the external model completion is replaced by a file-backed script.
     """
@@ -156,7 +156,7 @@ class _ScriptedGoalInterpreter(OllamaGoalInterpreter):
         payload: dict[str, Any],
         *,
         stage: str,
-        request: GoalInterpretationRequest | None = None,
+        request: UserMeaningInterpretationRequest | None = None,
     ) -> dict[str, Any]:
         del payload, request
         self.calls += 1
@@ -646,7 +646,7 @@ class _CognitiveScenarioClient:
                 ["deep_planner"] if plan.disposition == "escalate" else []
             ),
             confidence=plan.confidence,
-            unresolved=list(plan.unresolved),
+            unresolved=list(plan.meaning_uncertainties),
             reason_summary=(
                 plan.escalation_reason
                 or str(plan.metadata.get("reason") or "")
@@ -857,18 +857,18 @@ def load_scenarios(
     return selected
 
 
-def _goal_interpretation_decision_from_stub(
+def _user_meaning_interpretation_decision_from_stub(
     scenario: BehaviorScenario,
-) -> GoalInterpretationDecision | None:
+) -> UserMeaningInterpretationDecision | None:
     raw = scenario.stub.get("llm_decision")
     if raw is None:
         return None
     if not isinstance(raw, dict):
         raise ValueError(f"{scenario.key}: stub.llm_decision must be an object or null")
-    return GoalInterpretationDecision.model_validate(raw)
+    return UserMeaningInterpretationDecision.model_validate(raw)
 
 
-def _goal_interpretation_script_from_stub(
+def _user_meaning_interpretation_script_from_stub(
     scenario_key: str,
     stub: dict[str, Any],
 ) -> list[dict[str, Any]] | None:
@@ -892,10 +892,10 @@ def _expect_equal(errors: list[str], label: str, actual: Any, expected: Any) -> 
         errors.append(f"{label}={actual!r}, expected {expected!r}")
 
 
-def _evaluate_goal_interpretation_expectations(
+def _evaluate_user_meaning_interpretation_expectations(
     scenario: BehaviorScenario,
     *,
-    decision: GoalInterpretationDecision,
+    decision: UserMeaningInterpretationDecision,
     llm_calls: int,
     llm_stages: list[str] | None = None,
     expect: dict[str, Any] | None = None,
@@ -903,7 +903,12 @@ def _evaluate_goal_interpretation_expectations(
     expect = expect if isinstance(expect, dict) else scenario.expect
     errors: list[str] = []
     _expect_equal(errors, "confidence", decision.confidence, expect.get("confidence"))
-    _expect_equal(errors, "unresolved", decision.unresolved, expect.get("unresolved"))
+    _expect_equal(
+        errors,
+        "unresolved",
+        [item.description for item in decision.meaning_uncertainties],
+        expect.get("unresolved"),
+    )
     _expect_equal(errors, "llm_calls", llm_calls, expect.get("llm_calls"))
     expected_stages = _tuple_of_strings(expect.get("llm_stages"))
     if expected_stages and list(expected_stages) != list(llm_stages or []):
@@ -956,26 +961,26 @@ def _evaluate_goal_interpretation_expectations(
     return errors
 
 
-def _scenario_goal_interpreter_from_stub(
+def _scenario_user_meaning_interpreter_from_stub(
     scenario_key: str,
     stub: dict[str, Any],
     *,
-    fallback_decision: GoalInterpretationDecision | None = None,
-) -> _GoalInterpretationLlm | _ScriptedGoalInterpreter:
-    script = _goal_interpretation_script_from_stub(scenario_key, stub)
+    fallback_decision: UserMeaningInterpretationDecision | None = None,
+) -> _UserMeaningInterpretationLlm | _ScriptedUserMeaningInterpreter:
+    script = _user_meaning_interpretation_script_from_stub(scenario_key, stub)
     if script is not None:
-        return _ScriptedGoalInterpreter(script)
+        return _ScriptedUserMeaningInterpreter(script)
     raw_decision = stub.get("llm_decision")
     if raw_decision is None:
-        return _GoalInterpretationLlm(fallback_decision)
+        return _UserMeaningInterpretationLlm(fallback_decision)
     if not isinstance(raw_decision, dict):
         raise ValueError(f"{scenario_key}: stub.llm_decision must be an object or null")
-    return _GoalInterpretationLlm(
-        GoalInterpretationDecision.model_validate(raw_decision)
+    return _UserMeaningInterpretationLlm(
+        UserMeaningInterpretationDecision.model_validate(raw_decision)
     )
 
 
-async def _run_goal_interpretation_turn(
+async def _run_user_meaning_interpretation_turn(
     *,
     scenario: BehaviorScenario,
     text: str,
@@ -983,20 +988,20 @@ async def _run_goal_interpretation_turn(
     context: dict[str, Any] | None,
     stub: dict[str, Any],
 ) -> tuple[
-    GoalInterpretationDecision | InterpretationUnavailableError,
-    _GoalInterpretationLlm | _ScriptedGoalInterpreter,
+    UserMeaningInterpretationDecision | InterpretationUnavailableError,
+    _UserMeaningInterpretationLlm | _ScriptedUserMeaningInterpreter,
 ]:
-    from agent.app.cognitive_core.goal_interpreter import engine as main
+    from agent.app.cognitive_core.user_meaning_interpreter import engine as main
 
-    interpreter = _scenario_goal_interpreter_from_stub(
+    interpreter = _scenario_user_meaning_interpreter_from_stub(
         scenario.key,
         stub,
-        fallback_decision=_goal_interpretation_decision_from_stub(scenario),
+        fallback_decision=_user_meaning_interpretation_decision_from_stub(scenario),
     )
-    with patch.object(main, "goal_interpreter", interpreter):
+    with patch.object(main, "user_meaning_interpreter", interpreter):
         try:
-            decision = await main.interpret_goal(
-                GoalInterpretationRequest(
+            decision = await main.interpret_user_meaning(
+                UserMeaningInterpretationRequest(
                     sid=scenario.scenario_id,
                     text=text,
                     language=language,
@@ -1041,11 +1046,11 @@ def _evaluate_interpretation_unavailable_expectations(
     return errors
 
 
-async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
+async def evaluate_user_meaning_interpretation_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
     context = scenario.stub.get("context") or {}
     if not isinstance(context, dict):
         raise ValueError(f"{scenario.key}: stub.context must be an object")
-    decision, interpreter = await _run_goal_interpretation_turn(
+    decision, interpreter = await _run_user_meaning_interpretation_turn(
         scenario=scenario,
         text=scenario.text,
         language=scenario.language,
@@ -1071,7 +1076,7 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
             },
         }
 
-    errors = _evaluate_goal_interpretation_expectations(
+    errors = _evaluate_user_meaning_interpretation_expectations(
         scenario,
         decision=decision,
         llm_calls=interpreter.calls,
@@ -1082,7 +1087,7 @@ async def evaluate_goal_interpretation_scenario(scenario: BehaviorScenario) -> d
         "errors": errors,
         "actual": {
             "confidence": decision.confidence,
-            "unresolved": list(decision.unresolved),
+            "unresolved": [item.description for item in decision.meaning_uncertainties],
             "llm_calls": interpreter.calls,
             "llm_stages": list(interpreter.stages),
             "responsibilities": [
@@ -1240,7 +1245,7 @@ async def evaluate_cognitive_core_dialogue_scenario(
             pre_snapshot.get("active_task_snapshots") or [],
         )
 
-        decision, interpreter = await _run_goal_interpretation_turn(
+        decision, interpreter = await _run_user_meaning_interpretation_turn(
             scenario=scenario,
             text=text,
             language=language,
@@ -1270,7 +1275,7 @@ async def evaluate_cognitive_core_dialogue_scenario(
                 }
             )
             continue
-        errors = _evaluate_goal_interpretation_expectations(
+        errors = _evaluate_user_meaning_interpretation_expectations(
             scenario,
             decision=decision,
             llm_calls=interpreter.calls,
@@ -1282,7 +1287,7 @@ async def evaluate_cognitive_core_dialogue_scenario(
             turn_id,
             text,
             metadata={
-                "goal_interpretation": decision.model_dump(
+                "user_meaning_interpretation": decision.model_dump(
                     mode="json", exclude_none=True
                 )
             },
@@ -1306,7 +1311,7 @@ async def evaluate_cognitive_core_dialogue_scenario(
                 "errors": errors,
                 "interpretation": {
                     "confidence": decision.confidence,
-                    "unresolved": list(decision.unresolved),
+                    "unresolved": [item.description for item in decision.meaning_uncertainties],
                     "responsibilities": [
                         item.model_dump(mode="json", exclude_none=True)
                         for item in decision.responsibilities
@@ -2019,8 +2024,8 @@ async def evaluate_cognitive_turn_loop_scenario(
 
 
 async def evaluate_scenario(scenario: BehaviorScenario) -> dict[str, Any]:
-    if scenario.suite == "goal_interpretation":
-        return await evaluate_goal_interpretation_scenario(scenario)
+    if scenario.suite == "user_meaning_interpretation":
+        return await evaluate_user_meaning_interpretation_scenario(scenario)
     if scenario.suite == "cognitive_core_dialogue":
         return await evaluate_cognitive_core_dialogue_scenario(scenario)
     if scenario.suite == "cognitive_runtime":

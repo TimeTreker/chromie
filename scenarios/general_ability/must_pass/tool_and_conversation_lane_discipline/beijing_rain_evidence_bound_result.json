@@ -69,7 +69,7 @@
         "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
         "rationale": "The Beijing rain question should acknowledge the check promptly without claiming a result before trusted lookup evidence.",
         "root_cause_boundaries": [
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Prompt wording",
           "Test evidence"

@@ -51,7 +51,7 @@ not set `CHROMIE_HARDWARE_PROFILE` in `.env.local` or on a launcher command.
 
 `./scripts/start_services.sh` is the low-level Docker service launcher. It first
 refreshes hardware detection and `.env.runtime`, validates Compose, builds or
-starts ASR, TTS, Ollama, Goal Interpretation, and Agent, and then verifies that containers
+starts ASR, TTS, Ollama, User Meaning Interpretation, and Agent, and then verifies that containers
 and the TTS CUDA build match the detected profile. It also compares the running
 Agent app, shared contracts/runtime and Agent Skills with the checkout using
 content digests. A healthy container with old source fails this check before the
@@ -304,7 +304,7 @@ python scripts/general_ability_acceptance.py \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-This checks representative ability-class probes through Goal Interpretation and the
+This checks representative ability-class probes through User Meaning Interpretation and the
 goal-driven runtime in preview mode and writes evidence under
 `.chromie/acceptance/general-ability/<id>/`. Add `--execute` only for a
 supervised simulator run.
@@ -544,7 +544,7 @@ python scripts/provider_conformance.py --live --profile sim
 
 Run the automatic synthetic matrix first. It generates input WAV files with the
 existing TTS service and injects them through the Orchestrator's private stdin
-audio path, so the test still crosses VAD, ASR, Goal Interpretation,
+audio path, so the test still crosses VAD, ASR, User Meaning Interpretation,
 goal-driven Agent planning/composition, Trusted Capability Runtime, response
 TTS, and Soridormi without relying on a person speaking:
 
@@ -569,7 +569,7 @@ python scripts/voice_acceptance.py \
 ```
 
 The run is fully automatic. The terminal displays generated fixture paths, ASR
-transcripts, Goal Interpretation results, proposed skill IDs, skill results, and final case
+transcripts, User Meaning Interpretation results, proposed skill IDs, skill results, and final case
 verdicts. Validate this regression evidence with:
 
 ```bash

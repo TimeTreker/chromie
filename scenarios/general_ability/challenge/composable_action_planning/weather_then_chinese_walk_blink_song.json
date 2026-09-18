@@ -32,7 +32,7 @@
       "Optional social attention may be absent and must not delay or replace the primary act."
     ],
     "forbidden_semantic_outcomes": [
-      "Omit a requested outcome or violate its requested ordering. A complete compound GI Responsibility may own several Planner Activities.",
+      "Omit a requested outcome or violate its requested ordering. A complete compound UMI Responsibility may own several Planner Activities.",
       "Carry stale context into an unrelated task."
     ],
     "verdicts": [
@@ -96,7 +96,7 @@
         "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
         "rationale": "Retained 2026-08-01 voice incident: a completed weather turn must not contaminate a new Chinese walk, blink, and spoken-performance request.",
         "root_cause_boundaries": [
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Trusted Capability Runtime/provider",
           "Test evidence"

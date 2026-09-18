@@ -121,7 +121,7 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         skill_set = set(capabilities)
         requires_activity = any(
             item.output_mode not in {"speech", "unspecified", "other"}
-            for item in turn.goal_interpretation.responsibilities
+            for item in turn.user_meaning_interpretation.responsibilities
         )
         speech = " ".join(turn.agent.speech).strip()
 
@@ -208,8 +208,8 @@ def evaluate_episode_contract_precheck(episode: EpisodeRecord) -> EpisodeEvaluat
         if turn.agent.latency_ms is not None and turn.agent.latency_ms > 8000:
             _add_tag(failure_tags, "slow_agent")
             scores["latency"] = min(scores["latency"], 35)
-        if turn.goal_interpretation.latency_ms is not None and turn.goal_interpretation.latency_ms > 2000:
-            _add_tag(failure_tags, "slow_goal_interpretation")
+        if turn.user_meaning_interpretation.latency_ms is not None and turn.user_meaning_interpretation.latency_ms > 2000:
+            _add_tag(failure_tags, "slow_user_meaning_interpretation")
             scores["latency"] = min(scores["latency"], 55)
 
     base_score = int(round(sum(scores.values()) / len(scores)))
@@ -361,7 +361,7 @@ def offline_review_from_episode(
         learning_actions.append("owner_review_strategy_prompt_or_skill_selection_update")
     if case_quality == "good_case":
         learning_actions.append("retain_as_positive_reference")
-    if "slow_agent" in tag_set or "slow_goal_interpretation" in tag_set:
+    if "slow_agent" in tag_set or "slow_user_meaning_interpretation" in tag_set:
         learning_actions.append("inspect_latency_budget")
 
     root_cause = _root_cause_from_evaluation(evaluation)
@@ -523,7 +523,7 @@ def scenario_candidate_from_episode(
         if "missing_eye_skill" in evaluation.failure_tags:
             if any(
                 item.output_mode not in {"speech", "unspecified", "other"}
-                for item in turn.goal_interpretation.responsibilities
+                for item in turn.user_meaning_interpretation.responsibilities
             ):
                 expect["capabilities"] = ["soridormi.blink_eyes"]
             expect["forbidden_speech_any"] = [
@@ -540,13 +540,13 @@ def scenario_candidate_from_episode(
                 "id": f"turn_{turn.turn_index}",
                 "ask": turn.user_text,
                 "stub": {
-                    "goal_interpretation": {
-                        "confidence": turn.goal_interpretation.confidence or 0.5,
+                    "user_meaning_interpretation": {
+                        "confidence": turn.user_meaning_interpretation.confidence or 0.5,
                         "responsibilities": [
                             item.model_dump(mode="json")
-                            for item in turn.goal_interpretation.responsibilities
+                            for item in turn.user_meaning_interpretation.responsibilities
                         ],
-                        "unresolved": list(turn.goal_interpretation.unresolved),
+                        "unresolved": list(turn.user_meaning_interpretation.meaning_uncertainties),
                     }
                 },
                 "expect": expect,
@@ -645,7 +645,7 @@ def _root_cause_from_evaluation(evaluation: EpisodeEvaluation) -> str:
         return "A locomotion request did not produce a locomotion skill."
     if "confirmation_without_skill" in tags:
         return "The response asked for confirmation even though no executable skill was present."
-    if "slow_agent" in tags or "slow_goal_interpretation" in tags:
+    if "slow_agent" in tags or "slow_user_meaning_interpretation" in tags:
         return "The interaction exceeded the latency budget."
     if evaluation.passed:
         return "No contract-level failure was found."

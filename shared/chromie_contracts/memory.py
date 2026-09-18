@@ -61,7 +61,7 @@ class MemoryUpdateProposal(BaseModel):
         return normalized or None
 
 
-def role_memory_context(context: dict[str, Any], *, role: Literal["gi", "ga", "planner"]) -> str:
+def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "planner"]) -> str:
     """Project whole entries already activated and privacy-filtered by Memory.
 
     Cognitive scope and persistence remain independent. Never read raw stores or
@@ -70,7 +70,7 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["gi", "ga", "p
     memory = context.get("session_memory")
     entries = memory.get("extracted_memory", []) if isinstance(memory, dict) else []
     selected: list[dict[str, Any]] = []
-    budget = 2400 if role == "gi" else 4800
+    budget = 2400 if role == "umi" else 4800
     fields = (
         "id", "scope", "kind", "key", "text", "confidence", "relation",
         "subject_refs", "source_person_refs", "source_ref_ids", "source_turn_ids",
@@ -84,13 +84,13 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["gi", "ga", "p
         encoded = json.dumps([*selected, item], ensure_ascii=False, separators=(",", ":"))
         if len(encoded) <= budget:
             selected.append(item)
-        if len(selected) >= (4 if role == "gi" else 8):
+        if len(selected) >= (4 if role == "umi" else 8):
             break
     if not selected:
         return ""
     purpose = {
-        "gi": "Resolve the current utterance using relevant recent or historical context.",
-        "ga": "Relate authoritative GI Responsibilities to current and lasting Goal continuity.",
+        "umi": "Interpret the current user meaning using only activated relevant memory as context.",
+        "ga": "Relate authoritative UMI Responsibilities to current and lasting Goal continuity.",
         "planner": "Plan from canonical meaning, current Runtime Work and Evidence, with relevant remembered context.",
     }[role]
     return (
@@ -98,6 +98,6 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["gi", "ga", "p
         + json.dumps(selected, ensure_ascii=False, separators=(",", ":"))
         + "\n" + purpose
         + " Memory scope describes relevance; persistence_policy describes storage lifetime. "
-        "Neither memory nor its confidence replaces current intent, Goal state, Runtime state, "
-        "execution Evidence, or authorization. Never infer completion from remembered intent.\n\n"
+        "Neither memory nor its confidence replaces current meaning, Goal state, Runtime state, "
+        "execution Evidence, or authorization. Never turn remembered context into a new Responsibility or infer completion from it.\n\n"
     )

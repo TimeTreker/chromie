@@ -245,7 +245,7 @@ def fast_goal_continuity_projection(context: dict[str, Any]) -> list[dict[str, A
 
     Snapshot diagnostics and task implementation identity are not planning inputs.
     Keep complete semantic Goals, lifecycle state and gaps, including recent Goals;
-    do not choose between versions or reinterpret GI's explicit target IDs here.
+    do not choose between versions or reinterpret UMI's explicit target IDs here.
     """
 
     snapshots: list[dict[str, Any]] = []

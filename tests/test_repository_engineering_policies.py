@@ -205,13 +205,13 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
                 / "agent"
                 / "app"
                 / "cognitive_core"
-                / "goal_interpreter"
+                / "user_meaning_interpreter"
                 / "model_interpreter.py"
             )
             interpreter.parent.mkdir(parents=True)
             interpreter.write_text(
                 "weather_semantics_require_tool_route = True\n"
-                "goal_interpretation_contract_repair = True\n",
+                "user_meaning_interpretation_contract_repair = True\n",
                 encoding="utf-8",
             )
             coordinator = root / "orchestrator" / "runtime" / "interaction_coordinator.py"
@@ -256,7 +256,7 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
                 "    def _fallback_reply(self): return 'That sounds tiring.'\n",
                 encoding="utf-8",
             )
-            schema = root / "agent" / "app" / "cognitive_core" / "goal_interpreter" / "schema.py"
+            schema = root / "agent" / "app" / "cognitive_core" / "user_meaning_interpreter" / "schema.py"
             schema.parent.mkdir(parents=True, exist_ok=True)
             schema.write_text(
                 'decision.speak_first = "What do you mean?"\n',
@@ -280,7 +280,7 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
         self.assertIn("normalize_enum_string", symbols)
         self.assertIn("reject_contract_marker_as_spoken_text", symbols)
         self.assertIn("ACTION_PHRASES", symbols)
-        self.assertIn("goal_interpretation_contract_repair", symbols)
+        self.assertIn("user_meaning_interpretation_contract_repair", symbols)
 
     def test_obsolete_assets_and_copied_mechanisms_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -54,7 +54,7 @@
         "rationale": "A low-information fragment should clarify instead of becoming blink or another nearby skill.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]

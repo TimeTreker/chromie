@@ -25,13 +25,13 @@ Chromie 是一个本地优先、实时、可中断、可审计的语音与具身
 ## 职责边界
 
 已批准的目标架构加入 **Social Cognition（社会认知）**：把与人的交流作为
-有独立价值的认知职责，投入必要的注意力和计算资源。GI 负责理解本轮意思，
+有独立价值的认知职责，投入必要的注意力和计算资源。UMI 负责理解本轮意思，
 GA 负责目标连续性，Social Cognition 负责是否、何时以及如何交流，Planner
 负责行动规划。交流可以是深入讨论、必要的问题、进展或结果，也可以是沉默。
 它们共享对话、相关记忆、目标和真实任务状态；并行推理不产生两套事实或人格。
 
 SC 也可理解为面向人的交流与互动规划：读取同一套目标，跟踪待回答的问题、
-交流承诺和需要交代的结果。它可以由可信的环境变化触发，无须先出现 GI 输出。
+交流承诺和需要交代的结果。它可以由可信的环境变化触发，无须先出现 UMI 输出。
 表达包含语言、文字和能力允许的身体动作；用户明确要求的动作仍是 Planner
 负责的目标任务。快速交流的推理调度优先级高于普通行动规划，深思仍使用有界预算。
 
@@ -115,11 +115,11 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 
 ## 开发主线
 
-- **当前架构基线**：主 authority seam 已固定为 `Goal Interpretation →
+- **当前架构基线**：主 authority seam 已固定为 `User Meaning Interpretation →
   Responsibility evidence → Fast Planner 快速推进 →（可立即执行的安全 Activity）
   和/或 Goal Association / Deep Planner continuation → 需要持久连续性时建立
   Canonical Goal → canonical planning → Work/Primary Activity → realization → Provider
-  → Evidence`。GI 的 Fast/Deep 只有认知深度/上下文/推理预算差异，authority 和输出
+  → Evidence`。UMI 的 Fast/Deep 只有认知深度/上下文/推理预算差异，authority 和输出
   相同；均不得写回复文本、创建 Work/Activity、选择 lane/Capability/Plan。Fast
   Planner 是第一个 HOW owner，但 GA 仍唯一拥有 canonical Goal continuity。
 - **下一阶段设计**：Epistemic Qualification 只负责“证据是否足以建立某个事实”，

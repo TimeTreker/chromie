@@ -250,7 +250,7 @@ CASES: dict[str, AcceptanceCase] = {
         ),
         (
             "ASR emits final text.",
-            "Goal Interpretation and the goal-driven cognitive runtime complete.",
+            "User Meaning Interpretation and the goal-driven cognitive runtime complete.",
             "Interaction reports zero capabilities and TTS playback completes.",
         ),
         (SpokenStep("Tell me one short fact about the Moon.", (("moon",),)),),
@@ -1679,7 +1679,7 @@ def analyze_case(case_id: str, events: list[dict[str, Any]]) -> list[CheckResult
             row
             for row in rows("cognitive_gateway_reflex_applied")
             if field(row[1], "action") == "interrupt"
-            and str(field(row[1], "goal_interpretation_bypassed") or "").casefold()
+            and str(field(row[1], "user_meaning_interpretation_bypassed") or "").casefold()
             == "true"
         ]
 

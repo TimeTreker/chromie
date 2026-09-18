@@ -248,7 +248,7 @@ def _response() -> InteractionResponse:
             "canonical_plan": plan.model_dump(mode="json"),
             "canonical_plan_id": plan.plan_id,
             "canonical_plan_fingerprint": fingerprint,
-            "goal_interpretation": {
+            "user_meaning_interpretation": {
                 "responsibilities": [
                     {
                         "local_ref": "read-first",

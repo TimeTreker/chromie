@@ -84,7 +84,7 @@ def build_fast_plan_request(
         language=interpretation.language,
         responsibilities=interpretation.responsibilities,
         interpretation_confidence=interpretation.confidence,
-        interpretation_unresolved=interpretation.unresolved,
+        meaning_uncertainties=interpretation.meaning_uncertainties,
         context={
             "active_goal_snapshots": [],
             "goal_association_resolution": {
@@ -175,7 +175,7 @@ def run(base_url: str, *, timeout_s: float) -> dict[str, Any]:
             "turn_id": interpretation.turn_id,
             "responsibility_count": len(interpretation.responsibilities),
             "confidence": interpretation.confidence,
-            "unresolved": list(interpretation.unresolved),
+            "unresolved": list(interpretation.meaning_uncertainties),
         },
         "fast_plan": {
             "plan_id": plan.plan_id,

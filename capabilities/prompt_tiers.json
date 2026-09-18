@@ -65,7 +65,7 @@
     },
     "chromie.weather.lookup": {
       "prompt_tier": "common",
-      "reason": "Current weather and forecast lookup is a common read-only capability that should be visible to fast Goal Interpretation."
+      "reason": "Current weather and forecast lookup is a common read-only capability that should be visible to fast User Meaning Interpretation."
     },
     "chromie.external_information.retrieve": {
       "prompt_tier": "common",

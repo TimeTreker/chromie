@@ -34,7 +34,7 @@
         "rationale": "Overlapping ordinary turns preserve each independent outcome.",
         "root_cause_boundaries": [
           "Test evidence",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]
@@ -59,7 +59,7 @@
         "rationale": "A newer conversational turn does not erase valid unfinished work from the prior turn.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

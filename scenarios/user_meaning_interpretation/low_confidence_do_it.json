@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "id": "low_confidence_do_it",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "Fast UMI preserves the referential request, one Deep UMI pass confirms the action remains semantically unidentified, and UMI does not select a resolution policy.",
+  "tags": [
+    "deep-thought",
+    "low-confidence",
+    "filler-regression"
+  ],
+  "input": {
+    "text": "Please do it."
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.35,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "Please do it.",
+              "confidence": 0.35,
+              "output_mode": "speech",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t3"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": [
+            {
+              "local_ref": "u1",
+              "kind": "other",
+              "description": "The action referred to by it is not identified.",
+              "responsibility_refs": [
+                "r1"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "stage": "user_meaning_interpretation_deep",
+        "decision": {
+          "confidence": 0.35,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "Please do it.",
+              "confidence": 0.35,
+              "output_mode": "speech",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t3"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": [
+            {
+              "local_ref": "u1",
+              "kind": "other",
+              "description": "The action referred to by it is not identified.",
+              "responsibility_refs": [
+                "r1"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.35,
+    "llm_calls": 2,
+    "llm_stages": [
+      "user_meaning_interpretation",
+      "user_meaning_interpretation_deep"
+    ],
+    "unresolved": [
+      "The action referred to by it is not identified."
+    ],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "Please do it.",
+        "confidence": 0.35,
+        "output_mode": "speech"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "An unresolved pronoun remains explicit instead of being guessed.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      }
+    ]
+  }
+}

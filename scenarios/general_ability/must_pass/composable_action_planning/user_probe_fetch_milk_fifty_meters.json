@@ -32,7 +32,7 @@
       "Optional social attention may be absent and must not delay or replace the primary act."
     ],
     "forbidden_semantic_outcomes": [
-      "Omit a requested outcome or violate its requested ordering. A complete compound GI Responsibility may own several Planner Activities.",
+      "Omit a requested outcome or violate its requested ordering. A complete compound UMI Responsibility may own several Planner Activities.",
       "Carry stale context into an unrelated task."
     ],
     "verdicts": [
@@ -58,7 +58,7 @@
         "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
         "rationale": "The bottle, approximate fifty-meter acquisition constraint, and recipient must remain one physical acquire-and-deliver Responsibility rather than fragmented navigation and grasp Goals.",
         "root_cause_boundaries": [
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Trusted Capability Runtime/provider",
           "Test evidence"

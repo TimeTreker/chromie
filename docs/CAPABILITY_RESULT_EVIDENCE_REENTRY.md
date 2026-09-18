@@ -38,7 +38,7 @@ Runtime. Result contents cannot infer their own Goal from provider fields, text
 similarity, location, or recency. Missing immutable Goal provenance fails closed.
 Goal Association is not rerun merely because a provider completed: the authorized
 request already carries the exact Goal provenance. New person-authored meaning still
-enters Gateway -> Goal Interpretation -> Goal Association through the ordinary turn path.
+enters Gateway -> User Meaning Interpretation -> Goal Association through the ordinary turn path.
 
 ## Ownership
 
@@ -129,7 +129,7 @@ the primary prompt/schema/model boundary rather than by adding a same-owner audi
   not promoted to successful factual Evidence.
 - Unknown Goal IDs or a Goal-set mismatch fail closed; result contents never guess
   ownership.
-- Missing or ambiguous originating GI Responsibility provenance fails closed for this
+- Missing or ambiguous originating UMI Responsibility provenance fails closed for this
   cognitive opportunity. The terminal Evidence remains historical truth, but the Host
   does not synthesize a replacement Responsibility merely to obtain a Planner response.
 - Planner output that widens Goals or repeats the just-completed Activity is rejected.
@@ -137,7 +137,7 @@ the primary prompt/schema/model boundary rather than by adding a same-owner audi
   event.
 - When one originating interaction owns multiple Capability requests, Runtime publishes
   and correlates every terminal event immediately. Each terminal sibling may create an
-  exact scoped Planner re-entry, but that transaction receives only its bound GI
+  exact scoped Planner re-entry, but that transaction receives only its bound UMI
   Responsibilities, Goals, source-Plan steps, and Evidence; the retained originating
   UserTurnEnvelope is not replayed because it can contain excluded sibling semantics.
   This preserves incremental follow-up Work without granting authority to narrate a

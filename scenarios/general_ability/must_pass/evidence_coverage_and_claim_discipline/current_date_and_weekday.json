@@ -45,7 +45,7 @@
         "title": "Evidence Coverage And Claim Discipline",
         "general_rule": "Tests should prove the user-visible boundary being claimed and should retain enough trace detail to locate the earliest wrong component.",
         "rationale": "A date-and-weekday question must use the trusted local clock and cover both requested facts rather than guessing from model knowledge.",
-        "root_cause_boundaries": ["Test evidence", "Cognitive Core/goal interpretation", "Agent contract", "Orchestrator policy"]
+        "root_cause_boundaries": ["Test evidence", "Cognitive Core/user meaning interpretation", "Agent contract", "Orchestrator policy"]
       }
     ]
   }

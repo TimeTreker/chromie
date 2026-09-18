@@ -1071,7 +1071,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         response = assistant._cognitive_core_exception_safe_response(
             "你好。",
-            failure_stage="goal_interpretation",
+            failure_stage="user_meaning_interpretation",
             failure_class="InterpretationUnavailableError",
             failure_error="invalid deep interpretation",
         )
@@ -1107,7 +1107,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             captured["errors"],
             [
-                "goal_interpretation:InterpretationUnavailableError: "
+                "user_meaning_interpretation:InterpretationUnavailableError: "
                 "invalid deep interpretation"
             ],
         )

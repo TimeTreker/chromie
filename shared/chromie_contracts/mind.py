@@ -649,7 +649,7 @@ class ExperienceRecord(BaseModel):
     conversation_id: str | None = None
     user_text: str = ""
     interpretation_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
-    interpretation_unresolved: list[str] = Field(default_factory=list)
+    meaning_uncertainties: list[str] = Field(default_factory=list)
     response_status: str = "unknown"
     execution_status: str = "unknown"
     selected_capabilities: list[str] = Field(default_factory=list)

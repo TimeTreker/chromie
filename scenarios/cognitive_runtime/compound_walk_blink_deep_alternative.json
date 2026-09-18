@@ -201,7 +201,7 @@
         "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
         "rationale": "Deep planning can safely revise unfinished compound Work.",
         "root_cause_boundaries": [
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Trusted Capability Runtime/provider",
           "Test evidence"

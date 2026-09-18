@@ -16,7 +16,7 @@ GENERATOR = ROOT / "scripts" / "generate_runtime_env.py"
 MODEL_KEYS = (
     "AGENT_MODEL",
     "OLLAMA_MODEL",
-    "AGENT_GOAL_INTERPRETER_MODEL",
+    "AGENT_USER_MEANING_INTERPRETER_MODEL",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
@@ -141,13 +141,13 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             {"qualification", "services", "speech", "voice_mujoco"},
         )
         for mode_name in ("services", "speech", "voice_mujoco"):
-            with self.subTest(mode=mode_name, budget="goal_interpreter"):
+            with self.subTest(mode=mode_name, budget="user_meaning_interpreter"):
                 self.assertEqual(
-                    modes[mode_name]["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+                    modes[mode_name]["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"],
                     "60000",
                 )
                 self.assertEqual(
-                    modes[mode_name]["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+                    modes[mode_name]["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"],
                     "65000",
                 )
 
@@ -189,15 +189,15 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "voice_mujoco")
         self.assertEqual(values["ORCH_ENABLE_SORIDORMI_CAPABILITIES"], "1")
         self.assertEqual(values["ORCH_ACTION_DRY_RUN"], "false")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "60000")
-        self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "65000")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "65000")
         self.assertEqual(manifest["active_operator_mode"], "voice_mujoco")
         self.assertEqual(
-            manifest["cognitive_budgets"]["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+            manifest["cognitive_budgets"]["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"],
             "65000",
         )
-        self.assertIn("goal_interpreter=60000ms", completed.stdout)
-        self.assertIn("host_goal_interpreter=65000ms", completed.stdout)
+        self.assertIn("user_meaning_interpreter=60000ms", completed.stdout)
+        self.assertIn("host_user_meaning_interpreter=65000ms", completed.stdout)
 
     def test_every_profile_owns_the_complete_model_plan(self) -> None:
         for profile in sorted((ROOT / "env" / "profiles").glob("*.env")):
@@ -245,14 +245,14 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         for key in (
             "OLLAMA_NUM_CTX",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
-            "AGENT_GOAL_INTERPRETER_LLM_NUM_CTX",
+            "AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX",
             "AGENT_GOAL_ASSOCIATION_NUM_CTX",
             "AGENT_FAST_PLANNER_NUM_CTX",
             "AGENT_DEEP_PLANNER_NUM_CTX",
         ):
             self.assertEqual(values[key], "65536", key)
         self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "65536")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "2048")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_FAST_PLANNER_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_PREDICT"], "4096")
@@ -272,14 +272,14 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest["cognitive_budgets"]["CHROMIE_COGNITIVE_BUDGET_PROFILE"],
             "interactive",
         )
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "60000")
-        self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "65000")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "65000")
         self.assertEqual(
-            manifest["cognitive_budgets"]["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+            manifest["cognitive_budgets"]["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"],
             "60000",
         )
         self.assertEqual(
-            manifest["cognitive_budgets"]["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"],
+            manifest["cognitive_budgets"]["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"],
             "65000",
         )
         self.assertEqual(
@@ -322,7 +322,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         served_model = "chromie-qwen35-4b"
         ollama_fallback_model = "qwen3.5:4b"
         self.assertEqual(
-            values["AGENT_GOAL_INTERPRETER_MODEL"],
+            values["AGENT_USER_MEANING_INTERPRETER_MODEL"],
             served_model,
         )
         for key in (
@@ -356,7 +356,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["WARM_OLLAMA_BEFORE_ORCH"], "0")
         self.assertEqual(values["ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED"], "1")
         self.assertEqual(values["ORCH_PRESENTATION_COMPUTE_LEASE_MODE"], "in_place")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_CTX"], "16384")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX"], "16384")
         for key in (
             "OLLAMA_CONTEXT_LENGTH",
             "OLLAMA_NUM_CTX",
@@ -398,12 +398,12 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
                 )
                 self.assertTrue(any(item.event == "llm_prompt_budget_exceeded" for item in oversized))
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "65000")
-        self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "65000")
+        self.assertEqual(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"], "125000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "300000")
@@ -415,8 +415,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_TIMEOUT_MS",
             "ORCH_AGENT_TIMEOUT_MS",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS",
-            "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
-            "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+            "AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
+            "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
             "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
             "AGENT_FAST_PLANNER_TIMEOUT_MS",
             "AGENT_DEEP_PLANNER_TIMEOUT_MS",
@@ -473,8 +473,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["CHROMIE_OPERATOR_MODE"], "qualification")
         self.assertEqual(values["CHROMIE_COGNITIVE_BUDGET_PROFILE"], "qualification")
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_SKILL_SELECTION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_WEATHER_TIMEOUT_S"], "120")
@@ -482,7 +482,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_CTX"], "40960")
-        self.assertEqual(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "150000")
+        self.assertEqual(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"], "150000")
@@ -712,7 +712,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             **os.environ,
             "CHROMIE_ACTIVE_PROFILE": "test",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED": "0",
-            "AGENT_GOAL_INTERPRETER_MODEL": "shared-fast",
+            "AGENT_USER_MEANING_INTERPRETER_MODEL": "shared-fast",
             "AGENT_USE_LLM": "1",
             "AGENT_MODEL": "shared-fast",
             "AGENT_GOAL_ASSOCIATION_ENABLED": "1",

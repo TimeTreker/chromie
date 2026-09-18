@@ -10,9 +10,9 @@ def _text(path: str) -> str:
     return (ROOT / path).read_text(encoding="utf-8")
 
 
-def test_goal_interpretation_prompt_uses_general_rules_not_casebook_literals() -> None:
+def test_user_meaning_interpretation_prompt_uses_general_rules_not_casebook_literals() -> None:
     prompt = _text(
-        "agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt"
+        "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
     )
     for literal in (
         "Chinese `边…边…`",
@@ -32,8 +32,8 @@ def test_goal_interpretation_prompt_uses_general_rules_not_casebook_literals() -
     assert "difference between asking whether" in prompt
 
 
-def test_deep_goal_interpretation_atomicity_rule_is_language_independent() -> None:
-    source = _text("agent/app/cognitive_core/goal_interpreter/model_interpreter.py")
+def test_deep_user_meaning_interpretation_atomicity_rule_is_language_independent() -> None:
+    source = _text("agent/app/cognitive_core/user_meaning_interpreter/model_interpreter.py")
     assert "Chinese 边…边…" not in source
     assert "source" in source
     assert "original" in source
@@ -88,13 +88,13 @@ def test_weather_capability_prompt_metadata_has_no_place_phrase_table() -> None:
 
 
 def test_concrete_cases_remain_as_regression_evidence_outside_production_prompts() -> None:
-    gi_tests = _text("tests/test_goal_interpreter_llm_prompt.py") + "\n".join(
-        p.read_text() for p in (ROOT / "benchmarks/datasets/goal_interpretation_daily_life/scenarios").rglob("*.json"))
+    umi_tests = _text("tests/test_user_meaning_interpreter_llm_prompt.py") + "\n".join(
+        p.read_text() for p in (ROOT / "benchmarks/datasets/user_meaning_interpretation_daily_life/scenarios").rglob("*.json"))
     fast_tests = _text("tests/test_fast_planner_pr3.py")
     ga_tests = _text("tests/test_goal_association_pr2.py") + "\n".join(
         p.read_text() for p in (ROOT / "benchmarks/datasets/goal_association_daily_life/scenarios").rglob("*.json"))
     primary = "\n".join(p.read_text() for p in
-        (ROOT / "benchmarks/datasets/goal_interpreter_primary/scenarios").glob("*.json"))
+        (ROOT / "benchmarks/datasets/user_meaning_interpreter_primary/scenarios").glob("*.json"))
     assert "Sing a short song while waving." in primary
     assert "今晚重庆会不会下雨哦？" in primary
     assert "76%" in fast_tests
@@ -103,8 +103,8 @@ def test_concrete_cases_remain_as_regression_evidence_outside_production_prompts
 
 
 def test_temporal_realization_lives_in_capability_contract_not_gi_or_ga() -> None:
-    gi_prompt = _text(
-        "agent/app/cognitive_core/goal_interpreter/prompts/goal_interpreter_system.txt"
+    umi_prompt = _text(
+        "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
     )
     ga_source = (
         _text("agent/app/goal_association.py")
@@ -125,7 +125,7 @@ def test_temporal_realization_lives_in_capability_contract_not_gi_or_ga() -> Non
         "day_part=night",
         "period=night",
     ):
-        assert retired not in gi_prompt
+        assert retired not in umi_prompt
         assert retired not in ga_source
 
     assert "argument_realization" in weather_block

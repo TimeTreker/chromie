@@ -3,7 +3,7 @@
   "id": "weather_then_repeated_walk_stays_grounded",
   "suite": "cognitive_core_dialogue",
   "level": "integration",
-  "description": "After a weather query, repeated walking requests remain grounded as provider-neutral responsibilities; prior weather context does not pollute the human outcome and Fast Goal Interpretation never selects the walking Capability.",
+  "description": "After a weather query, repeated walking requests remain grounded as provider-neutral responsibilities; prior weather context does not pollute the human outcome and Fast User Meaning Interpretation never selects the walking Capability.",
   "tags": [
     "voice-log",
     "multi-turn",
@@ -21,7 +21,7 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "goal_interpretation",
+            "stage": "user_meaning_interpretation",
             "decision": {
               "confidence": 0.96,
               "responsibilities": [
@@ -33,10 +33,11 @@
                   "source_evidence": {
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t7"
-                  }
+                  },
+                  "continuity_scope": "goal"
                 }
               ],
-              "unresolved": []
+              "meaning_uncertainties": []
             }
           }
         ]
@@ -44,7 +45,7 @@
       "expect": {
         "llm_calls": 1,
         "llm_stages": [
-          "goal_interpretation"
+          "user_meaning_interpretation"
         ],
         "responsibilities": [
           {
@@ -63,7 +64,7 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "goal_interpretation",
+            "stage": "user_meaning_interpretation",
             "decision": {
               "confidence": 0.97,
               "responsibilities": [
@@ -75,10 +76,11 @@
                   "source_evidence": {
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t5"
-                  }
+                  },
+                  "continuity_scope": "goal"
                 }
               ],
-              "unresolved": []
+              "meaning_uncertainties": []
             }
           }
         ]
@@ -86,7 +88,7 @@
       "expect": {
         "llm_calls": 1,
         "llm_stages": [
-          "goal_interpretation"
+          "user_meaning_interpretation"
         ],
         "responsibilities": [
           {
@@ -108,7 +110,7 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "goal_interpretation",
+            "stage": "user_meaning_interpretation",
             "decision": {
               "confidence": 0.97,
               "responsibilities": [
@@ -120,10 +122,11 @@
                   "source_evidence": {
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t5"
-                  }
+                  },
+                  "continuity_scope": "goal"
                 }
               ],
-              "unresolved": []
+              "meaning_uncertainties": []
             }
           }
         ]
@@ -131,7 +134,7 @@
       "expect": {
         "llm_calls": 1,
         "llm_stages": [
-          "goal_interpretation"
+          "user_meaning_interpretation"
         ],
         "responsibilities": [
           {
@@ -160,7 +163,7 @@
         "rationale": "Prior weather context does not contaminate later repeated walking meaning.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Test evidence"
         ]
@@ -171,7 +174,7 @@
         "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
         "rationale": "Repeated walking meaning remains stable across turns.",
         "root_cause_boundaries": [
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Trusted Capability Runtime/provider",
           "Test evidence"
@@ -184,7 +187,7 @@
         "rationale": "Recent context is retained without contaminating the next requested outcome.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

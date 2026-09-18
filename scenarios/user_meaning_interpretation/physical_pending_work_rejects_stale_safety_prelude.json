@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "physical_pending_work_rejects_stale_safety_prelude",
+  "suite": "user_meaning_interpretation",
+  "level": "integration",
+  "description": "UMI preserves pending physical meaning but authors no acknowledgement, progress wording, Capability, or confirmation.",
+  "tags": [
+    "pending-work",
+    "claim-free",
+    "physical-safety",
+    "compatibility-rejection",
+    "zh-CN"
+  ],
+  "input": {
+    "text": "往前走十五秒。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.96,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "往前走十五秒。",
+              "confidence": 0.96,
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t6"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": []
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.96,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "往前走十五秒。",
+        "confidence": 0.96,
+        "output_mode": "body_action"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "truthful_embodied_speech",
+        "title": "Truthful Embodied Speech",
+        "general_rule": "Chromie speech should reflect proposal, confirmation, execution, refusal, cancellation, and provider evidence without claiming uncommitted or impossible work.",
+        "rationale": "UMI cannot author progress or completion wording for pending body work.",
+        "root_cause_boundaries": [
+          "Agent contract",
+          "Orchestrator policy",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

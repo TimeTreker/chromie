@@ -75,21 +75,21 @@ and review rules before broad use.
 
 The existing Memory owner supplies short/current context and relevant retained context.
 The role's question determines relevance; memory age or persistence does not assign a
-semantic responsibility to GI, GA or Planner.
+semantic responsibility to UMI, GA or Planner.
 
 | Role | Core question | Supplied context and Memory |
 | --- | --- | --- |
-| GI | What does the person mean in the current utterance? | Current authoritative wording; recent accepted context, referents and corrections; currently activated relevant historical Memory. |
-| GA | How does that accepted meaning relate to existing Goals? | Accepted GI Responsibilities and any explicit unresolved material; relevant canonical Goals, bounded Goal/progress history and unfulfilled commitments; necessary, disclosure-permitted personal and relational Memory. |
+| UMI | What does the person mean in the current utterance? | Current authoritative wording; recent accepted context, referents and corrections; currently activated relevant historical Memory. |
+| GA | How does that accepted meaning relate to existing Goals? | Accepted UMI Responsibilities and any explicit unresolved material; relevant canonical Goals, bounded Goal/progress history and unfulfilled commitments; necessary, disclosure-permitted personal and relational Memory. |
 | Planner | Given the intent, Goals and actual state, what should happen now? | Relevant Responsibilities and available canonical Goals; prepared, queued, running and completed Work projections; trusted Evidence and delivered/pending communication records; applicable remembered preferences and constraints. |
 
 These are views of existing owners, not three Memory stores or exclusive retrieval
-partitions. GI can use an old fact to resolve a current reference; GA also needs a recent
+partitions. UMI can use an old fact to resolve a current reference; GA also needs a recent
 correction; Planner can need both. Existing Goal snapshots and interaction history supply
-bounded continuity, not a promise of complete historical replay. The initial GI-triggered
+bounded continuity, not a promise of complete historical replay. The initial UMI-triggered
 Planner does not wait for canonical Goal state that GA has not yet committed.
 
-GI preserves a request for current information, a new observation, repeated action or a
+UMI preserves a request for current information, a new observation, repeated action or a
 specific historical result as WHAT. Planner decides whether the available facts satisfy
 that request and whether further Work/Evidence is needed; merely lacking an answer does
 not make the user's meaning unresolved. A clear requirement to observe again cannot be
@@ -97,7 +97,7 @@ fulfilled by substituting an older remembered result. Memory never grants execut
 authority, changes accepted meaning or substitutes remembered intent for completed Work.
 
 `role_memory_context` projects only the already activated, disclosure-filtered
-`session_memory.extracted_memory` entries. GI receives at most four whole entries within
+`session_memory.extracted_memory` entries. UMI receives at most four whole entries within
 2,400 characters; GA and both Planner depths receive at most eight within 4,800 characters.
 Oversized entries are omitted whole, never cut into invalid JSON. Source IDs, confidence,
 scope, persistence policy, consent and expiry travel with the selected entry; raw stores,
@@ -107,7 +107,7 @@ Short/long relevance and volatile/persistent storage are separate axes. Ephemera
 uses the existing conversation/TTL boundaries. Protected durable profile Memory retains
 its existing explicit-consent, expiry, forget and clear rules. A long-running Goal does
 not automatically promote Memory into persistent storage, and using historical Memory
-for GI does not change GI's current-turn WHAT authority. No new memory service or
+for UMI does not change UMI's current-turn WHAT authority. No new memory service or
 persistence default is introduced by these projections.
 
 ## Entry Shape
@@ -246,7 +246,7 @@ PSM-9 reuses Memory rather than adding a Concern/Intention manager. Goal-free co
 Every model-facing component should receive a role-appropriate compact memory
 block.
 
-For the fast Goal Interpreter, keep it very small:
+For the fast User Meaning Interpreter, keep it very small:
 
 ```text
 Memory Summary:
@@ -320,7 +320,7 @@ Memory is interpretive context, not authority.
 4. Future: add an optional LLM-assisted extractor only after the deterministic
    path is covered, with strict JSON output and low temperature.
 5. Implemented first slice: `MemoryPromptBuilder` feeds `session_memory`,
-   sanitized Goal Interpreter prompts, direct fallback context, conversation prompts,
+   sanitized User Meaning Interpreter prompts, direct fallback context, conversation prompts,
    Planner prompts and Reflection context.
 6. Implemented first slice: direct fallback and ordinary conversation prompts
    keep only a tiny recent-turn fallback for immediate reference resolution;
@@ -328,7 +328,7 @@ Memory is interpretive context, not authority.
    instead of raw history.
 7. Implemented first slice: focused tests cover extracted-memory storage,
    reset and hard-idle expiry, keyed correction updates, explicit typed memory
-   updates, trusted outcome memory, Goal Interpreter prompt sanitization,
+   updates, trusted outcome memory, User Meaning Interpreter prompt sanitization,
    conversation/Planner prompt migration, and Deep Planner Memory visibility.
 8. Implemented: terminal Goal history may feed evidence-grounded local
    `experience`/`calibration` proposals without reopening or rewriting the old Goal.
@@ -349,7 +349,7 @@ The first implemented slice should prove:
 
 - the next turn receives compact extracted memory for a multi-turn task;
 - raw transcript turns are not injected into Deep Planner as the normal path;
-- fast Goal Interpreter receives a small memory summary, not the full chat;
+- fast User Meaning Interpreter receives a small memory summary, not the full chat;
 - a user correction revises the memory summary used by the next turn;
 - runtime-confirmed outcomes can update task memory;
 - model speech alone cannot mark a physical action as completed;

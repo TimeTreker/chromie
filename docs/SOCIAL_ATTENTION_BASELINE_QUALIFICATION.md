@@ -43,7 +43,7 @@ Missing, duplicate, unexpected, or scope-mismatched results fail closed.
 
 ### Default model topology
 
-The RTX 5090 hardware profile declares `qwen3.5:9b` for Goal Interpretation,
+The RTX 5090 hardware profile declares `qwen3.5:9b` for User Meaning Interpretation,
 Fast Planning, and terminal Evidence re-entry; Goal Association and Deep Planning
 use `gemma4:12b`. Social Attention has no model role of its own: its effective
 model is the Fast or Deep Planner model that authored the containing Plan. The

@@ -71,10 +71,6 @@ class ServiceReadinessGate:
         if not self.get_http_session:
             return
         session = await self.get_http_session()
-        if self.llm_url:
-            # Ollama generate endpoint may not support GET; skip strict LLM check here.
-            logger.info("LLM URL configured: %s model=%s", self.llm_url, self.ollama_model)
-
         if self.enable_agent and self.agent_url:
             async with session.get(f"{self.agent_url}/health", timeout=aiohttp.ClientTimeout(total=3)) as resp:
                 if resp.status != 200:

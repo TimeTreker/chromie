@@ -249,8 +249,8 @@ class ExperienceManagerTests(unittest.TestCase):
                 metadata={
                     "experience_context": {
                         "user_text": "Please blink your eyes.",
-                        "goal_interpretation_confidence": 0.86,
-                        "goal_interpretation_unresolved": [],
+                        "user_meaning_interpretation_confidence": 0.86,
+                        "user_meaning_uncertainties": [],
                         "conversation_id": "local_default",
                     }
                 },
@@ -300,7 +300,7 @@ class ExperienceManagerTests(unittest.TestCase):
                 metadata={
                     "experience_context": {
                         "user_text": "Please do the impossible task.",
-                        "goal_interpretation_confidence": 0.9,
+                        "user_meaning_interpretation_confidence": 0.9,
                         "intent": "unknown",
                     }
                 }

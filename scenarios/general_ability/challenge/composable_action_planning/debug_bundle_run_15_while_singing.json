@@ -32,7 +32,7 @@
       "Optional social attention may be absent and must not delay or replace the primary act."
     ],
     "forbidden_semantic_outcomes": [
-      "Omit a requested outcome or violate its requested ordering. A complete compound GI Responsibility may own several Planner Activities.",
+      "Omit a requested outcome or violate its requested ordering. A complete compound UMI Responsibility may own several Planner Activities.",
       "Carry stale context into an unrelated task."
     ],
     "verdicts": [
@@ -62,7 +62,7 @@
         "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
         "rationale": "Retained 2026-08-19 debug-bundle episode: forward locomotion and singing remain separate Goals; the maintained forward-motion provider may cover the 15-second body Goal, while unavailable singing must be explicit and ordinary TTS or an execution-start claim cannot substitute for it.",
         "root_cause_boundaries": [
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Trusted Capability Runtime/provider",
           "Test evidence"

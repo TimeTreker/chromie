@@ -44,7 +44,7 @@
         "title": "Stable Capability Grounding",
         "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
         "rationale": "A direct request to bow should use the catalog-backed bow gesture without substituting a nod or verbal greeting.",
-        "root_cause_boundaries": ["Cognitive Core/goal interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
+        "root_cause_boundaries": ["Cognitive Core/user meaning interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
       }
     ]
   }

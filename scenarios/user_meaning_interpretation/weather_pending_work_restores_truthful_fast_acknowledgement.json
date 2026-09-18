@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "id": "weather_pending_work_restores_truthful_fast_acknowledgement",
+  "suite": "user_meaning_interpretation",
+  "level": "integration",
+  "description": "UMI preserves the Beijing rain question and fresh-evidence requirement; Fast Planner separately authors a truthful progress Communicative Act and owns its exact wording.",
+  "tags": [
+    "reported-live-voice",
+    "weather",
+    "evidence-before-claim",
+    "pending-work",
+    "zh-CN"
+  ],
+  "input": {
+    "text": "今天北京下雨了没有？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.95,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "今天北京下雨了没有？",
+              "confidence": 0.95,
+              "output_mode": "information",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t9"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": []
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.95,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "今天北京下雨了没有？",
+        "confidence": 0.95,
+        "output_mode": "information"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "Weather remains pending fresh Evidence at the UMI boundary.",
+        "root_cause_boundaries": [
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

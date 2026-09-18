@@ -206,8 +206,8 @@ is its executable coding-agent entrypoint; the method document remains authorita
    ```
 
 3. Reconstruct the actual turn from the workflow artifacts: admitted input and
-   Gateway decision; Goal Interpretation; independent SC communication,
-   Goal Association and complete Fast Work planning from the same GI result;
+   Gateway decision; User Meaning Interpretation; independent SC communication,
+   Goal Association and complete Fast Work planning from the same UMI result;
    optional Deep planning when actually invoked; deterministic Goal binding;
    Trusted Capability Runtime and provider work; Host-bound Evidence re-entry into
    Planner and SC; and actual delivered speech or effect. Include optional Agent Skill and

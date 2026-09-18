@@ -26,7 +26,7 @@ preserve enough evidence to answer:
 
 - What did the user say?
 - What did ASR produce?
-- What Responsibility and canonical Goal did Goal Interpretation / Goal Association preserve?
+- What Responsibility and canonical Goal did User Meaning Interpretation / Goal Association preserve?
 - What did the Agent say?
 - Which skills did the Agent select?
 - Did those skills preserve the user's intent?
@@ -91,7 +91,7 @@ Recommended top-level shape:
       "sid": "1ae17a72",
       "asr_text": "Walk forward for 15 seconds, quickly.",
       "operator_text": null,
-      "goal_interpretation": {
+      "user_meaning_interpretation": {
         "confidence": 0.95,
         "responsibilities": [
           {
@@ -134,7 +134,7 @@ Recommended top-level shape:
 
 `operator_text` is optional. It can be used when a supervised acceptance harness
 knows the intended phrase and wants to distinguish ASR failure from
-Goal Interpreter/Agent failure.
+User Meaning Interpreter/Agent failure.
 
 When `chromie.interaction_session_capture` is enabled for a SID, Episode and turn
 metadata preserve a bounded `interaction_session_evidence` reference. It
@@ -154,7 +154,7 @@ thread:
 - infer the user's likely intent from the turn and prior context;
 - compare canonical Goal meaning, Planner speech/work, selected skills, and execution against that intent;
 - notice when the robot used a social/body fallback for an unrelated task;
-- separate ASR, Goal Interpreter, Agent, Trusted Capability Runtime, TTS, and latency problems;
+- separate ASR, User Meaning Interpreter, Agent, Trusted Capability Runtime, TTS, and latency problems;
 - recommend whether the episode should become a regression scenario.
 
 The evaluator output should be structured JSON:
@@ -304,7 +304,7 @@ Promotion flow:
 2. Developer or owner reviews the candidate and edits deterministic
    expectations.
 3. Candidate is promoted into the applicable maintained suite:
-   `scenarios/goal_interpretation`, `scenarios/cognitive_core_dialogue`,
+   `scenarios/user_meaning_interpretation`, `scenarios/cognitive_core_dialogue`,
    `scenarios/cognitive_runtime`, or `scenarios/cognitive_turn_loop`.
 4. `python scripts/scenario_author.py validate-all` and the relevant scenario
    runner gate must pass.

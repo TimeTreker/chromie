@@ -2,7 +2,7 @@ from __future__ import annotations
 
 GOAL_PROGRESS_COMMUNICATION_PRINCIPLE = (
     "Goal Progress Communication is user-facing task-process communication across the full "
-    "Goal lifecycle. Goal Interpretation owns only provider-neutral Responsibility meaning "
+    "Goal lifecycle. User Meaning Interpretation owns only provider-neutral Responsibility meaning "
     "and never authors speech or a progress Activity. Fast Planner is the first HOW owner: "
     "after Responsibility meaning is sufficient, it may choose one tiny immediately-ready "
     "prospective Communicative Act when downstream work remains. Before trusted result "

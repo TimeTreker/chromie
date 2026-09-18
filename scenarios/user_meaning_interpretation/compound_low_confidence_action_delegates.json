@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "id": "compound_low_confidence_action_delegates",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "UMI preserves every requested outcome and its uncertainty; Fast Planner, not UMI, decides whether complex HOW needs Deep Planner.",
+  "tags": [
+    "cognitive-core-agent-contract",
+    "compound",
+    "per-action-confidence",
+    "deep-thought-handoff",
+    "daily-life"
+  ],
+  "input": {
+    "text": "Please walk forward for 20 seconds, blink six times, and tell me a joke while walking.",
+    "language": "en-US"
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.31,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "Please walk forward for 20 seconds",
+              "confidence": 0.72,
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t5"
+              },
+              "continuity_scope": "goal"
+            },
+            {
+              "local_ref": "r2",
+              "outcome": "blink six times",
+              "confidence": 0.7,
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t7",
+                "source_end_token_ref": "t9"
+              },
+              "continuity_scope": "goal"
+            },
+            {
+              "local_ref": "r3",
+              "outcome": "and tell me a joke while walking",
+              "confidence": 0.31,
+              "output_mode": "speech",
+              "source_evidence": {
+                "source_start_token_ref": "t12",
+                "source_end_token_ref": "t17"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": []
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.31,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "Please walk forward for 20 seconds",
+        "confidence": 0.72,
+        "output_mode": "body_action",
+        "source_evidence": {
+          "source_start_token_ref": "t0",
+          "source_end_token_ref": "t5"
+        }
+      },
+      {
+        "local_ref": "r2",
+        "outcome": "blink six times",
+        "confidence": 0.7,
+        "output_mode": "body_action",
+        "source_evidence": {
+          "source_start_token_ref": "t7",
+          "source_end_token_ref": "t9"
+        }
+      },
+      {
+        "local_ref": "r3",
+        "outcome": "and tell me a joke while walking",
+        "confidence": 0.31,
+        "output_mode": "speech",
+        "source_evidence": {
+          "source_start_token_ref": "t12",
+          "source_end_token_ref": "t17"
+        }
+      }
+    ]
+  }
+}

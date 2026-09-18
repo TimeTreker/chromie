@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "id": "user_meaning_interpretation_joke_discourse_marker",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "Discourse marker 'go ahead' does not become locomotion.",
+  "tags": [
+    "chat",
+    "discourse-marker",
+    "motion-confusion"
+  ],
+  "input": {
+    "text": "Go ahead and tell me a short joke about robots."
+  },
+  "stub": {
+    "llm_decision": {
+      "confidence": 0.91,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "tell the user a short joke about robots",
+          "bindings": {
+            "topic": "robots",
+            "length": "short"
+          },
+          "confidence": 0.91,
+          "output_mode": "speech",
+          "continuity_scope": "goal"
+        }
+      ],
+      "meaning_uncertainties": []
+    }
+  },
+  "expect": {
+    "confidence": 0.91,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "tell the user a short joke about robots",
+        "confidence": 0.91,
+        "output_mode": "speech"
+      }
+    ]
+  }
+}

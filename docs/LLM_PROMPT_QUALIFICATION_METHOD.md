@@ -4,7 +4,7 @@ Status: Required method for qualifying a complete Chromie semantic-model-role
 transaction and optimizing only its evidenced defective owner
 
 Audience: project owners, coding agents, prompt reviewers, benchmark authors, and
-operators qualifying Goal Interpretation, Goal Association, Fast/Deep Planner, or
+operators qualifying User Meaning Interpretation, Goal Association, Fast/Deep Planner, or
 another bounded LLM authority
 
 Owner: Chromie model-role qualification methodology. The component prompt, DTO,
@@ -12,7 +12,7 @@ Schema, Host validator, benchmark corpus, and acceptance documents remain
 authoritative for their own facts.
 
 This document is the reusable method distilled from the completed Goal
-Interpretation (GI) and Goal Association (GA) model-role investigations. It exists
+Interpretation (UMI) and Goal Association (GA) model-role investigations. It exists
 as a separate owner because no existing document owns the complete cross-component
 sequence from authority audit through frozen-corpus inference, adjudication,
 root-cause classification, minimal iteration, full rerun, and handoff. It does not
@@ -491,22 +491,22 @@ evidenced boundary, or when reviewer analysis recommends no prompt change and
 remaining differences are oracle/model/contract issues. A maximum iteration budget
 is a safety bound, not a target to consume.
 
-## 6. Lessons retained from GI and GA
+## 6. Lessons retained from UMI and GA
 
 These results demonstrate the method; they are not permanent release thresholds.
 
 | Investigation | What happened | Reusable lesson |
 |---|---|---|
-| GI daily-life cohort | 1,496 bilingual, production-shaped cases were kept as separate files and organized into contrast sets. Broad prompt experiments regressed decomposition/source semantics; the selected fifth iteration retained 1,496/1,496 Schema/Host passes and no further prompt-change recommendation. Some reference and reviewer judgments were themselves wrong. | More prompt text is not automatically better. Protect source truth, audit references and graders, compare whole contrast sets, and stop when remaining errors are not a shared prompt boundary. |
-| GI genuine-unresolved subset | The 68 source-based Deep-GI cases were qualified separately from the resolved primary path. | Conditional deeper cognition needs its own input contract, corpus, and claim; do not average it into the common path. |
+| UMI daily-life cohort | 1,496 bilingual, production-shaped cases were kept as separate files and organized into contrast sets. Broad prompt experiments regressed decomposition/source semantics; the selected fifth iteration retained 1,496/1,496 Schema/Host passes and no further prompt-change recommendation. Some reference and reviewer judgments were themselves wrong. | More prompt text is not automatically better. Protect source truth, audit references and graders, compare whole contrast sets, and stop when remaining errors are not a shared prompt boundary. |
+| UMI genuine-unresolved subset | The 68 source-based Deep-UMI cases were qualified separately from the resolved primary path. | Conditional deeper cognition needs its own input contract, corpus, and claim; do not average it into the common path. |
 | GA baseline | The target-blind Codex batch passed the then-current dynamic Schema in 1,500/1,500 cases, but 36 `modify_active` results failed the real Host because the semantic change existed only in `reason_summary`. | Schema pass alone is insufficient. Always execute the downstream DTO/Host boundary and compare authoritative field ownership. |
 | GA local fix | The existing semantic-update invariant was moved into dynamic Schema and next to relationship selection in the local prompt. The exact 36 failures passed, then the full supported cohort passed 1,400/1,400 with zero repair attempts. | Align prompt and decoder at the earliest boundary; prove the hypothesis on failures, then rerun the complete frozen cohort. |
-| GA global contract fix | 100 cases required continuing one Goal and creating an independent Goal in one turn, but the exclusive `associate | create_goals` DTO could not express both. After explicit owner authorization, the redundant discriminant was removed; candidate-aware GA now writes both non-exclusive collections directly, and decoder/Host conservation requires each GI Responsibility exactly once across their union. All 1,500 corpus references then passed the exact Schema/DTO/Host path. This is mechanical offline contract evidence; target-blind model inference was not rerun by that result. | Never optimize wording around an impossible output contract. Preserve the scenario, escalate the global DTO decision, repair the earliest representational boundary, and keep source closure distinct from model qualification. |
+| GA global contract fix | 100 cases required continuing one Goal and creating an independent Goal in one turn, but the exclusive `associate | create_goals` DTO could not express both. After explicit owner authorization, the redundant discriminant was removed; candidate-aware GA now writes both non-exclusive collections directly, and decoder/Host conservation requires each UMI Responsibility exactly once across their union. All 1,500 corpus references then passed the exact Schema/DTO/Host path. This is mechanical offline contract evidence; target-blind model inference was not rerun by that result. | Never optimize wording around an impossible output contract. Preserve the scenario, escalate the global DTO decision, repair the earliest representational boundary, and keep source closure distinct from model qualification. |
 | Same-model Codex review | Codex supplied strong offline inference and post-hoc judgment, but the reviewer was not independent and occasionally misread valid Schema fields. | Retain same-model judgment as diagnostic evidence and keep its errors visible; independent qualification remains a separate claim. |
 
 The retained corpora are:
 
-- [Goal Interpretation Daily-Life Dataset](../benchmarks/datasets/goal_interpretation_daily_life/README.md)
+- [User Meaning Interpretation Daily-Life Dataset](../benchmarks/datasets/user_meaning_interpretation_daily_life/README.md)
 - [Goal Association Daily-Life Corpus](../benchmarks/datasets/goal_association_daily_life/README.md)
 
 ## 7. Applying the method to Fast and Deep Planner
@@ -535,7 +535,7 @@ Fast primary/common path
 
 Planner scenarios must use production-shaped inputs containing, as applicable:
 
-- accepted GI Responsibilities and source evidence;
+- accepted UMI Responsibilities and source evidence;
 - GA-committed canonical Goals and their lifecycle/open gaps;
 - exact available Capability and Agent Skill projections;
 - current Plan/Work state and Planner re-entry scope;

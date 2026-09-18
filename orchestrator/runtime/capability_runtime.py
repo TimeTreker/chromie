@@ -450,7 +450,7 @@ class CapabilityRuntime:
         async with self._active_lock:
             existing = self._prepared_planner_work.get(turn_id)
             if existing is not None and existing != activities:
-                raise ValueError("one GI planning task cannot replace its prepared result")
+                raise ValueError("one UMI planning task cannot replace its prepared result")
             self._prepared_planner_work[turn_id] = copy.deepcopy(activities)
 
     async def discard_prepared_planner_work(self, turn_id: str) -> None:

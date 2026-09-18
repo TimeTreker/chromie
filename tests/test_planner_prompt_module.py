@@ -356,5 +356,5 @@ def test_planner_source_handoff_survives_transport_without_truncation(stage):
     assert source["original_text_sha256"] == hashlib.sha256(original.encode()).hexdigest()
     assert source["turn_id"] == "original-turn"
     assert source["authority"] == "read_only_source_provenance"
-    assert ("GI Responsibilities" if stage == "advance" else "FINAL CANONICAL GOALS") in header
+    assert ("UMI Responsibilities" if stage == "advance" else "FINAL CANONICAL GOALS") in header
     assert str(prompt).count(json.dumps(original, ensure_ascii=False)) == 1

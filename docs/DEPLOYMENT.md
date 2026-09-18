@@ -37,7 +37,7 @@ The Chromie deploy script:
   are missing;
 - generates `.env.runtime`;
 - pulls the external Ollama image;
-- builds Chromie-owned ASR, TTS, and Agent images; the Goal Interpreter is embedded in Agent;
+- builds Chromie-owned ASR, TTS, and Agent images; the User Meaning Interpreter is embedded in Agent;
 - runs `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh`.
 
 ## Start Separately

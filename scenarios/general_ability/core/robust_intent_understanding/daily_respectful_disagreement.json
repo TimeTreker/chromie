@@ -63,7 +63,7 @@
         "rationale": "Normalize respectful disagreement and shared choice without inventing either person's preference or making agreement mandatory.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Test evidence"
         ]

@@ -29,7 +29,10 @@ def capture_cognitive_integrity_exception(*, stage: str, exc: Exception, request
     responsibilities = getattr(request, "responsibilities", []) or []
     interpretation = {
         "confidence": getattr(request, "interpretation_confidence", None),
-        "unresolved": list(getattr(request, "interpretation_unresolved", []) or []),
+        "meaning_uncertainties": [
+            item.model_dump(mode="json")
+            for item in (getattr(request, "meaning_uncertainties", []) or [])
+        ],
         "responsibilities": [
             item.model_dump(mode="json", exclude_none=True)
             if hasattr(item, "model_dump") else item

@@ -1,6 +1,6 @@
 ---
 name: qualify-chromie-semantic-transaction
-description: Qualify and improve complete Chromie semantic model-role transactions through authority audit, a coverage-designed frozen contrast corpus, target-blind inference, Schema/DTO/Host adjudication, earliest-boundary diagnosis, authorized minimal repair, focused proof, full reruns, and evidence handoff. Use whenever Codex is asked to audit, evaluate, tune, qualify, compare, or optimize Goal Interpretation, Goal Association, Fast/Deep Planner, Agent Skill Selection, Attention Review, Reflection, or another Chromie semantic role, prompt, context projection, Schema, DTO, Host validator, model profile, or model-facing transaction. Do not imply that the candidate model itself is an optimization target.
+description: Qualify and improve complete Chromie semantic model-role transactions through authority audit, a coverage-designed frozen contrast corpus, target-blind inference, Schema/DTO/Host adjudication, earliest-boundary diagnosis, authorized minimal repair, focused proof, full reruns, and evidence handoff. Use whenever Codex is asked to audit, evaluate, tune, qualify, compare, or optimize User Meaning Interpretation, Goal Association, Fast/Deep Planner, Agent Skill Selection, Attention Review, Reflection, or another Chromie semantic role, prompt, context projection, Schema, DTO, Host validator, model profile, or model-facing transaction. Do not imply that the candidate model itself is an optimization target.
 ---
 
 # Qualify a Chromie Semantic Model Role

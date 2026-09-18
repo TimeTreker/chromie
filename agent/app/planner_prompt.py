@@ -74,7 +74,7 @@ CAPABILITY_LOOKUP_PROMPT = (
 
 EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "Planner owns decomposition of complete intent into Activities, Capability choice, "
-    "arguments, units, dependencies and scheduling. GI supplies complete "
+    "arguments, units, dependencies and scheduling. UMI supplies complete "
     "natural-language intent, not an argument table. Preserve every requested action, "
     "modifier and relation. One Responsibility may require several Activities. "
     "Use exact numeric values when the Capability units agree; normalize number words "
@@ -109,11 +109,11 @@ def immutable_source_turn_prompt(
 
     source = request.source_turn_provenance
     unresolved = (
-        "\n\nGI unresolved-meaning evidence (exact strings or empty):\n"
+        "\n\nUMI semantic uncertainty evidence (exact objects or empty):\n"
         + required_json(
-            request.interpretation_unresolved,
+            [item.model_dump(mode="json") for item in request.meaning_uncertainties],
             None,
-            label="GI unresolved-meaning evidence",
+            label="UMI semantic uncertainty evidence",
         )
     )
     original_text = str(source["original_text"])
@@ -129,7 +129,7 @@ def immutable_source_turn_prompt(
     return (
         "IMMUTABLE SOURCE TURN JSON (read-only; "
         f"{what_authority} own WHAT; Planner may use complete intent and exact source "
-        "to realize HOW, never reinterpret or repair WHAT, add omitted outcomes or resolve GI ambiguity):\n"
+        "to realize HOW, never reinterpret or repair WHAT, add omitted outcomes or resolve UMI ambiguity):\n"
         f"{projection}{unresolved}"
     )
 
@@ -254,7 +254,9 @@ def _canonical_work_prompt(
         "Goal association": goal_association_prompt_projection(context, goal_ids=scope if request.planner_reentry_scope else None),
         "Scoped canonical Goals": list(goals.authoritative_goals),
         "Original Responsibilities": [item.model_dump(mode="json") for item in request.responsibilities],
-        "Unresolved interpretation": list(request.interpretation_unresolved),
+        "UMI semantic uncertainty": [
+            item.model_dump(mode="json") for item in request.meaning_uncertainties
+        ],
         "Re-entry scope": request.planner_reentry_scope.model_dump(mode="json") if request.planner_reentry_scope else None,
         "Prior dialogue": recent_dialogue_prompt_projection(request.history),
         "language": request.language,
@@ -418,7 +420,7 @@ def fast_advance_layered_prompt(
 ) -> LayeredPrompt:
     context = request.context if isinstance(request.context, dict) else {}
     contract = PLANNER_WORK_AUTHORITY_PROMPT + (
-        "GI owns WHAT. This Fast invocation decides Work over exact Responsibility refs while "
+        "UMI owns WHAT. This Fast invocation decides Work over exact Responsibility refs while "
         "GA independently binds canonical Goals. Produce one complete Work DTO. No presentation "
         "wording or decoration; SC communicates independently. "
         "Use role=capability for direct executable task Work: activity_id, exact capability_id, "
@@ -455,7 +457,7 @@ def fast_advance_layered_prompt(
         "context, observation/query, preference, schema defaults and safe bounded defaults. "
         "Each gap cites exact unresolved_meaning or execution_input Capability, required_for and "
         "resolution_sources_considered. Supplied bindings/defaults are not missing. "
-        "Preserve every GI unresolved item; independent siblings may proceed as mixed. "
+        "Preserve every UMI unresolved item; independent siblings may proceed as mixed. "
         "Cover every source ref exactly and give each terminal Responsibility one outcome. "
         "Preserve before/after/precedes/follows/parallel_with in Activity order and timing. "
         "Ordered Activities, including communication Needs, use timing=sequential. Physical Work "
@@ -468,7 +470,9 @@ def fast_advance_layered_prompt(
     )
     facts = {
         "responsibilities": [item.model_dump(mode="json", exclude_defaults=True) for item in responsibilities],
-        "interpretation_unresolved": list(request.interpretation_unresolved),
+        "meaning_uncertainties": [
+            item.model_dump(mode="json") for item in request.meaning_uncertainties
+        ],
         "goal_continuity": fast_goal_continuity_projection(context),
         "context": {key: context.get(key) for key in (
             "interaction_context", "existing_work_activities", "active_task_snapshots",
@@ -491,7 +495,7 @@ def fast_advance_layered_prompt(
         + agent_skill_prompt_section(context, agent_role="fast_planner")
         + trusted_target_evidence_prompt_section(context)
         + "\nTrusted source facts JSON:\n" + required_json(facts, None, label="Fast complete Work source facts")
-        + "\n" + immutable_source_turn_prompt(request, what_authority="GI Responsibilities")
+        + "\n" + immutable_source_turn_prompt(request, what_authority="UMI Responsibilities")
     )
     return LayeredPrompt.promote(rendered, operating_contract=(contract,))
 

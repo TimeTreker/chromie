@@ -34,10 +34,10 @@ Create and validate scenarios with:
 
 ```bash
 python scripts/scenario_author.py templates
-python scripts/scenario_author.py new --suite goal_interpretation --id draft_case \
+python scripts/scenario_author.py new --suite user_meaning_interpretation --id draft_case \
   --text "Hello Chromie."
-python scripts/scenario_author.py edit --suite goal_interpretation --id draft_case
-python scripts/scenario_author.py validate scenarios/goal_interpretation/draft_case.json
+python scripts/scenario_author.py edit --suite user_meaning_interpretation --id draft_case
+python scripts/scenario_author.py validate scenarios/user_meaning_interpretation/draft_case.json
 python scripts/scenario_author.py validate-all
 ```
 
@@ -55,7 +55,7 @@ the deterministic judge.
 
 ```text
 scenarios/
-  goal_interpretation/  Goal Interpretation module and scripted-model recovery scenarios
+  user_meaning_interpretation/  User Meaning Interpretation module and scripted-model recovery scenarios
   cognitive_core_dialogue/  Multi-turn Cognitive Core replay scenarios
   interaction/      InteractionRuntime scenarios
   dialogue/         Multi-turn InteractionRuntime conversation scenarios
@@ -66,7 +66,7 @@ scenarios/
 ```
 
 Each file contains exactly one scenario object. The file stem must match the
-scenario `id`; for example `goal_interpretation/normal_greeting.json` must contain
+scenario `id`; for example `user_meaning_interpretation/normal_greeting.json` must contain
 `"id": "normal_greeting"`.
 
 The maintained scenario registry is defined by `scripts/behavior_scenarios.py`.
@@ -76,21 +76,21 @@ Responsibility → canonical Goal → Planner → Capability/Evidence contracts.
 behavior belongs in maintained suites that exercise the current typed owners directly.
 
 
-### Scripted bounded Goal Interpretation scenarios
+### Scripted bounded User Meaning Interpretation scenarios
 
-Goal Interpretation fixtures may use `stub.llm_script` instead of one final
+User Meaning Interpretation fixtures may use `stub.llm_script` instead of one final
 `stub.llm_decision`. The scenario runner then executes the real bounded
-`OllamaGoalInterpreter.route()` normalization and validation transaction while
+`OllamaUserMeaningInterpreter.route()` normalization and validation transaction while
 replacing only external model completions. A script contains one primary stage.
 When that accepted result retains genuine consequential `unresolved` meaning, it
-may contain one source-based `goal_interpretation_deep` stage; an invalid primary
+may contain one source-based `user_meaning_interpretation_deep` stage; an invalid primary
 or Deep DTO fails closed without a same-authority repair stage:
 
 ```json
 {
   "llm_script": [
     {
-      "stage": "goal_interpretation",
+      "stage": "user_meaning_interpretation",
       "decision": {
         "confidence": 0.85,
         "responsibilities": [
@@ -115,14 +115,14 @@ or Deep DTO fails closed without a same-authority repair stage:
 }
 ```
 
-Standalone Goal Interpretation scenarios may also set `stub.context` to replay bounded host
+Standalone User Meaning Interpretation scenarios may also set `stub.context` to replay bounded host
 request context, such as `interaction_engagement`. This context is passed to
-the real Goal Interpretation pipeline; it must be a JSON object and should contain only the
+the real User Meaning Interpretation pipeline; it must be a JSON object and should contain only the
 minimum fields needed to reproduce the boundary under test.
 
 `cognitive_core_dialogue` scenarios run ordered Cognitive Core turns with one bounded
 conversation-state snapshot. A turn may set `run_interaction=true` to pass the
-final Goal Interpretation decision through the dependency-light native InteractionRuntime
+final User Meaning Interpretation decision through the dependency-light native InteractionRuntime
 and assert emitted skills and arguments. This is deterministic Level A replay,
 not a live-model, microphone, simulator, or robot claim.
 

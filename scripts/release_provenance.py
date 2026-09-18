@@ -304,11 +304,11 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
         )
     inference_provider = str(common.get("AGENT_LLM_PROVIDER") or "ollama").strip().casefold()
     if inference_provider == "ollama":
-        goal_interpreter_model = common.get("AGENT_GOAL_INTERPRETER_MODEL")
-        if goal_interpreter_model and goal_interpreter_model not in set(
-            ollama.get("goal_interpreter_models", [])
+        user_meaning_interpreter_model = common.get("AGENT_USER_MEANING_INTERPRETER_MODEL")
+        if user_meaning_interpreter_model and user_meaning_interpreter_model not in set(
+            ollama.get("user_meaning_interpreter_models", [])
         ):
-            errors.append("AGENT_GOAL_INTERPRETER_MODEL is absent from release/model-lock.json")
+            errors.append("AGENT_USER_MEANING_INTERPRETER_MODEL is absent from release/model-lock.json")
     elif inference_provider == "sglang":
         served = lock.get("sglang", {}).get("candidate_served_models", {})
         if not isinstance(served, dict) or not served:
@@ -316,7 +316,7 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
         else:
             sglang_model_keys = (
                 "AGENT_MODEL",
-                "AGENT_GOAL_INTERPRETER_MODEL",
+                "AGENT_USER_MEANING_INTERPRETER_MODEL",
                 "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
                 "AGENT_GOAL_ASSOCIATION_MODEL",
                 "AGENT_FAST_PLANNER_MODEL",
@@ -414,7 +414,7 @@ def collect_provenance(
         try:
             resolved_ollama = ollama_models(
                 env.get("OLLAMA_URL", "http://127.0.0.1:11434"),
-                [env.get("AGENT_MODEL", "gemma4:e2b"), env.get("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b")],
+                [env.get("AGENT_MODEL", "gemma4:e2b"), env.get("AGENT_USER_MEANING_INTERPRETER_MODEL", "qwen3:4b")],
             )
         except Exception as exc:  # release diagnostics should preserve all failures
             runtime_errors.append(f"could not capture Ollama model digests: {exc}")

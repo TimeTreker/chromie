@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from agent.app.settings import GoalInterpreterSettings, Settings
+from agent.app.settings import UserMeaningInterpreterSettings, Settings
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,20 +44,20 @@ class AgentSettingsTests(unittest.TestCase):
         self.assertFalse(hasattr(settings, "fast_first_response_model"))
         self.assertFalse(hasattr(settings, "fast_first_response_timeout_ms"))
 
-    def test_goal_interpreter_deep_pass_retains_its_own_model_authority(self) -> None:
+    def test_user_meaning_interpreter_deep_pass_retains_its_own_model_authority(self) -> None:
         with patch.dict(
             os.environ,
             {
-                "AGENT_GOAL_INTERPRETER_TIMEOUT_MS": "7777",
-                "AGENT_GOAL_INTERPRETER_MODEL": "fast-gi",
+                "AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS": "7777",
+                "AGENT_USER_MEANING_INTERPRETER_MODEL": "fast-umi",
                 "AGENT_DEEP_PLANNER_MODEL": "deep-cognition",
             },
             clear=False,
         ):
-            settings = GoalInterpreterSettings()
+            settings = UserMeaningInterpreterSettings()
         self.assertEqual(settings.timeout_ms, 7777)
-        self.assertEqual(settings.model, "fast-gi")
-        self.assertEqual(settings.deep_model, "fast-gi")
+        self.assertEqual(settings.model, "fast-umi")
+        self.assertEqual(settings.deep_model, "fast-umi")
         self.assertFalse(hasattr(settings, "mode"))
         self.assertFalse(hasattr(settings, "capability_catalog_url"))
         self.assertFalse(hasattr(settings, "review_timeout_ms"))

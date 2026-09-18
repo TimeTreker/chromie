@@ -139,11 +139,11 @@ def _foreground_window_ms(phase: dict[str, Any]) -> float | None:
     requests = phase.get("requests")
     if not isinstance(requests, dict):
         return None
-    fast_gi = requests.get("fast_gi_canary")
+    fast_umi = requests.get("fast_umi_canary")
     fast_planner = requests.get("fast_planner_canary")
-    if not isinstance(fast_gi, dict) or not isinstance(fast_planner, dict):
+    if not isinstance(fast_umi, dict) or not isinstance(fast_planner, dict):
         return None
-    started = _number(fast_gi, "started_s")
+    started = _number(fast_umi, "started_s")
     finished = _number(fast_planner, "finished_s")
     if started is None or finished is None or finished < started:
         return None
@@ -199,11 +199,11 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
 
     metrics = {
         "foreground_window_ms": distribution(foreground_windows),
-        "fast_gi_ttft_ms": distribution(
-            _metric_values(typed_phases, "requests", "fast_gi_canary", "ttft_ms")
+        "fast_umi_ttft_ms": distribution(
+            _metric_values(typed_phases, "requests", "fast_umi_canary", "ttft_ms")
         ),
-        "fast_gi_elapsed_ms": distribution(
-            _metric_values(typed_phases, "requests", "fast_gi_canary", "elapsed_ms")
+        "fast_umi_elapsed_ms": distribution(
+            _metric_values(typed_phases, "requests", "fast_umi_canary", "elapsed_ms")
         ),
         "fast_planner_ttft_ms": distribution(
             _metric_values(typed_phases, "requests", "fast_planner_canary", "ttft_ms")
@@ -211,14 +211,14 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
         "fast_planner_elapsed_ms": distribution(
             _metric_values(typed_phases, "requests", "fast_planner_canary", "elapsed_ms")
         ),
-        "interruption_fast_gi_ttft_ms": distribution(
+        "interruption_fast_umi_ttft_ms": distribution(
             _metric_values(
-                typed_phases, "requests", "interruption_fast_gi_canary", "ttft_ms"
+                typed_phases, "requests", "interruption_fast_umi_canary", "ttft_ms"
             )
         ),
-        "interruption_fast_gi_elapsed_ms": distribution(
+        "interruption_fast_umi_elapsed_ms": distribution(
             _metric_values(
-                typed_phases, "requests", "interruption_fast_gi_canary", "elapsed_ms"
+                typed_phases, "requests", "interruption_fast_umi_canary", "elapsed_ms"
             )
         ),
         "interruption_fast_planner_ttft_ms": distribution(
@@ -272,12 +272,12 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
                 "resume_to_next_delta_ms",
             )
         ),
-        "presentation_lease_revocation_to_gi_first_delta_ms": distribution(
+        "presentation_lease_revocation_to_umi_first_delta_ms": distribution(
             _metric_values(
                 typed_phases,
                 "presentation_lease",
                 "revocation",
-                "interrupt_gi_first_delta_from_interrupt_trigger_ms",
+                "interrupt_umi_first_delta_from_interrupt_trigger_ms",
             )
         ),
         "presentation_lease_tts_cancel_close_ms": distribution(
@@ -390,11 +390,11 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
         and isinstance(phase["presentation_lease"].get("revocation"), dict)
         for phase in typed_phases
     )
-    interruption_fast_gi_before_deep_count = sum(
+    interruption_fast_umi_before_deep_count = sum(
         isinstance(phase.get("presentation_lease"), dict)
         and isinstance(phase["presentation_lease"].get("revocation"), dict)
         and phase["presentation_lease"]["revocation"].get(
-            "interrupt_gi_completed_before_deep"
+            "interrupt_umi_completed_before_deep"
         )
         is True
         for phase in typed_phases
@@ -487,8 +487,8 @@ def build_summary(sources: Iterable[str | Path], *, label: str = "") -> dict[str
             "presentation_lease_revocation_sample_count": (
                 presentation_lease_revocation_sample_count
             ),
-            "interruption_fast_gi_completed_before_deep_count": (
-                interruption_fast_gi_before_deep_count
+            "interruption_fast_umi_completed_before_deep_count": (
+                interruption_fast_umi_before_deep_count
             ),
             "interruption_fast_planner_completed_before_deep_count": (
                 interruption_fast_planner_before_deep_count

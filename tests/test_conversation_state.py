@@ -950,6 +950,30 @@ class GoalScopedLifecycleTests(unittest.TestCase):
             "goal_outcomes": outcomes,
         }
 
+    def test_unfinished_persistent_goal_survives_conversation_boundary_as_ga_candidate(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="cross-session-goal")
+        self._create_goals(manager, "goal-weather")
+        before = manager.active_goal_snapshots()
+        self.assertEqual([item["goal_id"] for item in before], ["goal-weather"])
+
+        boundary = manager.start_new_conversation(
+            reason="explicit_new_session", sid="sid-new-session"
+        )
+
+        self.assertTrue(boundary["started_new"])
+        self.assertEqual(manager.get_history(), [])
+        carried = manager.active_goal_snapshots()
+        self.assertEqual([item["goal_id"] for item in carried], ["goal-weather"])
+        self.assertEqual(carried[0]["work_status"], "recoverable")
+        raw_metadata = manager._task_contexts[0]["metadata"]
+        self.assertEqual(raw_metadata["persistence_resume_source"], "conversation_boundary")
+        self.assertTrue(raw_metadata["runtime_revalidation_required"])
+        self.assertTrue(raw_metadata["carried_across_conversation"])
+        self.assertEqual(
+            [item["goal_id"] for item in manager.goal_association_candidate_snapshots()],
+            ["goal-weather"],
+        )
+
     def test_semantic_goal_ids_bind_results_to_their_distinct_task_contexts(self) -> None:
         manager = ConversationStateManager(base_conversation_id="goal-lifecycle")
         created = self._create_goals(manager, "goal-walk", "goal-blink")

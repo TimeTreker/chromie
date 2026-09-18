@@ -64,11 +64,11 @@ class ComposeConfigurationTests(unittest.TestCase):
             "OLLAMA_KV_CACHE_TYPE: ${OLLAMA_KV_CACHE_TYPE:-f16}", llm_block
         )
 
-    def test_agent_embeds_fast_goal_interpreter_by_default(self) -> None:
+    def test_agent_embeds_fast_user_meaning_interpreter_by_default(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         agent_block = compose.split("  chromie-agent:", 1)[1].split("\nnetworks:", 1)[0]
 
-        self.assertIn("AGENT_GOAL_INTERPRETER_MODEL: ${AGENT_GOAL_INTERPRETER_MODEL:-qwen3.5:4b}", agent_block)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_MODEL: ${AGENT_USER_MEANING_INTERPRETER_MODEL:-qwen3.5:4b}", agent_block)
         self.assertIn(
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED: "
             "${AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED:-1}",
@@ -79,12 +79,12 @@ class ComposeConfigurationTests(unittest.TestCase):
             "${AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL:-qwen3:4b}",
             agent_block,
         )
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE: ${AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE:-24h}", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP: ${AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP:-1}", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS:-60000}", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_TIMEOUT_MS: ${AGENT_GOAL_INTERPRETER_TIMEOUT_MS:-5400}", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX: ${AGENT_GOAL_INTERPRETER_LLM_NUM_CTX:-16384}", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT: ${AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT:-512}", agent_block)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_LLM_KEEP_ALIVE: ${AGENT_USER_MEANING_INTERPRETER_LLM_KEEP_ALIVE:-24h}", agent_block)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP: ${AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP:-1}", agent_block)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS: ${AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS:-60000}", agent_block)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS: ${AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS:-5400}", agent_block)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX: ${AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX:-16384}", agent_block)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT: ${AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT:-512}", agent_block)
         self.assertIn("OLLAMA_CONTEXT_LENGTH: ${OLLAMA_CONTEXT_LENGTH:-2048}", agent_block)
         self.assertIn("OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-2048}", agent_block)
         self.assertIn("OLLAMA_NUM_PREDICT: ${OLLAMA_NUM_PREDICT:-64}", agent_block)
@@ -102,22 +102,22 @@ class ComposeConfigurationTests(unittest.TestCase):
             if line.startswith("      AGENT_") or line.startswith("      CHROMIE_AGENT_")
         }
         for stale in (
-            "AGENT_GOAL_INTERPRETER_MODE",
-            "AGENT_GOAL_INTERPRETER_USE_LLM",
-            "AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS",
-            "AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD",
+            "AGENT_USER_MEANING_INTERPRETER_MODE",
+            "AGENT_USER_MEANING_INTERPRETER_USE_LLM",
+            "AGENT_USER_MEANING_INTERPRETER_REVIEW_TIMEOUT_MS",
+            "AGENT_USER_MEANING_INTERPRETER_CONFIDENCE_THRESHOLD",
         ):
             self.assertNotIn(stale, environment_keys)
         self.assertFalse(
             any(
-                name.startswith("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_")
+                name.startswith("AGENT_USER_MEANING_INTERPRETER_CAPABILITY_CATALOG_")
                 for name in environment_keys
             )
         )
-        self.assertNotIn("AGENT_GOAL_INTERPRETER_REVIEW_MODEL", agent_block)
-        self.assertNotIn("AGENT_GOAL_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED", agent_block)
+        self.assertNotIn("AGENT_USER_MEANING_INTERPRETER_REVIEW_MODEL", agent_block)
+        self.assertNotIn("AGENT_USER_MEANING_INTERPRETER_POST_INTERRUPT_REVIEW_ENABLED", agent_block)
 
-    def test_agent_is_the_only_cognitive_service_and_owns_goal_interpretation(self) -> None:
+    def test_agent_is_the_only_cognitive_service_and_owns_user_meaning_interpretation(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         self.assertEqual(compose.count("\n  chromie-agent:\n"), 1)
         self.assertNotIn("chromie-router", compose)
@@ -125,7 +125,7 @@ class ComposeConfigurationTests(unittest.TestCase):
         agent_block = compose.split("  chromie-agent:", 1)[1].split("\nnetworks:", 1)[0]
         self.assertIn("      context: .", agent_block)
         self.assertIn("      dockerfile: agent/Dockerfile", agent_block)
-        self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", agent_block)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_MODEL", agent_block)
 
     def test_agent_service_passes_planner_catalog_configuration(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")

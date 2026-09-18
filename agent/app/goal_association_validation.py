@@ -168,7 +168,7 @@ def inherited_goal_outcomes(goal: GoalAssociationModelGoal, request: CognitiveWo
     by_ref = {item.local_ref: item.outcome for item in request.responsibilities}
     refs = goal.source_responsibility_refs
     if not refs or len(refs) != len(set(refs)) or any(ref not in by_ref for ref in refs):
-        raise ValueError("new Goal requires exact unique GI Responsibility references")
+        raise ValueError("new Goal requires exact unique UMI Responsibility references")
     return [by_ref[ref] for ref in refs]
 
 
@@ -283,7 +283,7 @@ def normalize_grounded_binding_types(
 
     The model already owns the semantic field name and exact value. This adapter
     changes neither; this replaces only a mechanically non-canonical type/name
-    pair after the value is proven by the authoritative turn, GI bindings, or an
+    pair after the value is proven by the authoritative turn, UMI bindings, or an
     admitted resolved reference. Provider-facing temporal realization remains a
     Planner responsibility.
     """
@@ -377,7 +377,7 @@ def normalize_grounded_binding_types(
                     and len(source_names_for_value) == 1
                     and "location" not in source_names_for_value
                 ):
-                    # The provider preserved one exact authoritative GI value but
+                    # The provider preserved one exact authoritative UMI value but
                     # attached the wrong query-scope label. Project the unique
                     # source binding name; no source-language meaning is inferred.
                     source_name = next(iter(source_names_for_value))
@@ -739,16 +739,16 @@ def source_grounded_binding_conservation_conflicts(
     *,
     request: CognitiveWorkRequest,
 ) -> list[str]:
-    """Conserve direct GI material values on their one typed Goal surface.
+    """Conserve direct UMI material values on their one typed Goal surface.
 
-    Goal Interpretation already owns whether a value is material WHAT. This
+    User Meaning Interpretation already owns whether a value is material WHAT. This
     check does not infer a parameter kind from the utterance; it follows the
     model-authored source_responsibility_refs and verifies that directly
     source-grounded values did not disappear. The Goal description is the
     authoritative owner of the action/effect itself, while bindings own its
     material parameters; an exact source action retained in that description
     therefore does not need a redundant ``action`` binding.
-    Numeric/boolean GI scalars are already typed authoritative values; conserve
+    Numeric/boolean UMI scalars are already typed authoritative values; conserve
     them even when their original surface was a word (for example, "twice").
     Context-normalized strings absent from the literal turn remain governed by
     their dedicated temporal/referent contracts.

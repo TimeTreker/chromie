@@ -4,7 +4,7 @@
 
 The provider-neutral semantic contract is implemented in
 `shared.chromie_contracts.resource` for retained typed Goals and provider contracts.
-The current GI/GA wire preserves complete resource intention in natural language;
+The current UMI/GA wire preserves complete resource intention in natural language;
 GA inherits that intent and does not author `resource_responsibility` or normalized
 parameters. Fast Planner and Deep Planner
 select an exact registered capability later; neither Goal Association nor the
@@ -178,7 +178,7 @@ materializes one canonical `resource_responsibility`; it does not persist a seco
 flat `SemanticGoal.object.bindings` copy. Generic Planner checks may derive a
 transient flat view from the canonical object, but that view is never written back.
 A separately supplied distance and direction remain separate typed bindings. When
-Goal Interpretation instead owns one composite relative-location value that already
+User Meaning Interpretation instead owns one composite relative-location value that already
 contains an approximate distance, Goal Association preserves that complete value in
 one location binding; it must not split or normalize the authoritative semantic value.
 A Goal description is a
@@ -281,10 +281,10 @@ principles, and resources.
 
 This distinction allows one semantic responsibility to cover both responsive
 information acquisition and carefully gated physical acquisition without a
-provider- or resource-kind router. It does **not** let Fast Goal Interpretation
+provider- or resource-kind router. It does **not** let Fast User Meaning Interpretation
 perform the acquisition.
 
-For information, Fast Goal Interpretation may resolve the provider-neutral human
+For information, Fast User Meaning Interpretation may resolve the provider-neutral human
 need and material bindings early, while Goal Association decides continuity and
 canonical ownership. The provider request begins only after that Goal exists and
 Planner selects the exact acquisition method:
@@ -294,7 +294,7 @@ existing Goal: go out for dinner tonight
 
 user: "Will Chongqing get heavy rain today?"
 
-Fast Goal Interpretation
+Fast User Meaning Interpretation
   |-- Responsibility: provide today's Chongqing weather
   |-- bindings: location=Chongqing, time=today
   `-- optional acknowledgement speech

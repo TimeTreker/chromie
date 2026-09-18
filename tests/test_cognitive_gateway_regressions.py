@@ -69,7 +69,7 @@ class _ConversationState:
 
 
 class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_deterministic_ignore_stays_suppressed_without_goal_interpreter_result(
+    async def test_deterministic_ignore_stays_suppressed_without_user_meaning_interpreter_result(
         self,
     ) -> None:
         for core_mode in ("unavailable", "raises"):

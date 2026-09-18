@@ -401,7 +401,7 @@ def planner_reentry_responsibilities(
     source_response: InteractionResponse,
     goal_ids: Sequence[str],
 ) -> list[CognitiveResponsibilityProposal]:
-    """Select the originating GI Responsibilities bound to the re-entered Goals.
+    """Select the originating UMI Responsibilities bound to the re-entered Goals.
 
     Missing provenance returns an empty list. A runtime callback must never invent a
     replacement Responsibility merely to keep cognition moving.
@@ -412,7 +412,7 @@ def planner_reentry_responsibilities(
         if isinstance(source_response.metadata, dict)
         else {}
     )
-    raw_interpretation = metadata.get("goal_interpretation")
+    raw_interpretation = metadata.get("user_meaning_interpretation")
     responsibilities = (
         raw_interpretation.get("responsibilities")
         if isinstance(raw_interpretation, dict)
@@ -469,7 +469,7 @@ def planner_reentry_responsibilities(
         ]
     if len(parsed) == 1 and len(normalized_goal_ids) == 1:
         # One Responsibility and one Goal have no association ambiguity. This is
-        # identity normalization over supplied GI evidence, not new semantics.
+        # identity normalization over supplied UMI evidence, not new semantics.
         return list(parsed.values())
     return []
 

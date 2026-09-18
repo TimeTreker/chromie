@@ -163,7 +163,7 @@
         "rationale": "Schema failure is observable and not promoted to speech.",
         "root_cause_boundaries": [
           "Test evidence",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]

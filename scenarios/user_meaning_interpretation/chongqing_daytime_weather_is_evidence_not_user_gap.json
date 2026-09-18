@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "id": "chongqing_daytime_weather_is_evidence_not_user_gap",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "The retained fully scoped Chongqing morning-rain question requires fresh external Evidence and no user clarification.",
+  "tags": [
+    "tool",
+    "normal",
+    "regression"
+  ],
+  "input": {
+    "text": "哎，今天上午重庆会不会下雨？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "llm_decision": {
+      "confidence": 0.95,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "weather",
+          "outcome": "判断并告知用户今天上午重庆会不会下雨",
+          "bindings": {
+            "location": "重庆",
+            "date": "today",
+            "time_of_day": "上午"
+          },
+          "confidence": 0.95,
+          "output_mode": "information",
+          "continuity_scope": "goal"
+        }
+      ],
+      "meaning_uncertainties": []
+    }
+  },
+  "expect": {
+    "confidence": 0.95,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "weather",
+        "outcome": "判断并告知用户今天上午重庆会不会下雨",
+        "confidence": 0.95,
+        "output_mode": "information"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "A fully scoped weather request treats the unknown result as fresh Evidence rather than a user-resolvable gap.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      },
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "The exact reported weather turn is fully bound at UMI and requires a trusted lookup rather than clarification.",
+        "root_cause_boundaries": [
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "planner_goal_semantic_quality",
+        "title": "Planner and Goal Semantic Quality",
+        "general_rule": "User Meaning Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
+        "rationale": "Unknown weather truth is an evidence need, not a fabricated user clarification.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner",
+          "Capability catalog",
+          "Evidence boundary"
+        ]
+      }
+    ]
+  }
+}

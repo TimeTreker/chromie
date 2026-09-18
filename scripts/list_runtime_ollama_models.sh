@@ -34,7 +34,7 @@ if is_enabled "${AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED:-1}"; then
   append_model "${AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL:-}"
 fi
 
-append_model "${AGENT_GOAL_INTERPRETER_MODEL:-}"
+append_model "${AGENT_USER_MEANING_INTERPRETER_MODEL:-}"
 
 if is_enabled "${AGENT_USE_LLM:-1}"; then
   append_model "${AGENT_MODEL:-${OLLAMA_MODEL:-}}"

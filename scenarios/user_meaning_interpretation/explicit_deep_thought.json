@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "id": "explicit_deep_thought",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "UMI preserves the request for a thorough test strategy and its requested depth; planning depth remains a Planner decision.",
+  "tags": [
+    "deep-thought",
+    "planning"
+  ],
+  "input": {
+    "text": "Please think deeply and design a test strategy."
+  },
+  "stub": {
+    "llm_decision": {
+      "confidence": 0.92,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "design a thorough test strategy",
+          "bindings": {
+            "depth": "deep"
+          },
+          "confidence": 0.92,
+          "output_mode": "information",
+          "continuity_scope": "goal"
+        }
+      ],
+      "meaning_uncertainties": []
+    }
+  },
+  "expect": {
+    "confidence": 0.92,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "design a thorough test strategy",
+        "confidence": 0.92,
+        "output_mode": "information"
+      }
+    ]
+  }
+}

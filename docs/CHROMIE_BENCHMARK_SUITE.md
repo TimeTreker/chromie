@@ -137,8 +137,8 @@ E2E levels remain evidence-scoped. Text-only, virtual audio, simulator, and
 supervised physical-device runs must not be reported as equivalent evidence.
 
 The independent Router service and wire contract are removed. Existing
-`scenarios/goal_interpretation/` and `scenarios/cognitive_core_dialogue/` assets
-exercise the maintained WHAT-only GI contract and bounded multi-turn Context. New benchmark
+`scenarios/user_meaning_interpretation/` and `scenarios/cognitive_core_dialogue/` assets
+exercise the maintained WHAT-only UMI contract and bounded multi-turn Context. New benchmark
 architecture must name the actual boundary under evaluation: Cognitive Gateway
 for ingress/admission, or Goal-Driven Cognitive Core for semantic goal reasoning
 and planning.
@@ -709,7 +709,7 @@ Git provenance, or evidence claims.
 
 | Current location | Initial benchmark classification |
 |---|---|
-| `scenarios/goal_interpretation/` | `modules/goal_interpretation` and semantic interpretation datasets |
+| `scenarios/user_meaning_interpretation/` | `modules/user_meaning_interpretation` and semantic interpretation datasets |
 | `scenarios/cognitive_turn_loop/` | `integration/cognitive_turn_loop` |
 | `scenarios/cognitive_runtime/` | `integration/goal_driven_runtime` |
 | `scenarios/cognitive_core_dialogue/` | `integration/cognitive_core_dialogue` |
@@ -721,7 +721,7 @@ Git provenance, or evidence claims.
 `benchmarks/manifests/scenario_migration_v1.json` now owns this classification.
 The suites manifest is only a compatibility redirect. The current inventory no
 longer references the retired interaction, dialogue, or adapter fixture directories;
-their former route-based executors did not exercise the maintained WHAT-only GI and
+their former route-based executors did not exercise the maintained WHAT-only UMI and
 Goal-driven Runtime contracts. Historical retained reports keep their revision-bound
 counts, while current executable evidence comes from the four maintained file-backed
 suites above plus benchmark datasets and entrypoints. Compatibility entrypoints have

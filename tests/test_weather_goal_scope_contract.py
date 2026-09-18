@@ -4,8 +4,8 @@ import json
 
 import pytest
 
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter, _source_tokens
-from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter, _source_tokens
+from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
 
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.capabilities.local import chromie_capability_bundle
@@ -37,6 +37,9 @@ def test_weather_capability_declares_bounded_temporal_scope() -> None:
     assert scope["scope_mismatch_policy"] == "clarify_or_unavailable_never_narrow"
     assert "person or object is present" in tool.llm_hints["when_not_to_use"]
     assert "direct visual or auditory observation" in tool.llm_hints["when_not_to_use"]
+    derivation = tool.llm_hints["argument_derivation"]["location_context"]
+    assert derivation["source_argument"] == "location"
+    assert derivation["require_exact_source_value"] is True
     assert tool.input_schema["properties"]["period"]["enum"] == [
         "day",
         "morning",
@@ -63,14 +66,15 @@ def test_weather_capability_declares_bounded_temporal_scope() -> None:
 async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
     mode_override, foreign_quote, text, location, date, period,
 ):
-    source = GoalInterpretationRequest(text=text)
-    schema = OllamaGoalInterpreter._goal_interpretation_response_schema(admitted_turn=text)
+    source = UserMeaningInterpretationRequest(text=text)
+    schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
     primary = {"confidence": 1.0, "responsibilities": [{
         "local_ref": "r1", "outcome": text, "output_mode": "information", "confidence": 1.0,
+        "continuity_scope": "goal",
         "source_evidence": {"source_start_token_ref": "t0",
             "source_end_token_ref": _source_tokens(text)[-1]["ref"]},
-    }], "unresolved": []}
-    interpreted = OllamaGoalInterpreter._validate_interpretation_content(
+    }], "meaning_uncertainties": []}
+    interpreted = OllamaUserMeaningInterpreter._validate_interpretation_content(
         source, json.dumps(primary), response_schema=schema,
     )
     request = CognitiveWorkRequest(sid="weather-contract", text=text,
@@ -197,7 +201,7 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
 ])
 async def test_fast_query_literal_arguments_require_own_intent_and_original_source(text, outcome, location, bindings, accepted):
     # Exercise the production pre-GA boundary, where required inputs formerly
-    # needed a duplicate same-name GI binding even for exact source literals.
+    # needed a duplicate same-name UMI binding even for exact source literals.
     from tests.test_fast_planner_pr3 import WeatherCatalog, FastPlannerResolver as StreamingResolver
 
     request = CognitiveWorkRequest(text=text, responsibilities=[{
@@ -224,6 +228,81 @@ async def test_fast_query_literal_arguments_require_own_intent_and_original_sour
         assert advance.disposition == "unavailable"
         assert not advance.activities
     assert len(candidate.prompts) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("location_context,accepted", [
+    ({"locality": "重庆", "country": "中国"}, True),
+    ({"locality": "成都", "country": "中国"}, False),
+])
+async def test_weather_location_context_derives_from_grounded_location(
+    location_context, accepted,
+):
+    from tests.test_fast_planner_pr3 import WeatherCatalog, FastPlannerResolver as StreamingResolver
+    from tests.test_fast_planner_pr3 import FakeOllama as StreamingFakeOllama
+
+    text = "重庆今天天气怎么样？"
+    request = CognitiveWorkRequest(
+        text=text,
+        responsibilities=[{
+            "local_ref": "r1", "outcome": text, "output_mode": "information",
+            "confidence": 1.0, "bindings": {},
+            "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": _source_tokens(text)[-1]["ref"],
+            },
+        }],
+        context={"user_turn_envelope": {
+            "turn_id": "weather-location-context",
+            "original_input": {"text": text},
+        }},
+    )
+    candidate = StreamingFakeOllama({
+        "disposition": "execute", "coverage": "complete",
+        "covered_responsibility_refs": ["r1"], "activities": [{
+            "activity_id": "query", "role": "capability",
+            "capability_id": "chromie.weather.lookup",
+            "args": {"location": "重庆", "location_context": location_context},
+            "argument_sources": {
+                "location": {
+                    "source_start_token_ref": "t0",
+                    "source_end_token_ref": "t1",
+                }
+            },
+            "source_responsibility_refs": ["r1"], "timing": "sequential",
+        }], "continuations": [], "confidence": 1.0, "unresolved": [],
+        "reason_summary": "Acquire the requested information.",
+    })
+    catalog = WeatherCatalog()
+    weather = next(item for item in catalog.items if item.capability_id == "chromie.weather.lookup")
+    input_schema = json.loads(json.dumps(weather.input_schema, ensure_ascii=False))
+    input_schema["properties"]["location_context"] = {
+        "type": "object",
+        "properties": {
+            "locality": {"type": "string"},
+            "country": {"type": "string"},
+        },
+        "additionalProperties": False,
+    }
+    hints = json.loads(json.dumps(weather.hints, ensure_ascii=False))
+    hints["argument_derivation"] = {
+        "location_context": {
+            "source_argument": "location",
+            "require_exact_source_value": True,
+        }
+    }
+    catalog.items = [
+        item.model_copy(update={"input_schema": input_schema, "hints": hints})
+        if item.capability_id == "chromie.weather.lookup" else item
+        for item in catalog.items
+    ]
+    advance = await StreamingResolver(candidate, catalog).resolve_advance(request)
+    assert (advance.disposition == "execute") is accepted, advance.metadata
+    if accepted:
+        assert advance.activities[0].args["location_context"] == location_context
+    else:
+        assert advance.disposition == "unavailable"
+        assert not advance.activities
 
 
 @pytest.mark.parametrize("value", [3, True, "3", "3 seconds", "0.2 m/s", {}, ["重庆"]])

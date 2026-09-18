@@ -98,7 +98,7 @@ def audit() -> dict[str, Any]:
 
     bounded_guards = {
         "single_semantic_authority": not errors,
-        "goal_interpretation_owns_what": "Goal Interpretation" in _read("docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md"),
+        "user_meaning_interpretation_owns_what": "User Meaning Interpretation" in _read("docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md"),
         "planner_owns_how": "Planner" in _read("docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md"),
         "runtime_owns_lifecycle": "Runtime owns lifecycle" in _read("docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md"),
     }

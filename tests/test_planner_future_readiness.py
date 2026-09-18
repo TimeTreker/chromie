@@ -48,7 +48,7 @@ def test_waiting_acknowledgement_keeps_goal_open_without_provider_work(tier, lan
         response=await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),
             plan=plan,session_id=request.sid,language=request.language)
         response.metadata.update(turn_id=request.sid,goal_association=request.context['goal_association_resolution'],
-            goal_interpretation={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]},
+            user_meaning_interpretation={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]},
             user_turn_envelope={'turn_id':request.sid,'original_input':{'text':request.text},
                 'normalized_input':{'text':request.text,'language':request.language}})
         manager=ConversationStateManager(task_store_enabled=False)
@@ -135,7 +135,7 @@ def test_old_future_condition_cannot_wake_cancelled_or_replaced_intention(termin
         request,catalog=future_case();plan=await resolve(request,catalog,waiting_reply(request),'fast')
         runtime,_=episode_runtime(catalog,False)
         response=await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),plan=plan,session_id=request.sid,language=request.language)
-        response.metadata['goal_interpretation']={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]}
+        response.metadata['user_meaning_interpretation']={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]}
         manager=ConversationStateManager(task_store_enabled=False)
         manager.apply_goal_association_resolution(request.context['goal_association_resolution'],sid=request.sid,user_text=request.text,atomic=True)
         manager.record_interaction_response(request.sid,response)
@@ -256,7 +256,7 @@ def test_future_intention_survives_restart_and_due_host_reentry_dispatches_once(
         runtime,provider=episode_runtime(catalog,False)
         adapter=CanonicalPlanRuntimeAdapter(runtime)
         response=await social_fixture_response(adapter,plan=plan,session_id=request.sid,language=request.language)
-        response.metadata['goal_interpretation']={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]}
+        response.metadata['user_meaning_interpretation']={'responsibilities':[r.model_dump(mode='json') for r in request.responsibilities]}
         path=tmp_path/'future-goals.json'
         manager=ConversationStateManager(task_store_enabled=True,task_store_path=path)
         manager.apply_goal_association_resolution(request.context['goal_association_resolution'],sid=request.sid,user_text=request.text,atomic=True)

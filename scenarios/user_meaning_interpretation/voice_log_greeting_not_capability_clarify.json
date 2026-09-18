@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_greeting_not_capability_clarify",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "One primary UMI DTO preserves a standalone greeting as a provider-neutral speech Responsibility.",
+  "tags": [
+    "voice-log",
+    "greeting",
+    "cognitive-core-agent-contract",
+    "capability-hallucination"
+  ],
+  "input": {
+    "text": "Hello, how are you."
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.94,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "Hello, how are you.",
+              "confidence": 0.94,
+              "output_mode": "speech",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t5"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": []
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.94,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "Hello, how are you.",
+        "confidence": 0.94,
+        "output_mode": "speech"
+      }
+    ]
+  }
+}

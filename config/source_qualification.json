@@ -91,7 +91,7 @@
         "-m",
         "pytest",
         "-q",
-        "tests/test_goal_interpreter_llm_prompt.py",
+        "tests/test_user_meaning_interpreter_llm_prompt.py",
         "tests/test_goal_association_pr2.py",
         "tests/test_fast_planner_pr3.py",
         "tests/test_deep_planner_pr4.py",

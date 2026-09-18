@@ -31,12 +31,12 @@ def write_identity(path: Path) -> dict:
         "runtime_profile": {
             "fingerprint": "runtime-fingerprint",
             "sha256": "a" * 64,
-            "models": {"AGENT_GOAL_INTERPRETER_MODEL": "qwen3:4b"},
+            "models": {"AGENT_USER_MEANING_INTERPRETER_MODEL": "qwen3:4b"},
         },
         "orchestrator_runtime": {
             "effective_models": {
                 "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "qwen3:4b",
-                "AGENT_GOAL_INTERPRETER_MODEL": "qwen3:4b",
+                "AGENT_USER_MEANING_INTERPRETER_MODEL": "qwen3:4b",
                 "AGENT_GOAL_ASSOCIATION_MODEL": "qwen3:4b",
                 "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
                 "AGENT_DEEP_PLANNER_MODEL": "qwen3:4b",
@@ -59,7 +59,7 @@ def write_identity(path: Path) -> dict:
                     },
                     "effective_models": {
                         "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "qwen3:4b",
-                        "AGENT_GOAL_INTERPRETER_MODEL": "qwen3:4b",
+                        "AGENT_USER_MEANING_INTERPRETER_MODEL": "qwen3:4b",
                         "AGENT_GOAL_ASSOCIATION_MODEL": "qwen3:4b",
                         "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
                         "AGENT_DEEP_PLANNER_MODEL": "qwen3:4b",

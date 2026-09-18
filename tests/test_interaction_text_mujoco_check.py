@@ -271,7 +271,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         self.assertEqual(reflex["cancellation_scope"], "media_output")
         self.assertFalse(response.speech)
         self.assertFalse(response.capabilities)
-        self.assertTrue(evidence["goal_interpretation_bypassed"])
+        self.assertTrue(evidence["user_meaning_interpretation_bypassed"])
 
     def test_compound_reflex_retains_real_continuation_and_completed_execution(self) -> None:
         from shared.chromie_contracts.interaction import InteractionResponse
@@ -331,7 +331,7 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
         ))
         self.assertEqual(errors, [])
         self.assertIs(actual, response)
-        self.assertFalse(evidence["goal_interpretation_bypassed"])
+        self.assertFalse(evidence["user_meaning_interpretation_bypassed"])
         self.assertEqual(evidence["execution"]["status"], "completed")
         self.assertEqual(evidence["cognitive_runtime"]["status"], "applied")
         self.assertEqual(evidence["interaction_responses"][0]["capabilities"][0]["args"], {"count": 2})

@@ -3,9 +3,9 @@
 Status: authoritative architecture with the production implementation complete. Input
 Normalization, Protective Reflex, Context Assembly, Attention Review, and Turn
 Admission are explicit modules. The normal order completes admission before
-ordinary Goal Interpretation; the admitted immutable `UserTurnEnvelope` and
+ordinary User Meaning Interpretation; the admitted immutable `UserTurnEnvelope` and
 digest-bound `GatewayContextSnapshot` form `CoreTurnRequest`; and the Core returns
-`CoreInterpretationResult`. Goal Interpretation hands typed WHAT-only semantics to
+`CoreInterpretationResult`. User Meaning Interpretation hands typed WHAT-only semantics to
 Goal Association through the current Core contract; there is no route/intent compatibility
 projection. Dedicated
 Soridormi E-stop/safe-idle evidence and source-bound target qualification remain
@@ -69,7 +69,7 @@ voice / text / trusted interaction event
        deterministic validation and commitment
        agent, tool, memory, and embodied execution coordination
        outcome reconciliation against goal success criteria
-       independent SC interaction from shared GI / Goals / Work / Situation / Evidence
+       independent SC interaction from shared UMI / Goals / Work / Situation / Evidence
   -> trusted Trusted Capability Runtime / tools / memory / Soridormi
   -> execution evidence returned to the Core
   -> validated speech and optional social-attention delivery
@@ -373,11 +373,11 @@ Router-owned model configuration have been removed. The maintained path is:
 transport input
   -> host Cognitive Gateway
   -> immutable UserTurnEnvelope
-  -> Agent-owned Goal Interpretation and Goal-Driven Cognitive Core
+  -> Agent-owned User Meaning Interpretation and Goal-Driven Cognitive Core
   -> validated planning, execution, reconciliation, and Planner communication
 ```
 
-The Gateway remains a narrow ingress boundary. Goal Interpretation emits a typed
+The Gateway remains a narrow ingress boundary. User Meaning Interpretation emits a typed
 WHAT-only decision for downstream Goal Association, while the Gateway itself never
 authors an ordinary goal, capability choice, plan, or response. The maintained Core
 contract contains no `RouteDecision` projection or active Router compatibility surface.
@@ -389,7 +389,7 @@ The production topology and authority boundaries are complete:
 1. the shared `ReflexOutcome` and `UserTurnEnvelope` contracts are authoritative;
 2. Protective Reflex runs locally before model-dependent cognition;
 3. only admitted envelopes enter the Goal-Driven Cognitive Core;
-4. Goal Interpretation is Agent-owned and shares the Agent service lifecycle;
+4. User Meaning Interpretation is Agent-owned and shares the Agent service lifecycle;
 5. the Orchestrator has no Router client, URL, health dependency, or fallback authority;
 6. deployment, diagnostics, Benchmark adapters, and current documentation no
    longer expose a first-class Router component;
@@ -444,7 +444,7 @@ evidence status is reported separately in [STATUS.md](STATUS.md).
 | Completed weather goal followed by unrelated action | Assemble only genuinely active goals | Core does not inherit stale weather meaning or authority |
 | Tool success, partial failure, or timeout | Preserve turn and correlations | Goal-scoped outcomes return to Core for closure, replan, clarification, or truthful report |
 
-Acceptance asserts required and forbidden behavior. A Goal Interpretation unit
+Acceptance asserts required and forbidden behavior. A User Meaning Interpretation unit
 test alone cannot prove stop-to-provider cancellation, and a planner test alone
 cannot prove result reconciliation or final spoken truth.
  The maintained live-service and MuJoCo evidence procedure is [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md).
@@ -457,5 +457,5 @@ cannot prove result reconciliation or final spoken truth.
 | `UserTurnEnvelope` | Evidence-preserving admitted/suppressed/reflex turn record |
 | Protective Reflex / 保护性反射 | Immediate deterministic operational-control path |
 | Goal-Driven Cognitive Core / 目标驱动认知核心 | Semantic goal understanding, planning, delegation, reconciliation, and response authority |
-| Goal Interpretation | Agent-owned Cognitive Core boundary; no independent routing service |
+| User Meaning Interpretation | Agent-owned Cognitive Core boundary; no independent routing service |
 | `CognitiveWorkRequest` | Typed Core handoff carrying interpreted WHAT/context into Goal Association without HOW authority |

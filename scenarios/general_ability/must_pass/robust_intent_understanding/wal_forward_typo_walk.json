@@ -58,7 +58,7 @@
         "rationale": "ASR-style typo should be understood as a walking request when the live catalog supports walking.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Test evidence"
         ]

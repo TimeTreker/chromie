@@ -36,7 +36,7 @@ any model an execution authority:
 ```text
 User Turn
 → deterministic emergency and interruption controls
-→ Goal Interpretation (contextual WHAT only)
+→ User Meaning Interpretation (contextual WHAT only)
 → concurrent Fast Planner / Goal Association fan-out
 → Fast Planner
    ├─ complete terminal CanonicalPlan
@@ -141,7 +141,7 @@ Context; wording never becomes execution evidence.
 
 ### `off`
 
-The PR7 unified pipeline is not called. Existing Goal Interpreter, Agent, and trusted
+The PR7 unified pipeline is not called. Existing User Meaning Interpreter, Agent, and trusted
 ordinary cognition fails closed rather than entering another semantic path.
 
 Use this mode only to disable the Goal-driven Runtime for diagnostics or fault isolation.

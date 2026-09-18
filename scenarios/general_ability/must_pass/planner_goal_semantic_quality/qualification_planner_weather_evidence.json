@@ -60,10 +60,10 @@
       {
         "id": "planner_goal_semantic_quality",
         "title": "Planner and Goal Semantic Quality",
-        "general_rule": "Goal Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
+        "general_rule": "User Meaning Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
         "rationale": "A fully scoped information Goal must be planned as evidence-backed information work and return through Planner re-entry, not be downgraded to immediate conversational speech.",
         "root_cause_boundaries": [
-          "Goal Interpretation",
+          "User Meaning Interpretation",
           "Goal Association",
           "Planner",
           "Capability catalog",

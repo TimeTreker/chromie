@@ -1796,6 +1796,13 @@ class VoiceAssistant:
             "active_task_contexts": conversation.get("active_task_contexts", []),
             "active_task_snapshots": conversation.get("active_task_snapshots", []),
             "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
+            # UMI receives only a small semantic projection of currently active/restored
+            # Goal meaning. It uses this to understand ellipsis/correction/confirmation,
+            # never to choose canonical Goal identity; GA receives the broader candidate set.
+            "user_meaning_goal_context": self.conversation_state.active_goal_snapshots(limit=4),
+            "goal_association_candidates": conversation.get(
+                "goal_association_candidates", []
+            ),
             "recent_goal_snapshots": conversation.get("recent_goal_snapshots", []),
             "current_task_context": conversation.get("current_task_context"),
             "discourse_referents": conversation.get("discourse_referents", []),
@@ -2453,13 +2460,13 @@ class VoiceAssistant:
         ):
             return False
 
-        # Maintained apply mode fans GI out to independent SC and task planning.
-        # Goal Interpretation contributes Responsibility evidence only.
+        # Maintained apply mode fans UMI out to independent SC and task planning.
+        # User Meaning Interpretation contributes Responsibility evidence only.
         fast_first_hedge = None
         runtime_context = dict(context)
         self.session_log(
             session_id,
-            "goal_progress_communication_owner=social_cognition work_owner=planner gi_speech_bypassed=true",
+            "goal_progress_communication_owner=social_cognition work_owner=planner umi_speech_bypassed=true",
         )
         resolution = await self._run_cognitive_runtime_pipeline(
             session,
@@ -2610,12 +2617,15 @@ class VoiceAssistant:
                     **response.metadata,
                     "language": core_interpretation.language,
                     "cognitive_runtime_resolution": summary,
-                    "goal_interpretation": core_interpretation.model_dump(mode="json"),
+                    "user_meaning_interpretation": core_interpretation.model_dump(mode="json"),
                     "experience_context": {
                         "user_text": user_text,
-                        "goal_interpretation_confidence": core_interpretation.confidence,
-                        "goal_interpretation_unresolved": list(core_interpretation.unresolved),
-                        "goal_interpretation_latency_ms": core_interpretation_latency_ms,
+                        "user_meaning_interpretation_confidence": core_interpretation.confidence,
+                        "user_meaning_uncertainties": [
+                            item.model_dump(mode="json")
+                            for item in core_interpretation.meaning_uncertainties
+                        ],
+                        "user_meaning_interpretation_latency_ms": core_interpretation_latency_ms,
                         "cognitive_runtime_latency_ms": float(
                             resolution.timings_ms.get("total", 0.0)
                         ),
@@ -2981,7 +2991,7 @@ class VoiceAssistant:
                             "semantic_status": "terminal_without_canonical_goal",
                             "canonical_goal_committed": False,
                         }
-                        if resolution.metadata.get("terminal_goal_interpretation") is True
+                        if resolution.metadata.get("terminal_user_meaning_interpretation") is True
                         else {}
                     ),
                 },
@@ -3165,7 +3175,7 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "cognitive_gateway_reflex_applied: action=%s trigger=%s goal_interpretation_bypassed=%s",
+                "cognitive_gateway_reflex_applied: action=%s trigger=%s user_meaning_interpretation_bypassed=%s",
                 reflex_outcome.action,
                 reflex_outcome.trigger,
                 not residual_semantic_input,
@@ -3208,7 +3218,7 @@ class VoiceAssistant:
             )
             self.session_log(
                 session_id,
-                "cognitive_gateway_reflex_applied: action=%s trigger=%s goal_interpretation_bypassed=True",
+                "cognitive_gateway_reflex_applied: action=%s trigger=%s user_meaning_interpretation_bypassed=True",
                 reflex_outcome.action,
                 reflex_outcome.trigger,
             )
@@ -3408,13 +3418,13 @@ class VoiceAssistant:
                 core_interpretation_latency_ms,
                 len(core_interpretation.responsibilities),
                 core_interpretation.confidence,
-                len(core_interpretation.unresolved),
+                len(core_interpretation.meaning_uncertainties),
                 core_interpretation.authority,
             )
             record_session_workflow_stage(
                 self,
                 session_id,
-                stage="goal_interpretation",
+                stage="user_meaning_interpretation",
                 started_monotonic_ms=core_start_ms,
                 finished_monotonic_ms=now_ms(),
                 status="accepted",
@@ -3431,7 +3441,7 @@ class VoiceAssistant:
             record_session_workflow_stage(
                 self,
                 session_id,
-                stage="goal_interpretation",
+                stage="user_meaning_interpretation",
                 started_monotonic_ms=core_start_ms,
                 finished_monotonic_ms=now_ms(),
                 status="failed",
@@ -3449,7 +3459,7 @@ class VoiceAssistant:
             safe_response = self._cognitive_core_exception_safe_response(
                 user_text,
                 context=context,
-                failure_stage="goal_interpretation",
+                failure_stage="user_meaning_interpretation",
                 failure_class=type(exc).__name__,
                 failure_error=str(exc),
             )
@@ -3461,7 +3471,7 @@ class VoiceAssistant:
                         "source": "cognitive_core_exception",
                         "error": str(exc),
                         "semantic_status": "failed",
-                        "semantic_failure_stage": "goal_interpretation",
+                        "semantic_failure_stage": "user_meaning_interpretation",
                         "semantic_failure_class": type(exc).__name__,
                         "canonical_goal_committed": False,
                     },
@@ -3482,7 +3492,7 @@ class VoiceAssistant:
                 finished_monotonic_ms=now_ms(),
                 status="selected",
                 input_payload={
-                    "failure_stage": "goal_interpretation",
+                    "failure_stage": "user_meaning_interpretation",
                     "user_text": user_text,
                 },
                 output_payload=safe_response,
@@ -3527,7 +3537,7 @@ class VoiceAssistant:
                     "semantic_failure_stage": "cognitive_runtime_entry",
                     "semantic_failure_class": "runtime_unavailable",
                     "canonical_goal_committed": False,
-                    "goal_interpretation": core_interpretation.model_dump(mode="json"),
+                    "user_meaning_interpretation": core_interpretation.model_dump(mode="json"),
                 },
                 turn_envelope,
             ),
@@ -5549,7 +5559,7 @@ class VoiceAssistant:
         # would therefore assert a false transport identity: its session/text belong
         # to the admitted source turn, not to this scoped state transition.  Keep the
         # immutable envelope on source_response and project only read-only source
-        # provenance plus the scoped GI Responsibilities below.
+        # provenance plus the scoped UMI Responsibilities below.
         context.pop("user_turn_envelope", None)
         source_envelope = metadata.get("user_turn_envelope")
         source_original_input = (
@@ -5661,7 +5671,7 @@ class VoiceAssistant:
         # A state re-entry is an exact Goal-subset transaction. The full immutable
         # UserTurnEnvelope can contain excluded sibling semantics, so it remains on
         # the source response. Its exact wording is exposed separately above as
-        # read-only provenance, while only authoritative scoped GI Responsibility
+        # read-only provenance, while only authoritative scoped UMI Responsibility
         # outcomes become request.text. Canonical Goal and Plan projections retain
         # the scoped bindings and execution correlation.
         scoped_request_text = "\n".join(
@@ -5671,8 +5681,8 @@ class VoiceAssistant:
                 if item.outcome.strip()
             )
         )
-        if isinstance(metadata.get("goal_interpretation"), dict):
-            source_interpretation = dict(metadata["goal_interpretation"])
+        if isinstance(metadata.get("user_meaning_interpretation"), dict):
+            source_interpretation = dict(metadata["user_meaning_interpretation"])
             source_interpretation["responsibilities"] = [
                 item
                 for item in source_interpretation.get("responsibilities") or []
@@ -5900,9 +5910,9 @@ class VoiceAssistant:
                 ),
             }
         )
-        if isinstance(metadata.get("goal_interpretation"), dict):
-            response.metadata["goal_interpretation"] = dict(
-                metadata["goal_interpretation"]
+        if isinstance(metadata.get("user_meaning_interpretation"), dict):
+            response.metadata["user_meaning_interpretation"] = dict(
+                metadata["user_meaning_interpretation"]
             )
         evidence_goal_set = set(normalized_evidence_goal_ids)
         for speech in response.speech:

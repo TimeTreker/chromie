@@ -70,12 +70,12 @@ class _FakeSession:
 @unittest.skipIf(AgentClient is None, "aiohttp is unavailable")
 class AgentClientTests(unittest.IsolatedAsyncioTestCase):
 
-    async def test_goal_interpretation_uses_its_dedicated_host_timeout(self) -> None:
+    async def test_user_meaning_interpretation_uses_its_dedicated_host_timeout(self) -> None:
         result = {
             "schema_version": 2,
             "turn_id": "turn-timeout",
             "session_id": "session-timeout",
-            "authority": "goal_interpretation",
+            "authority": "user_meaning_interpretation",
             "confidence": 0.95,
             "language": "zh-CN",
             "responsibilities": [
@@ -86,13 +86,13 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
                     "confidence": 0.95,
                 }
             ],
-            "unresolved": [],
+            "meaning_uncertainties": [],
         }
         session = _FakeSession(_FakeResponse(text=json.dumps(result)))
         client = AgentClient(
             "http://agent.local",
             timeout_ms=9000,
-            goal_interpreter_timeout_ms=65000,
+            user_meaning_interpreter_timeout_ms=65000,
         )
 
         with mock.patch(

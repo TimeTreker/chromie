@@ -6,7 +6,7 @@ primitives used across Chromie's control plane.
 ## `chromie_contracts`
 
 The contract package keeps JSON boundaries consistent between the host
-Orchestrator, Goal Interpretation, Agent, compatibility hardware daemon, tests, and
+Orchestrator, User Meaning Interpretation, Agent, compatibility hardware daemon, tests, and
 acceptance tools. It includes:
 
 - Goal/Core interpretation requests and typed `CognitiveWorkRequest` handoff contracts;

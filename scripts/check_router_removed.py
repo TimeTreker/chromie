@@ -11,7 +11,7 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 FORBIDDEN_PATHS = (
     Path("router"),
-    Path("goal_interpretation"),
+    Path("user_meaning_interpretation"),
     Path("orchestrator/clients/router_client.py"),
 )
 RETIRED_DOCUMENTS = (
@@ -37,7 +37,7 @@ RETIRED_CURRENT_TOKENS = (
     "A Router may propose",
     "The Router must not invent",
     "Router splits the responsibilities",
-    "`RouteDecision`, `chromie-agent`, `/route`, `AGENT_GOAL_INTERPRETER_*`",
+    "`RouteDecision`, `chromie-agent`, `/route`, `AGENT_USER_MEANING_INTERPRETER_*`",
 )
 STRUCTURAL_TOKENS = (
     "chromie-router",
@@ -49,15 +49,15 @@ STRUCTURAL_TOKENS = (
     "ROUTER_REVIEW_MODEL",
     "self.router_url",
     "self.enable_router",
-    '"goal_interpretation/requirements.txt"',
+    '"user_meaning_interpretation/requirements.txt"',
     "http://127.0.0.1:8091/route",
     "## Router HTTP API",
-    "AGENT_GOAL_INTERPRETER_PORT",
-    "AGENT_GOAL_INTERPRETER_HOST",
+    "AGENT_USER_MEANING_INTERPRETER_PORT",
+    "AGENT_USER_MEANING_INTERPRETER_HOST",
     "--router-url",
     "assistant.router_client",
     "ORCH_ENABLE_ROUTER",
-    "AGENT_GOAL_INTERPRETER_URL",
+    "AGENT_USER_MEANING_INTERPRETER_URL",
     "router_prompt_tier",
     "router_semantic_task_operations",
     "router_action_count",
@@ -185,7 +185,7 @@ def audit_removed_router(root: Path = ROOT) -> list[str]:
             for token in (
                 "router_client",
                 "ORCH_ENABLE_ROUTER",
-                "AGENT_GOAL_INTERPRETER_URL",
+                "AGENT_USER_MEANING_INTERPRETER_URL",
                 "router_prompt_tier",
                 "router_semantic_task_operations",
                 "router_action_count",
@@ -259,7 +259,7 @@ def audit_removed_router(root: Path = ROOT) -> list[str]:
             )
         if "8091" in compose_text:
             errors.append(
-                "docker-compose.yml still references removed Goal Interpreter "
+                "docker-compose.yml still references removed User Meaning Interpreter "
                 "service port 8091"
             )
     return errors

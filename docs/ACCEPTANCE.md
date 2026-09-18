@@ -26,9 +26,9 @@ incomplete result is a failed semantic case.
 
 | Responsible owner | Deterministically checked scope | What acceptance does not establish |
 |---|---|---|
-| Dynamic response Schema: GI `model_interpreter.py`, `goal_association_schema.py`, `planner_schema.py` | Required fields, closed vocabulary, permitted branches, supplied IDs/token references and applicable cardinalities for that exact request. | That free-text meaning follows the source, that all obligations were emitted, or that a reply answers the request. Schema descriptions instruct the model; they do not execute semantic checks. |
-| GI DTO and source validator: `goal_interpreter/schema.py`, `model_interpreter.py` | Unique refs; known, ordered, non-overlapping source spans; source provenance and result-type restrictions; parameter and relationship fields are forbidden on live GI wire. | That a cited span entails the authored outcome, that all predicates/qualifiers were preserved, or that confidence and uncertainty judgments are correct. |
-| GA: `goal_association.py`, `goal_association_validation.py` | Exactly-once mapping of accepted Responsibility refs, inherited intent/result type, retained typed-binding conservation, identity/reference constraints and comparison of permitted lossless repairs. | Completeness of GI against the original utterance or semantic appropriateness of every continuity association. Conserving all emitted Responsibilities cannot recover an obligation GI never emitted. |
+| Dynamic response Schema: UMI `model_interpreter.py`, `goal_association_schema.py`, `planner_schema.py` | Required fields, closed vocabulary, permitted branches, supplied IDs/token references and applicable cardinalities for that exact request. | That free-text meaning follows the source, that all obligations were emitted, or that a reply answers the request. Schema descriptions instruct the model; they do not execute semantic checks. |
+| UMI DTO and source validator: `user_meaning_interpreter/schema.py`, `model_interpreter.py` | Unique refs; known, ordered, non-overlapping source spans; source provenance and result-type restrictions; parameter and relationship fields are forbidden on live UMI wire. | That a cited span entails the authored outcome, that all predicates/qualifiers were preserved, or that confidence and uncertainty judgments are correct. |
+| GA: `goal_association.py`, `goal_association_validation.py` | Exactly-once mapping of accepted Responsibility refs, inherited intent/result type, retained typed-binding conservation, identity/reference constraints and comparison of permitted lossless repairs. | Completeness of UMI against the original utterance or semantic appropriateness of every continuity association. Conserving all emitted Responsibilities cannot recover an obligation UMI never emitted. |
 | Planner: `planner_validation.py`, `planner_fast_validation.py`, `planner_deep_validation.py` | Declared Goal coverage/dispositions, output-mode and provider contracts, argument grounding, explicit numeric constraints, Evidence identity/status/scope, and typed ordering/resource/reuse restrictions. | That an arbitrary action list or communication Need realizes every obligation, or that model-authored coverage/satisfaction scores are true. |
 | SC: `social_cognition.py` and exact Host projection | Source/snapshot identity, supplied Need/Goal/Evidence coverage, immutable acts, permitted communication phases, expression anchors and qualified targets. | That a structurally accepted utterance is useful, sufficiently informative or socially appropriate. Actual delivery and semantic adjudication remain separate. |
 | Host and Trusted Capability Runtime | Exact identities/versions, authorization/confirmation, contract validation, lifecycle, dispatch, and retained execution/delivery facts at the exercised boundaries. | User satisfaction or world/physical truth beyond the retained provider/device evidence. An accepted Plan is not completed execution. |
@@ -41,13 +41,13 @@ and inconsistent Evidence/state. No gate is weakened by this distinction. If a
 semantic omission or other hard failure is observed during qualification, a passing
 structural check or aggregate score cannot override or average it into a pass.
 
-For example, “Say hello and tell me a joke” may receive a Schema-valid GI result
+For example, “Say hello and tell me a joke” may receive a Schema-valid UMI result
 containing only the greeting. GA can conserve that one Responsibility exactly while
 the joke remains absent. Even with both correct Goals supplied, a Planner result
 can contain every Goal key while omitting the joke
 obligation; SC can also claim to cover both Needs while saying only “Hello.” These are semantic failures; reference coverage is a different invariant.
 Missing an already-declared Goal key remains a mechanical rejection. Neither
-downstream reconstruction of GI meaning nor an online reviewer is authorized.
+downstream reconstruction of UMI meaning nor an online reviewer is authorized.
 
 Reports must distinguish the following existing verdicts rather than collapse them
 into an unqualified “validation passed”:
@@ -83,15 +83,15 @@ each role's output/coverage contract, permitted depth and call topology under th
 | Contrast / boundary | Required evidence |
 |---|---|
 | Conversation with no effect Work, sharing and sustained discussion | A substantive appropriate response can complete the conversational obligation; no fabricated action or compulsory acknowledgement. Necessary conversational depth is not forced into filler. |
-| Multi-Responsibility turn and active Goal overview | Complete GI meaning remains visible, related history/preferences affect expression appropriately, and read-only sibling context grants no Goal/Work mutation authority. |
+| Multi-Responsibility turn and active Goal overview | Complete UMI meaning remains visible, related history/preferences affect expression appropriately, and read-only sibling context grants no Goal/Work mutation authority. |
 | No prior message / queued / playing / completed / interrupted / failed message | Correct semantic novelty/repetition decisions; exact once-only delivery and truthful partial-delivery state. Silence never drops a required answer. |
 | Slow planning, meaningful progress, terminal result overtaking early speech | Communication and Work progress independently; obsolete progress is rejected before queue/playback; one grounded result and no duplicate Work. |
 | Unknown / planned / committed / running / unavailable / failed / empty / completed | Speech preserves the exact established truth and Evidence scope, including probability and uncertainty. No fabricated completion or future promise. |
-| Planning-input gap, confirmation, correction and cancellation | Social Cognition expresses the authoritative need against exact Plan/request scope; GI interprets replies; Host controls consent, expiry and cancellation. No effect before required confirmation. |
+| Planning-input gap, confirmation, correction and cancellation | Social Cognition expresses the authoritative need against exact Plan/request scope; UMI interprets replies; Host controls consent, expiry and cancellation. No effect before required confirmation. |
 | Goal-free Situation, audience and relational Memory | No synthetic turn/Goal/Work; disclosure gate before inference; appropriate silence or initiative from trusted context; no inferred consent. |
 | Role failure, malformed output, stale snapshot and restart | No alternative wording owner or semantic repair chain; valid independent Work/Evidence survives; unresolved obligations remain auditable. |
 | Body expression and ordered voice | Social Cognition selects exact eligible social Capability proposals in its primary call; Runtime validates anchors, targets and safety. No decoration-only call; optional failure cannot delay/fail speech or required Work. Nonverbal-only delivery cannot be fabricated from empty speech. |
-| Environment-driven initiative with existing Goals but no GI | Shared Goal state and trusted Situation are read-only inputs; no synthetic user turn, duplicate Goal store or inferred consent. Useful initiative and silence both remain representable. |
+| Environment-driven initiative with existing Goals but no UMI | Shared Goal state and trusted Situation are read-only inputs; no synthetic user turn, duplicate Goal store or inferred consent. Useful initiative and silence both remain representable. |
 | Foreground communication under SGLang contention | Request priority exceeds ordinary Planner priority, server ordering is enabled and verified, and measured task completion remains live. Deep communication is bounded; configuration proof is distinct from observed latency. |
 
 Retain a bilingual, coverage-designed frozen cohort and judge every case,
@@ -116,14 +116,14 @@ not prove preemption. No scheduler setting alone establishes a latency pass.
 The frozen [workflow replay](../benchmarks/README.md#offline-workflow-replay)
 is Level A architecture/contract evidence only. GPT-6 Astra-authored reference
 replies are reviewed test fixtures, not independent ground truth or sampled model
-qualification. Real role clients use a strict local HTTP replay server; GI/GA/Planner
+qualification. Real role clients use a strict local HTTP replay server; UMI/GA/Planner
 validation, state and Capability Runtime run against controlled providers/audio.
 Initial admission and role scheduling remain explicit test-driver inputs. Each run
 retains source/corpus hashes and per-call requests/replies; mismatches fail closed.
-Retained-timer cases start from prior Goals; new-request cases separately prove GI/GA
+Retained-timer cases start from prior Goals; new-request cases separately prove UMI/GA
 admission of temporal intent followed by source-bound Planner readiness, waiting
 across restart, no early work and one due wake. The simulator returns authored
-reference replies; the historical #60 GI timestamp wire has been superseded by
+reference replies; the historical #60 UMI timestamp wire has been superseded by
 the intent-only contract. These passes cannot close #24/#32 or replace
 native streaming, voice or robot evidence. The expanded cohort has 60 authored contrasts
 and 6,000 parameter/language variants, not 6,000 independent inferences or abilities.
@@ -166,7 +166,7 @@ readiness are owned by [Current Status](STATUS.md), with the exact revision and
 retained artifacts in [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) and
 [Handoff](../HANDOFF.md). Source tests and offline model qualification do not
 establish a current live voice, simulator, physical audio or robot pass. The latest
-retained live aggregate at `f5522f87` stopped at Goal Interpretation before Planner
+retained live aggregate at `f5522f87` stopped at User Meaning Interpretation before Planner
 or execution; its 51-case cohort is incomplete. Current target qualification and
 release readiness remain open until the required current-revision evidence closes.
 
@@ -182,7 +182,7 @@ as fresh verification. A–D are evidence levels, not the four status axes above
 | Canonical local gate | Repository policy, test ownership, Ruff, Mypy, documentation, and the complete primary plus legacy Agent suites pass from the documented setup; quote the exact output of a fresh `./scripts/run_tests.sh` run rather than a copied count | Not applicable | Not applicable | Not applicable |
 | Core voice-to-embodied path | Full speech/control/runtime acceptance tooling and exact evidence contracts are implemented | Retained synthetic and virtual-microphone runs completed VAD, ASR, cognition, TTS/playback, and trusted dispatch; clean `90aa72a` validates the Goal-driven generated-voice path | Clean paired Chromie `a36444b` / Soridormi `fa8080d2` completed Goal-driven compound MuJoCo execution, cancellation, reconciliation, and safe idle | The host voice-device chain separately passed one supervised physical microphone-to-audible-speaker turn; physical robot deployment is optional and not needed to complete this row |
 | Historical narrow live voice loop (`90aa72a` / `a36444b`, August 9) | Strict profile and focused rejection/regression tests pass | Clean `90aa72a` rebuilt comprehensive profile passed all mechanical voice/GPU checks with one independent-review skip; merged `a36444b` paired services remained healthy with clean logs | Not applicable | Target validated for one supervised English physical microphone-to-audible-response turn in `20260809T122818Z`; broader accuracy, latency, and release claims remain open |
-| Goal Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
+| User Meaning Interpretation/Agent contracts | Yes | RTX smoke passed | Not required | Physical audio review open |
 | Cognitive Gateway/Core single authority | Five-module, admitted-envelope, identity, and verifier tests pass | Clean rebuilt comprehensive model distribution passed its mechanical matrix; the independent semantic reviewer remains an explicit skip | Clean merged `a36444b` paired proof completed exact compound planning/execution and deterministic provider-start cancellation against Soridormi `fa8080d2` | Not claimed |
 | Interaction contracts and Trusted Capability Runtime | Yes | Text path | Clean merged-revision exact arguments, ordered execution, Goal reconciliation, cancellation, and safe-idle recovery passed | Physical audio open separately |
 | WorkDAG read/planning execution | Yes | Endpoint tooling | Soridormi acceptance | Target retention open |
@@ -667,7 +667,7 @@ conda run -n Chromie python scripts/general_ability_acceptance.py \
 ```
 
 Use `--execute` only for supervised simulator runs. Live text preview checks the
-Goal Interpretation, Agent, and Soridormi status/preflight boundary but does not execute
+User Meaning Interpretation, Agent, and Soridormi status/preflight boundary but does not execute
 motion; live text execution can support a Level C simulator claim only when the
 summary shows successful Trusted Capability Runtime execution and safe idle. Neither mode is
 microphone, speaker, or physical hardware evidence.
@@ -729,7 +729,7 @@ the aggregate and reviewer artifacts are written. See
 
 Warm interaction cases retain two non-overlapping intervals: the accepted SC
 stage start to its complete decision (`max_warm_sc_decision_ms`), then that
-commitment to actual playback start (`max_warm_sc_to_playback_start_ms`). GI
+commitment to actual playback start (`max_warm_sc_to_playback_start_ms`). UMI
 remains a separately measured upstream interval. Silence is not a meaningful
 spoken response and cannot satisfy a speaking-latency target. Do not subtract
 duration sums from absolute timestamps. Headless discard playback proves its
@@ -789,11 +789,11 @@ an invented `target_ref`.
 To grow the scenario library, use the authoring helper:
 
 ```bash
-python scripts/scenario_author.py new --suite goal_interpretation --id draft_case \
+python scripts/scenario_author.py new --suite user_meaning_interpretation --id draft_case \
   --text "Hello Chromie."
-python scripts/scenario_author.py edit --suite goal_interpretation --id draft_case
+python scripts/scenario_author.py edit --suite user_meaning_interpretation --id draft_case
 python scripts/scenario_author.py validate-all
-python scripts/scenario_author.py prompt --suite goal_interpretation --count 20
+python scripts/scenario_author.py prompt --suite user_meaning_interpretation --count 20
 ```
 
 The prompt command is for generating reviewed candidate JSON with an LLM; the
@@ -822,17 +822,17 @@ evidence and cannot close independent semantic adjudication or release
 qualification. The authoritative workflow and multi-model commands are in
 [Chromie-specific semantic qualification workflow](CHROMIE_BENCHMARK_SUITE.md#chromie-specific-semantic-qualification-workflow).
 
-### Goal Interpreter model-potential screening
+### User Meaning Interpreter model-potential screening
 
 Model selection and production-contract qualification are separate claims. Use
-`scripts/qualify_goal_interpreter_model_potential.py` to compare a candidate's
+`scripts/qualify_user_meaning_interpreter_model_potential.py` to compare a candidate's
 atomic decomposition, outcome, output mode, binding, coordination, and uncertainty
 potential through a simplified model-neutral wire. The probe uses native Ollama
-structured decoding but deliberately excludes the production GI prompt, DTO
+structured decoding but deliberately excludes the production UMI prompt, DTO
 normalizer, Host validator, GA, Planner, and execution path:
 
 ```bash
-python scripts/qualify_goal_interpreter_model_potential.py \
+python scripts/qualify_user_meaning_interpreter_model_potential.py \
   --model ministral-3:14b \
   --temperature 0 --top-p 0.9 --repeats 2
 ```
@@ -840,7 +840,7 @@ python scripts/qualify_goal_interpreter_model_potential.py \
 Retain the model digest, prompt/schema digests, generation settings, raw output,
 per-dimension results, and repeat index. A high model-potential result only selects
 a candidate for prompt/schema engineering. It never promotes a runtime profile or
-qualifies the current production GI transaction. Production qualification must then
+qualifies the current production UMI transaction. Production qualification must then
 run the same source-bound cohort through the exact deployed prompt, schema, canonical
 Host validation, timeout, and provider settings. Do not combine the two evidence
 classes into one score, and do not turn qualification findings into phrase-specific
@@ -856,7 +856,7 @@ Host behavior rules.
 
 ## Model-assisted routing guardrails
 
-The fast Goal Interpretation model is accepted only as an advisory semantic interpreter.
+The fast User Meaning Interpretation model is accepted only as an advisory semantic interpreter.
 Level A routing evidence must continue to prove:
 
 - deterministic stop, cancel, emergency, silence, and unusable-audio paths do
@@ -869,9 +869,9 @@ Level A routing evidence must continue to prove:
   `addressed=false` directed/unclear pair, but deterministic code must not
   invent the ambient label;
 - the retained
-  `goal_interpretation/inactive_direct_weather_question_false_addressedness` scenario
+  `user_meaning_interpretation/inactive_direct_weather_question_false_addressedness` scenario
   replays the inactive host context, grounded weather-tool decision, and false
-  high-confidence question review through the real Goal Interpretation recovery pipeline;
+  high-confidence question review through the real User Meaning Interpretation recovery pipeline;
 - model routes are bounded by capability-catalog candidates and schema
   finalization;
 - low-confidence, ambiguous, unsupported, or unavailable routes clarify, refuse,
@@ -1011,7 +1011,7 @@ calls hang. Add one self-describing live text file under the appropriate
 `scenarios/general_ability/<stage>/<ability-class>/` directory instead.
 
 For a deployed text-to-MuJoCo check that skips microphone and ASR while keeping
-Goal Interpretation, the goal-driven runtime, the host Trusted Capability Runtime, live Soridormi
+User Meaning Interpretation, the goal-driven runtime, the host Trusted Capability Runtime, live Soridormi
 MCP, and optional real speaker playback, start Chromie with the Soridormi
 manifest loaded and run:
 
@@ -1323,7 +1323,7 @@ a partial live run from being attached as if it closed the broader audit. The co
 probe rejects exact repeated assistant speech on a new follow-up turn; the WorkDAG probe
 requires exact one-occurrence body observations and then a follow-up blink without replaying
 the completed walk; the information probes require Planner-owned Evidence re-entry. The
-source qualification separately pins the GI/GA/Planner, WorkDAG, turn-loop, continuous
+source qualification separately pins the UMI/GA/Planner, WorkDAG, turn-loop, continuous
 cognition, and conversation-state regression files, so a live bundle cannot hide a source
 regression.
 
@@ -1746,7 +1746,7 @@ python scripts/voice_acceptance.py \
 
 For each utterance the runner displays a countdown and `SPEAK NOW`, waits for
 `asr_final`, shows expected and recognized text, and prints the current
-session's Goal Interpretation, interaction, skill, playback, cancellation, and completion
+session's User Meaning Interpretation, interaction, skill, playback, cancellation, and completion
 events. It asks for an audible/visual operator verdict only after all machine
 checks pass. Missing ASR or required runtime events automatically fail the case.
 Before opening the microphone, supervised mode also waits for the live TTS
@@ -1816,7 +1816,7 @@ For every case retain:
 - repository and Soridormi revisions;
 - `.env.runtime` profile name without secrets;
 - audio device names, sample rates, and VAD thresholds;
-- Goal Interpretation decision, Agent/interaction metadata, skill results, and correlated IDs;
+- User Meaning Interpretation decision, Agent/interaction metadata, skill results, and correlated IDs;
 - confirmation ID, exact request fingerprint, expiry, and approval or denial;
 - timing logs and operator pass/fail notes;
 - simulator/hardware state before and after the case;

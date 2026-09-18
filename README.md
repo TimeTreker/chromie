@@ -11,7 +11,7 @@ The long-term goal and ownership boundaries are defined in the
 The owner-approved [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
 treats communication with people as a primary cognitive responsibility with
 independent value. It separates ordinary communication from Planner's Work
-planning while preserving GI understanding, GA continuity and trusted execution.
+planning while preserving UMI understanding, GA continuity and trusted execution.
 SC is integrated into ordinary turns, required communication, result re-entry and
 trusted Situation wakes. Work Planner returns tasks and communication Needs;
 SC returns grounded interaction or silence. See [current evidence](docs/STATUS.md#social-cognition-migration)
@@ -23,7 +23,7 @@ experience artifacts. See
 [Runtime Observability Architecture](docs/RUNTIME_OBSERVABILITY.md).
 
 > **Current state:** Chromie uses one Goal-driven semantic authority with
-> event-driven, readiness-driven continuation. Goal Interpretation owns
+> event-driven, readiness-driven continuation. User Meaning Interpretation owns
 > provider-neutral Responsibility / WHAT. The same admitted meaning can enter
 > Planner and Goal Association concurrently: Planner owns detailed HOW, exact
 > Communicative Activities and Capability Work, while Goal Association alone owns
@@ -86,7 +86,7 @@ Person / World
       ▼
 Cognitive Gateway
       ▼
-Goal Interpretation
+User Meaning Interpretation
       ▼
 Responsibility / WHAT
       │
@@ -337,7 +337,7 @@ documented in
   and planning, belongs to LLM reasoning over bounded contracts, not hardcoded phrase,
   person/event category, regex, or regression-case matches;
 - normal natural-language cognition goes through model-authored typed meaning;
-  Goal Interpretation owns WHAT, Goal Association owns canonical Goal continuity,
+  User Meaning Interpretation owns WHAT, Goal Association owns canonical Goal continuity,
   and Fast/Deep Planner owns HOW plus every user-facing Communicative Activity;
   the Host validates, schedules, and realizes those Activities without becoming
   a second response author;
@@ -351,7 +351,7 @@ documented in
 | Path | Responsibility |
 |---|---|
 | `orchestrator/` | Host audio, interruption, conversation state, and Trusted Capability Runtime |
-| `agent/app/cognitive_core/goal_interpreter/` | Goal Interpretation implementation: provider-neutral Responsibility meaning only |
+| `agent/app/cognitive_core/user_meaning_interpreter/` | User Meaning Interpretation implementation: provider-neutral Responsibility meaning only |
 | `agent/` | Native interaction, capabilities, and WorkDAG APIs |
 | `asr/`, `tts/` | Speech services |
 | `shared/` | Shared contracts and scheduling primitives |

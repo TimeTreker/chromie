@@ -8,7 +8,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
 from agent.app.goal_association_prompt import immutable_source_turn_prompt as ga_source_prompt
 from agent.app.planner_prompt import immutable_source_turn_prompt as planner_source_prompt
 from orchestrator.orchestrator import VoiceAssistant
@@ -126,13 +126,13 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
 
     def test_gi_ga_and_planner_reference_the_same_envelope_source(self) -> None:
         envelope = self._envelope()
-        gi_request = GoalInterpretationRequest(
+        umi_request = UserMeaningInterpretationRequest(
             sid=envelope.session_id,
             text=envelope.normalized_input.text,
             language=envelope.normalized_input.language,
             turn_envelope=envelope,
         )
-        self.assertEqual(gi_request.turn_envelope, envelope)
+        self.assertEqual(umi_request.turn_envelope, envelope)
 
         work_request = CognitiveWorkRequest(
             sid=envelope.session_id,
@@ -171,7 +171,7 @@ class UserTurnEnvelopeContractTests(unittest.TestCase):
     def test_semantic_requests_reject_envelope_transport_mismatch(self) -> None:
         envelope = self._envelope()
         with self.assertRaisesRegex(ValidationError, "text does not match UserTurnEnvelope"):
-            GoalInterpretationRequest(
+            UserMeaningInterpretationRequest(
                 sid=envelope.session_id,
                 text="Different words",
                 language=envelope.normalized_input.language,

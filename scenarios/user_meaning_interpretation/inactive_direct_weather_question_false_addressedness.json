@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "id": "inactive_direct_weather_question_false_addressedness",
+  "suite": "user_meaning_interpretation",
+  "level": "integration",
+  "description": "Once Gateway admits the direct Chinese weather question, UMI preserves its location, time, polarity, and fresh-evidence requirement.",
+  "tags": [
+    "voice-log",
+    "chinese",
+    "weather",
+    "addressedness",
+    "inactive-engagement",
+    "false-negative"
+  ],
+  "input": {
+    "text": "今天北京下雨了吗？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "context": {
+      "interaction_engagement": {
+        "gate_enabled": true,
+        "active": false,
+        "evidence": "none"
+      },
+      "common_ability_catalog": [
+        {
+          "capability_id": "chromie.weather.lookup",
+          "route": "tool",
+          "effects": [
+            "external_read",
+            "weather_lookup"
+          ],
+          "description": "Retrieve current weather or forecast for a city."
+        }
+      ]
+    },
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.95,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "今天北京下雨了吗？",
+              "confidence": 0.95,
+              "output_mode": "information",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t8"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": []
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.95,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "今天北京下雨了吗？",
+        "confidence": 0.95,
+        "output_mode": "information"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "robust_intent_understanding",
+        "title": "Robust Intent Understanding",
+        "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
+        "rationale": "An admitted direct weather question remains intact inside UMI.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

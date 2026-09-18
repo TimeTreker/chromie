@@ -21,7 +21,7 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "goal_interpretation",
+            "stage": "user_meaning_interpretation",
             "decision": {
               "confidence": 0.96,
               "responsibilities": [
@@ -33,10 +33,11 @@
                   "source_evidence": {
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t10"
-                  }
+                  },
+                  "continuity_scope": "goal"
                 }
               ],
-              "unresolved": []
+              "meaning_uncertainties": []
             }
           }
         ]
@@ -44,7 +45,7 @@
       "expect": {
         "llm_calls": 1,
         "llm_stages": [
-          "goal_interpretation"
+          "user_meaning_interpretation"
         ],
         "responsibilities": [
           {
@@ -63,7 +64,7 @@
       "stub": {
         "llm_script": [
           {
-            "stage": "goal_interpretation",
+            "stage": "user_meaning_interpretation",
             "decision": {
               "confidence": 0.97,
               "responsibilities": [
@@ -75,7 +76,8 @@
                   "source_evidence": {
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t3"
-                  }
+                  },
+                  "continuity_scope": "goal"
                 },
                 {
                   "local_ref": "r2",
@@ -85,10 +87,11 @@
                   "source_evidence": {
                     "source_start_token_ref": "t5",
                     "source_end_token_ref": "t9"
-                  }
+                  },
+                  "continuity_scope": "goal"
                 }
               ],
-              "unresolved": []
+              "meaning_uncertainties": []
             }
           }
         ]
@@ -96,7 +99,7 @@
       "expect": {
         "llm_calls": 1,
         "llm_stages": [
-          "goal_interpretation"
+          "user_meaning_interpretation"
         ],
         "responsibilities": [
           {

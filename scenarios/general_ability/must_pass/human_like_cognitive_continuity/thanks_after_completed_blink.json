@@ -58,7 +58,7 @@
         "title": "Human-like Cognitive Continuity",
         "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
         "rationale": "A routine thank-you after completed work should receive a social acknowledgement and must not replay the completed gesture.",
-        "root_cause_boundaries": ["Cognitive Gateway", "Goal Interpretation/Goal Association", "Planner", "Host interaction state", "Test evidence"]
+        "root_cause_boundaries": ["Cognitive Gateway", "User Meaning Interpretation/Goal Association", "Planner", "Host interaction state", "Test evidence"]
       }
     ]
   }

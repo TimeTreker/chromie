@@ -76,7 +76,7 @@
         "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
         "rationale": "The retained Chongqing morning-rain request should speak prompt progress and perform the safe weather lookup without asking the user for the answer.",
         "root_cause_boundaries": [
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Prompt wording",
           "Test evidence"

@@ -760,7 +760,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "Capability arguments require exact schema values; handwritten language aliases may not repair model output",
         ),
-        "agent/app/cognitive_core/goal_interpreter/model_interpreter.py": (
+        "agent/app/cognitive_core/user_meaning_interpreter/model_interpreter.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
                 "_decision_has_weather_semantics",
@@ -772,15 +772,15 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "Use tool for changing external facts, including current weather",
                 "direct_question_form",
                 "missing_aliases",
-                "goal_interpretation_responsibility_coverage",
-                "GoalInterpretationCoverageCertificate",
+                "user_meaning_interpretation_responsibility_coverage",
+                "UserMeaningInterpretationCoverageCertificate",
                 "build_responsibility_coverage_payload",
                 "_ensure_atomic_responsibility_coverage",
                 "build_interpretation_repair_payload",
-                "goal_interpretation_contract_repair",
-                "goal_interpretation_deep_contract_repair",
+                "user_meaning_interpretation_contract_repair",
+                "user_meaning_interpretation_deep_contract_repair",
             ),
-            "Goal Interpretation may not contain domain routing, punctuation/alias semantic fallbacks, or a second same-authority repair/coverage/resegmentation call",
+            "User Meaning Interpretation may not contain domain routing, punctuation/alias semantic fallbacks, or a second same-authority repair/coverage/resegmentation call",
         ),
         "agent/app/goal_association.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -994,13 +994,13 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "the static ability ontology may describe responsibility but may not author user-facing speech",
         ),
-        "agent/app/cognitive_core/goal_interpreter/engine.py": (
+        "agent/app/cognitive_core/user_meaning_interpreter/engine.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
                 "_unique_capability_suffix_match",
                 "action_claim_terms",
             ),
-            "Goal Interpretation may validate exact model output but may not guess capabilities or speech meaning from words",
+            "User Meaning Interpretation may validate exact model output but may not guess capabilities or speech meaning from words",
         ),
         "orchestrator/runtime/named_goal_cancellation.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -1050,7 +1050,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "spoken-text sanitization may remove mechanical identifiers but may not classify natural-language meaning",
         ),
-        "agent/app/cognitive_core/goal_interpreter/schema.py": (
+        "agent/app/cognitive_core/user_meaning_interpreter/schema.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
                 'decision.speak_first = "你是指什么？"',
@@ -1061,7 +1061,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "reject_contract_marker_as_spoken_text",
                 "contract_markers =",
             ),
-            "Goal Interpretation contracts may preserve exact typed model output but may not synthesize wording or semantic aliases",
+            "User Meaning Interpretation contracts may preserve exact typed model output but may not synthesize wording or semantic aliases",
         ),
         "orchestrator/runtime/session.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -1096,9 +1096,9 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/agents/capability.py",
         "agent/app/capabilities/catalog.py",
         "agent/app/capabilities/validator.py",
-        "agent/app/cognitive_core/goal_interpreter/engine.py",
-        "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-        "agent/app/cognitive_core/goal_interpreter/schema.py",
+        "agent/app/cognitive_core/user_meaning_interpreter/engine.py",
+        "agent/app/cognitive_core/user_meaning_interpreter/model_interpreter.py",
+        "agent/app/cognitive_core/user_meaning_interpreter/schema.py",
         "agent/app/schema.py",
         "orchestrator/orchestrator.py",
         "orchestrator/runtime/confirmation.py",

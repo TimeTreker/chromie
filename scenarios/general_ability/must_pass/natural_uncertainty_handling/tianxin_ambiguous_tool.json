@@ -54,7 +54,7 @@
         "rationale": "Ambiguous Chinese tool-like text should clarify the meaning, not report a missing physical skill.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]

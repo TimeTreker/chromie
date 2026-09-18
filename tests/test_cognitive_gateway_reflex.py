@@ -278,7 +278,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         }
         quiet = assistant._cognitive_core_exception_safe_response(
             "别说话，点头。", context={"user_turn_envelope": envelope},
-            failure_stage="goal_interpretation", failure_class="unavailable",
+            failure_stage="user_meaning_interpretation", failure_class="unavailable",
         )
         self.assertEqual(quiet.speech, [])
         self.assertEqual(quiet.metadata["semantic_status"], "failed")
@@ -448,7 +448,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     ) -> tuple[list[str], dict[str, Any]]:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         events: list[str] = []
-        network_calls = {"confirmation": 0, "session": 0, "goal_interpretation": 0, "model": 0}
+        network_calls = {"confirmation": 0, "session": 0, "user_meaning_interpretation": 0, "model": 0}
         recorded_turn: dict[str, Any] = {}
         approval_during_provider_cancel: list[str] = []
 
@@ -513,8 +513,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         class _AgentClient:
             async def interpret_turn(self, *args: Any, **kwargs: Any) -> None:
-                network_calls["goal_interpretation"] += 1
-                raise AssertionError("Goal Interpretation must not run for a local stop reflex")
+                network_calls["user_meaning_interpretation"] += 1
+                raise AssertionError("User Meaning Interpretation must not run for a local stop reflex")
 
         class _Sessions:
             state = {"sid-stop": {"llm_done": False}}
@@ -641,7 +641,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             network_calls,
-            {"confirmation": 0, "session": 0, "goal_interpretation": 0, "model": 0},
+            {"confirmation": 0, "session": 0, "user_meaning_interpretation": 0, "model": 0},
         )
         self.assertLess(
             events.index("output_invalidation"),
@@ -669,14 +669,14 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         recorded_turn["approval_during_provider_cancel"] = approval_during_provider_cancel
         return events, recorded_turn
 
-    async def test_english_emergency_stop_bypasses_goal_interpreter_and_model(self) -> None:
+    async def test_english_emergency_stop_bypasses_user_meaning_interpreter_and_model(self) -> None:
         _, turn = await self._exercise_local_stop("Emergency stop!")
         self.assertEqual(
             turn["metadata"]["reflex_outcome"]["trigger"],
             "emergency_stop_command",
         )
 
-    async def test_chinese_emergency_stop_bypasses_goal_interpreter_and_model(self) -> None:
+    async def test_chinese_emergency_stop_bypasses_user_meaning_interpreter_and_model(self) -> None:
         _, turn = await self._exercise_local_stop("急停！")
         self.assertEqual(
             turn["metadata"]["reflex_outcome"]["trigger"],

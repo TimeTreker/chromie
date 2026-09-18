@@ -96,7 +96,7 @@ def _wire_output(payload):
 async def test_terminal_cannot_drop_gi_meaning_gap(gap: str, preserve_gap: bool) -> None:
     """Replay the laptop's accepted shake plan with unresolved WHAT contrasts."""
     responsibility = CognitiveResponsibilityProposal(local_ref='r1', outcome='shake head twice', output_mode='body_action', bindings={'count': 2}, confidence=0.5)
-    request = CognitiveWorkRequest(sid='unresolved-shake', text='摇两下头。', language='zh-CN', responsibilities=[responsibility], interpretation_unresolved=[gap], interpretation_confidence=0.5)
+    request = CognitiveWorkRequest(sid='unresolved-shake', text='摇两下头。', language='zh-CN', responsibilities=[responsibility], meaning_uncertainties=[gap], interpretation_confidence=0.5)
     output = {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.shake_no', 'activity_id': 'act_shake_head_twice', 'args': {'count': 2}, 'timing': 'sequential', 'source_responsibility_refs': ['r1']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Execute head shake twice as requested'}
     if preserve_gap:
         output['disposition'] = 'clarify'
@@ -120,14 +120,14 @@ async def test_terminal_cannot_drop_gi_meaning_gap(gap: str, preserve_gap: bool)
 @pytest.mark.parametrize('independent', [False, True])
 def test_meaning_gaps_preserve_independent_terminal_work(preserve_all: bool, independent: bool) -> None:
     responsibilities = [CognitiveResponsibilityProposal(local_ref=ref, outcome=outcome, output_mode='body_action', bindings={'count': 2}, confidence=0.9) for ref, outcome in [('r1', 'shake the indicated head twice'), ('r2', 'nod twice')]]
-    request = CognitiveWorkRequest(sid='mixed-meaning', text='让那个摇两下头，你点两下头。', responsibilities=responsibilities, interpretation_unresolved=['actor', 'target_identity'])
-    gaps = [{'gap_id': f'gap-{name}', 'description': name, 'blocking': True, 'resolved': False, 'required_for': [name], 'preferred_resolution': 'ask_user', 'source_kind': 'unresolved_meaning', 'source_reference': name, 'resolution_sources_considered': ['authoritative_context']} for name in (request.interpretation_unresolved if preserve_all else ['actor'])]
-    raw = {'disposition': 'mixed', 'coverage': 'complete', 'covered_responsibility_refs': ['r1', 'r2'], 'activities': [{'activity_id': 'ask-meaning', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}, {'activity_id': 'nod', 'role': 'capability', 'capability_id': 'soridormi.nod_yes', 'args': {'count': 2}, 'timing': 'sequential', 'source_responsibility_refs': ['r2'] if independent else ['r1', 'r2']}], 'continuations': [], 'confidence': 0.9, 'unresolved': list(request.interpretation_unresolved), 'reason_summary': 'Clarify the first request; perform the independent nod.'}
+    request = CognitiveWorkRequest(sid='mixed-meaning', text='让那个摇两下头，你点两下头。', responsibilities=responsibilities, meaning_uncertainties=['actor', 'target_identity'])
+    gaps = [{'gap_id': f'gap-{name}', 'description': name, 'blocking': True, 'resolved': False, 'required_for': [name], 'preferred_resolution': 'ask_user', 'source_kind': 'unresolved_meaning', 'source_reference': name, 'resolution_sources_considered': ['authoritative_context']} for name in (request.meaning_uncertainties if preserve_all else ['actor'])]
+    raw = {'disposition': 'mixed', 'coverage': 'complete', 'covered_responsibility_refs': ['r1', 'r2'], 'activities': [{'activity_id': 'ask-meaning', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}, {'activity_id': 'nod', 'role': 'capability', 'capability_id': 'soridormi.nod_yes', 'args': {'count': 2}, 'timing': 'sequential', 'source_responsibility_refs': ['r2'] if independent else ['r1', 'r2']}], 'continuations': [], 'confidence': 0.9, 'unresolved': list(request.meaning_uncertainties), 'reason_summary': 'Clarify the first request; perform the independent nod.'}
     capabilities = [_nod_catalog_capability().model_dump(mode='json')]
     output = FastPlannerAdvanceModelOutput.model_validate(raw)
     if preserve_all and independent:
         validate_fast_advance_output(output, request=request, responsibilities=responsibilities, capabilities=capabilities)
-        schema = fast_streaming_advance_response_schema(['r1', 'r2'], responsibilities=responsibilities, capabilities=capabilities, interpretation_unresolved=request.interpretation_unresolved)
+        schema = fast_streaming_advance_response_schema(['r1', 'r2'], responsibilities=responsibilities, capabilities=capabilities, meaning_uncertainties=request.meaning_uncertainties)
         Draft202012Validator(schema).validate(raw)
     else:
         with pytest.raises(AuthoritativeGroundingValidationError):
@@ -219,7 +219,7 @@ async def test_declared_structured_resource_realization_rejects_lost_gi_value() 
     resolver = FastPlannerResolver(_StreamingModel([_wire_output(_structured_resource_output(recipient='requester'))]), _Catalog([_structured_resource_catalog_capability()]))
     frames = [frame async for frame in resolver.stream_advance(_structured_resource_request())]
     assert isinstance(frames[0], FastPlannerStreamFailure)
-    assert 'structured resource realization omitted exact GI bindings' in frames[0].reason
+    assert 'structured resource realization omitted exact UMI bindings' in frames[0].reason
     assert 'recipient=recipient' in frames[0].reason
 
 

@@ -19,7 +19,7 @@ python scripts/check_runtime_structure.py
 python scripts/check_docs.py
 ./scripts/benchmark_check.sh
 
-LOG_LEVEL=WARNING AGENT_LOG_LEVEL=WARNING AGENT_GOAL_INTERPRETER_LOG_LEVEL=WARNING \
+LOG_LEVEL=WARNING AGENT_LOG_LEVEL=WARNING AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL=WARNING \
   python -m pytest -q tests
 
 # The original Agent tests use plain pytest-style functions but do not depend on

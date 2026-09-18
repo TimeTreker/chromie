@@ -6,7 +6,7 @@ The owner-approved Social Cognition amendment transfers optional communication
 expression to Social Cognition's primary decision. It may use exact eligible
 social-domain Capability proposals with its immutable communicative anchor;
 Runtime/Soridormi retain validation and safe realization. This includes trusted
-Situation-driven initiative without GI. No additional decoration model is added.
+Situation-driven initiative without UMI. No additional decoration model is added.
 The representation below belongs to SC; Work Planner is not an expression author. Explicitly requested gestures remain
 Goal-owned Planner Work. Source and evidence progress are tracked in
 [Status](STATUS.md#social-cognition-migration).
@@ -20,7 +20,7 @@ that accompanies a concrete human-observable Main Activity. It is not a separate
 agent, Planner, Goal, execution lane, or post-response model call.
 
 ```text
-GI / committed Work / trusted Situation / Evidence
+UMI / committed Work / trusted Situation / Evidence
   -> SC primary interaction decision
        -> exact communicative acts (spoken or nonverbal)
        -> optional expression anchored to those acts

@@ -82,7 +82,7 @@ A profile must explicitly define the complete cognitive model plan:
 ```text
 AGENT_MODEL
 OLLAMA_MODEL
-AGENT_GOAL_INTERPRETER_MODEL
+AGENT_USER_MEANING_INTERPRETER_MODEL
 AGENT_GOAL_ASSOCIATION_MODEL
 AGENT_FAST_PLANNER_MODEL
 AGENT_DEEP_PLANNER_MODEL
@@ -92,7 +92,7 @@ AGENT_SOCIAL_ATTENTION_MODEL
 
 Startup warms every active model in that plan and stops immediately if a model
 is missing. After containers start, `scripts/verify_runtime_profile.sh` checks
-that Goal Interpretation and the Cognitive Core received the same profile and fingerprint as
+that User Meaning Interpretation and the Cognitive Core received the same profile and fingerprint as
 `.env.runtime`.
 
 The maintained RTX 5090 and RTX 4090 Laptop hardware profiles own model,
@@ -102,7 +102,7 @@ declared output budget plus a 2048-token safety margin before inference and
 reject prompt or completion truncation as an LLM-budget failure. RTX 5090 keeps
 its declared shared Gemma4-12B SGLang profile. RTX 4090 Laptop assigns every LLM role to
 one `qwen3.5:4b` model served by its own pinned SGLang AWQ override, retains the 16K/512
-Goal Interpretation request budget, reserves 48K for Fast/Deep Planner, and keeps 32K for
+User Meaning Interpretation request budget, reserves 48K for Fast/Deep Planner, and keeps 32K for
 other downstream roles. One resident engine avoids cross-role weight/context reloads while
 SGLang can run up to three requests and apply the existing compute-class priority/preemption
 contract. Its 49152-token shared cache covers one maximum-size Planner request; it does not
@@ -133,7 +133,7 @@ qualification watchdog merely because that profile was auto-detected.
 | `jetson_thor` | AGX Thor placeholder profile | `gemma4:12b` | `qwen3:4b` | 4096 |
 
 The quality model is normally used by Goal Association and Deep Planner. The fast
-model is normally used by Goal Interpretation, Fast Planner (including terminal
+model is normally used by User Meaning Interpretation, Fast Planner (including terminal
 Evidence re-entry), Task Continuity, and Social Attention unless the profile
 explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop assigns
 all of those roles to one `qwen3.5:4b` SGLang engine with three bounded running-request slots.
@@ -172,7 +172,7 @@ Generation fails before Docker build/start when:
 Without strict mode, conflicting profile-owned local keys are ignored with an
 `[env][warning]` message. Inspect `ignored_local_overrides` in
 `.chromie/runtime_profile.json` to clean them up later. After startup, container
-verification fails if Agent or Goal Interpretation received a stale profile, stale
+verification fails if Agent or User Meaning Interpretation received a stale profile, stale
 fingerprint, or different model assignment.
 
 Inspect the active result with:

@@ -25,7 +25,7 @@ idle expiry, or process restart.
 
 A new task is not the same thing as a new SID. One task can include many
 sessions, for example a command followed by "quickly please", "not that far",
-"did it finish?", and "continue". The Goal Interpreter model should propose whether a new
+"did it finish?", and "continue". The User Meaning Interpreter model should propose whether a new
 input creates a new task, continues a task, modifies a task, closes a task, or
 is side conversation. The host task manager owns the final task write and safety
 state.
@@ -52,7 +52,7 @@ The state is intended to improve short conversational continuity. It should not
 be treated as authoritative robot state, a durable user profile, or a database
 of completed side effects.
 
-The Orchestrator exposes a compact `session_memory` object to Goal Interpretation and downstream Agent
+The Orchestrator exposes a compact `session_memory` object to User Meaning Interpretation and downstream Agent
 prompts. It summarizes the current task, active pending tasks, extracted memory
 entries, a compact `memory_summary`, and the current forgetting policy. This is
 the prompt-facing working memory for the current session, not a permanent
@@ -77,7 +77,7 @@ result-free index of exact original arguments and provenance; the capability
 returns data only when the already-resolved Goal bindings match exactly and the
 record is fresh enough. See
 [`DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
-Goal Interpretation remains WHAT-only and never hands planning to a separate
+User Meaning Interpretation remains WHAT-only and never hands planning to a separate
 separate deep-thinking agent. Fast and Deep Planner passes consume the same bounded
 Goal/Situation/Memory authorities at different cognition depths. Raw turns remain
 evidence/debug context; model-facing Memory is compact retained meaning selected
@@ -103,7 +103,7 @@ The same rule applies to ordinary chat history: bounded raw turns may be
 retained for traceability, but they should not become the default memory block
 for future prompts.
 
-Memory is not a Goal Interpretation route and there is no maintained
+Memory is not a User Meaning Interpretation route and there is no maintained
 separate memory agent. `ConversationStateManager` records bounded Memory only from
 already-typed owner outputs such as structured extracted-memory metadata, trusted
 Runtime outcomes, Reflection-approved local lessons, and explicitly consent-bound

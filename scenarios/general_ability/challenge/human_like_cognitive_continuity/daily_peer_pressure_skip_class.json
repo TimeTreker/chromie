@@ -63,7 +63,7 @@
         "rationale": "Support a clear, age-appropriate refusal or boundary without moralizing, insulting the peers, or pretending to control the situation.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

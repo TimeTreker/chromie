@@ -41,7 +41,7 @@ def test_semantic_artifact_packet_detects_payload_mutation() -> None:
         {"outcome": "say hello"},
         artifact_kind="responsibility",
         artifact_id="turn-1:r1",
-        authority="goal_interpretation",
+        authority="user_meaning_interpretation",
         session_id="sid-1",
         turn_id="turn-1",
         parent_refs=[parent.ref],
@@ -60,8 +60,8 @@ def test_semantic_artifact_parent_refs_are_deduplicated() -> None:
         authority="cognitive_gateway", session_id="sid-1", turn_id="turn-1",
     )
     packet = semantic_artifact_packet(
-        {"result": "ok"}, artifact_kind="goal_interpretation", artifact_id="turn-1",
-        authority="goal_interpretation", session_id="sid-1", turn_id="turn-1",
+        {"result": "ok"}, artifact_kind="user_meaning_interpretation", artifact_id="turn-1",
+        authority="user_meaning_interpretation", session_id="sid-1", turn_id="turn-1",
         parent_refs=[parent.ref, parent.ref],
     )
     assert packet.envelope.parent_refs == (parent.ref,)
@@ -150,7 +150,7 @@ def test_cognitive_evidence_archives_semantic_artifact_lineage() -> None:
 
     assert set(by_kind) == {
         "user_turn",
-        "goal_interpretation",
+        "user_meaning_interpretation",
         "responsibility",
         "goal_association",
         "goal",
@@ -161,7 +161,7 @@ def test_cognitive_evidence_archives_semantic_artifact_lineage() -> None:
     responsibility_packet = by_kind["responsibility"][0]
     assert {item.artifact_kind for item in responsibility_packet.envelope.parent_refs} == {
         "user_turn",
-        "goal_interpretation",
+        "user_meaning_interpretation",
     }
     goal_packet = by_kind["goal"][0]
     assert {item.artifact_kind for item in goal_packet.envelope.parent_refs} == {
@@ -251,7 +251,7 @@ def test_work_request_binds_exact_user_turn_gi_and_responsibility_lineage() -> N
     core, envelope = admitted_core("walk left", sid="sid-lineage", language="en-US")
     lineage = merge_semantic_artifact_lineage(
         semantic_artifact_ref(envelope, artifact_kind="user_turn", artifact_id=envelope.turn_id),
-        semantic_artifact_ref(core, artifact_kind="goal_interpretation", artifact_id=core.turn_id),
+        semantic_artifact_ref(core, artifact_kind="user_meaning_interpretation", artifact_id=core.turn_id),
         [
             semantic_artifact_ref(
                 item,
@@ -272,7 +272,7 @@ def test_work_request_binds_exact_user_turn_gi_and_responsibility_lineage() -> N
         language=envelope.normalized_input.language,
         responsibilities=list(core.responsibilities),
         interpretation_confidence=core.confidence,
-        interpretation_unresolved=list(core.unresolved),
+        meaning_uncertainties=list(core.meaning_uncertainties),
         context=context,
     )
     assert request.semantic_artifact_lineage == lineage
@@ -286,7 +286,7 @@ def test_work_request_binds_exact_user_turn_gi_and_responsibility_lineage() -> N
             language=envelope.normalized_input.language,
             responsibilities=list(core.responsibilities),
             interpretation_confidence=core.confidence,
-            interpretation_unresolved=list(core.unresolved),
+            meaning_uncertainties=list(core.meaning_uncertainties),
             context={**context, "core_interpretation": corrupted},
         )
 
@@ -412,7 +412,7 @@ def test_live_turn_lineage_reaches_final_interaction_without_model_bookkeeping()
     )
     assert {item.artifact_kind for item in lineage.refs} == {
         "user_turn",
-        "goal_interpretation",
+        "user_meaning_interpretation",
         "responsibility",
         "goal_association",
         "goal",

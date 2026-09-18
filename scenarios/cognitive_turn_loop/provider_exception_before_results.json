@@ -189,7 +189,7 @@
         "rationale": "Provider failure is retained before any result exists.",
         "root_cause_boundaries": [
           "Test evidence",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]

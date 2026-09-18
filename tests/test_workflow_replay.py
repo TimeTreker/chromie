@@ -97,7 +97,7 @@ def test_bad_effect_reply_rejected_before_provider_dispatch(count, tmp_path):
                 assert replay.records[-1]['schema_errors']
             else:
                 # Numeric arguments are Planner-owned now. Their explicit
-                # value/proof mismatch rejects at Host, not a GI-derived enum.
+                # value/proof mismatch rejects at Host, not a UMI-derived enum.
                 assert not replay.records[-1]['schema_errors']
     asyncio.run(check())
 
@@ -149,11 +149,11 @@ def test_seeded_timer_does_not_authorize_unsourced_gi_ready_at():
     raw = copy.deepcopy(case['model_steps'][0]['response'])
     raw['responsibilities'][0]['binding_items'] = {'ready_at':'2099-09-04T19:00:00+08:00'}
     assert not Draft202012Validator(case['model_steps'][0]['request']['format']).is_valid(raw)
-    from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
-    from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
+    from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
     with pytest.raises(ValueError,match='binding_items'):
-        OllamaGoalInterpreter._validate_interpretation_content(
-            GoalInterpretationRequest(**case['input']),json.dumps(raw),
+        OllamaUserMeaningInterpreter._validate_interpretation_content(
+            UserMeaningInterpretationRequest(**case['input']),json.dumps(raw),
             response_schema=case['model_steps'][0]['request']['format'])
     assert case['initial_goal_resolution']['new_goals'][0]['object']['bindings']['ready_at']
 
@@ -217,7 +217,7 @@ def test_shared_packet_parts_are_hash_checked(tmp_path):
         load_case(case)
 
 
-@pytest.mark.parametrize('role', ['gi', 'ga', 'fast', 'deep'])
+@pytest.mark.parametrize('role', ['umi', 'ga', 'fast', 'deep'])
 def test_only_selected_role_receives_actual_answer_blind_packet(role, tmp_path):
     from benchmarks.integration.model_replay import load_case
     family = 'normal_deep' if role == 'deep' else 'normal_fast'
@@ -247,7 +247,7 @@ def test_valid_candidate_variation_stops_at_uncovered_downstream_branch(tmp_path
     step['response']['responsibilities'][0]['confidence'] = 0.75
     candidate = ModelReplay({'model_steps':[step]})
     with ReplayServer(candidate) as server:
-        replay = ModelReplay(case, candidate={'role':'gi','url':server.url,'model':'candidate-local'})
+        replay = ModelReplay(case, candidate={'role':'umi','url':server.url,'model':'candidate-local'})
         with pytest.raises(Exception):
             asyncio.run(run_case(case, tmp_path, replay))
     failure = json.loads((tmp_path/'failure.json').read_text())
@@ -262,9 +262,9 @@ def test_valid_candidate_variation_stops_at_uncovered_downstream_branch(tmp_path
 
 def test_candidate_mode_rejects_fault_injection_references():
     from benchmarks.integration.model_replay import load_case
-    case = load_case(CORPUS/'workflow-gi_unknown_binding-blink-0-0.json')
+    case = load_case(CORPUS/'workflow-umi_unknown_binding-blink-0-0.json')
     with pytest.raises(ValueError, match='intentional model faults'):
-        ModelReplay(case, candidate={'role':'gi','url':'http://127.0.0.1:1','model':'unused'})
+        ModelReplay(case, candidate={'role':'umi','url':'http://127.0.0.1:1','model':'unused'})
 
 
 def test_candidate_transport_preserves_incomplete_provider_envelope():
@@ -279,7 +279,7 @@ def test_candidate_transport_preserves_incomplete_provider_envelope():
         return envelope
     candidate.reply = incomplete
     with ReplayServer(candidate) as server:
-        replay = ModelReplay(case, candidate={'role':'gi','url':server.url,'model':'candidate-local'})
+        replay = ModelReplay(case, candidate={'role':'umi','url':server.url,'model':'candidate-local'})
         actual = replay.reply('/api/chat', case['model_steps'][0]['request'])
     assert actual['done'] is False and actual['done_reason'] == 'length'
     assert json.loads(replay.records[0]['raw_transport_response']) == actual
@@ -289,7 +289,7 @@ def test_candidate_http_failure_has_raw_evidence_and_no_reference_fallback():
     case = load()
     candidate = ModelReplay({'model_steps':[]})
     with ReplayServer(candidate) as server:
-        replay = ModelReplay(case, candidate={'role':'gi','url':server.url,'model':'candidate-local'})
+        replay = ModelReplay(case, candidate={'role':'umi','url':server.url,'model':'candidate-local'})
         with pytest.raises(ReplayMismatch, match='HTTP 409'):
             replay.reply('/api/chat', case['model_steps'][0]['request'])
     assert replay.position == 0 and replay.candidate_calls == 1

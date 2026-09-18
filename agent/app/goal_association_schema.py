@@ -24,7 +24,7 @@ except ImportError:  # pragma: no cover - repository development path
 
 
 def _decoder_binding_value(name: Any, value: Any) -> str:
-    """Project an already-typed GI value into the Goal binding vocabulary."""
+    """Project an already-typed UMI value into the Goal binding vocabulary."""
 
     normalized_name = "_".join(
         str(name).strip().casefold().replace("-", "_").split()
@@ -97,6 +97,7 @@ def goal_association_response_schema(
     responsibility_output_modes: dict[str, str] | None = None,
     responsibility_information_refs: set[str] | None = None,
     responsibility_bindings: dict[str, dict[str, Any]] | None = None,
+    meaning_uncertainty_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     schema = copy.deepcopy(output_type.model_json_schema())
     active_ids = [
@@ -125,6 +126,11 @@ def goal_association_response_schema(
         str(source_ref): dict(bindings)
         for source_ref, bindings in (responsibility_bindings or {}).items()
     }
+    meaning_uncertainty_refs = [
+        " ".join(str(item or "").strip().split())
+        for item in (meaning_uncertainty_refs or [])
+        if " ".join(str(item or "").strip().split())
+    ]
     properties = schema.get("properties", {})
     new_goals = properties.get("new_goals")
     if isinstance(new_goals, dict):
@@ -203,6 +209,18 @@ def goal_association_response_schema(
                         resolved_gaps["uniqueItems"] = True
                     else:
                         resolved_gaps["maxItems"] = 0
+                resolved_uncertainties = node_properties.get(
+                    "resolved_meaning_uncertainty_refs"
+                )
+                if isinstance(resolved_uncertainties, dict):
+                    if meaning_uncertainty_refs:
+                        resolved_uncertainties["items"] = {
+                            "type": "string",
+                            "enum": meaning_uncertainty_refs,
+                        }
+                        resolved_uncertainties["uniqueItems"] = True
+                    else:
+                        resolved_uncertainties["maxItems"] = 0
                 referent_id = node_properties.get("referent_id")
                 if isinstance(referent_id, dict):
                     referent_id["type"] = "string"
@@ -344,7 +362,7 @@ def goal_association_response_schema(
     if isinstance(goal_schema, dict) and responsibility_refs:
         # Every writable Goal-semantic surface must be explicit in the
         # constrained model output. Defaults on these fields are Python DTO
-        # conveniences, not permission for the model to drop GI-grounded
+        # conveniences, not permission for the model to drop UMI-grounded
         # bindings or silently avoid deciding the resource branch.
         goal_required = list(
             dict.fromkeys(
@@ -436,7 +454,7 @@ def goal_association_response_schema(
                     ):
                         binding_branch.pop("allOf", None)
                 if normalized_name == "location" and canonical_entity_type is None:
-                    # This GI-fixed name must use the existing location type
+                    # This UMI-fixed name must use the existing location type
                     # vocabulary directly; decoder conditionals are insufficient.
                     binding_properties["entity_type"] = {"enum": list(CANONICAL_LOCATION_ENTITY_TYPES)}
                     binding_branch.pop("allOf", None)
@@ -720,10 +738,10 @@ def goal_association_response_schema(
         def resource_variants(source_ref: str) -> list[str]:
             output_mode = responsibility_output_modes.get(source_ref)
             if source_ref in responsibility_information_refs:
-                # GI authored only the human-level information WHAT. At the
+                # UMI authored only the human-level information WHAT. At the
                 # canonical Goal boundary that category projects to the existing
                 # provider-neutral information-resource representation. This is
-                # a deterministic representation projection, not GI choosing a
+                # a deterministic representation projection, not UMI choosing a
                 # Capability, provider, or executable work item.
                 return ["information"]
             if output_mode == "body_action":
@@ -838,7 +856,7 @@ def goal_association_response_schema(
         # For one ref, every item branch fixes that same singleton ref and the
         # array has exactly one item. Multi-ref coverage is not redundant.
         if output_type is GoalSegmentationModelOutput:
-            # With no retained Goal candidate, every GI Responsibility must
+            # With no retained Goal candidate, every UMI Responsibility must
             # become exactly one new Goal. Encode the already-enforced Host
             # invariant in the decoder so contract repair cannot emit r1,r1
             # for an r1,r2 turn. This is identity conservation, not semantic
@@ -846,7 +864,7 @@ def goal_association_response_schema(
             properties["new_goals"].update(new_goal_conservation)
         else:
             # Existing-Goal continuity and independent new work can coexist in
-            # one turn.  For every accepted GI Responsibility, require exactly
+            # one turn.  For every accepted UMI Responsibility, require exactly
             # one owning item across the union of both semantic collections.
             # This is request-bound conservation at the earliest decoder
             # boundary; neither the DTO nor Host chooses the semantic owner.

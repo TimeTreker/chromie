@@ -87,7 +87,7 @@ class FastAdvanceMechanicalSchedulingError(PlannerDTOContractError):
 
 
 def _contains_exact_material_value(container: Any, expected: Any) -> bool:
-    """Return whether a declared structured realization conserves one GI value.
+    """Return whether a declared structured realization conserves one UMI value.
 
     This is deliberately representation-only. The Capability owns which
     semantic binding may realize into which provider argument; trusted code only
@@ -102,6 +102,21 @@ def _contains_exact_material_value(container: Any, expected: Any) -> bool:
     if isinstance(container, list):
         return any(_contains_exact_material_value(value, expected) for value in container)
     return False
+
+
+def _argument_derivation_contract(
+    capability: dict[str, Any], parameter: str,
+) -> dict[str, Any] | None:
+    """Return a declared provider-local argument derivation, if any."""
+
+    hints = capability.get("hints")
+    if not isinstance(hints, dict):
+        return None
+    contracts = hints.get("argument_derivation")
+    if not isinstance(contracts, dict):
+        return None
+    contract = contracts.get(parameter)
+    return contract if isinstance(contract, dict) else None
 
 
 def _drop_redundant_unbound_schema_default(
@@ -427,9 +442,9 @@ def validate_fast_advance_output(
     by_ref = {item.local_ref: item for item in responsibilities}
     allowed = {item["capability_id"]: item for item in capabilities}
     unresolved_meaning = {
-        " ".join(str(item or "").strip().split())
-        for item in request.interpretation_unresolved
-        if " ".join(str(item or "").strip().split())
+        " ".join(item.description.strip().split())
+        for item in request.meaning_uncertainties
+        if " ".join(item.description.strip().split())
     }
     clarification_activities = [item for item in output.activities if item.role == "clarification"]
     capability_activities = [item for item in output.activities if item.role == "capability"]
@@ -617,7 +632,7 @@ def validate_fast_advance_output(
                 if gap.source_kind == "unresolved_meaning":
                     if gap.source_reference not in unresolved_meaning:
                         raise PlannerDTOContractError(
-                            "semantic clarification must cite exact GI unresolved "
+                            "semantic clarification must cite exact UMI unresolved "
                             f"meaning: {gap.source_reference!r}"
                         )
                     continue
@@ -731,7 +746,7 @@ def validate_fast_advance_output(
                     or Decimal(str(actual)) != Decimal(str(expected))
                 ):
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner numeric Capability input contradicts GI binding: "
+                        "Fast Planner numeric Capability input contradicts UMI binding: "
                         f"{activity.capability_id}.{name}; source_ref={source_ref} "
                         f"expected={expected!r} actual={actual!r}"
                     )
@@ -776,7 +791,7 @@ def validate_fast_advance_output(
             # below, while a different ungrounded override remains fail-closed.
             if parameter not in activity.args and "default" in parameter_schema:
                 continue
-            # target_ref is not authored from a GI scalar binding.  GI owns the
+            # target_ref is not authored from a UMI scalar binding.  UMI owns the
             # person/addressee meaning; the Planner realizes that meaning against
             # the Runtime's current trusted target evidence.  Validate the exact
             # opaque reference independently of a Capability's optional
@@ -834,15 +849,64 @@ def validate_fast_advance_output(
                     if missing_sources:
                         raise AuthoritativeGroundingValidationError(
                             "Fast Planner structured resource realization omitted "
-                            "exact GI bindings: "
+                            "exact UMI bindings: "
                             f"{activity.capability_id}.{parameter}="
                             + ",".join(sorted(missing_sources))
                         )
                 continue
+            derivation = _argument_derivation_contract(definition, parameter)
+            if derivation is not None:
+                source_parameter = str(derivation.get("source_argument") or "").strip()
+                if (
+                    not source_parameter
+                    or source_parameter == parameter
+                    or source_parameter not in activity.args
+                ):
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner derived Capability input lacks its declared source "
+                        f"argument: {activity.capability_id}.{parameter}"
+                    )
+                source_value = activity.args[source_parameter]
+                source_schema = properties.get(source_parameter)
+                source_is_grounded = False
+                if source_parameter in authoritative_bindings:
+                    expected = authoritative_bindings[source_parameter]
+                    source_is_grounded = (
+                        source_value == expected
+                        or str(source_value).strip() == str(expected).strip()
+                    )
+                elif source_parameter in activity.argument_sources:
+                    # Source spans were already checked against the immutable UserTurn.
+                    source_is_grounded = True
+                elif isinstance(source_schema, dict) and source_schema.get("type") == "string":
+                    source_is_grounded = any(
+                        literal_intent_argument(
+                            source_value,
+                            outcome=by_ref[ref].outcome,
+                            source_text=request.original_user_text,
+                        )
+                        for ref in activity.source_responsibility_refs
+                    )
+                if not source_is_grounded:
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner derived Capability input depends on an ungrounded "
+                        f"source argument: {activity.capability_id}.{parameter}<-{source_parameter}"
+                    )
+                if (
+                    bool(derivation.get("require_exact_source_value", True))
+                    and not _contains_exact_material_value(
+                        activity.args.get(parameter), source_value
+                    )
+                ):
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner derived Capability input changed canonical source "
+                        f"identity: {activity.capability_id}.{parameter}<-{source_parameter}"
+                    )
+                continue
             if parameter not in authoritative_bindings:
                 if parameter in activity.argument_sources:
                     continue
-                # Planner owns the mapping to the selected Capability. GI need
+                # Planner owns the mapping to the selected Capability. UMI need
                 # not duplicate an exact named value already in its complete
                 # outcome. Check both source provenance and Responsibility scope;
                 # raw text alone must not lend a sibling's value to this Activity.
@@ -871,11 +935,11 @@ def validate_fast_advance_output(
             expected = authoritative_bindings[parameter]
             if actual != expected and str(actual).strip() != str(expected).strip():
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner required Capability input contradicts GI "
+                    "Fast Planner required Capability input contradicts UMI "
                     f"binding: {activity.capability_id}.{parameter}"
                 )
 
-    # WHAT uncertainty belongs to GI. A terminal HOW result may preserve it in
+    # WHAT uncertainty belongs to UMI. A terminal HOW result may preserve it in
     # clarification provenance, but cannot silently decide or discard it. Check
     # after individual gap validation so invented citations keep their diagnosis.
     if output.disposition in {"execute", "respond", "clarify", "mixed"}:
@@ -888,7 +952,7 @@ def validate_fast_advance_output(
         missing_meaning = unresolved_meaning - cited_meaning
         if missing_meaning:
             raise AuthoritativeGroundingValidationError(
-                "Fast Planner terminal work omitted GI unresolved meaning: "
+                "Fast Planner terminal work omitted UMI unresolved meaning: "
                 + ",".join(sorted(missing_meaning))
             )
     blocked_refs = {

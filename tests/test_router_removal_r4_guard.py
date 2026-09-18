@@ -21,7 +21,7 @@ def test_router_architecture_guard_passes() -> None:
 
 
 def test_removed_router_service_and_client_are_absent() -> None:
-    assert not (ROOT / "goal_interpretation").exists()
+    assert not (ROOT / "user_meaning_interpretation").exists()
     assert not (ROOT / "orchestrator/clients/router_client.py").exists()
 
 

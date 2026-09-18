@@ -594,7 +594,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                         "args": {"count": 1, "amplitude": "small"},
                         "metadata": {
                             "source": "agent.capability",
-                            "goal_interpretation_source": "goal_interpreter.v1",
+                            "user_meaning_interpretation_source": "user_meaning_interpreter.v1",
                         },
                     }
                 ],
@@ -612,7 +612,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("route_stage", chromie_intent)
         self.assertNotIn("route_task_source_stage", chromie_intent)
         self.assertNotIn("route_confidence", chromie_intent)
-        self.assertEqual(chromie_intent["goal_interpretation_source"], "goal_interpreter.v1")
+        self.assertEqual(chromie_intent["user_meaning_interpretation_source"], "user_meaning_interpreter.v1")
 
 
     async def test_named_skill_propagates_live_perception_contract(self) -> None:

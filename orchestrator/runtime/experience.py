@@ -113,11 +113,12 @@ class ExperienceManager:
             conversation_id=self._str_or_none(context.get("conversation_id")),
             user_text=str(context.get("user_text") or ""),
             interpretation_confidence=self._float_or_none(
-                context.get("goal_interpretation_confidence")
+                context.get("user_meaning_interpretation_confidence")
             ),
-            interpretation_unresolved=[
-                str(item) for item in context.get("goal_interpretation_unresolved", [])
-                if str(item).strip()
+            meaning_uncertainties=[
+                str(item.get("description") or "").strip()
+                for item in context.get("user_meaning_uncertainties", [])
+                if isinstance(item, dict) and str(item.get("description") or "").strip()
             ],
             response_status=response.status,
             execution_status=execution_status,

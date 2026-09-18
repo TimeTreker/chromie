@@ -66,7 +66,7 @@ _NUMERIC_LITERAL_RE = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"
 )
 _EXECUTION_CONTRACT_PROMPT = (
-    "Preserve the human-facing WHAT category from Goal Interpretation exactly. "
+    "Preserve the human-facing WHAT category from User Meaning Interpretation exactly. "
     "Goal Association may refine semantic bindings, resource structure, references, "
     "and canonical continuity, but it does not decide whether a Capability, provider, "
     "execution lane, fresh Evidence, or Work is required. Use information when the "
@@ -113,7 +113,7 @@ GoalAssociationModelRelationship = Literal[
 
 
 class GoalAssociationModelBindingChange(BaseModel):
-    """Copy one accepted GI binding to a named retained Goal field."""
+    """Copy one accepted UMI binding to a named retained Goal field."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -131,7 +131,7 @@ class GoalAssociationModelBindingChange(BaseModel):
 
 
 class GoalAssociationModelRequirementChange(BaseModel):
-    """Select retained requirements replaced by exact current GI outcomes.
+    """Select retained requirements replaced by exact current UMI outcomes.
 
     Indices address the supplied Goal's success_criteria (or its sole description
     when no criteria exist). Empty replacement indices mean additive refinement.
@@ -163,7 +163,7 @@ class GoalAssociationModelAssociation(BaseModel):
     @classmethod
     def reject_reauthored_meaning(cls, value: Any) -> Any:
         if isinstance(value, dict) and "updated_description" in value:
-            raise ValueError("GA cannot author updated_description; reference accepted GI requirements")
+            raise ValueError("GA cannot author updated_description; reference accepted UMI requirements")
         return value
 
     relationship: GoalAssociationModelRelationship = Field(
@@ -185,6 +185,15 @@ class GoalAssociationModelAssociation(BaseModel):
     reason_summary: str = ""
     requirement_changes: list[GoalAssociationModelRequirementChange] = Field(default_factory=list)
     resolved_gap_ids: list[str] = Field(default_factory=list)
+    resolved_meaning_uncertainty_refs: list[str] = Field(
+        default_factory=list,
+        max_length=12,
+        description=(
+            "Exact UMI uncertainty refs resolved only because this canonical Goal "
+            "association supplies the missing continuity meaning. This never creates "
+            "new meaning and is not a clarification decision."
+        ),
+    )
 
     @field_validator("reason_summary", mode="before")
     @classmethod
@@ -195,6 +204,7 @@ class GoalAssociationModelAssociation(BaseModel):
         "source_responsibility_refs",
         "target_goal_ids",
         "resolved_gap_ids",
+        "resolved_meaning_uncertainty_refs",
         mode="before",
     )
     @classmethod
@@ -234,11 +244,11 @@ class GoalAssociationModelAssociation(BaseModel):
             raise ValueError("requirement changes need distinct exact association targets")
         if any(set(change.source_responsibility_refs) - set(self.source_responsibility_refs)
                for change in self.requirement_changes):
-            raise ValueError("requirement changes may use only their association's GI refs")
+            raise ValueError("requirement changes may use only their association's UMI refs")
         if self.requirement_changes and {
             ref for change in self.requirement_changes for ref in change.source_responsibility_refs
         } != set(self.source_responsibility_refs):
-            raise ValueError("requirement changes must preserve every associated GI Responsibility")
+            raise ValueError("requirement changes must preserve every associated UMI Responsibility")
         return self
 class GoalAssociationModelBinding(BaseModel):
     """Model-facing semantic binding resolved before planning."""
@@ -494,8 +504,8 @@ class GoalAssociationModelInformationResourceResponsibility(BaseModel):
         min_length=0,
         max_length=12,
         description=(
-            "Each declared GI query binding exactly once; empty is valid when the complete "
-            "GI outcome owns the query without duplicate classification. Preserve "
+            "Each declared UMI query binding exactly once; empty is valid when the complete "
+            "UMI outcome owns the query without duplicate classification. Preserve "
             "source-grounded temporal wording as semantic scope; do not translate it "
             "into Capability argument names or values. A natural compound time scope "
             "may remain one binding with entity_type=temporal_scope."
@@ -593,7 +603,7 @@ class GoalAssociationModelGoal(BaseModel):
     output_mode: GoalOutputMode = Field(
         default="other",
         description=(
-            "Provider-neutral human outcome modality copied from Goal Interpretation. "
+            "Provider-neutral human outcome modality copied from User Meaning Interpretation. "
             "information says the person wants information; stateful_effect says the "
             "person wants a durable or future state change outside embodiment. Physical "
             "motion, posture, gaze, gesture, manipulation, carrying, and handover are "
@@ -793,7 +803,7 @@ class GoalAssociationModelOutput(BaseModel):
 
     Associations and new Goals are independent per-Responsibility outcomes, not
     mutually exclusive branches.  The dynamic decoder and trusted Host conserve
-    every accepted GI Responsibility across the union of both collections.
+    every accepted UMI Responsibility across the union of both collections.
     """
 
     model_config = ConfigDict(extra="forbid")

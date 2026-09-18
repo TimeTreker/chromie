@@ -19,7 +19,7 @@ def literal_intent_argument(value: Any, *, outcome: str, source_text: str) -> bo
     """Check literal provenance, not the Planner's semantic argument mapping.
 
     A non-numeric string may be copied from both the owning complete intent and
-    the immutable source without a duplicate GI classification. Measurements,
+    the immutable source without a duplicate UMI classification. Measurements,
     conversions and inferred values still require their existing typed evidence.
     Latin substrings inside another word are not independent source values;
     unsegmented scripts retain exact contiguous surface matching.

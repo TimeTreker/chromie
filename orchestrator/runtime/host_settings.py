@@ -263,7 +263,7 @@ class CognitionSettings:
     agent_url: str
     action_executor_url: str
     agent_timeout_ms: int
-    goal_interpreter_timeout_ms: int
+    user_meaning_interpreter_timeout_ms: int
     action_timeout_ms: int
     action_dry_run: bool
     enable_agent: bool
@@ -380,7 +380,7 @@ class HostSettingsSnapshot:
         ollama_num_ctx = _int(values, "OLLAMA_NUM_CTX", 2048, minimum=512)
         ready_greeting_fallback_model = (
             _text(values, "AGENT_FAST_PLANNER_MODEL")
-            or _text(values, "AGENT_GOAL_INTERPRETER_MODEL")
+            or _text(values, "AGENT_USER_MEANING_INTERPRETER_MODEL")
             or ollama_model
         )
         max_text_chars = _int(values, "TTS_MAX_TEXT_CHARS", 220, minimum=20)
@@ -562,9 +562,9 @@ class HostSettingsSnapshot:
                 agent_timeout_ms=_int(
                     values, "ORCH_AGENT_TIMEOUT_MS", 9000, minimum=100
                 ),
-                goal_interpreter_timeout_ms=_int(
+                user_meaning_interpreter_timeout_ms=_int(
                     values,
-                    "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+                    "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
                     9000,
                     minimum=100,
                 ),

@@ -78,7 +78,7 @@ def interrupt_reflex_event(sid: str = "sid-1") -> dict[str, object]:
     return event(
         "cognitive_gateway_reflex_applied",
         "cognitive_gateway_reflex_applied: action=interrupt "
-        "trigger=stop_command goal_interpretation_bypassed=True",
+        "trigger=stop_command user_meaning_interpretation_bypassed=True",
         sid,
     )
 
@@ -285,7 +285,7 @@ def write_cognitive_runtime_fixture(root: Path) -> None:
         event("asr_final", "asr_final: text='stop talking'", "sid-3-follow"),
         event("barge_in_external_speech_confirmed", "barge_in_external_speech_confirmed: scope=output_only cancel_cognitive_work=false playback_generation_at_start=1 confirmed_speech_to_silence_ms=20.0", "sid-3-follow"),
         event("cognitive_gateway_cancellation_dispatched", "cognitive_gateway_cancellation_dispatched: requested_scope=output_only effective_scope=output_only interactions=none selected=0 active=0 queued=0 non_interruptible=0 provider_failures=0 dispatch_failures=0", "sid-3-follow"),
-        event("cognitive_gateway_reflex_applied", "cognitive_gateway_reflex_applied: action=interrupt trigger=stop_command goal_interpretation_bypassed=True", "sid-3-follow"),
+        event("cognitive_gateway_reflex_applied", "cognitive_gateway_reflex_applied: action=interrupt trigger=stop_command user_meaning_interpretation_bypassed=True", "sid-3-follow"),
         event("playback_aborted_by_interrupt", "playback_aborted_by_interrupt: order=0 playback_ms=100.0 generation=1", "sid-3"),
         event("asr_final", "asr_final: text='nod eight times'", "sid-4"),
         cognitive_core_done_event("sid-4"),
@@ -1560,7 +1560,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             event(
                 "cognitive_gateway_reflex_applied",
                 "cognitive_gateway_reflex_applied: action=interrupt "
-                "trigger=stop_command goal_interpretation_bypassed=True",
+                "trigger=stop_command user_meaning_interpretation_bypassed=True",
                 "stop",
             ),
             event(
@@ -1618,7 +1618,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             event(
                 "cognitive_gateway_reflex_applied",
                 "cognitive_gateway_reflex_applied: action=interrupt "
-                "trigger=stop_command goal_interpretation_bypassed=True",
+                "trigger=stop_command user_meaning_interpretation_bypassed=True",
                 "retry",
             ),
         ]
@@ -1765,7 +1765,7 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             event(
                 "cognitive_gateway_reflex_applied",
                 "cognitive_gateway_reflex_applied: action=interrupt "
-                "trigger=stop_command goal_interpretation_bypassed=True",
+                "trigger=stop_command user_meaning_interpretation_bypassed=True",
                 "stop",
             ),
             event(

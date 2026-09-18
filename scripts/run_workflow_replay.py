@@ -63,7 +63,7 @@ def main() -> int:
     parser.add_argument('--workers', type=int, choices=(1,2,4,8), default=1, help='Independent offline episode processes; candidate mode requires 1')
     parser.add_argument('--family', action='append', help='Focused diagnostic family; omit for an aggregate')
     parser.add_argument('--evidence-dir', type=Path, required=True, help='New, unused output directory')
-    parser.add_argument('--candidate-role', choices=('gi', 'ga', 'fast', 'deep'))
+    parser.add_argument('--candidate-role', choices=('umi', 'ga', 'fast', 'deep'))
     parser.add_argument('--candidate-url', help='Explicit Ollama-compatible service base URL; only the selected role is forwarded')
     parser.add_argument('--candidate-model')
     parser.add_argument('--candidate-timeout', type=float, default=60)

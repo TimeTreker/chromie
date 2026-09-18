@@ -53,7 +53,7 @@ def test_laptop_sglang_profile_uses_colon_free_served_alias() -> None:
     assert values["AGENT_MODEL"] == "chromie-qwen35-4b"
     assert ":" not in values["AGENT_MODEL"]
     for key in (
-        "AGENT_GOAL_INTERPRETER_MODEL",
+        "AGENT_USER_MEANING_INTERPRETER_MODEL",
         "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
         "AGENT_GOAL_ASSOCIATION_MODEL",
         "AGENT_FAST_PLANNER_MODEL",

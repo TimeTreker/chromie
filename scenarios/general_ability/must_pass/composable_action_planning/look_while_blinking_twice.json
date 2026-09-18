@@ -52,7 +52,7 @@
         "title": "Composable High-Level Action Planning",
         "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
         "rationale": "A simultaneous social-motion request must preserve gaze and blinking as compatible independent effects rather than turning while into then.",
-        "root_cause_boundaries": ["Cognitive Core/goal interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
+        "root_cause_boundaries": ["Cognitive Core/user meaning interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
       }
     ]
   }

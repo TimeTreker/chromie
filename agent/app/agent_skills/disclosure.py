@@ -436,9 +436,10 @@ def build_agent_skill_selection_request(
         "responsibilities="
         + "; ".join(item.outcome[:160] for item in request.responsibilities[:4])
     ]
-    if request.interpretation_unresolved:
+    if request.meaning_uncertainties:
         summary.append(
-            "unresolved=" + "; ".join(request.interpretation_unresolved[:4])
+            "unresolved="
+            + "; ".join(item.description for item in request.meaning_uncertainties[:4])
         )
     current_goal_ids = _association_goal_ids(context)
     allowed_goal_ids = current_goal_ids if current_goal_ids else None

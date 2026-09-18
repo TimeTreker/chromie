@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, ORJSONResponse, StreamingResponse
 from .settings import (
     Settings,
     agent_service_settings as settings,
-    goal_interpreter_settings,
+    user_meaning_interpreter_settings,
 )
 from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
@@ -84,12 +84,12 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.reflection import ReflectionRequest
     from shared.chromie_contracts.social_cognition import SocialCognitionRequest
 from .schema import HealthResponse
-from .cognitive_core.goal_interpreter import (
-    GoalInterpretationRequest,
-    initialize_goal_interpreter,
-    interpret_goal,
+from .cognitive_core.user_meaning_interpreter import (
+    UserMeaningInterpretationRequest,
+    initialize_user_meaning_interpreter,
+    interpret_user_meaning,
 )
-from .cognitive_core.goal_interpreter.errors import InterpretationUnavailableError
+from .cognitive_core.user_meaning_interpreter.errors import InterpretationUnavailableError
 from .work_dag import (
     ExecutionTrace,
     WorkDAG,
@@ -434,7 +434,7 @@ def require_dag_engine_diagnostics_auth(authorization: str | None) -> None:
 
 @app.on_event("startup")
 async def initialize_cognitive_core() -> None:
-    await initialize_goal_interpreter()
+    await initialize_user_meaning_interpreter()
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -536,8 +536,8 @@ async def interpret_cognitive_turn(
     )
     context["gateway_admission_complete"] = True
     try:
-        interpretation = await interpret_goal(
-            GoalInterpretationRequest(
+        interpretation = await interpret_user_meaning(
+            UserMeaningInterpretationRequest(
                 sid=envelope.session_id,
                 text=envelope.normalized_input.text,
                 language=envelope.normalized_input.language,
@@ -549,7 +549,7 @@ async def interpret_cognitive_turn(
         unavailable = CoreInterpretationUnavailable(
             turn_id=envelope.turn_id,
             session_id=envelope.session_id,
-            failure_class="goal_interpreter_unavailable",
+            failure_class="user_meaning_interpreter_unavailable",
             retryable=True,
             reason=exc.reason,
         )
@@ -566,14 +566,14 @@ async def interpret_cognitive_turn(
             item.model_dump(mode="json", exclude_none=True)
             for item in interpretation.responsibilities
         ],
-        unresolved=list(interpretation.unresolved),
+        meaning_uncertainties=list(interpretation.meaning_uncertainties),
     )
 
 @app.post("/fast-advance")
 async def resolve_fast_advance(request: CognitiveWorkRequest):
     if fast_planner_resolver is None:
         raise HTTPException(status_code=503, detail="Fast planner is disabled")
-    # Fast Planner authors the first Activity Plan over GI Responsibility refs.
+    # Fast Planner authors the first Activity Plan over UMI Responsibility refs.
     # Agent Skill disclosure remains deferred; the endpoint may select only the
     # bounded common Capability catalog supplied by the Fast Planner resolver.
     async def frames():

@@ -187,7 +187,7 @@ class FastPlannerResolver:
                     raise PlannerDTOContractError("Common capability contracts exceed the configured context budget")
                 schema = fast_streaming_advance_response_schema(
                     [item.local_ref for item in responsibilities], responsibilities=responsibilities,
-                    capabilities=capabilities, interpretation_unresolved=list(request.interpretation_unresolved),
+                    capabilities=capabilities, meaning_uncertainties=list(request.meaning_uncertainties),
                     language=str(request.language or ""),
                     source_token_refs=[item["ref"] for item in user_turn_source_tokens(current.original_user_text)],
                 )

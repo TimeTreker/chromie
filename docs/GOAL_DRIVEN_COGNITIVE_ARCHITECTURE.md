@@ -5,13 +5,13 @@
 The [Social Cognition amendment](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
 defines the authority for ordinary communication. Interaction is a primary
 cognitive responsibility with independent value, including substantive discussion
-when no action task exists. GI owns WHAT, GA owns canonical continuity, Social
+when no action task exists. UMI owns WHAT, GA owns canonical continuity, Social
 Cognition owns whether/when/how to communicate, and Planner owns Work HOW.
 All use the same existing Mind, Memory, Situation, Goal, Work and Interaction
 truth; a separate inference task creates no separate personality or truth store.
 
 The runtime admits independently ready GA, communication and planning tasks from
-one complete GI result. New trusted state may reactivate the appropriate owner;
+one complete UMI result. New trusted state may reactivate the appropriate owner;
 it does not require every event to run every role. Optional acknowledgement
 cannot gate Work, and communication cannot authorize or claim unobserved effects.
 One primary result per distinct authority remains required; neither role is a
@@ -36,7 +36,7 @@ execution, terminal-Evidence correlation, and Planner re-entry path is implement
 immutable plan/request/result correlation and per-Goal `ExecutionOutcomeBundle` truth feed
 typed Evidence; ordinary result meaning returns to the same Planner rather than a Host
 status-to-sentence composer. The upstream boundary migration is also implemented: five
-explicit Cognitive Gateway modules complete admission before ordinary Goal Interpretation,
+explicit Cognitive Gateway modules complete admission before ordinary User Meaning Interpretation,
 the frozen version 1 `UserTurnEnvelope` is required at Core entry, and a Core-owned
 interpretation result carries only provider-neutral Responsibility evidence plus bounded
 confidence/unresolved meaning. No route/intent compatibility projection exists on the
@@ -66,7 +66,7 @@ arbitration. See
 Chromie has migrated its maintained semantic-planning path from a skill-routed
 interaction system to a goal-driven cognitive runtime. This document defines
 the Goal-Driven Cognitive Core and the principles and contracts that current and
-future Gateway, Goal Interpretation, Agent, memory, planning, social interaction,
+future Gateway, User Meaning Interpretation, Agent, memory, planning, social interaction,
 and execution work must follow.
 
 The central change is simple:
@@ -86,7 +86,7 @@ control evidence, but it does not own user-goal meaning, decomposition,
 planning, semantic agent coordination, outcome synthesis, or response
 composition. Those belong to the Goal-Driven Cognitive Core.
 
-Goal Interpretation is an Agent-owned WHAT stage inside the Goal-Driven Cognitive
+User Meaning Interpretation is an Agent-owned WHAT stage inside the Goal-Driven Cognitive
 Core. It receives an admitted `UserTurnEnvelope` projection and emits only
 provider-neutral Responsibility evidence, material semantic bindings, bounded
 confidence, and unresolved meaning. It does not emit `route`, `intent`, response
@@ -115,7 +115,7 @@ Person / World
 Cognitive Gateway
       │
       ▼
-Goal Interpretation
+User Meaning Interpretation
       │
       ▼
 Responsibility / WHAT
@@ -263,7 +263,7 @@ Implementation should reuse common model-transaction, grounding, and validation 
 rather than clone a parallel agent stack. A communication-only Planner pass has no
 Capability/Work authority. Capability planning
 requires independently admitted Responsibility/Goal inputs and normal authorization; a
-depth change cannot supply them. GI, GA and Reflection retain their own distinct authorities.
+depth change cannot supply them. UMI, GA and Reflection retain their own distinct authorities.
 
 A provisional claim is never permission to guess ahead of pending Work. If the truth of
 what Chromie would say materially depends on a Capability result or fresh Evidence that is
@@ -274,7 +274,7 @@ commitments remain consequence-bounded.
 
 ### Responsibility is what Chromie owes; Work is how it advances
 
-Goal Interpretation answers the human semantic question:
+User Meaning Interpretation answers the human semantic question:
 
 > What independently observable outcome is still owed to the person?
 
@@ -285,8 +285,8 @@ capability granularity.
 
 Goal Association determines how accepted Responsibilities relate to retained Goals.
 It selects identity, continuity and source-bound changes, rather than authoring another
-WHAT description. New Goal descriptions and success criteria inherit the exact GI
-outcome. A revision preserves unselected requirements, names the current GI sources of
+WHAT description. New Goal descriptions and success criteria inherit the exact UMI
+outcome. A revision preserves unselected requirements, names the current UMI sources of
 new/replacement requirements and copies any changed semantic fields from those sources.
 The Goal owner checks the supplied state fingerprint, commits the consistent revision,
 and retains prior meaning/provenance and execution evidence. The concrete contract is in
@@ -332,7 +332,7 @@ projections or references, not independently authored copies. Natural-language
 `description` fields summarize canonical semantics; they are not another source
 of truth that later code reconciles against typed fields.
 
-Responsibility coverage is evidence carried by the primary GI semantic result, not
+Responsibility coverage is evidence carried by the primary UMI semantic result, not
 another mutable Goal model and not a second LLM-authored certificate. It may be
 retained immutably in traces, but it creates no separate control authority or
 repair workflow. Source provenance is cited from the authoritative turn and
@@ -340,7 +340,7 @@ materialized by trusted code rather than retyped as a second semantic copy. Type
 ordered/parallel sibling references let trusted code verify `before`/`after` or
 `parallel_with` integrity without interpreting coordination words. A downstream
 Goal Association or Planner consumes this accepted evidence within its distinct
-authority; neither calls a semantic reviewer to reinterpret GI WHAT.
+authority; neither calls a semantic reviewer to reinterpret UMI WHAT.
 
 ### Semantic artifacts travel with immutable lineage
 
@@ -353,13 +353,13 @@ authority, turn/session/conversation correlation and immutable parent refs. A pa
 envelope plus the exact canonical typed payload; changing any payload byte invalidates the
 digest.
 
-The lineage begins with `UserTurnEnvelope` and may continue through accepted GI result and
+The lineage begins with `UserTurnEnvelope` and may continue through accepted UMI result and
 Responsibilities, GA resolution and newly committed Goals, Planner Plan, SC resolution and
 individual Communicative Activities. Trusted execution outcomes are enveloped as terminal
 history too; their Plan/Goal parent refs become mandatory when the live transport starts
 carrying those refs across the execution boundary. This lineage does not make the chain serial:
 GA, Planner and SC may still run concurrently from the same accepted source. Parent refs prove
-provenance; they do not transfer authority. In particular, a Planner envelope cannot rewrite GI
+provenance; they do not transfer authority. In particular, a Planner envelope cannot rewrite UMI
 WHAT and an SC envelope cannot authorize Work.
 
 Envelope construction is trusted-code bookkeeping after the semantic decision, never a model
@@ -427,7 +427,7 @@ semantic choice move below the model boundary.
 
 A Capability is eligible only when its declared semantic scope can actually satisfy
 the human Responsibility. Topic overlap, a shared noun, a date/location field, or
-being the closest available tool is not grounding. Goal Interpretation receives a
+being the closest available tool is not grounding. User Meaning Interpretation receives a
 bounded projection of both positive semantic scope and negative `when_not_to_use`
 boundaries; Planner then validates the canonical Goal against the full registered
 Capability contract. When no exact Capability exists, Chromie preserves the understood
@@ -476,7 +476,7 @@ between conversational behavior and whichever Provider or decoder happens to be 
 
 SC owns complete Communicative Activities: whether to communicate, exact words,
 function, timing, truth stage, source/Evidence references and optional expression.
-GI owns Responsibility meaning; Planner owns task Work and established answer,
+UMI owns Responsibility meaning; Planner owns task Work and established answer,
 input, confirmation and result Needs. Neither produces utterances for SC to polish.
 The Host joins an SC decision against the exact immutable Plan and input snapshot.
 It validates identity, freshness, consent and delivery without rewriting meaning.
@@ -670,7 +670,7 @@ owes, is waiting on, or must continue reasoning about; it is prospective memory
 for unfinished responsibility, not a mandatory ticket that every immediate
 interaction act must acquire before useful progress can begin.
 
-Fast Goal Interpretation may establish a fully understood, low-risk Responsibility
+Fast User Meaning Interpretation may establish a fully understood, low-risk Responsibility
 quickly, but it still stops at Responsibility evidence. Fast Planner then owns the
 smallest HOW advancement. For an ordinary greeting that can be satisfied immediately,
 Fast Planner may author one ready Communicative Act and no Goal Association is
@@ -794,7 +794,7 @@ preserves the user’s goal.
 ### 3.8.1 Single semantic authority
 
 One admitted turn has one maintained semantic architecture. In `apply` mode the
-Goal-Driven Cognitive Core owns the semantic path: GI interprets WHAT, Goal
+Goal-Driven Cognitive Core owns the semantic path: UMI interprets WHAT, Goal
 Association owns canonical Goal continuity, and Fast/Deep Planner owns HOW and
 Communicative Activities. A failure after this path starts fails closed; there is
 no retained CapabilityAgent, direct-LLM, route/intent, or emergency semantic
@@ -969,7 +969,7 @@ Plan/Activity, source, and consequence provenance and may survive turns through 
 Goal-scoped Interaction Context. They do not give Planner authority to change
 Responsibility meaning.
 
-GI's bounded `unresolved_meaning` is different: it records genuine ambiguity in the
+UMI's bounded `unresolved_meaning` is different: it records genuine ambiguity in the
 person's intended outcome, scope, or referent without declaring a Capability parameter,
 blocking state, or resolution policy. Planner may select a clarification Activity from
 that semantic evidence but may not choose the intended meaning itself.
@@ -1041,14 +1041,14 @@ and execution methods are forbidden in its bindings. Responsibility evidence mus
 preserve every explicit material qualifier that changes what would satisfy the human
 outcome—such as severity, intensity, magnitude, threshold, subtype, negation,
 comparison, quantity, or temporal scope—rather than generalizing a narrower request
-into a broader category. GI must read bounded Session Context, including pending
+into a broader category. UMI must read bounded Session Context, including pending
 clarifications and active Goal/Activity state. A reply such as “Green tea” therefore
 supplies a semantic binding for the pending clarification and proposes modification of
 the existing tea Goal; it is not interpreted as an isolated new request. This does not
-make GI the owner of why Planner asked or which source policy it chose. GA remains the
+make UMI the owner of why Planner asked or which source policy it chose. GA remains the
 sole authority that commits that Goal version.
 
-The same immutable GI result starts GA, SC and Fast Work independently. Fast emits
+The same immutable UMI result starts GA, SC and Fast Work independently. Fast emits
 one complete validated Work decision; there is no presentation prefix. SC may
 acknowledge understanding while Work is pending, but cannot predict its result.
 Capability dispatch requires the complete Work decision and applicable provenance,
@@ -1812,7 +1812,7 @@ payloads remain outside Situation. Meaningful provider Runtime-state transitions
 are the first production trusted ingress and are explicitly not promoted to
 Evidence; broader scene/body/environment adapters remain source-specific future
 work. The owner-approved #60 new-request contract separates requested temporal WHAT
-from its planned HOW. GI preserves the complete requested time wording in its
+from its planned HOW. UMI preserves the complete requested time wording in its
 outcome. Planner authors the normalized `due_at_ms` and exact `source_quote` in
 its time condition; GA does not normalize or bind a timestamp. The Gateway's
 immutable `received_at` anchors elapsed time but does not establish the user's
@@ -1848,10 +1848,10 @@ flowchart TD
     USER["Person-authored input"] --> GATEWAY["Cognitive Gateway<br/>attention, context, admission"]
     GATEWAY --> CONTROL{"Protective control?"}
     CONTROL -->|"stop, cancel, emergency"| REFLEX["Deterministic reflex<br/>revoke, cancel, or E-stop"]
-    CONTROL -->|"ordinary admitted turn"| GI["Goal Interpretation<br/>Responsibility / WHAT"]
+    CONTROL -->|"ordinary admitted turn"| UMI["User Meaning Interpretation<br/>Responsibility / WHAT"]
 
-    GI --> PLAN["Fast Core / Planner pass<br/>smallest useful commitment"]
-    GI --> GA["Goal Association<br/>canonical continuity when needed"]
+    UMI --> PLAN["Fast Core / Planner pass<br/>smallest useful commitment"]
+    UMI --> GA["Goal Association<br/>canonical continuity when needed"]
     PLAN --> WORK["Communicative / Capability Activities"]
     PLAN --> PROV{"Provisional conversation?"}
     PROV -->|"yes"| DELIB["Bounded SC deliberation<br/>communication-only; no permission widening"]
@@ -1872,7 +1872,7 @@ flowchart TD
     CORRELATE --> EVIDENCE["Trusted Evidence<br/>what is true"]
     REFLEX --> EVIDENCE
 
-    GI --> RESP["Responsibility<br/>what remains owed"]
+    UMI --> RESP["Responsibility<br/>what remains owed"]
     RESP --> STATE["Bounded current state"]
     GOALS --> STATE
     WORKSTATE --> STATE
@@ -1968,7 +1968,7 @@ The target ingress is therefore two-source, one-Mind:
 
 ```text
 person-authored speech
-    -> Gateway -> GI -> Responsibility cognition
+    -> Gateway -> UMI -> Responsibility cognition
 
 trusted world/social transition
     -> Situation revision -> derived relational/situational salience
@@ -1982,7 +1982,7 @@ same Core
     -> Situation + Memory + optional bounded Reflection
 ```
 
-A Goal-free opportunity fabricates no UserTurn, GI result, Goal, Evidence, consent, or
+A Goal-free opportunity fabricates no UserTurn, UMI result, Goal, Evidence, consent, or
 conversation obligation. It carries exact source/Situation provenance and may legitimately
 end in silence. If Chromie self-initiates speech, that Communicative Activity must cite the
 Situation/opportunity provenance rather than a fake user Responsibility. If the interaction
@@ -2027,7 +2027,7 @@ review, unavailable Deep fails quiet, and Deep cannot recurse. Every Planner sco
 ordinary communication authority and exact Activity/wording validation. Host checks all
 source/subject, identity, delivered-repair and Memory-candidate constraints before writing
 Memory or materializing speech. This Goal-free contract supplies no Responsibility and
-cannot use the separately approved GI-before-GA safe-read permission. The first
+cannot use the separately approved UMI-before-GA safe-read permission. The first
 relational-Memory/privacy source slice is also implemented without a new social
 owner. `MemoryEntry` carries bounded relation/subject/source-person/audience/disclosure
 provenance; exact Situation subject refs participate in deterministic activation; and
@@ -2046,16 +2046,16 @@ remains the evidence authority.
 The maintained architecture is a state-driven loop with multiple cognitive
 timescales, not a mandatory module pipeline. Person-authored turns and trusted
 non-turn Situation transitions are different ingress shapes: only the first passes
-through Gateway/GI as new user meaning; the target non-turn path revises Situation and
+through Gateway/UMI as new user meaning; the target non-turn path revises Situation and
 may create a bounded readiness opportunity without fabricating a turn or Goal.
 
 ```text
 Admitted User Turn + bounded Session Context
-  -> Goal Interpretation (GI)
+  -> User Meaning Interpretation (UMI)
        Responsibility + Goal relation + bounded unresolved meaning
   -> Fast Planner -> author first Communicative Activity
        -> one primary truth/provenance result -> validated Activity or silence
-  -> concurrent continuation from the same GI result
+  -> concurrent continuation from the same UMI result
        |-> same Fast Planner -> remaining Activity Plan + input resolution
        |     |-> ready Capability and still-needed speaking Activities
        |     |-> user-resolvable clarification only when needed
@@ -2103,15 +2103,15 @@ and explicitly discriminated:
 
 - `associate` for relationships to exact active goal IDs;
 - `create_goals` for source refs and Goal relationship IDs, with meaning inherited
-  from GI;
+  from UMI;
 - `clarify` for unresolved continuity facts, expressed to the user by SC.
 
 Goal Association has one bounded semantic transaction. Its primary model result
-conserves the accepted GI Responsibilities while deciding only canonical Goal
+conserves the accepted UMI Responsibilities while deciding only canonical Goal
 identity and continuity, and may receive one mechanical DTO repair. There is no
 second coverage reviewer, fresh interpretation, or final semantic audit. A
 semantic, grounding, or Responsibility-conservation rejection fails closed. No
-later stage may restore fields from an earlier candidate, reinterpret GI meaning,
+later stage may restore fields from an earlier candidate, reinterpret UMI meaning,
 or hand Goal meaning to Planner. The complete logical invocation DAG is:
 
 ```text
@@ -2143,7 +2143,7 @@ fields are rejected rather than ignored or merged into canonical state; the
 bounded model may revise one invalid schema result, but the Host never treats
 transport noise as semantic input.
 
-A new Goal inherits GI's requested result type as `output_mode`; GA does not author
+A new Goal inherits UMI's requested result type as `output_mode`; GA does not author
 another modality or media-operation field. It is WHAT, not an execution
 truth. `responsibility_kind`, `execution_lane`, and `provider_required` are not Goal fields,
 not Host projections, and not compatibility inputs. Goal Association commits only the
@@ -2152,12 +2152,12 @@ trusted state already satisfies the Goal or whether Capability-backed Work is ne
 selected Capability/Activity then carries its own Runtime execution-lane facts. There is no
 legacy responsibility/lane tuple to reverse-map and no `capability_work` bridge.
 
-The live GI contract preserves named entities, quantities and temporal meaning in
+The live UMI contract preserves named entities, quantities and temporal meaning in
 the complete natural-language outcome. It emits no typed parameter bindings or
 Goal relationships. GA inherits new Goal description, success criteria and result
-type from the exact GI source ref; it does not classify a resource or author a
+type from the exact UMI source ref; it does not classify a resource or author a
 parameter table. Existing typed Goals remain supported as retained authority, not
-as a second live GI wire.
+as a second live UMI wire.
 
 Planner performs unit conversion, defaults, capability argument mapping and new
 future readiness. Fast intent-derived arguments cite closed token spans on the immutable
@@ -2166,7 +2166,7 @@ canonical parameter provenance. Retained typed values remain binding and cannot 
 overridden by a span or quote. These are mechanical provenance checks, not proof of
 meaning or semantic conversion.
 Missing execution data is a Planner input gap; genuine ambiguous intent remains
-GI-owned. Host never extracts place names, chooses referents or rewrites meaning.
+UMI-owned. Host never extracts place names, chooses referents or rewrites meaning.
 
 Goal semantic information and Planner execution information are distinct. A
 material entity or parameter that determines what Chromie owes the user must be
@@ -2177,34 +2177,34 @@ material-binding provenance contradiction is not repaired by copying values from
 an earlier candidate or by narrowing the Host schema to a guessed clarification.
 The primary Goal Association DTO may receive its one mechanical repair. A semantic,
 grounding, or Responsibility-conservation rejection is terminal at that authority;
-GA does not launch a reviewer or fresh interpretation to rewrite GI meaning. A
-genuine unresolved meaning returns through the designated GI/user-clarification
+GA does not launch a reviewer or fresh interpretation to rewrite UMI meaning. A
+genuine unresolved meaning returns through the designated UMI/user-clarification
 path. Invalid or incomplete output fails closed with no Goal commit or effect.
 
-Fast/Deep Goal Interpretation are depths of the same WHAT authority. Their maintained
+Fast/Deep User Meaning Interpretation are depths of the same WHAT authority. Their maintained
 model-facing contract is provider-neutral Responsibility evidence only: intended outcome,
 material semantic bindings, Goal relation, bounded unresolved meaning, and confidence.
 There are no `chat`, `tool`, `memory`, `robot_action`, `deep_thought`, route, intent,
-Capability, Activity, or provider-selection branches in the current GI contract.
+Capability, Activity, or provider-selection branches in the current UMI contract.
 
-The maintained GI transaction is deliberately bounded:
+The maintained UMI transaction is deliberately bounded:
 
 ```text
-primary Fast Goal Interpretation from the authoritative admitted turn
+primary Fast User Meaning Interpretation from the authoritative admitted turn
   -> deterministic validation of primary-result source/coverage evidence
   -> accept when WHAT is sufficiently resolved
-  -> otherwise at most one source-based Deep Goal Interpretation when consequential
+  -> otherwise at most one source-based Deep User Meaning Interpretation when consequential
      ambiguity remains in intended outcome, scope, Goal relation, or referent
   -> accept or fail closed
 ```
 
-Deep Goal Interpretation receives authoritative source context rather than the Fast DTO and
+Deep User Meaning Interpretation receives authoritative source context rather than the Fast DTO and
 uses the same WHAT-only authority. It is not a repair reviewer and receives no additional
-Capability/planning authority. Fast Planner—not GI—owns execution-input completeness,
+Capability/planning authority. Fast Planner—not UMI—owns execution-input completeness,
 input-source/default policy, clarification selection for HOW, exact Capability identity,
 arguments, Work, timing, and communication. Deterministic validation may reject malformed
-or authority-violating GI output, but it must not manufacture user meaning. Rejected typed
-dimensions are removed from the one constrained recovery surface so Deep GI cannot preserve
+or authority-violating UMI output, but it must not manufacture user meaning. Rejected typed
+dimensions are removed from the one constrained recovery surface so Deep UMI cannot preserve
 the invalid field by moving an unrelated duration, direction, or action into it. Malformed
 serialization fragments inside binding values are DTO corruption, not semantic facts.
 Conversational grounding follows the same rule: a vocative does not become a second effect;
@@ -2346,7 +2346,7 @@ Conversation continuity has two publication boundaries.
    committed to canonical Goal/Task/discourse state. That semantic state may then
    guide later turns and planning.
 
-Goal Interpretation therefore sees recent accepted dialogue plus whatever
+User Meaning Interpretation therefore sees recent accepted dialogue plus whatever
 canonical Goal/Task state already exists. Goal Association uses the same dialogue
 evidence but is the only stage that decides how the current turn relates to the
 bounded Goal set. Within one conversation, Goal Association is serialized at this
@@ -2464,9 +2464,9 @@ Possible goals:
 
 #### 7.1.1 Responsibility coverage is primary-result evidence
 
-The GI semantic model owns the judgment about what is an independent human
+The UMI semantic model owns the judgment about what is an independent human
 outcome. The Host must not reproduce that judgment with verbs, regexes, action
-lists, provider names, or a second LLM reviewer. The primary GI result therefore
+lists, provider names, or a second LLM reviewer. The primary UMI result therefore
 contains the complete Responsibility inventory and the minimum source-grounding
 evidence needed to validate each item. The same item owns its provider-neutral
 result type, complete natural-language outcome and source span; no parallel
@@ -2478,23 +2478,25 @@ Trusted validation checks only mechanics:
 - source references belong to the authoritative admitted turn;
 - source spans are ordered, known and non-overlapping;
 - result types belong to the closed provider-neutral contract;
-- parameter, relationship and execution fields are forbidden on live GI output;
+- Goal relationship/identity and execution/provider fields are forbidden on live UMI output; sparse source-grounded semantic bindings are allowed only when they conserve WHAT;
 - unavailable provider support does not remove the semantic Responsibility.
 
 Completeness and independence remain one model-authored semantic decision in the
 primary result. If that decision is unreliable, development improves the primary
 prompt, schema, model choice, or deterministic representation and reruns the
 aggregate semantic cohort. Production does not add a critic, coverage auditor,
-resegmentation reviewer, or semantic repair call. The maintained GI implementation
+resegmentation reviewer, or semantic repair call. The maintained UMI implementation
 fails a malformed primary or Deep DTO closed rather than attempting the Charter's
-optional semantics-preserving same-stage regeneration. Genuine unresolved meaning
-follows the single Deep-GI, user-clarification, or fail-closed path.
+optional semantics-preserving same-stage regeneration. Genuine semantic uncertainty
+remains UMI-authored; GA may resolve only continuity-owned uncertainty from a selected
+canonical Goal, after which any remainder follows the Planner/SC clarification or
+fail-closed path.
 
-Goal Association consumes the accepted GI inventory and must conserve it while
+Goal Association consumes the accepted UMI inventory and must conserve it while
 deciding canonical Goal identity and continuity. Its primary result may be checked
 mechanically for one-to-one Responsibility conservation, source provenance, and
 inherited intent and retained typed-state conservation, but GA does not invoke another model to decide whether
-GI understood the user correctly. Planner likewise consumes canonical WHAT and
+UMI understood the user correctly. Planner likewise consumes canonical WHAT and
 cannot reinterpret it from Capability availability. This keeps the earliest
 semantic boundary responsible without paying for a live confirmation chain.
 
@@ -2508,7 +2510,7 @@ This is one goal with a conditional plan, not two user goals.
 
 ### 7.3 Segmentation output
 
-For three independently accepted GI Responsibilities, GA's new-Goal model wire is:
+For three independently accepted UMI Responsibilities, GA's new-Goal model wire is:
 
 ```json
 {
@@ -2566,7 +2568,7 @@ coverage, satisfaction, response, information gaps, and execution evidence.
 
 ### 8.1 Fast Planner
 
-Fast Planner is the first task Work owner after GI. Its one primary invocation
+Fast Planner is the first task Work owner after UMI. Its one primary invocation
 establishes complete Work over accepted Responsibility references while GA commits
 canonical Goal identity and SC independently decides interaction. No early speech
 prefix or optional decoration remains in the Work model result.
@@ -2580,7 +2582,7 @@ Fast Planner may use:
 - essential provider and safety state.
 
 A pre-Association Fast terminal result already owns the complete HOW decision against
-the GI Responsibility and executable Capability catalog. When GA creates a new Goal that
+the UMI Responsibility and executable Capability catalog. When GA creates a new Goal that
 conserves that same Responsibility, Host mechanically joins the exact source ref to the
 new Goal identity, including GA's provider-neutral resource projection, and does not ask
 Fast Planner to decide the same HOW a second time. A new Fast pass is justified only when
@@ -2588,7 +2590,7 @@ GA changes retained Goal meaning, the commit intersects Work that is actually
 queued/running/completed, or later trusted Runtime/Evidence/Situation state creates a
 genuinely new planning input. The Host never chooses or substitutes a Capability.
 
-The primary GI Responsibility evidence cites authoritative source tokens. Trusted
+The primary UMI Responsibility evidence cites authoritative source tokens. Trusted
 validation may materialize those references and check their provenance, but it
 cannot change ownership, output mode, relation, or split an overmerged candidate.
 Semantic incompleteness therefore remains a failure of the primary semantic owner,
@@ -2609,7 +2611,7 @@ It may:
 - propose a low-consequence bounded default in canonical planning;
 - escalate.
 
-When GI binds an exact repeat request to previously delivered words, that immutable
+When UMI binds an exact repeat request to previously delivered words, that immutable
 dialogue value reaches SC as source evidence. SC owns expressing the requested
 repeat; current questions, prefixes or new paraphrases do not replace the bound text.
 
@@ -2623,7 +2625,7 @@ Only complete, high-confidence, structurally valid coverage may proceed to
 validation.
 
 A complete Fast Plan is a commit candidate, not a draft waiting for Deep approval.
-When the GI-to-GA Goal mapping, exact Capability availability, parameter schema,
+When the UMI-to-GA Goal mapping, exact Capability availability, parameter schema,
 safety/authorization, and confirmation policy all pass deterministic validation, the
 runtime may dispatch that Responsibility immediately. Deep Planner is not a second
 approval gate. Conversely, a Fast contract/provenance failure stops before execution;
@@ -2645,7 +2647,7 @@ validation checks that the value equals the claimed step argument and that
 every explicit numeric value in an executable Goal is accounted for by a
 resolution owned by that Goal. Retained typed constraints keep their exact conservation checks. New intent-only
 Goals use exact owning excerpts in Planner parameter provenance; no duplicate
-GI argument table is required. The
+UMI argument table is required. The
 Host neither infers the argument mapping nor substitutes a default. At the
 pre-Association Fast Activity boundary, when a selected capability has an
 identically named input and every cited Responsibility supplies one agreeing
@@ -2687,7 +2689,7 @@ nontrivial dependencies, material alternatives, novelty or broader planning cont
 or safety/resource reasoning requires the wider planning boundary. Fast-Planner-to-
 Deep-Planner is one **HOW** escalation, not repair of a Fast contract/provenance
 failure, already committed Goal, or execution result. Genuine ambiguity in the
-person's intended outcome, scope, or referent belongs to Deep Goal Interpretation
+person's intended outcome, scope, or referent belongs to Deep User Meaning Interpretation
 before planning; Deep Planner cannot reinterpret it. A Responsibility that is already
 completely and safely resolved by Fast does not enter Deep in parallel for reassurance.
 Deep Planner receives the original Goal truth, the Fast planning-escalation evidence,
@@ -2848,7 +2850,7 @@ but it must not silently turn all-or-nothing behavior back on.
 
 ### 10.1 Planning ownership
 
-Goal Interpretation supplies only understood Responsibility meaning, explicit/contextual
+User Meaning Interpretation supplies only understood Responsibility meaning, explicit/contextual
 semantic bindings, and bounded unresolved meaning. It does not decide whether a
 Capability parameter is missing. The Planner owns that comparison and decides whether
 a required execution input can be supplied by:
@@ -2902,9 +2904,9 @@ When useful, the model may offer bounded choices naturally.
 
 A Planner-selected blocking information gap keeps the original Responsibility/Goal
 active in `waiting_for_user` and remains in Goal-scoped Interaction Context with its
-exact Activity and source provenance. A later answer is interpreted by GI against that
+exact Activity and source provenance. A later answer is interpreted by UMI against that
 pending clarification, committed by GA as the applicable Goal update, and triggers
-replanning. GI understands the answer; it does not retroactively own the gap or its
+replanning. UMI understands the answer; it does not retroactively own the gap or its
 resolution policy.
 
 ## 11. Alternative planning
@@ -2963,7 +2965,7 @@ and terminal provider evidence are then recorded against every source goal they
 serve; optional social-attention requests never enter the primary user-goal
 lifecycle.
 
-Effect authority is also monotonic within one turn. Goal Interpretation cannot authorize
+Effect authority is also monotonic within one turn. User Meaning Interpretation cannot authorize
 an effect: it supplies Responsibility meaning only. Planner may propose Capability Work
 only from the current catalog and only in service of that Responsibility/Goal; Runtime then
 enforces schema, confirmation, authorization, resource, availability, and provider-safety
@@ -3202,10 +3204,10 @@ wording and therefore cannot own a completion claim. Terminal Evidence re-enters
 Planner for new Work/Needs and SC for a trustworthy communicative delta or silence. When
 an originating interaction contains multiple Capability requests, each per-request Runtime
 event can re-enter Planner immediately, but its transaction contains only that result's
-bound GI Responsibilities, Goals, source-Plan steps, and Evidence. The retained original
+bound UMI Responsibilities, Goals, source-Plan steps, and Evidence. The retained original
 whole-turn envelope is not replayed as the current request. Instead, the exact original
 wording is supplied separately as digest-validated, read-only source provenance while
-`request.text` is built only from the affected GI Responsibility outcomes. Canonical Goal,
+`request.text` is built only from the affected UMI Responsibility outcomes. Canonical Goal,
 Plan, and Evidence projections remain restricted to that same subset, so source visibility
 cannot authorize narration or execution of a sibling that is still running. When
 every completed fact has already been delivered, aggregate closure still records whole-scope
@@ -3246,7 +3248,7 @@ change it, and `chromie.speak` cannot stand in for the missing substantive Capab
 
 The Host schedules only complete, schema-valid SC decisions after exact source,
 snapshot, provenance, cancellation and delivery checks. Raw model tokens are never
-speech. At GI ingress SC may acknowledge understanding while Work is pending; it
+speech. At UMI ingress SC may acknowledge understanding while Work is pending; it
 cannot claim a specific action is planned, started or complete before those facts
 exist. A required confirmation cites the exact immutable proposal and remains a
 consent barrier. Input questions express Planner-established gaps. Optional progress
@@ -3256,7 +3258,7 @@ does not hold Work. Result-dependent words require admitted terminal Evidence.
 
 `Interaction Ledger` is the bounded, append-only journal through which Chromie
 reports her own already-performed interaction history to later cognition. Its
-model-facing audience includes Goal Interpretation, Goal Association, Fast
+model-facing audience includes User Meaning Interpretation, Goal Association, Fast
 Planner, Deep Planner, and any
 later cognitive stage that can otherwise repeat a Goal-scoped conversational or
 effectful responsibility. Runtime owners append the qualified facts. This
@@ -3291,7 +3293,7 @@ relevant Goal IDs and includes same-turn unbound Fast Planner Communicative Acti
 Goal ownership. It exposes already audible speech, pending speech, Activity and
 provider-backed Vocal work, Social Attention decorations, Goal/Plan history, and
 unresolved waits. Ledger `domain=social_attention` is an observation domain, not
-an execution lane; accepted decoration physically executes through Activity. Before canonical Goal IDs exist, Goal Interpretation and Goal
+an execution lane; accepted decoration physically executes through Activity. Before canonical Goal IDs exist, User Meaning Interpretation and Goal
 Association receive bounded recent session context; after association, later
 cognition receives the Goal-scoped projection.
 
@@ -3315,9 +3317,9 @@ promoting the Ledger into long-term memory.
 
 ### 15.1.2 Goal Progress Communication
 
-Goal Progress Communication belongs to SC across the lifetime of Work. GI supplies
+Goal Progress Communication belongs to SC across the lifetime of Work. UMI supplies
 complete provider-neutral intent and genuine uncertainty. Planner determines Work
-and input needs; neither GI nor Planner authors progress speech.
+and input needs; neither UMI nor Planner authors progress speech.
 
 After Responsibility meaning is sufficient, SC may select one useful
 immediately-ready Communicative Act while downstream work continues. A
@@ -3344,12 +3346,12 @@ milestone is not promoted into an anchor merely because it happened.
 
 Each Communicative Act has one SC wording owner and one downstream delivery owner,
 with deterministic authority, evidence, cancellation, and delivery validation. The architecture does not add a
-second LLM to repair ordinary progress wording, and Goal Interpretation has no
+second LLM to repair ordinary progress wording, and User Meaning Interpretation has no
 maintained response-authoring path.
 
 ### 15.1.3 Independent early interaction
 
-One accepted GI result may start SC, GA and Work planning independently. SC
+One accepted UMI result may start SC, GA and Work planning independently. SC
 receives relevant history, Memory, Goal overview, Work state and delivery records
 and may acknowledge understanding or remain silent. The Fast model emits one
 complete Work result; it has no presentation prefix or writable speech fields.
@@ -3603,7 +3605,7 @@ later-stage behavior.
 PR1-PR9 established the Goal-Driven Cognitive Core and closed one admitted
 effectful turn through evidence-bound final response. The subsequent Gateway
 work completed the five-module admission boundary and removed the independent
-Goal Interpreter service. Target live behavior remains a separate evidence
+User Meaning Interpreter service. Target live behavior remains a separate evidence
 claim tracked by the current status and qualification documents.
 
 ### PR1 — Goal contracts and continuity projection
@@ -3749,7 +3751,7 @@ persistence objects.
 Exit criteria:
 
 - authoritative turns do not fall through to a second semantic planner;
-- GI owns WHAT without route/intent/Capability/Activity leakage;
+- UMI owns WHAT without route/intent/Capability/Activity leakage;
 - Planner owns HOW and exact Communicative Activities;
 - model-facing Goal Association values are schema constrained and receive at
   most one mechanical DTO repair before deterministic conservation validation;
@@ -3768,7 +3770,7 @@ This stage closes the two contract gaps around PR1-PR8 without redesigning its
 semantic planners:
 
 - a versioned `UserTurnEnvelope` is the preserved Gateway-to-Core input;
-- a compatibility adapter preserves bounded Goal Interpreter and Agent data
+- a compatibility adapter preserves bounded User Meaning Interpreter and Agent data
   contracts inside the Core without restoring a service or fallback authority;
 - a deterministic `ExecutionOutcomeBundle` joins exact canonical
   step/skill/arguments/timing, committed requests/schema identity, and trusted
@@ -3786,7 +3788,7 @@ Exit criteria:
 
 - original input, reflex, attention, admission, and context provenance survive
   the Gateway/Core boundary;
-- exact admitted wording remains available to GI, GA, Planner, and scoped Planner
+- exact admitted wording remains available to UMI, GA, Planner, and scoped Planner
   re-entry as read-only provenance without creating another persisted source or moving
   WHAT/continuity/HOW authority;
 - success, partial failure, refusal, timeout, cancellation, and missing results
@@ -3805,20 +3807,20 @@ Exit criteria:
 The maintained Goal-driven Runtime has no Goal-Interpretation route/intent compatibility
 projection and no fallback into a second legacy semantic pipeline. Historical APIs or
 retained evidence may exist outside the maintained turn path, but they cannot be adapter
-inputs to current Goal Interpretation, Goal Association, or planning.
+inputs to current User Meaning Interpretation, Goal Association, or planning.
 
 Evolution rules:
 
 - preserve deterministic safety, authorization, cancellation, and evidence boundaries;
 - keep Cognitive Gateway normalization, protective reflex, attention, context, and
   admission distinct from Core semantics;
-- keep Goal Interpretation WHAT-only: complete natural-language intent, source evidence,
+- keep User Meaning Interpretation WHAT-only: complete natural-language intent, source evidence,
   confidence, provider-neutral output modality, and unresolved meaning;
 - make `CognitiveWorkRequest` the typed WHAT-to-HOW handoff; do not tunnel semantic
   authority through anonymous context dictionaries;
 - keep Fast Planner as the first HOW owner, including execution-input completeness,
   source/default policy, and clarification selection; Capability schemas constrain
-  realization but cannot turn Planner into a second Goal Interpreter;
+  realization but cannot turn Planner into a second User Meaning Interpreter;
 - keep Goal Association as the sole canonical Goal-continuity owner;
 - expose exact Capability identity only after applicable canonical Goal grounding;
 - after Core authority is acquired, fail closed rather than falling through to an older

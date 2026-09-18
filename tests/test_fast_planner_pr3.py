@@ -1674,7 +1674,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 run_request, raw = CanonicalDeepPlanContractTests.speech_outcomes("clarify", True)
                 unresolved = "The referenced content is not identified."
                 run_request = run_request.model_copy(update={
-                    "language": language, "interpretation_unresolved": [unresolved],
+                    "language": language, "meaning_uncertainties": [unresolved],
                     "responsibilities": [
                         CognitiveResponsibilityProposal(local_ref="r1", outcome="say the referenced content", output_mode="speech", confidence=1.0),
                         CognitiveResponsibilityProposal(local_ref="r2", outcome="say goodnight", output_mode="speech", confidence=1.0),
@@ -2087,7 +2087,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 else:
                     self.assertEqual(result.disposition, "unavailable", result.metadata)
                     self.assertEqual(result.activities, [])
-                    self.assertIn("numeric Capability input contradicts GI binding", result.metadata["error"])
+                    self.assertIn("numeric Capability input contradicts UMI binding", result.metadata["error"])
 
 
     def test_repetition_cannot_be_witnessed_by_duration_without_count_input(self):
@@ -2161,7 +2161,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         validate()
                         self.assertEqual(output.activities[0].args, args)
                     else:
-                        with self.assertRaisesRegex((PlannerDTOContractError, planner_fast_validation.AuthoritativeGroundingValidationError), "numeric Capability input contradicts GI binding|omitted explicit numeric Responsibility bindings"):
+                        with self.assertRaisesRegex((PlannerDTOContractError, planner_fast_validation.AuthoritativeGroundingValidationError), "numeric Capability input contradicts UMI binding|omitted explicit numeric Responsibility bindings"):
                             validate()
 
     def test_advance_declared_realization_cannot_fall_back_to_defaults(self):
@@ -2383,7 +2383,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 0.72,
                 }
             ],
-            interpretation_unresolved=[unresolved],
+            meaning_uncertainties=[unresolved],
         )
 
         advance = asyncio.run(
@@ -2415,7 +2415,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 0.72,
                 }
             ],
-            interpretation_unresolved=["The intended device is not identified."],
+            meaning_uncertainties=["The intended device is not identified."],
         )
 
         advance = asyncio.run(
@@ -2428,7 +2428,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             advance.metadata["failure_class"], "fast_stream_contract_invalid"
         )
-        self.assertIn("exact GI unresolved meaning", advance.metadata["error"])
+        self.assertIn("exact UMI unresolved meaning", advance.metadata["error"])
 
     def test_missing_weather_location_is_a_planner_execution_input_gap(self):
         raw = self._clarification_output(
@@ -2452,7 +2452,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 0.94,
                 }
             ],
-            interpretation_unresolved=[],
+            meaning_uncertainties=[],
         )
 
         advance = asyncio.run(
@@ -2757,7 +2757,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             '\"original_text\":\"  今晚，重庆热不热？  \"',
             str(prompt),
         )
-        self.assertIn('GI owns WHAT', str(prompt))
+        self.assertIn('UMI owns WHAT', str(prompt))
 
     def test_first_activity_weather_prompt_fits_declared_context_budget(self):
         responsibility = {
@@ -3301,7 +3301,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     },
                 }
             ],
-            interpretation_unresolved=[],
+            meaning_uncertainties=[],
             committed_communicative=True,
         )
 
@@ -4457,7 +4457,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertNotEqual(schema["properties"]["steps"].get("maxItems"), 0)
         self.assertIn("soridormi.blink_eyes", ollama.prompts[0][0])
-        self.assertNotIn("Goal Interpretation advisory JSON", ollama.prompts[0][0])
+        self.assertNotIn("User Meaning Interpretation advisory JSON", ollama.prompts[0][0])
         self.assertNotIn("authoritative source route", ollama.prompts[0][0].casefold())
         self.assertEqual(len(ollama.prompts), 1)
 

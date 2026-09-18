@@ -371,7 +371,7 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
             ],
         )
 
-        self.assertEqual(interpretation.authority, "goal_interpretation")
+        self.assertEqual(interpretation.authority, "user_meaning_interpretation")
         dumped = interpretation.model_dump(mode="json")
         self.assertNotIn("route", dumped)
         self.assertNotIn("intent", dumped)

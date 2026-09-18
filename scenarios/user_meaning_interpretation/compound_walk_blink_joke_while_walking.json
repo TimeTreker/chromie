@@ -1,0 +1,136 @@
+{
+  "schema_version": 1,
+  "id": "compound_walk_blink_joke_while_walking",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "Regression from the compound walk/blink/joke request: one primary User Meaning Interpretation result must preserve all three human responsibilities and their coordination without a same-authority repair; Planner owns executable decomposition.",
+  "tags": [
+    "voice-log",
+    "cognitive-core-agent-contract",
+    "robot-action",
+    "compound",
+    "speech-skill",
+    "joke",
+    "walk",
+    "blink"
+  ],
+  "input": {
+    "text": "Please walk forward for 20 seconds, after that, blink your little eyes 6 times, tell me a joke when you are walking.",
+    "language": "en-US"
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.87,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "Please walk forward for 20 seconds",
+              "output_mode": "body_action",
+              "confidence": 0.91,
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t5"
+              },
+              "continuity_scope": "goal"
+            },
+            {
+              "local_ref": "r2",
+              "outcome": "after that blink your little eyes 6 times",
+              "output_mode": "body_action",
+              "confidence": 0.86,
+              "source_evidence": {
+                "source_start_token_ref": "t10",
+                "source_end_token_ref": "t15"
+              },
+              "continuity_scope": "goal"
+            },
+            {
+              "local_ref": "r3",
+              "outcome": "tell me a joke when you are walking",
+              "output_mode": "speech",
+              "confidence": 0.88,
+              "source_evidence": {
+                "source_start_token_ref": "t17",
+                "source_end_token_ref": "t24"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": []
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.87,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "Please walk forward for 20 seconds",
+        "output_mode": "body_action",
+        "confidence": 0.91
+      },
+      {
+        "local_ref": "r2",
+        "outcome": "after that blink your little eyes 6 times",
+        "output_mode": "body_action",
+        "confidence": 0.86
+      },
+      {
+        "local_ref": "r3",
+        "outcome": "tell me a joke when you are walking",
+        "output_mode": "speech",
+        "confidence": 0.88
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "stable_capability_grounding",
+        "title": "Stable Capability Grounding",
+        "general_rule": "When the live catalog contains an exact high-level ability, Chromie should ground the user meaning to that ability without relying on a fragile timeout-prone second chance.",
+        "rationale": "UMI preserves three independent outcomes without choosing Capabilities.",
+        "root_cause_boundaries": [
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "composable_action_planning",
+        "title": "Composable High-Level Action Planning",
+        "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+        "rationale": "UMI preserves sequential and concurrent user timing without planning HOW.",
+        "root_cause_boundaries": [
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Trusted Capability Runtime/provider",
+          "Test evidence"
+        ]
+      },
+      {
+        "id": "planner_goal_semantic_quality",
+        "title": "Planner and Goal Semantic Quality",
+        "general_rule": "User Meaning Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
+        "rationale": "Three independently satisfiable outcomes remain three Responsibilities before planning.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner",
+          "Capability catalog",
+          "Evidence boundary"
+        ]
+      }
+    ]
+  }
+}

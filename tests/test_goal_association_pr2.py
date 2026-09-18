@@ -146,7 +146,7 @@ def goal(
 
 
 def intent_goal(description: str, output_mode: str, **extra) -> dict:
-    """GA fixture selects intent identities; descriptions/types come from GI."""
+    """GA fixture selects intent identities; descriptions/types come from UMI."""
     return {"source_responsibility_refs": ["r1"], "related_goal_ids": [],
             "supersedes_goal_ids": [], **extra}
 
@@ -170,7 +170,7 @@ def request(
     language: str = "zh-CN",
     discourse_referents=None,
     responsibility_outcomes: list[str] | None = None,
-    interpretation_unresolved: list[str] | None = None,
+    meaning_uncertainties: list[str] | None = None,
 ) -> CognitiveWorkRequest:
     outcomes = list(responsibility_outcomes or [text])
     return CognitiveWorkRequest(
@@ -187,7 +187,15 @@ def request(
             for index, outcome in enumerate(outcomes, start=1)
         ],
         interpretation_confidence=0.9,
-        interpretation_unresolved=list(interpretation_unresolved or []),
+        meaning_uncertainties=[
+            {
+                "local_ref": f"u{index}",
+                "kind": "other",
+                "description": description,
+                "responsibility_refs": ["r1"],
+            }
+            for index, description in enumerate(meaning_uncertainties or [], start=1)
+        ],
         context={
             "active_goal_snapshots": active_goals or [],
             "recent_goal_snapshots": [],
@@ -833,17 +841,14 @@ class GoalExecutionContractTests(unittest.TestCase):
                     {
                         "local_ref": "r1",
                         "outcome": "singing",
-                        "bindings": {"action": "singing"},
+                        "bindings": {},
                         "output_mode": "singing",
                         "confidence": 0.98,
                     },
                     {
                         "local_ref": "r2",
                         "outcome": "blinking eyes simultaneously",
-                        "bindings": {
-                            "action": "blinking eyes",
-                            "simultaneously": "simultaneously",
-                        },
+                        "bindings": {"simultaneously": "simultaneously"},
                         "output_mode": "body_action",
                         "confidence": 0.98,
                     },
@@ -1319,7 +1324,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                     {
                         "local_ref": "r2",
                         "outcome": "眨一下眼睛",
-                        "bindings": {"action": "眨眼", "count": "1 次"},
+                        "bindings": {"count": "1 次"},
                         "output_mode": "body_action",
                         "confidence": 0.95,
                     },
@@ -1556,7 +1561,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             GoalSegmentationModelOutput.model_validate(raw)
         parsed = GoalAssociationModelGoal.model_validate(intent_goal("label", "speech", source_responsibility_refs=["unknown"]))
-        with self.assertRaisesRegex(ValueError, "exact unique GI"):
+        with self.assertRaisesRegex(ValueError, "exact unique UMI"):
             ga_validation.inherited_goal_outcomes(parsed, req)
 
     def test_unentailed_resource_query_location_is_dropped_without_replacement(self):
@@ -1663,7 +1668,7 @@ class GoalExecutionContractTests(unittest.TestCase):
             output_type=GoalSegmentationModelOutput,
         )
 
-        label = "GI complete intentions JSON:\n"
+        label = "UMI Responsibilities JSON:\n"
         payload, end = json.JSONDecoder().raw_decode(prompt.split(label, 1)[1])
         payload_text = prompt.split(label, 1)[1][:end]
         self.assertGreater(len(payload_text), 2600)
@@ -1692,7 +1697,7 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
         self.assertIn("IMMUTABLE SOURCE TURN JSON", prompt)
         self.assertIn('"original_text":"  今晚，重庆热不热？  "', prompt)
-        self.assertIn("GI Responsibilities own current-turn WHAT", prompt)
+        self.assertIn("UMI Responsibilities own current-turn WHAT", prompt)
         self.assertIn("never silent semantic repair", prompt)
 
 
@@ -1713,9 +1718,9 @@ class GoalExecutionContractTests(unittest.TestCase):
         # therefore admit at most 11,264 input characters.
         self.assertLessEqual(input_chars, 11_264)
         prompt = layered.render()
-        self.assertIn("Every Responsibility ref must occur exactly once", prompt)
+        self.assertIn("Every supplied Responsibility ref must occur exactly once", prompt)
         self.assertIn("Planner decomposes Activities", prompt)
-        self.assertIn("Host inherits GI", prompt)
+        self.assertIn("Host inherits UMI", prompt)
         self.assertIn("IMMUTABLE SOURCE TURN JSON", prompt)
 
     def test_existing_goal_association_prompt_fits_qualified_8k_preflight(self):
@@ -1735,8 +1740,6 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "distance_duration": "10 秒",
                         },
                         "output_mode": "body_action",
-                        "relationship": "continue",
-                        "target_goal_ids": ["goal-walk"],
                         "confidence": 1.0,
                     }
                 ),
@@ -1993,7 +1996,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             request(
                 "Turn it off.",
                 language="en-US",
-                interpretation_unresolved=["which device the user means"],
+                meaning_uncertainties=["which device the user means"],
             ),
         )
 
@@ -2043,7 +2046,7 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             request(
                 "Bring me that cup.",
                 language="en-US",
-                interpretation_unresolved=["which cup the user means"],
+                meaning_uncertainties=["which cup the user means"],
             ),
         )
 
@@ -2302,8 +2305,7 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
             context["plan_status"] = "proposed"
             req = request("Do B five times.", active_goals=manager.active_goal_snapshots()).model_copy(update={
                 "responsibilities": typed_responsibilities({"local_ref": "r1", "outcome": "Do B five times.",
-                    "bindings": {"count": "5"}, "output_mode": "body_action", "relationship": "modify",
-                    "target_goal_ids": ["goal-retained"], "confidence": 1.0})})
+                    "bindings": {"count": "5"}, "output_mode": "body_action", "confidence": 1.0})})
             raw = {"associations": [{"relationship": "modify", "source_responsibility_refs": ["r1"],
                 "target_goal_ids": ["goal-retained"], "confidence": 1.0,
                 "requirement_changes": [{"target_goal_id": "goal-retained", "replace_requirement_indices": [1],
@@ -2377,7 +2379,7 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
         conflicting = {**update, "base_goal_fingerprint": semantic_goal_fingerprint(typed),
                        "source_responsibilities": [{"local_ref": "r1", "outcome": "B five times.",
                                                      "bindings": {"count": "5"}}]}
-        with self.assertRaisesRegex(ValueError, "conflicts with its accepted GI"):
+        with self.assertRaisesRegex(ValueError, "conflicts with its accepted UMI"):
             apply_goal_meaning_update(typed, conflicting)
 
     def test_association_cannot_hide_what_rewrite_or_drop_a_source(self):
@@ -2391,14 +2393,13 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
             with self.assertRaises(ValidationError):
                 GoalAssociationModelAssociation.model_validate(change)
 
-    def test_structured_gi_binding_is_referenced_without_reauthoring(self):
+    def test_structured_umi_binding_is_referenced_without_reauthoring(self):
         retained = active_goal("goal-region", "Arrange the items in the specified region.")
         retained["goal"]["constraints"] = {"region": {"room": "desk", "offset": [0, 0]}}
         structured_value = {"room": "desk", "offset": [1, 2]}
         req = request("Arrange them in this region.", active_goals=[retained]).model_copy(update={
             "responsibilities": typed_responsibilities({"local_ref": "r1", "outcome": "Arrange the items in the specified region.",
-                "bindings": {"region": structured_value}, "output_mode": "body_action", "relationship": "modify",
-                "target_goal_ids": ["goal-region"], "confidence": 1.0})})
+                "bindings": {"region": structured_value}, "output_mode": "body_action", "confidence": 1.0})})
         raw = {"associations": [{"relationship": "modify", "source_responsibility_refs": ["r1"],
             "target_goal_ids": ["goal-region"], "confidence": 1.0, "requirement_changes": [{
                 "target_goal_id": "goal-region", "replace_requirement_indices": [0],

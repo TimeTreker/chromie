@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
 from shared.chromie_contracts.interaction import CapabilityIdentityModel, InteractionResponse
 from shared.chromie_contracts.mind import MindProfile
 from shared.chromie_runtime.runtime_events import persist_runtime_event
@@ -35,12 +35,12 @@ if TYPE_CHECKING:
     from .host_settings import EpisodeSettings
 
 
-class EpisodeGoalInterpretationRecord(BaseModel):
+class EpisodeUserMeaningInterpretationRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     responsibilities: list[CognitiveResponsibilityProposal] = Field(default_factory=list)
-    unresolved: list[str] = Field(default_factory=list)
+    meaning_uncertainties: list[UserMeaningUncertainty] = Field(default_factory=list)
     latency_ms: float | None = Field(default=None, ge=0.0)
 
 
@@ -97,7 +97,7 @@ class EpisodeTurnRecord(BaseModel):
     turn_index: int = Field(ge=1)
     created_at: str = Field(default_factory=_now_iso)
     user_text: str = ""
-    goal_interpretation: EpisodeGoalInterpretationRecord = Field(default_factory=EpisodeGoalInterpretationRecord)
+    user_meaning_interpretation: EpisodeUserMeaningInterpretationRecord = Field(default_factory=EpisodeUserMeaningInterpretationRecord)
     agent: EpisodeAgentRecord = Field(default_factory=EpisodeAgentRecord)
     execution: EpisodeExecutionRecord = Field(default_factory=EpisodeExecutionRecord)
     errors: list[str] = Field(default_factory=list)
@@ -460,25 +460,25 @@ class EpisodeRecorder:
             sid=session_id,
             turn_index=turn_index,
             user_text=str(context.get("user_text") or ""),
-            goal_interpretation=EpisodeGoalInterpretationRecord(
+            user_meaning_interpretation=EpisodeUserMeaningInterpretationRecord(
                 confidence=self._float_or_none(
-                    context.get("goal_interpretation_confidence")
+                    context.get("user_meaning_interpretation_confidence")
                 ),
                 responsibilities=list(
                     (
-                        context.get("goal_interpretation")
-                        if isinstance(context.get("goal_interpretation"), dict)
+                        context.get("user_meaning_interpretation")
+                        if isinstance(context.get("user_meaning_interpretation"), dict)
                         else {}
                     ).get("responsibilities")
                     or []
                 ),
-                unresolved=[
-                    str(item)
-                    for item in context.get("goal_interpretation_unresolved", [])
-                    if str(item).strip()
+                meaning_uncertainties=[
+                    UserMeaningUncertainty.model_validate(item)
+                    for item in context.get("user_meaning_uncertainties", [])
+                    if isinstance(item, dict)
                 ],
                 latency_ms=self._float_or_none(
-                    context.get("goal_interpretation_latency_ms")
+                    context.get("user_meaning_interpretation_latency_ms")
                 ),
             ),
             agent=EpisodeAgentRecord(

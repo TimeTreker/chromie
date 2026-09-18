@@ -37,13 +37,13 @@ _PURPOSE_COMPUTE_CLASS: dict[str, CognitionComputeClass] = {
     "cognitive_gateway_attention_review": CognitionComputeClass.REALTIME,
     "agent_default": CognitionComputeClass.INTERACTIVE,
     "agent_skill_selection": CognitionComputeClass.INTERACTIVE,
-    "goal_interpreter_fast": CognitionComputeClass.INTERPRETATION,
+    "user_meaning_interpreter_fast": CognitionComputeClass.INTERPRETATION,
     "fast_planner": CognitionComputeClass.INTERACTIVE,
     "social_cognition": CognitionComputeClass.REALTIME,
     "social_cognition_deep": CognitionComputeClass.REALTIME,
     "situational_cognition": CognitionComputeClass.INTERACTIVE,
     "goal_association": CognitionComputeClass.CONTINUITY,
-    "goal_interpreter_deep": CognitionComputeClass.INTERPRETATION,
+    "user_meaning_interpreter_deep": CognitionComputeClass.INTERPRETATION,
     "situational_deliberative_cognition": CognitionComputeClass.DELIBERATIVE,
     "deep_planner": CognitionComputeClass.DELIBERATIVE,
     "reflection": CognitionComputeClass.BACKGROUND,
@@ -73,8 +73,8 @@ def compute_class_for_purpose(
     return _PURPOSE_COMPUTE_CLASS.get(normalized, default)
 
 
-def goal_interpreter_compute_class(stage: str) -> CognitionComputeClass:
-    """Map the GI stage depth to compute scheduling without changing GI authority."""
+def user_meaning_interpreter_compute_class(stage: str) -> CognitionComputeClass:
+    """Map the UMI stage depth to compute scheduling without changing UMI authority."""
 
     normalized = str(stage or "").strip().casefold()
     if normalized == "startup_warm":

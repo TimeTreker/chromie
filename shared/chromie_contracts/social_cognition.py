@@ -11,7 +11,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .core_interpretation import CognitiveResponsibilityProposal
+from .core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
 from .interaction import reject_forbidden_low_level_fields
 from .semantic_artifact import SemanticArtifactLineage, semantic_artifact_ref
 from .plan import (
@@ -31,7 +31,7 @@ class SocialCognitionRequest(BaseModel):
     source_refs: list[str] = Field(min_length=1, max_length=64)
     language: str = "auto"
     responsibilities: list[CognitiveResponsibilityProposal] = Field(default_factory=list)
-    interpretation_unresolved: list[str] = Field(default_factory=list)
+    meaning_uncertainties: list[UserMeaningUncertainty] = Field(default_factory=list)
     source_turn: dict[str, Any] = Field(default_factory=dict)
     goal_ids: list[str] = Field(default_factory=list)
     evidence_refs: list[str] = Field(default_factory=list)
@@ -90,6 +90,11 @@ class SocialCognitionRequest(BaseModel):
         refs = {item.local_ref for item in self.responsibilities}
         if len(refs) != len(self.responsibilities):
             raise ValueError("Social Cognition Responsibility refs must be unique")
+        for uncertainty in self.meaning_uncertainties:
+            if set(uncertainty.responsibility_refs) - refs:
+                raise ValueError(
+                    "Social Cognition meaning uncertainty widens Responsibility scope"
+                )
         lineage = self.semantic_artifact_lineage
         responsibility_lineage = lineage.by_kind("responsibility")
         if responsibility_lineage and self.responsibilities:
@@ -246,7 +251,18 @@ class SocialCognitionResolution(SocialCognitionOutput):
                 raise ValueError("social self-context widens Situation subjects")
         for act in self.activities:
             if request.trigger == "interpretation" and not request.communication_needs and act.function in {"respond", "ask"}:
-                raise ValueError("interpretation acknowledgement cannot fulfill an unestablished Work communication need")
+                turn_local_refs = {
+                    item.local_ref
+                    for item in request.responsibilities
+                    if item.continuity_scope == "turn"
+                }
+                cited_refs = set(act.source_responsibility_refs)
+                if not cited_refs or not cited_refs.issubset(turn_local_refs):
+                    raise ValueError(
+                        "interpretation-triggered respond/ask cannot fulfill an unestablished "
+                        "Work communication need unless it cites only turn-local "
+                        "Responsibility provenance"
+                    )
             for name, values in scopes.items():
                 if not set(getattr(act, name)).issubset(values):
                     raise ValueError(f"Social Cognition widened {name}")

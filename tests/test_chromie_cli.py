@@ -45,8 +45,8 @@ class ChromieCliTests(unittest.TestCase):
                 ORCH_ACTION_DRY_RUN=true
                 AGENT_ENABLE_PHYSICAL_DAG_EXECUTION=0
                 AGENT_ENABLE_GUARDED_DAG_EXECUTION=0
-                AGENT_GOAL_INTERPRETER_TIMEOUT_MS=1500
-                ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=3000
+                AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS=1500
+                ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS=3000
                 AGENT_TIMEOUT_MS=30000
                 ORCH_AGENT_TIMEOUT_MS=40000
                 """,
@@ -161,7 +161,7 @@ class ChromieCliTests(unittest.TestCase):
                             "elapsed_ms": 110.0,
                             "event": "cognitive_gateway_reflex_applied",
                             "status": "ok",
-                            "message": "cognitive_gateway_reflex_applied: action=interrupt trigger=stop_command goal_interpretation_bypassed=True",
+                            "message": "cognitive_gateway_reflex_applied: action=interrupt trigger=stop_command user_meaning_interpretation_bypassed=True",
                         },
                         {
                             "sid": "sid-timeline",
@@ -534,8 +534,8 @@ class ChromieCliTests(unittest.TestCase):
                 AGENT_ENABLE_PHYSICAL_DAG_EXECUTION=1
                 AGENT_ENABLE_GUARDED_DAG_EXECUTION=0
                 ORCH_ACTION_DRY_RUN=false
-                AGENT_GOAL_INTERPRETER_TIMEOUT_MS=1500
-                ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=3000
+                AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS=1500
+                ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS=3000
                 AGENT_TIMEOUT_MS=30000
                 ORCH_AGENT_TIMEOUT_MS=40000
                 """,
@@ -573,8 +573,8 @@ class ChromieCliTests(unittest.TestCase):
                 TTS_URL=
                 LLM_URL=
                 SORIDORMI_MCP_URL=
-                AGENT_GOAL_INTERPRETER_TIMEOUT_MS=1500
-                ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS=3000
+                AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS=1500
+                ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS=3000
                 AGENT_TIMEOUT_MS=30000
                 ORCH_AGENT_TIMEOUT_MS=40000
                 """,

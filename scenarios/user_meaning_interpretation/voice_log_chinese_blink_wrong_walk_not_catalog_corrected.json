@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_chinese_blink_wrong_walk_not_catalog_corrected",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "One primary UMI DTO preserves provider-neutral blink meaning; the Host never repairs it or chooses a substitute Capability.",
+  "tags": [
+    "voice-log",
+    "zh-CN",
+    "cognitive-core-agent-contract",
+    "robot-action",
+    "blink",
+    "model-authority"
+  ],
+  "input": {
+    "text": "眨两小眼睛。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.93,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "眨两小眼睛。",
+              "confidence": 0.93,
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t5"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": []
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.93,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "眨两小眼睛。",
+        "confidence": 0.93,
+        "output_mode": "body_action"
+      }
+    ]
+  }
+}

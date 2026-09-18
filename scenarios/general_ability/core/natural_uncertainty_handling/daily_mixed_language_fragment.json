@@ -62,7 +62,7 @@
         "rationale": "Preserve the mixed-language uncertainty and ask about the missing object instead of inventing a tool target.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]

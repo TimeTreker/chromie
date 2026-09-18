@@ -68,7 +68,7 @@ ORCH_OUTPUT_DEVICE=扬声器名称或编号
 
 1. 打开带跟随摄像机的 MuJoCo viewer；
 2. 启动 Soridormi runtime-backed MCP 服务；
-3. 启动 Chromie ASR、TTS、Ollama 和 Agent（含内嵌 Goal Interpreter）；
+3. 启动 Chromie ASR、TTS、Ollama 和 Agent（含内嵌 User Meaning Interpreter）；
 4. 验证 Soridormi capability contract；
 5. 启动主机 Orchestrator，并打开麦克风和扬声器；
 6. 启用统一 Goal-driven Runtime 的权威 `apply` 路径；具体对话、信息读取和

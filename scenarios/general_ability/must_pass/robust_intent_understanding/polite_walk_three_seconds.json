@@ -49,7 +49,7 @@
         "title": "Robust Intent Understanding",
         "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
         "rationale": "A polite request remains a concrete three-second walking command; politeness must not hide the action or its duration.",
-        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/goal interpretation", "Agent contract", "Test evidence"]
+        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/user meaning interpretation", "Agent contract", "Test evidence"]
       }
     ]
   }

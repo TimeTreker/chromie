@@ -62,7 +62,7 @@
         "rationale": "Offer simple companionship without claiming human presence, dependency, or exclusive friendship.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

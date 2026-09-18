@@ -549,7 +549,7 @@ class SessionEvidenceTests(unittest.TestCase):
             )
             tracker.record_cognitive_stage(
                 sid,
-                stage="goal_interpretation",
+                stage="user_meaning_interpretation",
                 started_monotonic_ms=started + 121.0,
                 finished_monotonic_ms=started + 421.0,
                 status="accepted",
@@ -582,7 +582,7 @@ class SessionEvidenceTests(unittest.TestCase):
             self.assertNotIn("\n", message)
             self.assertIn("vad[accepted]", message)
             self.assertIn("asr[accepted,120.0ms]", message)
-            self.assertIn("goal_interpretation[accepted,300.0ms]", message)
+            self.assertIn("user_meaning_interpretation[accepted,300.0ms]", message)
             self.assertIn("fast_planner[escalate,1.50s]", message)
             self.assertIn("deep_planner[complete,600.0ms]", message)
             self.assertIn("tts_playback[played=1/1,failed=0,skipped=0]", message)
@@ -597,7 +597,7 @@ class SessionEvidenceTests(unittest.TestCase):
             started = now_ms()
             tracker.record_cognitive_stage(
                 first,
-                stage="goal_interpretation",
+                stage="user_meaning_interpretation",
                 started_monotonic_ms=started,
                 finished_monotonic_ms=started + 10.0,
                 status="accepted",
@@ -613,7 +613,7 @@ class SessionEvidenceTests(unittest.TestCase):
             ]
             self.assertEqual(len(flow), 1)
             self.assertIn("state=abandoned", flow[0]["message"])
-            self.assertIn("goal_interpretation[accepted,10.0ms]", flow[0]["message"])
+            self.assertIn("user_meaning_interpretation[accepted,10.0ms]", flow[0]["message"])
 
     def test_evidence_write_failure_does_not_break_session_logging(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -269,7 +269,7 @@ async def begin_episode(language, rain):
     response.metadata.update(
         turn_id=request.sid,
         goal_association=request.context["goal_association_resolution"],
-        goal_interpretation={
+        user_meaning_interpretation={
             "responsibilities": [r.model_dump(mode="json") for r in request.responsibilities]
         },
         user_turn_envelope={

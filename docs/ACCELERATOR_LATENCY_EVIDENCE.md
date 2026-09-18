@@ -207,10 +207,10 @@ Existing Ollama transactions record the class for observability without sending 
 priority fields.
 
 On 2026-09-14, after dual-engine resource probes, the owner explicitly selected
-one resident Gemma 12B SGLang instance shared by all cognition roles. SC, GI, GA
+one resident Gemma 12B SGLang instance shared by all cognition roles. SC, UMI, GA
 and Planner retain independent semantic authority and request context. The order
-is SC > GI > GA > Fast Planner > deliberative Work > background, mapped by the
-default step to 500/400/300/200/100/0. Depth does not lower SC/GI urgency.
+is SC > UMI > GA > Fast Planner > deliberative Work > background, mapped by the
+default step to 500/400/300/200/100/0. Depth does not lower SC/UMI urgency.
 SGLang must actually preempt and resume lower-priority requests; a priority field
 alone is not sufficient evidence. The two-instance Qwen/Gemma experiments are
 retained as failed/unqualified candidates, not the maintained topology.
@@ -285,7 +285,7 @@ The owner requested fixing non-model engineering defects first; model inference 
 separate future optimization/LoRA work. Migration is judged by foreground interaction latency
 and no additional degradation, not by requiring all model roles to become perfect.
 
-Baseline revision: `759b5e062cd43ac2cb919e4ca587a682ca673eee`. The paired 24-case GI runs and
+Baseline revision: `759b5e062cd43ac2cb919e4ca587a682ca673eee`. The paired 24-case UMI runs and
 three-trial responsiveness series froze the same worktree digest:
 `fc0d5a0b425f759af72c34fa2bfda0eb1555dbc38e5e1992940331eb63227cb9`.
 Artifacts: `.chromie/acceptance/sglang-contract-comparison-20260909/`.
@@ -294,7 +294,7 @@ Artifacts: `.chromie/acceptance/sglang-contract-comparison-20260909/`.
 
 | Actual episode / boundary owner | Input → actual output → required output | Diagnosis and repair |
 | --- | --- | --- |
-| GI schema builder | Prompt requires lexicographic keys; schema placed duration before direction → SGLang grammar rejects direction then duration → decoder must admit the instructed order | `contract_or_schema`: sort binding properties after adding optional context fields, in Fast and Deep. Decoder proof rejects the old order and accepts the fixed order; no meaning, authority or allowed value changed. |
+| UMI schema builder | Prompt requires lexicographic keys; schema placed duration before direction → SGLang grammar rejects direction then duration → decoder must admit the instructed order | `contract_or_schema`: sort binding properties after adding optional context fields, in Fast and Deep. Decoder proof rejects the old order and accepts the fixed order; no meaning, authority or allowed value changed. |
 | Primary-screen oracle | Canonical unit-bearing scalar `30度` → oracle demanded 30; unfamiliar name → unconditional ambiguity; minimal source span → not scored | `scenario_or_oracle`: v2 owns separate scenario files, validates references through Schema/Host, preserves units/pronouns, contrasts ambiguity, and checks spans. Historic v1 stays unchanged. |
 | Primary-screen result retention | Valid JSON with a length stop, or a mechanically passing result → incomplete termination could pass / passing raw text omitted | `context_or_harness`: require normal stop and retain raw text for both verdicts. Unalignable dimensions are unscored, not false passes. |
 | SGLang cache sizing | Default auto-sized shared cache with resident TTS → later CosyVoice allocation OOM → retain speech headroom | `runtime_or_provider`: maintained Compose now exposes positive `SGLANG_MAX_TOTAL_TOKENS`, default 32768, instead of relying on an ignored private override. Exact AWQ profile proved two simultaneous 16K inputs and speech coexistence. |
@@ -314,14 +314,14 @@ Post-batch rubric review additionally accepts “give” as a transfer synonym a
 Original reports are unchanged; separate `post-batch-rubric-review.json` records the review,
 which changes neither aggregate pass count. No reference was supplied to model inference.
 
-Actual complete GI workflow for every case:
+Actual complete UMI workflow for every case:
 
 ```text
 immutable turn/context → production prompt + sorted dynamic Schema → provider call
   → production parser / deterministic Host
       ├─ rejected primary → explicit unavailable; no semantic retry
       ├─ accepted and unresolved → one fresh source-only Deep call → Host
-      └─ accepted and resolved → final GI decision
+      └─ accepted and resolved → final UMI decision
   → offline schema and semantic rubric review; no GA/Planner/robot execution
 ```
 
@@ -344,11 +344,11 @@ numerical causality has not been isolated. No further prompt tuning was performe
 
 Responsiveness series, three observations per deployment; report medians and ranges, not
 release percentiles. These are synthetic foreground requests under active Deep, not full
-production GI/Planner payloads or microphone-to-speaker latency:
+production UMI/Planner payloads or microphone-to-speaker latency:
 
 | Measurement | SGLang AWQ | Maintained Ollama Q4_K_M |
 | --- | --- | --- |
-| Fast GI first delta | 91.294 ms (49.384–99.433) | 27,473.888 ms (23,220.009–29,466.147) |
+| Fast UMI first delta | 91.294 ms (49.384–99.433) | 27,473.888 ms (23,220.009–29,466.147) |
 | Fast Planner first delta | 85.856 ms (49.872–88.760) | 64.209 ms (63.804–77.632), after Deep finishes |
 | Complete foreground window | 279.363 ms (201.700–285.325) | 27,686.594 ms (23,414.119–29,654.988) |
 | TTS first audio under tested workload | 3,530.734 ms (2,865.601–4,266.149) | 6,493.102 ms (4,557.640–7,112.504) |
@@ -416,7 +416,7 @@ The actual failure workflow is the same in these three trials:
 | Provider harness | Structured output, streams, concurrent/cancel/foreground workload; pass | Inference contract satisfied for this synthetic workload |
 | Protocol-5 harness | Opens TTS warmup websocket before Deep or any lease | Correct ordering; first audio required before progressing |
 | CosyVoice GPU allocation | Warmup synthesis with SGLang resident; 20 MiB allocation fails, free memory only 6.31 / 22.31 / 10.31 MiB respectively | First failed execution boundary; worker fails instead of producing audio |
-| Harness containment | Receives worker error; records qualification failure | Correct fail-closed; Deep, lease/revocation and GI cohort not invoked |
+| Harness containment | Receives worker error; records qualification failure | Correct fail-closed; Deep, lease/revocation and UMI cohort not invoked |
 
 The root resource problem is insufficient shared-GPU transient headroom; an idle healthy
 container and an allocated KV pool do not prove speech coexistence. No evidence supports
@@ -442,21 +442,21 @@ two simultaneous full 32K contexts are not claimed. The memory-budget change alt
 SGLang allocation, leaving more transient room for CosyVoice; it does not move semantic authority.
 
 `protocol5-awq32.json` retains first-audio baseline 2,722.82 ms, interruption speech
-2,864.89 ms, replacement speech 3,763.01 ms; synthetic Fast GI/Planner TTFTs were
-58.47/57.96 ms and interruption-to-GI-first-delta 59.24 ms. Deep stayed active before
+2,864.89 ms, replacement speech 3,763.01 ms; synthetic Fast UMI/Planner TTFTs were
+58.47/57.96 ms and interruption-to-UMI-first-delta 59.24 ms. Deep stayed active before
 both pauses, emitted zero content deltas during each held lease, and resumed afterward.
 This is one sample, not P95/P99, production lease policy, real interruption, or audible playback.
 
-The frozen primary GI screen then completed all 16 cases on the unchanged runtime and
+The frozen primary UMI screen then completed all 16 cases on the unchanged runtime and
 worktree hash `b41f1d680d954871b8c3d0953817606cee215affa594f50a39913a8dfdee7263`.
 Manifest SHA-256:
 `f13c1c14e73bcb1c64092bbf1e959b21cac870b907a9c63ec13b00c8c290bbfe`.
 Mechanical result: **2/16 pass, 14/16 fail**. All requests returned HTTP 200 and stopped
 without output truncation. Actual prompts were roughly 3.4–3.9K tokens; the separate
 capacity probe supplies the larger-context evidence. All request/response pairs, including
-passes, are retained in `gi-transactions/`; `gi-adjudication.json` reviews every case.
+passes, are retained in `umi-transactions/`; `umi-adjudication.json` reviews every case.
 
-| GI workflow boundary / owner | Observed contract and output | Judgment |
+| UMI workflow boundary / owner | Observed contract and output | Judgment |
 | --- | --- | --- |
 | Canonical payload builder | Exact immutable utterance, token refs, empty bounded context, WHAT prompt/schema; temperature 0, thinking off, 512 output tokens | No expected answers supplied to model; required binding rules present |
 | SGLang primary invocation | One complete JSON response per case; missing/mistyped dimensions, translated provenance, wrong modality and lost coordination | Earliest observed semantic failure is the primary transaction output; prompt/template/quantization/model causality not isolated |
@@ -465,7 +465,7 @@ passes, are retained in `gi-transactions/`; `gi-adjudication.json` reviews every
 | Downstream authorities | Deep, GA, Planner, Agent/Host execution not invoked by this primary-only screen | No complete semantic-transaction or robot behavior claim |
 
 Failures cluster around typed binding coverage/grounding, modality/coordination, and
-referent interpretation. Reject this artifact for GI promotion under the unchanged transaction.
+referent interpretation. Reject this artifact for UMI promotion under the unchanged transaction.
 Do not infer that quantization caused these errors without a controlled contrast. No prompt,
 Schema, DTO, Host semantic repair, or maintained model profile was changed.
 
@@ -475,7 +475,7 @@ numeric 30 where the canonical unit-preserving contract requires `30度`; the un
 oracle demands unresolved unconditionally although unfamiliarity alone is not ambiguity.
 Both failing cases have independent defects, so neither observation rescues this candidate.
 These oracle gaps must be reconciled and frozen as a new cohort before another optimization;
-do not silently edit or retrospectively rescore this run. Uniform confidence .5 is retained as diagnostic output. Production GI delegates only on
+do not silently edit or retrospectively rescore this run. Uniform confidence .5 is retained as diagnostic output. Production UMI delegates only on
 unresolved meaning; confidence alone does not trigger Deep.
 
 One bundle was collected after the complete semantic cohort:
@@ -528,7 +528,7 @@ multimodal post-sizing reservation remained, weight memory stayed 8.62 GB, and t
 remained exactly 5,091 tokens. Do not retain that flag as a Chromie optimization.
 
 This proves physical SGLang + CosyVoice co-residency on the 16 GB laptop, but **does not qualify
-the topology for Chromie cognition**. The maintained laptop GI request budget is 16K and other
+the topology for Chromie cognition**. The maintained laptop UMI request budget is 16K and other
 semantic roles retain 32K request budgets; 5,091 tokens cannot represent that deployment. Do not
 trade away the two-request concurrency requirement merely to make the canary fit, because
 foreground progress while Deep remains active is the reason for evaluating SGLang.
@@ -537,7 +537,7 @@ The next laptop gate is therefore a quantized SGLang-served model/artifact compa
 semantic contracts, `max_running_requests=2`, resident TTS, priority semantics, and target context
 topology fixed while changing only the exact model artifact/runtime quantization. Resource fit must
 be proven before running semantic-role promotion. Only after a candidate has a production-sized
-context pool should the frozen GI semantic cohort and then protocol-5 contention/lease/revocation
+context pool should the frozen UMI semantic cohort and then protocol-5 contention/lease/revocation
 be used as promotion evidence.
 
 For resource reproduction on the measured BF16 canary, the relevant operator values are:
@@ -565,7 +565,7 @@ mandatory `foreground_under_deliberative_load` phase:
 optional TTS warm/baseline
   -> start long DELIBERATIVE stream with context pressure
   -> wait until it is actively decoding
-  -> inject INTERACTIVE Fast-GI canary
+  -> inject INTERACTIVE Fast-UMI canary
   -> while Deep remains active, inject INTERACTIVE Fast-Planner canary
   -> optionally synthesize TTS in the same contention window
   -> require foreground completion before Deep finishes
@@ -578,7 +578,7 @@ mapping. SGLang's default convention is translated as larger numeric values firs
 priority convention is translated as smaller numeric values first. These raw numbers are
 evidence knobs only and never become semantic configuration.
 
-The contention transaction has three explicit operational model routes: `fast_gi`,
+The contention transaction has three explicit operational model routes: `fast_umi`,
 `fast_planner`, and `deliberative`. All three inherit the required base `--model` identity by
 default. A deployed topology may override any route only by supplying its model name, exact
 revision, and exact artifact record together. This is compute/deployment evidence only; it does
@@ -619,7 +619,7 @@ the Fast-Planner canary has produced its synthetic PresentationCommit boundary:
 
 ```text
 Deep actively decoding
-  -> Fast GI completes under INTERACTIVE priority
+  -> Fast UMI completes under INTERACTIVE priority
   -> Fast Planner completes under INTERACTIVE priority
   -> POST /pause_generation {"mode":"in_place"}
   -> allow already-buffered SSE delivery to settle
@@ -639,7 +639,7 @@ The harness records pause/continue latency, Deep delta counts across the held le
 resume-to-next-delta latency, TTS baseline and lease timing, and final Deep completion. It does
 **not** invent a new TTS slowdown threshold: the result is retained as evidence and must later be
 judged with Chromie's existing interaction-latency contract and real
-GI -> Planner -> typed `PresentationCommit` -> TTS -> playback evidence.
+UMI -> Planner -> typed `PresentationCommit` -> TTS -> playback evidence.
 
 Run the bounded probe only after the ordinary foreground-under-Deep SGLang canary has passed and
 TTS is warm/resident:
@@ -672,7 +672,7 @@ samples with presentation-lease samples.
 
 A stable presentation lease is still insufficient for production because `in_place` pauses the
 whole SGLang engine. A new user input that arrives while speech is being synthesized must be able
-to revoke that lease before it asks Fast GI for new foreground cognition. The provider must not
+to revoke that lease before it asks Fast UMI for new foreground cognition. The provider must not
 turn "speech is active" into "the mind cannot hear anything new."
 
 `--presentation-lease-revocation-probe` extends the bounded provider canary only; it does not
@@ -680,13 +680,13 @@ claim microphone detection, playback interruption, or Agent policy. The correct 
 
 ```text
 Deep actively decoding
-  -> Fast GI + Fast Planner complete
+  -> Fast UMI + Fast Planner complete
   -> pause_generation(mode=in_place)
   -> start TTS while Deep is quiescent
   -> first TTS audio arrives (synthetic interruption trigger)
   -> close the old TTS websocket to cancel synthesis
   -> continue_generation(torch_empty_cache=false)
-  -> immediately inject a new Fast-GI canary
+  -> immediately inject a new Fast-UMI canary
   -> run a new Fast-Planner canary to the next synthetic PresentationCommit
   -> pause_generation(mode=in_place) again
   -> synthesize the replacement response while Deep is quiescent
@@ -704,16 +704,16 @@ artificial cancellation sleep.
 
 The first retained protocol-4 RTX 5090 revocation series established 20/20 fast revocation and
 Deep continuity, but it also exposed an invalid recovery ordering in the canary itself: after the
-interrupted GI completed, the harness let Deep run to saturation and only then asked TTS to prove
-recovery. Fast interruption stayed excellent (about 56 ms worst-case trigger-to-GI-first-delta),
+interrupted UMI completed, the harness let Deep run to saturation and only then asked TTS to prove
+recovery. Fast interruption stayed excellent (about 56 ms worst-case trigger-to-UMI-first-delta),
 but post-interruption TTS recovery became bimodal: about 2.09 s P50 versus about 13.9 s P95/P99.
 That path reintroduced the same cross-process contention that the presentation lease exists to
 prevent. CosyVoice's worker also uses a three-second bounded cancellation drain before falling back
 to terminate-and-reload, so starving that drain can turn a barge-in into a cold-worker tail.
 Protocol 4 is therefore diagnostic evidence, not the final revocation transaction.
 
-The corrected round-trip records interrupted GI and Planner latency, TTS close latency,
-interruption-trigger-to-GI-first-delta and Planner-finish latency, second-lease pause/continue and
+The corrected round-trip records interrupted UMI and Planner latency, TTS close latency,
+interruption-trigger-to-UMI-first-delta and Planner-finish latency, second-lease pause/continue and
 resume latency, Deep delta counts during recovery TTS, and recovery TTS queue/native-first-audio
 timing. Revocation samples now use contention protocol version 5 so protocol-4 diagnostics cannot
 be silently mixed with the corrected transaction.
@@ -723,8 +723,8 @@ be silently mixed with the corrected transaction.
 The retained RTX 5090 protocol-5 round-trip series closes the synthetic provider-compute phase:
 20/20 samples passed; original and interrupted foreground work completed before Deep in every
 trial; both presentation leases held Deep at zero new content deltas during TTS and Deep resumed
-afterward in every trial. Observed P99s were about 41.7 ms Fast-GI TTFT, 40.6 ms Fast-Planner
-TTFT, 54.6 ms interruption-trigger-to-new-GI-first-delta, 307.1 ms interruption-trigger-to-new
+afterward in every trial. Observed P99s were about 41.7 ms Fast-UMI TTFT, 40.6 ms Fast-Planner
+TTFT, 54.6 ms interruption-trigger-to-new-UMI-first-delta, 307.1 ms interruption-trigger-to-new
 Planner completion, 2.95 ms reacquire-pause, 4.71 ms reacquire-continue, and 3.79 ms
 resume-to-next-Deep-delta. Replacement TTS no longer showed the invalid protocol-4 ~14 s tail:
 its P99 first audio was about 2.86 s, split into about 825 ms worker queue wait and about 2.15 s
@@ -736,13 +736,13 @@ composition root and translates existing provider-neutral compute classes into t
 qualified priority wire field. Ollama remains the default and is not deleted. The Host separately
 owns the presentation-compute lease around real Vocal delivery; SC owns interaction wording, Planner owns Work HOW, and the
 provider merely executes pause/resume resource commands. A newly admitted foreground input revokes
-an active engine pause before its routed GI transaction begins.
+an active engine pause before its routed UMI transaction begins.
 
 This source integration is **not** model/role promotion evidence. The provider canaries used one
 Qwen3.5-9B served model to isolate scheduler behavior, while the maintained RTX 5090 Ollama profile
 still uses its declared Gemma/Qwen role topology. Candidate Agent runs must explicitly select the
-served model for each role and then pass the real GI/Planner semantic gates plus
-GI -> Planner -> typed PresentationCommit -> TTS -> playback/interruption end-to-end evidence.
+served model for each role and then pass the real UMI/Planner semantic gates plus
+UMI -> Planner -> typed PresentationCommit -> TTS -> playback/interruption end-to-end evidence.
 
 Run only after the full presentation-lease series is stable:
 
@@ -829,7 +829,7 @@ not a candidate-provider pass.
 
 Run the control against the already deployed model topology, with TTS alive. A single-model
 profile needs only the base model identity. A multi-model profile must override the exact routes
-that differ from the base. For example, the maintained RTX 5090 profile currently routes Fast GI
+that differ from the base. For example, the maintained RTX 5090 profile currently routes Fast UMI
 and deliberative cognition through `gemma4:12b`, while Fast Planner uses `qwen3.5:9b`:
 
 ```bash
@@ -850,7 +850,7 @@ python scripts/qualify_inference_provider.py \
   --output .chromie/acceptance/inference-runtime/ollama-provider-control.json
 ```
 
-The base identity therefore applies to both `fast_gi` and `deliberative`; only Fast Planner is
+The base identity therefore applies to both `fast_umi` and `deliberative`; only Fast Planner is
 overridden. This matters because the first foreground transaction can contend with Deep on the
 same Gemma runner before the later Planner transaction reaches the already-resident Qwen runner.
 Do not collapse those two stages into one generic "foreground model" in evidence.
@@ -868,13 +868,13 @@ configuration into a provider-specific directory, then summarize those immutable
 `scripts/summarize_inference_provider_evidence.py`. The summary reuses Chromie's maintained latency
 distribution implementation and refuses to combine samples whose provider/model revision/runtime
 image/CUDA/accelerator/source revision/scheduler operator record/workload configuration differ.
-It reports p50/p90/p95/p99 for Fast-GI TTFT, Fast-Planner TTFT, the complete foreground window,
+It reports p50/p90/p95/p99 for Fast-UMI TTFT, Fast-Planner TTFT, the complete foreground window,
 Deep timing, TTS timing, peak VRAM, and GPU utilization. It does not invent a promotion threshold.
 
 Use `scripts/run_inference_contention_series.py` instead of manually copying a command N times.
 The wrapper forwards one frozen `--contention-only` transaction, owns only the per-trial output
 paths, verifies that Git revision plus worktree-state hash do not change between trials, and then
-invokes the maintained summarizer. It refuses to mix semantic GI probes into the latency series.
+invokes the maintained summarizer. It refuses to mix semantic UMI probes into the latency series.
 
 ```bash
 python scripts/run_inference_contention_series.py \
@@ -903,14 +903,14 @@ workload for each provider comparison.
 ### RTX 5090 deployed-topology boundary
 
 The maintained `rtx5090` production profile is not a one-model scheduler experiment. It currently
-uses `gemma4:12b` for Goal Interpretation, Goal Association, and Deep Planner, while
+uses `gemma4:12b` for User Meaning Interpretation, Goal Association, and Deep Planner, while
 `qwen3.5:9b` owns Fast Planner and other latency-sensitive roles. Both models are intended to stay
 resident beside TTS. The deployed Ollama control must therefore preserve at least the transaction
 route relevant to the foreground-under-Deep experiment:
 
 ```text
 Deep deliberative load    -> gemma4:12b
-Fast GI canary            -> gemma4:12b
+Fast UMI canary            -> gemma4:12b
 Fast Planner canary       -> qwen3.5:9b
 TTS                       -> live shared-GPU service
 ```
@@ -939,12 +939,12 @@ scheduler-isolated three-provider comparison may be added. Do not weaken model q
 force artifact symmetry; serving-runtime qualification and model-role qualification remain
 separate decisions.
 
-This phase is provider-level scheduling evidence. The Fast-GI/Fast-Planner strings are
+This phase is provider-level scheduling evidence. The Fast-UMI/Fast-Planner strings are
 canaries, not production semantic transactions, and
 `chromie-presentation-commit-ready` is not a real `PresentationCommit`. A provider pass does
 not prove Chromie interaction latency, semantic correctness, audible playback, simulator
 behavior, or physical robot behavior. Production Ollama remains unchanged until same-revision
-comparison and the actual Agent GI -> Fast Planner -> typed `PresentationCommit` -> TTS ->
+comparison and the actual Agent UMI -> Fast Planner -> typed `PresentationCommit` -> TTS ->
 playback path satisfy `INTERACTION-LATENCY-001`. The same saturated-deliberation control must
 also be retained for Ollama before a cross-provider promotion claim is made.
 

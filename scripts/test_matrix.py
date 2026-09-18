@@ -59,17 +59,17 @@ GROUPS: dict[str, TestGroup] = {
         ),
     ),
     "goal-interpretation": TestGroup(
-        "Goal Interpretation endpoint, semantic-authority boundary, and model-contract regressions.",
+        "User Meaning Interpretation endpoint, semantic-authority boundary, and model-contract regressions.",
         (
             _unittest(
                 "tests.test_cognitive_core_interpretation_endpoint",
-                "tests.test_goal_interpreter_llm_prompt",
+                "tests.test_user_meaning_interpreter_llm_prompt",
                 "tests.test_semantic_authority",
             ),
         ),
     ),
     "behavior": TestGroup(
-        "Unit-tested file-backed behavior scenarios for Goal Interpretation and InteractionRuntime.",
+        "Unit-tested file-backed behavior scenarios for User Meaning Interpretation and InteractionRuntime.",
         (
             _unittest(
                 "tests.test_behavior_scenario_runner",

@@ -57,7 +57,7 @@
         "rationale": "Without trusted local perception Evidence, Chromie must preserve uncertainty instead of inventing a person outside.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]

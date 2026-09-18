@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_chinese_blink_llm_unavailable_fails_closed",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "When quick interpretation is unavailable for a Chinese blink request, the Core reports interpretation unavailable and does not select a motion from catalog scores.",
+  "tags": [
+    "voice-log",
+    "zh-CN",
+    "cognitive-core-agent-contract",
+    "robot-action",
+    "blink",
+    "llm-fallback",
+    "latency"
+  ],
+  "input": {
+    "text": "眨两小眼睛。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "error": "llm unavailable"
+      }
+    ]
+  },
+  "expect": {
+    "status": "interpretation_unavailable",
+    "failure_reason_contains": [
+      "user_meaning_interpreter_error",
+      "llm unavailable"
+    ],
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ]
+  }
+}

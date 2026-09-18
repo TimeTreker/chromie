@@ -43,7 +43,7 @@ def _sample(*, index: int, provider: str = "sglang", planner_before_deep: bool =
             "contention_protocol_version": 2,
             "contention_only": True,
             "model_topology": {
-                "fast_gi": {
+                "fast_umi": {
                     "model": "Qwen/Qwen3.5-9B",
                     "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
                     "artifact": {
@@ -88,7 +88,7 @@ def _sample(*, index: int, provider: str = "sglang", planner_before_deep: bool =
                         "ttft_ms": 100 + index,
                         "elapsed_ms": 2000 + index * 10,
                     },
-                    "fast_gi_canary": {
+                    "fast_umi_canary": {
                         "started_s": fast_start,
                         "finished_s": fast_start + 0.2,
                         "ttft_ms": 20 + index,
@@ -129,10 +129,10 @@ def test_summary_builds_p50_p95_p99_from_repeated_contention_samples(tmp_path: P
     assert report["report_type"] == "chromie.inference_provider_contention_summary"
     assert report["source"]["included_sample_count"] == 5
     assert report["identity"]["provider"] == "sglang"
-    assert report["metrics"]["fast_gi_ttft_ms"]["count"] == 5
-    assert "p50" in report["metrics"]["fast_gi_ttft_ms"]
-    assert "p95" in report["metrics"]["fast_gi_ttft_ms"]
-    assert "p99" in report["metrics"]["fast_gi_ttft_ms"]
+    assert report["metrics"]["fast_umi_ttft_ms"]["count"] == 5
+    assert "p50" in report["metrics"]["fast_umi_ttft_ms"]
+    assert "p95" in report["metrics"]["fast_umi_ttft_ms"]
+    assert "p99" in report["metrics"]["fast_umi_ttft_ms"]
     assert report["outcomes"]["foreground_completed_before_deep_rate"] == 1.0
     assert report["outcomes"]["tts_sample_count"] == 5
 
@@ -255,10 +255,10 @@ def test_summary_reads_presentation_lease_revocation_metrics(tmp_path: Path) -> 
             "continue_torch_empty_cache": False,
             "revocation_probe": True,
             "revocation_trigger": "tts_first_audio",
-            "revocation_roundtrip": "resume_new_gi_planner_then_reacquire_for_tts",
+            "revocation_roundtrip": "resume_new_umi_planner_then_reacquire_for_tts",
         }
         phase = sample["phases"]["foreground_under_deliberative_load"]
-        phase["requests"]["interruption_fast_gi_canary"] = {
+        phase["requests"]["interruption_fast_umi_canary"] = {
             "started_s": 20.0 + index,
             "finished_s": 20.1 + index,
             "ttft_ms": 25 + index,
@@ -294,11 +294,11 @@ def test_summary_reads_presentation_lease_revocation_metrics(tmp_path: Path) -> 
             "continue": {"elapsed_ms": 7 + index},
             "resume_to_next_delta_ms": 11 + index,
             "revocation": {
-                "deep_active_at_interrupt_gi_start": True,
-                "interrupt_gi_completed_before_deep": True,
+                "deep_active_at_interrupt_umi_start": True,
+                "interrupt_umi_completed_before_deep": True,
                 "interrupt_planner_completed_before_deep": True,
                 "tts_recovery_completed": True,
-                "interrupt_gi_first_delta_from_interrupt_trigger_ms": 40 + index,
+                "interrupt_umi_first_delta_from_interrupt_trigger_ms": 40 + index,
                 "interrupt_planner_finished_from_interrupt_trigger_ms": 70 + index,
                 "tts": {"close_ms": 3 + index},
                 "reacquired_presentation_lease": {
@@ -315,15 +315,15 @@ def test_summary_reads_presentation_lease_revocation_metrics(tmp_path: Path) -> 
     report = build_summary([tmp_path], label="sglang-presentation-lease-revocation")
 
     assert report["outcomes"]["presentation_lease_revocation_sample_count"] == 3
-    assert report["outcomes"]["interruption_fast_gi_completed_before_deep_count"] == 3
+    assert report["outcomes"]["interruption_fast_umi_completed_before_deep_count"] == 3
     assert report["outcomes"]["interruption_fast_planner_completed_before_deep_count"] == 3
     assert report["outcomes"]["reacquired_lease_paused_deep_during_recovery_count"] == 3
     assert report["outcomes"]["deep_resumed_after_reacquired_lease_count"] == 3
     assert report["outcomes"]["post_interruption_tts_recovery_count"] == 3
     assert report["metrics"]["tts_first_audio_ms"]["count"] == 3
-    assert report["metrics"]["interruption_fast_gi_ttft_ms"]["count"] == 3
+    assert report["metrics"]["interruption_fast_umi_ttft_ms"]["count"] == 3
     assert report["metrics"]["interruption_fast_planner_ttft_ms"]["count"] == 3
-    assert report["metrics"]["presentation_lease_revocation_to_gi_first_delta_ms"]["count"] == 3
+    assert report["metrics"]["presentation_lease_revocation_to_umi_first_delta_ms"]["count"] == 3
     assert report["metrics"]["presentation_lease_revocation_to_planner_finish_ms"]["count"] == 3
     assert report["metrics"]["presentation_lease_tts_cancel_close_ms"]["count"] == 3
     assert report["metrics"]["presentation_lease_reacquire_pause_ms"]["count"] == 3

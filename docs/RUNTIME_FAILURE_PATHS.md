@@ -83,7 +83,7 @@ and completion proof remain in communication Need facts. Unknown references,
 BEFORE dependencies and references to new Work are not discharged; ordinary
 CanonicalPlan/Runtime ordering checks still reject invalid dependencies.
 
-GI's short-turn source-spelling constraints share one `SourceBackedBindingString`
+UMI's short-turn source-spelling constraints share one `SourceBackedBindingString`
 definition for location, duration and speed. The original character-slice values,
 40-character applicability bound and context-dependent fallback remain unchanged;
 references reduce repeated wire data without selecting meaning or relaxing Host
@@ -97,8 +97,8 @@ the authoritative Schema and DTO/Host validators: native decoder acceptance alon
 is not proof of Schema, DTO, Host or semantic correctness. Bounds shared by every
 valid Fast Work assignment are also exposed in native-visible fields; a
 response-only re-entry cannot emit completed Work again. Advance branches preserve
-GI timing relations and provider compatibility before generation. Provider-required
-vocal sources may bind only the qualified vocal provider with the exact GI-authored
+UMI timing relations and provider compatibility before generation. Provider-required
+vocal sources may bind only the qualified vocal provider with the exact UMI-authored
 supported mode; unavailable/empty catalogs cannot substitute another provider.
 Streaming decision-state alternatives also expose existing execution/delegation
 invariants: execute/respond/mixed have complete accounting, normal outcomes have

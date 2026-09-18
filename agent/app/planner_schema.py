@@ -6,7 +6,7 @@ from itertools import product
 from typing import Any
 
 try:
-    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
     from chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
         VOCAL_MODES,
@@ -16,7 +16,7 @@ try:
         FastPlannerAdvanceModelOutput,
     )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
     from shared.chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
         VOCAL_MODES,
@@ -1569,7 +1569,7 @@ def fast_multi_goal_response_schema(
     steps = properties.get("steps")
     if isinstance(steps, dict):
         # One complete intent may require several Activities. Bound composition
-        # independently of GI segmentation; repetitions still use count arguments.
+        # independently of UMI segmentation; repetitions still use count arguments.
         steps["maxItems"] = len(allowed_goals) * 4
         steps["description"] = (
             "At most four executable steps per authoritative goal. A skill's "
@@ -2478,7 +2478,7 @@ def fast_advance_response_schema(
     responsibilities: list[CognitiveResponsibilityProposal] | None = None,
     capabilities: list[dict[str, Any]] | None = None,
     auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
-    interpretation_unresolved: list[str] | None = None,
+    meaning_uncertainties: list[UserMeaningUncertainty] | None = None,
     source_token_refs: list[str] | None = None,
     committed_communicative: bool = False,
     suppress_new_communicative: bool = False,
@@ -2486,7 +2486,7 @@ def fast_advance_response_schema(
 ) -> dict[str, Any]:
     """Constrain Fast Activities to authoritative WHAT and the live catalog.
 
-    Work/evidence readiness is a Planner decision, not a GI field. The decoder
+    Work/evidence readiness is a Planner decision, not a UMI field. The decoder
     therefore keeps response, execution, clarification, escalation, and silence-
     preserving branches available subject only to already-committed communication
     and concrete Capability contracts.
@@ -2494,9 +2494,9 @@ def fast_advance_response_schema(
 
     schema = copy.deepcopy(FastPlannerAdvanceModelOutput.model_json_schema())
     unresolved_meaning = {
-        " ".join(str(item or "").strip().split())
-        for item in (interpretation_unresolved or [])
-        if " ".join(str(item or "").strip().split())
+        " ".join(item.description.strip().split())
+        for item in (meaning_uncertainties or [])
+        if " ".join(item.description.strip().split())
     }
     top_properties = schema.get("properties", {})
     disposition = top_properties.get("disposition")
@@ -2511,7 +2511,7 @@ def fast_advance_response_schema(
         if unresolved_meaning:
             disposition["enum"] = ["mixed", "clarify", "escalate"]
             disposition["description"] = (
-                "Terminal work must preserve every GI unresolved meaning in an "
+                "Terminal work must preserve every UMI unresolved meaning in an "
                 "exact unresolved_meaning InformationGap citation. Mixed work "
                 "may execute only independent Responsibilities not blocked by "
                 "a clarification. Escalation authorizes no Capability work."
@@ -2563,7 +2563,7 @@ def fast_advance_response_schema(
     capability_refs = [ref for ref in refs if ref not in speech_only]
     vocal_modes = {item.local_ref: item.output_mode for item in responsibility_items
                    if item.output_mode in set(VOCAL_MODES) - {"speech"}}
-    # Project already-authored GI timing onto both ends of each relation.
+    # Project already-authored UMI timing onto both ends of each relation.
     # Host validation enforces the same invariant; the decoder must not offer
     # a contradictory label and rely on rejection after primary inference.
     timing_choices = {ref: {"sequential", "parallel"} for ref in refs}
@@ -2612,7 +2612,7 @@ def fast_advance_response_schema(
             required_for = gap_properties.get("required_for")
             if isinstance(required_for, dict):
                 required_for["minItems"] = 1
-            if interpretation_unresolved == []:
+            if meaning_uncertainties == []:
                 gap_properties["source_kind"] = {
                     "const": "execution_input",
                     "type": "string",
@@ -2689,7 +2689,7 @@ def fast_advance_response_schema(
     if isinstance(clarification_contract, dict):
         gaps = clarification_contract.get("properties", {}).get("information_gaps")
         if isinstance(gaps, dict):
-            # One Responsibility may retain several independent GI gaps. Stay
+            # One Responsibility may retain several independent UMI gaps. Stay
             # within the canonical DTO bound instead of forcing silent omission.
             gaps["maxItems"] = min(
                 int(gaps.get("maxItems", 8)), max(1, len(unresolved_meaning))
@@ -2778,7 +2778,7 @@ def fast_advance_response_schema(
                 }
                 branch_properties["args"] = _ordered_capability_arguments(input_schema)
                 # Match the Host's existing exact vocal-provider/mode invariant.
-                # GI has already authored the mode; this does not infer it from words.
+                # UMI has already authored the mode; this does not infer it from words.
                 modes: list[str | None] = [None]
                 if vocal_modes and capability_id_value == VOCAL_PERFORMANCE_CAPABILITY_ID:
                     mode_contract = input_schema.get("properties", {}).get("mode", {})
@@ -2797,7 +2797,7 @@ def fast_advance_response_schema(
                         properties = copy.deepcopy(branch_properties)
                         required = list(capability_required)
                         # Intent-derived non-string values need provenance when
-                        # GI intentionally carries WHAT without canonical bindings.
+                        # UMI intentionally carries WHAT without canonical bindings.
                         # Direct strings have a separate literal-grounding path; numeric
                         # and structured values cannot be proven by string containment.
                         # Keep optional/defaulted inputs representable without forcing a
@@ -3025,14 +3025,14 @@ def fast_streaming_advance_response_schema(
     responsibilities: list[CognitiveResponsibilityProposal] | None = None,
     capabilities: list[dict[str, Any]] | None = None,
     auxiliary_social_capabilities: list[dict[str, Any]] | None = None,
-    interpretation_unresolved: list[str] | None = None,
+    meaning_uncertainties: list[UserMeaningUncertainty] | None = None,
     language: str = "",
     source_token_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     """One complete Work result; independent SC owns communication latency."""
     schema = fast_advance_response_schema(
         responsibility_refs, responsibilities=responsibilities, capabilities=capabilities,
-        interpretation_unresolved=interpretation_unresolved, source_token_refs=source_token_refs,
+        meaning_uncertainties=meaning_uncertainties, source_token_refs=source_token_refs,
     )
     compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
     compiled["title"] = "FastPlannerWorkAdvanceOutput"

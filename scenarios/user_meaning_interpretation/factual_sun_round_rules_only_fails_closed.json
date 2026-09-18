@@ -1,0 +1,68 @@
+{
+  "schema_version": 1,
+  "id": "factual_sun_round_rules_only_fails_closed",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "A factual agreement question remains a provider-neutral conversational Responsibility and cannot be redirected by motion-word overlap.",
+  "tags": [
+    "factual",
+    "rules-only",
+    "no-motion"
+  ],
+  "input": {
+    "text": "I think the sun is hot and round, do you agree with me?",
+    "language": "en-US"
+  },
+  "stub": {
+    "llm_decision": {
+      "confidence": 0.94,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "answer whether the user is correct that the sun is hot and round",
+          "bindings": {
+            "proposition": "the sun is hot and round",
+            "speech_act": "request_agreement"
+          },
+          "confidence": 0.94,
+          "output_mode": "information",
+          "continuity_scope": "goal"
+        }
+      ],
+      "meaning_uncertainties": []
+    }
+  },
+  "expect": {
+    "confidence": 0.94,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "answer whether the user is correct that the sun is hot and round",
+        "confidence": 0.94,
+        "output_mode": "information"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "A factual agreement question remains provider-neutral conversation.",
+        "root_cause_boundaries": [
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

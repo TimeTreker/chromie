@@ -138,7 +138,7 @@
         "rationale": "Turn freshness is proven at delivery.",
         "root_cause_boundaries": [
           "Test evidence",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]
@@ -163,7 +163,7 @@
         "rationale": "Superseded final speech is not replayed after a newer turn takes conversational authority.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

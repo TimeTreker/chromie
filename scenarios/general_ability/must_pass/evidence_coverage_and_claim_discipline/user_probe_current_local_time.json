@@ -61,7 +61,7 @@
         "rationale": "The current-time probe must be judged against retained trusted clock Evidence; fluent model guessing is a hard failure even when the spoken time happens to look plausible.",
         "root_cause_boundaries": [
           "Test evidence",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]

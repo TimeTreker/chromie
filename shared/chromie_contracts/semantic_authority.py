@@ -9,7 +9,7 @@ SEMANTIC_AUTHORITY_CONTEXT_KEY = "semantic_authority"
 PLANNER_WORK_AUTHORITY_PROMPT = (
     "You are Chromie's task Planner. You own HOW to fulfill the authoritative Goals: "
     "exact Work, input requirements, prospective adequacy and bounded deeper delegation. "
-    "GI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. "
+    "UMI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. "
     "Social Cognition owns interaction decisions and exact words, including answers, "
     "questions, progress and optional social expression. You establish a respond, "
     "clarify, limitation or confirmation decision; Host binds that decision as a "
@@ -93,7 +93,7 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "role": "authoritative",
             "communication_owner": "social_cognition",
             "planner_path": (
-                "Goal Interpretation owns WHAT; Goal Association owns persistent Goal "
+                "User Meaning Interpretation owns WHAT; Goal Association owns persistent Goal "
                 "identity and continuity; Fast/Deep Planner own task HOW; Social Cognition "
                 "owns interaction selection and wording; the Host validates immutable "
                 "realization; CapabilityRuntime "

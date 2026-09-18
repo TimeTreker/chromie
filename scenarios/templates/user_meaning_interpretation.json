@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "id": "$id",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "$description",
+  "tags": [
+    "draft"
+  ],
+  "input": {
+    "text": "$text"
+  },
+  "stub": {
+    "llm_decision": {
+      "confidence": 0.8,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "respond to the user request: $text",
+          "bindings": {},
+          "relationship": "new",
+          "target_goal_ids": [],
+          "confidence": 0.8,
+          "output_mode": "speech"
+        }
+      ],
+      "unresolved": []
+    }
+  },
+  "expect": {
+    "confidence": 0.8,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "respond to the user request: $text",
+        "bindings": {},
+        "relationship": "new",
+        "target_goal_ids": [],
+        "confidence": 0.8,
+        "output_mode": "speech"
+      }
+    ]
+  }
+}

@@ -230,7 +230,7 @@ def test_role_memory_preserves_scope_independent_of_storage_and_provenance() -> 
         MemoryEntry(scope="profile", kind="preference", text="长期偏好", source_turn_ids=["turn-old"],
                     persistence_policy="durable_with_explicit_consent", consent_basis="explicit_current_turn").to_prompt_dict(),
     ]
-    for role in ("gi", "ga", "planner"):
+    for role in ("umi", "ga", "planner"):
         prompt = role_memory_context({"session_memory": {"extracted_memory": entries}}, role=role)
         projected = json.loads(prompt.split("\n")[1])
         assert [entry["text"] for entry in projected] == ["当前约束", "长期偏好"]
@@ -251,6 +251,6 @@ def test_role_memory_uses_only_activated_entries_and_keeps_whole_records() -> No
             {"text": "relevant filtered fact", "source_turn_ids": ["visible"]},
         ]},
     }
-    prompt = role_memory_context(context, role="gi")
+    prompt = role_memory_context(context, role="umi")
     assert json.loads(prompt.split("\n")[1]) == [{"text": "relevant filtered fact", "source_turn_ids": ["visible"]}]
     assert "raw store" not in prompt and "unfiltered aggregate" not in prompt

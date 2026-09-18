@@ -19,14 +19,14 @@ speech is one outcome; a required discussion must not be reduced to a short
 acknowledgement merely to meet a speed metric.
 
 Social Cognition needs enough shared context to decide whether and how to
-participate: the complete accepted GI result, relevant dialogue and Memory,
+participate: the complete accepted UMI result, relevant dialogue and Memory,
 current Goal overview, detailed affected Goals, actual task and evidence state,
 pending questions/confirmations, and what has been queued, heard or interrupted.
 Privacy filtering precedes inference. Context compression cannot remove a
 material obligation, turn an unknown into a fact, or imply that queued speech
 was heard. Goal and task views remain read-only to this owner.
 
-GI is optional for trusted environmental/Goal/Work/Evidence triggers. Interaction
+UMI is optional for trusted environmental/Goal/Work/Evidence triggers. Interaction
 may be verbal, textual or embodied; Social Cognition decides coherent expression
 from the eligible social Capability catalog in its primary call. It does not turn
 perception into a user command or task completion, create a private Goal list, or
@@ -35,7 +35,7 @@ own explicit delivery evidence. Foreground communication has scheduling priority
 over ordinary planning, with bounded depth and measured Planner liveness.
 
 Useful early communication may proceed alongside planning. No fixed sentence is
-required after GI or every milestone. Social Cognition may remain silent when a
+required after UMI or every milestone. Social Cognition may remain silent when a
 response would repeat pending/delivered meaning or interfere with the interaction.
 A substantive answer, required clarification or confirmation remains outstanding
 until its own completion/cancellation contract resolves it. Important progress
@@ -58,7 +58,7 @@ while Planner retains task Work and Host/Soridormi retain execution authority.
 
 ## Core rule
 
-This contract applies the Charter requirements `IDENTITY-TRUTH-001`, `ATTENTION-AUTHORITY-001`, `GREETING-GOAL-001`, `SPEECH-OWNER-001`, and `INTERACTION-LATENCY-001`.
+This contract applies the Charter requirements `IDENTITY-TRUTH-001`, `ATTENTION-AUTHORITY-001`, `TURN-GOAL-BOUNDARY-001`, `SPEECH-OWNER-001`, and `INTERACTION-LATENCY-001`.
 
 A user-visible symptom is not the root cause.
 
@@ -241,29 +241,29 @@ must not cause the same answer to be delivered again without a new reason. A lat
 failure remains visible as failure Evidence/telemetry but must not append a generic
 Host apology over an already committed or delivered SC Communicative Activity.
 
-Goal Interpretation reads bounded Session Context: recent admitted dialogue,
+User Meaning Interpretation reads bounded Session Context: recent admitted dialogue,
 active/recent Goals and versions, current Activity/task state, pending
 clarifications, and relevant Evidence. It emits contextual Responsibility evidence
 with complete intent, requested result type, source provenance and bounded unresolved meaning. It may understand an answer
 against a pending clarification, but it does not decide that a Capability parameter is
 missing, create a planning `InformationGap`, classify one as blocking, or choose how it
-should be resolved. The same immutable GI result starts Social Cognition, Fast Planner and Goal
+should be resolved. The same immutable UMI result starts Social Cognition, Fast Planner and Goal
 Association independently. SC owns a complete interaction decision; Planner owns
-one complete Work result and emits no presentation prefix. Deep Goal Interpretation is reserved for genuine consequential ambiguity
+one complete Work result and emits no presentation prefix. Deep User Meaning Interpretation is reserved for genuine consequential ambiguity
 in the person's intended outcome, scope, or referent; it is not an external-evidence
 lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
-For a conversational Responsibility, GI describes the communicative obligation or
+For a conversational Responsibility, UMI describes the communicative obligation or
 proposition and never the sentence Chromie will say; Social Cognition remains the
 only exact-wording owner. Absence of accepted assistant dialogue is represented once by the empty
 bounded dialogue, never by a textual sentinel that a model could repeat as semantic
 content. Prior accepted dialogue may resolve the current intent without inventing
-an additional request. GI preserves complete natural-language intent and cites its
+an additional request. UMI preserves complete natural-language intent and cites its
 source and requested result type; it does not extract parameter bindings or Goal
 relationships. The result type keeps ordinary communication distinct from requested
 physical effects without selecting any Capability.
 A compound request may remain one Responsibility. GA relates that intent to retained
 Goals; Planner decomposes Activities and resolves their parameters against full
-Capability contracts. Missing execution details are Planner gaps, not GI uncertainty.
+Capability contracts. Missing execution details are Planner gaps, not UMI uncertainty.
 SC communicates the actual state reported by these owners through speech and eligible
 Social Attention. Runtime admission and execution safety remain independent.
 
@@ -279,11 +279,11 @@ conjunction/action phrase rules, a second model auditor, or source resegmentatio
 reinterpret WHAT. Any malformed, semantic, or authority-invalid primary DTO fails
 closed without a second same-authority call; only genuine
 unresolved outcome, scope, or referent meaning may delegate once
-to source-based Deep GI under the same WHAT-only contract.
+to source-based Deep UMI under the same WHAT-only contract.
 
-GI may resolve contextual meaning from accepted bounded dialogue actually projected
+UMI may resolve contextual meaning from accepted bounded dialogue actually projected
 to it. Raw history metadata, suppressed turns and text outside that window are not
-source evidence. GI preserves the understood outcome; Planner realizes locations
+source evidence. UMI preserves the understood outcome; Planner realizes locations
 and other Capability inputs. Host validates their declared provenance without
 resolving or rewriting a referent.
 
@@ -293,22 +293,22 @@ execution-input completeness and any planning `InformationGap`. It tries authori
 context, trusted observation or query, an owner/schema default, and a safe bounded
 ordinary default as applicable. It asks the person only when their answer can resolve
 the need, materially changes the next action, and no safer authorized source is enough.
-The clarification Activity retains exact provenance to either GI's unresolved meaning
-or the planner-owned input need. The next GI uses that pending Activity as semantic
+The clarification Activity retains exact provenance to either UMI's unresolved meaning
+or the planner-owned input need. The next UMI uses that pending Activity as semantic
 context; it does not inherit the Planner's source-policy authority.
 
 The distinction must remain visible in ordinary behavior. “今天上午重庆会不会下雨？”
-has a clear outcome, location, date, and day part, so GI reports no unresolved meaning
+has a clear outcome, location, date, and day part, so UMI reports no unresolved meaning
 and Fast Planner schedules trusted weather Evidence. “今天会不会下雨？” can still be a
 clear weather question even though the selected lookup needs a location; Planner first
 uses trusted context or another permitted source and asks only if location remains a
 real blocker. “把它关掉” with several plausible referents is genuine unresolved meaning,
 so Planner may ask but cannot choose the referent. “往前走” expresses a clear outcome;
 duration and speed are Planner-owned execution inputs governed by safety, defaults, and
-clarification policy rather than GI-owned intent gaps.
+clarification policy rather than UMI-owned intent gaps.
 
 The unknown answer to an already-defined external lookup is never unresolved user
-meaning or a reason to ask the user for the result Chromie was asked to find. GI and
+meaning or a reason to ask the user for the result Chromie was asked to find. UMI and
 GA preserve the person's human temporal scope rather than converting it into provider
 arguments. Planner receives that source-grounded scope together with the immutable
 original turn and realizes provider-local temporal arguments only after selecting a
@@ -331,7 +331,7 @@ Plan.
 A clear observational request must not wait for Goal Association merely to learn its
 canonical Goal ID. After Fast Planner verifies complete arguments, availability,
 schema validity, no confirmation, `safe_read`, `side_effect_free=true`, and an explicit
-parallel-safety declaration, Trusted Runtime may start the lookup under GI-local
+parallel-safety declaration, Trusted Runtime may start the lookup under UMI-local
 Responsibility refs while GA runs. This is ordinary human-like anticipation: begin a
 cheap observation while deciding how it fits ongoing concerns. It is not permission to
 speculate with effects, private or materially costly access, or undeclared concurrency.
@@ -358,7 +358,7 @@ and may preserve any subset alongside newly planned Work. The original execution
 binding survives reuse. Omitted Work remains unchanged; `cancel_activity_ids` explicitly
 names pending Work to cancel or replace. Host verifies every owner of shared Work,
 closes the selected cancellation before replacement dispatch, and preserves completed
-Evidence. Independent GI-, GA-, and Evidence-triggered planning tasks share this contract;
+Evidence. Independent UMI-, GA-, and Evidence-triggered planning tasks share this contract;
 a later-arriving obsolete result cannot overwrite a newer task list. The executable
 commit rules are owned by [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md).
 
@@ -394,7 +394,7 @@ review chains, or phrase exceptions.
 Fast and Deep are two depths of the same semantic Mind. Deep receives the
 authoritative turn/context and thinks more broadly; it is not a reviewer that
 patches Fast output. Only a role with an explicitly declared lossless DTO-repair contract may
-regenerate a mechanically malformed result once under the same meaning. GI and
+regenerate a mechanically malformed result once under the same meaning. UMI and
 Planner semantic/authority failures do not gain a generic repair call. Semantic failure either escalates once to its designated deeper
 cognition, asks a genuine clarification, or fails closed.
 
@@ -616,7 +616,7 @@ Goal Association remains canonical Goal continuity; Planner remains Work HOW aut
 
 Latency qualification must include contention, not only an idle-server TTFT. A target run
 must keep deliberative cognition active, inject a real foreground interaction, carry it
-through validated GI and independent SC, and include TTS on the shared
+through validated UMI and independent SC, and include TTS on the shared
 GPU. Retain P50/P95/P99 first meaningful reaction, foreground queue/TTFT/completion, TTS
 first PCM/playback, deep interruption/resume behavior, GPU/VRAM, cache/preemption, provider
 errors, structured-output validity, and semantic correctness. A longer watchdog or higher
@@ -643,14 +643,14 @@ versions, a Canonical Plan, and evidence when each exists. Neither a response
 delivery transport nor an execution specialist may reinterpret the Goal, widen effects,
 authorize work, or become a second conversation authority. WorkDAG execution follows Planner-authored dependency/concurrency topology; DAGEngine may dispatch only mechanically ready, runtime-qualified nodes.
 
-SC authors complete interaction acts from the applicable immutable GI, Goal/Work,
+SC authors complete interaction acts from the applicable immutable UMI, Goal/Work,
 Situation and delivery context. It can acknowledge sufficient understanding before GA
 and Work planning finish; substantive answers and required questions use exact typed
 communication needs. A scheduled act is not heard speech and cannot complete a
 conversational Goal. Only its correlated completed playback can supply that evidence.
 SC may remain silent when it would repeat a delivered message or add no useful
 information. It must not describe scheduled Work as running, or running Work as
-completed. GI supplies meaning, Work Planner supplies execution and communication
+completed. UMI supplies meaning, Work Planner supplies execution and communication
 obligations, and SC supplies words, timing and optional expression. The Host validates
 and delivers their exact decisions without rewriting semantics.
 
@@ -661,21 +661,21 @@ be committed without waiting for Deep. Deep is not a reviewer of a successful Fa
 Plan; a Fast contract/provenance failure also does not justify asking Deep to repair the
 same work. Different independent Responsibilities may progress at different depths, so a
 confirmation-free read with canonical Goal grounding and a valid Fast Plan need
-not wait for unrelated deeper thinking. Deep Goal Interpretation is exceptional and is
+not wait for unrelated deeper thinking. Deep User Meaning Interpretation is exceptional and is
 justified by genuine consequential ambiguity in intended outcome, scope, or referent.
 Deep Planner is separately exceptional and is justified by incomplete or compound Plan
 coverage, nontrivial dependencies, material alternatives, novelty or broader planning
 context, or safety/resource reasoning. Each Fast stage may use its designated one-way
 Deep escalation only when broader reasoning inside that same authority is actually
 warranted. A purely mechanical schema/DTO failure may be regenerated once under the
-same meaning. A terminal Deep-GI meaning rejection or Deep-Planner grounding/coverage
+same meaning. A terminal Deep-UMI meaning rejection or Deep-Planner grounding/coverage
 rejection is not repaired by another same-tier semantic pass. A confidence number alone
 neither permits a bypass nor requires escalation, and it never authorizes an
 effect.
 
 Streaming changes delivery timing, not semantic authority. Raw model-token
 deltas, partial JSON, private reasoning, and incomplete sentences are not speech
-contracts and must never reach TTS. Goal Interpretation never authors maintained
+contracts and must never reach TTS. User Meaning Interpretation never authors maintained
 speech. SC owns each complete interaction result, including function, timing,
 provenance and applicable Evidence. Fast Planner emits one complete Work result;
 partial Work output cannot release effects. A pre-evidence SC act cannot claim an
@@ -695,7 +695,7 @@ evidence. Only playback-started or playback-completed state satisfies the
 audible act. A later response stage may reference a queued event without
 resynthesizing it; if that exact event becomes `not_delivered`, Runtime may
 fulfill the same act once. A Fast Planner Communicative Activity scheduled before GA finishes retains only
-GI Responsibility refs until GA binds it; Goal-bound speech cannot be reassigned
+UMI Responsibility refs until GA binds it; Goal-bound speech cannot be reassigned
 to unrelated work. Literal text
 equality is only a payload-integrity check and never decides whether two
 conversational responsibilities are the same. Distinct result, failure,
@@ -786,12 +786,12 @@ catalog as affordance grounding, not phrase tables. Catalog presence does not
 justify weak substitution: a capability may be selected only when user meaning
 and required arguments are sufficiently supported.
 
-Goal Interpretation is an internal stage of the Goal-Driven Cognitive Core. It
+User Meaning Interpretation is an internal stage of the Goal-Driven Cognitive Core. It
 receives admitted evidence and emits provider-neutral Responsibility proposals,
 complete natural-language intentions, requested result types, source evidence and bounded unresolved meaning. It
 does not emit planning InformationGaps, input-source policy, conversational progress,
 route/intent labels, Activities, or Capabilities.
-The same GI result starts SC, Fast Planner and GA independently. SC owns ordinary
+The same UMI result starts SC, Fast Planner and GA independently. SC owns ordinary
 communication. Planner owns executable Activities, execution-input completeness,
 source/default policy and clarification requirements; SC expresses those requirements. Capability
 contracts constrain realization but cannot make Planner reinterpret Responsibility or
@@ -865,17 +865,17 @@ and trusted code preserves the exact technical cause for debugging.
 ## Tool behavior
 
 The Cognitive Gateway admits a turn without authoring ordinary speech. The same
-immutable GI intent may start SC, GA and Work planning independently. SC has first
+immutable UMI intent may start SC, GA and Work planning independently. SC has first
 communication compute priority; actual scheduler ordering and human-facing latency
 must be measured on the deployed backend. Missing external communication Needs
 alone is never a reason for silence: SC has its own duty to maintain useful shared
-understanding. It may acknowledge what GI understood, preserve GI uncertainty,
+understanding. It may acknowledge what UMI understood, preserve UMI uncertainty,
 or remain silent for a supplied situational reason. It cannot infer uncertainty
 from missing planning inputs or promise an action before the relevant Work facts exist.
 
 SC authors a complete interaction decision once. Raw tokens and partial JSON stay
 private. A prospective act uses `truth_stage=pre_evidence`, its exact progress kind
-and no result Evidence references. Goal Interpretation authors no response.
+and no result Evidence references. User Meaning Interpretation authors no response.
 Planner returns word-free Work and communication Needs, including required answers,
 input questions, confirmation and result facts. SC alone expresses these Needs;
 required pre-action/final timing stays bound to the exact Work steps. Optional
@@ -888,7 +888,7 @@ failed playback remain distinct. Runtime validates exact identity and provenance
 never wording similarity. SC decides whether new information, intentional repetition
 or a delivered-act correction is useful from the retained Interaction Context.
 
-A trusted task-state delta or environmental opportunity can invoke SC without GI.
+A trusted task-state delta or environmental opportunity can invoke SC without UMI.
 It may choose speech, a qualified nonverbal act or silence. Situation and Memory do
 not grant task Work, consent or factual authority. Failure of a communication call
 preserves valid independent Work and Evidence. Planning failure cannot manufacture
@@ -897,8 +897,8 @@ execution progress; factual failures remain available to SC and observability.
 Foreground workflow watchdogs and user-facing latency targets are separate.
 Configured role/provider budgets are owned by runtime profiles and Configuration;
 raising them cannot qualify interaction latency. Qualified warm targets remain at
-most 2.0 seconds from validated GI handoff to a complete valid SC commitment and
-3.0 seconds from commitment to playback start. Retain GI, queue, inference, TTS,
+most 2.0 seconds from validated UMI handoff to a complete valid SC commitment and
+3.0 seconds from commitment to playback start. Retain UMI, queue, inference, TTS,
 PCM and delivery anchors separately. Headless/discard playback proves transport
 scheduling only, never audible speaker behavior. The current native profile has
 not met these targets.
@@ -928,7 +928,7 @@ complete, "no retained record" cannot be rounded into "it did not happen."
 ### Truthful limitation and result-state separation
 
 A missing Capability is a conversationally complete outcome, not a failed search. If
-Goal Interpretation understands the requested outcome but the live Capability catalog
+User Meaning Interpretation understands the requested outcome but the live Capability catalog
 has no exact implementation, Planner establishes a typed limitation without
 executable Work; GA retains the intended Goal and SC may communicate the limitation.
 SC owns natural wording and may acknowledge
@@ -1203,7 +1203,7 @@ when it would have caught the user-visible failure that motivated the change.
 Use this evidence hierarchy when making claims:
 
 1. **Live or retained trace evidence** - microphone/ASR text, Gateway admission,
-   GI Responsibility, canonical Goal, Planner output, scheduled TTS text, Capability
+   UMI Responsibility, canonical Goal, Planner output, scheduled TTS text, Capability
    request/result, and Soridormi/provider Evidence from the same turn.
 2. **Black-box interaction tests** - a user utterance enters the same public
    boundary used by the orchestrator or scenario runner, and assertions inspect
@@ -1297,7 +1297,7 @@ Before submitting a fix for a user-visible interaction problem, write down:
 
 1. What did the user actually say, and what did ASR produce?
 2. What reflex or admission decision did the Cognitive Gateway make?
-3. What provider-neutral Responsibility did Goal Interpretation produce, and what
+3. What provider-neutral Responsibility did User Meaning Interpretation produce, and what
    canonical Goal meaning and Planner Plan did downstream cognition resolve?
 4. What uncertainty or missing argument existed?
 5. Which component first violated the human-like interaction contract?

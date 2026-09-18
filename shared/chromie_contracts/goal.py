@@ -55,6 +55,7 @@ class GoalAssociation(BaseModel):
     ambiguity_summary: str = ""
     goal_update: dict[str, Any] = Field(default_factory=dict)
     resolved_gap_ids: list[str] = Field(default_factory=list)
+    resolved_meaning_uncertainty_refs: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("association_id", "reason_summary", "ambiguity_summary", mode="before")
@@ -66,6 +67,7 @@ class GoalAssociation(BaseModel):
         "source_responsibility_refs",
         "target_goal_ids",
         "resolved_gap_ids",
+        "resolved_meaning_uncertainty_refs",
         mode="before",
     )
     @classmethod

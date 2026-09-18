@@ -27,7 +27,7 @@ KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 MODEL_PLAN_KEYS = (
     "AGENT_MODEL",
     "OLLAMA_MODEL",
-    "AGENT_GOAL_INTERPRETER_MODEL",
+    "AGENT_USER_MEANING_INTERPRETER_MODEL",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
@@ -54,21 +54,21 @@ COGNITIVE_BUDGET_KEYS = (
     "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_PREDICT",
-    "AGENT_GOAL_INTERPRETER_LLM_NUM_CTX",
-    "AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT",
+    "AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX",
+    "AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT",
     "AGENT_GOAL_ASSOCIATION_NUM_CTX",
     "AGENT_GOAL_ASSOCIATION_NUM_PREDICT",
     "AGENT_FAST_PLANNER_NUM_CTX",
     "AGENT_FAST_PLANNER_NUM_PREDICT",
     "AGENT_DEEP_PLANNER_NUM_CTX",
     "AGENT_DEEP_PLANNER_NUM_PREDICT",
-    "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+    "AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS",
     "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
     "AGENT_FAST_PLANNER_TIMEOUT_MS",
     "AGENT_DEEP_PLANNER_TIMEOUT_MS",
     "ORCH_AGENT_TIMEOUT_MS",
-    "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+    "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
     "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
     "ORCH_FAST_PLANNER_TIMEOUT_MS",
     "ORCH_DEEP_PLANNER_TIMEOUT_MS",
@@ -427,7 +427,7 @@ def active_models(values: Mapping[str, str]) -> list[str]:
         if value and value not in models:
             models.append(value)
 
-    append(values.get("AGENT_GOAL_INTERPRETER_MODEL"))
+    append(values.get("AGENT_USER_MEANING_INTERPRETER_MODEL"))
     if enabled(values.get("AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED"), default=True):
         append(values.get("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL"))
 
@@ -598,7 +598,7 @@ def main(argv: list[str] | None = None) -> int:
     print(
         "[env] Model plan: "
         f"gateway_attention={models['AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL']} "
-        f"goal_interpreter={models['AGENT_GOAL_INTERPRETER_MODEL']} "
+        f"user_meaning_interpreter={models['AGENT_USER_MEANING_INTERPRETER_MODEL']} "
         f"association={models['AGENT_GOAL_ASSOCIATION_MODEL']} "
         f"fast={models['AGENT_FAST_PLANNER_MODEL']} "
         f"deep={models['AGENT_DEEP_PLANNER_MODEL']}"
@@ -615,8 +615,8 @@ def main(argv: list[str] | None = None) -> int:
         f"fast_output={budgets.get('AGENT_FAST_PLANNER_NUM_PREDICT')} "
         f"deep_output={budgets.get('AGENT_DEEP_PLANNER_NUM_PREDICT')} "
         f"margin={budgets.get('AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS')} "
-        f"goal_interpreter={budgets.get('AGENT_GOAL_INTERPRETER_TIMEOUT_MS')}ms "
-        f"host_goal_interpreter={budgets.get('ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS')}ms "
+        f"user_meaning_interpreter={budgets.get('AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS')}ms "
+        f"host_user_meaning_interpreter={budgets.get('ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS')}ms "
         f"fast={budgets.get('AGENT_FAST_PLANNER_TIMEOUT_MS')}ms "
         f"deep={budgets.get('AGENT_DEEP_PLANNER_TIMEOUT_MS')}ms "
         f"host_deep={budgets.get('ORCH_DEEP_PLANNER_TIMEOUT_MS')}ms "

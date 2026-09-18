@@ -5,11 +5,11 @@ import copy
 import pytest
 from jsonschema import Draft202012Validator
 
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
-    OllamaGoalInterpreter,
+from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import (
+    OllamaUserMeaningInterpreter,
     _source_tokens,
 )
-from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_context import fast_capability_context
@@ -52,27 +52,28 @@ def intent_result(text, output_mode="body_action"):
         "confidence": 1.0,
         "responsibilities": [{
             "local_ref": "r1", "outcome": text, "confidence": 1.0, "output_mode": output_mode,
+            "continuity_scope": "goal",
             "source_evidence": {
                 "source_start_token_ref": tokens[0]["ref"],
                 "source_end_token_ref": tokens[-1]["ref"],
             },
         }],
-        "unresolved": [],
+        "meaning_uncertainties": [],
     }
 
 
 @pytest.mark.parametrize("text", EPISODES)
 def test_complete_intent_needs_no_capability_fields(text):
-    request = GoalInterpretationRequest(text=text)
-    schema = OllamaGoalInterpreter._goal_interpretation_response_schema(admitted_turn=text)
+    request = UserMeaningInterpretationRequest(text=text)
+    schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
     result = intent_result(text, "information" if text in EPISODES[-2:] else "body_action")
     Draft202012Validator(schema).validate(result)
-    decision = OllamaGoalInterpreter._validate_interpretation_content(
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         request, json.dumps(result), response_schema=schema,
     )
     assert decision.responsibilities[0].outcome == text
     assert not decision.responsibilities[0].bindings
-    assert not decision.unresolved
+    assert not decision.meaning_uncertainties
 
 
 @pytest.mark.parametrize("name,value", [
@@ -87,8 +88,8 @@ def test_gi_rejects_downstream_authorship(name, value):
     result = intent_result(text)
     result["responsibilities"][0][name] = value
     with pytest.raises(ValueError):
-        OllamaGoalInterpreter._validate_interpretation_content(
-            GoalInterpretationRequest(text=text), json.dumps(result),
+        OllamaUserMeaningInterpreter._validate_interpretation_content(
+            UserMeaningInterpretationRequest(text=text), json.dumps(result),
         )
 
 
@@ -156,8 +157,8 @@ class Model:
 
 
 def request_for(text):
-    decision = OllamaGoalInterpreter._validate_interpretation_content(
-        GoalInterpretationRequest(text=text), json.dumps(intent_result(text)),
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+        UserMeaningInterpretationRequest(text=text), json.dumps(intent_result(text)),
     )
     return CognitiveWorkRequest(sid="intent-handoff", text=text,
         responsibilities=decision.responsibilities, interpretation_confidence=1.0)
@@ -398,7 +399,7 @@ async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp
         response = await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),
             plan=plan, session_id=request.sid, language="en-US",
             text="The nod is scheduled for the requested time.")
-        response.metadata["goal_interpretation"] = {
+        response.metadata["user_meaning_interpretation"] = {
             "responsibilities": [item.model_dump(mode="json") for item in request.responsibilities]}
         path = tmp_path / "goals.json"
         manager = ConversationStateManager(task_store_enabled=True, task_store_path=path)

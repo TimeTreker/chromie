@@ -18,15 +18,15 @@ from scripts.behavior_scenarios import (
 class BehaviorScenarioRunnerTests(unittest.TestCase):
     def test_loads_one_file_per_scenario_and_filters_by_suite_or_key(self) -> None:
         all_cases = load_scenarios()
-        goal_interpretation_cases = load_scenarios(suites={"goal_interpretation"})
+        user_meaning_interpretation_cases = load_scenarios(suites={"user_meaning_interpretation"})
         cognitive_core_dialogue_cases = load_scenarios(suites={"cognitive_core_dialogue"})
         cognitive_turn_loop_cases = load_scenarios(
             suites={"cognitive_turn_loop"}
         )
-        selected = load_scenarios(only={"goal_interpretation/goal_interpretation_normal_greeting"})
+        selected = load_scenarios(only={"user_meaning_interpretation/user_meaning_interpretation_normal_greeting"})
 
         self.assertEqual(len(all_cases), 52)
-        self.assertEqual(len(goal_interpretation_cases), 28)
+        self.assertEqual(len(user_meaning_interpretation_cases), 28)
         self.assertEqual(len(cognitive_core_dialogue_cases), 3)
         cognitive_cases = load_scenarios(suites={"cognitive_runtime"})
         self.assertEqual(len(cognitive_cases), 15)
@@ -48,10 +48,10 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
             [case.key for case in cognitive_cases],
         )
         self.assertIn(
-            "goal_interpretation/weather_check",
-            [case.key for case in goal_interpretation_cases],
+            "user_meaning_interpretation/weather_check",
+            [case.key for case in user_meaning_interpretation_cases],
         )
-        self.assertEqual([case.key for case in selected], ["goal_interpretation/goal_interpretation_normal_greeting"])
+        self.assertEqual([case.key for case in selected], ["user_meaning_interpretation/user_meaning_interpretation_normal_greeting"])
         for case in all_cases:
             self.assertEqual(case.path.stem, case.scenario_id)
 
@@ -63,7 +63,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
                     {
                         "schema_version": 1,
                         "id": "right_name",
-                        "suite": "goal_interpretation",
+                        "suite": "user_meaning_interpretation",
                         "input": {"text": "hello"},
                         "expect": {"route": "chat"},
                     }
@@ -77,32 +77,32 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
     def test_report_compare_marks_improvements_and_regressions(self) -> None:
         baseline = {
             "cases": [
-                {"key": "goal_interpretation/a", "ok": True},
-                {"key": "goal_interpretation/b", "ok": False},
-                {"key": "goal_interpretation/old", "ok": True},
+                {"key": "user_meaning_interpretation/a", "ok": True},
+                {"key": "user_meaning_interpretation/b", "ok": False},
+                {"key": "user_meaning_interpretation/old", "ok": True},
             ]
         }
         current = {
             "cases": [
-                {"key": "goal_interpretation/a", "ok": False},
-                {"key": "goal_interpretation/b", "ok": True},
-                {"key": "goal_interpretation/new", "ok": True},
+                {"key": "user_meaning_interpretation/a", "ok": False},
+                {"key": "user_meaning_interpretation/b", "ok": True},
+                {"key": "user_meaning_interpretation/new", "ok": True},
             ]
         }
 
         comparison = compare_reports(current, baseline)
 
-        self.assertEqual(comparison["regressions"], ["goal_interpretation/a"])
-        self.assertEqual(comparison["improvements"], ["goal_interpretation/b"])
-        self.assertEqual(comparison["new_cases"], ["goal_interpretation/new"])
-        self.assertEqual(comparison["removed_cases"], ["goal_interpretation/old"])
+        self.assertEqual(comparison["regressions"], ["user_meaning_interpretation/a"])
+        self.assertEqual(comparison["improvements"], ["user_meaning_interpretation/b"])
+        self.assertEqual(comparison["new_cases"], ["user_meaning_interpretation/new"])
+        self.assertEqual(comparison["removed_cases"], ["user_meaning_interpretation/old"])
 
     def test_cli_writes_json_report_for_selected_scenario(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             code = scenario_runner.main(
                 [
                     "--suite",
-                    "goal_interpretation",
+                    "user_meaning_interpretation",
                     "--only",
                     "weather_check",
                     "--report-dir",
@@ -126,7 +126,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertTrue(report["ok"], report["cases"][0]["errors"])
         self.assertEqual(
             turns[1]["llm_stages"],
-            ["goal_interpretation"],
+            ["user_meaning_interpretation"],
         )
         self.assertEqual(
             turns[2]["interpretation"]["responsibilities"][0]["outcome"],
@@ -137,9 +137,9 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
             str(turns[1]["pre_context"]["history"]),
         )
 
-    def test_goal_interpretation_scenario_preserves_direct_weather_question(self) -> None:
+    def test_user_meaning_interpretation_scenario_preserves_direct_weather_question(self) -> None:
         scenarios = load_scenarios(
-            only={"goal_interpretation/inactive_direct_weather_question_false_addressedness"}
+            only={"user_meaning_interpretation/inactive_direct_weather_question_false_addressedness"}
         )
 
         report = run_scenarios_sync(scenarios)
@@ -150,7 +150,7 @@ class BehaviorScenarioRunnerTests(unittest.TestCase):
         self.assertIn("北京", actual["responsibilities"][0]["outcome"])
         self.assertEqual(
             actual["llm_stages"],
-            ["goal_interpretation"],
+            ["user_meaning_interpretation"],
         )
 
     def test_cognitive_turn_loop_retains_outcomes_and_suppresses_unsafe_speech(
@@ -202,15 +202,15 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def test_goal_interpretation_oracle_checks_requested_output_mode():
+def test_user_meaning_interpretation_oracle_checks_requested_output_mode():
     import copy
-    from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationDecision
-    from scripts.behavior_scenarios import _evaluate_goal_interpretation_expectations
-    scenario, = load_scenarios(only={'goal_interpretation/chinese_nod_blink_primary_grounded'})
-    decision = GoalInterpretationDecision.model_validate(scenario.stub['llm_script'][0]['decision'])
+    from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationDecision
+    from scripts.behavior_scenarios import _evaluate_user_meaning_interpretation_expectations
+    scenario, = load_scenarios(only={'user_meaning_interpretation/chinese_nod_blink_primary_grounded'})
+    decision = UserMeaningInterpretationDecision.model_validate(scenario.stub['llm_script'][0]['decision'])
     expected = copy.deepcopy(scenario.expect)
     expected['responsibilities'][0]['output_mode'] = 'speech'
-    errors = _evaluate_goal_interpretation_expectations(
-        scenario, decision=decision, llm_calls=1, llm_stages=['goal_interpretation'], expect=expected,
+    errors = _evaluate_user_meaning_interpretation_expectations(
+        scenario, decision=decision, llm_calls=1, llm_stages=['user_meaning_interpretation'], expect=expected,
     )
     assert any('responsibilities[0].output_mode' in error for error in errors)

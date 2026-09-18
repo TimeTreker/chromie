@@ -49,7 +49,7 @@ def test_required_json_preserves_complete_authoritative_list() -> None:
         for index in range(1, 9)
     ]
 
-    rendered = required_json(payload, 16000, label="GI Responsibility evidence")
+    rendered = required_json(payload, 16000, label="UMI Responsibility evidence")
 
     assert json.loads(rendered) == payload
     assert '"local_ref":"r8"' in rendered
@@ -59,10 +59,10 @@ def test_required_json_fails_instead_of_truncating() -> None:
     payload = [{"local_ref": "r1", "outcome": "x" * 200}]
 
     try:
-        required_json(payload, 80, label="GI Responsibility evidence")
+        required_json(payload, 80, label="UMI Responsibility evidence")
     except ValueError as exc:
         assert "exceeds required prompt projection budget" in str(exc)
-        assert "GI Responsibility evidence" in str(exc)
+        assert "UMI Responsibility evidence" in str(exc)
     else:
         raise AssertionError("required authoritative JSON must not be truncated")
 

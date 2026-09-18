@@ -141,10 +141,10 @@
       {
         "id": "planner_goal_semantic_quality",
         "title": "Planner and Goal Semantic Quality",
-        "general_rule": "Goal Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
+        "general_rule": "User Meaning Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
         "rationale": "Planner response coverage remains bound to the canonical Goal set.",
         "root_cause_boundaries": [
-          "Goal Interpretation",
+          "User Meaning Interpretation",
           "Goal Association",
           "Planner",
           "Capability catalog",

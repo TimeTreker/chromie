@@ -1,6 +1,6 @@
 """Architecture episodes using frozen model HTTP replies and controlled providers.
 
-Initial admission and role scheduling are explicit test drivers. Real GI/GA/Planner
+Initial admission and role scheduling are explicit test drivers. Real UMI/GA/Planner
 resolvers, contract checks, state, Runtime, result re-entry and due wake are exercised.
 """
 from __future__ import annotations
@@ -19,8 +19,8 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from agent.app.clients.ollama_client import OllamaClient
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
-from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
+from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
 from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.goal_association import GoalAssociationResolver
@@ -102,7 +102,7 @@ class Episode:
         self.contract_failure = None
         self.catalog = case['catalog']
         self.model_timeout_ms = timeout_ms = int((replay.candidate.get('timeout', 60) + 1) * 1000) if replay.candidate else 5000
-        self.gi = OllamaGoalInterpreter(ollama_url=url, model='fixture-gi', deep_model='fixture-gi-deep', timeout_ms=timeout_ms, num_ctx=131072, num_predict=2048)
+        self.umi = OllamaUserMeaningInterpreter(ollama_url=url, model='fixture-umi', deep_model='fixture-umi-deep', timeout_ms=timeout_ms, num_ctx=131072, num_predict=2048)
         settings = AgentServiceSettings(ollama_num_ctx=131072, ollama_num_predict=2048)
         def model(role):
             return OllamaClient(base_url=url, model='fixture-'+role, purpose=role, timeout_ms=timeout_ms, service_settings=settings)
@@ -172,15 +172,15 @@ class Episode:
         if self.case.get('initial_goal_resolution'):
             self.manager.apply_goal_association_resolution(self.case['initial_goal_resolution'], sid=inp['sid'], user_text='Prior scheduled request', atomic=True)
             context['active_goal_snapshots'] = self.manager.active_goal_snapshots()
-        gi_request = GoalInterpretationRequest(sid=inp['sid'], text=inp['text'], language=inp['language'], context=context)
-        self.boundary = 'gi'
-        interpreted = await self.gi.interpret_goal(gi_request)
-        self.events.append({'boundary':'gi', 'responsibilities':interpreted.model_dump(mode='json')})
-        if self.case.get('expected_rejection') == 'gi':
-            raise UnexpectedAdmission('GI accepted a result forbidden by its primary contract')
+        umi_request = UserMeaningInterpretationRequest(sid=inp['sid'], text=inp['text'], language=inp['language'], context=context)
+        self.boundary = 'umi'
+        interpreted = await self.umi.interpret_user_meaning(umi_request)
+        self.events.append({'boundary':'umi', 'responsibilities':interpreted.model_dump(mode='json')})
+        if self.case.get('expected_rejection') == 'umi':
+            raise UnexpectedAdmission('UMI accepted a result forbidden by its primary contract')
         request = CognitiveWorkRequest(sid=inp['sid'], text=inp['text'], language=inp['language'], context=context,
             responsibilities=interpreted.responsibilities, interpretation_confidence=interpreted.confidence,
-            interpretation_unresolved=interpreted.unresolved)
+            meaning_uncertainties=interpreted.meaning_uncertainties)
         self.boundary = 'ga'
         association = await self.ga.resolve(request)
         assert association.resolution_status == 'resolved', association.metadata
@@ -212,7 +212,7 @@ class Episode:
         response = await social_fixture_response(self.adapter, plan=plan, session_id=request.sid,
             language=request.language, text=self.social_words.get(plan.plan_id) or "Fixture response.")
         response.metadata.update(turn_id=request.sid, goal_association=association.model_dump(mode='json'),
-            goal_interpretation=interpreted.model_dump(mode='json'),
+            user_meaning_interpretation=interpreted.model_dump(mode='json'),
             user_turn_envelope={'turn_id':request.sid, 'original_input':{'text':request.text}, 'normalized_input':{'text':request.text, 'language':request.language}})
         self.manager.record_interaction_response(request.sid, response)
         if self.case.get('expected_speech'):
@@ -270,7 +270,7 @@ class Episode:
 
         plan, response = await self.begin()
         if probe == 'clarification':
-            assert plan.disposition == 'clarify' and plan.unresolved
+            assert plan.disposition == 'clarify' and plan.meaning_uncertainties
             assert not plan.steps and not plan.time_conditions and not response.capabilities
             await self.execute(plan, response)
             assert self.goal_status() == 'open' and not self.provider.calls
@@ -330,9 +330,9 @@ class Episode:
             if probe == 'cancel_timer':
                 inp = self.case['followup']
                 context = {'active_goal_snapshots':self.manager.active_goal_snapshots()}
-                interpretation = await self.gi.interpret_goal(GoalInterpretationRequest(**inp, context=context))
+                interpretation = await self.umi.interpret_user_meaning(UserMeaningInterpretationRequest(**inp, context=context))
                 request = CognitiveWorkRequest(**inp, context=context, responsibilities=interpretation.responsibilities,
-                    interpretation_confidence=interpretation.confidence, interpretation_unresolved=interpretation.unresolved)
+                    interpretation_confidence=interpretation.confidence, meaning_uncertainties=interpretation.meaning_uncertainties)
                 association = await self.ga.resolve(request)
                 assert association.resolution_status == 'resolved', association
                 self.manager.apply_goal_cancellation_resolution(association, receipts=[], confirmation_transition=None,

@@ -1,7 +1,7 @@
 """Immutable transport/archival envelopes for already-owned semantic artifacts.
 
 The envelope is mechanical integrity and lineage metadata around an artifact whose
-semantic authority already belongs to Gateway, GI, GA, Planner, SC, or Runtime.
+semantic authority already belongs to Gateway, UMI, GA, Planner, SC, or Runtime.
 It never creates, repairs, summarizes, or reinterprets the payload.
 """
 from __future__ import annotations
@@ -16,7 +16,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 SemanticArtifactKind = Literal[
     "user_turn",
-    "goal_interpretation",
+    "user_meaning_interpretation",
     "responsibility",
     "goal_association",
     "goal",

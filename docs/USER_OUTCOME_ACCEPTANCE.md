@@ -8,7 +8,7 @@ hardware qualification remain separate evidence steps.
 ## Purpose
 
 Chromie's primary end-to-end acceptance gate evaluates the outcome visible to
-the user rather than binding the test to today's Goal Interpreter, Goal
+the user rather than binding the test to today's User Meaning Interpreter, Goal
 Association, Fast Planner, Deep Planner, or Host materialization implementation.
 
 A case does not pass merely because a final service returns `ok=true`. It must

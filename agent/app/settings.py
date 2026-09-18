@@ -225,7 +225,7 @@ class Settings(BaseModel):
     cognitive_gateway_attention_model: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
-            os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3:4b"),
+            os.getenv("AGENT_USER_MEANING_INTERPRETER_MODEL", "qwen3:4b"),
         )
     )
     cognitive_gateway_attention_timeout_ms: int = Field(
@@ -324,16 +324,16 @@ class Settings(BaseModel):
     ollama_num_predict: int = Field(default_factory=lambda: int(float(os.getenv("OLLAMA_NUM_PREDICT", "0") or "0")), ge=0)
     llm_prompt_chars_per_token_estimate: float = Field(default_factory=lambda: float(os.getenv("AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE", "2.0")), gt=0.0)
     llm_context_safety_margin_tokens: int = Field(default_factory=lambda: int(os.getenv("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", "0")), ge=0)
-    goal_interpreter_debug_raw: bool = Field(default_factory=lambda: os.getenv("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW", os.getenv("AGENT_GOAL_INTERPRETER_DEBUG_RAW", "0")).strip().lower() not in {"", "0", "false", "no", "off"})
-    goal_interpreter_debug_prompt: bool = Field(default_factory=lambda: os.getenv("CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT", os.getenv("AGENT_GOAL_INTERPRETER_DEBUG_PROMPT", "0")).strip().lower() not in {"", "0", "false", "no", "off"})
+    user_meaning_interpreter_debug_raw: bool = Field(default_factory=lambda: os.getenv("CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW", os.getenv("AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW", "0")).strip().lower() not in {"", "0", "false", "no", "off"})
+    user_meaning_interpreter_debug_prompt: bool = Field(default_factory=lambda: os.getenv("CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT", os.getenv("AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT", "0")).strip().lower() not in {"", "0", "false", "no", "off"})
     weather_geocoding_url: str = Field(default_factory=lambda: os.getenv("AGENT_WEATHER_GEOCODING_URL", "https://geocoding-api.open-meteo.com/v1/search"))
     weather_forecast_url: str = Field(default_factory=lambda: os.getenv("AGENT_WEATHER_FORECAST_URL", "https://api.open-meteo.com/v1/forecast"))
     weather_timeout_s: float = Field(default_factory=lambda: float(os.getenv("AGENT_WEATHER_TIMEOUT_S", "8")), gt=0.0)
     environment: dict[str, str] = Field(default_factory=lambda: dict(os.environ), exclude=True, repr=False)
     mode: Literal["runtime"] = "runtime"
 
-class GoalInterpreterSettings(BaseModel):
-    ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
+class UserMeaningInterpreterSettings(BaseModel):
+    ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
     inference_provider: Literal["ollama", "sglang"] = Field(
         default_factory=lambda: os.getenv("AGENT_LLM_PROVIDER", "ollama").strip().casefold() or "ollama"
     )
@@ -347,35 +347,35 @@ class GoalInterpreterSettings(BaseModel):
         ge=1,
         le=100000,
     )
-    model: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3.5:4b"))
+    model: str = Field(default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_MODEL", "qwen3.5:4b"))
     deep_model: str = Field(
-        # Deep Goal Interpretation retains the same WHAT-only model authority.
+        # Deep User Meaning Interpretation retains the same WHAT-only model authority.
         # Reusing the Deep Planner model here couples semantic interpretation to
         # a separately tuned HOW owner and has produced responsibility collapse.
-        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_MODEL", "qwen3.5:4b")
+        default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_MODEL", "qwen3.5:4b")
     )
-    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_TIMEOUT_MS", "5400")))
+    timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS", "5400")))
     llm_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX", "4096")),
+        default_factory=lambda: int(os.getenv("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX", "4096")),
         ge=2048,
         le=131072,
     )
-    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT", "512")))
+    llm_num_predict: int = Field(default_factory=lambda: int(os.getenv("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT", "512")))
     llm_keep_alive: str = Field(
         default_factory=lambda: os.getenv(
-            "AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE",
+            "AGENT_USER_MEANING_INTERPRETER_LLM_KEEP_ALIVE",
             os.getenv("OLLAMA_KEEP_ALIVE", "24h"),
         )
     )
     warm_llm_on_startup: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP", "1").strip().lower()
+        default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP", "1").strip().lower()
         not in {"0", "false", "no", "off"}
     )
     warm_llm_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS", "60000"))
+        default_factory=lambda: int(os.getenv("AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS", "60000"))
     )
-    log_level: str = Field(default_factory=lambda: os.getenv("AGENT_GOAL_INTERPRETER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
+    log_level: str = Field(default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
 
 AgentServiceSettings = Settings
 agent_service_settings = Settings()
-goal_interpreter_settings = GoalInterpreterSettings()
+user_meaning_interpreter_settings = UserMeaningInterpreterSettings()

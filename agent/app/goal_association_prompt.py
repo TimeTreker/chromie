@@ -47,7 +47,7 @@ logger = logging.getLogger("chromie.agent.goal_association.prompt")
 
 
 def immutable_source_turn_prompt(request: CognitiveWorkRequest) -> str:
-    """Expose exact source evidence while keeping GI/GA authority explicit."""
+    """Expose exact source evidence while keeping UMI/GA authority explicit."""
 
     source = request.source_turn_provenance
     projection = json.dumps(
@@ -59,7 +59,7 @@ def immutable_source_turn_prompt(request: CognitiveWorkRequest) -> str:
         separators=(",", ":"),
     )
     return (
-        "IMMUTABLE SOURCE TURN JSON (read-only; GI Responsibilities own "
+        "IMMUTABLE SOURCE TURN JSON (read-only; UMI Responsibilities own "
         "current-turn WHAT; GA owns continuity, never silent semantic repair):\n"
         f"{projection}"
     )
@@ -103,7 +103,7 @@ def situation_projection(request: CognitiveWorkRequest) -> dict[str, Any]:
 
 
 def build_segmentation_prompt(request: CognitiveWorkRequest) -> str:
-    """No candidate Goals: preserve each complete intent in one new Goal."""
+    """No candidate Goals: preserve each supplied goal-scoped intent in one new Goal."""
     return build_association_prompt(request, [])
 
 
@@ -232,37 +232,47 @@ def association_dialogue_projection(history: Any) -> list[dict[str, Any]]:
 def build_association_prompt(
     request: CognitiveWorkRequest, candidate_goals: list[dict[str, Any]],
 ) -> str:
-    """GI owns meaning; GA chooses canonical identity and continuity only."""
+    """UMI owns meaning; GA chooses canonical identity and continuity only."""
     return (
-        "Associate the complete accepted GI intentions with the supplied Goals. "
-        "Every Responsibility ref must occur exactly once across associations and "
-        "new_goals. Preserve compound intentions intact; Planner decomposes Activities. "
-        "Choose continuity from the accepted meaning, candidate requirements, state and "
+        "Associate the complete accepted UMI Responsibilities with the supplied bounded "
+        "candidate Goals. Runtime supplies only Responsibilities whose continuity_scope is "
+        "goal. Every supplied Responsibility ref must occur exactly once across associations "
+        "and new_goals. Never invent a Goal for turn-local conversation. Preserve compound "
+        "meaning intact; Planner decomposes Activities. "
+        "Choose continuity from accepted meaning, candidate requirements, retained state and "
         "dialogue. Candidate presence, lexical overlap or recency alone is insufficient. "
-        "GI does not supply relationship labels; you own that judgment. "
+        "Candidates may include restored cross-session persistent Goals; their presence only "
+        "makes them eligible for comparison. GA alone decides canonical continuity identity. "
+        "UMI does not supply relationship labels or Goal IDs; you own that judgment. "
         "Use exact supplied IDs. Recent terminal Goals may be referenced but not reopened. "
         "For changed requirements, select the exact target and replaced requirement indices; "
-        "Host inherits the complete new requirements from the cited GI outcomes. "
-        "Keep unrelated retained requirements. Supersede a Goal only when the accepted "
-        "intent explicitly replaces it; an additional intention leaves it intact. "
-        "A replaced Goal must not also be listed as related context. "
+        "Host inherits complete new requirements from cited UMI outcomes. Keep unrelated "
+        "retained requirements. Supersede a Goal only when accepted meaning explicitly "
+        "replaces it; an additional Responsibility leaves it intact. A replaced Goal must "
+        "not also be listed as related context. "
         "No candidates means new_goals only. Emit source_responsibility_refs, related_goal_ids "
         "and supersedes_goal_ids for each new Goal. Host supplies descriptions and IDs. "
-        "Host inherits GI's expected result type unchanged. Do not extract duration, "
-        "direction, count, speed, resource fields, or reclassify output modes "
-        "or other execution details. Planner owns parameter realization and Work. "
-        "Preserve GI uncertainty; do not resolve it or choose a clarification strategy. "
-        "SC owns communication. Return the supplied schema only.\n\n"
+        "Host inherits UMI's expected result type unchanged. Do not extract duration, "
+        "direction, count, speed, resource fields, or reclassify output modes or other "
+        "execution details. Planner owns parameter realization and Work. "
+        "A UMI meaning uncertainty is not a request to ask the user. You may list its exact "
+        "local_ref in resolved_meaning_uncertainty_refs only when the selected canonical "
+        "Goal itself supplies the missing continuity meaning for every cited Responsibility. "
+        "Never resolve uncertainty from lexical similarity, general memory, guessed intent, "
+        "external facts, or execution assumptions. Leave every other uncertainty unresolved; "
+        "later cognition decides whether clarification is actually required. SC owns wording. "
+        "Return the supplied schema only.\n\n"
         "Candidate Goal evidence JSON:\n"
         + required_json(association_goal_projection(candidate_goals), None, label="Goal requirement evidence")
-        + "\nGI complete intentions JSON:\n"
+        + "\nUMI Responsibilities JSON:\n"
         + required_json([
             {"local_ref": item.local_ref, "outcome": item.outcome,
              "confidence": item.confidence, "output_mode": item.output_mode,
+             "continuity_scope": item.continuity_scope,
              "source_evidence": item.source_evidence.model_dump() if item.source_evidence else None}
             for item in request.responsibilities
-        ], None, label="GI intent evidence")
-        + "\nGI unresolved meaning JSON:\n" + bounded_json(request.interpretation_unresolved, 800)
+        ], None, label="UMI Responsibility evidence")
+        + "\nUMI semantic uncertainty JSON:\n" + bounded_json([item.model_dump(mode="json") for item in request.meaning_uncertainties], 1600)
         + "\nScoped discourse referents JSON:\n" + bounded_json(discourse_referents(request), 1400)
         + "\nAccepted dialogue JSON:\n"
         + bounded_json(association_dialogue_projection(request.history or request.context.get("history") or []), 1400)
@@ -409,8 +419,8 @@ def system_prompt(
     if output_type is GoalSegmentationModelOutput:
         return (
             "You are Chromie's Goal Segmentation model. No active or retained recent Goal IDs exist, so association with existing work is impossible. "
-            "Preserve each accepted GI Responsibility as one new Goal, including compound intent. GI owns current-turn meaning; do not resegment it or resolve its uncertainty. "
-            "Conversational framing attached to a substantive responsibility is not independently satisfiable work: do not create a separate Goal for its greeting or politeness preamble. A standalone social interaction remains one conversational Goal. "
+            "Preserve each supplied goal-scoped UMI Responsibility as one new Goal, including compound intent. UMI owns current-turn meaning; do not resegment it or resolve its uncertainty. "
+            "Conversational framing attached to a substantive responsibility is not independently satisfiable work: do not create a separate Goal for its greeting or politeness preamble. Turn-local conversational Responsibilities are handled by Social Cognition and must not be supplied here. "
             "When one evidence acquisition satisfies both a factual lookup and the requested interpretation of its result, preserve them as one Goal. "
             "Return only the minimal semantic DTO; the host owns all transport and persistence fields. "
             "You are advisory only and never execute or commit. Return JSON only."
@@ -420,7 +430,7 @@ def system_prompt(
         "Produce one complete candidate-aware result; existing-Goal associations and independent new Goals may coexist in that result. "
         "Apply continuity before creation. Resolve references from current user meaning, scoped discourse referents/focus, bounded candidate Goals and their bindings, and dialogue context. Candidate Goals may be active, recoverable, or recently terminal; referencing a terminal Goal does not reopen it. Tool-result memory is not reference-resolution authority. Status follow-ups about an unfinished lookup should associate with the bound task; if its safe read is recoverable, preserve the exact skill arguments for retry. Do not treat another task's evidence as completion. "
         "Do not decide association through regexes, phrase tables, lexical overlap, or recency alone. "
-        "Preserve GI Responsibility ownership, including compound intent; do not resegment, reclassify or repair its meaning. Planner decomposes Activities. "
-        "Conversational framing attached to substantive work is not a separate Goal; a standalone social interaction remains one conversational Goal. A new reaction, feeling, evaluation, acknowledgement, or practical decision after a prior result is a current conversational responsibility, not continuation of the completed lookup. One lookup and an interpretation requested as part of that same lookup are one Goal. "
+        "Preserve UMI Responsibility ownership, including compound intent; do not resegment, reclassify or repair its meaning. Planner decomposes Activities. "
+        "Conversational framing attached to substantive work is not a separate Goal. Turn-local conversation never reaches GA. A new goal-scoped reaction, evaluation, or practical decision after a prior result is a new current responsibility rather than continuation of the completed lookup. One lookup and an interpretation requested as part of that same lookup are one Goal. "
         "You are advisory only and never execute or commit. Return JSON only."
     )

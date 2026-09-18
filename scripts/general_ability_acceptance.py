@@ -524,11 +524,11 @@ def _social_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
     top_timings = summary.get("timings_ms")
     if not isinstance(top_timings, dict):
         top_timings = {}
-    goal_interpretation_duration = _elapsed_ms(
-        top_timings.get("goal_interpretation_ms")
+    user_meaning_interpretation_duration = _elapsed_ms(
+        top_timings.get("user_meaning_interpretation_ms")
     )
     session_start = first_event("session_start")
-    interpretation_done = first_event("text_check_goal_interpretation_done")
+    interpretation_done = first_event("text_check_user_meaning_interpretation_done")
     tts_schedule = first_event("tts_schedule", not_before=social_finish)
     first_provider_pcm = first_event(
         "tts_first_provider_pcm",
@@ -542,8 +542,8 @@ def _social_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
         return round(finish - start, 3)
 
     duration_sum = None
-    if goal_interpretation_duration is not None and social_duration is not None:
-        duration_sum = round(goal_interpretation_duration + social_duration, 3)
+    if user_meaning_interpretation_duration is not None and social_duration is not None:
+        duration_sum = round(user_meaning_interpretation_duration + social_duration, 3)
     return {
         "schema_version": 1,
         "clock": "session_relative_monotonic_elapsed_ms",
@@ -555,8 +555,8 @@ def _social_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
         ),
         "raw": {
             "session_start_elapsed_ms": session_start,
-            "goal_interpretation_done_elapsed_ms": interpretation_done,
-            "goal_interpretation_duration_ms": goal_interpretation_duration,
+            "user_meaning_interpretation_done_elapsed_ms": interpretation_done,
+            "user_meaning_interpretation_duration_ms": user_meaning_interpretation_duration,
             "social_cognition_started_elapsed_ms": social_start,
             "social_cognition_finished_elapsed_ms": social_finish,
             "social_cognition_duration_ms": social_duration,
@@ -579,7 +579,7 @@ def _social_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
                 session_start,
                 social_finish,
             ),
-            "goal_interpretation_plus_sc_duration_ms": duration_sum,
+            "user_meaning_interpretation_plus_sc_duration_ms": duration_sum,
         },
         "claim_limits": {
             "audible_speaker_proven": summary.get("speaker") is True,

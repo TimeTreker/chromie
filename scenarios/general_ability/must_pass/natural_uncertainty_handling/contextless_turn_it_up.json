@@ -44,7 +44,7 @@
         "title": "Natural Uncertainty Handling",
         "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
         "rationale": "With no active media, speech, display, or other adjustable target, turn it up has no grounded object and requires clarification.",
-        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/goal interpretation", "Agent contract", "Orchestrator policy"]
+        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/user meaning interpretation", "Agent contract", "Orchestrator policy"]
       }
     ]
   }

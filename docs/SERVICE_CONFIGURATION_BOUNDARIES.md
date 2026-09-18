@@ -48,9 +48,9 @@ model-source environment surface. `tts/server.py`, `tts/candidate_server.py`,
 instead of reparsing environment values independently. Invalid ports, ranges,
 booleans, and missing immutable model references fail with the owning key.
 
-`agent.app.settings` now owns the Agent service and Goal Interpreter startup
+`agent.app.settings` now owns the Agent service and User Meaning Interpreter startup
 surfaces. Main composition, model clients, weather, capability planning,
-conversation, deep thinking, Goal Interpreter diagnostics, and manifest
+conversation, deep thinking, User Meaning Interpreter diagnostics, and manifest
 expansion consume typed snapshots or explicitly supplied standalone settings.
 Maintained startup passes the same Agent snapshot into every model and provider
 client; compatibility factories remain only for isolated callers and tests.

@@ -34,7 +34,7 @@ class ObservabilityRecordingPolicyTests(unittest.TestCase):
             capabilities=[],
             metadata={
                 "semantic_status": "failed",
-                "semantic_failure_stage": "goal_interpretation",
+                "semantic_failure_stage": "user_meaning_interpretation",
                 "semantic_failure_class": "InterpretationUnavailableError",
                 "semantic_failure_error": "invalid interpretation",
             },
@@ -54,7 +54,7 @@ class ObservabilityRecordingPolicyTests(unittest.TestCase):
         self.assertEqual(
             captured["errors"],
             [
-                "goal_interpretation:InterpretationUnavailableError: "
+                "user_meaning_interpretation:InterpretationUnavailableError: "
                 "invalid interpretation"
             ],
         )

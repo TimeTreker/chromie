@@ -80,7 +80,7 @@ interaction ledger. An unavailable optional provider leaves anchored speech
 eligible, with the failed admission retained explicitly.
 
 Social Attention is not an idle-animation loop. An autonomous blink without a
-social interaction anchor belongs to baseline embodiment. GI/GA execution and
+social interaction anchor belongs to baseline embodiment. UMI/GA execution and
 provider transitions are evidence for SC consideration, not themselves observable
 act anchors. Situation-triggered SC uses the same materialization and freshness
 checks as other SC entry points.

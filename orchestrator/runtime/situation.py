@@ -851,7 +851,7 @@ async def apply_due_time_condition_opportunity(
 
     Wall-clock readiness is a trusted mechanical state transition, not Evidence and
     not a fabricated user turn. The due item must therefore retain exact Planner/Goal
-    binding plus original GI Responsibility provenance. Missing provenance fails
+    binding plus original UMI Responsibility provenance. Missing provenance fails
     closed after the one-shot condition is consumed; Host never reconstructs WHAT
     from Goal prose and never authors a response or Activity.
     """

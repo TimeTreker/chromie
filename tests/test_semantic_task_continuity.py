@@ -3,8 +3,8 @@ from __future__ import annotations
 import unittest
 
 from orchestrator.runtime.conversation_state import ConversationStateManager
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
-from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
+from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
 from shared.chromie_contracts.semantic_task import (
     SemanticGoal,
     SemanticTaskOperation,
@@ -226,24 +226,27 @@ class ConversationSemanticTaskTests(unittest.TestCase):
 
 class InterpreterSemanticTaskPromptTests(unittest.TestCase):
     def test_prompt_exposes_semantic_continuity_without_task_identity(self) -> None:
-        interpreter = OllamaGoalInterpreter(
+        interpreter = OllamaUserMeaningInterpreter(
             ollama_url="http://example.invalid",
             model="test-model",
             timeout_ms=800,
         )
         prompt = interpreter.build_interpretation_user_prompt(
-            GoalInterpretationRequest(
+            UserMeaningInterpretationRequest(
                 sid="s2",
                 text="Make that coffee iced.",
                 context={
-                    "active_task_snapshots": [
+                    "user_meaning_goal_context": [
                         {
+                            "goal_id": "goal-coffee-001",
                             "task_id": "task-coffee-001",
-                            "status": "planning",
-                            "semantic_goal": {
+                            "responsibility_status": "open",
+                            "goal": {
+                                "goal_id": "goal-coffee-001",
                                 "description": "Prepare or obtain coffee for the current user.",
                                 "source_text": "Bring me a coffee.",
                                 "constraints": {},
+                                "metadata": {"output_mode": "body_action"},
                             },
                             "open_information_gaps": [],
                         }
@@ -252,11 +255,13 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
             )
         )
 
-        self.assertIn("task-coffee-001", prompt)
+        self.assertNotIn("task-coffee-001", prompt)
+        self.assertNotIn("goal-coffee-001", prompt)
         self.assertIn("Prepare or obtain coffee", prompt)
-        self.assertIn("Active Task/Activity progress with identity", prompt)
+        self.assertIn("Goal meaning context JSON", prompt)
+        self.assertIn("no canonical Goal identity", prompt)
         self.assertIn("system WHAT-only contract", prompt)
         self.assertIn("authoritative turn", prompt)
-        self.assertIn("bounded semantic Context", prompt)
+        self.assertIn("bounded human-meaning Context", prompt)
         self.assertNotIn('"route"', prompt)
         self.assertNotIn('"intent"', prompt)

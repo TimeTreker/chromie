@@ -70,7 +70,7 @@ def admitted_core(
     sid: str,
     language: str,
     responsibilities: list[dict] | None = None,
-    interpretation_unresolved: list[str] | None = None,
+    meaning_uncertainties: list[str] | None = None,
 ):
     gateway = CognitiveGateway()
     capture = gateway.capture(
@@ -103,13 +103,23 @@ def admitted_core(
             "confidence": 0.95,
         }
     ]
+    responsibility_refs = [str(item.get("local_ref") or "r1") for item in rows]
+    uncertainties = [
+        {
+            "local_ref": f"u{index}",
+            "kind": "other",
+            "description": str(description),
+            "responsibility_refs": [responsibility_refs[0]],
+        }
+        for index, description in enumerate(meaning_uncertainties or [], start=1)
+    ]
     core = CoreInterpretationResult(
         turn_id=envelope.turn_id,
         session_id=envelope.session_id,
         confidence=min(float(item.get("confidence", 0.95)) for item in rows),
         language=language,
         responsibilities=rows,
-        unresolved=list(interpretation_unresolved or []),
+        meaning_uncertainties=uncertainties,
     )
     return core, envelope
 
@@ -248,7 +258,7 @@ def _stream_advance_from_canonical_plan(
             activities.append(FastPlannerResponseNeed(activity_id=need.need_id, role="complete_response",
                 source_responsibility_refs=refs, timing="sequential", rationale="The scripted Work fixture establishes an answer obligation."))
         elif need.kind == "input":
-            raise ValueError("Script an explicit FastPlannerInputNeed with exact GI gap provenance for input cases.")
+            raise ValueError("Script an explicit FastPlannerInputNeed with exact UMI gap provenance for input cases.")
 
     return FastPlannerAdvance(
         turn_id="test-fast-advance",
@@ -822,8 +832,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 {
                     "local_ref": "weather",
                     "outcome": "Continue the existing weather lookup.",
-                    "relationship": "continue",
-                    "target_goal_ids": ["goal-weather"],
                     "confidence": 0.98,
                 }
             ],
@@ -857,7 +865,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.interaction_response.capabilities, [])
         self.assertEqual(result.interaction_response.metadata["retained_work_activities"][0]["activity_id"], "request-weather-existing")
         self.assertEqual(
-            result.interaction_response.metadata["goal_interpretation"]
+            result.interaction_response.metadata["user_meaning_interpretation"]
             ["responsibilities"][0]["local_ref"],
             "weather",
         )
@@ -913,8 +921,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 {
                     "local_ref": "walk",
                     "outcome": "Continue moving forward for ten seconds.",
-                    "relationship": "continue",
-                    "target_goal_ids": ["goal-walk"],
                     "confidence": 0.98,
                 }
             ],
@@ -1058,8 +1064,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "Check Neixiang weather.",
                     "bindings": {"location": "内乡", "date": "today"},
-                    "relationship": "modify",
-                    "target_goal_ids": ["goal-weather"],
                     "confidence": 0.98,
                 }
             ],
@@ -1270,7 +1274,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(runtime.started_fast_activities, [])
         self.assertEqual(result.interaction_response.speech[0].metadata["wording_owner"], "social_cognition")
         self.assertEqual(result.terminal_plan.auxiliary_activities, [])
-        self.assertTrue(result.metadata["gi_fanout_concurrent"])
+        self.assertTrue(result.metadata["umi_fanout_concurrent"])
 
     def test_fast_failure_retrieves_already_failed_goal_association_task(self):
         class Client:
@@ -1520,8 +1524,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "Answer from the corrected canonical scope.",
                     "bindings": {},
-                    "relationship": "modify",
-                    "target_goal_ids": ["goal-1"],
                     "confidence": 0.98,
                 }
             ],
@@ -1952,8 +1954,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "Check the corrected weather scope.",
                     "bindings": {"location": "内乡", "date": "today"},
-                    "relationship": "modify",
-                    "target_goal_ids": ["goal-weather"],
                     "confidence": 0.98,
                 }
             ],
@@ -2122,8 +2122,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "weather",
                     "outcome": "Check Chongqing weather today.",
                     "bindings": {"location": "重庆", "date": "today"},
-                    "relationship": "modify",
-                    "target_goal_ids": ["goal-weather"],
                     "confidence": 0.98,
                 }
             ],
@@ -2357,7 +2355,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         adapter_situation = client.social_requests[-1].context["situation"]
         self.assertEqual(association_situation["revision"], 1)
         self.assertEqual(association_situation["focus_goal_ids"], [])
-        # Fast starts concurrently from the immutable GI result, before GA has
+        # Fast starts concurrently from the immutable UMI result, before GA has
         # constructed its Situation projection.  The canonical response path
         # receives the GA-bound Situation after the join.
         self.assertNotIn("situation", client.fast_contexts[0])
@@ -2394,7 +2392,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             self.assertTrue((payload_root / "trace.json").is_file())
             self.assertTrue((payload_root / "trace-summary.json").is_file())
 
-    def test_goal_interpretation_cannot_short_circuit_missing_ability_before_goal_state(self):
+    def test_user_meaning_interpretation_cannot_short_circuit_missing_ability_before_goal_state(self):
         client = ScriptedClient(
             association=new_goal_association(source_ref="restaurant"),
             fast_plans=[respond_plan()],
@@ -2656,7 +2654,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "move over there",
             sid="sid-pr7",
             language="en-US",
-            interpretation_unresolved=["which destination 'there' refers to"],
+            meaning_uncertainties=["which destination 'there' refers to"],
         )
         result = asyncio.run(
             coordinator.resolve(
@@ -4916,9 +4914,9 @@ if __name__ == "__main__":
 
 
 class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
-    async def test_goal_planner_finishes_while_gi_planner_is_still_waiting(self):
-        gi_started = asyncio.Event()
-        gi_cancelled = asyncio.Event()
+    async def test_goal_planner_finishes_while_umi_planner_is_still_waiting(self):
+        umi_started = asyncio.Event()
+        umi_cancelled = asyncio.Event()
         goal_planned = asyncio.Event()
         association = GoalAssociationResolution(
             resolution_status="resolved", turn_id="turn-independent",
@@ -4932,16 +4930,16 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
 
         class Client(ScriptedClient):
             async def stream_fast_advance(self, *args, **kwargs):
-                gi_started.set()
+                umi_started.set()
                 try:
                     await asyncio.Event().wait()
                 finally:
-                    gi_cancelled.set()
+                    umi_cancelled.set()
                 async for frame in super().stream_fast_advance(*args, **kwargs):
                     yield frame
 
             async def resolve_goal_association(self, *args, **kwargs):
-                await gi_started.wait()
+                await umi_started.wait()
                 return await super().resolve_goal_association(*args, **kwargs)
 
             async def resolve_fast_plan(self, *args, **kwargs):
@@ -4957,8 +4955,8 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
             core_interpretation=core, turn_envelope=envelope, context={"history": []}, history=[], language="zh-CN"), 1)
         self.assertEqual(result.status, "applied", (result.fallback_reason, result.metadata))
         self.assertTrue(goal_planned.is_set())
-        self.assertTrue(gi_cancelled.is_set())
-        self.assertTrue(result.metadata["gi_planning_superseded"])
+        self.assertTrue(umi_cancelled.is_set())
+        self.assertTrue(result.metadata["umi_planning_superseded"])
         self.assertTrue(client.request.planning_task_id.startswith("ga:"))
         self.assertEqual(result.terminal_plan.plan_id, "independent-goal-plan")
 

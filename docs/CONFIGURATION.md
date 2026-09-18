@@ -106,11 +106,11 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ENABLE_SORIDORMI_CAPABILITIES` | `0` | Allow named Soridormi skills in the structured path. |
 | `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to Cognitive Gateway. High-confidence unaddressed ambient speech may be suppressed by Gateway Attention Review; stop/cancel and unusable audio remain deterministic. |
 | `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; Gateway-suppressed ambient turns do not refresh the exchange window. |
-| `AGENT_LLM_PROVIDER` | `ollama` | Model transport selected at Agent composition. RTX 5090 selects `sglang` in its hardware profile; other profiles retain their declared provider. This does not change GI/Planner semantic authority or establish behavior qualification. |
+| `AGENT_LLM_PROVIDER` | `ollama` | Model transport selected at Agent composition. RTX 5090 selects `sglang` in its hardware profile; other profiles retain their declared provider. This does not change UMI/Planner semantic authority or establish behavior qualification. |
 | `AGENT_SGLANG_URL` | `http://chromie-llm-sglang-qualification:30000/v1` | OpenAI-compatible SGLang base URL used only when `AGENT_LLM_PROVIDER=sglang`. |
 | `AGENT_SGLANG_PRIORITY_STEP` | `100` | Operational translation step from provider-neutral compute ranks to SGLang request priority. |
 | `SGLANG_MAX_TOTAL_TOKENS` | `32768` | Qualification Compose shared KV-cache cap, independent of per-request context. Positive token count parsed by SGLang; the laptop AWQ profile retains two request slots and proves two 16K inputs. Larger caps require renewed speech-headroom qualification. |
-| `ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED` | `0` | Host-owned shared-GPU speech arbitration. When enabled, real Vocal delivery pauses the qualified SGLang engine and foreground input revokes that pause before GI. |
+| `ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED` | `0` | Host-owned shared-GPU speech arbitration. When enabled, real Vocal delivery pauses the qualified SGLang engine and foreground input revokes that pause before UMI. |
 | `ORCH_PRESENTATION_COMPUTE_CONTROL_URL` | `http://127.0.0.1:30000` | SGLang native control root for Host `pause_generation` / `continue_generation`; never a semantic endpoint. |
 | `ORCH_PRESENTATION_COMPUTE_LEASE_MODE` | `in_place` | Qualified engine pause mode retaining running request/KV state. |
 | `ORCH_PRESENTATION_COMPUTE_TIMEOUT_MS` | `2000` | Fail-closed timeout for one Host presentation-compute control operation. |
@@ -149,7 +149,7 @@ does not implement priority, preemption or a maximum queue wait.
 
 | Configuration | Actual support and qualification boundary |
 | --- | --- |
-| RTX 4090 Laptop / SGLang, three bounded running requests | One resident Qwen3.5-4B AWQ engine can admit the normal post-GI SC + GA + Fast Planner fan-out with priority/preemption. The 49K cache covers one current full Planner request; three concurrent full-window requests are not claimed. Fresh 16GB+CosyVoice contention evidence is required before latency promotion. |
+| RTX 4090 Laptop / SGLang, three bounded running requests | One resident Qwen3.5-4B AWQ engine can admit the normal post-UMI SC + GA + Fast Planner fan-out with priority/preemption. The 49K cache covers one current full Planner request; three concurrent full-window requests are not claimed. Fresh 16GB+CosyVoice contention evidence is required before latency promotion. |
 | RTX 5090 / SGLang, configured scheduling and presentation lease | The adapter may use provider scheduling and the qualified speech lease. Source support alone does not establish a foreground-wait bound or the target latency budget; retain same-profile contention and real Agent/playback evidence before promotion. |
 | Other profiles/providers | Only capabilities actually verified on that exact configuration may be claimed. Missing scheduling telemetry or untested contention remains unknown. |
 
@@ -157,7 +157,7 @@ Qualification records submission/admission, provider queue wait when observable,
 first valid model commitment, first TTS PCM and playback start separately, with
 source/model/engine/context/scheduler/workload/TTS identities. Client elapsed time
 is not measured queue wait; discarded audio is not physical playback. Keep failures
-and same-configuration contention controls. The existing 2s GI-handoff-to-commit and
+and same-configuration contention controls. The existing 2s UMI-handoff-to-commit and
 3s commit-to-playback warm targets remain unchanged. A timeout limits request
 lifetime, not foreground service delay. Development use does not qualify promotion.
 
@@ -172,7 +172,7 @@ lifetime, not foreground service delay. Development use does not qualify promoti
 | `FOLLOW_LOGS=1` | Follow service logs after startup. |
 | `CHROMIE_PULL_POLICY` | Compose pull policy used by `start_services.sh`; default `never` for local project images. |
 | `CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced by `start_services.sh` after `.env.runtime`; intended for acceptance/service harnesses that need temporary Compose variables. |
-| `WARM_OLLAMA_BEFORE_ORCH` | Warm the Agent model before opening the microphone; also warm the Agent-owned fast Goal Interpreter model. Default `1`. |
+| `WARM_OLLAMA_BEFORE_ORCH` | Warm the Agent model before opening the microphone; also warm the Agent-owned fast User Meaning Interpreter model. Default `1`. |
 | `OLLAMA_AUTO_RESTART_ON_CRASH` | `1` by default. During host warmup, restart `chromie-llm` once if Ollama reports a native `llama-server` crash such as a segmentation fault, then retry generation. |
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
@@ -186,11 +186,11 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
 The RTX 4090 Laptop profile now selects one resident Qwen3.5-4B AWQ SGLang engine.
-GI retains its 16K request limit, the other ordinary roles retain 32K, and Fast/Deep
+UMI retains its 16K request limit, the other ordinary roles retain 32K, and Fast/Deep
 retain 49152 so complete re-entry packets requiring up to 42172 estimated tokens still
 fit with their unchanged output allowance and safety margin. SGLang owns three bounded
 running-request slots, priority/preemption, and one 49152-token shared cache so the normal
-post-GI SC, GA and Fast Planner branches can be admitted together. This covers one
+post-UMI SC, GA and Fast Planner branches can be admitted together. This covers one
 maximum-size Planner request plus smaller concurrent work, not three simultaneous full
 49K requests. Earlier laptop SGLang+CosyVoice evidence proved only the 32K cache topology;
 the promoted source configuration therefore requires fresh 49K shared-GPU qualification.
@@ -263,55 +263,55 @@ written to the Agent and Orchestrator runtime overrides.
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED` | `1`; enables the focused pre-Core addressedness classifier. Disabled or unavailable review admits the turn and cannot block direct/unclear speech. |
-| `AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL` | Defaults to `AGENT_GOAL_INTERPRETER_MODEL`; the launcher-effective model identity must be retained with cognitive evidence. |
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL` | Defaults to `AGENT_USER_MEANING_INTERPRETER_MODEL`; the launcher-effective model identity must be retained with cognitive evidence. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS` | `2500`; bounded model-call deadline. Timeout and transport failure fail open to Core admission. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_MIN_SUPPRESSION_CONFIDENCE` | `0.72`; applies only to inactive ambient speech acts. It is not a normal-intent or capability threshold. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX` | `2048`; bounded engagement and latest-transcript context. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_PREDICT` | `96`; schema-constrained addressedness, speech-act, and confidence output. |
 
 Attention Review runs after deterministic Protective Reflex and Context Assembly,
-but before ordinary Goal Interpretation. Its schema contains no route, intent,
+but before ordinary User Meaning Interpretation. Its schema contains no route, intent,
 goal, capability, tool, action, plan, or response fields. Active interaction
 context admits without a model call. Inactive suppression requires a valid
 high-confidence ambient speech act; direct question form, directed speech acts,
 uncertainty, malformed output, and model failure all fail open.
 
-## Goal Interpretation inside Agent
+## User Meaning Interpretation inside Agent
 
-Goal Interpretation has one maintained model path and one authority: understand
+User Meaning Interpretation has one maintained model path and one authority: understand
 WHAT the already-admitted human turn means. Cognitive Gateway owns deterministic
-interrupt/suppression before Core entry. Goal Interpretation does not query the
+interrupt/suppression before Core entry. User Meaning Interpretation does not query the
 Capability Catalog, classify routes/intents, author progress speech, choose
 Capabilities, or delegate HOW.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_GOAL_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `chromie-gemma4-12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
-| `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep Goal Interpretation escalation with the same WHAT-only schema, only when Fast GI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to GI. |
-| `AGENT_GOAL_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
-| `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | Common fallback `5400`; interactive `services`/`speech`/`voice_mujoco` modes use `60000`, while explicit qualification mode uses `120000`. This is the per-invocation watchdog for one complete WHAT-only Fast interpretation or one allowed source-based Deep GI interpretation; human-facing latency remains separately measured and is not used as a cognition kill switch. An invalid primary or Deep DTO fails closed without a same-authority repair call. |
-| `AGENT_GOAL_INTERPRETER_LLM_NUM_CTX` | `16384`; conservative prompt/schema budget for user meaning plus semantic continuity. The maintained GI request still excludes Capability catalog entries and canonical lifecycle IDs. |
-| `AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for `confidence`, `responsibilities`, and `unresolved`. |
-| `AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; keeps the warmed interpretation model resident. |
-| `AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; warm the Goal Interpreter model during Agent startup. |
-| `AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget. Explicit qualification mode raises it to `120000`. Warm failure is logged and does not create a fallback semantic authority. |
-| `AGENT_GOAL_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
-| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW` / `AGENT_GOAL_INTERPRETER_DEBUG_RAW` | `0`; opt-in raw model-output diagnostics. |
-| `CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` / `AGENT_GOAL_INTERPRETER_DEBUG_PROMPT` | `0`; opt-in bounded prompt diagnostics. |
+| `AGENT_USER_MEANING_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `chromie-gemma4-12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
+| `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep User Meaning Interpretation escalation with the same WHAT-only schema, only when Fast UMI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to UMI. |
+| `AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
+| `AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` | Common fallback `5400`; interactive `services`/`speech`/`voice_mujoco` modes use `60000`, while explicit qualification mode uses `120000`. This is the per-invocation watchdog for one complete WHAT-only Fast interpretation or one allowed source-based Deep UMI interpretation; human-facing latency remains separately measured and is not used as a cognition kill switch. An invalid primary or Deep DTO fails closed without a same-authority repair call. |
+| `AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX` | `16384`; conservative prompt/schema budget for user meaning plus semantic continuity. The maintained UMI request still excludes Capability catalog entries and canonical lifecycle IDs. |
+| `AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT` | `512`; bounded JSON output budget for `confidence`, `responsibilities`, and `unresolved`. |
+| `AGENT_USER_MEANING_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; keeps the warmed interpretation model resident. |
+| `AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; warm the User Meaning Interpreter model during Agent startup. |
+| `AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget. Explicit qualification mode raises it to `120000`. Warm failure is logged and does not create a fallback semantic authority. |
+| `AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
+| `CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW` / `AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW` | `0`; opt-in raw model-output diagnostics. |
+| `CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT` / `AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT` | `0`; opt-in bounded prompt diagnostics. |
 | `CHROMIE_CLI_COLOR` | `auto`; cognitive-model diagnostic color policy. |
 
 The maintained typed output is provider-neutral Responsibility evidence only.
 Fast/Deep cognition may differ in depth elsewhere in the architecture, but route,
 intent, Activity, Work, Plan, Capability, provider, response wording, and canonical
-Goal/Task/Plan identities are outside Goal Interpretation authority. A malformed
+Goal/Task/Plan identities are outside User Meaning Interpretation authority. A malformed
 Fast DTO may receive one mechanical schema repair. When its schema-valid result retains
 genuine ambiguity in intended outcome, scope, Goal relation, or referent, one source-based
-Deep GI invocation re-reads the authoritative turn without receiving the Fast DTO. The
+Deep UMI invocation re-reads the authoritative turn without receiving the Fast DTO. The
 primary result supplies per-Responsibility source-token evidence; no separate coverage,
 critic, reviewer, or resegmentation model call exists. Fast
-Planner—not GI—owns execution-input resolution, source/default policy, blocking state,
+Planner—not UMI—owns execution-input resolution, source/default policy, blocking state,
 and clarification selection. One mechanically malformed DTO may be regenerated once at
-its current GI stage; semantic failure otherwise fails closed as
+its current UMI stage; semantic failure otherwise fails closed as
 `interpretation_unavailable`.
 
 ## Mind, Principles, and Experience
@@ -320,7 +320,7 @@ its current GI stage; semantic failure otherwise fails closed as
 |---|---|
 | `ORCH_MIND_PROFILE_PATH` | Explicit operator override. Without it, runtime uses `.chromie/mind/active_profile.json` when a validated customer setup exists, otherwise `config/mind/chromie_default.json`. The JSON contains Chromie’s concrete identity, independent worldview, household values, personality expression, principles, long-term goals, and social style. Relative paths resolve from the project root. Python defines only schema, derivation, locked-foundation validation, and projection. |
 | `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` | Optional owner/operator-selected preset: `courteous`, `neutral`, or `reserved`. It overrides only `MindProfile.social_interaction_style`; use `ORCH_MIND_PROFILE_PATH` with `preset=custom` for reviewed custom guidance. |
-| `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600`; maximum prompt-summary size attached to Goal Interpretation and downstream Agent context. |
+| `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600`; maximum prompt-summary size attached to User Meaning Interpretation and downstream Agent context. |
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1`; append interaction outcomes to the local experience journal. |
 | `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl`; relative paths resolve from the project root. |
 | `ORCH_MIND_PROPOSAL_LOG_PATH` | `.chromie/experience/mind_update_proposals.jsonl`; stores human-review-only proposed updates. |
@@ -328,7 +328,7 @@ its current GI stage; semantic failure otherwise fails closed as
 | `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl`; stores rolling conversation-thread snapshots keyed by `conversation_id`. |
 | `ORCH_EPISODE_MAX_TURNS` | `12`; maximum recent turns retained in one episode snapshot. |
 
-The maintained factory profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Customer setup may derive `.chromie/mind/active_profile.json` through `python scripts/configure_chromie_mind.py`; the runtime prefers that validated file at next startup unless an explicit operator path overrides it. The customer contract exposes only display name, pronouns, household role, one reviewed social-style preset, bounded household worldview perspectives, and bounded household values. Core principles, safety/reflex policy, privacy, consent, authorization, embodiment truth, capabilities, providers, prompts, models, and permissions remain locked and customer-marked files that modify them fail validation. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in Goal Interpretation, Goal Association, Fast and Deep Planning, Planner-owned Communicative Activities, conversation, and direct fallback prompts. Planner and selective Reflection additionally receive the independent Stable Mind worldview/value projection; narrow classifiers receive only the facts relevant to their authority. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
+The maintained factory profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Customer setup may derive `.chromie/mind/active_profile.json` through `python scripts/configure_chromie_mind.py`; the runtime prefers that validated file at next startup unless an explicit operator path overrides it. The customer contract exposes only display name, pronouns, household role, one reviewed social-style preset, bounded household worldview perspectives, and bounded household values. Core principles, safety/reflex policy, privacy, consent, authorization, embodiment truth, capabilities, providers, prompts, models, and permissions remain locked and customer-marked files that modify them fail validation. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in User Meaning Interpretation, Goal Association, Fast and Deep Planning, Planner-owned Communicative Activities, conversation, and direct fallback prompts. Planner and selective Reflection additionally receive the independent Stable Mind worldview/value projection; narrow classifiers receive only the facts relevant to their authority. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
 principles require owner approval and are not changed by experience. The
 experience journal can support future prompt, test, strategy, and long-term-goal
 tuning, but proposals are never auto-applied. See
@@ -336,7 +336,7 @@ tuning, but proposals are never auto-applied. See
 
 `episodes.jsonl` is an append-only observability artifact. The realtime Host
 writes it only after an interaction has produced a response/execution record; it
-is not loaded into Goal Interpretation, Goal Association, planning, response
+is not loaded into User Meaning Interpretation, Goal Association, planning, response
 composition, conversation memory, or capability execution. The maintained reader
 is the explicit offline evaluator below, so deleting or disabling episode recording
 does not remove Chromie's live conversational memory or reasoning context.
@@ -488,7 +488,7 @@ Do not commit a real execution token. Manifest strings may use required
 
 | Variable | Default or profile behavior |
 |---|---|
-| `ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS` | Common fallback `9000`; interactive `services`/`speech`/`voice_mujoco` modes use `65000`, while explicit qualification mode uses `150000`. It must exceed `AGENT_GOAL_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
+| `ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` | Common fallback `9000`; interactive `services`/`speech`/`voice_mujoco` modes use `65000`, while explicit qualification mode uses `150000`. It must exceed `AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
 | `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout. Hardware profiles do not own it; explicit operator/validation modes may override it when collecting qualification evidence. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
@@ -765,7 +765,7 @@ safety margin. For SGLang model-client calls, an estimated overflow is checked w
 count must fit both the request context and server limit, including output and margin.
 An unavailable or malformed tokenizer result fails closed; an actual overflow sends no
 generation request. This is tokenizer computation, not another LLM decision or semantic
-retry. Ordinary estimates that fit do not add a tokenizer round trip. GI retains its
+retry. Ordinary estimates that fit do not add a tokenizer round trip. UMI retains its
 own existing conservative preflight. After inference, the following are
 untrusted hard failures:
 
@@ -898,7 +898,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
 | `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `chromie-gemma4-12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
-| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Fast Planner after GI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
+| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Fast Planner after UMI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
 | `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
@@ -1005,7 +1005,7 @@ runtime-identity capture are defined in
 ## Semantic task continuity
 
 The maintained runtime does not use route/intent labels to decide whether a turn becomes
-conversation, tool, memory, or robot work. An admitted turn enters Goal Interpretation,
+conversation, tool, memory, or robot work. An admitted turn enters User Meaning Interpretation,
 which produces provider-neutral Responsibility meaning; Goal Association owns canonical
 Goal continuity and Planner owns HOW, Work, Capability selection, clarification, and
 ordinary communication.
@@ -1023,7 +1023,7 @@ adds a trusted body Provider, after which Planner may select its declared capabi
 Runtime/Soridormi still enforce physical confirmation, safety, preflight, and execution.
 
 Every maintained Agent model invocation emits a single-line `llm_call_evidence` JSON record
-at the model-client boundary. The embedded Goal Interpreter emits the same evidence shape
+at the model-client boundary. The embedded User Meaning Interpreter emits the same evidence shape
 through its specialized model transport. Records correlate prompt-bearing request, response
 schema/options, raw model output, parsed JSON when available, provider metadata, model,
 role/purpose, stage, call ID, and available trace/turn/session IDs. Provider `context` token
@@ -1038,21 +1038,21 @@ or memory. `scripts/collect_debug_bundle.sh` extracts/deduplicates them as
 `llm_calls.jsonl`; review and sanitize before external sharing. Capture never converts a bad
 result into an LLM-fault claim by itself.
 
-Goal Interpretation also retains compact human-oriented observability such as
-`goal_interpreter_prompt_profile`, `goal_interpreter_llm_raw_summary`, and
-`goal_interpreter_normalize_result`. Those diagnostics describe the WHAT-only model call and
+User Meaning Interpretation also retains compact human-oriented observability such as
+`user_meaning_interpreter_prompt_profile`, `user_meaning_interpreter_llm_raw_summary`, and
+`user_meaning_interpreter_normalize_result`. Those diagnostics describe the WHAT-only model call and
 normalization; they do not restore route/intent classification, Capability selection, or a
 Host semantic fallback.
 
 Cognitive Gateway owns deterministic protective filtering and focused addressedness review
 before Core entry. Interrupt, silence, and unusable-audio handling remain deterministic.
-Goal Interpretation receives only admitted input/context and may use one Fast pass and at
-most one source-based Deep GI pass for genuine
-consequential ambiguity in intended outcome, scope, Goal relation, or referent. Fast/Deep GI
+User Meaning Interpretation receives only admitted input/context and may use one Fast pass and at
+most one source-based Deep UMI pass for genuine
+consequential ambiguity in intended outcome, scope, Goal relation, or referent. Fast/Deep UMI
 share the same Responsibility-only authority. Planning input gaps, source/default policy,
 Capability selection, and clarification for HOW belong to Planner.
 
-The capability catalog is an ability source, not the semantic brain. Goal Interpretation
+The capability catalog is an ability source, not the semantic brain. User Meaning Interpretation
 must not emit executable IDs or route labels from it; Planner receives the applicable live
 catalog/schema projections for semantic Capability grounding. No maintained `rules_only`,
 `hybrid`, or `llm_only` route mode exists on the current Goal-driven path.
@@ -1102,18 +1102,18 @@ The request-format candidate also makes the pinned XGrammar dispatcher honor
 cache key. The Agent adds `false` to the two GA output-contract titles and the
 Deep Planner and Agent Skill Selection output-contract titles. Deep/Skill calls
 also reproduced outside-string whitespace loops that exhausted their output budgets.
-GI and other unannotated requests retain their existing formatting. No global compact
+UMI and other unannotated requests retain their existing formatting. No global compact
 flag or environment variable is added. This candidate requires the full qualification
 record in the checkpoint before promotion; the earlier global compact experiment
-was rejected for GI regressions. Remove the image patch when upstream supports this
+was rejected for UMI regressions. Remove the image patch when upstream supports this
 request annotation. Independent canonical Schema and Host constraints remain required.
 GA, canonical Fast Planner (single and multiple Goals), Deep Planner and Agent Skill Selection decoder schemas expose existing object fields and array item/cardinality constraints
 as redundant single alternatives beside intersections. This preserves the full Schema
 contract while making those shapes visible to the pinned decoder; cross-item identity
 conservation still requires the original Schema clauses and deterministic Host checks.
-GI likewise exposes its existing Responsibility object shape when supplied Goal context
+UMI likewise exposes its existing Responsibility object shape when supplied Goal context
 adds a continuity intersection. This preserves required source citations, relationship
-tokens and supplied Goal IDs in the decoder; it changes neither GI formatting nor the
+tokens and supplied Goal IDs in the decoder; it changes neither UMI formatting nor the
 semantic contract. Conditional relationship checks remain independently enforced.
 The checkpoint must be cached in `hf_cache` before offline startup. Normal launch is
 `./scripts/start_chromie.sh --build`; `--no-orchestrator --keep-services` provides

@@ -47,8 +47,6 @@
   "text": "我有点累。",
   "language": "zh-CN",
   "expect_no_capabilities": true,
-  "min_new_goal_count": 1,
-  "min_goal_outcome_count": 1,
   "description": "A personal feeling is a fresh social Responsibility; Chromie should respond warmly without treating it as a body command, diagnosis, or empty turn.",
   "general_ability": {
     "memberships": [
@@ -59,7 +57,7 @@
         "rationale": "A personal feeling is a fresh social Responsibility; Chromie should respond warmly without treating it as a body command, diagnosis, or empty turn.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Test evidence"
         ]

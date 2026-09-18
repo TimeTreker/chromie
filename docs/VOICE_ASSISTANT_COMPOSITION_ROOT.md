@@ -14,7 +14,7 @@ The public runtime remains intentionally stable while internal responsibilities
 move behind narrow collaborators with explicit contracts and focused tests.
 
 There is one maintained Host-to-Agent service boundary. `chromie-agent` is one
-FastAPI service containing separately testable GI, GA, Planner fast/deep passes,
+FastAPI service containing separately testable UMI, GA, Planner fast/deep passes,
 and Reflection modules/endpoints. Optional Social Attention is part of Planner output,
 not another module or endpoint; these cognitive roles are not
 independent deployment services. `VoiceAssistant` coordinates their lifecycle and

@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "id": "voice_log_chinese_blink_chat_not_catalog_recovered",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "UMI preserves the noisy Chinese blink request as provider-neutral blink meaning without consulting a Capability catalog.",
+  "tags": [
+    "voice-log",
+    "zh-CN",
+    "cognitive-core-agent-contract",
+    "blink",
+    "model-authority"
+  ],
+  "input": {
+    "text": "眨两小眼睛。",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "llm_decision": {
+      "confidence": 0.9,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "眨眼两次",
+          "bindings": {
+            "count": 2
+          },
+          "confidence": 0.9,
+          "output_mode": "body_action",
+          "continuity_scope": "goal"
+        }
+      ],
+      "meaning_uncertainties": []
+    }
+  },
+  "expect": {
+    "confidence": 0.9,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "眨眼两次",
+        "confidence": 0.9,
+        "output_mode": "body_action"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "robust_intent_understanding",
+        "title": "Robust Intent Understanding",
+        "general_rule": "Chromie should preserve ordinary human meaning across discourse markers, short fragments, ASR-like noise, Chinese and English input, and follow-up context.",
+        "rationale": "The Chinese blink request is preserved as provider-neutral body meaning.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

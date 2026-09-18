@@ -44,7 +44,7 @@
         "title": "Natural Uncertainty Handling",
         "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
         "rationale": "Without a discourse or perception binding for that, Chromie must ask which object instead of inventing one or starting motion.",
-        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/goal interpretation", "Agent contract", "Orchestrator policy"]
+        "root_cause_boundaries": ["ASR/audio", "Cognitive Core/user meaning interpretation", "Agent contract", "Orchestrator policy"]
       }
     ]
   }

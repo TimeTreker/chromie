@@ -916,12 +916,17 @@ async def test_ordered_sc_answer_stays_between_work_steps_and_waits_for_delivery
     assert scheduled[1].args["metadata"]["communication_completion_goal_ids"] == ["say"]
 
 
-@pytest.mark.parametrize("unresolved", [[], ["which person the user means"]])
-def test_initial_sc_cannot_complete_a_task_before_work_establishes_its_need(unresolved):
+@pytest.mark.parametrize("meaning_uncertainties", [[], [{
+    "local_ref": "u1",
+    "kind": "referent",
+    "description": "which person the user means",
+    "responsibility_refs": ["say"],
+}]])
+def test_initial_sc_cannot_complete_a_task_before_work_establishes_its_need(meaning_uncertainties):
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     current = SocialCognitionRequest(request_id="initial", trigger="interpretation", source_refs=["turn"],
-        source_turn={"original_text": "先眨眼再说你好"}, interpretation_unresolved=unresolved,
+        source_turn={"original_text": "先眨眼再说你好"}, meaning_uncertainties=meaning_uncertainties,
         responsibilities=[CognitiveResponsibilityProposal(local_ref="say", outcome="Say hello after blinking",
             output_mode="speech", bindings={"after": ["blink"]}, confidence=0.8)])
     result = SocialCognitionResolution(request_id=current.request_id, snapshot_digest=current.snapshot_digest(),

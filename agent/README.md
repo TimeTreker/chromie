@@ -2,15 +2,15 @@
 
 [Social Cognition](../docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
 owns interaction planning and wording. `POST /social-cognition` serves admitted
-GI, Goal/Work/Evidence state and trusted Situation through one shared transaction.
-Planner retains Work HOW and typed communication needs; GI/GA retain meaning and
+UMI, Goal/Work/Evidence state and trusted Situation through one shared transaction.
+Planner retains Work HOW and typed communication needs; UMI/GA retain meaning and
 continuity. Foreground SC uses realtime priority; genuine unresolved social
 reasoning has one bounded deliberative continuation. See the
 [source inventory](../docs/COGNITIVE_TURN_LOOP.md#source-migration-inventory) and
 [evidence limits](../docs/STATUS.md#social-cognition-migration).
 
 `chromie-agent` is Chromie's single model-facing cognitive service. It exposes
-separately testable Goal Interpretation, Goal Association, Planner fast/deep passes,
+separately testable User Meaning Interpretation, Goal Association, Planner fast/deep passes,
 Social Cognition for shared interaction state, Reflection, capability-catalog, and WorkDAG diagnostic
 surfaces. These are module/contract boundaries inside one FastAPI service, not a
 microservice per cognitive role. The Cognitive Gateway itself remains Host-owned.
@@ -28,7 +28,7 @@ uniquely derivable duplicate parameter provenance. The Host Orchestrator owns tu
 and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution
 provider behind the Capability boundary.
 
-GI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Fast/Deep results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
+UMI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Fast/Deep results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
 
 Fast and Deep admit a complete, fully bound information-acquisition stage with an
 honest partial whole-Goal score and explicit per-Goal/aggregate deferred obligations.
@@ -55,12 +55,12 @@ The existing provider preflight still checks the complete request's model budget
 
 ## Authority boundary
 
-GI hands off complete natural-language intentions, their existing provider-neutral
+UMI hands off complete natural-language intentions, their existing provider-neutral
 `output_mode`, confidence and source evidence alongside immutable original input.
 All actions, modifiers, quantities, units, negation and relations stay in `outcome`.
-One compound intention can remain one Responsibility. GI authors no argument table,
+One compound intention can remain one Responsibility. UMI authors no argument table,
 Goal relationship or activation timestamp. GA owns continuity; its new Goal text and
-result type are exact Host projections of GI. SC owns communication and Social
+result type are exact Host projections of UMI. SC owns communication and Social
 Attention, receives the same intent concurrently, and has first compute priority.
 
 Planner owns Activity decomposition, capability choice, argument realization and
@@ -74,7 +74,7 @@ forms. Provenance still does not prove semantic conversion accuracy.
 Runtime retains canonical binding, confirmation, sequential physical execution,
 cancellation, restart-safe timers and evidence.
 
-GI, committed Goal changes and trusted execution state may trigger scoped Planner Work.
+UMI, committed Goal changes and trusted execution state may trigger scoped Planner Work.
 Those owners and trusted Situation may independently request SC communication.
 Goal-free Situation supplies no Responsibility, Goal or Capability Work permission,
 including safe reads. `SocialCognitionResolver` serves the `/social-cognition` contract and configured
@@ -85,11 +85,11 @@ has the same restricted scope. A complete decision has no second model reviewer.
 Runtime validates all returned provenance, identity, delivered repair references and
 Memory candidates before committing Memory or preserving exact speech for delivery.
 
-Primary and Deep GI reject downstream parameter/relationship fields. Missing
+Primary and Deep UMI reject downstream parameter/relationship fields. Missing
 execution inputs belong to Planner; only genuine uncertainty about user meaning
-can enter the single source-based Deep GI path.
+can enter the single source-based Deep UMI path.
 
-GA inherits new Goal WHAT directly from accepted GI references. Existing Goals use
+GA inherits new Goal WHAT directly from accepted UMI references. Existing Goals use
 source-bound `requirement_changes`, without model-authored descriptions. Host validates
 the original Goal snapshot and commits the selected requirements and provenance
 atomically. Updates that would leave incompatible retained typed constraints require
@@ -101,7 +101,7 @@ Perception
   ↓
 Cognitive Gateway
   ↓
-Goal Interpretation     WHAT only
+User Meaning Interpretation     WHAT only
   ├──────────────────┬───────────────────┐
   ↓                  ↓                   ↓
 SC                   Goal Association    Planner
@@ -149,7 +149,7 @@ Important endpoints include:
 - `GET /capabilities`
 - `GET /capabilities/catalog`
 - `POST /capabilities/search`
-- Goal Interpretation / cognitive-core endpoints
+- User Meaning Interpretation / cognitive-core endpoints
 - `POST /goal-association`
 - `POST /fast-advance`
 - `POST /fast-plan`

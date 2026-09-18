@@ -38,12 +38,12 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "with people: whether and when to communicate, exact wording, and coherent optional "
     "social expression. Read the supplied facts, shared Goal overview, Work and Evidence, "
     "Situation, disclosure-safe Memory, Stable Mind and delivered/pending interaction. "
-    "GI owns WHAT and Planner owns requested task Work. Never reinterpret their decisions, "
+    "UMI owns WHAT and Planner owns requested task Work. Never reinterpret their decisions, "
     "invent a user turn, change Goals, plan task actions, grant consent or authorize effects. "
     "Your standing interaction goals are to respond to the person, maintain shared "
     "understanding of important task changes, and engage appropriately with people "
     "present in the supplied Situation. These duties exist even when there is no "
-    "GI result, task Goal or communication_needs entry. Decide their relevance yourself "
+    "UMI result, task Goal or communication_needs entry. Decide their relevance yourself "
     "from the current facts and actual delivered/pending interaction; never wait for "
     "Planner to grant permission to communicate. Planner never grants or withholds your "
     "communication authority. Do not explain a communication or silence decision by "
@@ -69,8 +69,8 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "NOT finished. Parallel describes scheduling compatibility, never execution state. "
     "Keep this distinction in both your reason_summary and your words. Preserve "
     "upstream-authored uncertainty and cite supplied Evidence for results. "
-    "Report each module's actual state. Do not infer that GI is uncertain from "
-    "missing Planner inputs, or claim execution from understanding alone. GI, GA, "
+    "Report each module's actual state. Do not infer that UMI is uncertain from "
+    "missing Planner inputs, or claim execution from understanding alone. UMI, GA, "
     "Planner and Runtime may supply communication needs; their facts retain their "
     "owner while you choose speech, Social Attention or silence. "
     "An internal module finishing is not automatically news for a person. Never promise "
@@ -96,8 +96,11 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "absence of task-oriented speech as 'no useful social change'. If you still choose silence, "
     "your reason_summary must cite a separate supplied situational fact, such as actual duplicate "
     "delivery or inappropriate interruption, rather than task modality or missing Planner Needs. "
-    "At interpretation ingress the independent Work decision is still pending, so do not answer "
-    "the task or invent an input question before that decision. Silence remains valid only for "
+    "At interpretation ingress a goal-scoped Responsibility still has an independent Work "
+    "decision pending, so do not answer that task or invent an input question before that "
+    "decision. A Responsibility marked continuity_scope=turn has no pending task Work and may "
+    "be answered directly from supplied conversational context; do not create or imply a Goal "
+    "for it. Silence remains valid only for "
     "a positive supplied situational reason such as duplicate/pending interaction, inappropriate "
     "interruption, or genuinely no useful social change. Never invent a task just to create an "
     "interaction need. "
@@ -256,8 +259,6 @@ def social_cognition_response_schema(
     else:
         act["repair_of_activity_ids"]["maxItems"] = 0
         act["function"]["enum"].remove("repair")
-    if request.trigger == "interpretation" and not request.communication_needs:
-        act["function"]["enum"] = [value for value in act["function"]["enum"] if value not in {"respond", "ask"}]
     stages = ["context_grounded"]
     if request.evidence_refs:
         stages.append("post_evidence")
@@ -354,6 +355,40 @@ def social_cognition_response_schema(
                         addressed["maxItems"] = 0
                 question_branches.append(variant)
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": question_branches}
+    if request.trigger == "interpretation" and not request.communication_needs:
+        # Native decoding must see the same semantic boundary as Host validation.
+        # A direct respond/ask branch is legal only for turn-local conversation;
+        # goal-scoped input remains acknowledgement-only until Planner establishes
+        # a communication need.
+        turn_local_refs = sorted(
+            item.local_ref
+            for item in request.responsibilities
+            if item.continuity_scope == "turn"
+        )
+        existing = schema["$defs"]["SocialCommunicativeAct"]
+        continuity_branches = []
+        for branch in existing.get("oneOf", [existing]):
+            function = branch["properties"]["function"]
+            functions = [
+                value for value in function.get("enum", [function.get("const")])
+                if value is not None
+            ]
+            direct = [value for value in functions if value in {"respond", "ask"}]
+            other = [value for value in functions if value not in {"respond", "ask"}]
+            if other:
+                variant = copy.deepcopy(branch)
+                variant["properties"]["function"] = {"type": "string", "enum": other}
+                continuity_branches.append(variant)
+            if direct and turn_local_refs:
+                variant = copy.deepcopy(branch)
+                properties = variant["properties"]
+                properties["function"] = {"type": "string", "enum": direct}
+                source_refs = copy.deepcopy(properties["source_responsibility_refs"])
+                source_refs["minItems"] = 1
+                source_refs["items"] = {"type": "string", "enum": turn_local_refs}
+                properties["source_responsibility_refs"] = source_refs
+                continuity_branches.append(variant)
+        schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": continuity_branches}
     _constrain_social_activity_identity(schema, request)
     # Native decoding does not enforce conditional decision-state dependencies.
     # Realize the existing DTO/Host states without deciding whether speech is
@@ -407,6 +442,19 @@ def validate_social_cognition_output(
         "addressed_need_ids": {item.need_id for item in request.communication_needs},
     }
     for act in output.activities:
+        if request.trigger == "interpretation" and not request.communication_needs and act.function in {"respond", "ask"}:
+            turn_local_refs = {
+                item.local_ref
+                for item in request.responsibilities
+                if item.continuity_scope == "turn"
+            }
+            cited_refs = set(act.source_responsibility_refs)
+            if not cited_refs or not cited_refs.issubset(turn_local_refs):
+                raise ValueError(
+                    "interpretation-triggered respond/ask cannot fulfill an unestablished "
+                    "Work communication need unless it cites only turn-local "
+                    "Responsibility provenance"
+                )
         for name, values in scopes.items():
             if not set(getattr(act, name)).issubset(values):
                 raise ValueError(f"Social Cognition widened {name}")

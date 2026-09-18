@@ -12,7 +12,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from agent.app import main as agent_main
-from agent.app.cognitive_core.goal_interpreter.engine import Settings as GoalInterpreterSettings
+from agent.app.cognitive_core.user_meaning_interpreter.engine import Settings as UserMeaningInterpreterSettings
 from orchestrator.runtime.host_components import build_agent_client
 from orchestrator.runtime.host_settings import HostSettingsSnapshot
 
@@ -32,8 +32,8 @@ def _common_env() -> dict[str, str]:
 
 
 class RuntimeConfigurationTests(unittest.TestCase):
-    def test_goal_interpreter_has_no_rules_or_catalog_compatibility_settings(self) -> None:
-        settings = GoalInterpreterSettings()
+    def test_user_meaning_interpreter_has_no_rules_or_catalog_compatibility_settings(self) -> None:
+        settings = UserMeaningInterpreterSettings()
         self.assertFalse(hasattr(settings, "rules_first"))
         self.assertFalse(hasattr(settings, "capability_catalog_timeout_ms"))
 
@@ -42,7 +42,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         settings = HostSettingsSnapshot.from_env(project_root=ROOT, environ={})
         self.assertIn('"SHERPA_ONNX_NUM_THREADS",\n                2,', asr_settings_source)
         self.assertEqual(settings.cognition.agent_timeout_ms, 9000)
-        self.assertEqual(settings.cognition.goal_interpreter_timeout_ms, 9000)
+        self.assertEqual(settings.cognition.user_meaning_interpreter_timeout_ms, 9000)
         self.assertEqual(settings.cognition.goal_association_timeout_ms, 65000)
         self.assertEqual(settings.cognition.fast_planner_timeout_ms, 65000)
         self.assertEqual(settings.cognition.deep_planner_timeout_ms, 125000)
@@ -57,28 +57,28 @@ class RuntimeConfigurationTests(unittest.TestCase):
             dockerfile,
         )
 
-    def test_goal_interpreter_host_budget_exceeds_service_budget(self) -> None:
+    def test_user_meaning_interpreter_host_budget_exceeds_service_budget(self) -> None:
         values = _common_env()
         self.assertGreater(
-            int(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"]),
-            int(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"]),
+            int(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"]),
+            int(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"]),
         )
 
-    def test_goal_interpreter_host_budget_has_a_dedicated_typed_setting(self) -> None:
+    def test_user_meaning_interpreter_host_budget_has_a_dedicated_typed_setting(self) -> None:
         settings = HostSettingsSnapshot.from_env(
             project_root=ROOT,
-            environ={"ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS": "65000"},
+            environ={"ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS": "65000"},
         )
 
-        self.assertEqual(settings.cognition.goal_interpreter_timeout_ms, 65000)
+        self.assertEqual(settings.cognition.user_meaning_interpreter_timeout_ms, 65000)
         self.assertEqual(
-            build_agent_client(settings).goal_interpreter_timeout_ms,
+            build_agent_client(settings).user_meaning_interpreter_timeout_ms,
             65000,
         )
 
-    def test_goal_interpreter_uses_fast_llm_by_default(self) -> None:
+    def test_user_meaning_interpreter_uses_fast_llm_by_default(self) -> None:
         values = _common_env()
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_MODEL"], "qwen3.5:4b")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_MODEL"], "qwen3.5:4b")
         self.assertEqual(
             values["AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED"],
             "1",
@@ -87,18 +87,18 @@ class RuntimeConfigurationTests(unittest.TestCase):
             values["AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL"],
             "qwen3:4b",
         )
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE"], "24h")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP"], "1")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "60000")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"], "5400")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_CTX"], "16384")
-        self.assertEqual(values["AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT"], "512")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_LLM_KEEP_ALIVE"], "24h")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP"], "1")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "5400")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX"], "16384")
+        self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT"], "512")
 
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         for name in (
-            "AGENT_GOAL_INTERPRETER_LOG_LEVEL",
-            "CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW",
-            "CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT",
+            "AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL",
+            "CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW",
+            "CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT",
         ):
             self.assertIn(f"{name}:", compose)
         compose_keys = {
@@ -107,15 +107,15 @@ class RuntimeConfigurationTests(unittest.TestCase):
             if line.startswith("      AGENT_") or line.startswith("      CHROMIE_AGENT_")
         }
         for stale in (
-            "AGENT_GOAL_INTERPRETER_MODE",
-            "AGENT_GOAL_INTERPRETER_USE_LLM",
-            "AGENT_GOAL_INTERPRETER_REVIEW_TIMEOUT_MS",
-            "AGENT_GOAL_INTERPRETER_CONFIDENCE_THRESHOLD",
+            "AGENT_USER_MEANING_INTERPRETER_MODE",
+            "AGENT_USER_MEANING_INTERPRETER_USE_LLM",
+            "AGENT_USER_MEANING_INTERPRETER_REVIEW_TIMEOUT_MS",
+            "AGENT_USER_MEANING_INTERPRETER_CONFIDENCE_THRESHOLD",
         ):
             self.assertNotIn(stale, compose_keys)
         self.assertFalse(
             any(
-                name.startswith("AGENT_GOAL_INTERPRETER_CAPABILITY_CATALOG_")
+                name.startswith("AGENT_USER_MEANING_INTERPRETER_CAPABILITY_CATALOG_")
                 for name in compose_keys
             )
         )
@@ -130,7 +130,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         ):
             self.assertIn(f"{name}:", compose)
 
-    def test_ollama_keeps_goal_interpreter_and_agent_models_loaded_without_extra_parallelism(self) -> None:
+    def test_ollama_keeps_user_meaning_interpreter_and_agent_models_loaded_without_extra_parallelism(self) -> None:
         values = _common_env()
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "2")
         self.assertEqual(values["OLLAMA_NUM_PARALLEL"], "1")
@@ -222,7 +222,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("TTS_MAX_LENGTH=4096", profile)
         self.assertIn("AGENT_MODEL=qwen3.5:4b", profile)
         self.assertIn(
-            "AGENT_GOAL_INTERPRETER_MODEL=qwen3.5:4b",
+            "AGENT_USER_MEANING_INTERPRETER_MODEL=qwen3.5:4b",
             profile,
         )
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=qwen3.5:4b", profile)
@@ -232,8 +232,8 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
         self.assertIn("OLLAMA_NUM_PARALLEL=1", profile)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=16384", profile)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT=512", profile)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX=16384", profile)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT=512", profile)
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", profile)
         self.assertIn("OLLAMA_FLASH_ATTENTION=1", profile)
         self.assertIn("OLLAMA_KV_CACHE_TYPE=q8_0", profile)
@@ -246,7 +246,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("TTS_MAX_LENGTH=8192", rtx5090)
         self.assertIn("TTS_RESET_LLAMA_STATE=1", rtx5090)
         self.assertIn("AGENT_MODEL=chromie-gemma4-12b", rtx5090)
-        self.assertIn("AGENT_GOAL_INTERPRETER_MODEL=chromie-gemma4-12b", rtx5090)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_DEEP_PLANNER_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_FAST_PLANNER_MODEL=chromie-gemma4-12b", rtx5090)
@@ -261,7 +261,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", rtx5090)
         self.assertIn("OLLAMA_NUM_CTX=65536", rtx5090)
         self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX=65536", rtx5090)
-        self.assertIn("AGENT_GOAL_INTERPRETER_LLM_NUM_CTX=65536", rtx5090)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX=65536", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_NUM_CTX=65536", rtx5090)
         self.assertNotIn("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX", rtx5090)
         self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", rtx5090)
@@ -274,7 +274,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_EPISODE_LOG_PATH"], ".chromie/experience/episodes.jsonl")
         self.assertEqual(values["ORCH_EPISODE_MAX_TURNS"], "12")
 
-    def test_orchestrator_warms_goal_interpreter_and_agent_models_when_interpreter_llm_enabled(self) -> None:
+    def test_orchestrator_warms_user_meaning_interpreter_and_agent_models_when_interpreter_llm_enabled(self) -> None:
         source = (ROOT / "scripts" / "start_orchestrator.sh").read_text(
             encoding="utf-8"
         )
@@ -471,7 +471,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn("CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE", verifier)
-        self.assertIn("AGENT_GOAL_INTERPRETER_MODEL", verifier)
+        self.assertIn("AGENT_USER_MEANING_INTERPRETER_MODEL", verifier)
         self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL", verifier)
         self.assertIn("OLLAMA_CONTEXT_LENGTH", verifier)
         self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", verifier)
@@ -488,7 +488,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "Cognitive Gateway attention": (
                 "EFFECTIVE_COGNITIVE_GATEWAY_ATTENTION_MODEL"
             ),
-            "Goal Interpretation": "EFFECTIVE_AGENT_GOAL_INTERPRETER_MODEL",
+            "User Meaning Interpretation": "EFFECTIVE_AGENT_USER_MEANING_INTERPRETER_MODEL",
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
             "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
             "Deep Planner": "EFFECTIVE_DEEP_PLANNER_MODEL",

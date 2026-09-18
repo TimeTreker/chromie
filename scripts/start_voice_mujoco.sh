@@ -235,7 +235,6 @@ echo "$CHROMIE_PID" > "$CHROMIE_PID_FILE"
 wait_for_tcp 127.0.0.1 8092 "$STARTUP_TIMEOUT_S" "Chromie Agent" "$CHROMIE_PID" "$CHROMIE_LOG"
 wait_for_ws 127.0.0.1 9001 "$STARTUP_TIMEOUT_S" "Chromie ASR" asr "$CHROMIE_PID" "$CHROMIE_LOG"
 wait_for_ws 127.0.0.1 5000 "$STARTUP_TIMEOUT_S" "Chromie TTS" tts "$CHROMIE_PID" "$CHROMIE_LOG"
-wait_for_tcp 127.0.0.1 11434 "$STARTUP_TIMEOUT_S" "Chromie Ollama" "$CHROMIE_PID" "$CHROMIE_LOG"
 
 echo "[voice-mujoco] Waiting for Chromie Orchestrator..."
 ORCHESTRATOR_DEADLINE=$((SECONDS + STARTUP_TIMEOUT_S))

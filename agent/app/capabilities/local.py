@@ -823,6 +823,19 @@ def chromie_manifests(
                             ),
                         }
                     },
+                    "argument_derivation": {
+                        "location_context": {
+                            "source_argument": "location",
+                            "require_exact_source_value": True,
+                            "contract": (
+                                "Provider-local structure for the same already-grounded "
+                                "canonical location. Preserve the exact canonical location "
+                                "value somewhere in location_context and add only hierarchy "
+                                "or aliases supported by current discourse. Never change "
+                                "the location identity."
+                            ),
+                        }
+                    },
                     "resource_contract": {
                         "provider_role": "acquire_information",
                         "plan_requires": [],

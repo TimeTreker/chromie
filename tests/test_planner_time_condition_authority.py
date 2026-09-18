@@ -121,7 +121,7 @@ def test_conversation_state_binds_planner_time_condition_to_original_responsibil
         "canonical_plan_id": plan.plan_id,
         "canonical_plan_fingerprint": "fingerprint-1",
         "language": "en",
-        "goal_interpretation": {
+        "user_meaning_interpretation": {
             "responsibilities": [
                 {
                     "schema_version": 1,

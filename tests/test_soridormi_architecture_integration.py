@@ -102,7 +102,7 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
                         "args": {"count": 2},
                         "metadata": {
                             "source_component": "agent.capability",
-                            "goal_interpretation_source": "goal_interpreter.v1",
+                            "user_meaning_interpretation_source": "user_meaning_interpreter.v1",
                         },
                     }
                 ],
@@ -134,8 +134,8 @@ class SoridormiArchitectureIntegrationTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(chromie_intent["requires_runtime_validation"])
         self.assertEqual(chromie_intent["source_component"], "agent.capability")
         self.assertEqual(
-            chromie_intent["goal_interpretation_source"],
-            "goal_interpreter.v1",
+            chromie_intent["user_meaning_interpretation_source"],
+            "user_meaning_interpreter.v1",
         )
         self.assertNotIn("route_stage", chromie_intent)
         self.assertNotIn("route_confidence", chromie_intent)

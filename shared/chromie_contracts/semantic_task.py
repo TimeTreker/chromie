@@ -103,7 +103,7 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
     """Apply source-selected requirements atomically, without interpreting text.
 
     Requirement indices and field paths are GA continuity decisions. All new
-    values are exact copies of accepted GI; the supplied retained Goal snapshot
+    values are exact copies of accepted UMI; the supplied retained Goal snapshot
     must still match. This function neither plans nor changes Work/Evidence.
     """
     from .core_interpretation import CognitiveResponsibilityProposal
@@ -119,7 +119,7 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
                for item in update["source_responsibilities"]]
     by_ref = {item.local_ref: item for item in sources}
     if not sources or len(by_ref) != len(sources):
-        raise ValueError("Goal meaning update requires unique accepted GI sources")
+        raise ValueError("Goal meaning update requires unique accepted UMI sources")
     retained_mode = goal.metadata.get("output_mode", "unspecified")
     if any(item.output_mode not in {"unspecified", retained_mode}
            for item in sources) and retained_mode != "unspecified":
@@ -144,7 +144,7 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
         )
     criteria = [criteria[index] for index in kept] + [item.outcome for item in sources]
     provenance = [copy.deepcopy(prior_sources[index]) for index in kept] + [
-        {"origin": "gi", "turn_id": turn_id, "responsibility": item.model_dump(mode="json")}
+        {"origin": "umi", "turn_id": turn_id, "responsibility": item.model_dump(mode="json")}
         for item in sources
     ]
     values = goal.model_dump(mode="json")
@@ -161,7 +161,7 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
         seen_paths.add(key)
         source = by_ref.get(change["source_responsibility_ref"])
         if source is None or change["source_binding"] not in source.bindings:
-            raise ValueError("Goal binding change has no exact GI source")
+            raise ValueError("Goal binding change has no exact UMI source")
         parent: Any = values
         for part in path[:-1]:
             if not isinstance(parent, dict) or part not in parent:
@@ -186,7 +186,7 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
                     if isinstance(actual, dict) and "value" in actual:
                         actual = actual["value"]
                     if actual != expected:
-                        raise ValueError(f"Goal field {name!r} conflicts with its accepted GI binding")
+                        raise ValueError(f"Goal field {name!r} conflicts with its accepted UMI binding")
     return SemanticGoal.model_validate(values)
 
 

@@ -106,7 +106,7 @@ def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind
     assistant.build_context = lambda _sid: {"history": []}
     assistant.get_http_session = AsyncMock(return_value=object())
     source = InteractionResponse(interaction_id="weather", metadata={
-        "goal_interpretation": {"responsibilities": [{"local_ref": "r-weather",
+        "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r-weather",
             "outcome": "Check the weather.", "output_mode": "information", "confidence": 1.0}]},
         "goal_association": {"associations": [], "new_goals": [{"goal_id": goal_id,
             "source_responsibility_refs": ["r-weather"], "source_text": "Check the weather."}]},
@@ -364,7 +364,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     "context_refs": [],
                     "admission": "admit",
                 },
-                "goal_interpretation": {
+                "user_meaning_interpretation": {
                     "responsibilities": [
                         {
                             "local_ref": "weather-result",
@@ -1082,7 +1082,7 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                 assistant._playback_state().turn_speech_events["sid"] = [delivered]
                 ledger.record_playback_event(delivered)
                 source = InteractionResponse(interaction_id="mixed", metadata={"turn_id": "turn",
-                    "goal_interpretation": {"responsibilities": [{"local_ref": "r1", "outcome": "Blink twice.",
+                    "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r1", "outcome": "Blink twice.",
                         "bindings": {"count": 2}, "output_mode": "body_action", "relationship": "new", "confidence": 1.0}]},
                     "goal_association": {"associations": [], "new_goals": [
                         {"goal_id": goal_id, "source_responsibility_refs": ["r1"], "metadata": {"output_mode": "body_action"}},

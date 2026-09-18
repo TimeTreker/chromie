@@ -143,7 +143,7 @@ class RuntimeIdentityCaptureTests(unittest.TestCase):
             return_value={
                 "CHROMIE_RUNTIME_ENV_FINGERPRINT": "fingerprint",
                 "CHROMIE_ACTIVE_PROFILE": "rtx5090",
-                "AGENT_GOAL_INTERPRETER_MODEL": "qwen3:4b",
+                "AGENT_USER_MEANING_INTERPRETER_MODEL": "qwen3:4b",
             },
         ):
             identity = _deployment_identity(
@@ -160,7 +160,7 @@ class RuntimeIdentityCaptureTests(unittest.TestCase):
             "fingerprint",
         )
         self.assertEqual(
-            agent["effective_models"]["AGENT_GOAL_INTERPRETER_MODEL"],
+            agent["effective_models"]["AGENT_USER_MEANING_INTERPRETER_MODEL"],
             "qwen3:4b",
         )
         self.assertEqual(DEFAULT_SERVICES[0], "chromie-agent")

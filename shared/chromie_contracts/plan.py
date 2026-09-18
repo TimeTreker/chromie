@@ -29,7 +29,7 @@ class SocialCommunicationNeed(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     need_id: str = Field(min_length=1, max_length=160)
-    owner: Literal["goal_interpretation", "goal_association", "planner", "runtime"]
+    owner: Literal["user_meaning_interpretation", "goal_association", "planner", "runtime"]
     kind: Literal["answer", "input", "confirmation", "result"]
     source_goal_ids: list[str] = Field(default_factory=list)
     source_responsibility_refs: list[str] = Field(default_factory=list)
@@ -588,12 +588,12 @@ def fast_planner_activity_request_id(turn_id: str, activity_id: str) -> str:
 
 
 class FastPlannerAdvance(BaseModel):
-    """Fast Planner's first Activity Plan over Goal Interpretation evidence.
+    """Fast Planner's first Activity Plan over User Meaning Interpretation evidence.
 
-    Goal Interpretation owns contextual WHAT. This contract is the first
+    User Meaning Interpretation owns contextual WHAT. This contract is the first
     planner-owned HOW decision and may contain speaking and Capability Activities
     with the same sequential/parallel relation. Goal Association runs independently
-    from the same GI result; it is not a Planner continuation. Runtime safety,
+    from the same UMI result; it is not a Planner continuation. Runtime safety,
     confirmation, and authorization still decide whether an Activity may start.
     """
 

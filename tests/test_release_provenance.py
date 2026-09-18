@@ -41,7 +41,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
         env = {
             "AGENT_LLM_PROVIDER": "sglang",
             "AGENT_MODEL": "chromie-qwen35-9b-sglang",
-            "AGENT_GOAL_INTERPRETER_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_USER_MEANING_INTERPRETER_MODEL": "chromie-qwen35-9b-sglang",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "chromie-qwen35-9b-sglang",
             "AGENT_GOAL_ASSOCIATION_MODEL": "chromie-qwen35-9b-sglang",
             "AGENT_FAST_PLANNER_MODEL": "chromie-qwen35-9b-sglang",

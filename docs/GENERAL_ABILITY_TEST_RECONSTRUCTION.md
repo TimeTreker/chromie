@@ -103,7 +103,7 @@ robot conversation is fixed.
 
 ### Layer 2 - File-Backed Behavior Scenarios
 
-Purpose: deterministic black-box or integrated checks for Goal Interpreter,
+Purpose: deterministic black-box or integrated checks for User Meaning Interpreter,
 InteractionRuntime, adapter, and multi-turn dialogue behavior.
 
 Evidence level: Level A.
@@ -156,7 +156,7 @@ succeeds.
 
 ### Layer 4 - Live Text Preview And Execution
 
-Purpose: feed natural text into the same Goal Interpretation and downstream Agent boundary used after
+Purpose: feed natural text into the same User Meaning Interpretation and downstream Agent boundary used after
 ASR, with live Soridormi status preflight and optional MuJoCo execution.
 
 Preview command:
@@ -279,7 +279,7 @@ Scope:
 - enforce per-case wall-clock timeouts;
 - write partial summaries when a case hangs or a service fails;
 - expand exception reporting for grouped async failures;
-- surface Goal Interpreter, Agent, review-model, and provider timeout causes separately.
+- surface User Meaning Interpreter, Agent, review-model, and provider timeout causes separately.
 
 Exit criteria:
 
@@ -292,7 +292,7 @@ Exit criteria:
 Scope:
 
 - attach a first-pass failure classification to retained summaries:
-  ASR/audio, Goal Interpretation/Responsibility, Goal Association, Planner contract,
+  ASR/audio, User Meaning Interpretation/Responsibility, Goal Association, Planner contract,
   Prompt wording, Orchestrator policy, Trusted Capability Runtime/provider, or Test evidence;
 - include Goal, Plan, response, speech, capability/skill, provider, and Evidence facts
   needed to inspect the classification;

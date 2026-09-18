@@ -25,7 +25,7 @@ User request
 ```
 
 Before canonical Goal identity exists, Fast Planner may author one prospective
-Communicative Activity grounded only in GI Responsibility evidence and its current
+Communicative Activity grounded only in UMI Responsibility evidence and its current
 truth stage. It must not claim Capability selection, execution, result Evidence, or
 Goal completion. The Host may transport only that exact validated Activity; it does
 not author a generic semantic acknowledgement. Every cognitive re-entry follows the
@@ -83,7 +83,7 @@ feature.
      projection. When provider arguments require semantic transformation of a human
      scope, declare `llm_hints.argument_realization` instead. Planner owns that HOW
      mapping after capability selection and records `semantic_realization` provenance;
-     GI/GA do not pre-shape Goal semantics to the provider schema.
+     UMI/GA do not pre-shape Goal semantics to the provider schema.
 
 3. **Set routing metadata.**
    - `effects` should describe what the capability does, for example
@@ -109,7 +109,7 @@ feature.
 
 5. **Expose the Capability to model-owned planning.**
    - Catalog projection may present the compact semantic description and schema
-     to fast Goal Interpretation and the canonical planners.
+     to fast User Meaning Interpretation and the canonical planners.
    - Goal Association owns what the user means; Fast or terminal Deep Planning
      owns exact Capability selection and complete Goal coverage.
    - Review/repair stages may reject malformed or out-of-envelope proposals, but
@@ -181,7 +181,7 @@ cannot access realtime data” when the catalog advertises a working tool. If th
 Capability is disabled or fails, return a structured grounded failure so the
 model-owned response boundary can report it honestly.
 
-Goal Interpretation has no speech contract. Any pre-Goal-binding progress speech is a
+User Meaning Interpretation has no speech contract. Any pre-Goal-binding progress speech is a
 Planner-owned Communicative Activity and must not claim a selected Capability, final
 result, permanent memory write, physical completion, or any truth stage that Runtime /
 Evidence has not established.

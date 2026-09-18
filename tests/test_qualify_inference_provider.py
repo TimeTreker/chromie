@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from scripts.qualify_inference_provider import (
-    DEFAULT_GOAL_INTERPRETER_MANIFEST,
+    DEFAULT_USER_MEANING_INTERPRETER_MANIFEST,
     QualificationFailure,
     StreamObservation,
     TtsInterruptionObservation,
@@ -19,17 +19,17 @@ from scripts.qualify_inference_provider import (
     _assert_complete_stream,
     _binding_value_matches,
     _chat_payload,
-    _evaluate_goal_interpreter_case,
-    _evaluate_goal_interpreter_case_dimensions,
+    _evaluate_user_meaning_interpreter_case,
+    _evaluate_user_meaning_interpreter_case_dimensions,
     _extract_stream_delta,
-    _load_goal_interpreter_manifest,
+    _load_user_meaning_interpreter_manifest,
     _candidate_compatible_schema,
     _model_artifact_arg,
     _provider_priority,
     _provider_priority_semantics,
     _priority_mapping,
     _qualify_foreground_under_deep_load,
-    _qualify_goal_interpreter,
+    _qualify_user_meaning_interpreter,
     _resolve_contention_model_topology,
     _sglang_native_control_url,
     _wire_coordination_satisfies,
@@ -155,9 +155,9 @@ class InferenceProviderQualificationTests(unittest.TestCase):
             model="gemma4:12b",
             model_revision="gemma-digest",
             model_artifact_json=gemma_artifact,
-            fast_gi_model=None,
-            fast_gi_model_revision=None,
-            fast_gi_model_artifact_json=None,
+            fast_umi_model=None,
+            fast_umi_model_revision=None,
+            fast_umi_model_artifact_json=None,
             fast_planner_model="qwen3.5:9b",
             fast_planner_model_revision="qwen-digest",
             fast_planner_model_artifact_json=qwen_artifact,
@@ -168,7 +168,7 @@ class InferenceProviderQualificationTests(unittest.TestCase):
 
         topology = _resolve_contention_model_topology(args)
 
-        self.assertEqual(topology["fast_gi"]["model"], "gemma4:12b")
+        self.assertEqual(topology["fast_umi"]["model"], "gemma4:12b")
         self.assertEqual(topology["fast_planner"]["model"], "qwen3.5:9b")
         self.assertEqual(topology["deliberative"]["model"], "gemma4:12b")
         self.assertEqual(topology["fast_planner"]["revision"], "qwen-digest")
@@ -183,9 +183,9 @@ class InferenceProviderQualificationTests(unittest.TestCase):
                 "weight_format": "gguf",
                 "quantization": "Q4_K_M",
             },
-            fast_gi_model=None,
-            fast_gi_model_revision=None,
-            fast_gi_model_artifact_json=None,
+            fast_umi_model=None,
+            fast_umi_model_revision=None,
+            fast_umi_model_artifact_json=None,
             fast_planner_model="qwen3.5:9b",
             fast_planner_model_revision=None,
             fast_planner_model_artifact_json=None,
@@ -311,11 +311,13 @@ class InferenceProviderQualificationTests(unittest.TestCase):
 
         self.assertFalse(_wire_coordination_satisfies(payload, "sequence", 2))
 
-    def test_primary_goal_interpreter_manifest_freezes_broader_contract(self) -> None:
-        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+    def test_primary_user_meaning_interpreter_manifest_freezes_broader_contract(self) -> None:
+        manifest = _load_user_meaning_interpreter_manifest(DEFAULT_USER_MEANING_INTERPRETER_MANIFEST)
         case_ids = {str(case["id"]) for case in manifest["cases"]}
         groups = {str(case["group"]) for case in manifest["cases"]}
 
+        # The frozen cohort keeps its historical evidence identity even though the
+        # live semantic owner has been renamed to UMI.
         self.assertEqual(manifest["qualification_id"], "chromie.goal_interpreter.primary.v2")
         self.assertEqual(len(manifest["cases"]), 24)
         self.assertGreaterEqual(len(groups), 6)
@@ -332,16 +334,16 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         self.assertEqual(len(manifest["manifest_sha256"]), 64)
 
     def test_current_oracle_preserves_units_and_source_provenance(self) -> None:
-        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        manifest = _load_user_meaning_interpreter_manifest(DEFAULT_USER_MEANING_INTERPRETER_MANIFEST)
         cases = {case["id"]: case for case in manifest["cases"]}
         case = cases["weather_explicit_threshold"]
         wire = copy.deepcopy(case["reference_wire_output"])
-        self.assertEqual(_evaluate_goal_interpreter_case(case, wire, wire), [])
+        self.assertEqual(_evaluate_user_meaning_interpreter_case(case, wire, wire), [])
         wire["responsibilities"][0]["outcome"] = case["text"].replace("30度", "30")
-        self.assertTrue(_evaluate_goal_interpreter_case_dimensions(case, wire, wire)["intent_details"])
+        self.assertTrue(_evaluate_user_meaning_interpreter_case_dimensions(case, wire, wire)["intent_details"])
         wire = copy.deepcopy(cases["filler_blink_twice"]["reference_wire_output"])
         wire["responsibilities"][0]["source_evidence"]["source_end_token_ref"] = "t999"
-        self.assertTrue(_evaluate_goal_interpreter_case_dimensions(
+        self.assertTrue(_evaluate_user_meaning_interpreter_case_dimensions(
             cases["filler_blink_twice"], wire, wire)["source_evidence"])
         self.assertFalse(cases["ambiguous_bare_referent"]["expected"]["unresolved"])
 
@@ -351,21 +353,21 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         self.assertFalse(_binding_value_matches("three", [3]))
 
     def test_case_evaluator_binds_modifiers_to_their_own_responsibility(self) -> None:
-        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        manifest = _load_user_meaning_interpreter_manifest(DEFAULT_USER_MEANING_INTERPRETER_MANIFEST)
         case = next(item for item in manifest["cases"] if item["id"] == "parallel_gaze_blink")
         wire = copy.deepcopy(case["reference_wire_output"])
-        self.assertEqual(_evaluate_goal_interpreter_case(case, wire, wire), [])
+        self.assertEqual(_evaluate_user_meaning_interpreter_case(case, wire, wire), [])
         wire["responsibilities"][0]["outcome"] = "看着我两秒，同时眨三下眼睛。"
-        dimensions = _evaluate_goal_interpreter_case_dimensions(case, wire, wire)
+        dimensions = _evaluate_user_meaning_interpreter_case_dimensions(case, wire, wire)
         self.assertTrue(dimensions["intent_details"])
         self.assertEqual(dimensions["intent_relations"], [])
 
     def test_compound_intent_accepts_grouping_without_losing_order_or_effects(self):
-        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        manifest = _load_user_meaning_interpreter_manifest(DEFAULT_USER_MEANING_INTERPRETER_MANIFEST)
         case = next(item for item in manifest["cases"] if item["id"] == "compound_numeric_sequence")
         wire = copy.deepcopy(case["reference_wire_output"])
-        self.assertEqual(_evaluate_goal_interpreter_case(case, wire, wire), [])
-        from agent.app.cognitive_core.goal_interpreter.model_interpreter import _source_tokens
+        self.assertEqual(_evaluate_user_meaning_interpreter_case(case, wire, wire), [])
+        from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
         units = ["walk ahead at 0.2 speed for 10 seconds", "then nod your head twice", "then turn left"]
         tokens = _source_tokens(case["text"])
         wire["responsibilities"] = []
@@ -377,14 +379,14 @@ class InferenceProviderQualificationTests(unittest.TestCase):
                 "output_mode": "body_action", "confidence": 1.0,
                 "source_evidence": {"source_start_token_ref": next(t["ref"] for t in tokens if t["start"] == start),
                     "source_end_token_ref": next(t["ref"] for t in tokens if t["end"] == cursor)}})
-        self.assertEqual(_evaluate_goal_interpreter_case(case, wire, wire), [])
+        self.assertEqual(_evaluate_user_meaning_interpreter_case(case, wire, wire), [])
         wire["responsibilities"].pop()
-        self.assertTrue(_evaluate_goal_interpreter_case(case, wire, wire))
+        self.assertTrue(_evaluate_user_meaning_interpreter_case(case, wire, wire))
 
 
-class GoalInterpreterCompletionIntegrityTests(unittest.IsolatedAsyncioTestCase):
+class UserMeaningInterpreterCompletionIntegrityTests(unittest.IsolatedAsyncioTestCase):
     async def test_retains_passing_content_and_rejects_truncated_valid_json(self) -> None:
-        manifest = _load_goal_interpreter_manifest(DEFAULT_GOAL_INTERPRETER_MANIFEST)
+        manifest = _load_user_meaning_interpreter_manifest(DEFAULT_USER_MEANING_INTERPRETER_MANIFEST)
         case = next(c for c in manifest["cases"] if c["id"] == "distance_and_direction_single_predicate")
         one_case = {**manifest, "cases": [case]}
         content = json.dumps(case["reference_wire_output"])
@@ -396,9 +398,9 @@ class GoalInterpreterCompletionIntegrityTests(unittest.IsolatedAsyncioTestCase):
                                      "message": {"content": content}}],
                     })
                 async with httpx.AsyncClient(transport=httpx.MockTransport(respond)) as client:
-                    with patch("scripts.qualify_inference_provider._load_goal_interpreter_manifest",
+                    with patch("scripts.qualify_inference_provider._load_user_meaning_interpreter_manifest",
                                return_value=one_case):
-                        result = await _qualify_goal_interpreter(
+                        result = await _qualify_user_meaning_interpreter(
                             client, "http://qualification.invalid/chat/completions",
                             provider="sglang", model="qwen3-test",
                         )
@@ -442,10 +444,10 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 return observation(
                     label=label, text="1 2 3", started_s=1.0, finished_s=3.0
                 )
-            if label == "foreground_fast_gi":
+            if label == "foreground_fast_umi":
                 return observation(
                     label=label,
-                    text="chromie-fast-gi-ready",
+                    text="chromie-fast-umi-ready",
                     started_s=1.2,
                     finished_s=1.4,
                 )
@@ -467,7 +469,7 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 object(),
                 "http://provider.invalid/v1/chat/completions",
                 provider="ollama",
-                fast_gi_model="gemma4:12b",
+                fast_umi_model="gemma4:12b",
                 fast_planner_model="qwen3.5:9b",
                 deliberative_model="gemma4:12b",
                 priority_step=100,
@@ -482,14 +484,14 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
             seen,
             {
                 "deliberative_load": "gemma4:12b",
-                "foreground_fast_gi": "gemma4:12b",
+                "foreground_fast_umi": "gemma4:12b",
                 "foreground_fast_planner": "qwen3.5:9b",
             },
         )
         self.assertEqual(
             result["model_routes"],
             {
-                "fast_gi": "gemma4:12b",
+                "fast_umi": "gemma4:12b",
                 "fast_planner": "qwen3.5:9b",
                 "deliberative": "gemma4:12b",
             },
@@ -542,9 +544,9 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 if delta_times is not None:
                     delta_times.append(resumed)
                 return stream_observation(label, "1 2 3", now, resumed + 0.01)
-            if label == "foreground_fast_gi":
+            if label == "foreground_fast_umi":
                 return stream_observation(
-                    label, "chromie-fast-gi-ready", now, now + 0.01
+                    label, "chromie-fast-umi-ready", now, now + 0.01
                 )
             if label == "foreground_fast_planner":
                 return stream_observation(
@@ -596,7 +598,7 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 object(),
                 "http://127.0.0.1:30000/v1/chat/completions",
                 provider="sglang",
-                fast_gi_model="chromie-qwen35-9b-sglang",
+                fast_umi_model="chromie-qwen35-9b-sglang",
                 fast_planner_model="chromie-qwen35-9b-sglang",
                 deliberative_model="chromie-qwen35-9b-sglang",
                 priority_step=100,
@@ -668,12 +670,12 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 result.finished_s = resumed + 0.02
                 result.last_delta_s = resumed + 0.01
                 return result
-            if label == "foreground_fast_gi":
-                return observation(label, "chromie-fast-gi-ready")
+            if label == "foreground_fast_umi":
+                return observation(label, "chromie-fast-umi-ready")
             if label == "foreground_fast_planner":
                 return observation(label, "chromie-presentation-commit-ready")
-            if label == "interruption_fast_gi":
-                return observation(label, "chromie-interrupt-fast-gi-ready")
+            if label == "interruption_fast_umi":
+                return observation(label, "chromie-interrupt-fast-umi-ready")
             if label == "interruption_fast_planner":
                 return observation(
                     label, "chromie-interrupt-presentation-commit-ready"
@@ -740,7 +742,7 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 object(),
                 "http://127.0.0.1:30000/v1/chat/completions",
                 provider="sglang",
-                fast_gi_model="chromie-qwen35-9b-sglang",
+                fast_umi_model="chromie-qwen35-9b-sglang",
                 fast_planner_model="chromie-qwen35-9b-sglang",
                 deliberative_model="chromie-qwen35-9b-sglang",
                 priority_step=100,
@@ -757,8 +759,8 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
         revocation = result["presentation_lease"]["revocation"]
         self.assertEqual(result["status"], "pass")
         self.assertEqual(result["tts"]["measurement_mode"], "presentation_lease_revocation")
-        self.assertTrue(revocation["deep_active_at_interrupt_gi_start"])
-        self.assertTrue(revocation["interrupt_gi_completed_before_deep"])
+        self.assertTrue(revocation["deep_active_at_interrupt_umi_start"])
+        self.assertTrue(revocation["interrupt_umi_completed_before_deep"])
         self.assertTrue(revocation["interrupt_planner_completed_before_deep"])
         self.assertTrue(revocation["tts_recovery_completed"])
         self.assertTrue(revocation["tts"]["cancelled_by_websocket_close"])
@@ -773,7 +775,7 @@ class InferenceProviderContentionRoutingTests(unittest.IsolatedAsyncioTestCase):
                 "deep_resumed_after_continue"
             ]
         )
-        self.assertIn("interruption_fast_gi_canary", result["requests"])
+        self.assertIn("interruption_fast_umi_canary", result["requests"])
         self.assertIn("interruption_fast_planner_canary", result["requests"])
         self.assertEqual(
             controls,

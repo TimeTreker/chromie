@@ -325,7 +325,7 @@ When cognitive evidence is enabled, the same Session owner also writes one
 JSON workflow fact layer and one human-readable Markdown flow when each SID
 becomes complete or abandoned. These reports retain monotonic start/finish
 timing plus the already-owned input DTO, output DTO, status, diagnostics, and
-attempt number for ASR, Gateway attention, Goal Interpretation, Goal
+attempt number for ASR, Gateway attention, User Meaning Interpretation, Goal
 Association and state commit, Fast/Deep Planning, canonical-plan validation or
 rejection, Planner response projection, runtime adaptation, fallback speech, and the
 Trusted Capability Runtime. The existing runtime event timeline adds TTS,

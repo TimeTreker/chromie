@@ -34,7 +34,7 @@ normal Core owners, with two distinct ingress shapes:
 ```text
 owner-approved MindProfile / persistent Self
         +
-person-authored input -> Cognitive Gateway -> Goal Interpretation
+person-authored input -> Cognitive Gateway -> User Meaning Interpretation
                        -> Responsibility / WHAT -> Goal/Planner cognition
 
 trusted world/social transition -> Situation revision
@@ -56,7 +56,7 @@ The profile may shape interpretation, planning, language style, and optional Soc
 Attention, but it never authorizes an effect or becomes a parallel semantic lifecycle.
 In particular:
 
-- Goal Interpretation owns provider-neutral Responsibility meaning only;
+- User Meaning Interpretation owns provider-neutral Responsibility meaning only;
 - Goal Association owns canonical Goal identity and continuity;
 - Fast and Deep are cognition depths/passes of the same Planner HOW authority;
 - SC owns ordinary Communicative Acts and their exact wording;
@@ -175,7 +175,7 @@ owners receive only the projections they need:
 
 - Cognitive Gateway context assembly carries source-attributed stable context without
   turning it into addressedness or semantic authorization;
-- Goal Interpretation may use identity/principle/session context while remaining WHAT-only;
+- User Meaning Interpretation may use identity/principle/session context while remaining WHAT-only;
 - Goal Association may use bounded context while remaining a continuity owner only;
 - Planner may use personality, principles, Situation, Goal, Work, Evidence, and capability
   context while remaining the single HOW/ordinary-communication owner; and
@@ -251,7 +251,7 @@ Focused checks:
 PYTHONPATH=. python -m pytest -q \
   tests/test_mind_profile.py \
   tests/test_cognitive_identity_context.py \
-  tests/test_goal_interpreter_llm_prompt.py \
+  tests/test_user_meaning_interpreter_llm_prompt.py \
   tests/test_planner_prompt_module.py \
   tests/test_social_attention_current.py
 ```

@@ -198,7 +198,7 @@
         "rationale": "Mixed outcomes retain per-step evidence.",
         "root_cause_boundaries": [
           "Test evidence",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]

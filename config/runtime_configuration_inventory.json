@@ -593,7 +593,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_DEBUG_PROMPT",
+      "key": "AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT",
       "owners": [
         "agent/app/settings.py"
       ]
@@ -601,7 +601,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_DEBUG_RAW",
+      "key": "AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW",
       "owners": [
         "agent/app/settings.py"
       ]
@@ -609,7 +609,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_LLM_KEEP_ALIVE",
+      "key": "AGENT_USER_MEANING_INTERPRETER_LLM_KEEP_ALIVE",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -619,7 +619,7 @@
     {
       "boolean": false,
       "category": "acceptance_override",
-      "key": "AGENT_GOAL_INTERPRETER_LLM_NUM_CTX",
+      "key": "AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -632,7 +632,7 @@
     {
       "boolean": false,
       "category": "acceptance_override",
-      "key": "AGENT_GOAL_INTERPRETER_LLM_NUM_PREDICT",
+      "key": "AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -645,7 +645,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_LOG_LEVEL",
+      "key": "AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL",
       "owners": [
         "agent/app/settings.py",
         "docker-compose.yml"
@@ -654,7 +654,7 @@
     {
       "boolean": false,
       "category": "profile_constant",
-      "key": "AGENT_GOAL_INTERPRETER_MODEL",
+      "key": "AGENT_USER_MEANING_INTERPRETER_MODEL",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -674,7 +674,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_OLLAMA_URL",
+      "key": "AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL",
       "owners": [
         "agent/app/settings.py",
         "docker-compose.yml"
@@ -683,7 +683,7 @@
     {
       "boolean": false,
       "category": "acceptance_override",
-      "key": "AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+      "key": "AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -698,7 +698,7 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_WARM_LLM_ON_STARTUP",
+      "key": "AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -708,7 +708,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_GOAL_INTERPRETER_WARM_LLM_TIMEOUT_MS",
+      "key": "AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -1273,7 +1273,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_PROMPT",
+      "key": "CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT",
       "owners": [
         "agent/app/settings.py",
         "docker-compose.yml"
@@ -1282,7 +1282,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "CHROMIE_AGENT_GOAL_INTERPRETER_DEBUG_RAW",
+      "key": "CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW",
       "owners": [
         "agent/app/settings.py",
         "docker-compose.yml"
@@ -2125,7 +2125,7 @@
     {
       "boolean": false,
       "category": "profile_constant",
-      "key": "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS",
+      "key": "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
       "owners": [
         ".env.common",
         "env/modes/qualification.env",

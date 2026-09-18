@@ -5,7 +5,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .goal import GoalRelationship
 from .interaction import reject_forbidden_low_level_fields
 from .semantic_artifact import (
     SemanticArtifactLineage,
@@ -21,7 +20,10 @@ _PLANNER_OWNED_BINDING_FIELDS = frozenset({
     "execution_method",
     "executable_args",
     "args",
+    "action",
     "actions",
+    "user_input",
+    "raw_input",
     "primary_activity",
     "activity_id",
     "work_item_id",
@@ -49,7 +51,7 @@ def _reject_planner_owned_bindings(value: Any, *, path: str = "bindings") -> Any
 
 
 class CoreInterpretationUnavailable(BaseModel):
-    """Typed non-semantic outcome when Goal Interpretation is unavailable."""
+    """Typed non-semantic outcome when User Meaning Interpretation is unavailable."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -76,21 +78,20 @@ class CoreInterpretationUnavailable(BaseModel):
 
 
 class ResponsibilitySourceEvidence(UserTurnSourceSpan):
-    """GI-owned semantic span into the authoritative admitted UserTurnEnvelope.
+    """UMI-owned semantic span into the authoritative admitted UserTurnEnvelope.
 
     The shared span contract keeps all later semantic owners on the same immutable
-    source coordinate system. Trusted code resolves refs; GI selects only WHAT.
+    source coordinate system. Trusted code resolves refs; UMI selects only WHAT.
     """
 
 
 class CognitiveResponsibilityProposal(BaseModel):
-    """Complete human intention and expected result type understood by GI.
+    """Complete human intention and expected result type understood by UMI.
 
-    Live GI supplies natural-language meaning and current-turn provenance only.
+    Live UMI supplies natural-language meaning and current-turn provenance only.
     Planner selects Capabilities, realizes parameters and decomposes Activities.
     GA alone selects canonical Goal relationships; SC owns communication wording.
-    Retained typed fields below describe existing persisted sources, not permission
-    for the live GI decoder to author parameter or continuity contracts.
+    The DTO deliberately contains no Goal identity/relationship or HOW fields.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -101,7 +102,7 @@ class CognitiveResponsibilityProposal(BaseModel):
         min_length=1,
         max_length=500,
         description=(
-            "Complete provider-neutral user intent, including every material detail, "
+            "Complete provider-neutral user meaning/outcome, including every material detail, "
             "condition and relation. A compound request may remain one outcome; "
             "Planner owns its Activity decomposition. Preserve the "
             "requested answer or judgment and proposition polarity: a question about "
@@ -141,7 +142,7 @@ class CognitiveResponsibilityProposal(BaseModel):
     ] = Field(
         default="unspecified",
         description=(
-            "Goal Interpretation's provider-neutral WHAT category for this one human "
+            "User Meaning Interpretation's provider-neutral WHAT category for this one human "
             "outcome. Goal Association preserves the accepted value and must not "
             "re-author it. information "
             "means the person wants Chromie to determine or provide information; "
@@ -155,17 +156,28 @@ class CognitiveResponsibilityProposal(BaseModel):
             "body_action because the human-level outcome is an embodied effect."
         ),
     )
-    relationship: GoalRelationship = "new"
-    target_goal_ids: list[str] = Field(default_factory=list, max_length=8)
+    continuity_scope: Literal["goal", "turn"] = Field(
+        default="goal",
+        description=(
+            "Whether this understood human outcome leaves unfinished cross-turn "
+            "responsibility after the current interaction. goal means Goal Association "
+            "must own canonical continuity, including an elliptical reply that answers, "
+            "confirms, corrects, rejects, or cancels pending Goal meaning. turn means "
+            "ordinary conversational meaning can be completed in this interaction and "
+            "leaves no unfinished user/world objective. This is a semantic property of "
+            "WHAT in context, never a keyword or hardware rule; GA still owns which "
+            "canonical Goal is created, continued, modified, or cancelled."
+        ),
+    )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     source_evidence: ResponsibilitySourceEvidence | None = Field(
         default=None,
         description=(
-            "Primary Goal-Interpretation evidence citing the exact inclusive token "
+            "Primary User-Meaning evidence citing the exact inclusive token "
             "span in the authoritative admitted turn that grounds this one "
-            "Responsibility. The live GI contract requires it; the optional model "
+            "Responsibility. The live UMI contract requires it; the optional model "
             "default preserves construction of bounded downstream/test projections "
-            "that do not themselves author GI meaning."
+            "that do not themselves author UMI meaning."
         ),
     )
 
@@ -181,15 +193,50 @@ class CognitiveResponsibilityProposal(BaseModel):
         _reject_planner_owned_bindings(value)
         return value
 
-    @field_validator("target_goal_ids", mode="before")
+    @model_validator(mode="after")
+    def validate_continuity_scope(self) -> "CognitiveResponsibilityProposal":
+        if self.continuity_scope == "turn" and self.output_mode != "speech":
+            raise ValueError(
+                "turn-local Responsibility must be ordinary conversational speech"
+            )
+        return self
+
+
+class UserMeaningUncertainty(BaseModel):
+    """One semantic uncertainty that remains after UMI used its bounded context.
+
+    This is not an instruction to ask the user. Goal Association may resolve an
+    uncertainty from canonical Goal continuity; only uncertainty that remains after
+    continuity resolution may become a Planner/SC clarification need.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    schema_version: Literal[1] = 1
+    local_ref: str = Field(min_length=1, max_length=80)
+    kind: Literal[
+        "referent",
+        "scope",
+        "relation",
+        "proposition",
+        "communicative_intent",
+        "other",
+    ] = "other"
+    description: str = Field(min_length=1, max_length=320)
+    responsibility_refs: list[str] = Field(min_length=1, max_length=8)
+
+    @field_validator("local_ref", "description", mode="before")
     @classmethod
-    def normalize_context_ids(cls, value: Any) -> list[str]:
-        if value is None:
-            return []
+    def normalize_uncertainty_text(cls, value: Any) -> str:
+        return normalize_turn_text(str(value or ""))
+
+    @field_validator("responsibility_refs", mode="before")
+    @classmethod
+    def normalize_responsibility_refs(cls, value: Any) -> list[str]:
         if isinstance(value, str):
             value = [value]
         if not isinstance(value, list):
-            raise ValueError("Goal identity fields must be arrays")
+            raise ValueError("responsibility_refs must be an array")
         return list(
             dict.fromkeys(
                 text
@@ -198,26 +245,16 @@ class CognitiveResponsibilityProposal(BaseModel):
             )
         )
 
-    @model_validator(mode="after")
-    def validate_goal_relationship(self) -> "CognitiveResponsibilityProposal":
-        if self.relationship == "new" and self.target_goal_ids:
-            raise ValueError("relationship=new must not target an existing Goal")
-        if self.relationship != "new" and not self.target_goal_ids:
-            raise ValueError(
-                f"relationship={self.relationship} requires target_goal_ids"
-            )
-        return self
-
-
 class CoreInterpretationResult(BaseModel):
-    """Goal Interpretation result in the current architecture.
+    """User Meaning Interpretation result in the current architecture.
 
-    Goal Interpretation answers WHAT the human means in the current bounded
-    Context, including whether the turn creates, continues, or modifies supplied
-    Goal meaning. Pending clarification is semantic context, but GI neither owns nor
-    resolves its Planner-created InformationGap. Fast/Deep depth may change how much
+    User Meaning Interpretation answers WHAT the human means in bounded conversational
+    and situational context. It may determine that a Responsibility needs continuity,
+    but it never chooses, creates, updates, cancels, or names a canonical Goal. Semantic
+    uncertainty is context evidence, not a request to clarify; GA may first resolve it
+    from Goal continuity and Planner/SC may clarify only what remains. Fast/Deep depth may change how much
     cognition is used, but not this authority boundary. There is
-    deliberately no compatibility RouteDecision projection and no GI-authored
+    deliberately no compatibility RouteDecision projection and no UMI-authored
     response/progress Activity, Capability choice, or Goal-state commit.
     """
 
@@ -226,7 +263,7 @@ class CoreInterpretationResult(BaseModel):
     schema_version: Literal[2] = 2
     turn_id: str = Field(min_length=1, max_length=160)
     session_id: str = Field(min_length=1, max_length=160)
-    authority: Literal["goal_interpretation"] = "goal_interpretation"
+    authority: Literal["user_meaning_interpretation"] = "user_meaning_interpretation"
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     language: str = Field(default="auto", min_length=1, max_length=64)
     responsibilities: list[CognitiveResponsibilityProposal] = Field(
@@ -238,33 +275,46 @@ class CoreInterpretationResult(BaseModel):
             "to collapse two effects into one item."
         ),
     )
-    unresolved: list[str] = Field(default_factory=list, max_length=12)
+    meaning_uncertainties: list[UserMeaningUncertainty] = Field(
+        default_factory=list, max_length=12,
+        description=(
+            "Semantic ambiguity that remains only after UMI has used the bounded "
+            "conversation, situation, activated-memory and continuity context available "
+            "to it. This is evidence for later continuity/clarification resolution, not "
+            "an instruction to ask the user."
+        ),
+    )
 
     @field_validator("turn_id", "session_id", "language", mode="before")
     @classmethod
     def normalize_text_fields(cls, value: str) -> str:
         return normalize_turn_text(str(value or ""))
 
-    @field_validator("unresolved", mode="before")
-    @classmethod
-    def normalize_unresolved(cls, value: Any) -> list[str]:
-        if value is None:
-            return []
-        if isinstance(value, str):
-            value = [value]
-        if not isinstance(value, list):
-            raise ValueError("unresolved must be an array")
-        return [
-            text
-            for item in value
-            if (text := normalize_turn_text(str(item or "")))
-        ]
-
     @model_validator(mode="after")
     def validate_responsibility_refs(self) -> "CoreInterpretationResult":
         refs = [item.local_ref for item in self.responsibilities]
         if len(refs) != len(set(refs)):
-            raise ValueError("Goal Interpretation responsibility local_ref values must be unique")
+            raise ValueError("User Meaning Interpretation responsibility local_ref values must be unique")
+        uncertainty_refs = [item.local_ref for item in self.meaning_uncertainties]
+        if len(uncertainty_refs) != len(set(uncertainty_refs)):
+            raise ValueError("User Meaning Interpretation uncertainty local_ref values must be unique")
+        known = set(refs)
+        scope_by_ref = {
+            item.local_ref: item.continuity_scope for item in self.responsibilities
+        }
+        for uncertainty in self.meaning_uncertainties:
+            unknown = set(uncertainty.responsibility_refs) - known
+            if unknown:
+                raise ValueError(
+                    "meaning uncertainty references unknown Responsibilities: "
+                    + ",".join(sorted(unknown))
+                )
+            scopes = {scope_by_ref[ref] for ref in uncertainty.responsibility_refs}
+            if len(scopes) != 1:
+                raise ValueError(
+                    "one meaning uncertainty cannot span turn-local and goal-scoped "
+                    "Responsibilities; UMI must keep those semantic uncertainties separate"
+                )
         return self
 
 
@@ -351,8 +401,8 @@ class CognitiveWorkRequest(BaseModel):
     """Typed WHAT→HOW handoff used by maintained cognitive work endpoints.
 
     This replaces RouteDecision-shaped requests in the Goal-driven runtime.  The
-    request carries Goal Interpretation responsibilities explicitly together with
-    Host-owned immutable source wording. GI never regenerates that source copy;
+    request carries User Meaning Interpretation responsibilities explicitly together with
+    Host-owned immutable source wording. UMI never regenerates that source copy;
     Planner realizes complete intent into arguments without adding omitted outcomes.
     Canonical
     Goal state and later Plan/Capability state remain in their own typed contracts.
@@ -367,7 +417,7 @@ class CognitiveWorkRequest(BaseModel):
     language: str | None = None
     responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)
     interpretation_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
-    interpretation_unresolved: list[str] = Field(default_factory=list, max_length=12)
+    meaning_uncertainties: list[UserMeaningUncertainty] = Field(default_factory=list, max_length=12)
     planner_reentry_scope: PlannerReentryScope | None = None
     context: dict[str, Any] = Field(default_factory=dict)
     history: list[dict[str, Any]] = Field(default_factory=list)
@@ -377,10 +427,13 @@ class CognitiveWorkRequest(BaseModel):
     def normalize_text(cls, value: str) -> str:
         return normalize_turn_text(str(value or ""))
 
-    @field_validator("interpretation_unresolved", mode="before")
-    @classmethod
-    def normalize_interpretation_unresolved(cls, value: Any) -> list[str]:
-        return CoreInterpretationResult.normalize_unresolved(value)
+    @property
+    def meaning_uncertainty_descriptions(self) -> list[str]:
+        return [item.description for item in self.meaning_uncertainties]
+
+    @property
+    def meaning_uncertainty_refs(self) -> set[str]:
+        return {item.local_ref for item in self.meaning_uncertainties}
 
     @property
     def semantic_artifact_lineage(self) -> SemanticArtifactLineage:
@@ -445,7 +498,7 @@ class CognitiveWorkRequest(BaseModel):
         if isinstance(raw_core, dict):
             core = CoreInterpretationResult.model_validate(raw_core)
             lineage.require(semantic_artifact_ref(
-                core, artifact_kind="goal_interpretation", artifact_id=core.turn_id,
+                core, artifact_kind="user_meaning_interpretation", artifact_id=core.turn_id,
             ))
             for item in core.responsibilities:
                 lineage.require(semantic_artifact_ref(

@@ -6,9 +6,9 @@ The [Charter's Social Cognition amendment](PROJECT_CHARTER.md#social-cognition--
 splits ordinary communication from Work planning inside the same Cognitive Core.
 Single semantic authority means one writer per semantic decision, not one model
 invocation for every responsibility in a turn. Social Cognition owns exact
-Communicative Activities; Planner owns Capability/Work decisions. GI and GA keep
+Communicative Activities; Planner owns Capability/Work decisions. UMI and GA keep
 WHAT and canonical continuity respectively. Neither downstream role reinterprets
-GI or reviews/repairs the other's output.
+UMI or reviews/repairs the other's output.
 
 The `context.semantic_authority` guard prevents a second Core or retired planner
 from acquiring the turn. Within that Core, `/social-cognition` owns interaction
@@ -52,7 +52,7 @@ Speech composition and user-task execution may be prepared or scheduled
 independently from immutable projections of that authoritative turn. Parallel
 output preparation does not create another semantic owner. SC owns each
 Communicative Activity's function, exact words, timing, truth stage, provenance,
-and constraints; Goal Interpretation owns none of those fields. Trusted Runtime
+and constraints; User Meaning Interpretation owns none of those fields. Trusted Runtime
 and Host bind terminal results to exact request/Goal provenance as Evidence, then
 reactivate Planner for Work and SC for communication with bounded current-state
 views. Result contents cannot bypass those authorities or infer their own Goal. Confirmation/cancellation mechanisms likewise own
@@ -88,7 +88,7 @@ capability name, is the decomposition boundary.
 
 ## Approved semantic boundary
 
-Goal Interpretation performs WHAT-only semantic interpretation. Its target model-facing
+User Meaning Interpretation performs WHAT-only semantic interpretation. Its target model-facing
 contract emits complete provider-neutral `responsibilities[]`, requested result
 types, source evidence and bounded unresolved meaning. It emits neither parameter
 bindings nor Goal relationships. It does not author Work, Primary
@@ -117,13 +117,13 @@ SC does not infer missing identity or audience. Ordinary turns and trusted Situa
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | Goal Interpretation → independent SC / Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
+| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | User Meaning Interpretation → independent SC / Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
 | Trusted Goal-free Situation | Goal-Driven Cognitive Core; SC owns communication | authoritative, communication-only | Situation → bounded Social Cognition invocation → exact Activity → existing delivery runtime; no synthetic Goal or Capability Work | Invalid provenance/identity/repair fails before Memory or delivery; unavailable cognition remains quiet. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
 | Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Work Planner, Social Cognition (including optional expression), Goal Association, Reflection, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 
-The first user-facing speech path belongs to SC. One accepted GI result can start
+The first user-facing speech path belongs to SC. One accepted UMI result can start
 SC, GA and Work planning independently. At that point SC may acknowledge understanding
 or remain silent; it cannot predict unfinished Work decisions. Canonical Goal binding
 does not itself require another utterance. Required answer/input/confirmation Needs
@@ -155,20 +155,20 @@ preserve every primary claim through deterministic preflight and comparison; it
 does not authorize Planner review or semantic rewriting. See the
 [turn-loop depth and repair contract](COGNITIVE_TURN_LOOP.md#30-fastdeep-escalation-is-cognition-depth-not-repair).
 
-GI's parser and projection have the following #40 classification. A deterministic
+UMI's parser and projection have the following #40 classification. A deterministic
 operation is permitted because it preserves an explicit contract, not merely
 because it uses no model. Primary and designated Deep use the same boundary.
 
 | Operation | Maintained rule and owner |
 | --- | --- |
-| JSON transport wrapper | GI parser accepts a complete object or one complete JSON fence. It rejects leading/trailing prose, duplicate keys and non-finite constants; it cannot select a convenient object or silently replace an earlier claim. |
-| Retired `binding_items`, `bindings`, `coordination`, relationship or capability fields | Reject live GI output. Preserve complete intent in `outcome`; GA owns continuity and Planner owns decomposition/parameters. Persisted older Goal constraints remain immutable for their versions. |
+| JSON transport wrapper | UMI parser accepts a complete object or one complete JSON fence. It rejects leading/trailing prose, duplicate keys and non-finite constants; it cannot select a convenient object or silently replace an earlier claim. |
+| Responsibility semantic bindings versus Goal/Work fields | Permit only sparse source/context-grounded semantic bindings that conserve WHAT (for example place, time, count, measurement, ordering). Reject Goal relationship/ID, Capability/provider, execution, raw-input, and Planner-realization fields. GA owns continuity; Planner owns HOW. |
 | Missing confidence or required Responsibility meaning | Reject; Host does not derive aggregate confidence from sibling scores or invent required output mode, outcome or local reference. |
-| Unresolved values | Preserve authored non-empty strings, including their order; a single string may be wrapped losslessly. Null, empty and non-string entries reject instead of disappearing or becoming text. |
+| Semantic uncertainty | UMI alone authors typed `UserMeaningUncertainty` objects with a local ref, kind, description and affected Responsibility refs after bounded context is exhausted. Missing execution/provider inputs are not semantic uncertainty. GA may resolve only exact refs through validated canonical continuity; only the remainder may reach clarification. |
 | Source evidence | Validate exact known token references, source order and non-overlap. This does not prove semantic completeness or permit Host resegmentation. |
 | IDs and text | Require authored local refs, result type, text and confidence; do not invent missing meaning. |
 | Planner argument and time citations | Check exact owning intent excerpts and DTO/argument consistency. Planner owns extraction and conversion; semantic correctness requires native qualification. |
-| Semantic reconsideration | No retry for invalid GI semantics. Only an accepted result with genuinely unresolved meaning permits its one designated source-based Deep invocation. |
+| Semantic reconsideration | No retry for invalid UMI semantics. Only an accepted result with genuinely unresolved meaning permits its one designated source-based Deep invocation. |
 
 These rules do not make all natural-language meaning mechanically provable. GA's
 separate lossless container repair and Planner's no-repair rules remain unchanged.

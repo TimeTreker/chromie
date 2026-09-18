@@ -76,14 +76,14 @@
       ]
     },
     {
-      "path": "agent/app/cognitive_core/goal_interpreter/engine.py",
-      "symbol": "initialize_goal_interpreter",
+      "path": "agent/app/cognitive_core/user_meaning_interpreter/engine.py",
+      "symbol": "initialize_user_meaning_interpreter",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "6f8f29e0fc9fa8ca00bef6ad81b6443abeb2c2b60e937138b9b0bb1f6210c413",
+      "body_sha256": "c287c46602659b97e3e641fe2444945d2ef9d994537fe60c175bba427906a5ba",
       "failure_signals": [
         "diagnostic"
       ]
@@ -91,12 +91,12 @@
     {
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Map bounded Deep Goal Interpretation transport, parse, schema, or authority failure to InterpretationUnavailableError; never accept the preliminary consequential user-gap decision.",
+      "contract": "Map bounded Deep User Meaning Interpretation transport, parse, schema, or authority failure to InterpretationUnavailableError; never accept the preliminary consequential user-gap decision.",
       "review_status": "reviewed",
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter._accept_or_deepen_interpretation",
+      "path": "agent/app/cognitive_core/user_meaning_interpreter/model_interpreter.py",
+      "symbol": "OllamaUserMeaningInterpreter._accept_or_deepen_interpretation",
       "ordinal": 1,
-      "body_sha256": "f893a3cc536ab61f957b020189a860c5d2adaec2be77b656e4bbc7ccdc9a5aa6",
+      "body_sha256": "48383426f28602f3ed562b02dd5edf520d7325858a5de56695c629861dc32ed3",
       "failure_signals": [
         "raise"
       ]
@@ -106,10 +106,10 @@
       "owner": "agent",
       "contract": "Map model transport/runtime failures to InterpretationUnavailableError; never continue with untrusted semantic output.",
       "review_status": "reviewed",
-      "path": "agent/app/cognitive_core/goal_interpreter/model_interpreter.py",
-      "symbol": "OllamaGoalInterpreter.interpret_goal",
+      "path": "agent/app/cognitive_core/user_meaning_interpreter/model_interpreter.py",
+      "symbol": "OllamaUserMeaningInterpreter.interpret_user_meaning",
       "ordinal": 1,
-      "body_sha256": "fc2c1188d8b6e45ac4d53fd59f1e2cdf765f0e88cd97091151dbe3c6bfde0056",
+      "body_sha256": "c1ba9c11c9c34d5dfb0c2a02f9c9bad5bbe0277b20e5b5160bc1fb094bdc3bc8",
       "failure_signals": [
         "raise"
       ]
@@ -807,7 +807,7 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "8511ee3efd25be51e384a702666d17c717ce7bd6e81a61c10bedb7e7da49e228",
+      "body_sha256": "f770895af89e3ce671540c2c28662b3d1dfaf3aecace4e0d42ce0afd16bc40b3",
       "failure_signals": [
         "diagnostic",
         "return",

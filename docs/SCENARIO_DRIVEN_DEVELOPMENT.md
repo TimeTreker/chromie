@@ -84,14 +84,14 @@ boundaries.
 
 Dependency-light tests of schemas, versions, lifecycle, validation, and replay.
 
-### 3.2 Goal Interpretation scenarios
+### 3.2 User Meaning Interpretation scenarios
 
 Model outputs are mocked or replayed to verify goal-preserving routing,
 coverage, escalation, and normalization.
 
 ### 3.3 Interaction scenarios
 
-A Goal Interpretation decision is passed through the Agent interaction runtime and checked
+A User Meaning Interpretation decision is passed through the Agent interaction runtime and checked
 for speech, plans, skills, confirmations, and metadata.
 
 ### 3.4 Dialogue scenarios
@@ -396,7 +396,7 @@ Contracts, mocked models, simulated providers, and local deterministic tests.
 
 ### Level B — Deployed live-text evidence
 
-Real Goal Interpretation and Agent models, real tool/provider interfaces, text input, and
+Real User Meaning Interpretation and Agent models, real tool/provider interfaces, text input, and
 retained traces.
 
 ### Level C — Simulator evidence

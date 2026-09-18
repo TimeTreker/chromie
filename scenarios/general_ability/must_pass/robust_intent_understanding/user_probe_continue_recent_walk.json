@@ -81,7 +81,7 @@
         "rationale": "An indirect continuation must bind to the one retained unfinished walking Goal rather than create a generic new task.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Test evidence"
         ]

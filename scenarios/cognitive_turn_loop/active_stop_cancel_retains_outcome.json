@@ -187,7 +187,7 @@
         "rationale": "Cancellation evidence remains correlated.",
         "root_cause_boundaries": [
           "Test evidence",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Orchestrator policy"
         ]
@@ -212,7 +212,7 @@
         "rationale": "A stop/cancel turn changes the active work truth without fabricating or erasing the underlying Goal history.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

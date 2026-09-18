@@ -114,15 +114,15 @@ STALE_PHRASES = {
     "robotidentity": "the current identity contract is ChromieIdentity",
     "retained capabilityagent planner": "CapabilityAgent is retired from the maintained semantic architecture",
     "emergency compatibility planner is retained": "there is no maintained emergency semantic planner",
-    "capability planner, conversation agent, or deepthinking agent": "Mind context must use the current GI/GA/Planner/Social Attention owners",
+    "capability planner, conversation agent, or deepthinking agent": "Mind context must use the current UMI/GA/Planner/Social Attention owners",
     "selected route/capability hints": "current cognition has no route/intent handoff",
     "may propose routes, speech, task metadata, or skill plans": "current model owners have separate typed authority boundaries",
     "direct no-planner `spoken_response` branch": "ordinary response meaning is Planner-owned",
     "contract-defined conservative fallback": "Host may fail closed but may not author an ordinary semantic fallback",
-    "schema-valid benign `chat`": "Goal Interpretation no longer has chat/tool/memory/robot route branches",
+    "schema-valid benign `chat`": "User Meaning Interpretation no longer has chat/tool/memory/robot route branches",
     "goal interpretation can hand complex requests to `deepthinking_agent`": "Fast/Deep are Planner cognition depths, not a downstream deepthinking agent",
     "`memory_agent` only validates and applies": "Memory has no maintained semantic agent or route",
-    "explicit `memory` routes now carry": "Memory is not a Goal Interpretation route",
+    "explicit `memory` routes now carry": "Memory is not a User Meaning Interpretation route",
     "deepthinking may use the full catalog": "Deep Planner owns full-catalog HOW reasoning",
     "deepthinking can replace an exact catalog-backed action proposal": "current downstream cognition must preserve Planner authority",
     "deterministic post-execution composer produces": "terminal Evidence must re-enter Planner rather than a status-to-sentence composer",
@@ -162,7 +162,7 @@ ARCHITECTURE_REQUIREMENT_REFERENCES = {
         ROOT / "docs" / "HUMAN_LIKE_INTERACTION_CONTRACT.md",
         ROOT / "docs" / "COGNITIVE_GATEWAY.md",
     ],
-    "GREETING-GOAL-001": [
+    "TURN-GOAL-BOUNDARY-001": [
         ROOT / "docs" / "HUMAN_LIKE_INTERACTION_CONTRACT.md",
         ROOT / "docs" / "COGNITIVE_TURN_LOOP.md",
     ],
@@ -553,15 +553,15 @@ def check_configuration_reference(errors: list[str]) -> None:
                 "from .env.common"
             )
     try:
-        goal_interpreter_service_ms = int(values["AGENT_GOAL_INTERPRETER_TIMEOUT_MS"])
-        goal_interpreter_host_ms = int(values["ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS"])
+        user_meaning_interpreter_service_ms = int(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"])
+        user_meaning_interpreter_host_ms = int(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"])
     except (KeyError, ValueError) as exc:
-        errors.append(f".env.common has invalid Goal Interpreter timeout configuration: {exc}")
+        errors.append(f".env.common has invalid User Meaning Interpreter timeout configuration: {exc}")
     else:
-        if goal_interpreter_host_ms <= goal_interpreter_service_ms:
+        if user_meaning_interpreter_host_ms <= user_meaning_interpreter_service_ms:
             errors.append(
-                "ORCH_AGENT_GOAL_INTERPRETER_TIMEOUT_MS must exceed "
-                "AGENT_GOAL_INTERPRETER_TIMEOUT_MS so Goal Interpretation can "
+                "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS must exceed "
+                "AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS so User Meaning Interpretation can "
                 "finish or report its own timeout first"
             )
 

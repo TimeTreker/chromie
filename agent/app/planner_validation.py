@@ -160,7 +160,7 @@ def _validate_communication_work_order(
     output: PlannerModelOutput, *, context: dict[str, Any] | None,
     responsibilities: list[Any] | None,
 ) -> None:
-    """Reject reversal/omission of supplied GI order at the exact GA identity join."""
+    """Reject reversal/omission of supplied UMI order at the exact GA identity join."""
     association = (context or {}).get("goal_association_resolution") or {}
     by_ref: dict[str, set[str]] = {}
     for goal in association.get("new_goals", []):
@@ -1731,7 +1731,7 @@ def validate_user_supplied_parameter_provenance(
     A Planner may map a Goal binding to a differently named Capability argument,
     but it cannot manufacture a material string/entity value and label it as user
     supplied. An exact literal in both the complete Goal and its source can also
-    establish provenance without a duplicate GI classification. Numeric provenance
+    establish provenance without a duplicate UMI classification. Numeric provenance
     retains its older dedicated validator because it
     also accounts for explicit numeric literals during the binding migration.
     """

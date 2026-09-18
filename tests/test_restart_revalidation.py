@@ -167,7 +167,7 @@ class RestartRevalidationTests(unittest.TestCase):
             }
             retained = manager._planner_reentry_responsibilities(
                 result_metadata={
-                    "goal_interpretation": {"responsibilities": [responsibility]}
+                    "user_meaning_interpretation": {"responsibilities": [responsibility]}
                 },
                 goal_id="goal-walk",
             )

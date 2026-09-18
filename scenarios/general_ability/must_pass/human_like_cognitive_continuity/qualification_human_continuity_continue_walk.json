@@ -102,7 +102,7 @@
         "rationale": "A follow-up continuation must bind to the retained walking Goal and perform exactly one new continuation effect rather than acknowledge or execute twice.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

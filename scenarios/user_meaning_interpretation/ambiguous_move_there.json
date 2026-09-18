@@ -1,0 +1,125 @@
+{
+  "schema_version": 1,
+  "id": "ambiguous_move_there",
+  "suite": "user_meaning_interpretation",
+  "level": "module",
+  "description": "Fast UMI preserves the requested movement, one Deep UMI pass confirms the unresolved referent, and Fast Planner alone decides whether to create a clarification gap.",
+  "tags": [
+    "clarify",
+    "motion-safety",
+    "ambiguous"
+  ],
+  "input": {
+    "text": "Can you move over there a little?"
+  },
+  "stub": {
+    "llm_script": [
+      {
+        "stage": "user_meaning_interpretation",
+        "decision": {
+          "confidence": 0.78,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "Can you move over there a little?",
+              "confidence": 0.78,
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t7"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": [
+            {
+              "local_ref": "u1",
+              "kind": "other",
+              "description": "The intended destination is not identified.",
+              "responsibility_refs": [
+                "r1"
+              ]
+            }
+          ]
+        }
+      },
+      {
+        "stage": "user_meaning_interpretation_deep",
+        "decision": {
+          "confidence": 0.78,
+          "responsibilities": [
+            {
+              "local_ref": "r1",
+              "outcome": "Can you move over there a little?",
+              "confidence": 0.78,
+              "output_mode": "body_action",
+              "source_evidence": {
+                "source_start_token_ref": "t0",
+                "source_end_token_ref": "t7"
+              },
+              "continuity_scope": "goal"
+            }
+          ],
+          "meaning_uncertainties": [
+            {
+              "local_ref": "u1",
+              "kind": "other",
+              "description": "The intended destination is not identified.",
+              "responsibility_refs": [
+                "r1"
+              ]
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "expect": {
+    "confidence": 0.78,
+    "llm_calls": 2,
+    "llm_stages": [
+      "user_meaning_interpretation",
+      "user_meaning_interpretation_deep"
+    ],
+    "unresolved": [
+      "The intended destination is not identified."
+    ],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "Can you move over there a little?",
+        "confidence": 0.78,
+        "output_mode": "body_action"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "UMI retains the unidentified destination only as unresolved meaning; it does not create a planning gap or choose to ask.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      },
+      {
+        "id": "planner_goal_semantic_quality",
+        "title": "Planner and Goal Semantic Quality",
+        "general_rule": "User Meaning Interpretation must preserve WHAT, Goal Association must preserve continuity only, and Planner must choose HOW from current context without inventing capabilities, collapsing independent outcomes, or converting evidence needs into user ambiguity.",
+        "rationale": "Real semantic ambiguity remains explicit and is not guessed into an executable destination.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner",
+          "Capability catalog",
+          "Evidence boundary"
+        ]
+      }
+    ]
+  }
+}

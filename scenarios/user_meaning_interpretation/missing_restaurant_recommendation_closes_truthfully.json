@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "id": "missing_restaurant_recommendation_closes_truthfully",
+  "suite": "user_meaning_interpretation",
+  "level": "integration",
+  "description": "UMI preserves the nearby restaurant-recommendation WHAT; sourcing the location, evidence, and capability availability remain Planner/runtime authority.",
+  "tags": [
+    "missing-ability",
+    "external-information",
+    "terminal-closure",
+    "primary-interpretation",
+    "recommendation",
+    "zh-CN"
+  ],
+  "input": {
+    "text": "不知道该去什么地方吃饭，附近有啥好吃的？",
+    "language": "zh-CN"
+  },
+  "stub": {
+    "llm_decision": {
+      "confidence": 0.93,
+      "responsibilities": [
+        {
+          "schema_version": 1,
+          "local_ref": "r1",
+          "outcome": "recommend good nearby places for the user to eat",
+          "bindings": {
+            "proximity": "nearby"
+          },
+          "confidence": 0.93,
+          "output_mode": "information",
+          "continuity_scope": "goal"
+        }
+      ],
+      "meaning_uncertainties": []
+    }
+  },
+  "expect": {
+    "confidence": 0.93,
+    "llm_calls": 1,
+    "llm_stages": [
+      "user_meaning_interpretation"
+    ],
+    "unresolved": [],
+    "responsibilities": [
+      {
+        "local_ref": "r1",
+        "outcome": "recommend good nearby places for the user to eat",
+        "confidence": 0.93,
+        "output_mode": "information"
+      }
+    ]
+  },
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "natural_uncertainty_handling",
+        "title": "Natural Uncertainty Handling",
+        "general_rule": "Ambiguous, underspecified, or perception-dependent requests should ask about the real uncertainty instead of leaking generic missing-skill or internal-policy speech.",
+        "rationale": "A nearby recommendation remains clear at UMI; sourcing a location and choosing whether to ask belong to Planner.",
+        "root_cause_boundaries": [
+          "ASR/audio",
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Orchestrator policy"
+        ]
+      },
+      {
+        "id": "tool_and_conversation_lane_discipline",
+        "title": "Tool And Conversation Lane Discipline",
+        "general_rule": "Conversation, memory, tool use, and body action should stay in the right lane, with validated arguments before any tool or skill claim.",
+        "rationale": "External recommendation meaning retains its evidence need while Planner owns location-input resolution.",
+        "root_cause_boundaries": [
+          "Cognitive Core/user meaning interpretation",
+          "Agent contract",
+          "Prompt wording",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

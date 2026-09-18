@@ -496,6 +496,79 @@ class ConversationStateManager:
     def _persist_task_contexts_if_enabled(self) -> None:
         self.persist_task_contexts()
 
+    def _recoverable_persistent_goal_context(
+        self,
+        item: dict[str, Any],
+        *,
+        now: float,
+        source: str,
+    ) -> dict[str, Any] | None:
+        """Rebase one unfinished durable Goal onto a fresh runtime context.
+
+        Conversation/session boundaries and process restart both preserve semantic
+        Goal identity while invalidating transient execution/confirmation bindings.
+        The Goal therefore returns as recoverable and must be revalidated before new
+        Work is committed. This is persistence mechanics, not a continuity decision;
+        GA still decides whether a new Responsibility belongs to this Goal.
+        """
+
+        if self._goal_responsibility_status(item) != "open":
+            return None
+        original_status = str(item.get("status") or "open")
+        context = copy.deepcopy(item)
+        context["conversation_id"] = self.conversation_id
+        context["status"] = "recoverable"
+        context["commitment_state"] = "evaluating"
+        context["plan_status"] = "revalidation_required"
+        context["task_relation"] = "continue_task"
+        context["updated_ms"] = now
+        metadata = context.get("metadata")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        previous_confirmation = (
+            copy.deepcopy(context.get("confirmation"))
+            if isinstance(context.get("confirmation"), dict)
+            else None
+        )
+        previous_remaining = self._string_list(
+            metadata.get("remaining_request_ids")
+        )
+        previous_request_statuses = metadata.get("request_statuses")
+        if not isinstance(previous_request_statuses, dict):
+            previous_request_statuses = {}
+        previous_confirmation_request_ids = self._string_list(
+            metadata.get("confirmation_request_ids")
+            or (previous_confirmation or {}).get("request_ids")
+        )
+        context["confirmation"] = None
+        recovery_metadata = {
+            "restored_original_status": original_status,
+            "restored_ms": now,
+            "runtime_revalidation_required": True,
+            "persistence_resume_source": source,
+            "recovery_previous_remaining_request_ids": previous_remaining,
+            "recovery_previous_request_statuses": dict(previous_request_statuses),
+            "recovery_previous_confirmation_request_ids": (
+                previous_confirmation_request_ids
+            ),
+            "remaining_request_ids": [],
+            "request_statuses": {},
+            "confirmation_pending": False,
+        }
+        if source == "task_store":
+            recovery_metadata["restored_from_task_store"] = True
+        elif source == "conversation_boundary":
+            recovery_metadata["carried_across_conversation"] = True
+        metadata = {**metadata, **recovery_metadata}
+        if previous_confirmation is not None:
+            metadata["recovery_previous_confirmation"] = previous_confirmation
+        for stale_key in ("confirmation_id", "confirmation_request_ids"):
+            metadata.pop(stale_key, None)
+        context["metadata"] = metadata
+        if not isinstance(context.get("related_sids"), list):
+            context["related_sids"] = []
+        return context
+
     def _restore_task_contexts(self) -> None:
         if self.max_pending_tasks <= 0:
             return
@@ -561,61 +634,11 @@ class ConversationStateManager:
         for item in raw_contexts[-self.max_pending_tasks :]:
             if not isinstance(item, dict):
                 continue
-            original_status = str(item.get("status") or "open")
-            if self._goal_responsibility_status(item) != "open":
-                continue
-            context = copy.deepcopy(item)
-            context["conversation_id"] = self.conversation_id
-            context["status"] = "recoverable"
-            context["commitment_state"] = "evaluating"
-            context["plan_status"] = "revalidation_required"
-            context["task_relation"] = "continue_task"
-            context["updated_ms"] = now
-            metadata = context.get("metadata")
-            if not isinstance(metadata, dict):
-                metadata = {}
-            previous_confirmation = (
-                copy.deepcopy(context.get("confirmation"))
-                if isinstance(context.get("confirmation"), dict)
-                else None
+            context = self._recoverable_persistent_goal_context(
+                item, now=now, source="task_store"
             )
-            previous_remaining = self._string_list(
-                metadata.get("remaining_request_ids")
-            )
-            previous_request_statuses = metadata.get("request_statuses")
-            if not isinstance(previous_request_statuses, dict):
-                previous_request_statuses = {}
-            previous_confirmation_request_ids = self._string_list(
-                metadata.get("confirmation_request_ids")
-                or (previous_confirmation or {}).get("request_ids")
-            )
-            context["confirmation"] = None
-            metadata = {
-                **metadata,
-                "restored_from_task_store": True,
-                "restored_original_status": original_status,
-                "restored_ms": now,
-                "runtime_revalidation_required": True,
-                "recovery_previous_remaining_request_ids": previous_remaining,
-                "recovery_previous_request_statuses": dict(previous_request_statuses),
-                "recovery_previous_confirmation_request_ids": (
-                    previous_confirmation_request_ids
-                ),
-                "remaining_request_ids": [],
-                "request_statuses": {},
-                "confirmation_pending": False,
-            }
-            if previous_confirmation is not None:
-                metadata["recovery_previous_confirmation"] = previous_confirmation
-            for stale_key in (
-                "confirmation_id",
-                "confirmation_request_ids",
-            ):
-                metadata.pop(stale_key, None)
-            context["metadata"] = metadata
-            if not isinstance(context.get("related_sids"), list):
-                context["related_sids"] = []
-            restored.append(context)
+            if context is not None:
+                restored.append(context)
         if restored:
             self._task_contexts = deque(restored, maxlen=max(1, self.max_pending_tasks))
         if restored or restored_referents:
@@ -931,7 +954,14 @@ class ConversationStateManager:
         *,
         limit: int | None = None,
     ) -> list[dict[str, Any]]:
-        """Prefer active Goals, then fill the bounded association set with recent terminal Goals."""
+        """Return the bounded canonical-Goal candidate set GA may compare.
+
+        Restored unfinished task contexts are represented by ``active_goal_snapshots``
+        and therefore survive conversation/session boundaries when persistence policy
+        permits. Candidate retrieval only decides what GA may inspect: active/restored
+        persistent Goals are preferred, then recent terminal Goals fill the bounded set.
+        It never decides continuity identity or reopens terminal Goals.
+        """
 
         if limit is None:
             limit = self.max_pending_tasks
@@ -3102,6 +3132,11 @@ class ConversationStateManager:
             self._pending_tasks = deque(retained, maxlen=max(1, self.max_pending_tasks))
 
     def start_new_conversation(self, *, reason: str, sid: str | None = None) -> dict[str, Any]:
+        # A conversation boundary clears local discourse/session state, not unfinished
+        # persistent responsibility. Preserve durable canonical Goals and invalidate
+        # only their transient execution bindings; GA may associate future sessions
+        # with these recoverable candidates.
+        persistent_goals = self._durable_task_contexts()
         self._conversation_seq += 1
         self.conversation_id = f"{self.base_conversation_id}-{self._conversation_seq:04d}"
         self.started_ms = _now_ms()
@@ -3109,6 +3144,12 @@ class ConversationStateManager:
         self._turns.clear()
         self._pending_tasks.clear()
         self._task_contexts.clear()
+        for item in persistent_goals:
+            context = self._recoverable_persistent_goal_context(
+                item, now=self.started_ms, source="conversation_boundary"
+            )
+            if context is not None:
+                self._task_contexts.append(context)
         self._recent_tool_evidence.clear()
         self._discourse_referents.clear()
         self._discourse_focus.clear()
@@ -3730,7 +3771,8 @@ class ConversationStateManager:
                 "last_error": self._durable_memory.last_error,
             },
             "forgetting_policy": {
-                "conversation_boundary_clears_history_and_tasks": True,
+                "conversation_boundary_clears_history_and_ephemeral_tasks": True,
+                "conversation_boundary_preserves_unfinished_persistent_goals": True,
                 "conversation_boundary_clears_durable_profile_memory": False,
                 "durable_profile_requires_explicit_forget_or_clear": True,
                 "hard_idle_timeout_sec": self.hard_idle_timeout_sec,
@@ -3754,6 +3796,7 @@ class ConversationStateManager:
             "task_contexts": list(self._task_contexts),
             "active_task_contexts": self._active_task_contexts(),
             "active_task_snapshots": self.active_task_snapshots(),
+            "goal_association_candidates": self.goal_association_candidate_snapshots(),
             "recent_goal_snapshots": self.recent_goal_snapshots(),
             "current_task_context": self._current_task_context(),
             "discourse_referents": self.discourse_referents(),
@@ -3891,7 +3934,7 @@ class ConversationStateManager:
                 semantic_operations,
                 sid=sid,
                 user_text=compact,
-                source=str(turn_metadata.get("source") or "goal_interpreter"),
+                source=str(turn_metadata.get("source") or "user_meaning_interpreter"),
             )
             turn_metadata["semantic_task_operation_results"] = operation_results
         existing = self._matching_user_turn(sid=sid, text=compact)
@@ -5469,7 +5512,7 @@ class ConversationStateManager:
         result_metadata: dict[str, Any] | None,
         goal_id: str,
     ) -> list[dict[str, Any]]:
-        """Retain exact GI provenance for later state-driven Planner re-entry.
+        """Retain exact UMI provenance for later state-driven Planner re-entry.
 
         This is not a second Responsibility authority. The canonical Goal remains
         the owed outcome; these immutable source records let a later trusted Runtime,
@@ -5480,7 +5523,7 @@ class ConversationStateManager:
 
         if not isinstance(result_metadata, dict):
             return []
-        interpretation = result_metadata.get("goal_interpretation")
+        interpretation = result_metadata.get("user_meaning_interpretation")
         if not isinstance(interpretation, dict):
             return []
         raw_responsibilities = interpretation.get("responsibilities")
@@ -5515,7 +5558,7 @@ class ConversationStateManager:
         """Bind Planner-authored time semantics to current Goal provenance.
 
         The canonical Plan carries only Planner-owned Goal/time semantics.  This
-        owner adds current Plan identity and original GI Responsibility refs at
+        owner adds current Plan identity and original UMI Responsibility refs at
         persistence time; it never derives time from Goal prose.
         """
 

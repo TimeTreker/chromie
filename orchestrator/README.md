@@ -25,7 +25,7 @@ Runtime retains validated pre-GA preparation, admits only contract-declared safe
 ## Service boundaries
 
 - ASR converts complete PCM utterances to final text.
-- Goal Interpretation produces typed WHAT-only goal interpretation decisions and Responsibility candidates.
+- User Meaning Interpretation produces typed WHAT-only goal interpretation decisions and Responsibility candidates.
 - Agent exposes schema-constrained Goal Association, Fast/Deep Planning, and
   Activity-attached Social-Attention proposals. Planner owns exact Communicative
   Activity wording; terminal Evidence reactivates Fast Planner.
@@ -54,7 +54,7 @@ execution coordination, and outcome reconciliation.
 The frozen version 1 `UserTurnEnvelope`, shared deterministic reflex contract,
 host admission adapter, source/freshness context references, and local
 stop/suppression paths are implemented. The host begins stop/cancel handling
-before Goal Interpretation model inference, records the requested and effective
+before User Meaning Interpretation model inference, records the requested and effective
 cancellation scopes, and projects only admitted envelopes into the Core.
 Output, embodied-motion, foreground-interaction, and global-emergency reflex
 scopes are implemented. Exact named-Goal cancellation is also implemented in
@@ -65,9 +65,9 @@ A shared-owner pending request fails closed without changing its token, while a
 post-dispatch reconciliation failure is surfaced as an uncertain final state.
 Input Normalization, Protective Reflex, Context Assembly, focused Attention
 Review, and Turn Admission are physically distinct modules. Admission completes
-before ordinary Goal Interpretation. The Core endpoint accepts only an admitted
+before ordinary User Meaning Interpretation. The Core endpoint accepts only an admitted
 `CoreTurnRequest`; it returns a Core-owned `CoreInterpretationResult`, and Goal
-Association receives the typed `CognitiveWorkRequest` handoff. Goal Interpretation
+Association receives the typed `CognitiveWorkRequest` handoff. User Meaning Interpretation
 has no route/intent compatibility projection and does not select executable capabilities.
 
 ## Current interaction paths
@@ -80,8 +80,8 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> local suppression: record the envelope and start no ordinary cognition
   -> explicit text: transport-addressed admission -> admitted UserTurnEnvelope
   -> otherwise: attention review -> admitted UserTurnEnvelope
-  -> Goal Interpretation: complete intent + result type + source evidence + unresolved meaning
-  -> same GI result, concurrent fan-out
+  -> User Meaning Interpretation: complete intent + result type + source evidence + unresolved meaning
+  -> same UMI result, concurrent fan-out
        |-> SC: complete interaction + optional expression -> validated delivery
        |-> Fast Planner: input resolution + exact Capability Work + communication Needs
        |     `-> Deep Planner only when HOW exceeds the Fast budget
@@ -127,7 +127,7 @@ ORCH_COGNITIVE_RUNTIME_MODE=apply
 SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
 
-The maintained Host path uses the typed Goal Interpretation, Goal Association,
+The maintained Host path uses the typed User Meaning Interpretation, Goal Association,
 Fast/Deep Planner, and Trusted Capability Runtime contracts directly. A retired
 Agent interaction endpoint is not a semantic rollback surface.
 
@@ -143,7 +143,7 @@ confirmation regardless of the provider declaration.
 ### Maintained authority path
 
 ```text
-ASR -> Gateway -> GI -> independent SC / GA / Work Planner
+ASR -> Gateway -> UMI -> independent SC / GA / Work Planner
     -> validated communication / Goal commit / Work -> Runtime -> Evidence
     -> scoped Planner Work and independent SC interaction
 ```
@@ -160,7 +160,7 @@ semantic path.
 
 `orchestrator/runtime/planner_reentry.py` owns the pure mechanical policy used when
 terminal Runtime Evidence may reactivate Planner. It checks the exact current
-Goal/Plan/request binding, reuses only the originating GI Responsibility provenance,
+Goal/Plan/request binding, reuses only the originating UMI Responsibility provenance,
 constructs an immutable typed scope for the exact affected Goal/Evidence/Plan set,
 rejects repeated completed Work, and leaves validated SC speech intact. Related
 same-turn speech facts are read-only context and do not widen the re-entry scope.
@@ -259,9 +259,9 @@ This generates runtime configuration, activates the selected Conda environment,
 checks Python 3.11+ support, installs changed requirements, warms Ollama, avoids
 duplicate processes, and starts the module from the repository root.
 
-One complete GI result independently enables SC and GA/Work planning. SC may
+One complete UMI result independently enables SC and GA/Work planning. SC may
 acknowledge understanding while Work proceeds, and may also interact from trusted
-state without a new GI. Work results establish scoped answer/input/confirmation
+state without a new UMI. Work results establish scoped answer/input/confirmation
 needs; SC authors the corresponding acts. Host accepts only complete typed
 results, preserves explicit communication-to-Work order, and suppresses stale
 output. Raw tokens and partial JSON never reach playback or execution. Actual
@@ -393,7 +393,7 @@ truncation logs, while near-limit prompt/output budgets produce yellow pressure
 logs with tuning suggestions. The operator CLI colors warning lines yellow and
 error lines red when attached to a color-capable terminal. Set
 `ORCH_CLI_COLOR=1` to force Orchestrator session color or `ORCH_CLI_COLOR=0` to
-disable it. Agent and Goal Interpretation Ollama diagnostics also respect
+disable it. Agent and User Meaning Interpretation Ollama diagnostics also respect
 `CHROMIE_CLI_COLOR=1` for forced color, falling back to the same auto/NO_COLOR
 terminal behavior. Finished sessions also write `session_workflow` and
 `session_workflow_graph` events plus paired JSON/Markdown reports under
@@ -448,5 +448,5 @@ speech and require governance review before collection or sharing. See
 [Chromie Data Loop](../docs/SCENARIO_CANDIDATE_DATA_LOOP.md).
 
 The Orchestrator does not maintain a second static execution-ability registry.
-Goal Interpretation owns WHAT, Planner owns HOW, and executable availability comes
+User Meaning Interpretation owns WHAT, Planner owns HOW, and executable availability comes
 from the live canonical Capability Registry and trusted Runtime evidence.

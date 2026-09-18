@@ -190,9 +190,9 @@ def command_edit(args: argparse.Namespace) -> int:
 
 
 def _scenario_schema_summary(suite: str) -> str:
-    if suite == "goal_interpretation":
+    if suite == "user_meaning_interpretation":
         return (
-            "Goal Interpretation scenarios must set a WHAT-only stub.llm_decision "
+            "User Meaning Interpretation scenarios must set a WHAT-only stub.llm_decision "
             "with confidence, provider-neutral responsibilities, Goal relationships, "
             "InformationGaps, and unresolved meaning. Expectations cover those fields "
             "and llm_calls/llm_stages; route, Capability, Activity, and response wording "

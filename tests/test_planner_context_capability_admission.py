@@ -137,7 +137,7 @@ def test_fast_streaming_activity_budget_is_bounded_per_responsibility() -> None:
         ["r1"],
         responsibilities=responsibilities,
         capabilities=[],
-        interpretation_unresolved=[],
+        meaning_uncertainties=[],
     )
     assert one["properties"]["activities"]["maxItems"] == 5
 
@@ -151,7 +151,7 @@ def test_fast_streaming_activity_budget_is_bounded_per_responsibility() -> None:
         ["r1", "r2"],
         responsibilities=two_responsibilities,
         capabilities=[],
-        interpretation_unresolved=[],
+        meaning_uncertainties=[],
     )
     assert two["properties"]["activities"]["maxItems"] == 10
 

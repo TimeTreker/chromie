@@ -103,7 +103,7 @@ class CognitiveIntegrityEventTests(unittest.TestCase):
                 language="en",
                 responsibilities=[],
                 interpretation_confidence=0.0,
-                interpretation_unresolved=[],
+                meaning_uncertainties=[],
                 context={},
             )
             old = os.environ.get("CHROMIE_RUNTIME_EVENT_ROOT")

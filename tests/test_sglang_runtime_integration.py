@@ -5,7 +5,7 @@ import os
 import unittest
 from unittest.mock import AsyncMock, Mock, patch
 
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
+from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
 from agent.app.clients.model_client_factory import build_model_client
 from agent.app.clients.ollama_client import OllamaClient
 from agent.app.clients.sglang_client import SGLangClient, SGLangGenerationError
@@ -100,7 +100,7 @@ class SGLangProtocolTests(unittest.TestCase):
             "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
-            "GoalInterpretationModelOutput", "FastPlannerOutput", "OtherOutput",
+            "UserMeaningInterpretationModelOutput", "FastPlannerOutput", "OtherOutput",
         ):
             with self.subTest(title=title):
                 schema = {"title": title, "type": "object", "properties": {}}
@@ -406,11 +406,11 @@ class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(record["error"]["failure_class"], "output_truncated")
 
 
-class SGLangGoalInterpreterWarmTests(unittest.IsolatedAsyncioTestCase):
+class SGLangUserMeaningInterpreterWarmTests(unittest.IsolatedAsyncioTestCase):
     async def test_gi_primary_and_designated_deep_share_engine_and_interpretation_priority(self) -> None:
         import httpx
 
-        interpreter = OllamaGoalInterpreter(ollama_url="http://unused.invalid", model="qwen3.5-fast",
+        interpreter = OllamaUserMeaningInterpreter(ollama_url="http://unused.invalid", model="qwen3.5-fast",
             deep_model="gemma-deep", inference_provider="sglang", sglang_url="http://fast.invalid/v1",
             timeout_ms=1000)
         http_client = AsyncMock()
@@ -418,10 +418,10 @@ class SGLangGoalInterpreterWarmTests(unittest.IsolatedAsyncioTestCase):
         http_client.post.return_value = httpx.Response(200, json={"choices": [{
             "message": {"content": "{}"}, "finish_reason": "stop",
         }]}, request=httpx.Request("POST", "http://test.invalid"))
-        for stage, model, endpoint in (("goal_interpretation_fast", "qwen3.5-fast", "fast"),
-                                       ("goal_interpretation_deep", "gemma-deep", "fast")):
+        for stage, model, endpoint in (("user_meaning_interpretation_fast", "qwen3.5-fast", "fast"),
+                                       ("user_meaning_interpretation_deep", "gemma-deep", "fast")):
             with self.subTest(stage=stage), patch(
-                "agent.app.cognitive_core.goal_interpreter.model_interpreter.httpx.AsyncClient",
+                "agent.app.cognitive_core.user_meaning_interpreter.model_interpreter.httpx.AsyncClient",
                 return_value=http_client,
             ), patch.object(interpreter, "_validate_completion"):
                 await interpreter._chat({"model": model, "messages": [{"role": "user", "content": "source"}],
@@ -431,7 +431,7 @@ class SGLangGoalInterpreterWarmTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(http_client.post.call_args.kwargs["json"]["priority"], 400)
 
     async def test_warm_probe_reserves_terminal_completion_headroom(self) -> None:
-        interpreter = OllamaGoalInterpreter(
+        interpreter = OllamaUserMeaningInterpreter(
             ollama_url="http://ollama.invalid",
             model="chromie-qwen35-9b-sglang",
             inference_provider="sglang",

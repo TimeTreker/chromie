@@ -32,7 +32,9 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-DEFAULT_GOAL_INTERPRETER_MANIFEST = (
+# Frozen benchmark artifact names remain historical evidence IDs. Runtime authority is
+# UMI, but renaming retained qualification data would rewrite evidence lineage.
+DEFAULT_USER_MEANING_INTERPRETER_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "goal_interpreter_primary_v2.json"
 )
 
@@ -193,7 +195,7 @@ class Evidence:
         utilization_peak = max(
             (item.utilization_percent for item in self.gpu_samples), default=None
         )
-        includes_goal_interpreter = "goal_interpreter_semantics" in self.phases
+        includes_user_meaning_interpreter = "user_meaning_interpreter_semantics" in self.phases
         includes_provider_contract = self.qualification_mode == "provider_contract"
         contention_phase = self.phases.get("foreground_under_deliberative_load") or {}
         includes_tts = isinstance(contention_phase, dict) and contention_phase.get("tts") is not None
@@ -208,10 +210,10 @@ class Evidence:
                 contention_phase["presentation_lease"].get("revocation"), dict
             )
         )
-        if includes_goal_interpreter:
+        if includes_user_meaning_interpreter:
             claim_boundary = (
                 "Direct candidate-provider transport, provider-level contention, optional TTS "
-                "synthesis timing, and isolated current-checkout Goal Interpreter probe evidence "
+                "synthesis timing, and isolated current-checkout User Meaning Interpreter probe evidence "
                 "only; not an Agent workflow, audible playback, simulator, target, or physical "
                 "robot claim."
             )
@@ -250,8 +252,8 @@ class Evidence:
                 "not Agent semantic quality, voice/audio delivery, simulator, target, or physical "
                 "robot evidence."
             )
-        if includes_goal_interpreter:
-            evidence_class = "provider_contract_and_goal_interpreter_probe"
+        if includes_user_meaning_interpreter:
+            evidence_class = "provider_contract_and_user_meaning_interpreter_probe"
         elif includes_provider_contract:
             evidence_class = "provider_contract_only"
         else:
@@ -267,7 +269,7 @@ class Evidence:
                 "tts_contention": includes_tts,
                 "presentation_compute_lease": includes_presentation_lease,
                 "presentation_lease_revocation": includes_presentation_lease_revocation,
-                "goal_interpreter_semantics": includes_goal_interpreter,
+                "user_meaning_interpreter_semantics": includes_user_meaning_interpreter,
                 "audible_playback": False,
                 "agent_workflow": False,
             },
@@ -726,7 +728,7 @@ async def _interrupt_tts_at_first_audio(
     This models a user interruption after speech has actually become presentable.
     The provider contract already treats websocket disconnect as request cancellation;
     the observation retains close latency so lingering cancellation/drain work remains
-    visible in the subsequent foreground-GI timing.
+    visible in the subsequent foreground-UMI timing.
     """
 
     request_id = f"inference-qualification-{label}"
@@ -851,24 +853,24 @@ def _binding_value_matches(actual: Any, accepted_values: list[Any]) -> bool:
     )
 
 
-def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
+def _load_user_meaning_interpreter_manifest(path: Path) -> dict[str, Any]:
     resolved = path.expanduser().resolve()
     try:
         payload = json.loads(resolved.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise QualificationFailure(
-            f"could not load Goal Interpreter qualification manifest {resolved}: {exc}"
+            f"could not load User Meaning Interpreter qualification manifest {resolved}: {exc}"
         ) from exc
     if not isinstance(payload, dict):
-        raise QualificationFailure("Goal Interpreter qualification manifest is not an object")
+        raise QualificationFailure("User Meaning Interpreter qualification manifest is not an object")
     version = payload.get("schema_version")
     if version not in (1, 2):
         raise QualificationFailure(
-            "Goal Interpreter qualification manifest schema_version must be 1 or 2"
+            "User Meaning Interpreter qualification manifest schema_version must be 1 or 2"
         )
     qualification_id = payload.get("qualification_id")
     if not isinstance(qualification_id, str) or not qualification_id.strip():
-        raise QualificationFailure("Goal Interpreter qualification manifest lacks qualification_id")
+        raise QualificationFailure("User Meaning Interpreter qualification manifest lacks qualification_id")
     if version == 2:
         paths = payload.get("case_files")
         if (
@@ -876,13 +878,13 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
             or any(not isinstance(path, str) or not path for path in paths)
             or len(set(paths)) != len(paths)
         ):
-            raise QualificationFailure("Goal Interpreter case_files must be unique paths")
+            raise QualificationFailure("User Meaning Interpreter case_files must be unique paths")
         cases_from_files = []
         tree = hashlib.sha256()
         for name in sorted(paths):
             path = (ROOT / str(name)).resolve()
             if ROOT not in path.parents or not path.is_file():
-                raise QualificationFailure(f"Goal Interpreter case file is missing: {name}")
+                raise QualificationFailure(f"User Meaning Interpreter case file is missing: {name}")
             raw = path.read_bytes()
             tree.update(str(path.relative_to(ROOT)).encode() + b"\0" + raw + b"\0")
             cases_from_files.append(json.loads(raw))
@@ -891,42 +893,42 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
     cases = payload.get("cases")
     if not isinstance(cases, list) or len(cases) < 10:
         raise QualificationFailure(
-            "Goal Interpreter qualification manifest requires at least 10 cases"
+            "User Meaning Interpreter qualification manifest requires at least 10 cases"
         )
     seen_ids: set[str] = set()
     seen_groups: set[str] = set()
     for index, case in enumerate(cases):
         if not isinstance(case, dict):
-            raise QualificationFailure(f"Goal Interpreter case {index} is not an object")
+            raise QualificationFailure(f"User Meaning Interpreter case {index} is not an object")
         case_id = case.get("id")
         if not isinstance(case_id, str) or not case_id.strip():
-            raise QualificationFailure(f"Goal Interpreter case {index} lacks id")
+            raise QualificationFailure(f"User Meaning Interpreter case {index} lacks id")
         if case_id in seen_ids:
-            raise QualificationFailure(f"duplicate Goal Interpreter case id: {case_id}")
+            raise QualificationFailure(f"duplicate User Meaning Interpreter case id: {case_id}")
         seen_ids.add(case_id)
         group = case.get("group")
         if not isinstance(group, str) or not group.strip():
-            raise QualificationFailure(f"Goal Interpreter case {case_id} lacks group")
+            raise QualificationFailure(f"User Meaning Interpreter case {case_id} lacks group")
         seen_groups.add(group)
         if not isinstance(case.get("text"), str) or not str(case["text"]).strip():
-            raise QualificationFailure(f"Goal Interpreter case {case_id} lacks text")
+            raise QualificationFailure(f"User Meaning Interpreter case {case_id} lacks text")
         expected = case.get("expected")
         if not isinstance(expected, dict):
-            raise QualificationFailure(f"Goal Interpreter case {case_id} lacks expected")
+            raise QualificationFailure(f"User Meaning Interpreter case {case_id} lacks expected")
         responsibilities = expected.get("responsibilities")
         if not isinstance(responsibilities, list) or not responsibilities:
             raise QualificationFailure(
-                f"Goal Interpreter case {case_id} requires expected responsibilities"
+                f"User Meaning Interpreter case {case_id} requires expected responsibilities"
             )
         for responsibility_index, responsibility in enumerate(responsibilities):
             if not isinstance(responsibility, dict):
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} responsibility "
+                    f"User Meaning Interpreter case {case_id} responsibility "
                     f"{responsibility_index} is not an object"
                 )
             if not isinstance(responsibility.get("output_mode"), str):
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} responsibility "
+                    f"User Meaning Interpreter case {case_id} responsibility "
                     f"{responsibility_index} lacks output_mode"
                 )
             outcome_contains_any = responsibility.get("outcome_contains_any")
@@ -939,7 +941,7 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
                 )
             ):
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} responsibility "
+                    f"User Meaning Interpreter case {case_id} responsibility "
                     f"{responsibility_index} has invalid outcome_contains_any"
                 )
             required_bindings = responsibility.get("required_bindings", {})
@@ -947,7 +949,7 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
                 not isinstance(values, list) or not values for values in required_bindings.values()
             ):
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} responsibility "
+                    f"User Meaning Interpreter case {case_id} responsibility "
                     f"{responsibility_index} has invalid required_bindings"
                 )
             spans = responsibility.get("source_spans")
@@ -956,19 +958,19 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
                 or any(not isinstance(span, str) or not span or span not in case["text"]
                        for span in spans)
             ):
-                raise QualificationFailure(f"Goal Interpreter case {case_id} has invalid source spans")
+                raise QualificationFailure(f"User Meaning Interpreter case {case_id} has invalid source spans")
             forbidden = responsibility.get("forbidden_binding_keys", [])
             if not isinstance(forbidden, list) or any(
                 not isinstance(value, str) or not value for value in forbidden
             ):
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} responsibility "
+                    f"User Meaning Interpreter case {case_id} responsibility "
                     f"{responsibility_index} has invalid forbidden_binding_keys"
                 )
         coordination = expected.get("coordination")
         if not isinstance(coordination, list):
             raise QualificationFailure(
-                f"Goal Interpreter case {case_id} coordination must be an array"
+                f"User Meaning Interpreter case {case_id} coordination must be an array"
             )
         for relation in coordination:
             if not isinstance(relation, dict) or relation.get("kind") not in {
@@ -976,7 +978,7 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
                 "sequence",
             }:
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} has invalid coordination"
+                    f"User Meaning Interpreter case {case_id} has invalid coordination"
                 )
             indexes = relation.get("responsibility_indexes")
             if (
@@ -989,49 +991,49 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
                 )
             ):
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} has invalid coordination indexes"
+                    f"User Meaning Interpreter case {case_id} has invalid coordination indexes"
                 )
         if not isinstance(expected.get("unresolved"), bool):
             raise QualificationFailure(
-                f"Goal Interpreter case {case_id} unresolved must be boolean"
+                f"User Meaning Interpreter case {case_id} unresolved must be boolean"
             )
         source_scenario = case.get("source_scenario")
         if source_scenario is not None:
             scenario_path = (ROOT / str(source_scenario)).resolve()
             if ROOT not in scenario_path.parents or not scenario_path.is_file():
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} source_scenario is missing"
+                    f"User Meaning Interpreter case {case_id} source_scenario is missing"
                 )
             scenario = json.loads(scenario_path.read_text(encoding="utf-8"))
             if scenario.get("text") != case["text"]:
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} text differs from source_scenario"
+                    f"User Meaning Interpreter case {case_id} text differs from source_scenario"
                 )
             if scenario.get("language") not in (None, case.get("language")):
                 raise QualificationFailure(
-                    f"Goal Interpreter case {case_id} language differs from source_scenario"
+                    f"User Meaning Interpreter case {case_id} language differs from source_scenario"
                 )
     if len(seen_groups) < 5:
         raise QualificationFailure(
-            "Goal Interpreter qualification manifest requires at least 5 semantic groups"
+            "User Meaning Interpreter qualification manifest requires at least 5 semantic groups"
         )
     if version == 2:
         from jsonschema import Draft202012Validator
-        from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
-        from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
+        from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
+        from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
 
-        interpreter = OllamaGoalInterpreter(
+        interpreter = OllamaUserMeaningInterpreter(
             ollama_url="http://reference-validation.invalid", model="reference", timeout_ms=60000
         )
         for case in cases:
-            request = GoalInterpretationRequest(
+            request = UserMeaningInterpretationRequest(
                 text=case["text"], language=case["language"], context=case.get("context", {})
             )
             wire = case.get("reference_wire_output")
             schema = interpreter.build_interpretation_payload(request)["format"]
             Draft202012Validator(schema).validate(wire)
             decision = interpreter._validate_interpretation_content(request, json.dumps(wire))
-            errors = _evaluate_goal_interpreter_case(case, decision.model_dump(mode="json"), wire)
+            errors = _evaluate_user_meaning_interpreter_case(case, decision.model_dump(mode="json"), wire)
             if errors:
                 raise QualificationFailure(f"Reference {case['id']} fails its oracle: {errors}")
     payload["manifest_path"] = str(resolved.relative_to(ROOT))
@@ -1039,12 +1041,12 @@ def _load_goal_interpreter_manifest(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _evaluate_goal_interpreter_case(
+def _evaluate_user_meaning_interpreter_case(
     case: dict[str, Any],
     decision_payload: dict[str, Any],
     wire_payload: dict[str, Any],
 ) -> list[str]:
-    dimensions = _evaluate_goal_interpreter_case_dimensions(
+    dimensions = _evaluate_user_meaning_interpreter_case_dimensions(
         case,
         decision_payload,
         wire_payload,
@@ -1052,7 +1054,7 @@ def _evaluate_goal_interpreter_case(
     return [error for errors in dimensions.values() if errors is not None for error in errors]
 
 
-def _evaluate_goal_interpreter_case_dimensions(
+def _evaluate_user_meaning_interpreter_case_dimensions(
     case: dict[str, Any],
     decision_payload: dict[str, Any],
     wire_payload: dict[str, Any],
@@ -1130,7 +1132,7 @@ def _evaluate_goal_interpreter_case_dimensions(
                     f"one of {wanted['outcome_contains_any']!r}",
                 )
             if "source_spans" in wanted:
-                from agent.app.cognitive_core.goal_interpreter.model_interpreter import _source_tokens
+                from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
 
                 tokens = {token["ref"]: token for token in _source_tokens(case["text"])}
                 evidence = wire.get("source_evidence") or {}
@@ -1195,7 +1197,7 @@ def _evaluate_complete_intent(
     units may share that Responsibility; splitting must neither omit nor duplicate
     units. Manual review remains required for paraphrases and semantic correctness.
     """
-    from agent.app.cognitive_core.goal_interpreter.model_interpreter import _source_tokens
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
 
     errors: dict[str, list[str]] = {key: [] for key in (
         "decomposition", "outcome", "output_mode", "intent_details",
@@ -1229,7 +1231,7 @@ def _evaluate_complete_intent(
     previous_end = -1
     for item in wire.get("responsibilities", []):
         if set(item) - {"local_ref", "outcome", "output_mode", "confidence", "source_evidence"}:
-            errors["intent_details"].append("GI authored a downstream contract field")
+            errors["intent_details"].append("UMI authored a downstream contract field")
         evidence = item.get("source_evidence") or {}
         first = tokens.get(evidence.get("source_start_token_ref"))
         last = tokens.get(evidence.get("source_end_token_ref"))
@@ -1277,23 +1279,23 @@ def _wire_coordination_satisfies(
     )
 
 
-async def _qualify_goal_interpreter(
+async def _qualify_user_meaning_interpreter(
     client: httpx.AsyncClient,
     endpoint: str,
     *,
     provider: str,
     model: str,
     priority: int | None = None,
-    manifest_path: Path = DEFAULT_GOAL_INTERPRETER_MANIFEST,
+    manifest_path: Path = DEFAULT_USER_MEANING_INTERPRETER_MANIFEST,
 ) -> dict[str, Any]:
-    from agent.app.cognitive_core.goal_interpreter.model_interpreter import (
-        OllamaGoalInterpreter,
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import (
+        OllamaUserMeaningInterpreter,
     )
-    from agent.app.cognitive_core.goal_interpreter.schema import (
-        GoalInterpretationRequest,
+    from agent.app.cognitive_core.user_meaning_interpreter.schema import (
+        UserMeaningInterpretationRequest,
     )
 
-    interpreter = OllamaGoalInterpreter(
+    interpreter = OllamaUserMeaningInterpreter(
         ollama_url="http://provider-adapter-not-used.invalid",
         model=model,
         # This instance only builds and validates payloads; no Ollama request is
@@ -1303,11 +1305,11 @@ async def _qualify_goal_interpreter(
         num_ctx=16384,
         num_predict=512,
     )
-    manifest = _load_goal_interpreter_manifest(manifest_path)
+    manifest = _load_user_meaning_interpreter_manifest(manifest_path)
     cases = manifest["cases"]
     results: list[dict[str, Any]] = []
     for case in cases:
-        request = GoalInterpretationRequest(
+        request = UserMeaningInterpretationRequest(
             text=str(case["text"]),
             language=str(case["language"]),
             context=case.get("context", {}),
@@ -1325,7 +1327,7 @@ async def _qualify_goal_interpreter(
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "chromie_goal_interpretation",
+                    "name": "chromie_user_meaning_interpretation",
                     "strict": True,
                     "schema": provider_schema,
                 },
@@ -1363,15 +1365,15 @@ async def _qualify_goal_interpreter(
         }
         try:
             if choice.get("finish_reason") != "stop":
-                raise QualificationFailure("Goal Interpreter completion did not stop normally")
+                raise QualificationFailure("User Meaning Interpreter completion did not stop normally")
             wire_payload = json.loads(content)
             if not isinstance(wire_payload, dict):
-                raise QualificationFailure("Goal Interpreter wire output is not an object")
+                raise QualificationFailure("User Meaning Interpreter wire output is not an object")
             decision = interpreter._validate_interpretation_content(request, content)
             decision_payload = decision.model_dump(mode="json", exclude_none=True)
             if reasoning_seen:
                 raise QualificationFailure("reasoning channel exposed")
-            case_errors = _evaluate_goal_interpreter_case(
+            case_errors = _evaluate_user_meaning_interpreter_case(
                 case,
                 decision_payload,
                 wire_payload,
@@ -1396,7 +1398,7 @@ async def _qualify_goal_interpreter(
         "manifest_sha256": manifest["manifest_sha256"],
         "scenario_tree_sha256": manifest.get("scenario_tree_sha256"),
         "groups": sorted({str(case["group"]) for case in cases}),
-        "prompt_contract": "current_checkout_primary_goal_interpretation",
+        "prompt_contract": "current_checkout_primary_user_meaning_interpretation",
         "cases": results,
     }
 
@@ -1406,7 +1408,7 @@ async def _qualify_foreground_under_deep_load(
     endpoint: str,
     *,
     provider: str,
-    fast_gi_model: str,
+    fast_umi_model: str,
     fast_planner_model: str,
     deliberative_model: str,
     priority_step: int,
@@ -1496,8 +1498,8 @@ async def _qualify_foreground_under_deep_load(
             "deliberative request ended before producing a contention window"
         )
     await deep_started_waiter
-    deep_active_at_fast_gi_start = not deep_task.done()
-    if not deep_active_at_fast_gi_start:
+    deep_active_at_fast_umi_start = not deep_task.done()
+    if not deep_active_at_fast_umi_start:
         raise QualificationFailure(
             "deliberative request completed before foreground contention began"
         )
@@ -1510,23 +1512,23 @@ async def _qualify_foreground_under_deep_load(
         else None
     )
 
-    fast_gi = await _observe_stream(
+    fast_umi = await _observe_stream(
         client,
         endpoint,
         _chat_payload(
-            fast_gi_model,
-            "Reply with exactly: chromie-fast-gi-ready",
+            fast_umi_model,
+            "Reply with exactly: chromie-fast-umi-ready",
             provider=provider,
             stream=True,
             max_tokens=32,
             priority=interpretation_priority,
         ),
-        label="foreground_fast_gi",
+        label="foreground_fast_umi",
     )
-    _assert_complete_stream(fast_gi)
-    if fast_gi.text.strip() != "chromie-fast-gi-ready":
+    _assert_complete_stream(fast_umi)
+    if fast_umi.text.strip() != "chromie-fast-umi-ready":
         raise QualificationFailure(
-            f"foreground_fast_gi: unexpected output {fast_gi.text.strip()!r}"
+            f"foreground_fast_umi: unexpected output {fast_umi.text.strip()!r}"
         )
 
     deep_active_at_fast_planner_start = not deep_task.done()
@@ -1557,7 +1559,7 @@ async def _qualify_foreground_under_deep_load(
     presentation_lease: dict[str, Any] | None = None
     contention_tts: TtsObservation | None = None
     interrupted_tts: TtsInterruptionObservation | None = None
-    interruption_fast_gi: StreamObservation | None = None
+    interruption_fast_umi: StreamObservation | None = None
     interruption_fast_planner: StreamObservation | None = None
     post_interruption_tts_recovery: TtsObservation | None = None
     if presentation_lease_mode is not None:
@@ -1648,29 +1650,29 @@ async def _qualify_foreground_under_deep_load(
         if presentation_lease_revocation_probe:
             assert interrupted_tts is not None
             assert interrupted_tts.first_audio_s is not None
-            deep_active_at_interrupt_gi_start = not deep_task.done()
-            if not deep_active_at_interrupt_gi_start:
+            deep_active_at_interrupt_umi_start = not deep_task.done()
+            if not deep_active_at_interrupt_umi_start:
                 raise QualificationFailure(
-                    "deliberative request ended before interrupted foreground GI could run"
+                    "deliberative request ended before interrupted foreground UMI could run"
                 )
-            interruption_fast_gi = await _observe_stream(
+            interruption_fast_umi = await _observe_stream(
                 client,
                 endpoint,
                 _chat_payload(
-                    fast_gi_model,
-                    "Reply with exactly: chromie-interrupt-fast-gi-ready",
+                    fast_umi_model,
+                    "Reply with exactly: chromie-interrupt-fast-umi-ready",
                     provider=provider,
                     stream=True,
                     max_tokens=32,
                     priority=foreground_priority,
                 ),
-                label="interruption_fast_gi",
+                label="interruption_fast_umi",
             )
-            _assert_complete_stream(interruption_fast_gi)
-            if interruption_fast_gi.text.strip() != "chromie-interrupt-fast-gi-ready":
+            _assert_complete_stream(interruption_fast_umi)
+            if interruption_fast_umi.text.strip() != "chromie-interrupt-fast-umi-ready":
                 raise QualificationFailure(
-                    "interruption_fast_gi: unexpected output "
-                    f"{interruption_fast_gi.text.strip()!r}"
+                    "interruption_fast_umi: unexpected output "
+                    f"{interruption_fast_umi.text.strip()!r}"
                 )
 
             interruption_fast_planner = await _observe_stream(
@@ -1697,7 +1699,7 @@ async def _qualify_foreground_under_deep_load(
                 )
 
             # The first-audio interruption revokes the old speech lease so the
-            # new GI/Planner can run.  Once that new foreground transaction reaches
+            # new UMI/Planner can run.  Once that new foreground transaction reaches
             # its synthetic PresentationCommit, acquire a *new* presentation lease
             # before asking TTS to speak again.  Letting Deep run during the recovery
             # synthesis would recreate the cross-process GPU contention this lease is
@@ -1767,20 +1769,20 @@ async def _qualify_foreground_under_deep_load(
                 "roundtrip_protocol": 1,
                 "trigger": "tts_first_audio",
                 "tts": interrupted_tts.evidence(),
-                "deep_active_at_interrupt_gi_start": deep_active_at_interrupt_gi_start,
+                "deep_active_at_interrupt_umi_start": deep_active_at_interrupt_umi_start,
                 "continue_ack_from_interrupt_trigger_ms": (
                     continue_control["finished_s"] - interrupted_tts.first_audio_s
                 )
                 * 1000.0,
-                "interrupt_gi_start_from_interrupt_trigger_ms": (
-                    interruption_fast_gi.started_s - interrupted_tts.first_audio_s
+                "interrupt_umi_start_from_interrupt_trigger_ms": (
+                    interruption_fast_umi.started_s - interrupted_tts.first_audio_s
                 )
                 * 1000.0,
-                "interrupt_gi_first_delta_from_interrupt_trigger_ms": (
-                    interruption_fast_gi.first_delta_s - interrupted_tts.first_audio_s
+                "interrupt_umi_first_delta_from_interrupt_trigger_ms": (
+                    interruption_fast_umi.first_delta_s - interrupted_tts.first_audio_s
                 )
                 * 1000.0
-                if interruption_fast_gi.first_delta_s is not None
+                if interruption_fast_umi.first_delta_s is not None
                 else None,
                 "interrupt_planner_finished_from_interrupt_trigger_ms": (
                     interruption_fast_planner.finished_s - interrupted_tts.first_audio_s
@@ -1818,7 +1820,7 @@ async def _qualify_foreground_under_deep_load(
     foreground_completed_before_deep = fast_planner.finished_s < deep.finished_s
     if not foreground_completed_before_deep and require_foreground_before_deep:
         raise QualificationFailure(
-            "foreground Fast GI + Fast Planner did not complete while deliberation remained active"
+            "foreground Fast UMI + Fast Planner did not complete while deliberation remained active"
         )
 
     if presentation_lease is not None:
@@ -1841,23 +1843,23 @@ async def _qualify_foreground_under_deep_load(
         presentation_lease["deep_finished_after_continue"] = True
 
         if presentation_lease_revocation_probe:
-            assert interruption_fast_gi is not None
+            assert interruption_fast_umi is not None
             assert interruption_fast_planner is not None
-            assert interruption_fast_gi.finished_s is not None
+            assert interruption_fast_umi.finished_s is not None
             assert interruption_fast_planner.finished_s is not None
-            interrupt_gi_completed_before_deep = interruption_fast_gi.finished_s < deep.finished_s
+            interrupt_umi_completed_before_deep = interruption_fast_umi.finished_s < deep.finished_s
             interrupt_planner_completed_before_deep = (
                 interruption_fast_planner.finished_s < deep.finished_s
             )
-            if not interrupt_gi_completed_before_deep:
+            if not interrupt_umi_completed_before_deep:
                 raise QualificationFailure(
-                    "interrupted foreground GI did not complete while deliberation remained active"
+                    "interrupted foreground UMI did not complete while deliberation remained active"
                 )
             if not interrupt_planner_completed_before_deep:
                 raise QualificationFailure(
                     "interrupted foreground Planner did not complete while deliberation remained active"
                 )
-            presentation_lease["revocation"]["interrupt_gi_completed_before_deep"] = True
+            presentation_lease["revocation"]["interrupt_umi_completed_before_deep"] = True
             presentation_lease["revocation"][
                 "interrupt_planner_completed_before_deep"
             ] = True
@@ -1929,7 +1931,7 @@ async def _qualify_foreground_under_deep_load(
             else:
                 if contention_tts.finished_s is None or fast_planner.finished_s is None:
                     raise QualificationFailure("TTS/foreground contention timing missing")
-                foreground_window_start = fast_gi.started_s
+                foreground_window_start = fast_umi.started_s
                 foreground_window_finish = fast_planner.finished_s
                 overlap_proven = (
                     contention_tts.started_s < foreground_window_finish
@@ -1937,7 +1939,7 @@ async def _qualify_foreground_under_deep_load(
                 )
                 if not overlap_proven:
                     raise QualificationFailure(
-                        "TTS synthesis did not overlap the Fast-GI/Fast-Planner foreground window "
+                        "TTS synthesis did not overlap the Fast-UMI/Fast-Planner foreground window "
                         "while deliberation remained active"
                     )
                 tts_evidence = {
@@ -1952,7 +1954,7 @@ async def _qualify_foreground_under_deep_load(
                 }
 
     scheduling_pass = (
-        deep_active_at_fast_gi_start
+        deep_active_at_fast_umi_start
         and deep_active_at_fast_planner_start
         and foreground_completed_before_deep
     )
@@ -1970,11 +1972,11 @@ async def _qualify_foreground_under_deep_load(
         or (
             presentation_lease is not None
             and presentation_lease.get("revocation", {}).get(
-                "deep_active_at_interrupt_gi_start"
+                "deep_active_at_interrupt_umi_start"
             )
             is True
             and presentation_lease.get("revocation", {}).get(
-                "interrupt_gi_completed_before_deep"
+                "interrupt_umi_completed_before_deep"
             )
             is True
             and presentation_lease.get("revocation", {}).get(
@@ -1994,11 +1996,11 @@ async def _qualify_foreground_under_deep_load(
     )
     requests = {
         "deliberative": deep.evidence(),
-        "fast_gi_canary": fast_gi.evidence(),
+        "fast_umi_canary": fast_umi.evidence(),
         "fast_planner_canary": fast_planner.evidence(),
     }
-    if interruption_fast_gi is not None:
-        requests["interruption_fast_gi_canary"] = interruption_fast_gi.evidence()
+    if interruption_fast_umi is not None:
+        requests["interruption_fast_umi_canary"] = interruption_fast_umi.evidence()
     if interruption_fast_planner is not None:
         requests["interruption_fast_planner_canary"] = interruption_fast_planner.evidence()
 
@@ -2017,7 +2019,7 @@ async def _qualify_foreground_under_deep_load(
                 else ""
             )
             + (
-                " plus synthetic first-audio lease revocation and interrupted-GI evidence"
+                " plus synthetic first-audio lease revocation and interrupted-UMI evidence"
                 if presentation_lease_revocation_probe
                 else ""
             )
@@ -2028,11 +2030,11 @@ async def _qualify_foreground_under_deep_load(
         "qualification_only_priority_mapping": priorities,
         "priority_step": priority_step,
         "model_routes": {
-            "fast_gi": fast_gi_model,
+            "fast_umi": fast_umi_model,
             "fast_planner": fast_planner_model,
             "deliberative": deliberative_model,
         },
-        "deep_active_at_fast_gi_start": deep_active_at_fast_gi_start,
+        "deep_active_at_fast_umi_start": deep_active_at_fast_umi_start,
         "deep_active_at_fast_planner_start": deep_active_at_fast_planner_start,
         "foreground_completed_before_deep": foreground_completed_before_deep,
         "requests": requests,
@@ -2080,7 +2082,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 client,
                 endpoint,
                 _chat_payload(
-                    args.contention_model_topology["fast_gi"]["model"],
+                    args.contention_model_topology["fast_umi"]["model"],
                     "Reply with exactly: chromie-stream-ready",
                     provider=args.provider,
                     stream=True,
@@ -2102,7 +2104,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                     client,
                     endpoint,
                     provider=args.provider,
-                    fast_gi_model=args.contention_model_topology["fast_gi"]["model"],
+                    fast_umi_model=args.contention_model_topology["fast_umi"]["model"],
                     fast_planner_model=args.contention_model_topology["fast_planner"]["model"],
                     deliberative_model=args.contention_model_topology["deliberative"]["model"],
                     priority_step=args.priority_step,
@@ -2303,7 +2305,7 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                 client,
                 endpoint,
                 provider=args.provider,
-                fast_gi_model=args.contention_model_topology["fast_gi"]["model"],
+                fast_umi_model=args.contention_model_topology["fast_umi"]["model"],
                 fast_planner_model=args.contention_model_topology["fast_planner"]["model"],
                 deliberative_model=args.contention_model_topology["deliberative"]["model"],
                 priority_step=args.priority_step,
@@ -2317,8 +2319,8 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
             )
         )
 
-        if args.goal_interpreter_probe:
-            goal_interpreter = await _qualify_goal_interpreter(
+        if args.user_meaning_interpreter_probe:
+            user_meaning_interpreter = await _qualify_user_meaning_interpreter(
                 client,
                 endpoint,
                 provider=args.provider,
@@ -2328,13 +2330,13 @@ async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
                     CognitionComputeClass.INTERPRETATION,
                     step=args.priority_step,
                 ),
-                manifest_path=args.goal_interpreter_manifest,
+                manifest_path=args.user_meaning_interpreter_manifest,
             )
-            evidence.phases["goal_interpreter_semantics"] = goal_interpreter
-            if goal_interpreter["status"] != "pass":
+            evidence.phases["user_meaning_interpreter_semantics"] = user_meaning_interpreter
+            if user_meaning_interpreter["status"] != "pass":
                 raise QualificationFailure(
-                    "Goal Interpreter semantic probe failed: "
-                    f"{goal_interpreter['failed']}/{goal_interpreter['case_count']} cases"
+                    "User Meaning Interpreter semantic probe failed: "
+                    f"{user_meaning_interpreter['failed']}/{user_meaning_interpreter['case_count']} cases"
                 )
 
 
@@ -2380,7 +2382,7 @@ def _resolve_contention_model_topology(args: argparse.Namespace) -> dict[str, di
         "artifact": dict(args.model_artifact_json),
     }
     topology: dict[str, dict[str, Any]] = {}
-    for route in ("fast_gi", "fast_planner", "deliberative"):
+    for route in ("fast_umi", "fast_planner", "deliberative"):
         model = getattr(args, f"{route}_model", None)
         revision = getattr(args, f"{route}_model_revision", None)
         artifact = getattr(args, f"{route}_model_artifact_json", None)
@@ -2426,7 +2428,7 @@ def _parser() -> argparse.ArgumentParser:
         ),
     )
     for route, label in (
-        ("fast-gi", "Fast Goal Interpretation canary"),
+        ("fast-umi", "Fast User Meaning Interpretation canary"),
         ("fast-planner", "Fast Planner canary"),
         ("deliberative", "deliberative load"),
     ):
@@ -2492,7 +2494,7 @@ def _parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Qualification-only synthetic user interruption round-trip: cancel TTS at "
-            "first audio, resume SGLang for new foreground GI + Planner, reacquire the "
+            "first audio, resume SGLang for new foreground UMI + Planner, reacquire the "
             "presentation lease for recovery TTS, then resume Deep."
         ),
     )
@@ -2509,7 +2511,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--goal-interpreter-manifest",
         type=Path,
-        default=DEFAULT_GOAL_INTERPRETER_MANIFEST,
+        default=DEFAULT_USER_MEANING_INTERPRETER_MANIFEST,
     )
     return parser
 
@@ -2544,7 +2546,7 @@ def main(argv: list[str] | None = None) -> int:
             "--provider ollama requires --contention-only; Ollama is the deployed "
             "baseline control, not a candidate provider-contract qualification"
         )
-    if args.provider == "ollama" and args.goal_interpreter_probe:
+    if args.provider == "ollama" and args.user_meaning_interpreter_probe:
         raise SystemExit(
             "--goal-interpreter-probe is not part of the Ollama contention baseline; "
             "use existing deployed-model qualification for Ollama semantics"
@@ -2624,7 +2626,7 @@ def main(argv: list[str] | None = None) -> int:
                     "tts_first_audio" if args.presentation_lease_revocation_probe else None
                 ),
                 "revocation_roundtrip": (
-                    "resume_new_gi_planner_then_reacquire_for_tts"
+                    "resume_new_umi_planner_then_reacquire_for_tts"
                     if args.presentation_lease_revocation_probe
                     else None
                 ),

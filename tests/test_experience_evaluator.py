@@ -36,7 +36,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-1",
                     turn_index=1,
                     user_text="Walk forward for 15 seconds, quickly.",
-                    goal_interpretation={
+                    user_meaning_interpretation={
                         "confidence": 0.95,
                         "responsibilities": [
                             {
@@ -106,7 +106,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-1",
                     turn_index=1,
                     user_text="Hello.",
-                    goal_interpretation={
+                    user_meaning_interpretation={
                         "confidence": 0.95,
                         "responsibilities": [
                             {
@@ -155,7 +155,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-blink",
                     turn_index=1,
                     user_text="Please blink your eyes 5 times.",
-                    goal_interpretation={
+                    user_meaning_interpretation={
                         "confidence": 0.82,
                         "responsibilities": [
                             {
@@ -199,7 +199,7 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
                     sid="sid-blink",
                     turn_index=1,
                     user_text="Please blink your eyes 5 times.",
-                    goal_interpretation={
+                    user_meaning_interpretation={
                         "confidence": 0.82,
                         "responsibilities": [
                             {

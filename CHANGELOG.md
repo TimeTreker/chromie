@@ -8,7 +8,7 @@ remains available in Git history.
 ### P3 audit continuation
 
 - Removed the remaining Goal-Association execution projection: `information` and
-  `stateful_effect` now survive unchanged from Goal Interpretation into canonical Goals,
+  `stateful_effect` now survive unchanged from User Meaning Interpretation into canonical Goals,
   and Planner is the first owner allowed to decide Capability-backed HOW.
 - Re-grounded Planner capability filtering and direct-speech detection on canonical WHAT
   instead of deleted Goal execution metadata. Typed information-resource Goals cannot be
@@ -19,7 +19,7 @@ remains available in Git history.
   capability-state projection into the existing Planner re-entry policy module and
   collapsing restart revalidation helpers into the one orchestration path.
 
-- Bounded Fast Goal Interpretation to one mechanical DTO repair and one risk-tiered Deep handoff: benign low-confidence chat stays fast, consequential uncertainty escalates, and repeated malformed or contradictory output fails closed.
+- Bounded Fast User Meaning Interpretation to one mechanical DTO repair and one risk-tiered Deep handoff: benign low-confidence chat stays fast, consequential uncertainty escalates, and repeated malformed or contradictory output fails closed.
 - Collapsed physical-object and information fetch/delivery into one canonical
   `AcquireAndDeliverResource` semantic responsibility. `resource.kind` and
   `delivery_mode` now drive provider matching; legacy `responsibility_variant` is
@@ -30,7 +30,7 @@ remains available in Git history.
 
 ### Goal Progress Communication
 
-- Restored Goal Interpretation to WHAT-only authority. `CognitiveResponsibilityProposal`
+- Restored User Meaning Interpretation to WHAT-only authority. `CognitiveResponsibilityProposal`
   no longer carries work/fresh-evidence readiness flags and cannot emit the old
   `capability_work` planning category; information and durable state-change requests
   remain provider-neutral WHAT categories until Goal Association/Planner project them.
@@ -50,7 +50,7 @@ remains available in Git history.
   response transport remains outside task steps, while Interaction Context—not a
   blanket execute-speech ban—prevents duplicate acknowledgements.
 - Made the shared Interaction Ledger / still-needed-delta rule explicit across
-  Goal Interpretation, Goal Association, Fast and Deep Planning, Tool Result
+  User Meaning Interpretation, Goal Association, Fast and Deep Planning, Tool Result
   Interpretation, and Response Composition.
 - Kept the Interaction Ledger as the only cross-stage continuity authority for
   Goal progress speech. Later stages infer the still-needed communication delta from
@@ -76,12 +76,12 @@ remains available in Git history.
 - Updated generated-speech acceptance to recognize the current
   `cognitive_core_done` semantic receipt and deterministic
   `cognitive_gateway_reflex_applied` interrupt receipt while retaining the old
-  Goal Interpretation event only for compatibility evidence.
+  User Meaning Interpretation event only for compatibility evidence.
 - Made Goal Association resegment mechanical action-collection and location-
   provenance failures from the authoritative turn rather than anchoring repair
   on an invalid DTO, and clarified that stable knowledge and ordinary reasoning
   are spoken responsibilities unless fresh non-vocal evidence is required.
-- Replaced the repeated invalid Goal Interpreter retry with an error-directed
+- Replaced the repeated invalid User Meaning Interpreter retry with an error-directed
   typed-contract repair. If the repaired model response still adds durable-only
   fields to explicit session/ephemeral memory, a logged mechanical recovery may
   only remove authority; durable, profile, forget, and clear contradictions
@@ -210,7 +210,7 @@ remains available in Git history.
 
 ### Existing maintained foundations
 
-- Cognitive Gateway admission, immutable turn envelopes, Goal Interpretation,
+- Cognitive Gateway admission, immutable turn envelopes, User Meaning Interpretation,
   Goal Association, Fast/Deep planning, response composition, trusted capability
   execution, and outcome evidence remain the maintained control-plane path.
 - Deterministic stop, cancellation, confirmation revocation, playback ordering,

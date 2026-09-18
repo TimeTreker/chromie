@@ -848,7 +848,7 @@ async def dispatch_initial_reflex(
     reflex_evidence = {
         "captured_outcome": outcome.model_dump(mode="json"),
         "recorded_turn": recorded_turn,
-        "goal_interpretation_bypassed": not residual,
+        "user_meaning_interpretation_bypassed": not residual,
     }
     reflex_projection = outcome.model_dump(mode="json")
     response = InteractionResponse(
@@ -1167,17 +1167,17 @@ async def run_check(
             context_snapshot=context_snapshot,
         )
         interpretation_ms = (time.perf_counter() - interpretation_start) * 1000.0
-        timings_ms["goal_interpretation_ms"] = interpretation_ms
+        timings_ms["user_meaning_interpretation_ms"] = interpretation_ms
         _write_json(
             evidence_dir / "core_interpretation.json",
             core_interpretation.model_dump(mode="json"),
         )
         assistant.session_log(
             sid,
-            "text_check_goal_interpretation_done: responsibilities=%s confidence=%.2f unresolved=%s interpretation_ms=%.1f",
+            "text_check_user_meaning_interpretation_done: responsibilities=%s confidence=%.2f unresolved=%s interpretation_ms=%.1f",
             len(core_interpretation.responsibilities),
             core_interpretation.confidence,
-            len(core_interpretation.unresolved),
+            len(core_interpretation.meaning_uncertainties),
             interpretation_ms,
         )
 
@@ -1296,7 +1296,7 @@ async def run_check(
                 item.model_dump(mode="json")
                 for item in core_interpretation.responsibilities
             ],
-            "unresolved": list(core_interpretation.unresolved),
+            "unresolved": list(core_interpretation.meaning_uncertainties),
         }
         errors.extend(
             validate_contract(
@@ -1514,7 +1514,7 @@ async def run_check(
             },
             "debug_summary": debug_summary,
             "errors": errors,
-            "goal_interpretation": core_interpretation.model_dump(mode="json"),
+            "user_meaning_interpretation": core_interpretation.model_dump(mode="json"),
             "interaction_response": response.model_dump(mode="json"),
             "cognitive_runtime": cognitive_resolution_payload,
             "execution": execution_payload,

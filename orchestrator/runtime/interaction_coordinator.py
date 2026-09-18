@@ -545,7 +545,7 @@ class InteractionRuntimeCoordinator:
     ) -> ReadyFastPlannerCapabilityExecution | None:
         """Accept safe, side-effect-free Fast Activities without waiting for GA.
 
-        These requests initially retain GI Responsibility references.  Once GA
+        These requests initially retain UMI Responsibility references.  Once GA
         returns, :meth:`bind_fast_planner_capability_execution` reindexes every
         still-open task into the canonical per-Goal task lists and seeds terminal
         Evidence into the final canonical response so Work is never executed twice.

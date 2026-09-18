@@ -62,7 +62,7 @@
         "rationale": "Respond to the distress without validating the global claim, diagnosing the user, or inventing circumstances.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

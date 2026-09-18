@@ -6,7 +6,7 @@ from agent.app.inference_compute import (
     CognitionComputeClass,
     compute_class_for_purpose,
     compute_rank,
-    goal_interpreter_compute_class,
+    user_meaning_interpreter_compute_class,
 )
 
 
@@ -32,7 +32,7 @@ class InferenceComputePolicyTests(unittest.TestCase):
         ]
 
         self.assertEqual([compute_rank(item) for item in ordered], [5, 4, 3, 2, 1, 0])
-        roles = ["social_cognition", "goal_interpreter_fast", "goal_association", "fast_planner"]
+        roles = ["social_cognition", "user_meaning_interpreter_fast", "goal_association", "fast_planner"]
         ranks = [compute_rank(compute_class_for_purpose(role)) for role in roles]
         self.assertTrue(all(left > right for left, right in zip(ranks, ranks[1:])))
 
@@ -60,17 +60,17 @@ class InferenceComputePolicyTests(unittest.TestCase):
             CognitionComputeClass.INTERACTIVE,
         )
 
-    def test_goal_interpreter_priority_is_independent_of_model_depth(self) -> None:
+    def test_user_meaning_interpreter_priority_is_independent_of_model_depth(self) -> None:
         self.assertEqual(
-            goal_interpreter_compute_class("goal_interpretation_fast"),
+            user_meaning_interpreter_compute_class("user_meaning_interpretation_fast"),
             CognitionComputeClass.INTERPRETATION,
         )
         self.assertEqual(
-            goal_interpreter_compute_class("goal_interpretation_deep"),
+            user_meaning_interpreter_compute_class("user_meaning_interpretation_deep"),
             CognitionComputeClass.INTERPRETATION,
         )
         self.assertEqual(
-            goal_interpreter_compute_class("startup_warm"),
+            user_meaning_interpreter_compute_class("startup_warm"),
             CognitionComputeClass.BACKGROUND,
         )
 

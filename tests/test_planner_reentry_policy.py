@@ -51,7 +51,7 @@ def _response(*, include_interpretation: bool = True) -> InteractionResponse:
         },
     }
     if include_interpretation:
-        metadata["goal_interpretation"] = {
+        metadata["user_meaning_interpretation"] = {
             "responsibilities": [
                 {
                     "local_ref": "responsibility-a",
@@ -345,7 +345,7 @@ def test_planner_reentry_does_not_invent_missing_responsibility() -> None:
 
 def test_one_unbound_responsibility_does_not_cover_multiple_goals() -> None:
     response = _response()
-    response.metadata["goal_interpretation"] = {
+    response.metadata["user_meaning_interpretation"] = {
         "responsibilities": [
             {
                 "local_ref": "responsibility-a",

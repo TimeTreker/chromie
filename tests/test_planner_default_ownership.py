@@ -56,16 +56,16 @@ def test_required_input_is_never_removed_even_when_schema_has_a_default() -> Non
 
 
 def test_integrated_fast_validation_drops_exact_unbound_optional_default_after_grounding() -> None:
-    from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
-    from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
+    from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
     from agent.app.planner_fast_validation import validate_fast_advance_output
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
     from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
 
     text = "turn left"
-    decision = OllamaGoalInterpreter._validate_interpretation_content(
-        GoalInterpretationRequest(text=text),
-        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"unresolved":[]}',
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+        UserMeaningInterpretationRequest(text=text),
+        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","continuity_scope":"goal","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[]}',
     )
     request = CognitiveWorkRequest(
         sid="default-owner", text=text, responsibilities=decision.responsibilities,
@@ -115,8 +115,8 @@ def test_integrated_fast_validation_drops_exact_unbound_optional_default_after_g
 
 
 def test_integrated_fast_validation_keeps_nondefault_unbound_override_fail_closed() -> None:
-    from agent.app.cognitive_core.goal_interpreter.schema import GoalInterpretationRequest
-    from agent.app.cognitive_core.goal_interpreter.model_interpreter import OllamaGoalInterpreter
+    from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
     from agent.app.planner_fast_validation import (
         AuthoritativeGroundingValidationError,
         validate_fast_advance_output,
@@ -125,9 +125,9 @@ def test_integrated_fast_validation_keeps_nondefault_unbound_override_fail_close
     from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
 
     text = "turn left"
-    decision = OllamaGoalInterpreter._validate_interpretation_content(
-        GoalInterpretationRequest(text=text),
-        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"unresolved":[]}',
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+        UserMeaningInterpretationRequest(text=text),
+        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","continuity_scope":"goal","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[]}',
     )
     request = CognitiveWorkRequest(
         sid="default-owner-nondefault", text=text, responsibilities=decision.responsibilities,

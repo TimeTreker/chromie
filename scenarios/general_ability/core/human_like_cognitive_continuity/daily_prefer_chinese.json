@@ -62,7 +62,7 @@
         "rationale": "Recognize a language preference and distinguish acknowledging it from verified durable storage.",
         "root_cause_boundaries": [
           "Cognitive Gateway",
-          "Goal Interpretation/Goal Association",
+          "User Meaning Interpretation/Goal Association",
           "Planner",
           "Host interaction state",
           "Test evidence"

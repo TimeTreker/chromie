@@ -163,6 +163,16 @@ class GoalAssociationResolver:
     async def _resolve(self, request: CognitiveWorkRequest) -> GoalAssociationResolution:
         """Resolve one turn through the bounded Goal semantic transaction."""
 
+        turn_local_refs = [
+            item.local_ref
+            for item in request.responsibilities
+            if item.continuity_scope != "goal"
+        ]
+        if turn_local_refs:
+            raise ValueError(
+                "Goal Association accepts only goal-scoped Responsibilities; "
+                "turn-local refs belong to Social Cognition: " + ",".join(turn_local_refs)
+            )
         candidate_goals = self._candidate_goals(request)
         turn_id = self._turn_id(request)
         output_type: (
@@ -195,6 +205,9 @@ class GoalAssociationResolver:
                 }
                 for item in request.responsibilities
             },
+            meaning_uncertainty_refs=[
+                item.local_ref for item in request.meaning_uncertainties
+            ],
         )
         generation_options = {
             "temperature": 0,
@@ -459,7 +472,38 @@ class GoalAssociationResolver:
                 "target Goals: "
                 + ",".join(sorted(set(invalid_resolved_gaps)))
             )
-        # Preserve GI's human-level result type without letting GA re-author it.
+
+        uncertainty_by_ref = {
+            item.local_ref: item for item in request.meaning_uncertainties
+        }
+        resolved_uncertainty_owners: dict[str, str] = {}
+        for association in getattr(model_output, "associations", []):
+            responsibility_refs = set(association.source_responsibility_refs)
+            for uncertainty_ref in association.resolved_meaning_uncertainty_refs:
+                uncertainty = uncertainty_by_ref.get(uncertainty_ref)
+                if uncertainty is None:
+                    raise ValueError(
+                        "Goal Association resolved an unknown UMI uncertainty ref: "
+                        + uncertainty_ref
+                    )
+                affected = set(uncertainty.responsibility_refs)
+                if not affected.issubset(responsibility_refs):
+                    raise ValueError(
+                        "Goal Association may resolve a UMI uncertainty only inside "
+                        "the association that owns every affected Responsibility: "
+                        + uncertainty_ref
+                    )
+                previous = resolved_uncertainty_owners.get(uncertainty_ref)
+                if previous is not None:
+                    raise ValueError(
+                        "UMI uncertainty may be resolved by only one canonical Goal "
+                        f"association: {uncertainty_ref}:{previous}"
+                    )
+                resolved_uncertainty_owners[uncertainty_ref] = ",".join(
+                    association.target_goal_ids
+                )
+
+        # Preserve UMI's human-level result type without letting GA re-author it.
         by_ref = {item.local_ref: item for item in request.responsibilities}
         model_output = model_output.model_copy(update={"new_goals": [
             item.model_copy(update={"output_mode": (
@@ -482,7 +526,7 @@ class GoalAssociationResolver:
         )
         if output_mode_conflicts:
             raise ValueError(
-                "new Goal output_mode must preserve Goal Interpretation's "
+                "new Goal output_mode must preserve User Meaning Interpretation's "
                 "provider-neutral completion modality: "
                 + ", ".join(output_mode_conflicts)
             )
@@ -541,13 +585,17 @@ class GoalAssociationResolver:
 
     def _candidate_goals(self, request: CognitiveWorkRequest) -> list[dict[str, Any]]:
         context = request.context if isinstance(request.context, dict) else {}
-        active = context.get("active_goal_snapshots")
-        recent = context.get("recent_goal_snapshots")
-        if not isinstance(active, list):
-            active = []
-        if not isinstance(recent, list):
-            recent = []
-        raw = [*active, *recent]
+        explicit = context.get("goal_association_candidates")
+        if isinstance(explicit, list):
+            raw = explicit
+        else:
+            active = context.get("active_goal_snapshots")
+            recent = context.get("recent_goal_snapshots")
+            if not isinstance(active, list):
+                active = []
+            if not isinstance(recent, list):
+                recent = []
+            raw = [*active, *recent]
         out: list[dict[str, Any]] = []
         seen: set[str] = set()
         for index, item in enumerate(raw):
@@ -650,6 +698,9 @@ class GoalAssociationResolver:
                     reason_summary=item.reason_summary,
                     goal_update=goal_update,
                     resolved_gap_ids=item.resolved_gap_ids,
+                    resolved_meaning_uncertainty_refs=(
+                        item.resolved_meaning_uncertainty_refs
+                    ),
                 )
             )
 
@@ -964,7 +1015,7 @@ class GoalAssociationResolver:
                     metadata={
                         "model_boundary": type(model_output).__name__,
                         "requirement_sources": [
-                            {"origin": "gi", "turn_id": turn_id,
+                            {"origin": "umi", "turn_id": turn_id,
                              "responsibility": responsibility_by_ref[ref].model_dump(mode="json")}
                             for ref in item.source_responsibility_refs
                         ],
@@ -991,7 +1042,7 @@ class GoalAssociationResolver:
         ]
         if sorted(mapped_refs) != sorted(responsibility_refs):
             raise ValueError(
-                "Goal Association must map every GI Responsibility exactly once: "
+                "Goal Association must map every UMI Responsibility exactly once: "
                 f"expected={sorted(responsibility_refs)} actual={sorted(mapped_refs)}"
             )
         return GoalAssociationResolution(

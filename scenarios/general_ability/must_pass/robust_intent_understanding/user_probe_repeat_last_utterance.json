@@ -72,7 +72,7 @@
         "rationale": "Chromie must repeat or accurately summarize what she actually delivered, not invent an earlier sentence or expose internal planner text.",
         "root_cause_boundaries": [
           "ASR/audio",
-          "Cognitive Core/goal interpretation",
+          "Cognitive Core/user meaning interpretation",
           "Agent contract",
           "Test evidence"
         ]

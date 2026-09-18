@@ -1118,7 +1118,7 @@ class SoridormiCapabilityProvider:
             ),
         }
         for source_key, target_key in (
-            ("goal_interpretation_source", "goal_interpretation_source"),
+            ("user_meaning_interpretation_source", "user_meaning_interpretation_source"),
         ):
             value = request.metadata.get(source_key)
             if value is not None:

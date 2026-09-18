@@ -409,7 +409,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         summary = {
             "preview_only": False,
             "speaker": False,
-            "timings_ms": {"goal_interpretation_ms": 400.0},
+            "timings_ms": {"user_meaning_interpretation_ms": 400.0},
             "interaction_response": {"speech": [], "capabilities": []},
             "cognitive_runtime": {
                 "timings_ms": {"fast_planner_commit": 600.0},
@@ -438,7 +438,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "workflow_events": [
                     {"event": "session_start", "elapsed_ms": 0.0},
                     {
-                        "event": "text_check_goal_interpretation_done",
+                        "event": "text_check_user_meaning_interpretation_done",
                         "elapsed_ms": 500.0,
                     },
                     {"event": "tts_schedule", "elapsed_ms": 1102.0},
@@ -462,7 +462,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             2300.0,
         )
         self.assertEqual(
-            evidence["derived"]["goal_interpretation_plus_sc_duration_ms"],
+            evidence["derived"]["user_meaning_interpretation_plus_sc_duration_ms"],
             1000.0,
         )
         self.assertFalse(evidence["claim_limits"]["audible_speaker_proven"])
@@ -498,7 +498,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
     def test_fast_timing_evidence_keeps_absolute_and_duration_axes_separate(self) -> None:
         summary = {
             "speaker": False,
-            "timings_ms": {"goal_interpretation_ms": 826.2},
+            "timings_ms": {"user_meaning_interpretation_ms": 826.2},
             "session_state": {
                 "cognitive_workflow_stages": [
                     {
@@ -513,7 +513,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "workflow_events": [
                     {"event": "session_start", "elapsed_ms": 0.266},
                     {
-                        "event": "text_check_goal_interpretation_done",
+                        "event": "text_check_user_meaning_interpretation_done",
                         "elapsed_ms": 1299.678,
                     },
                     {"event": "tts_schedule", "elapsed_ms": 2366.437},
@@ -541,7 +541,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             2362.831,
         )
         self.assertEqual(
-            evidence["derived"]["goal_interpretation_plus_sc_duration_ms"],
+            evidence["derived"]["user_meaning_interpretation_plus_sc_duration_ms"],
             1888.418,
         )
         self.assertFalse(
@@ -945,7 +945,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                                             "title": "Intent",
                                             "general_rule": "Understand the selected test turns.",
                                             "rationale": "Understand this selected test turn.",
-                                            "root_cause_boundaries": ["goal_interpretation"],
+                                            "root_cause_boundaries": ["user_meaning_interpretation"],
                                         }
                                     ]
                                 },
