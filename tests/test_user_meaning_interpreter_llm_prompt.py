@@ -593,3 +593,14 @@ def test_user_meaning_interpreter_keeps_multi_action_physical_compounds_body_act
     assert "do not use other merely because the compound has" in prompt
     assert "several actions or Activities" in prompt
     assert "different observable result domains" in prompt
+
+def test_user_meaning_interpreter_scope_prompt_distinguishes_work_from_duration() -> None:
+    from pathlib import Path
+
+    prompt = (
+        Path("agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
+        .read_text(encoding="utf-8")
+    )
+    assert "goal does\nNOT mean long-term, cross-session" in prompt
+    assert "Every non-speech output_mode therefore\nuses goal" in prompt
+    assert "Use turn only for ordinary current-conversation\nspeech" in prompt

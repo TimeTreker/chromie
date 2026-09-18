@@ -63,12 +63,18 @@ as speech. do not use other merely because the compound has several actions or A
 result domain; split Responsibilities only when the person expresses different
 independently satisfiable outcomes, including different observable result domains.
 
-continuity_scope answers only: "does this Responsibility leave unfinished continuity
-after the current interaction?" Use goal when an outcome still needs work/evidence or
-when the expression confirms, corrects, rejects, cancels, resumes, refines or otherwise
-changes pending Goal meaning. Use turn only when ordinary conversation can be completed
-inside the current interaction and leaves no unfinished user/world objective. This is a
-meaning judgment, not a phrase table. GA still decides WHICH canonical Goal, if any.
+continuity_scope is about ownership after the UMI handoff, not elapsed time. goal does
+NOT mean long-term, cross-session, or "will need another user turn". Use goal whenever
+the requested result still needs Planner/evidence/effect work, even if Chromie can finish
+that work immediately before the next user turn. Every non-speech output_mode therefore
+uses goal: information needs a truth/evidence owner; body_action, media_playback,
+stateful_effect, styled/recited/sung/hummed/nonverbal vocal results need downstream work.
+Also use goal when the expression confirms, corrects, rejects, cancels, resumes, refines
+or otherwise changes pending Goal meaning. Use turn only for ordinary current-conversation
+speech whose completion is Social Cognition's reply itself and that leaves no separate
+user/world objective. speech may still be goal-scoped when it carries pending-Goal or
+other non-conversational continuity. This is an architectural meaning distinction, not a
+phrase table. GA still decides WHICH canonical Goal, if any.
 
 meaning_uncertainties contains only genuine semantic ambiguity remaining AFTER the
 bounded context above has been used. Each item has its own local_ref and names the

@@ -13,6 +13,43 @@ from .semantic_artifact import (
 from .user_turn import UserTurnEnvelope, UserTurnSourceSpan, normalize_turn_text
 
 
+_UMI_BINDING_PROVENANCE_KEYS = frozenset({
+    "source_evidence",
+    "source_ref",
+    "source_token_ref",
+    "source_start_token_ref",
+    "source_end_token_ref",
+    "confidence",
+})
+
+
+def responsibility_binding_material_value(value: Any) -> Any:
+    """Return the semantic value of one UMI binding.
+
+    UMI bindings own WHAT, not a second provenance envelope. Some model outputs
+    wrap a scalar as ``{"value": ..., "source_evidence": ...}`` even though the
+    Responsibility already carries authoritative source evidence. Treat only that
+    narrow evidence-only wrapper as representation noise. Structured semantic
+    values (for example a region object or a measured value with ``unit``) remain
+    intact.
+    """
+
+    if isinstance(value, dict) and "value" in value:
+        metadata_keys = set(value) - {"value"}
+        if metadata_keys.issubset(_UMI_BINDING_PROVENANCE_KEYS):
+            return value["value"]
+    return value
+
+
+def _normalize_umi_binding_values(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return value
+    return {
+        key: responsibility_binding_material_value(item)
+        for key, item in value.items()
+    }
+
+
 _PLANNER_OWNED_BINDING_FIELDS = frozenset({
     "capability_id",
     "tool_name",
@@ -159,14 +196,15 @@ class CognitiveResponsibilityProposal(BaseModel):
     continuity_scope: Literal["goal", "turn"] = Field(
         default="goal",
         description=(
-            "Whether this understood human outcome leaves unfinished cross-turn "
-            "responsibility after the current interaction. goal means Goal Association "
-            "must own canonical continuity, including an elliptical reply that answers, "
-            "confirms, corrects, rejects, or cancels pending Goal meaning. turn means "
-            "ordinary conversational meaning can be completed in this interaction and "
-            "leaves no unfinished user/world objective. This is a semantic property of "
-            "WHAT in context, never a keyword or hardware rule; GA still owns which "
-            "canonical Goal is created, continued, modified, or cancelled."
+            "Whether this understood human outcome needs canonical Goal/Planner continuity "
+            "after the UMI handoff. goal does not mean long-term or cross-session: it is "
+            "required whenever the requested result still needs information/evidence, "
+            "embodied/media/stateful work, or changes/answers pending Goal meaning, even "
+            "when that work can finish before the next user turn. turn is reserved for "
+            "ordinary current-conversation speech that Social Cognition can complete "
+            "directly and that leaves no separate user/world objective. This is a semantic "
+            "property of WHAT in context, never a keyword or hardware rule; GA still owns "
+            "which canonical Goal is created, continued, modified, or cancelled."
         ),
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -186,12 +224,17 @@ class CognitiveResponsibilityProposal(BaseModel):
     def normalize_responsibility_text(cls, value: str) -> str:
         return normalize_turn_text(str(value or ""))
 
-    @field_validator("bindings")
+    @field_validator("bindings", mode="before")
     @classmethod
-    def reject_low_level_bindings(cls, value: dict[str, Any]) -> dict[str, Any]:
-        reject_forbidden_low_level_fields(value)
-        _reject_planner_owned_bindings(value)
-        return value
+    def normalize_and_reject_low_level_bindings(
+        cls, value: Any,
+    ) -> dict[str, Any]:
+        normalized = _normalize_umi_binding_values(value)
+        if not isinstance(normalized, dict):
+            return normalized
+        reject_forbidden_low_level_fields(normalized)
+        _reject_planner_owned_bindings(normalized)
+        return normalized
 
     @model_validator(mode="after")
     def validate_continuity_scope(self) -> "CognitiveResponsibilityProposal":

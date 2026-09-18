@@ -1256,11 +1256,15 @@ for both depths without forcing response-only behavior: Planner may answer, auth
 genuinely new follow-up Work, clarify, wait, or remain silent. Neither depth may
 independently turn the same terminal Evidence back into a requirement to repeat the
 completed Work. Planner, not a deterministic or model-backed post-execution composer,
-owns the human-relevant answer/follow-up/silence decision and exact wording. It cannot
-treat the result as a new user turn, reassign it to another Goal, or add execution
-authority. The Fast or Deep primary result owns its exact Goal/Evidence interpretation
-and wording. No second model qualifies or repairs that semantic decision. The Host only
-validates provenance, structured claim boundaries, and delivery.
+owns the semantic next-Work / respond / clarify / limitation decision. Social Cognition
+owns exact human-facing wording. Planner cannot treat the result as a new user turn,
+reassign it to another Goal, or add execution authority. Fast post-execution Evidence
+re-entry uses a dedicated minimal model-facing decision DTO that is deliberately disjoint
+from both `CanonicalPlan` and the ordinary Planner model DTO; Host deterministically lifts
+that validated decision back into the canonical Planner contract before the normal trusted
+validators run. Historical Plan/Runtime envelopes are input provenance, never output
+examples. No second model qualifies or repairs the semantic decision. Host validates
+provenance and structured claim boundaries; SC owns delivery wording.
 
 The canonical Fast prompt preserves the request's response-language value for
 both single-Goal and multiple-Goal plans. Internal English Goal descriptions,

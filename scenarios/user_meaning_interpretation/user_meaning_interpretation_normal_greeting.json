@@ -22,7 +22,7 @@
           "bindings": {},
           "confidence": 0.82,
           "output_mode": "speech",
-          "continuity_scope": "goal"
+          "continuity_scope": "turn"
         }
       ],
       "meaning_uncertainties": []

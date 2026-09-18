@@ -50,7 +50,11 @@ def stable_referent_id(
 
 
 class GoalEntityBinding(BaseModel):
-    """One model-authored semantic parameter bound before planning begins."""
+    """One canonical semantic parameter retained before planning begins.
+
+    New-Goal values may be inherited mechanically from UMI; GA owns only the
+    Goal identity/continuity decision and need not re-author accepted WHAT.
+    """
 
     model_config = ConfigDict(extra="forbid")
 

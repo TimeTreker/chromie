@@ -37,6 +37,31 @@ def test_turn_local_scope_is_semantic_and_speech_only() -> None:
         )
 
 
+def test_umi_binding_evidence_wrapper_is_not_part_of_semantic_value() -> None:
+    item = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="Nod your head five times.",
+        output_mode="body_action",
+        continuity_scope="goal",
+        bindings={"count": {"value": 5, "source_evidence": "t3"}},
+        confidence=1.0,
+    )
+    assert item.bindings == {"count": 5}
+
+
+def test_umi_structured_semantic_binding_is_not_flattened() -> None:
+    structured = {"value": 5, "unit": "times", "source_evidence": "t3"}
+    item = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="Nod your head five times.",
+        output_mode="body_action",
+        continuity_scope="goal",
+        bindings={"count": structured},
+        confidence=1.0,
+    )
+    assert item.bindings["count"] == structured
+
+
 def test_live_user_meaning_interpreter_schema_requires_continuity_scope() -> None:
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(
         admitted_turn="Yeah."
@@ -44,6 +69,26 @@ def test_live_user_meaning_interpreter_schema_requires_continuity_scope() -> Non
     item = schema["$defs"]["CognitiveResponsibilityProposal"]
     assert "continuity_scope" in item["required"]
     assert set(item["properties"]["continuity_scope"]["enum"]) == {"goal", "turn"}
+    scope_help = item["properties"]["continuity_scope"]["description"]
+    mode_help = item["properties"]["output_mode"]["description"]
+    assert "not duration" in scope_help
+    assert "every non-speech" in scope_help
+    assert "requires continuity_scope=goal" in mode_help
+
+
+def test_weather_and_body_work_cannot_be_turn_local() -> None:
+    for output_mode, outcome in (
+        ("information", "Provide today's Chongqing weather."),
+        ("body_action", "Nod your head three times."),
+    ):
+        with pytest.raises(ValidationError, match="turn-local Responsibility"):
+            CognitiveResponsibilityProposal(
+                local_ref="r1",
+                outcome=outcome,
+                output_mode=output_mode,
+                continuity_scope="turn",
+                confidence=1.0,
+            )
 
 
 @pytest.mark.asyncio

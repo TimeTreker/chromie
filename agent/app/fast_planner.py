@@ -17,9 +17,11 @@ from .clients.ollama_client import (
 from .prompt_projection import RequiredPromptProjectionError, bounded_json
 from .planner_model_contract import (
     PlannerDTOContractError,
+    PlannerEvidenceReentryModelOutput,
     ResourceResponsibilityCapabilityUnavailableError,
     ResourceResponsibilityRequiresCompositionError,
     is_planner_step_capability,
+    materialize_evidence_reentry_model_output,
     materialize_planner_output,
     stable_plan_id,
 )
@@ -31,6 +33,7 @@ from .planner_schema import (
     canonical_goal_binding_argument_response_schema,
     canonical_resource_argument_response_schema,
     canonical_plan_response_schema,
+    fast_evidence_reentry_response_schema,
     fast_multi_goal_response_schema,
     fast_streaming_advance_response_schema,
 )
@@ -106,6 +109,8 @@ except ImportError:  # pragma: no cover
 
 from .planner_prompt import (
     fast_advance_layered_prompt,
+    fast_evidence_reentry_prompt,
+    fast_evidence_reentry_system_prompt,
     fast_streaming_advance_system_prompt,
     fast_layered_prompt,
     fast_system_prompt,
@@ -217,6 +222,14 @@ class FastPlannerResolver:
                     continue
                 Draft202012Validator(schema).validate(raw)
                 output = FastPlannerAdvanceModelOutput.model_validate(raw)
+                # Validate/ground every authored Activity before any representation
+                # deduplication. Validation also removes exact optional schema defaults
+                # that have no semantic owner. Two side-effect-free idempotent reads
+                # which differ only because one redundantly restated such a provider
+                # default are therefore identical *after* trusted grounding and may be
+                # collapsed without changing Planner meaning.
+                validate_fast_advance_output(output, request=current,
+                    responsibilities=responsibilities, capabilities=capabilities)
                 output, duplicate_read_repairs = collapse_redundant_idempotent_read_activities(
                     output, capabilities=capabilities
                 )
@@ -226,8 +239,6 @@ class FastPlannerResolver:
                         request.sid,
                         bounded_json(duplicate_read_repairs, 2400),
                     )
-                validate_fast_advance_output(output, request=current,
-                    responsibilities=responsibilities, capabilities=capabilities)
                 output = canonicalize_fast_argument_source_spans(
                     output, source=current.original_user_text
                 )
@@ -338,140 +349,189 @@ class FastPlannerResolver:
             retained_capability_ids=retained_capability_ids,
         )
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
-        contract_schema = (
-            "FastPlannerMultiGoalPlanOutput" if multi_goal_contract else "FastPlannerModelOutput"
+        evidence_reentry = bool(
+            request.planner_reentry_scope is not None
+            and request.planner_reentry_scope.trigger in {
+                "capability_result_reentry",
+                "post_execution",
+            }
+            and reentry_goal_ids
         )
-        response_schema = (
-            fast_multi_goal_response_schema(
+        if evidence_reentry:
+            contract_schema = "FastPlannerEvidenceReentryOutput"
+            response_schema = fast_evidence_reentry_response_schema(
                 expected_goal_ids=expected_goal_ids_for_turn,
-                allowed_capability_ids=[item["capability_id"] for item in capability_payload],
+                evidence_refs=list(request.planner_reentry_scope.evidence_refs),
+                allowed_capability_ids=[
+                    item["capability_id"] for item in capability_payload
+                ],
                 capability_input_schemas={
                     item["capability_id"]: item["input_schema"]
                     for item in capability_payload
                 },
-                auxiliary_social_capabilities=auxiliary_social_capabilities,
-                response_only=response_only,
-                requires_execution=requires_execution,
-                response_goal_ids=response_goal_ids,
-                nonfulfilling_response_goal_ids=sorted(reporting_goal_ids),
-                effectful_goal_ids=list(
-                    planner_effectful_goal_ids(authoritative_goals) - reporting_goal_ids
-                ),
-                confirmation_required_capability_ids=[
-                    item["capability_id"]
-                    for item in capability_payload
-                    if item.get("requires_confirmation")
-                ],
+                allow_new_work=requires_execution,
             )
-            if multi_goal_contract
-            else canonical_plan_response_schema(
-                planner_tier="fast",
-                expected_goal_ids=expected_goal_ids_for_turn,
-                allowed_capability_ids=[item["capability_id"] for item in capability_payload],
-                capability_input_schemas={
-                    item["capability_id"]: item["input_schema"]
-                    for item in capability_payload
-                },
-                auxiliary_social_capabilities=auxiliary_social_capabilities,
-                response_only=response_only,
-                requires_execution=requires_execution,
-                response_goal_ids=response_goal_ids,
-                nonfulfilling_response_goal_ids=sorted(reporting_goal_ids),
-                confirmation_required_capability_ids=[
-                    item["capability_id"]
-                    for item in capability_payload
-                    if item.get("requires_confirmation")
-                ],
+        else:
+            contract_schema = (
+                "FastPlannerMultiGoalPlanOutput"
+                if multi_goal_contract
+                else "FastPlannerModelOutput"
             )
-        )
-        response_schema = canonical_resource_argument_response_schema(
-            response_schema,
-            authoritative_goals=authoritative_goals,
-        )
-        response_schema = canonical_goal_binding_argument_response_schema(
-            response_schema,
-            authoritative_goals=authoritative_goals,
-            capabilities=capability_payload,
-        )
-        response_schema = work_change_response_schema(response_schema, context=context)
-        response_schema = scoped_reporting_response_schema(
-            response_schema, goal_ids=reporting_goal_ids,
-            expected_goal_ids=expected_goal_ids_for_turn,
-            future_goal_times=future_goal_times,
-        )
-        if reentry_goal_ids:
-            evidence_wording_description = (
-                "Exact natural answer grounded only in trusted terminal Evidence for "
-                "the requested Goal scope. Preserve epistemic strength: a probability "
-                "below 100% remains a possibility/probability, never certainty. Do not "
-                "add unsupported duration, severity, reassurance, advice, or measurements "
-                "from another current/day/period scope."
-            )
-            top_response = response_schema.get("properties", {}).get(
-                "response_text"
-            )
-            if isinstance(top_response, dict):
-                top_response["description"] = evidence_wording_description
-                top_response["maxLength"] = 240
-            for definition in response_schema.get("$defs", {}).values():
-                if not isinstance(definition, dict):
-                    continue
-                outcome_response = definition.get("properties", {}).get(
-                    "response_text"
+            response_schema = (
+                fast_multi_goal_response_schema(
+                    expected_goal_ids=expected_goal_ids_for_turn,
+                    allowed_capability_ids=[item["capability_id"] for item in capability_payload],
+                    capability_input_schemas={
+                        item["capability_id"]: item["input_schema"]
+                        for item in capability_payload
+                    },
+                    auxiliary_social_capabilities=auxiliary_social_capabilities,
+                    response_only=response_only,
+                    requires_execution=requires_execution,
+                    response_goal_ids=response_goal_ids,
+                    nonfulfilling_response_goal_ids=sorted(reporting_goal_ids),
+                    effectful_goal_ids=list(
+                        planner_effectful_goal_ids(authoritative_goals) - reporting_goal_ids
+                    ),
+                    confirmation_required_capability_ids=[
+                        item["capability_id"]
+                        for item in capability_payload
+                        if item.get("requires_confirmation")
+                    ],
                 )
-                if isinstance(outcome_response, dict):
-                    outcome_response["description"] = evidence_wording_description
-                    outcome_response["maxLength"] = 240
+                if multi_goal_contract
+                else canonical_plan_response_schema(
+                    planner_tier="fast",
+                    expected_goal_ids=expected_goal_ids_for_turn,
+                    allowed_capability_ids=[item["capability_id"] for item in capability_payload],
+                    capability_input_schemas={
+                        item["capability_id"]: item["input_schema"]
+                        for item in capability_payload
+                    },
+                    auxiliary_social_capabilities=auxiliary_social_capabilities,
+                    response_only=response_only,
+                    requires_execution=requires_execution,
+                    response_goal_ids=response_goal_ids,
+                    nonfulfilling_response_goal_ids=sorted(reporting_goal_ids),
+                    confirmation_required_capability_ids=[
+                        item["capability_id"]
+                        for item in capability_payload
+                        if item.get("requires_confirmation")
+                    ],
+                )
+            )
+            response_schema = canonical_resource_argument_response_schema(
+                response_schema,
+                authoritative_goals=authoritative_goals,
+            )
+            response_schema = canonical_goal_binding_argument_response_schema(
+                response_schema,
+                authoritative_goals=authoritative_goals,
+                capabilities=capability_payload,
+            )
+            response_schema = work_change_response_schema(
+                response_schema, context=context
+            )
+            response_schema = scoped_reporting_response_schema(
+                response_schema,
+                goal_ids=reporting_goal_ids,
+                expected_goal_ids=expected_goal_ids_for_turn,
+                future_goal_times=future_goal_times,
+            )
+            if not reporting_goal_ids and not request.planner_reentry_scope:
+                response_schema = planner_readiness_response_schema(
+                    response_schema,
+                    expected_goal_ids_for_turn,
+                    confirmation_required_capability_ids=[
+                        item["capability_id"]
+                        for item in capability_payload
+                        if item.get("requires_confirmation")
+                    ],
+                )
+            if not loaded_capability_ids:
+                response_schema = capability_lookup_response_schema(
+                    response_schema,
+                    [
+                        item
+                        for item in indexed_catalog
+                        if item.capability_id
+                        not in {known.capability_id for known in selected_catalog}
+                    ],
+                )
         options = {
             "temperature": 0,
             "top_p": 0.9,
             "num_ctx": self.num_ctx,
-            # Terminal-result plans are bounded state deltas, not full original
-            # plan replays.  Their smaller output reservation keeps the complete
-            # scoped prompt inside the configured context window without dropping
-            # provenance or silently reducing input context.
             "num_predict": (
-                min(self.num_predict, 2048)
-                if reentry_goal_ids
+                min(self.num_predict, 1024)
+                if evidence_reentry
                 else self.num_predict
             ),
         }
-        if not reporting_goal_ids and not request.planner_reentry_scope:
-            response_schema = planner_readiness_response_schema(
-                response_schema, expected_goal_ids_for_turn,
-                confirmation_required_capability_ids=[item["capability_id"] for item in capability_payload if item.get("requires_confirmation")],
-            )
-        if not loaded_capability_ids:
-            response_schema = capability_lookup_response_schema(response_schema, [
-                item for item in indexed_catalog if item.capability_id not in {known.capability_id for known in selected_catalog}
-            ])
         raw: Any = None
         parameter_provenance_repairs: list[dict[str, Any]] = []
         try:
-                raw = await self.ollama.generate(
-                    fast_layered_prompt(
-                        request,
-                        capability_payload,
-                        response_schema=response_schema,
-                        goal_context=goal_context,
-                    ),
-                    system=fast_system_prompt(),
-                    options=options,
-                    response_format=response_schema,
-                    prompt_family="fast_planner.primary",
-                    turn_id=request.sid,
-                    attempt=1 + int(bool(loaded_capability_ids)),
-                )
-                if isinstance(raw, dict) and "requested_capability_ids" in raw:
+                if evidence_reentry:
+                    raw = await self.ollama.generate(
+                        fast_evidence_reentry_prompt(
+                            request,
+                            capability_payload,
+                            goal_context=goal_context,
+                            allow_new_work=requires_execution,
+                        ),
+                        system=fast_evidence_reentry_system_prompt(),
+                        options=options,
+                        response_format=response_schema,
+                        prompt_family="fast_planner.evidence_reentry",
+                        turn_id=request.sid,
+                        attempt=1,
+                    )
+                    if not isinstance(raw, dict):
+                        raise ValueError(
+                            "fast planner evidence re-entry response is not a JSON object"
+                        )
                     from jsonschema import Draft202012Validator
                     Draft202012Validator(response_schema).validate(raw)
-                    looked_up = await self._resolve(request, tuple(raw["requested_capability_ids"]))
-                    return looked_up.model_copy(update={"metadata": {
-                        **looked_up.metadata, "capability_detail_lookups": 1,
-                        "semantic_result_call_count": 1,
-                    }})
-                if not isinstance(raw, dict):
-                    raise ValueError("fast planner response is not a JSON object")
+                    compact_reentry = PlannerEvidenceReentryModelOutput.model_validate(raw)
+                    raw = materialize_evidence_reentry_model_output(
+                        compact_reentry,
+                        expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                        allowed_evidence_refs=set(
+                            request.planner_reentry_scope.evidence_refs
+                        ),
+                        completed_step_evidence=completed_work_step_evidence(
+                            request.context,
+                            reentry_scope=request.planner_reentry_scope,
+                        ),
+                    )
+                else:
+                    raw = await self.ollama.generate(
+                        fast_layered_prompt(
+                            request,
+                            capability_payload,
+                            response_schema=response_schema,
+                            goal_context=goal_context,
+                        ),
+                        system=fast_system_prompt(),
+                        options=options,
+                        response_format=response_schema,
+                        prompt_family="fast_planner.primary",
+                        turn_id=request.sid,
+                        attempt=1 + int(bool(loaded_capability_ids)),
+                    )
+                    if isinstance(raw, dict) and "requested_capability_ids" in raw:
+                        from jsonschema import Draft202012Validator
+                        Draft202012Validator(response_schema).validate(raw)
+                        looked_up = await self._resolve(
+                            request, tuple(raw["requested_capability_ids"])
+                        )
+                        return looked_up.model_copy(update={"metadata": {
+                            **looked_up.metadata,
+                            "capability_detail_lookups": 1,
+                            "semantic_result_call_count": 1,
+                        }})
+                    if not isinstance(raw, dict):
+                        raise ValueError("fast planner response is not a JSON object")
                 raw, common_repairs = normalize_common_planner_output(
                     raw,
                     authoritative_goals=authoritative_goals,

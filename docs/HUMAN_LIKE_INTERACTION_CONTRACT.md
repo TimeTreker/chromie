@@ -1001,9 +1001,14 @@ and optional decoration.
 A ready safe read need not wait for optional acknowledgement. After execution,
 Host binds immutable request, Goal and qualified Evidence. Planner may decide new
 Work or a result Need; SC authors the grounded result against the same evidence.
-The SC primary result must preserve scope, probability, execution state and sibling
-boundaries. No later model audits or repairs a completed decision. Invalid output
-is retained as a primary transaction failure, never converted to a successful answer.
+Fast Evidence re-entry exposes a narrow next-state DTO rather than reusing either the
+ordinary Planner wire or the canonical Plan envelope. Host may mechanically lift that
+validated decision into canonical Planner state, but it may not reinterpret Evidence or
+repair model semantics. Historical Plan/Runtime shapes remain provenance only and must
+not appear as competing model-output templates. The SC primary result must preserve
+scope, probability, execution state and sibling boundaries. No later model audits or
+repairs a completed decision. Invalid output is retained as a primary transaction failure,
+never converted to a successful answer.
 
 A provider result summary is evidence for cognition, not a fallback wording owner.
 If SC is unavailable, Runtime retains the result and pending obligation without

@@ -14,9 +14,15 @@ from .clients.ollama_client import (
 )
 from .prompt_projection import bounded_json
 try:
-    from chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from chromie_contracts.core_interpretation import (
+        CognitiveWorkRequest,
+        responsibility_binding_material_value,
+    )
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.core_interpretation import (
+        CognitiveWorkRequest,
+        responsibility_binding_material_value,
+    )
 
 try:
     from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
@@ -92,7 +98,6 @@ from .goal_association_validation import (
     resource_source_binding_contract_conflicts,
     responsibility_output_mode_conflicts,
     inherited_goal_outcomes,
-    source_grounded_binding_conservation_conflicts,
     validation_error_json,
 )
 
@@ -564,18 +569,13 @@ class GoalAssociationResolver:
                 "surface into resolved_references.surface_form: "
                 + ", ".join(location_bindings)
             )
-        binding_conservation_conflicts = (
-            source_grounded_binding_conservation_conflicts(
-                model_output,
-                request=request,
-            )
-        )
-        if binding_conservation_conflicts:
-            raise ValueError(
-                "Goal Association primary result must conserve every directly "
-                "source-grounded material binding on its canonical Goal surface: "
-                + ", ".join(binding_conservation_conflicts)
-            )
+        # GA now owns only canonical Goal identity/continuity.  UMI already owns
+        # the accepted semantic bindings, and the constrained GA new-goal DTO
+        # intentionally does not expose a second writable binding surface.  The
+        # Host therefore inherits those bindings while materializing the canonical
+        # Goal below instead of requiring the model to restate them.  Requiring
+        # both was contradictory: the decoder forbade GA-authored bindings while
+        # this boundary rejected their absence.
         return self._expand_model_output(
             model_output,
             request=request,
@@ -890,7 +890,53 @@ class GoalAssociationResolver:
                     exclude_none=True,
                 )
 
+            # Canonical new Goals inherit UMI-owned semantic bindings
+            # mechanically.  GA selects only which Responsibility owns this Goal;
+            # it must not re-author location, time, count, measurements, or other
+            # WHAT.  Preserve structured values losslessly for cross-session Goal
+            # continuity; Planner later realizes provider/execution arguments.
             binding_map: dict[str, Any] = {}
+            semantic_entity_types = {
+                "after": "sequence_ref",
+                "before": "sequence_ref",
+                "count": "count",
+                "direction": "direction",
+                "distance": "distance",
+                "duration": "duration",
+                "location": "location",
+                "parallel_with": "sequence_ref",
+                "quantity": "quantity",
+                "speed": "speed",
+                "date": "temporal_scope",
+                "period": "temporal_scope",
+                "time": "temporal_scope",
+                "time_reference": "temporal_scope",
+                "time_scope": "temporal_scope",
+                "temporal_scope": "temporal_scope",
+            }
+            for source_ref in item.source_responsibility_refs:
+                responsibility = responsibility_by_ref[source_ref]
+                for raw_name, raw_value in responsibility.bindings.items():
+                    raw_value = responsibility_binding_material_value(raw_value)
+                    name = "_".join(
+                        str(raw_name).strip().casefold().replace("-", "_").split()
+                    )
+                    if not name or name in {"action", "activity", "effect", "outcome"}:
+                        continue
+                    if name in binding_map:
+                        if binding_map[name].get("value") != raw_value:
+                            raise ValueError(
+                                "one new Goal cannot inherit conflicting UMI semantic "
+                                f"bindings for {name!r}"
+                            )
+                        continue
+                    binding_map[name] = {
+                        "name": name,
+                        "entity_type": semantic_entity_types.get(name, name),
+                        "value": copy.deepcopy(raw_value),
+                        "confidence": responsibility.confidence,
+                    }
+
             resource_responsibility = None
             if item.resource_responsibility is not None:
                 resource_item = item.resource_responsibility
@@ -972,12 +1018,18 @@ class GoalAssociationResolver:
                         delivery_mode="physical_handover",
                     )
             else:
+                # ``item.bindings`` is absent from the live GA decoder surface.
+                # Keep this internal typed path only for non-live construction and
+                # never let it override the authoritative UMI inheritance above.
                 for binding in item.bindings:
                     normalized = normalize_binding(binding)
                     if binding.name in binding_map:
-                        raise ValueError(
-                            f"duplicate Goal binding name={binding.name!r}"
-                        )
+                        if binding_map[binding.name].get("value") != normalized.get("value"):
+                            raise ValueError(
+                                "GA binding conflicts with the accepted UMI semantic "
+                                f"binding name={binding.name!r}"
+                            )
+                        continue
                     binding_map[binding.name] = normalized
 
             unknown_related_goal_ids = sorted(
@@ -1068,9 +1120,12 @@ class GoalAssociationResolver:
         candidate_goals: list[dict[str, Any]],
         request: CognitiveWorkRequest,
     ) -> GoalAssociationResolution:
-        candidate_ids = {
-            str(item.get("goal_id") or "") for item in candidate_goals
+        candidate_by_id = {
+            str(item.get("goal_id") or ""): item
+            for item in candidate_goals
+            if str(item.get("goal_id") or "")
         }
+        candidate_ids = set(candidate_by_id)
         accepted: list[GoalAssociation] = []
         rejected: list[dict[str, Any]] = []
         for association in resolution.associations:
@@ -1082,6 +1137,17 @@ class GoalAssociationResolver:
                 for goal_id in association.target_goal_ids
             ):
                 reason = "unknown_target_goal"
+            elif association.relationship != "reference" and any(
+                str(candidate_by_id[goal_id].get("responsibility_status") or "open")
+                != "open"
+                for goal_id in association.target_goal_ids
+            ):
+                # Retained terminal Goals are historical continuity evidence only.
+                # They may be referenced for retrieval/restatement/comparison, but
+                # cannot absorb a fresh Responsibility or be silently reopened by
+                # continue/modify/cancel/etc. A fresh obligation must become a new
+                # Goal. Prompt guidance is not sufficient authority for lifecycle.
+                reason = "terminal_goal_reference_only"
             if reason:
                 rejected.append({"association_id": association.association_id, "reason": reason})
             else:

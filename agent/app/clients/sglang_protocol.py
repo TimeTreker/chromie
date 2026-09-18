@@ -75,7 +75,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         if schema.get("title") in {
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
-            "FastPlannerWorkAdvanceOutput",
+            "FastPlannerWorkAdvanceOutput", "FastPlannerEvidenceReentryOutput",
             "SocialCognitionOutput",
         }:
             # Native intersections can hide required object/array fields. Repeat
@@ -85,7 +85,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
             "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
-            "FastPlannerWorkAdvanceOutput", "SocialCognitionOutput",
+            "FastPlannerWorkAdvanceOutput", "FastPlannerEvidenceReentryOutput", "SocialCognitionOutput",
         }:
             # Formatting belongs to this request, never to the shared model's
             # global settings. This also prevents the reproduced Planner/Skill JSON

@@ -38,6 +38,7 @@ from .planner_grounding import (
     semantic_numeric_values,
 )
 from .planner_model_contract import (
+    PlannerEvidenceReentryModelOutput,
     PlannerModelOutput,
     PlannerTier,
 )
@@ -479,6 +480,86 @@ def scoped_reporting_response_schema(
                     fields["satisfied_goal_ids"]["maxItems"] = 0
                     fields["satisfied_goal_ids"]["items"].pop("enum")
     return result
+
+
+
+def fast_evidence_reentry_response_schema(
+    *,
+    expected_goal_ids: list[str],
+    evidence_refs: list[str],
+    allowed_capability_ids: list[str],
+    capability_input_schemas: dict[str, dict[str, Any]] | None = None,
+    allow_new_work: bool = True,
+) -> dict[str, Any]:
+    """Compact decoder contract for trusted Fast Planner Evidence re-entry.
+
+    The model decides only post-execution next action and genuinely new Work. Host
+    materializes the redundant Planner/CanonicalPlan envelope afterwards. Keeping this
+    schema disjoint from ``goal_outcomes``/``steps`` prevents historical Plan/Runtime
+    evidence from becoming an accidental answer template.
+    """
+
+    schema = copy.deepcopy(PlannerEvidenceReentryModelOutput.model_json_schema())
+    schema["title"] = "FastPlannerEvidenceReentryOutput"
+    properties = schema.setdefault("properties", {})
+    required = schema.setdefault("required", [])
+    for field_name in (
+        "goal_decisions",
+        "new_work",
+        "confidence",
+        "plan_relation",
+        "user_confirmation_required",
+        "escalation_reason",
+    ):
+        if field_name not in required:
+            required.append(field_name)
+
+    goals = list(dict.fromkeys(str(item).strip() for item in expected_goal_ids if str(item).strip()))
+    evidence = list(dict.fromkeys(str(item).strip() for item in evidence_refs if str(item).strip()))
+    decisions = properties.get("goal_decisions")
+    if isinstance(decisions, dict):
+        decisions["minItems"] = len(goals)
+        decisions["maxItems"] = len(goals)
+    decision_schema = schema.get("$defs", {}).get("PlannerEvidenceReentryGoalDecision")
+    if isinstance(decision_schema, dict):
+        decision_properties = decision_schema.get("properties", {})
+        goal_id = decision_properties.get("goal_id")
+        if isinstance(goal_id, dict):
+            goal_id["enum"] = goals
+        evidence_field = decision_properties.get("evidence_refs")
+        if isinstance(evidence_field, dict):
+            evidence_field["items"] = {"type": "string", "enum": evidence}
+            evidence_field["maxItems"] = len(evidence)
+            evidence_field["uniqueItems"] = True
+        if not allow_new_work:
+            next_action = decision_properties.get("next_action")
+            if isinstance(next_action, dict):
+                next_action["enum"] = [
+                    "respond", "clarify", "unavailable", "refused", "escalate"
+                ]
+
+    new_work = properties.get("new_work")
+    if isinstance(new_work, dict):
+        new_work["maxItems"] = (max(1, len(goals)) * 4) if allow_new_work else 0
+    step_schema = schema.get("$defs", {}).get("PlannerModelStep")
+    allowed_capabilities = list(dict.fromkeys(allowed_capability_ids))
+    if isinstance(step_schema, dict):
+        step_properties = step_schema.get("properties", {})
+        source_goals = step_properties.get("source_goal_ids")
+        if isinstance(source_goals, dict):
+            source_goals["items"] = {"type": "string", "enum": goals}
+            source_goals["uniqueItems"] = True
+            source_goals["maxItems"] = len(goals)
+        capability_id = step_properties.get("capability_id")
+        if isinstance(capability_id, dict):
+            capability_id["enum"] = allowed_capabilities
+        _constrain_planner_step_args(
+            step_schema,
+            allowed_capabilities=allowed_capabilities,
+            capability_input_schemas=capability_input_schemas,
+        )
+
+    return schema
 
 
 def canonical_plan_response_schema(

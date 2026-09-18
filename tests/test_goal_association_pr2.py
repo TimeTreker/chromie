@@ -2070,6 +2070,72 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
 
 
 
+    def test_terminal_goal_cannot_absorb_fresh_responsibility(self):
+        terminal = active_goal("goal-weather", "Check Chongqing weather.")
+        terminal["responsibility_status"] = "satisfied"
+        terminal["work_status"] = "done"
+        terminal["goal"]["responsibility_status"] = "satisfied"
+        payload = {
+            "associations": [{
+                "relationship": "continue",
+                "source_responsibility_refs": ["r1"],
+                "target_goal_ids": ["goal-weather"],
+                "confidence": 1.0,
+                "reason_summary": "Wrongly reuse the completed weather Goal.",
+            }],
+            "new_goals": [],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+            "reason_summary": "Wrong continuity decision.",
+        }
+
+        result = self._resolve(
+            [payload],
+            request("Nod your head five times.", active_goals=[terminal], language="en-US"),
+        )
+
+        self.assertEqual(result.resolution_status, "fail_closed")
+        self.assertEqual(result.associations, [])
+        self.assertEqual(
+            result.metadata["rejected_associations"][0]["reason"],
+            "terminal_goal_reference_only",
+        )
+
+    def test_decoder_allows_only_reference_relationship_to_terminal_goal(self):
+        terminal = active_goal("goal-weather", "Check Chongqing weather.")
+        terminal["responsibility_status"] = "satisfied"
+        terminal["work_status"] = "done"
+        terminal["goal"]["responsibility_status"] = "satisfied"
+        schema = ga_schema.goal_association_response_schema(
+            GoalAssociationModelOutput,
+            [terminal],
+            [],
+            responsibility_count=1,
+            responsibility_refs=["r1"],
+        )
+        base = {
+            "source_responsibility_refs": ["r1"],
+            "target_goal_ids": ["goal-weather"],
+            "confidence": 1.0,
+        }
+        envelope = {
+            "new_goals": [],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+            "reason_summary": "Retained Goal is terminal.",
+        }
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid({
+            **envelope,
+            "associations": [{**base, "relationship": "reference"}],
+        }))
+        self.assertFalse(validator.is_valid({
+            **envelope,
+            "associations": [{**base, "relationship": "continue"}],
+        }))
+
     def test_existing_goal_continuity_commits_without_creation_or_audit(self):
         ollama = ScriptedOllama(
             [
@@ -2242,6 +2308,81 @@ if __name__ == "__main__":
 
 
 class GoalMeaningInheritanceTests(unittest.TestCase):
+    def test_minimal_ga_new_goal_inherits_umi_bindings_without_reauthoring(self):
+        cases = (
+            (
+                "what's the weather today in chongqing?",
+                {"location": "chongqing", "time_reference": "today"},
+                "information",
+                {"location": "location", "time_reference": "temporal_scope"},
+            ),
+            (
+                "nod your head 5 times, please",
+                {"count": 5},
+                "body_action",
+                {"count": "count"},
+            ),
+        )
+        for text, bindings, output_mode, entity_types in cases:
+            with self.subTest(text=text):
+                req = request(text, language="en-US").model_copy(
+                    update={
+                        "responsibilities": typed_responsibilities(
+                            {
+                                "local_ref": "r1",
+                                "outcome": text.rstrip("?., "),
+                                "bindings": bindings,
+                                "output_mode": output_mode,
+                                "confidence": 1.0,
+                            }
+                        )
+                    }
+                )
+                raw = create_goals(intent_goal("unused", output_mode))
+                model = ScriptedOllama([raw])
+
+                result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+
+                self.assertEqual(result.resolution_status, "resolved", result.metadata)
+                inherited = result.new_goals[0].object["bindings"]
+                self.assertEqual(set(inherited), set(bindings))
+                for name, value in bindings.items():
+                    self.assertEqual(inherited[name]["value"], value)
+                    self.assertEqual(inherited[name]["entity_type"], entity_types[name])
+                self.assertEqual(result.new_goals[0].metadata["output_mode"], output_mode)
+
+                # The live GA decoder still has no writable semantic-binding
+                # surface: the Host inheritance above is not GA re-authoring.
+                schema = model.prompts[0][1]["response_format"]
+                forged = copy.deepcopy(raw)
+                forged["new_goals"][0]["bindings"] = []
+                self.assertFalse(Draft202012Validator(schema).is_valid(forged))
+
+    def test_minimal_ga_new_goal_preserves_structured_umi_binding_losslessly(self):
+        structured = {"room": "desk", "offset": [1, 2]}
+        req = request("Arrange them in this region.", language="en-US").model_copy(
+            update={
+                "responsibilities": typed_responsibilities(
+                    {
+                        "local_ref": "r1",
+                        "outcome": "Arrange them in this region.",
+                        "bindings": {"region": structured},
+                        "output_mode": "body_action",
+                        "confidence": 0.97,
+                    }
+                )
+            }
+        )
+        model = ScriptedOllama([create_goals(intent_goal("unused", "body_action"))])
+
+        result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+
+        self.assertEqual(result.resolution_status, "resolved", result.metadata)
+        inherited = result.new_goals[0].object["bindings"]["region"]
+        self.assertEqual(inherited["value"], structured)
+        self.assertEqual(inherited["entity_type"], "region")
+        self.assertEqual(inherited["confidence"], 0.97)
+
     def test_bilingual_new_goal_preserves_polarity_freshness_and_historical_scope(self):
         for outcome in (
             "Tell me whether the result is correct.",

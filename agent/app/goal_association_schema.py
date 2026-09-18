@@ -105,6 +105,12 @@ def goal_association_response_schema(
         for item in candidate_goals
         if " ".join(str(item.get("goal_id") or "").strip().split())
     ]
+    open_goal_ids = [
+        " ".join(str(item.get("goal_id") or "").strip().split())
+        for item in candidate_goals
+        if " ".join(str(item.get("goal_id") or "").strip().split())
+        and str(item.get("responsibility_status") or "open").strip() == "open"
+    ]
     referent_ids = [
         " ".join(str(item.get("referent_id") or "").strip().split())
         for item in discourse_referents
@@ -265,6 +271,40 @@ def goal_association_response_schema(
         "GoalAssociationModelAssociation"
     )
     if isinstance(association_schema, dict):
+        # A retained terminal Goal is historical evidence, not unfinished work.
+        # Encode that lifecycle invariant in the constrained decoder as well as
+        # Host validation: only relationship=reference may target a non-open
+        # Goal.  This prevents a nearby completed Goal from absorbing an
+        # unrelated fresh Responsibility before fail-closed validation runs.
+        continuity_relationships = [
+            "continue", "modify", "clarify", "confirm", "reject",
+            "cancel", "pause", "resume", "merge", "split",
+        ]
+        association_schema.setdefault("allOf", []).append(
+            {
+                "if": {
+                    "properties": {
+                        "relationship": {"enum": continuity_relationships},
+                    },
+                    "required": ["relationship"],
+                },
+                "then": {
+                    "properties": {
+                        "target_goal_ids": (
+                            {
+                                "type": "array",
+                                "items": {"type": "string", "enum": open_goal_ids},
+                                "uniqueItems": True,
+                                "minItems": 1,
+                            }
+                            if open_goal_ids
+                            else {"type": "array", "maxItems": 0}
+                        ),
+                    },
+                    "required": ["target_goal_ids"],
+                },
+            }
+        )
         # Pydantic rejects a modify/clarify association whose semantic update
         # exists only in reason_summary, but the generated decoder schema used
         # to permit exactly that shape.  Expose the existing DTO invariant at

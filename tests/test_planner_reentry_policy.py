@@ -10,10 +10,23 @@ from orchestrator.runtime.planner_reentry import (
     terminal_result_waits_for_batch_closure,
 )
 from agent.app.planner_context import (
+    PlannerGoalContext,
     goal_association_prompt_projection,
     planner_goal_context,
 )
+from agent.app.planner_prompt import (
+    fast_evidence_reentry_prompt,
+    fast_plan_prompt,
+    planner_reentry_execution_truth_projection,
+    planner_reentry_source_work_projection,
+)
 from agent.app.planner_fallback import materialize_fast_escalation
+from agent.app.planner_model_contract import (
+    PlannerEvidenceReentryModelOutput,
+    PlannerModelOutput,
+    materialize_evidence_reentry_model_output,
+)
+from agent.app.planner_schema import fast_evidence_reentry_response_schema
 from shared.chromie_contracts.core_interpretation import (
     CognitiveWorkRequest,
     PlannerReentryScope,
@@ -479,3 +492,406 @@ def test_work_request_rejects_unverified_source_projection() -> None:
         "language": "auto",
         "authority": "normalized_transport_fallback",
     }
+
+
+def test_planner_reentry_source_work_projection_is_provenance_not_output_template() -> None:
+    source_plan = {
+        "schema_version": 1,
+        "plan_id": "plan-weather",
+        "planner_tier": "fast",
+        "disposition": "execute",
+        "coverage": "complete",
+        "goal_ids": ["goal-weather", "goal-other"],
+        "goal_outcomes": [{"goal_id": "goal-weather", "disposition": "execute"}],
+        "goal_satisfaction": {"status": "exact", "score": 1.0},
+        "metadata": {"path_classification": "terminal"},
+        "steps": [
+            {
+                "step_id": "weather-read",
+                "capability_id": "chromie.weather.lookup",
+                "args": {"location": "chongqing"},
+                "timing": "sequential",
+                "source_goal_ids": ["goal-weather"],
+                "step_purpose": "acquire_information",
+                "expected_outcome": "Weather evidence for Chongqing.",
+            },
+            {
+                "step_id": "other-read",
+                "capability_id": "chromie.test.lookup",
+                "args": {},
+                "timing": "sequential",
+                "source_goal_ids": ["goal-other"],
+            },
+        ],
+    }
+
+    projection = planner_reentry_source_work_projection(
+        source_plan, goal_ids={"goal-weather"}
+    )
+
+    assert projection["plan_id"] == "plan-weather"
+    assert projection["goal_ids"] == ["goal-weather"]
+    assert [step["step_id"] for step in projection["steps"]] == ["weather-read"]
+    for obsolete_envelope_field in (
+        "schema_version", "planner_tier", "disposition", "coverage",
+        "goal_outcomes", "goal_satisfaction", "metadata",
+    ):
+        assert obsolete_envelope_field not in projection
+
+
+def test_planner_reentry_execution_truth_projection_is_fact_shaped_not_output_shaped() -> None:
+    truth = {
+        "outcome_id": "outcome-weather",
+        "aggregate_status": "completed",
+        "goal_outcomes": [{
+            "goal_id": "goal-weather",
+            "status": "completed",
+            "planned_satisfaction": {
+                "status": "exact",
+                "score": 1.0,
+                "satisfied_goal_ids": ["goal-weather"],
+            },
+            "requires_planner_continuation": False,
+            "reason_codes": [],
+            "evidence_ids": ["evidence-weather"],
+            "completion_qualification": {
+                "required": True,
+                "established": True,
+                "qualifications": [{
+                    "claim": "capability request completed",
+                    "evidence_id": "evidence-weather",
+                    "status": "established",
+                    "reason_codes": [],
+                }],
+            },
+        }],
+        "evidence": [{
+            "evidence_id": "evidence-weather",
+            "capability_id": "chromie.weather.lookup",
+            "source_goal_ids": ["goal-weather"],
+            "status": "completed",
+            "reason_code": "",
+            "observation_status": "available",
+            "provider_retryability": {},
+        }],
+    }
+
+    projection = planner_reentry_execution_truth_projection(
+        truth, goal_ids={"goal-weather"}
+    )
+
+    assert projection == {
+        "execution_outcome_ref": "outcome-weather",
+        "aggregate_execution_state": "completed",
+        "goal_execution_facts": [{
+            "goal_ref": "goal-weather",
+            "execution_state": "completed",
+            "evidence_refs": ["evidence-weather"],
+            "runtime_continuation_required": False,
+            "completion_gate": {
+                "required": True,
+                "established": True,
+                "evidence_refs": ["evidence-weather"],
+            },
+        }],
+        "evidence_facts": [{
+            "evidence_ref": "evidence-weather",
+            "capability_ref": "chromie.weather.lookup",
+            "goal_refs": ["goal-weather"],
+            "execution_state": "completed",
+            "observation_state": "available",
+        }],
+    }
+    serialized = str(projection)
+    for output_shaped_key in (
+        "goal_outcomes", "planned_satisfaction", "respond", "satisfaction",
+        "steps", "disposition", "coverage",
+    ):
+        assert output_shaped_key not in serialized
+
+def test_planner_reentry_prompt_does_not_expose_old_plan_envelope_as_template() -> None:
+    scope = PlannerReentryScope(
+        trigger="capability_result_reentry",
+        goal_ids=["goal-weather"],
+        evidence_refs=["evidence-weather"],
+        source_plan_id="plan-weather",
+        source_plan_fingerprint="f" * 64,
+    )
+    request = CognitiveWorkRequest(
+        sid="reentry-prompt-projection",
+        text="what's the weather today in chongqing?",
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": "the weather today in chongqing",
+            "output_mode": "information",
+            "continuity_scope": "goal",
+            "confidence": 1.0,
+        }],
+        interpretation_confidence=1.0,
+        planner_reentry_scope=scope,
+        context={
+            "trusted_execution_outcome": {
+                "outcome_id": "outcome-weather",
+                "aggregate_status": "completed",
+                "goal_outcomes": [{
+                    "goal_id": "goal-weather",
+                    "status": "completed",
+                    "planned_satisfaction": {"status": "exact", "score": 1.0},
+                    "requires_planner_continuation": False,
+                    "evidence_ids": ["evidence-weather"],
+                    "completion_qualification": {
+                        "required": True,
+                        "established": True,
+                        "qualifications": [{
+                            "evidence_id": "evidence-weather",
+                            "status": "established",
+                        }],
+                    },
+                }],
+                "evidence": [{
+                    "evidence_id": "evidence-weather",
+                    "capability_id": "chromie.weather.lookup",
+                    "source_goal_ids": ["goal-weather"],
+                    "status": "completed",
+                    "observation_status": "available",
+                    "provider_retryability": {},
+                }],
+            },
+            "canonical_plan_resolution": {
+                "schema_version": 1,
+                "plan_id": "plan-weather",
+                "planner_tier": "fast",
+                "disposition": "execute",
+                "coverage": "complete",
+                "goal_ids": ["goal-weather"],
+                "goal_outcomes": [{"goal_id": "goal-weather", "disposition": "execute"}],
+                "goal_satisfaction": {"status": "exact", "score": 1.0},
+                "metadata": {"path_classification": "terminal"},
+                "steps": [{
+                    "step_id": "weather-read",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "chongqing"},
+                    "timing": "sequential",
+                    "source_goal_ids": ["goal-weather"],
+                    "step_purpose": "acquire_information",
+                }],
+            },
+        },
+    )
+    goal_context = PlannerGoalContext(
+        expected_goal_ids=("goal-weather",),
+        authoritative_goals=({
+            "goal_id": "goal-weather",
+            "description": "the weather today in chongqing",
+            "metadata": {"output_mode": "information"},
+        },),
+        cancellation_reentry_goal_ids=frozenset(),
+        result_reentry_goal_ids=frozenset({"goal-weather"}),
+        response_goal_ids=(),
+        response_only=False,
+        requires_execution=False,
+    )
+
+    prompt = fast_plan_prompt(
+        request, [], response_schema={}, goal_context=goal_context
+    )
+
+    assert "PLANNER RE-ENTRY CONTRACT" in prompt
+    assert "Historical source Work correlation JSON" in prompt
+    assert "Trusted execution fact rows JSON" in prompt
+    assert "Trusted execution outcome truth JSON" not in prompt
+    assert "Authoritative source Plan JSON for exact re-entry correlation" not in prompt
+    source_section = prompt.split(
+        "Historical source Work correlation JSON", 1
+    )[1].split("Trusted Work planning facts JSON", 1)[0]
+    for old_envelope_field in (
+        '"disposition"', '"coverage"', '"goal_outcomes"',
+        '"goal_satisfaction"', '"planner_tier"',
+        '"planned_satisfaction"', '"respond"', '"satisfaction"',
+    ):
+        assert old_envelope_field not in source_section
+    assert '"goal_execution_facts"' in source_section
+    assert '"evidence_facts"' in source_section
+    assert "respond outcome with zero steps" in prompt
+
+
+def test_fast_evidence_reentry_contract_is_disjoint_from_plan_envelopes() -> None:
+    from jsonschema import Draft202012Validator
+
+    schema = fast_evidence_reentry_response_schema(
+        expected_goal_ids=["goal-weather"],
+        evidence_refs=["evidence-weather"],
+        allowed_capability_ids=[],
+        capability_input_schemas={},
+        allow_new_work=False,
+    )
+    assert schema["title"] == "FastPlannerEvidenceReentryOutput"
+    assert set(schema["properties"]) == {
+        "goal_decisions",
+        "new_work",
+        "confidence",
+        "plan_relation",
+        "user_confirmation_required",
+        "escalation_reason",
+    }
+    for forbidden in (
+        "goal_outcomes", "steps", "disposition", "coverage",
+        "unmet_goal_ids", "unmet_requirements", "response_text",
+    ):
+        assert forbidden not in schema["properties"]
+
+    valid = {
+        "goal_decisions": [{
+            "goal_id": "goal-weather",
+            "next_action": "respond",
+            "satisfaction_status": "exact",
+            "satisfaction_score": 1.0,
+            "evidence_refs": ["evidence-weather"],
+            "unresolved_needs": [],
+            "unmet_requirements": [],
+            "rationale": "Fresh trusted weather evidence fully answers the Goal.",
+        }],
+        "new_work": [],
+        "confidence": 1.0,
+        "plan_relation": "exact",
+        "user_confirmation_required": False,
+        "escalation_reason": "",
+    }
+    Draft202012Validator(schema).validate(valid)
+    assert not Draft202012Validator(schema).is_valid({
+        "goal_outcomes": [{"goal_id": "goal-weather", "disposition": "respond"}],
+        "steps": [],
+        "unmet_goal_ids": [],
+        "unmet_requirements": [],
+    })
+
+
+def test_fast_evidence_reentry_lifts_to_current_planner_contract() -> None:
+    compact = PlannerEvidenceReentryModelOutput.model_validate({
+        "goal_decisions": [{
+            "goal_id": "goal-weather",
+            "next_action": "respond",
+            "satisfaction_status": "exact",
+            "satisfaction_score": 1.0,
+            "evidence_refs": ["evidence-weather"],
+            "unresolved_needs": [],
+            "unmet_requirements": [],
+            "rationale": "Fresh trusted weather evidence fully answers the Goal.",
+        }],
+        "new_work": [],
+        "confidence": 1.0,
+        "plan_relation": "exact",
+        "user_confirmation_required": False,
+        "escalation_reason": "",
+    })
+    lifted = materialize_evidence_reentry_model_output(
+        compact,
+        expected_goal_ids_for_turn=["goal-weather"],
+        allowed_evidence_refs={"evidence-weather"},
+        completed_step_evidence={
+            "weather-read": {
+                "step_id": "weather-read",
+                "evidence_id": "evidence-weather",
+                "source_goal_ids": ["goal-weather"],
+            }
+        },
+    )
+    current = PlannerModelOutput.model_validate(lifted)
+    assert current.disposition == "respond"
+    assert current.steps == []
+    assert current.goal_outcomes["goal-weather"].follows_step_ids == ["weather-read"]
+    assert current.goal_satisfaction is not None
+    assert current.goal_satisfaction.status == "exact"
+
+
+def test_fast_evidence_reentry_prompt_is_bounded_and_has_no_old_output_template() -> None:
+    scope = PlannerReentryScope(
+        trigger="capability_result_reentry",
+        goal_ids=["goal-weather"],
+        evidence_refs=["evidence-weather"],
+        source_plan_id="plan-weather",
+        source_plan_fingerprint="f" * 64,
+    )
+    request = CognitiveWorkRequest(
+        sid="compact-reentry",
+        text="What's the weather today in Chongqing?",
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": "the weather today in Chongqing",
+            "output_mode": "information",
+            "continuity_scope": "goal",
+            "confidence": 1.0,
+        }],
+        interpretation_confidence=1.0,
+        planner_reentry_scope=scope,
+        context={
+            "trusted_terminal_evidence": [{
+                "evidence_id": "evidence-weather",
+                "tool_id": "chromie.weather.lookup",
+                "status": "completed",
+                "source_goal_ids": ["goal-weather"],
+                "data": {"location": "Chongqing", "temperature_c": 25.8},
+            }],
+            "trusted_execution_outcome": {
+                "outcome_id": "outcome-weather",
+                "aggregate_status": "completed",
+                "goal_outcomes": [{
+                    "goal_id": "goal-weather",
+                    "status": "completed",
+                    "requires_planner_continuation": False,
+                    "evidence_ids": ["evidence-weather"],
+                    "completion_qualification": {
+                        "required": True,
+                        "established": True,
+                    },
+                }],
+                "evidence": [{
+                    "evidence_id": "evidence-weather",
+                    "capability_id": "chromie.weather.lookup",
+                    "source_goal_ids": ["goal-weather"],
+                    "status": "completed",
+                    "observation_status": "available",
+                }],
+            },
+            "canonical_plan_resolution": {
+                "plan_id": "plan-weather",
+                "goal_ids": ["goal-weather"],
+                "steps": [{
+                    "step_id": "weather-read",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "Chongqing"},
+                    "source_goal_ids": ["goal-weather"],
+                    "step_purpose": "acquire_information",
+                }],
+            },
+        },
+    )
+    goal_context = PlannerGoalContext(
+        expected_goal_ids=("goal-weather",),
+        authoritative_goals=({
+            "goal_id": "goal-weather",
+            "description": "the weather today in Chongqing",
+            "metadata": {"output_mode": "information"},
+        },),
+        cancellation_reentry_goal_ids=frozenset(),
+        result_reentry_goal_ids=frozenset({"goal-weather"}),
+        response_goal_ids=(),
+        response_only=False,
+        requires_execution=False,
+    )
+    prompt = str(fast_evidence_reentry_prompt(
+        request, [], goal_context=goal_context, allow_new_work=False
+    ))
+    assert len(prompt) < 8000
+    assert "FastPlannerEvidenceReentryOutput" in prompt
+    assert "Owner-approved Chromie identity" not in prompt
+    assert "Personality Expression" not in prompt
+    assert "Stable Mind" not in prompt
+    facts = prompt.split("Trusted post-execution facts JSON:", 1)[1]
+    assert '"fresh_evidence"' in facts
+    assert '"goal_execution_facts"' in facts
+    # Historical objects may be discussed in the contract text, but no old Planner
+    # result object is embedded as a candidate output example.
+    assert '"planned_satisfaction"' not in facts
+    assert '"goal_satisfaction"' not in facts
+    assert '"respond"' not in facts

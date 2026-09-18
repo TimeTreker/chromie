@@ -340,3 +340,88 @@ def test_canonical_literal_provenance_preserves_goal_ownership_and_explicit_bind
     else:
         with pytest.raises(ValueError, match="not present in authoritative"):
             validate_user_supplied_parameter_provenance(output, authoritative_goals=goals)
+
+
+@pytest.mark.asyncio
+async def test_fast_weather_collapses_duplicate_read_after_default_cleanup() -> None:
+    from tests.test_fast_planner_pr3 import (
+        FakeOllama as StreamingFakeOllama,
+        FastPlannerResolver as StreamingResolver,
+    )
+
+    tool = next(
+        tool
+        for agent in chromie_capability_bundle().agents
+        for tool in agent.tools
+        if tool.name == "chromie.weather.lookup"
+    )
+
+    class QualifiedWeatherCatalog:
+        async def prompt_entries(self, **kwargs):
+            del kwargs
+            return [CatalogCapability(
+                capability_id=tool.name,
+                agent_id="chromie.weather",
+                description=tool.description,
+                input_schema=tool.input_schema,
+                output_schema=tool.output_schema,
+                available=True,
+                interaction_executable=True,
+                hints=tool.llm_hints,
+                idempotent=tool.execution.idempotent,
+                side_effect_free=tool.execution.side_effect_free,
+            )]
+
+    request = CognitiveWorkRequest(
+        sid="weather-deduplicate-default",
+        text="what's the weather today in chongqing?",
+        language="en-US",
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": "the weather today in chongqing",
+            "bindings": {"location": "chongqing", "time_reference": "today"},
+            "output_mode": "information",
+            "continuity_scope": "goal",
+            "confidence": 1.0,
+        }],
+        interpretation_confidence=1.0,
+    )
+    raw = {
+        "disposition": "execute",
+        "coverage": "complete",
+        "covered_responsibility_refs": ["r1"],
+        "activities": [
+            {
+                "activity_id": "weather-explicit-default",
+                "role": "capability",
+                "capability_id": "chromie.weather.lookup",
+                "args": {"location": "chongqing", "date": "today", "period": "day"},
+                "timing": "sequential",
+                "source_responsibility_refs": ["r1"],
+            },
+            {
+                "activity_id": "weather-implicit-default",
+                "role": "capability",
+                "capability_id": "chromie.weather.lookup",
+                "args": {"location": "chongqing"},
+                "timing": "sequential",
+                "source_responsibility_refs": ["r1"],
+            },
+        ],
+        "continuations": [],
+        "confidence": 1.0,
+        "unresolved": [],
+        "reason_summary": "Acquire the same weather evidence once.",
+    }
+
+    advance = await StreamingResolver(
+        StreamingFakeOllama(raw), QualifiedWeatherCatalog()
+    ).resolve_advance(request)
+
+    assert advance.disposition == "execute", advance.metadata
+    assert [(item.activity_id, item.args) for item in advance.activities] == [
+        ("weather-explicit-default", {"location": "chongqing", "date": "today"})
+    ]
+    repairs = advance.metadata["mechanical_duplicate_activity_collapses"]
+    assert len(repairs) == 1
+    assert repairs[0]["removed_activity_id"] == "weather-implicit-default"

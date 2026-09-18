@@ -349,6 +349,128 @@ class PlannerModelOutput(BaseModel):
             )
         return self
 
+
+
+class PlannerEvidenceReentryGoalDecision(BaseModel):
+    """One post-execution decision over an already-owned canonical Goal.
+
+    This is intentionally not a CanonicalPlan/PlannerModelGoalOutcome shape. Re-entry
+    answers one narrow question: given fresh trusted Evidence, what should the same
+    Planner do next for this Goal? Host later lifts the decision into the canonical
+    Planner DTO and re-runs the ordinary trusted validators.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    goal_id: str = Field(min_length=1, max_length=160)
+    next_action: GoalOutcomeDisposition
+    satisfaction_status: GoalSatisfactionStatus
+    satisfaction_score: float = Field(ge=0.0, le=1.0)
+    evidence_refs: list[str] = Field(default_factory=list, max_length=32)
+    unresolved_needs: list[str] = Field(default_factory=list, max_length=16)
+    unmet_requirements: list[str] = Field(default_factory=list, max_length=16)
+    rationale: str = Field(default="", max_length=600)
+
+    @field_validator(
+        "goal_id", "evidence_refs", "unresolved_needs", "unmet_requirements",
+        mode="before",
+    )
+    @classmethod
+    def normalize_reentry_ids_and_lists(cls, value: Any, info: Any) -> Any:
+        if info.field_name == "goal_id":
+            return normalize_whitespace(value)
+        if value is None:
+            return []
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError(f"{info.field_name} must be an array")
+        return list(dict.fromkeys(
+            text for item in value if (text := normalize_whitespace(str(item or "")))
+        ))
+
+    @field_validator("rationale", mode="before")
+    @classmethod
+    def normalize_reentry_rationale(cls, value: Any) -> str:
+        return normalize_whitespace(value)
+
+    @model_validator(mode="after")
+    def validate_reentry_goal_decision(self) -> "PlannerEvidenceReentryGoalDecision":
+        band = PlannerGoalSatisfaction(
+            score=self.satisfaction_score,
+            status=self.satisfaction_status,
+            satisfied_goal_ids=[],
+            unmet_goal_ids=[],
+            unmet_requirements=[],
+        )
+        del band
+        if self.next_action == "respond" and not self.evidence_refs:
+            raise ValueError("post-execution respond requires trusted Evidence refs")
+        if self.next_action in {"respond", "execute"} and self.unresolved_needs:
+            raise ValueError("complete re-entry action cannot retain unresolved needs")
+        if self.next_action in {"clarify", "escalate"} and not (
+            self.unresolved_needs or self.unmet_requirements or self.rationale
+        ):
+            raise ValueError(
+                "clarify/escalate re-entry requires a concrete unresolved need or rationale"
+            )
+        if self.next_action in {"clarify", "unavailable", "refused", "escalate"}:
+            if self.satisfaction_status == "exact":
+                raise ValueError("noncompletion re-entry action cannot claim exact satisfaction")
+        return self
+
+
+class PlannerEvidenceReentryModelOutput(BaseModel):
+    """Minimal model-facing contract for trusted post-execution Evidence re-entry.
+
+    It deliberately avoids the names/shapes of both ``CanonicalPlan`` and
+    ``PlannerModelOutput`` (notably ``goal_outcomes`` and ``steps``). That prevents
+    historical Runtime/Plan evidence from acting as an accidental output template.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    goal_decisions: list[PlannerEvidenceReentryGoalDecision] = Field(min_length=1, max_length=16)
+    new_work: list[PlannerModelStep] = Field(default_factory=list, max_length=64)
+    confidence: float = Field(ge=0.0, le=1.0)
+    plan_relation: PlannerPlanRelation
+    user_confirmation_required: bool
+    escalation_reason: str = Field(default="", max_length=600)
+
+    @field_validator("escalation_reason", mode="before")
+    @classmethod
+    def normalize_reentry_escalation(cls, value: Any) -> str:
+        return normalize_whitespace(value)
+
+    @model_validator(mode="after")
+    def validate_reentry_shape(self) -> "PlannerEvidenceReentryModelOutput":
+        goal_ids = [item.goal_id for item in self.goal_decisions]
+        if len(goal_ids) != len(set(goal_ids)):
+            raise ValueError("re-entry goal_decisions must contain unique Goal IDs")
+        executing = {item.goal_id for item in self.goal_decisions if item.next_action == "execute"}
+        authored = {goal_id for step in self.new_work for goal_id in step.source_goal_ids}
+        if executing != authored:
+            raise ValueError(
+                "re-entry new_work ownership must exactly match execute Goal decisions"
+            )
+        if any(item.next_action != "execute" for item in self.goal_decisions) and authored - executing:
+            raise ValueError("non-execute re-entry Goal cannot own new Work")
+        if any(item.next_action == "escalate" for item in self.goal_decisions):
+            if self.new_work:
+                raise ValueError("escalating re-entry cannot also author new Work")
+            if not self.escalation_reason:
+                raise ValueError("escalating re-entry requires escalation_reason")
+        elif self.escalation_reason:
+            raise ValueError("escalation_reason is valid only when a Goal escalates")
+        if self.plan_relation in {"safe_adjustment", "alternative"}:
+            if not self.user_confirmation_required:
+                raise ValueError("adjusted/alternative re-entry requires user confirmation")
+            if not executing:
+                raise ValueError("adjusted/alternative re-entry requires executable Work")
+        elif self.user_confirmation_required and not executing:
+            raise ValueError("re-entry confirmation is valid only for executable Work")
+        return self
+
 class PlannerDTOContractError(ValueError):
     """Planner output is mechanically malformed or internally inconsistent."""
 
@@ -411,6 +533,157 @@ def materialize_goal_outcomes(
         }
         for goal_id in ordered_ids
     ]
+
+
+
+def materialize_evidence_reentry_model_output(
+    output: PlannerEvidenceReentryModelOutput,
+    *,
+    expected_goal_ids_for_turn: list[str],
+    allowed_evidence_refs: set[str],
+    completed_step_evidence: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    """Lift the compact post-execution decision into the ordinary Planner DTO.
+
+    This is deterministic representation materialization, not semantic repair. The model
+    still owns each Goal's next action, satisfaction band/score, unresolved needs, new
+    Work, and plan relation. Host owns the redundant aggregate/envelope fields required by
+    the maintained ``PlannerModelOutput`` contract.
+    """
+
+    expected = list(dict.fromkeys(expected_goal_ids_for_turn))
+    decisions = {item.goal_id: item for item in output.goal_decisions}
+    if set(decisions) != set(expected):
+        raise PlannerDTOContractError(
+            "evidence re-entry must decide every scoped Goal exactly once: "
+            f"expected={sorted(expected)} actual={sorted(decisions)}"
+        )
+    allowed_evidence = {str(item).strip() for item in allowed_evidence_refs if str(item).strip()}
+    for decision in output.goal_decisions:
+        unknown = set(decision.evidence_refs) - allowed_evidence
+        if unknown:
+            raise PlannerDTOContractError(
+                "evidence re-entry decision cites Evidence outside typed scope: "
+                + ",".join(sorted(unknown))
+            )
+
+    steps_by_goal: dict[str, list[str]] = {goal_id: [] for goal_id in expected}
+    for step in output.new_work:
+        for goal_id in step.source_goal_ids:
+            if goal_id not in steps_by_goal:
+                raise PlannerDTOContractError(
+                    f"evidence re-entry new Work references out-of-scope Goal: {goal_id}"
+                )
+            steps_by_goal[goal_id].append(step.step_id)
+
+    proved_steps = completed_step_evidence or {}
+    outcomes: dict[str, dict[str, Any]] = {}
+    per_goal_satisfaction: list[PlannerGoalSatisfaction] = []
+    for goal_id in expected:
+        decision = decisions[goal_id]
+        completion_action = decision.next_action in {"respond", "execute"}
+        unmet_goal_ids = (
+            []
+            if completion_action and decision.satisfaction_status in {"exact", "substantial"}
+            else [goal_id]
+        )
+        satisfied_goal_ids = (
+            [goal_id]
+            if completion_action and not unmet_goal_ids
+            else []
+        )
+        satisfaction = PlannerGoalSatisfaction(
+            score=decision.satisfaction_score,
+            status=decision.satisfaction_status,
+            satisfied_goal_ids=satisfied_goal_ids,
+            unmet_goal_ids=unmet_goal_ids,
+            unmet_requirements=decision.unmet_requirements,
+            rationale=decision.rationale,
+        )
+        per_goal_satisfaction.append(satisfaction)
+        follows: list[str] = []
+        if decision.next_action == "respond":
+            cited = set(decision.evidence_refs)
+            follows = [
+                step_id
+                for step_id, evidence in proved_steps.items()
+                if goal_id in set(evidence.get("source_goal_ids") or [])
+                and str(evidence.get("evidence_id") or "") in cited
+            ]
+        coverage: PlanCoverage = (
+            "complete"
+            if completion_action
+            else "partial"
+            if decision.unresolved_needs or decision.unmet_requirements
+            else "uncertain"
+        )
+        outcomes[goal_id] = {
+            "disposition": decision.next_action,
+            "coverage": coverage,
+            "unresolved": list(decision.unresolved_needs),
+            "step_ids": list(steps_by_goal[goal_id]),
+            "satisfaction": satisfaction.model_dump(mode="python"),
+            "rationale": decision.rationale,
+            "precedes_step_ids": [],
+            "follows_step_ids": follows,
+        }
+
+    statuses = {item.next_action for item in output.goal_decisions}
+    disposition: PlanDisposition = (
+        next(iter(statuses)) if len(statuses) == 1 else "mixed"
+    )
+    aggregate_score = min(item.score for item in per_goal_satisfaction)
+    worst_status = min(
+        (item.status for item in per_goal_satisfaction),
+        key={"unsatisfied": 0, "partial": 1, "substantial": 2, "exact": 3}.get,
+    )
+    aggregate_satisfied = list(dict.fromkeys(
+        goal_id for item in per_goal_satisfaction for goal_id in item.satisfied_goal_ids
+    ))
+    aggregate_unmet = list(dict.fromkeys(
+        goal_id for item in per_goal_satisfaction for goal_id in item.unmet_goal_ids
+    ))
+    aggregate_requirements = list(dict.fromkeys(
+        requirement
+        for item in per_goal_satisfaction
+        for requirement in item.unmet_requirements
+    ))
+    aggregate = PlannerGoalSatisfaction(
+        score=aggregate_score,
+        status=worst_status,
+        satisfied_goal_ids=aggregate_satisfied,
+        unmet_goal_ids=aggregate_unmet,
+        unmet_requirements=aggregate_requirements,
+        rationale="; ".join(
+            item.rationale for item in output.goal_decisions if item.rationale
+        )[:1200],
+    )
+    coverage: PlanCoverage = (
+        "complete"
+        if all(item.next_action in {"respond", "execute"} for item in output.goal_decisions)
+        else "partial"
+        if aggregate_unmet or aggregate_requirements
+        else "uncertain"
+    )
+    unresolved = list(dict.fromkeys(
+        need for item in output.goal_decisions for need in item.unresolved_needs
+    ))
+    return {
+        "disposition": disposition,
+        "coverage": coverage,
+        "confidence": output.confidence,
+        "goal_summary": "",
+        "steps": [item.model_dump(mode="python") for item in output.new_work],
+        "cancel_activity_ids": [],
+        "escalation_reason": output.escalation_reason,
+        "unresolved": unresolved,
+        "parameter_resolutions": [],
+        "time_conditions": [],
+        "goal_outcomes": outcomes,
+        "goal_satisfaction": aggregate.model_dump(mode="python"),
+        "plan_relation": output.plan_relation,
+        "user_confirmation_required": output.user_confirmation_required,
+    }
 
 def stable_plan_id(request: Any, planner_tier: PlannerTier) -> str:
     """Return the stable host-owned Plan ID for one Planner pass."""

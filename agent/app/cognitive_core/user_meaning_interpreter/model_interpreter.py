@@ -687,15 +687,18 @@ class OllamaUserMeaningInterpreter:
             "Never a category name, code or underscore-separated identifier."
         )
         item["properties"]["output_mode"]["description"] = (
-            "Expected human result type only; the complete request belongs in outcome."
+            "Expected human result type only; the complete request belongs in outcome. "
+            "Any value other than speech requires continuity_scope=goal; only ordinary "
+            "current-conversation speech may be continuity_scope=turn."
         )
         item["properties"]["output_mode"]["enum"].remove("unspecified")
         item["properties"]["output_mode"].pop("default", None)
         item["properties"]["continuity_scope"]["description"] = (
-            "Use goal when the understood meaning leaves unfinished cross-turn "
-            "responsibility or changes/answers pending Goal meaning. Use turn only for "
-            "ordinary conversation that can be completed now with no unfinished "
-            "user/world objective. Decide from meaning in context, never surface words."
+            "Ownership after UMI handoff, not duration. Use goal for every non-speech "
+            "result and whenever information/evidence, embodied/media/stateful work, or "
+            "pending-Goal change remains; goal may complete before the next user turn. "
+            "Use turn only for ordinary current-conversation speech completed directly "
+            "by Social Cognition with no separate user/world objective."
         )
         item["properties"]["continuity_scope"].pop("default", None)
         item["properties"]["local_ref"] = {

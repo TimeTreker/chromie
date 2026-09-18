@@ -228,6 +228,158 @@ def cancellation_reporting_contract(context: dict[str, Any], goal_ids: frozenset
     )
 
 
+def planner_reentry_source_work_projection(
+    plan: Any, *, goal_ids: set[str],
+) -> dict[str, Any]:
+    """Project historical source Work without exposing an obsolete output envelope.
+
+    Re-entry is a new Planner decision. The prior Plan is correlation provenance,
+    not a template for the current model DTO. Exposing its aggregate disposition,
+    coverage, satisfaction, and goal-outcome envelope encouraged the model to copy
+    that already-materialized CanonicalPlan shape instead of the current flat
+    PlannerModelOutput contract. Keep only exact Work identities/arguments needed to
+    correlate terminal Evidence and reject replay.
+    """
+
+    if not isinstance(plan, dict):
+        return {}
+    scoped = {str(item).strip() for item in goal_ids if str(item).strip()}
+    steps: list[dict[str, Any]] = []
+    for item in plan.get("steps") or []:
+        if not isinstance(item, dict):
+            continue
+        source_goal_ids = [
+            str(goal_id).strip()
+            for goal_id in item.get("source_goal_ids") or []
+            if str(goal_id).strip()
+        ]
+        if scoped and not scoped.intersection(source_goal_ids):
+            continue
+        projected = {
+            key: copy.deepcopy(item[key])
+            for key in (
+                "step_id",
+                "capability_id",
+                "args",
+                "timing",
+                "source_goal_ids",
+                "step_purpose",
+                "expected_outcome",
+            )
+            if key in item
+        }
+        steps.append(projected)
+    return {
+        "plan_id": plan.get("plan_id"),
+        "goal_ids": [
+            goal_id
+            for goal_id in plan.get("goal_ids") or []
+            if not scoped or str(goal_id).strip() in scoped
+        ],
+        "steps": steps,
+    }
+
+
+def planner_reentry_execution_truth_projection(
+    truth: Any, *, goal_ids: set[str],
+) -> dict[str, Any]:
+    """Project Runtime execution facts without resembling a Planner output DTO.
+
+    ``trusted_execution_outcome`` is Host-owned evidence state. Its historical shape
+    contains names such as ``goal_outcomes`` and ``planned_satisfaction`` that closely
+    resemble older Planner envelopes and can become an accidental few-shot template.
+    Re-entry needs the facts, not that representation. Rename and narrow the surface so
+    the model receives terminal/retryability truth while the current response schema
+    remains the only output shape in the transaction.
+    """
+
+    if not isinstance(truth, dict):
+        return {}
+    scoped = {str(item).strip() for item in goal_ids if str(item).strip()}
+
+    evidence_facts: list[dict[str, Any]] = []
+    for item in truth.get("evidence") or []:
+        if not isinstance(item, dict):
+            continue
+        item_goal_ids = [
+            str(goal_id).strip()
+            for goal_id in item.get("source_goal_ids") or []
+            if str(goal_id).strip()
+        ]
+        if scoped and not scoped.intersection(item_goal_ids):
+            continue
+        row: dict[str, Any] = {
+            "evidence_ref": item.get("evidence_id"),
+            "capability_ref": item.get("capability_id"),
+            "goal_refs": item_goal_ids,
+            "execution_state": item.get("status"),
+            "observation_state": item.get("observation_status"),
+        }
+        retryability = item.get("provider_retryability")
+        if isinstance(retryability, dict) and retryability:
+            row["provider_retryability"] = copy.deepcopy(retryability)
+        reason_code = str(item.get("reason_code") or "").strip()
+        if reason_code:
+            row["reason_code"] = reason_code
+        evidence_facts.append({
+            key: value for key, value in row.items()
+            if value not in (None, "", [], {})
+        })
+
+    goal_execution_facts: list[dict[str, Any]] = []
+    for item in truth.get("goal_outcomes") or []:
+        if not isinstance(item, dict):
+            continue
+        goal_id = str(item.get("goal_id") or "").strip()
+        if not goal_id or (scoped and goal_id not in scoped):
+            continue
+        row: dict[str, Any] = {
+            "goal_ref": goal_id,
+            "execution_state": item.get("status"),
+            "evidence_refs": [
+                str(evidence_id).strip()
+                for evidence_id in item.get("evidence_ids") or []
+                if str(evidence_id).strip()
+            ],
+            "runtime_continuation_required": bool(
+                item.get("requires_planner_continuation")
+            ),
+        }
+        qualification = item.get("completion_qualification")
+        if isinstance(qualification, dict):
+            gate: dict[str, Any] = {
+                "required": bool(qualification.get("required")),
+                "established": bool(qualification.get("established")),
+            }
+            qualification_evidence = [
+                str(entry.get("evidence_id") or "").strip()
+                for entry in qualification.get("qualifications") or []
+                if isinstance(entry, dict)
+                and str(entry.get("evidence_id") or "").strip()
+            ]
+            if qualification_evidence:
+                gate["evidence_refs"] = qualification_evidence
+            row["completion_gate"] = gate
+        reason_codes = [
+            str(code).strip()
+            for code in item.get("reason_codes") or []
+            if str(code).strip()
+        ]
+        if reason_codes:
+            row["reason_codes"] = reason_codes
+        goal_execution_facts.append({
+            key: value for key, value in row.items()
+            if value not in (None, "", [], {})
+        })
+
+    return {
+        "execution_outcome_ref": truth.get("outcome_id"),
+        "aggregate_execution_state": truth.get("aggregate_status"),
+        "goal_execution_facts": goal_execution_facts,
+        "evidence_facts": evidence_facts,
+    }
+
+
 def _canonical_work_prompt(
     request: CognitiveWorkRequest, capabilities: list[dict[str, Any]], *,
     tier: str, goal_context: PlannerGoalContext | None = None,
@@ -281,8 +433,25 @@ def _canonical_work_prompt(
     )
     for key, label in required_sections:
         if key in context:
+            value = context[key]
+            if key == "canonical_plan_resolution" and request.planner_reentry_scope:
+                label = (
+                    "Historical source Work correlation JSON "
+                    "(provenance only; never copy its envelope into current output)"
+                )
+                value = planner_reentry_source_work_projection(
+                    value, goal_ids=set(request.planner_reentry_scope.goal_ids),
+                )
+            elif key == "trusted_execution_outcome" and request.planner_reentry_scope:
+                label = (
+                    "Trusted execution fact rows JSON "
+                    "(input facts only; never an output template)"
+                )
+                value = planner_reentry_execution_truth_projection(
+                    value, goal_ids=set(request.planner_reentry_scope.goal_ids),
+                )
             sections.append("\n" + label + ":\n" + required_json(
-                context[key], None, label=label,
+                value, None, label=label,
             ) + "\n")
     if context.get("active_goal_snapshots"):
         sections.append("\nActive goals JSON:\n" + required_json(
@@ -295,6 +464,23 @@ def _canonical_work_prompt(
     sections.append("Trusted Work planning facts JSON:\n" + required_json(
         projections, None, label=tier + " Planner complete Work facts",
     ))
+    if request.planner_reentry_scope:
+        sections.append(
+            "\nPLANNER RE-ENTRY CONTRACT:\n"
+            "This is a new bounded Planner decision over current trusted state, not a replay "
+            "or repair of the historical source Plan. The historical source Work projection "
+            "exists only to correlate completed/recoverable Activities with Evidence. Never "
+            "copy its CanonicalPlan envelope or any historical Runtime/result envelope into "
+            "the current result. Execution fact rows are input evidence, not a DTO example; "
+            "never rename/copy them back into goal_outcomes, satisfaction, respond, or steps. "
+            "Return "
+            "only the current flat Work DTO required by the decoder. Never replay a completed "
+            "Activity merely to report its result. When trusted terminal Evidence is sufficient "
+            "for an information Goal, establish a respond outcome with zero steps; Social "
+            "Cognition will author the actual words from the supplied Evidence. If Evidence is "
+            "insufficient, plan only genuinely new Work or expose the real remaining gap.\n"
+        )
+
     sections.append(
         "\n" + PLANNER_WORK_AUTHORITY_PROMPT + CAPABILITY_LOOKUP_PROMPT +
         "Capability library index JSON:\n" + required_json(context.get("capability_index", []), None, label="Capability index") +
@@ -405,6 +591,151 @@ def _canonical_work_prompt(
     sections.append(future_readiness_contract(goals))
     sections.append(cancellation_reporting_contract(context, goals.cancellation_reentry_goal_ids))
     return "".join(sections)
+
+
+
+def fast_evidence_reentry_goal_projection(
+    goals: list[dict[str, Any]] | tuple[dict[str, Any], ...],
+) -> list[dict[str, Any]]:
+    """Project only canonical WHAT needed for a post-execution decision."""
+
+    projected: list[dict[str, Any]] = []
+    for goal in goals:
+        if not isinstance(goal, dict):
+            continue
+        metadata = goal.get("metadata") if isinstance(goal.get("metadata"), dict) else {}
+        item = {
+            "goal_id": goal.get("goal_id"),
+            "description": goal.get("description"),
+            "success_criteria": goal.get("success_criteria"),
+            "bindings": (goal.get("object") or {}).get("bindings")
+            if isinstance(goal.get("object"), dict)
+            else None,
+            "constraints": goal.get("constraints"),
+            "resource_responsibility": goal.get("resource_responsibility"),
+            "output_mode": metadata.get("output_mode"),
+        }
+        projected.append({
+            key: value for key, value in item.items()
+            if value not in (None, "", [], {})
+        })
+    return projected
+
+
+def fast_evidence_reentry_evidence_projection(
+    context: dict[str, Any], *, evidence_refs: set[str], goal_ids: set[str],
+) -> list[dict[str, Any]]:
+    """Keep fresh trusted observations verbatim enough for Planner judgment."""
+
+    rows: list[dict[str, Any]] = []
+    for item in context.get("trusted_terminal_evidence") or []:
+        if not isinstance(item, dict):
+            continue
+        evidence_id = str(item.get("evidence_id") or "").strip()
+        if evidence_id not in evidence_refs:
+            continue
+        source_goal_ids = [
+            str(goal_id).strip()
+            for goal_id in item.get("source_goal_ids") or []
+            if str(goal_id).strip()
+        ]
+        if goal_ids and source_goal_ids and not goal_ids.intersection(source_goal_ids):
+            continue
+        row = {
+            "evidence_ref": evidence_id,
+            "capability_ref": item.get("tool_id") or item.get("capability_id"),
+            "status": item.get("status"),
+            "goal_refs": source_goal_ids,
+            "data": copy.deepcopy(item.get("data")),
+            "reason_code": item.get("reason_code"),
+        }
+        rows.append({
+            key: value for key, value in row.items()
+            if value not in (None, "", [], {})
+        })
+    return rows
+
+
+def fast_evidence_reentry_prompt(
+    request: CognitiveWorkRequest,
+    capabilities: list[dict[str, Any]],
+    *,
+    goal_context: PlannerGoalContext,
+    allow_new_work: bool,
+) -> LayeredPrompt:
+    """Minimal post-execution Planner prompt, deliberately unlike Plan DTOs."""
+
+    if request.planner_reentry_scope is None:
+        raise ValueError("evidence re-entry prompt requires typed re-entry scope")
+    context = request.context if isinstance(request.context, dict) else {}
+    scope = request.planner_reentry_scope
+    goal_ids = set(scope.goal_ids)
+    evidence_refs = set(scope.evidence_refs)
+    contract = (
+        "You are Chromie's Fast Planner handling a trusted post-execution Evidence re-entry. "
+        "There is no new user meaning and no new Goal Association decision. Decide only what "
+        "the already-owned scoped Goals need next after the supplied Runtime/Evidence facts. "
+        "Return exactly the FastPlannerEvidenceReentryOutput decoder shape. This contract is "
+        "intentionally different from CanonicalPlan and PlannerModelOutput: never emit "
+        "goal_outcomes, steps, disposition, coverage, unmet_goal_ids, unmet_requirements, "
+        "response_text, or any historical envelope key at the top level. For every scoped Goal "
+        "emit exactly one goal_decisions item. next_action=respond means fresh trusted Evidence "
+        "is sufficient and no new Work is needed; cite the exact evidence_refs and put nothing "
+        "in new_work for that Goal. next_action=execute means genuinely new Work is required; "
+        "author it only in new_work and never replay a completed source Activity. clarify is "
+        "only for a real user-resolvable blocker; unavailable/refused are terminal limitations; "
+        "escalate delegates unresolved HOW without Work. SC owns all user-facing wording. "
+        "satisfaction_score/status assess how fully the selected next action covers the Goal; "
+        "pending execution alone does not lower prospective adequacy. Preserve uncertainty and "
+        "epistemic strength from Evidence. Historical source Work and execution facts are input "
+        "provenance only, never examples of the output shape. plan_relation normally stays exact; "
+        "safe_adjustment/alternative requires confirmation and executable new Work."
+    )
+    source_work = context.get("canonical_plan_resolution") or {}
+    facts = {
+        "reentry_scope": scope.model_dump(mode="json"),
+        "canonical_goals": fast_evidence_reentry_goal_projection(
+            list(goal_context.authoritative_goals)
+        ),
+        "responsibilities": [
+            {
+                "local_ref": item.local_ref,
+                "outcome": item.outcome,
+                "output_mode": item.output_mode,
+                "bindings": copy.deepcopy(item.bindings),
+            }
+            for item in request.responsibilities
+        ],
+        "fresh_evidence": fast_evidence_reentry_evidence_projection(
+            context, evidence_refs=evidence_refs, goal_ids=goal_ids,
+        ),
+        "source_work_provenance": planner_reentry_source_work_projection(
+            source_work, goal_ids=goal_ids,
+        ),
+        "execution_facts": planner_reentry_execution_truth_projection(
+            context.get("trusted_execution_outcome"), goal_ids=goal_ids,
+        ),
+        "available_new_work_capabilities": (
+            fast_advance_semantic_capability_projection(capabilities)
+            if allow_new_work else []
+        ),
+        "original_user_text": request.original_user_text,
+    }
+    rendered = (
+        contract
+        + "\n\nTrusted post-execution facts JSON:\n"
+        + required_json(facts, None, label="Fast Planner Evidence re-entry facts")
+    )
+    return LayeredPrompt.promote(rendered, operating_contract=(contract,))
+
+
+def fast_evidence_reentry_system_prompt() -> str:
+    return (
+        "You are Chromie's Fast Planner at the post-execution Evidence boundary. "
+        "Judge only the next Work state for the exact scoped Goals. Fresh trusted Evidence is "
+        "fact; historical Plan/Runtime objects are provenance, not output templates. Return only "
+        "FastPlannerEvidenceReentryOutput JSON. Do not write user-facing language."
+    )
 
 
 def fast_plan_prompt(

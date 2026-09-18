@@ -149,6 +149,52 @@ def _look_at_person_catalog_capability() -> CatalogCapability:
 def _nod_catalog_capability() -> CatalogCapability:
     return CatalogCapability(capability_id='soridormi.nod_yes', agent_id='capability_agent', description='Perform a bounded affirmative head nod.', input_schema={'type': 'object', 'properties': {'count': {'type': 'integer', 'minimum': 1}}, 'required': ['count'], 'additionalProperties': False}, effects=['physical_motion'], available=True, interaction_executable=True, prompt_tier='common', can_run_parallel=True, parallel_metadata_declared=True, exclusive_group='body.head', resource_claims=['body.head'])
 
+@pytest.mark.asyncio
+async def test_nod_count_binding_evidence_wrapper_is_semantically_equal_to_scalar_arg() -> None:
+    request = CognitiveWorkRequest(
+        sid="nod-count-evidence-wrapper",
+        text="nod your head 5 times, please",
+        language="en-US",
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1",
+            outcome="nod your head 5 times",
+            output_mode="body_action",
+            continuity_scope="goal",
+            bindings={"count": {"value": 5, "source_evidence": "t3"}},
+            confidence=1.0,
+        )],
+        interpretation_confidence=1.0,
+    )
+    raw = {
+        "disposition": "execute",
+        "coverage": "complete",
+        "covered_responsibility_refs": ["r1"],
+        "activities": [{
+            "activity_id": "nod-five",
+            "role": "capability",
+            "capability_id": "soridormi.nod_yes",
+            "args": {"count": 5},
+            "timing": "sequential",
+            "source_responsibility_refs": ["r1"],
+        }],
+        "continuations": [],
+        "confidence": 1.0,
+        "unresolved": [],
+        "reason_summary": "Perform exactly five nods.",
+    }
+    model = _StreamingModel([_wire_output(raw)])
+    frames = [
+        frame
+        async for frame in FastPlannerResolver(
+            model, _Catalog([_nod_catalog_capability()])
+        ).stream_advance(request)
+    ]
+
+    assert isinstance(frames[-1], FastPlannerStreamTerminal)
+    assert frames[-1].advance.activities[0].args == {"count": 5}
+    assert request.responsibilities[0].bindings == {"count": 5}
+
+
 def _blink_social_catalog_capability() -> CatalogCapability:
     return CatalogCapability(capability_id='soridormi.blink_eyes', agent_id='capability_agent', description='Blink as an optional visual social expression.', input_schema={'type': 'object', 'properties': {'count': {'type': 'integer', 'minimum': 1, 'default': 2}}, 'additionalProperties': False}, effects=['visual_expression'], available=True, interaction_executable=True, prompt_tier='common', behavior_domains=['social_attention'], can_run_parallel=True, parallel_metadata_declared=True, exclusive_group='visual.eyes', resource_claims=['visual.eyes'])
 

@@ -17,6 +17,7 @@ try:
     from chromie_contracts.core_interpretation import (
         CognitiveResponsibilityProposal,
         CognitiveWorkRequest,
+        responsibility_binding_material_value,
     )
     from chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
     from chromie_contracts.user_turn import (
@@ -33,6 +34,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import (
         CognitiveResponsibilityProposal,
         CognitiveWorkRequest,
+        responsibility_binding_material_value,
     )
     from shared.chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
     from shared.chromie_contracts.user_turn import (
@@ -730,7 +732,8 @@ def validate_fast_advance_output(
         # (for example intensity=1.0) cannot witness a requested count=1.
         # Check each source independently, including optional/defaulted inputs.
         for source_ref in activity.source_responsibility_refs:
-            for name, expected in by_ref[source_ref].bindings.items():
+            for name, raw_expected in by_ref[source_ref].bindings.items():
+                expected = responsibility_binding_material_value(raw_expected)
                 parameter_schema = properties.get(name)
                 if (
                     isinstance(expected, bool)
@@ -777,7 +780,7 @@ def validate_fast_advance_output(
                 )
         required_inputs = set(input_schema.get("required") or [])
         authoritative_bindings = {
-            str(name): value
+            str(name): responsibility_binding_material_value(value)
             for ref in activity.source_responsibility_refs
             for name, value in by_ref[ref].bindings.items()
         }
@@ -1096,19 +1099,48 @@ def validated_fail_safe_progress(
     return retained
 
 
+def _effective_idempotent_read_args(
+    args: dict[str, Any],
+    *,
+    capability: dict[str, Any],
+) -> dict[str, Any]:
+    """Return provider-effective args for duplicate safe-read comparison.
+
+    A side-effect-free idempotent Capability may expose optional schema defaults.
+    Omitting such a field and spelling the exact default are the same provider read,
+    even when one spelling was explicitly grounded by UMI and the other relies on the
+    provider contract.  Apply defaults only to the comparison surface; do not mutate
+    Planner-authored Work or fabricate provenance.
+    """
+
+    effective = copy.deepcopy(args)
+    schema = capability.get("input_schema")
+    properties = schema.get("properties") if isinstance(schema, dict) else None
+    if not isinstance(properties, dict):
+        return effective
+    for parameter, parameter_schema in properties.items():
+        if parameter in effective or not isinstance(parameter_schema, dict):
+            continue
+        if "default" in parameter_schema:
+            effective[parameter] = copy.deepcopy(parameter_schema["default"])
+    return effective
+
+
 def collapse_redundant_idempotent_read_activities(
     output: FastPlannerAdvanceModelOutput,
     *,
     capabilities: list[dict[str, Any]],
 ) -> tuple[FastPlannerAdvanceModelOutput, list[dict[str, Any]]]:
-    """Collapse exact duplicate read Activities without changing Planner meaning.
+    """Collapse semantically identical provider reads without changing Work.
 
     Only a Capability whose authoritative catalog contract is both idempotent and
-    side-effect-free is eligible.  Two Activities are duplicates only when their
-    capability, args, argument provenance, timing, and Responsibility ownership are
-    identical; model-authored IDs and rationale are representation-only.  Distinct
-    arguments, provenance, timing, ownership, or any effectful/non-idempotent Work
-    remain untouched.
+    side-effect-free is eligible. Two Activities are duplicates when the same
+    Capability, Responsibility ownership and timing resolve to the same effective
+    provider arguments after declared optional defaults are applied. Argument-source
+    provenance has already been validated before this function and is not execution
+    identity: two grounded paths to the same safe read must not cause duplicate I/O.
+    Distinct effective arguments, timing, ownership, or any effectful/non-idempotent
+    Work remain untouched.
     """
 
     by_id = {
@@ -1130,11 +1162,9 @@ def collapse_redundant_idempotent_read_activities(
         signature = json.dumps(
             {
                 "capability_id": activity.capability_id,
-                "args": activity.args,
-                "argument_sources": {
-                    name: span.model_dump(mode="json")
-                    for name, span in sorted(activity.argument_sources.items())
-                },
+                "effective_args": _effective_idempotent_read_args(
+                    activity.args, capability=definition
+                ),
                 "timing": activity.timing,
                 "source_responsibility_refs": sorted(activity.source_responsibility_refs),
             },
