@@ -19,6 +19,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                 environ={
                     "ORCH_ENABLE_AGENT": "true",
                     "ORCH_TTS_CONCURRENCY": "2",
+                    "ORCH_FAILURE_SPEECH_MODE": "diagnostic",
                     "RECORDINGS_DIR": "captures",
                     "ORCH_DATA_LOOP_INTERACTION_SESSION_CAPTURE_POLICY_PATH": "policies/session.json",
                     "CHROMIE_RUNTIME_EVENT_ROOT": "events",
@@ -28,6 +29,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
 
         self.assertTrue(settings.cognition.enable_agent)
         self.assertEqual(settings.playback.concurrency, 2)
+        self.assertEqual(settings.session.failure_speech_mode, "diagnostic")
         self.assertEqual(settings.evidence.recordings_dir, root / "captures")
         self.assertEqual(
             settings.evidence.interaction_session_capture_policy_path,

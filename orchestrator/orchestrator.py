@@ -225,6 +225,7 @@ class VoiceAssistant:
             cognition_settings.enable_interaction_response
         )
         self.enable_soridormi_capabilities = cognition_settings.enable_soridormi_capabilities
+        self.failure_speech_mode = session_settings.failure_speech_mode
         self.addressedness_gate_enabled = session_settings.addressedness_gate_enabled
         self.addressedness_engagement_timeout_s = (
             session_settings.addressedness_engagement_timeout_s
@@ -3944,6 +3945,48 @@ class VoiceAssistant:
             "cancelled_confirmation": confirmation_evidence,
         }
 
+    @staticmethod
+    def _diagnostic_failure_speech(
+        *,
+        zh: bool,
+        failure_stage: str | None,
+        failure_class: str | None,
+        failure_error: str | None,
+    ) -> str:
+        """Project recorded operational failure evidence into debug speech."""
+
+        stage = " ".join(str(failure_stage or "cognition").split())
+        failure_kind = " ".join(
+            str(failure_class or "semantic_failure").split()
+        )
+        detail = " ".join(str(failure_error or "").split())
+        duplicate_prefix = f"{stage}:{failure_kind}:"
+        if detail.startswith(duplicate_prefix):
+            detail = detail[len(duplicate_prefix):].strip()
+        elif detail == failure_kind:
+            detail = ""
+        if len(detail) > 320:
+            detail = f"{detail[:317].rstrip()}..."
+
+        stage_label = stage.replace("_", " ").strip()
+        failure_label = failure_kind.replace("_", " ").strip()
+        if zh:
+            base = f"{stage_label} 失败"
+            if not detail:
+                return f"{base}（{failure_label}）。"
+            ending = (
+                ""
+                if detail.endswith(("。", "！", "？", ".", "!", "?"))
+                else "。"
+            )
+            return f"{base}：{detail}{ending}"
+
+        base = f"{stage_label.capitalize()} failed"
+        if not detail:
+            return f"{base} ({failure_label})."
+        ending = "" if detail.endswith((".", "!", "?")) else "."
+        return f"{base}: {detail}{ending}"
+
     def _cognitive_core_exception_safe_response(
         self,
         user_text: str,
@@ -3960,15 +4003,29 @@ class VoiceAssistant:
         validated Canonical Plan and Trusted Capability Runtime execution.
         """
 
-        # Cognition is unavailable at this boundary. Keep this emergency
-        # fail-closed utterance tiny and natural; authoritative safety facts stay
-        # in metadata rather than leaking workflow vocabulary into Chromie's voice.
+        # Cognition is unavailable at this boundary. Friendly mode keeps the
+        # emergency fail-closed utterance tiny and natural. Explicit diagnostic
+        # mode may project only already-recorded operational failure evidence;
+        # it does not reinterpret user meaning or authorize any effect.
         envelope = (context or {}).get("user_turn_envelope")
         zh = self._looks_zh(user_text)
+        diagnostic = (
+            getattr(self, "failure_speech_mode", "friendly") == "diagnostic"
+            and bool(failure_stage or failure_class or failure_error)
+        )
         text = (
-            "咦，刚才没接上。你再跟我说一遍嘛。"
-            if zh
-            else "Huh, that didn't go through. Can you tell me again?"
+            self._diagnostic_failure_speech(
+                zh=zh,
+                failure_stage=failure_stage,
+                failure_class=failure_class,
+                failure_error=failure_error,
+            )
+            if diagnostic
+            else (
+                "咦，刚才没接上。你再跟我说一遍嘛。"
+                if zh
+                else "Huh, that didn't go through. Can you tell me again?"
+            )
         )
         response = self._host_speech_response(
             text,

@@ -333,6 +333,7 @@ class PlaybackSettings:
 class SessionLifecycleSettings:
     timing_logs_enabled: bool
     event_log_path: Path | None
+    failure_speech_mode: str
     addressedness_gate_enabled: bool
     addressedness_engagement_timeout_s: float
     confirmation_ttl_s: float
@@ -827,6 +828,12 @@ class HostSettingsSnapshot:
                 ),
                 event_log_path=_optional_path(
                     values, "ORCH_EVENT_LOG_PATH", project_root=project_root
+                ),
+                failure_speech_mode=_choice(
+                    values,
+                    "ORCH_FAILURE_SPEECH_MODE",
+                    "friendly",
+                    {"diagnostic", "friendly"},
                 ),
                 addressedness_gate_enabled=_bool(
                     values, "ORCH_ADDRESSEDNESS_GATE_ENABLED", True

@@ -1067,6 +1067,44 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
 
+    def test_cognitive_core_exception_diagnostic_mode_speaks_recorded_failure(
+        self,
+    ) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.failure_speech_mode = "diagnostic"
+
+        response = assistant._cognitive_core_exception_safe_response(
+            "nod your head 6 times",
+            context={},
+            failure_stage="fast_planner_stream",
+            failure_class="stream_transport_invalid",
+            failure_error=(
+                "fast_planner_stream:stream_transport_invalid:"
+                "SGLang stream ended without a finish_reason"
+            ),
+        )
+
+        self.assertEqual(
+            response.speech[0].text,
+            "Fast planner stream failed: "
+            "SGLang stream ended without a finish_reason.",
+        )
+        self.assertEqual(
+            response.metadata["semantic_failure_stage"],
+            "fast_planner_stream",
+        )
+        self.assertEqual(
+            response.metadata["semantic_failure_class"],
+            "stream_transport_invalid",
+        )
+        self.assertEqual(
+            response.metadata["semantic_failure_error"],
+            "fast_planner_stream:stream_transport_invalid:"
+            "SGLang stream ended without a finish_reason",
+        )
+        self.assertEqual(response.metadata["effect_execution"], "not_authorized")
+        self.assertFalse(response.metadata["semantic_fallback"])
+
     def test_cognitive_failure_metadata_is_recorded_as_experience_error(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         response = assistant._cognitive_core_exception_safe_response(
