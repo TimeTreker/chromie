@@ -106,7 +106,15 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "a fresh turn whose reply is already pending/delivered. Never invent a task just to create "
     "an interaction need. "
     "Use exact eligible social-expression Capability IDs and schema-valid arguments only "
-    "when useful, with each proposal anchored to its own communicative act. The prohibition "
+    "when useful, with each proposal anchored to its own communicative act. Decide the immediate "
+    "social intention first, then choose as many or as few verbal and embodied expressions as are "
+    "socially useful to realize it. There is no target number of expressions and no requirement to "
+    "use an available Capability. Add another expression only when it contributes distinct social "
+    "meaning or noticeably improves the naturalness of the interaction; availability alone is never "
+    "a reason to add one. Repetition is valid only when the repetition itself has a socially meaningful "
+    "purpose. Stop the decision as soon as the intended social response is complete. When an embodied "
+    "expression decorates the same communicative act, put it in that act's auxiliary_activities; do "
+    "not create a sibling communicative act merely to enumerate another gesture. The prohibition "
     "on raw motor, joint, actuator or controller fields applies only to optional social "
     "expression that YOU author. High-level requested Work such as walking, turning, nodding, "
     "fetching or looking is not raw motor control and must never be declared unavailable or "
@@ -136,7 +144,12 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
 
 
 def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialCognitionRequest) -> None:
-    """Offer fresh opaque IDs and immutable reuse of known messages."""
+    """Keep fresh IDs compact while preserving immutable reuse of delivered wording.
+
+    Activity identity is transport bookkeeping, not a social-expression quota.  Fresh
+    acts may use any short ID that is not a retained delivered identity; retained IDs
+    remain reusable only with their exact delivered wording.
+    """
     known: dict[str, set[str]] = {}
     context = request.context.get("interaction_context", {})
     for key in (
@@ -147,16 +160,19 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
             if isinstance(ids, list):
                 for identity in ids:
                     known.setdefault(str(identity).strip(), set()).add(normalize_whitespace(row.get("text") or ""))
-    if not known:
-        return
-    capacity = schema["properties"]["activities"]["maxItems"]
-    candidates = [f"sc:{request.snapshot_digest()[:24]}:{index}" for index in range(capacity + len(known))]
-    fresh_ids = [identity for identity in candidates if identity not in known][:capacity]
+
     contract = schema["$defs"]["SocialCommunicativeAct"]
     branches = []
     for branch in contract.get("oneOf", [contract]):
         fresh = copy.deepcopy(branch)
-        fresh["properties"]["activity_id"] = {"type": "string", "enum": fresh_ids}
+        fresh_id = fresh["properties"].get("activity_id")
+        if isinstance(fresh_id, dict):
+            fresh["properties"]["activity_id"] = {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": min(int(fresh_id.get("maxLength", 160)), 24),
+                **({"not": {"enum": sorted(known)}} if known else {}),
+            }
         variants = [fresh]
         for identity, messages in known.items():
             if len(messages) != 1:
@@ -626,6 +642,13 @@ def _social_model_context(context: dict[str, Any]) -> dict[str, Any]:
     projected = copy.deepcopy(context)
     if "mind" in projected:
         projected["mind"] = _social_mind_projection(context)
+    # UMI already interpreted the current user turn before SC runs.  Generic
+    # dialogue history is useful to UMI, but exposing it again to SC invites a
+    # smaller model to re-answer an older turn instead of wording the accepted
+    # current Responsibility.  Delivered prior speech remains available through
+    # interaction_context.prior_delivered_speech for repetition/repair identity.
+    projected.pop("history", None)
+    projected.pop("core_interpretation", None)
     # Integrity lineage is trusted transport metadata rather than cognition.
     projected.pop("semantic_artifact_lineage", None)
     # The exact admitted source is already present once as request.source_turn.

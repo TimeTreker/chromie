@@ -1235,7 +1235,6 @@ def auxiliary_social_prompt_context(
         "target_evidence": target_evidence,
         "social_interaction_style": style,
         "recent_auxiliary_behavior_evidence": recent,
-        "max_activities": 3,
     }
 
 

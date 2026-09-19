@@ -146,7 +146,7 @@ class SocialCommunicativeAct(BaseModel):
     evidence_refs: list[str] = Field(default_factory=list)
     addressed_need_ids: list[str] = Field(default_factory=list)
     repair_of_activity_ids: list[str] = Field(default_factory=list, max_length=8)
-    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(default_factory=list, max_length=3)
+    auxiliary_activities: list[AuxiliaryPlanActivity] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_expression(self) -> "SocialCommunicativeAct":
@@ -180,7 +180,7 @@ class SocialCognitionOutput(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
     disposition: Literal["communicate", "silence", "deliberate"]
-    activities: list[SocialCommunicativeAct] = Field(default_factory=list, max_length=8)
+    activities: list[SocialCommunicativeAct] = Field(default_factory=list)
     reason_summary: str = Field(max_length=600)
     need_outcomes: dict[str, Literal["covered", "pending"]] = Field(default_factory=dict)
     memory_candidates: list[SituationalRelationshipMemoryCandidate] = Field(default_factory=list, max_length=4)
@@ -197,8 +197,6 @@ class SocialCognitionOutput(BaseModel):
         ids = [act.activity_id for act in self.activities]
         if len(ids) != len(set(ids)):
             raise ValueError("communicative Activity IDs must be unique")
-        if sum(len(act.auxiliary_activities) for act in self.activities) > 3:
-            raise ValueError("one Social Cognition decision permits at most three expressions")
         auxiliary_ids = [item.auxiliary_activity_id for act in self.activities for item in act.auxiliary_activities]
         if len(auxiliary_ids) != len(set(auxiliary_ids)):
             raise ValueError("social-expression IDs must be unique across the complete decision")

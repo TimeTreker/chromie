@@ -492,13 +492,32 @@ class CapabilityRuntime:
             else:
                 self._prepared_planner_work.pop(turn_id, None)
 
+    @staticmethod
+    def _request_affects_planning_state(request: CapabilityRequest) -> bool:
+        """Return whether one Runtime request is Planner-owned task Work.
+
+        Presentation runs concurrently with planning by design.  Speech delivery and
+        optional social decoration may share the same turn_id, but they do not change
+        Goal/Work semantics and therefore must not advance or invalidate Planner guards.
+        """
+
+        metadata = request.metadata if isinstance(request.metadata, dict) else {}
+        return not (
+            request.capability_id == "chromie.speak"
+            or metadata.get("execution_role") == "social_decoration"
+            or metadata.get("source") == "social_cognition_auxiliary_activity"
+        )
+
     def _planning_state_locked(self, goal_ids: list[str], turn_id: str) -> dict[str, Any]:
         goals = set(goal_ids)
         self._refresh_goal_state(goals)
         work: dict[str, Any] = {}
         for interaction_id, requests in self._scheduled.items():
             for request_id, (request, _definition) in requests.items():
-                if not (goals.intersection(self._request_goal_ids(request)) or request.metadata.get("turn_id") == turn_id):
+                metadata = request.metadata if isinstance(request.metadata, dict) else {}
+                if not self._request_affects_planning_state(request):
+                    continue
+                if not (goals.intersection(self._request_goal_ids(request)) or metadata.get("turn_id") == turn_id):
                     continue
                 active = self._active.get((interaction_id, request_id))
                 work[interaction_id + "/" + request_id] = {
@@ -1050,8 +1069,21 @@ class CapabilityRuntime:
                         self._plan_commit_versions[scope] = version + 1
                     self._consume_prepared_bindings_locked(guard)
                 else:
-                    scopes = {"goal:" + goal for request in scheduled for goal in self._request_goal_ids(request)}
-                    scopes.update("turn:" + str(request.metadata["turn_id"]) for request in scheduled if request.metadata.get("turn_id"))
+                    planning_requests = [
+                        request
+                        for request in scheduled
+                        if self._request_affects_planning_state(request)
+                    ]
+                    scopes = {
+                        "goal:" + goal
+                        for request in planning_requests
+                        for goal in self._request_goal_ids(request)
+                    }
+                    scopes.update(
+                        "turn:" + str(request.metadata["turn_id"])
+                        for request in planning_requests
+                        if request.metadata.get("turn_id")
+                    )
                     for scope in scopes:
                         self._plan_commit_versions[scope] = self._plan_commit_versions.get(scope, 0) + 1
                 submission_task = asyncio.create_task(

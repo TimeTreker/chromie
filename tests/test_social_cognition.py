@@ -532,7 +532,7 @@ def test_silence_and_repair_have_distinct_schema_contracts():
         "text": "Previously delivered.", "metadata": {"communicative_activity_ids": ["earlier"]},
     }]}})
     schema = social_cognition_response_schema(current, [])
-    fresh_id = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]["enum"][0]
+    fresh_id = "fresh"
     assert Draft202012Validator(schema).is_valid({
         "disposition": "silence", "activities": [], "reason_summary": "No new interaction need.",
     })
@@ -551,17 +551,20 @@ def test_native_identity_choices_preserve_reuse_and_explicit_repetition(ledger_k
         "text": words, "metadata": {"communicative_activity_ids": ["existing"]},
     }]}})
     schema = social_cognition_response_schema(current, [])
-    fresh_ids = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]["enum"]
-    assert len(fresh_ids) == schema["properties"]["activities"]["maxItems"]
-    assert "existing" not in fresh_ids and len(set(fresh_ids)) == len(fresh_ids)
+    fresh_contract = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]
+    assert fresh_contract["maxLength"] == 24
+    assert fresh_contract["not"]["enum"] == ["existing"]
+    assert "maxItems" not in schema["properties"]["activities"]
     for contract in (schema, {"$defs": schema["$defs"], "oneOf": schema["oneOf"]}):
         validator = Draft202012Validator(contract)
         assert validator.is_valid(response(activity_id="existing", text=words))
         assert not validator.is_valid(response(activity_id="existing", text="Different words."))
-        assert validator.is_valid(response(activity_id=fresh_ids[0], text="Different words."))
+        assert validator.is_valid(response(activity_id="fresh", text="Different words."))
         repeated = response()
-        repeated["activities"] = [response(activity_id=identity, text=words)["activities"][0]
-                                  for identity in fresh_ids]
+        repeated["activities"] = [
+            response(activity_id=f"fresh-{index}", text=words)["activities"][0]
+            for index in range(12)
+        ]
         assert validator.is_valid(repeated)
 
 
@@ -570,9 +573,9 @@ async def test_raw_schema_rejects_nested_identity_violation_before_dto_or_retry(
     current = request(context={"interaction_context": {"already_spoken": [{
         "text": "Old words.", "metadata": {"communicative_activity_ids": ["old"]},
     }]}})
-    # This is a valid free-standing DTO. The request-specific Schema excludes
-    # an unoffered fresh ID, while preserving all fresh message meanings.
-    raw = response(activity_id="unoffered", text="New words.")
+    # This is a valid free-standing DTO. The request-specific Schema prevents
+    # reusing a delivered identity with different wording while leaving fresh IDs open.
+    raw = response(activity_id="old", text="New words.")
     model = Model(raw)
     with pytest.raises(ValueError, match="raw Schema rejected"):
         await SocialCognitionResolver(model, Catalog()).resolve(current)
@@ -1404,6 +1407,96 @@ def test_native_question_need_requires_question_function_without_forcing_optiona
         # Optional communication remains a separate decision with no false coverage.
         act["addressed_need_ids"] = []
         Draft202012Validator(schema).validate({**valid, "activities": [act], "need_outcomes": {"question": "pending"}})
+
+
+def test_social_expression_cardinality_is_semantic_not_schema_policy() -> None:
+    from agent.app.social_cognition import social_cognition_response_schema
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput, SocialCognitionRequest
+
+    current = SocialCognitionRequest(
+        request_id="sc-autonomous-expression",
+        trigger="interpretation",
+        source_refs=["turn:1"],
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1",
+            outcome="Greet the person and answer their social question.",
+            output_mode="speech",
+            continuity_scope="turn",
+            confidence=1.0,
+        )],
+        source_turn={"turn_id": "turn:1", "original_text": "Hello, how are you?"},
+        context={"interaction_context": {"already_spoken": [], "pending_speech": []}},
+    )
+    candidates = [{
+        "capability_id": "test.wave",
+        "input_schema": {
+            "type": "object",
+            "properties": {"count": {"type": "integer", "minimum": 1}},
+            "additionalProperties": False,
+        },
+    }]
+
+    schema = social_cognition_response_schema(current, candidates)
+    assert "maxItems" not in schema["properties"]["activities"]
+    contract = schema["$defs"]["SocialCommunicativeAct"]
+    for branch in contract.get("oneOf", [contract]):
+        assert "maxItems" not in branch["properties"]["auxiliary_activities"]
+
+    # Cardinality is a semantic choice: more than the old 3-expression/8-act quotas
+    # remains structurally legal when every item otherwise satisfies the contract.
+    auxiliaries = [{
+        "auxiliary_activity_id": f"wave-{index}",
+        "capability_id": "test.wave",
+        "args": {"count": 1},
+        "anchor_kind": "communicative_act",
+        "anchor_id": "sc-act",
+    } for index in range(5)]
+    rich = response(
+        text="Hi!",
+        function="respond",
+        source_goal_ids=[],
+        source_responsibility_refs=["r1"],
+        auxiliary_activities=auxiliaries,
+    )
+    Draft202012Validator(schema).validate(rich)
+    SocialCognitionOutput.model_validate(rich)
+
+
+def test_social_authority_uses_semantic_stop_condition_not_action_quota() -> None:
+    from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
+
+    prompt = SOCIAL_COGNITION_AUTHORITY_PROMPT.lower()
+    assert "there is no target number of expressions" in prompt
+    assert "no requirement to use an available capability" in prompt
+    assert "contributes distinct social meaning" in prompt
+    assert "availability alone is never a reason to add one" in prompt
+    assert "stop the decision as soon as the intended social response is complete" in prompt
+    assert "do not create a sibling communicative act merely to enumerate another gesture" in prompt
+
+
+def test_social_model_context_does_not_reinterpret_generic_dialogue_history() -> None:
+    from agent.app.social_cognition import _social_model_context
+
+    interaction = {
+        "already_spoken": [],
+        "pending_speech": [],
+        "prior_delivered_speech": [{"turn_id": "old", "text": "Hi!"}],
+    }
+    projected = _social_model_context({
+        "history": [
+            {"role": "user", "text": "Hello, how are you?"},
+            {"role": "assistant", "text": "Huh, that didn't go through."},
+        ],
+        "core_interpretation": {"responsibilities": [{"outcome": "old duplicate"}]},
+        "interaction_context": interaction,
+        "other_evidence": {"status": "retain"},
+    })
+
+    assert "history" not in projected
+    assert "core_interpretation" not in projected
+    assert projected["interaction_context"] == interaction
+    assert projected["other_evidence"] == {"status": "retain"}
 
 
 def test_social_model_context_compacts_redundant_mind_without_losing_social_self() -> None:

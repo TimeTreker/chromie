@@ -192,7 +192,8 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
         )
         context = auxiliary_social_prompt_context({}, candidates)
         self.assertEqual(context["eligible_capabilities"][0]["capability_id"], "soridormi.blink_eyes")
-        self.assertEqual(context["max_activities"], 3)
+        self.assertNotIn("max_activities", context)
+        self.assertNotIn("max_auxiliary_expressions", context)
 
     def test_runtime_executes_exact_proposal_without_goal_authority(self) -> None:
         runtime = _Runtime([_definition()])

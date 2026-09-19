@@ -3670,6 +3670,73 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(result.results[0].status, status)
                 await runtime.validate_planning_state(snapshot)
 
+    async def test_social_presentation_does_not_invalidate_planner_work_snapshot(self) -> None:
+        speech_release = asyncio.Event()
+        body_release = asyncio.Event()
+
+        async def speak(_args):
+            await speech_release.wait()
+            return {"scheduled": True}
+
+        class SocialProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                self.calls.append(request)
+                await body_release.wait()
+                return CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    capability_version=definition.version,
+                    status="completed",
+                    provider_id=self.provider_id,
+                    output={"args": request.args},
+                )
+
+        registry = CapabilityRegistry()
+        registry.register(local_speech_definition())
+        registry.register(_body_definition(
+            capability_id="test.wave", provider_id="mock.social", exclusive_group=None
+        ))
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(LocalSpeechCapabilityProvider(speak))
+        runtime.register_provider(SocialProvider("mock.social"))
+
+        snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
+        receipt = await runtime.submit(InteractionResponse(
+            interaction_id="social-turn-a",
+            capabilities=[
+                {
+                    "request_id": "social-speech",
+                    "capability_id": "chromie.speak",
+                    "args": {"text": "Okay."},
+                    "metadata": {"turn_id": "turn-a"},
+                },
+                {
+                    "request_id": "social-wave",
+                    "capability_id": "test.wave",
+                    "args": {"count": 1},
+                    "metadata": {
+                        "turn_id": "turn-a",
+                        "source": "social_cognition_auxiliary_activity",
+                        "execution_role": "social_decoration",
+                        "auxiliary_plan_activity": True,
+                        "source_goal_ids": [],
+                    },
+                },
+            ],
+        ))
+
+        # Both requests share the Planner's turn, but neither is task Work.
+        # Concurrent social delivery must not stale an otherwise-valid plan.
+        await runtime.validate_planning_state(snapshot)
+        self.assertEqual(
+            (await runtime.planning_state_snapshot(["goal-a"], "turn-a"))["work"],
+            {},
+        )
+
+        speech_release.set()
+        body_release.set()
+        await runtime.wait_terminal(receipt)
+
     async def test_overlapping_plans_reject_late_commit_but_other_goals_proceed(self) -> None:
         runtime = CapabilityRuntime(CapabilityRegistry())
         older = await runtime.planning_state_snapshot(["goal-a"], "turn-old")
