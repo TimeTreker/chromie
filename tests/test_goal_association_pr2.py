@@ -2099,10 +2099,10 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertEqual(result.associations, [])
         self.assertEqual(
             result.metadata["rejected_associations"][0]["reason"],
-            "terminal_goal_reference_only",
+            "terminal_goal_history_only",
         )
 
-    def test_decoder_allows_only_reference_relationship_to_terminal_goal(self):
+    def test_decoder_excludes_terminal_goal_from_association_targets(self):
         terminal = active_goal("goal-weather", "Check Chongqing weather.")
         terminal["responsibility_status"] = "satisfied"
         terminal["work_status"] = "done"
@@ -2114,27 +2114,38 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             responsibility_count=1,
             responsibility_refs=["r1"],
         )
-        base = {
-            "source_responsibility_refs": ["r1"],
-            "target_goal_ids": ["goal-weather"],
-            "confidence": 1.0,
-        }
-        envelope = {
-            "new_goals": [],
-            "referent_updates": [],
-            "resolved_references": [],
-            "confidence": 1.0,
-            "reason_summary": "Retained Goal is terminal.",
-        }
-        validator = Draft202012Validator(schema)
-        self.assertTrue(validator.is_valid({
-            **envelope,
-            "associations": [{**base, "relationship": "reference"}],
-        }))
-        self.assertFalse(validator.is_valid({
-            **envelope,
-            "associations": [{**base, "relationship": "continue"}],
-        }))
+        self.assertEqual(schema["properties"]["associations"]["maxItems"], 0)
+        association = schema["$defs"]["GoalAssociationModelAssociation"]
+        self.assertEqual(
+            association["properties"]["target_goal_ids"]["items"]["enum"],
+            [],
+        )
+        goal = schema["$defs"]["GoalAssociationModelGoal"]
+        self.assertEqual(
+            goal["properties"]["related_goal_ids"]["items"]["enum"],
+            ["goal-weather"],
+        )
+
+    def test_decoder_associations_target_only_open_goals_while_terminal_remains_related_context(self):
+        open_goal = active_goal("goal-open", "Walk forward.")
+        terminal = active_goal("goal-done", "Check Chongqing weather.")
+        terminal["responsibility_status"] = "satisfied"
+        terminal["work_status"] = "done"
+        terminal["goal"]["responsibility_status"] = "satisfied"
+        schema = ga_schema.goal_association_response_schema(
+            GoalAssociationModelOutput, [open_goal, terminal], [],
+            responsibility_count=1, responsibility_refs=["r1"],
+        )
+        association = schema["$defs"]["GoalAssociationModelAssociation"]
+        self.assertEqual(
+            association["properties"]["target_goal_ids"]["items"]["enum"],
+            ["goal-open"],
+        )
+        goal = schema["$defs"]["GoalAssociationModelGoal"]
+        self.assertEqual(
+            goal["properties"]["related_goal_ids"]["items"]["enum"],
+            ["goal-open", "goal-done"],
+        )
 
     def test_existing_goal_continuity_commits_without_creation_or_audit(self):
         ollama = ScriptedOllama(

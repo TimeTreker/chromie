@@ -73,10 +73,19 @@ def validate_communicative_activity_identity(
         values = metadata.get("communicative_activity_ids") or row.get("communicative_activity_ids") or []
         return {str(value).strip() for value in values} if isinstance(values, list) else set()
 
-    for row in [*rows("events"), *rows("already_spoken"), *rows("pending_speech")]:
+    for row in [
+        *rows("events"),
+        *rows("already_spoken"),
+        *rows("pending_speech"),
+        *rows("prior_delivered_speech"),
+    ]:
         if activity_id in ids(row) and normalize_whitespace(row.get("text") or "") != normalize_whitespace(text):
             raise ValueError("Communicative Activity wording cannot change under one identity")
-    delivered_ids = {value for row in rows("already_spoken") for value in ids(row)}
+    delivered_ids = {
+        value
+        for row in [*rows("already_spoken"), *rows("prior_delivered_speech")]
+        for value in ids(row)
+    }
     if not set(repair_of_activity_ids or []).issubset(delivered_ids):
         raise ValueError("Planner repair must reference actually delivered activities")
 

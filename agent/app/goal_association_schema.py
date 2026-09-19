@@ -145,6 +145,12 @@ def goal_association_response_schema(
             if responsibility_count is None
             else min(8, max(0, int(responsibility_count)))
         )
+    associations = properties.get("associations")
+    if isinstance(associations, dict) and not open_goal_ids:
+        # Retained terminal Goals remain available below as related historical
+        # context for a new Goal, but they cannot own a current Responsibility.
+        # Make this structural for native decoders rather than relying on if/then.
+        associations["maxItems"] = 0
     if not referent_ids:
         resolved_references = properties.get("resolved_references")
         if isinstance(resolved_references, dict):
@@ -188,15 +194,16 @@ def goal_association_response_schema(
                             related_field["maxItems"] = 0
                 target_ids = node_properties.get("target_goal_ids")
                 if isinstance(target_ids, dict):
+                    # Associations are continuity operations over live Goal identity.
+                    # Terminal Goals are immutable historical context: a fresh
+                    # Responsibility may cite them through new_goals.related_goal_ids
+                    # but must not be attached to them as its canonical owner.
                     target_ids["items"] = {
                         "type": "string",
-                        "enum": active_ids,
+                        "enum": open_goal_ids,
                     }
                     target_ids["uniqueItems"] = True
-                    if "relationship" in node_properties and active_ids:
-                        # Every association addresses retained Goal state.
-                        # An empty array can never satisfy the DTO, so expose
-                        # that mechanical fact to the structured decoder.
+                    if "relationship" in node_properties and open_goal_ids:
                         target_ids["minItems"] = 1
                 target_referents = node_properties.get("target_referent_ids")
                 if isinstance(target_referents, dict):
@@ -271,40 +278,6 @@ def goal_association_response_schema(
         "GoalAssociationModelAssociation"
     )
     if isinstance(association_schema, dict):
-        # A retained terminal Goal is historical evidence, not unfinished work.
-        # Encode that lifecycle invariant in the constrained decoder as well as
-        # Host validation: only relationship=reference may target a non-open
-        # Goal.  This prevents a nearby completed Goal from absorbing an
-        # unrelated fresh Responsibility before fail-closed validation runs.
-        continuity_relationships = [
-            "continue", "modify", "clarify", "confirm", "reject",
-            "cancel", "pause", "resume", "merge", "split",
-        ]
-        association_schema.setdefault("allOf", []).append(
-            {
-                "if": {
-                    "properties": {
-                        "relationship": {"enum": continuity_relationships},
-                    },
-                    "required": ["relationship"],
-                },
-                "then": {
-                    "properties": {
-                        "target_goal_ids": (
-                            {
-                                "type": "array",
-                                "items": {"type": "string", "enum": open_goal_ids},
-                                "uniqueItems": True,
-                                "minItems": 1,
-                            }
-                            if open_goal_ids
-                            else {"type": "array", "maxItems": 0}
-                        ),
-                    },
-                    "required": ["target_goal_ids"],
-                },
-            }
-        )
         # Pydantic rejects a modify/clarify association whose semantic update
         # exists only in reason_summary, but the generated decoder schema used
         # to permit exactly that shape.  Expose the existing DTO invariant at

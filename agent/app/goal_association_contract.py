@@ -170,8 +170,9 @@ class GoalAssociationModelAssociation(BaseModel):
         description=(
             "Model-owned semantic relationship to the targeted Goal. continue "
             "advances unfinished unchanged work; reference requests retrieval, "
-            "restatement, explanation, comparison, or another answer from a retained "
-            "Goal without changing it. A social reaction, personal feeling, practical "
+            "restatement, explanation, comparison, or another answer from an open retained "
+            "Goal without changing it. Terminal Goals are historical context for new Goal "
+            "related_goal_ids, never association targets. A social reaction, personal feeling, practical "
             "decision, acknowledgement, or new conversational judgment is a fresh "
             "vocal_output Goal even when prior Goal evidence supplies context. "
             "clarify means the current user "

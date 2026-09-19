@@ -54,7 +54,9 @@ class SocialCognitionRequest(BaseModel):
         interaction = self.context.get("interaction_context", {})
         if not isinstance(interaction, dict):
             raise ValueError("Social Cognition interaction context must be an object")
-        for name in ("events", "already_spoken", "pending_speech"):
+        for name in (
+            "events", "already_spoken", "pending_speech", "prior_delivered_speech"
+        ):
             rows = interaction.get(name, [])
             if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
                 raise ValueError("Social Cognition interaction records must be object arrays")

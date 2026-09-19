@@ -274,6 +274,33 @@ def test_fresh_addressed_task_cannot_silently_disappear_while_work_runs_in_paral
     Draft202012Validator(duplicate_schema).validate(silence)
 
 
+def test_social_auxiliary_anchor_is_mechanical_parent_linkage() -> None:
+    from agent.app.social_cognition import _materialize_communicative_auxiliary_anchors
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    raw = response(
+        text="Hi!",
+        function="acknowledge",
+        source_goal_ids=[],
+        auxiliary_activities=[{
+            "auxiliary_activity_id": "wave-1",
+            "capability_id": "test.wave",
+            "anchor_kind": "plan_step",
+            "anchor_id": "wrong-parent",
+            "args": {},
+        }],
+    )
+
+    materialized = _materialize_communicative_auxiliary_anchors(raw)
+
+    auxiliary = materialized["activities"][0]["auxiliary_activities"][0]
+    assert auxiliary["anchor_kind"] == "communicative_act"
+    assert auxiliary["anchor_id"] == materialized["activities"][0]["activity_id"]
+    # The semantic expression choice itself is unchanged and the DTO now accepts it.
+    assert auxiliary["capability_id"] == "test.wave"
+    SocialCognitionOutput.model_validate(materialized)
+
+
 @pytest.mark.asyncio
 async def test_shared_goal_state_is_read_only_input_and_complete_decision_is_one_call():
     current = request()

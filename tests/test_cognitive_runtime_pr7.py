@@ -709,16 +709,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         )
 
+        self.assertEqual(context["already_spoken"], [])
         self.assertEqual(
-            [item["text"] for item in context["already_spoken"]],
+            [item["text"] for item in context["prior_delivered_speech"]],
             ["你好呀！"],
         )
         self.assertEqual(
-            context["already_spoken"][0]["owner"],
+            context["prior_delivered_speech"][0]["owner"],
             "playback_delivery",
         )
         self.assertEqual(
-            context["already_spoken"][0]["metadata"]["source"],
+            context["prior_delivered_speech"][0]["metadata"]["source"],
             "fast_planner_communicative_delivery",
         )
 
@@ -2281,6 +2282,40 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 float(stage["started_monotonic_ms"]),
             )
 
+    def test_prior_turn_delivery_does_not_suppress_fresh_turn_social_reply(self):
+        ledger = InteractionLedger()
+        prior = {
+            "role": "assistant",
+            "text": "Sure thing!",
+            "sid": "turn-old",
+            "metadata": {
+                "source": "social_cognition_communicative_delivery",
+                "turn_id": "turn-old",
+                "communicative_activity_ids": ["old-ack"],
+                "source_goal_ids": [],
+            },
+        }
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=object(),
+            adapter=RecordingPlannerAdapter(FakeRuntime([blink_definition()])),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+            interaction_ledger=ledger,
+        )
+        context = {
+            "history": [prior],
+            "user_turn_envelope": {"turn_id": "turn-new"},
+        }
+
+        interaction = coordinator._interaction_context(
+            sid="sid-pr7", context=context, goal_ids=[],
+        )
+
+        self.assertEqual(interaction["already_spoken"], [])
+        self.assertEqual(
+            [item["subject_id"] for item in interaction["prior_delivered_speech"]],
+            ["old-ack"],
+        )
+
     def test_interaction_context_reaches_association_planner_and_adapter(self):
         ledger = InteractionLedger()
         ledger.record_playback_event(
@@ -2327,10 +2362,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(coordinator, client)
 
         self.assertEqual(result.status, "applied")
+        interaction = client.association_contexts[0]["interaction_context"]
+        self.assertEqual(interaction["already_spoken"], [])
         self.assertEqual(
-            client.association_contexts[0]["interaction_context"][
-                "already_spoken"
-            ][0]["subject_id"],
+            interaction["prior_delivered_speech"][0]["subject_id"],
             "speech-existing",
         )
         self.assertNotIn(

@@ -1137,17 +1137,16 @@ class GoalAssociationResolver:
                 for goal_id in association.target_goal_ids
             ):
                 reason = "unknown_target_goal"
-            elif association.relationship != "reference" and any(
+            elif any(
                 str(candidate_by_id[goal_id].get("responsibility_status") or "open")
                 != "open"
                 for goal_id in association.target_goal_ids
             ):
-                # Retained terminal Goals are historical continuity evidence only.
-                # They may be referenced for retrieval/restatement/comparison, but
-                # cannot absorb a fresh Responsibility or be silently reopened by
-                # continue/modify/cancel/etc. A fresh obligation must become a new
-                # Goal. Prompt guidance is not sufficient authority for lifecycle.
-                reason = "terminal_goal_reference_only"
+                # Terminal Goals are immutable historical context, not canonical
+                # owners of current Responsibilities. The model may relate a fresh
+                # new Goal to that history, but no association may reopen or attach
+                # work to a terminal identity.
+                reason = "terminal_goal_history_only"
             if reason:
                 rejected.append({"association_id": association.association_id, "reason": reason})
             else:

@@ -2991,12 +2991,12 @@ class GoalDrivenRuntimeCoordinator:
 
         # The append-only ledger is session-scoped, while ordinary dialogue
         # continuity spans several session/turn IDs inside one Conversation.
-        # ConversationState already retains exact Fast communicative text only
-        # after Capability Runtime reports delivery completed. Project those
-        # owner-labelled prior-turn facts into the existing ``already_spoken``
-        # surface so Planner can answer contextual questions from what the user
-        # actually heard. Never project generic agent_result history: authored or
-        # scheduled text is not delivery evidence.
+        # ConversationState already retains exact communicative text only after
+        # delivery completed. Preserve those prior-turn facts for identity/repair
+        # and contextual reasoning, but never put them in current-turn
+        # ``already_spoken``: SC uses that surface to decide whether THIS addressed
+        # turn already received a reply. Never project generic agent_result history;
+        # authored or scheduled text is not delivery evidence.
         prior_delivered: list[dict[str, Any]] = []
         for turn in list(context.get("history") or [])[-16:]:
             if not isinstance(turn, dict) or turn.get("role") != "assistant":
@@ -3048,26 +3048,37 @@ class GoalDrivenRuntimeCoordinator:
                 }
             )
 
-        retained_spoken = list(payload.get("already_spoken") or [])
-        retained_keys = {
-            (
+        current_turn_id = self._context_turn_id(context, sid)
+        ledger_spoken = [
+            item
+            for item in list(payload.get("already_spoken") or [])
+            if isinstance(item, dict)
+        ]
+        payload["already_spoken"] = [
+            item
+            for item in ledger_spoken
+            if not current_turn_id
+            or str(item.get("turn_id") or "") == current_turn_id
+        ][-16:]
+        historical = [
+            item
+            for item in [*ledger_spoken, *prior_delivered]
+            if current_turn_id
+            and str(item.get("turn_id") or "") != current_turn_id
+        ]
+        deduplicated_history: list[dict[str, Any]] = []
+        history_keys: set[tuple[str, str, str]] = set()
+        for item in historical:
+            key = (
                 str(item.get("turn_id") or ""),
                 str(item.get("subject_id") or ""),
                 str(item.get("text") or ""),
             )
-            for item in retained_spoken
-            if isinstance(item, dict)
-        }
-        for item in prior_delivered:
-            key = (
-                str(item["turn_id"]),
-                str(item["subject_id"]),
-                str(item["text"]),
-            )
-            if key not in retained_keys:
-                retained_spoken.append(item)
-                retained_keys.add(key)
-        payload["already_spoken"] = retained_spoken[-16:]
+            if key in history_keys:
+                continue
+            history_keys.add(key)
+            deduplicated_history.append(item)
+        payload["prior_delivered_speech"] = deduplicated_history[-16:]
         return payload
 
 

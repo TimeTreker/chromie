@@ -139,7 +139,9 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
     """Offer fresh opaque IDs and immutable reuse of known messages."""
     known: dict[str, set[str]] = {}
     context = request.context.get("interaction_context", {})
-    for key in ("events", "already_spoken", "pending_speech"):
+    for key in (
+        "events", "already_spoken", "pending_speech", "prior_delivered_speech"
+    ):
         for row in context.get(key, []):
             ids = row.get("metadata", {}).get("communicative_activity_ids") or row.get("communicative_activity_ids") or []
             if isinstance(ids, list):
@@ -196,6 +198,37 @@ def _fresh_addressed_turn_requires_acknowledgement(
         interaction.get("already_spoken")
         or interaction.get("pending_speech")
     )
+
+
+def _materialize_communicative_auxiliary_anchors(raw: Any) -> Any:
+    """Bind nested social expression linkage mechanically to its parent act.
+
+    The model chooses whether an auxiliary expression exists, its Capability, arguments
+    and social meaning.  Its nesting already identifies the communicative act it decorates,
+    so asking the model to repeat that internal activity_id as ``anchor_id`` adds no semantic
+    information and can create a false contract failure.  Materialize only this transport
+    linkage before schema/Pydantic validation; never change the selected expression itself.
+    """
+
+    if not isinstance(raw, dict):
+        return raw
+    normalized = copy.deepcopy(raw)
+    activities = normalized.get("activities")
+    if not isinstance(activities, list):
+        return normalized
+    for activity in activities:
+        if not isinstance(activity, dict):
+            continue
+        activity_id = normalize_whitespace(activity.get("activity_id"))
+        auxiliary = activity.get("auxiliary_activities")
+        if not activity_id or not isinstance(auxiliary, list):
+            continue
+        for item in auxiliary:
+            if not isinstance(item, dict):
+                continue
+            item["anchor_kind"] = "communicative_act"
+            item["anchor_id"] = activity_id
+    return normalized
 
 
 def social_cognition_response_schema(
@@ -704,6 +737,7 @@ class SocialCognitionResolver:
             response_format=schema, prompt_family="social_cognition.deep" if deep else "social_cognition.primary",
             turn_id=request.request_id, attempt=1,
         )
+        raw = _materialize_communicative_auxiliary_anchors(raw)
         schema_errors = [error.message for error in Draft202012Validator(schema).iter_errors(raw)]
         if schema_errors:
             raise ValueError(f"Social Cognition raw Schema rejected: {schema_errors}")
