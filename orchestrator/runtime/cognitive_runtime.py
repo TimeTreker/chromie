@@ -2700,6 +2700,17 @@ class GoalDrivenRuntimeCoordinator:
             response = await self.adapter.prepare_social_response(response, social_cognition=result,
                 session_id=session_id, turn_id=str(request.source_turn.get("turn_id") or request.request_id),
                 context=request.context, snapshot_is_current=snapshot_is_current)
+        logger.info(
+            "social_cognition_done sid=%s request_id=%s disposition=%s activities=%d "
+            "speech=%d capabilities=%d reason=%r",
+            session_id,
+            request.request_id,
+            result.disposition,
+            len(result.activities),
+            len(response.speech),
+            len(response.capabilities),
+            result.reason_summary,
+        )
         return result, response
 
     def _track_auxiliary_execution_task(self, task: asyncio.Task[Any]) -> None:

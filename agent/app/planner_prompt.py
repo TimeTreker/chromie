@@ -85,18 +85,20 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "the supplied UserTurn source_tokens. Never copy or paraphrase the source wording. "
     "Trusted code materializes the span into canonical source_quote and Goal provenance; "
     "you remain responsible for correct mapping, conversion and coverage. "
-    "Existing typed Goal constraints remain binding and cannot be overridden by a "
-    "quote. Omit every optional input that is not bound by the Responsibility, canonical "
-    "Goal, exact source evidence, or trusted context, even when its schema declares a "
-    "default. Do not copy, choose, modify or restate schema defaults in model-authored "
-    "Work, and do not replace omission with a minimum, maximum, conservative, guessed, "
-    "or otherwise ungrounded value for a default-owned optional input. Trusted Runtime/"
-    "provider realization applies declared defaults after Planner output. A non-default "
-    "optional override grounded only by the current UserTurn must cite "
-    "argument_sources for that exact same argument key. Source membership is not semantic "
-    "permission: cite only a span that actually expresses that parameter, never a sibling "
-    "value that merely has the same number or words. Never borrow a sibling Goal's values. "
-    "Missing consequential input must use "
+    "Existing typed Responsibility and Goal constraints remain binding and cannot be "
+    "overridden by a Planner HOW choice or a quote. Treat each Capability input schema as "
+    "the action template: required fields must be supplied; an optional field with a "
+    "declared default may be omitted when that default is suitable, in which case trusted "
+    "Runtime/provider realization owns the default. Schema metadata such as type, enum, "
+    "bounds, requiredness and default are instructions for choosing args, never fields to "
+    "copy into model-authored args. Planner owns HOW and may emit a schema-valid non-default "
+    "optional value when the requested Work genuinely benefits from it; briefly explain "
+    "that HOW choice in the Activity reason_summary. If an argument is instead realized "
+    "from the current UserTurn, cite argument_sources for that exact same argument key. "
+    "Source membership is not semantic permission: cite only a span that actually expresses "
+    "that parameter, never a sibling value that merely has the same number or words. Never "
+    "borrow a sibling Goal's values. Do not emit optional fields merely to restate their "
+    "declared defaults. Missing consequential required input must use "
     "a genuine Planner gap or the declared depth path, without invented Work. "
 )
 
@@ -871,38 +873,14 @@ def fast_advance_semantic_capability_projection(
 
 
 def _fast_streaming_prompt_input_schema(input_schema: dict[str, Any]) -> dict[str, Any]:
-    """Hide Runtime-owned optional default values from Fast's semantic view.
+    """Preserve the canonical Capability action template for Fast Planner.
 
-    The exact schema still drives constrained decoding and trusted validation. The prompt
-    needs to know which optional controls exist and their legal type/range, but exposing a
-    concrete provider default encourages small models to restate or dodge that value even
-    when the source never requested an override. Mark that omission is Runtime-owned while
-    preserving every non-default constraint needed to author an explicit grounded override.
+    Planner needs the same requiredness, types, enums, bounds and defaults that trusted
+    validation uses. A declared default describes omission behavior; it is capability
+    metadata and never an extra field in Planner output.
     """
 
-    projected = copy.deepcopy(input_schema)
-    required = {str(item) for item in projected.get("required") or []}
-    properties = projected.get("properties")
-    if not isinstance(properties, dict):
-        return projected
-    for name, contract in properties.items():
-        if (
-            str(name) in required
-            or not isinstance(contract, dict)
-            or "default" not in contract
-        ):
-            continue
-        contract.pop("default", None)
-        contract["x-chromie-default-owner"] = "trusted_runtime"
-        guidance = (
-            "Optional default-owned input. Omit unless the Responsibility, canonical Goal, "
-            "exact source evidence, or trusted context grounds an explicit override. "
-            "A UserTurn-only non-default override must carry same-key argument_sources "
-            "provenance; another argument's source never authorizes this input."
-        )
-        prior = str(contract.get("description") or "").strip()
-        contract["description"] = f"{prior} {guidance}".strip()
-    return projected
+    return copy.deepcopy(input_schema)
 
 
 def fast_advance_streaming_capability_prompt_projection(
@@ -910,9 +888,9 @@ def fast_advance_streaming_capability_prompt_projection(
 ) -> list[dict[str, Any]]:
     """Keep one argument contract beside each semantic catalog entry.
 
-    The native streaming response schema retains the exact Capability contract. The prompt
-    projection differs only by withholding concrete optional defaults that belong to trusted
-    Runtime/provider realization; it preserves names, requiredness, types, enums and bounds.
+    The prompt and native response schema share the same Capability action template. Planner
+    sees defaults so it knows what omission means, while its output remains only the actual
+    selected arguments and provenance/rationale fields defined by the Planner DTO.
     """
 
     return [

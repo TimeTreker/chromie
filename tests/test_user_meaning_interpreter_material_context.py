@@ -27,6 +27,41 @@ def test_user_meaning_interpreter_preserves_same_turn_material_context() -> None
     assert "never put provider arguments, defaults or execution realization" in prompt
 
 
+def test_user_meaning_interpreter_uses_native_json_binding_values() -> None:
+    prompt = PROMPT.read_text(encoding="utf-8").casefold()
+
+    assert "a primitive count is `count: 6`" in prompt
+    assert "not a mini-schema" in prompt
+    assert "measured value together with its unit" in prompt
+
+
+def test_primitive_binding_type_wrapper_is_representation_only() -> None:
+    from shared.chromie_contracts.core_interpretation import (
+        CognitiveResponsibilityProposal,
+        responsibility_binding_material_value,
+    )
+
+    proposal = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="nod your head 6 times",
+        bindings={"count": {"value": 6, "type": "integer"}},
+        output_mode="body_action",
+        continuity_scope="goal",
+        confidence=1.0,
+        source_evidence={
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t6",
+        },
+    )
+    assert proposal.bindings == {"count": 6}
+
+    measured = {"value": 50, "unit": "m", "type": "distance"}
+    assert responsibility_binding_material_value(measured) == measured
+
+    mismatched = {"value": "6", "type": "integer"}
+    assert responsibility_binding_material_value(mismatched) == mismatched
+
+
 def test_user_meaning_interpreter_source_span_covers_material_clauses_not_only_command() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 

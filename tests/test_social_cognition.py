@@ -222,13 +222,56 @@ def test_social_authority_treats_fresh_task_request_as_interaction_not_silence_b
     prompt = SOCIAL_COGNITION_AUTHORITY_PROMPT.lower()
     assert "fresh addressed turn is itself an interaction opportunity" in prompt
     assert "task-oriented content, physical work, or absence of a planner communication need" in prompt
-    assert "are never by themselves reasons for silence" in prompt
-    assert "acknowledging receipt is itself useful interaction" in prompt
-    assert "do not relabel the absence of task-oriented speech as 'no useful social change'" in prompt
-    assert "reason_summary must cite a separate supplied situational fact" in prompt
+    assert "never remove this independent interaction duty" in prompt
+    assert "produce at least one brief truthful acknowledgement" in prompt
     assert "planner never grants or withholds your communication authority" in prompt
     assert "do not explain a communication or silence decision by saying planner authorized" in prompt
 
+
+def test_fresh_addressed_task_cannot_silently_disappear_while_work_runs_in_parallel():
+    from agent.app.social_cognition import validate_social_cognition_output
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="r1", outcome="nod six times", output_mode="body_action", confidence=1.0,
+    )
+    current = SocialCognitionRequest(
+        request_id="sc-parallel-ack", trigger="interpretation", source_refs=["turn:1"],
+        responsibilities=[responsibility],
+        source_turn={"turn_id": "turn:1", "original_text": "nod your head 6 times please"},
+        context={
+            "work_decision_pending": True,
+            "interaction_context": {"already_spoken": [], "pending_speech": []},
+        },
+    )
+    schema = social_cognition_response_schema(current, [])
+    silence = {"disposition": "silence", "activities": [], "reason_summary": "Wait for Planner."}
+    assert list(Draft202012Validator(schema).iter_errors(silence))
+    with pytest.raises(ValueError, match="requires acknowledgement"):
+        validate_social_cognition_output(SocialCognitionOutput.model_validate(silence), current, [])
+
+    acknowledgement = response(
+        text="Okay.",
+        function="acknowledge",
+        truth_stage="pre_evidence",
+        progress_kind="acknowledge_work",
+        source_goal_ids=[],
+        source_responsibility_refs=["r1"],
+    )
+    Draft202012Validator(schema).validate(acknowledgement)
+
+    duplicate = current.model_copy(deep=True, update={
+        "context": {
+            **current.context,
+            "interaction_context": {
+                "already_spoken": [],
+                "pending_speech": [{"text": "Okay."}],
+            },
+        },
+    })
+    duplicate_schema = social_cognition_response_schema(duplicate, [])
+    Draft202012Validator(duplicate_schema).validate(silence)
 
 
 @pytest.mark.asyncio

@@ -788,11 +788,14 @@ def validate_fast_advance_output(
             parameter_schema = properties.get(parameter)
             if not isinstance(parameter_schema, dict):
                 continue
-            # Omitted declared defaults are already executable below Planner. A
-            # present value must still prove semantic ownership first; otherwise an
-            # exact redundant default may be removed by the representation cleanup
-            # below, while a different ungrounded override remains fail-closed.
-            if parameter not in activity.args and "default" in parameter_schema:
+            # Omitted unbound defaults are executable below Planner. A user/Goal
+            # binding still owns WHAT even when the provider declares a default, so
+            # Planner may neither omit nor replace that explicit semantic value.
+            if (
+                parameter not in activity.args
+                and "default" in parameter_schema
+                and parameter not in authoritative_bindings
+            ):
                 continue
             # target_ref is not authored from a UMI scalar binding.  UMI owns the
             # person/addressee meaning; the Planner realizes that meaning against
@@ -909,10 +912,10 @@ def validate_fast_advance_output(
             if parameter not in authoritative_bindings:
                 if parameter in activity.argument_sources:
                     continue
-                # Planner owns the mapping to the selected Capability. UMI need
-                # not duplicate an exact named value already in its complete
-                # outcome. Check both source provenance and Responsibility scope;
-                # raw text alone must not lend a sibling's value to this Activity.
+                # Planner owns HOW inside the selected Capability contract. UMI need
+                # not duplicate an exact named value already in its complete outcome.
+                # UserTurn-derived values may still prove provenance literally; raw
+                # text alone must not lend a sibling's value to this Activity.
                 if parameter_schema.get("type") == "string" and any(
                     literal_intent_argument(
                         activity.args.get(parameter),
@@ -928,6 +931,12 @@ def validate_fast_advance_output(
                     parameter_schema=parameter_schema,
                     required_inputs=required_inputs,
                 ):
+                    continue
+                if parameter not in required_inputs and "default" in parameter_schema:
+                    # Optional defaults define the provider's omission behavior, not
+                    # semantic ownership. A schema-valid explicit non-default value is
+                    # a legitimate Planner HOW decision; exact redundant defaults are
+                    # removed above so model-authored Work stays minimal.
                     continue
                 raise AuthoritativeGroundingValidationError(
                     "Fast Planner cannot invent an unbound Capability input before "

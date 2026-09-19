@@ -294,6 +294,26 @@ def test_streaming_capability_applicability_and_resource_tail_are_exact():
     assert deep["when_to_use"] == capability["hints"]["when_to_use"]
     assert deep["when_not_to_use"] == capability["hints"]["when_not_to_use"]
 
+
+def test_fast_streaming_capability_projection_preserves_provider_defaults():
+    capability = {
+        "capability_id": "test.defaults",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "duration_s": {
+                    "type": "number", "minimum": 1, "maximum": 10, "default": 4,
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+    }
+    projected, = planner_prompt.fast_advance_streaming_capability_prompt_projection([capability])
+    assert projected["args_schema"] == capability["input_schema"]
+    assert projected["args_schema"]["properties"]["duration_s"]["default"] == 4
+
+
 def test_delivered_evidence_keeps_late_qualifier_and_all_goal_bindings():
     from agent.app.planner_context import evidence_bound_dialogue
     text = "Measured result. " * 100 + "Only valid under the final condition."

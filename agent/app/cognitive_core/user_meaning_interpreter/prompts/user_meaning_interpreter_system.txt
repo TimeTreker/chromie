@@ -41,8 +41,11 @@ identifies the object/resource, source/location, recipient/target, condition, or
 fact necessary to preserve WHAT. Keep material semantic facts in the complete outcome.
 Use bindings sparsely for semantic facts that are explicitly/contextually grounded and
 useful to preserve exactly (for example location, time, count, measurement, before/after
-or parallel relations). Never put provider arguments, defaults or execution realization
-there. The source_evidence span must cover every current-turn material clause that
+or parallel relations). Use native JSON values directly: a primitive count is `count: 6`,
+not a mini-schema such as `count: {"value": 6, "type": "integer"}`. Keep an object only
+when its structure is itself semantic, such as a measured value together with its unit.
+Never put provider arguments, defaults or execution realization there.
+The source_evidence span must cover every current-turn material clause that
 determines what, where, which, whom or under what condition the Responsibility means;
 never cite only the final command/question clause when earlier current-turn material is
 semantically necessary. This is semantic conservation, not a Capability rule. Source

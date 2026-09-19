@@ -23,6 +23,27 @@ _UMI_BINDING_PROVENANCE_KEYS = frozenset({
 })
 
 
+def _matches_json_primitive_type(value: Any, declared_type: Any) -> bool:
+    """Recognize representation-only JSON type annotations on UMI binding values."""
+
+    kind = str(declared_type or "").strip().casefold()
+    if kind == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if kind == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if kind == "string":
+        return isinstance(value, str)
+    if kind == "boolean":
+        return isinstance(value, bool)
+    if kind == "array":
+        return isinstance(value, list)
+    if kind == "object":
+        return isinstance(value, dict)
+    if kind == "null":
+        return value is None
+    return False
+
+
 def responsibility_binding_material_value(value: Any) -> Any:
     """Return the semantic value of one UMI binding.
 
@@ -37,6 +58,21 @@ def responsibility_binding_material_value(value: Any) -> Any:
     if isinstance(value, dict) and "value" in value:
         metadata_keys = set(value) - {"value"}
         if metadata_keys.issubset(_UMI_BINDING_PROVENANCE_KEYS):
+            return value["value"]
+        # Some constrained models redundantly emit a JSON-schema primitive type
+        # beside a scalar, for example {"value": 6, "type": "integer"}. JSON
+        # already carries that type, so this is representation noise rather than
+        # semantic structure. Only unwrap when the declared primitive exactly
+        # matches the value and every other field is provenance-only. Semantic
+        # typed objects such as {"value": 50, "unit": "m", "type": "distance"}
+        # therefore remain intact.
+        declared_type = value.get("type")
+        non_type_metadata = metadata_keys - {"type"}
+        if (
+            "type" in metadata_keys
+            and non_type_metadata.issubset(_UMI_BINDING_PROVENANCE_KEYS)
+            and _matches_json_primitive_type(value["value"], declared_type)
+        ):
             return value["value"]
     return value
 
@@ -156,7 +192,9 @@ class CognitiveResponsibilityProposal(BaseModel):
             "semantic context only; never runtime/session identifiers or HOW fields. "
             "Counts, measurements, activation and field-specific Goal updates retain "
             "typed evidence; other details may remain solely in the complete outcome. "
-            "Preserve an explicitly measured value and its unit together as one exact "
+            "Use native JSON scalar types directly; do not wrap a primitive as value+type "
+            "merely to restate its JSON type. Preserve an explicitly measured value and "
+            "its semantic unit together as one exact "
             "source/context surface; execution-unit normalization belongs downstream. "
             "Cross-Responsibility order uses before/after with exact sibling local_ref "
             "values; requested concurrency uses parallel_with with exact sibling "

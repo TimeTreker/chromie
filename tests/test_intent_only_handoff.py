@@ -572,13 +572,11 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
     validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
         responsibilities=request.responsibilities, capabilities=capabilities)
     del raw["activities"][0]["argument_sources"]
-    assert list(validator.iter_errors(raw))
-    raw["activities"][0]["argument_sources"] = {}
-    # Native-visible branch expansion must reject the same invalid shape as Host.
-    assert list(validator.iter_errors(raw))
-    with pytest.raises(ValueError, match="unbound Capability input"):
-        validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
-            responsibilities=request.responsibilities, capabilities=capabilities)
+    # Without UserTurn provenance this same schema-valid value is a Planner-owned
+    # HOW choice, not a claim that the person supplied the parameter.
+    validator.validate(raw)
+    validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
+        responsibilities=request.responsibilities, capabilities=capabilities)
     # Omitting an optional input still permits the provider's authoritative default.
     raw["activities"][0]["args"] = {}
     validator.validate(raw)
@@ -586,10 +584,12 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
         responsibilities=request.responsibilities, capabilities=capabilities)
 
 
-def test_provider_style_defaults_compile_to_native_visible_provenance_branches():
+def test_provider_style_defaults_keep_one_compact_capability_contract():
     from agent.app.clients.sglang_protocol import build_sglang_chat_payload
     from agent.app.inference_compute import CognitionComputeClass
+    from agent.app.planner_fast_validation import validate_fast_advance_output
     from agent.app.planner_schema import fast_streaming_advance_response_schema
+    from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
 
     text = "nod your head 5 times"
     request = CognitiveWorkRequest(
@@ -621,36 +621,54 @@ def test_provider_style_defaults_compile_to_native_visible_provenance_branches()
         },
     })
     entry.input_schema["required"] = []
+    from agent.app.planner_schema import fast_advance_response_schema
+
+    canonical_schema = fast_advance_response_schema(
+        ["r1"],
+        responsibilities=request.responsibilities,
+        capabilities=[entry.model_dump(mode="json")],
+    )
+    assert len(canonical_schema["$defs"]["FastPlannerCapabilityActivity"]["oneOf"]) == 1
+
     schema = fast_streaming_advance_response_schema(
         ["r1"],
         responsibilities=request.responsibilities,
         capabilities=[entry.model_dump(mode="json")],
     )
     validator = Draft202012Validator(schema)
-
     count_only = work([activity("nod", {"count": 5}, {})])
     exact_defaults = work([activity(
         "nod",
         {"count": 5, "amplitude": "small", "duration_s": 4},
         {},
     )])
-    bad_duration = work([activity(
+    planner_override = work([activity(
         "nod",
-        {"count": 5, "duration_s": 5},
-        {},
-    )])
-    bad_amplitude = work([activity(
-        "nod",
-        {"count": 5, "amplitude": "medium"},
+        {"count": 5, "amplitude": "medium", "duration_s": 5},
         {},
     )])
     validator.validate(count_only)
     validator.validate(exact_defaults)
-    assert list(validator.iter_errors(bad_duration))
-    assert list(validator.iter_errors(bad_amplitude))
+    validator.validate(planner_override)
+    capabilities = [entry.model_dump(mode="json")]
+    for raw in (count_only, planner_override):
+        validate_fast_advance_output(
+            FastPlannerAdvanceModelOutput.model_validate(raw),
+            request=request,
+            responsibilities=request.responsibilities,
+            capabilities=capabilities,
+        )
 
-    # SGLang's wire projection must preserve the structural alternatives. This
-    # deliberately tests the provider-facing schema, not only the canonical one.
+    normalized_defaults = FastPlannerAdvanceModelOutput.model_validate(exact_defaults)
+    validate_fast_advance_output(
+        normalized_defaults,
+        request=request,
+        responsibilities=request.responsibilities,
+        capabilities=capabilities,
+    )
+    assert normalized_defaults.activities[0].args == {"count": 5}
+
+    # SGLang sees the same compact action template instead of the 2^N expansion.
     wire = build_sglang_chat_payload(
         model="fixed",
         messages=[],
@@ -662,7 +680,8 @@ def test_provider_style_defaults_compile_to_native_visible_provenance_branches()
     )["response_format"]["json_schema"]["schema"]
     wire_validator = Draft202012Validator(wire)
     wire_validator.validate(count_only)
-    assert list(wire_validator.iter_errors(bad_duration))
+    wire_validator.validate(planner_override)
+
 
 def test_fast_argument_source_cannot_escape_owning_responsibility_span():
     from agent.app.planner_fast_validation import validate_fast_advance_output

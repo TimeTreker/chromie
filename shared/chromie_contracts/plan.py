@@ -334,11 +334,13 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     argument_sources: dict[str, UserTurnSourceSpan] = Field(
         default_factory=dict,
         description=(
-            "For each argument realized from the current user turn, cite the closed "
-            "UserTurnEnvelope token span that grounds it. Planner owns the mapping "
-            "and conversion; trusted code materializes the exact source surface. "
-            "Never retype or paraphrase source text. Omit declared defaults and "
-            "trusted Runtime target references."
+            "For each argument actually realized from the current user turn, cite the "
+            "closed UserTurnEnvelope token span that grounds it. Planner owns the mapping "
+            "and conversion; trusted code materializes the exact source surface. Never "
+            "retype or paraphrase source text. Omit provenance entries for provider "
+            "defaults, Planner-owned HOW choices and trusted Runtime target references. "
+            "Capability schema metadata such as type, bounds and default never belongs "
+            "inside args."
         ),
     )
     timing: PlanTiming = "sequential"

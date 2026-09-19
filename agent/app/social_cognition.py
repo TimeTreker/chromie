@@ -25,12 +25,14 @@ try:
         SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     )
     from chromie_contracts.text import normalize_whitespace
+    from chromie_contracts.user_turn import user_turn_prohibits_speech
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
     from shared.chromie_contracts.social_cognition import (
         SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
     )
     from shared.chromie_contracts.text import normalize_whitespace
+    from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
 
 
 SOCIAL_COGNITION_AUTHORITY_PROMPT = (
@@ -86,24 +88,23 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "the gap or proposal; SC owns expressing it. A fresh required question normally "
     "needs delivery unless actual pending/delivered interaction or current social "
     "conditions justify deferral. Explain any such deferral from supplied facts. "
-    "A fresh addressed turn is itself an interaction opportunity even when the person "
-    "did not explicitly ask for speech. When no reply is already pending or delivered for "
-    "that turn, a brief truthful acknowledgement or useful nonverbal acknowledgement is "
-    "ordinarily appropriate if it will not interrupt something more important. Task-oriented "
-    "content, physical Work, or absence of a Planner communication need are never by "
-    "themselves reasons for silence. For a fresh addressed turn with no reply already pending "
-    "or delivered, acknowledging receipt is itself useful interaction; do not relabel the "
-    "absence of task-oriented speech as 'no useful social change'. If you still choose silence, "
-    "your reason_summary must cite a separate supplied situational fact, such as actual duplicate "
-    "delivery or inappropriate interruption, rather than task modality or missing Planner Needs. "
+    "A fresh addressed turn is itself an interaction opportunity and commitment even when the "
+    "person did not explicitly ask for speech. When no reply is already pending or delivered for "
+    "that turn, produce at least one brief truthful acknowledgement, verbal or nonverbal. "
+    "Task-oriented content, physical Work, or absence of a Planner communication need never "
+    "remove this independent interaction duty; a pending Planner decision does not remove it "
+    "either. Do not claim that Work has started, will succeed, or has a particular method before "
+    "those facts exist; acknowledgement may claim only receipt/understanding at the truth stage "
+    "you actually have. Host protective controls suppress SC before inference when interaction "
+    "must remain silent. Duplicate pending/delivered interaction may still suppress another "
+    "acknowledgement. "
     "At interpretation ingress a goal-scoped Responsibility still has an independent Work "
     "decision pending, so do not answer that task or invent an input question before that "
     "decision. A Responsibility marked continuity_scope=turn has no pending task Work and may "
     "be answered directly from supplied conversational context; do not create or imply a Goal "
-    "for it. Silence remains valid only for "
-    "a positive supplied situational reason such as duplicate/pending interaction, inappropriate "
-    "interruption, or genuinely no useful social change. Never invent a task just to create an "
-    "interaction need. "
+    "for it. Silence remains valid for trusted state changes with no useful interaction or for "
+    "a fresh turn whose reply is already pending/delivered. Never invent a task just to create "
+    "an interaction need. "
     "Use exact eligible social-expression Capability IDs and schema-valid arguments only "
     "when useful, with each proposal anchored to its own communicative act. The prohibition "
     "on raw motor, joint, actuator or controller fields applies only to optional social "
@@ -179,6 +180,24 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
     schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": branches}
 
 
+def _fresh_addressed_turn_requires_acknowledgement(
+    request: SocialCognitionRequest,
+) -> bool:
+    """Keep direct interaction independent from concurrent Planner success."""
+
+    if request.trigger != "interpretation":
+        return False
+    if user_turn_prohibits_speech(request.context.get("user_turn_envelope")):
+        return False
+    interaction = request.context.get("interaction_context")
+    if not isinstance(interaction, dict):
+        interaction = {}
+    return not bool(
+        interaction.get("already_spoken")
+        or interaction.get("pending_speech")
+    )
+
+
 def social_cognition_response_schema(
     request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, deep: bool = False,
 ) -> dict[str, Any]:
@@ -207,6 +226,12 @@ def social_cognition_response_schema(
         })
     if deep:
         schema["properties"]["disposition"]["enum"] = ["communicate", "silence"]
+    if _fresh_addressed_turn_requires_acknowledgement(request):
+        schema["properties"]["disposition"]["enum"] = [
+            value
+            for value in schema["properties"]["disposition"]["enum"]
+            if value != "silence"
+        ]
     act_schema = schema["$defs"]["SocialCommunicativeAct"]
     act = act_schema["properties"]
     act_schema.setdefault("required", []).append("text")
@@ -434,6 +459,10 @@ def validate_social_cognition_output(
     candidates: list[dict[str, Any]],
 ) -> None:
     """Check exact provenance and contract; never judge or rewrite social meaning."""
+    if _fresh_addressed_turn_requires_acknowledgement(request) and output.disposition == "silence":
+        raise ValueError(
+            "fresh addressed turn without pending or delivered reply requires acknowledgement"
+        )
     allowed = {item["capability_id"]: item for item in candidates}
     scopes = {
         "source_responsibility_refs": {item.local_ref for item in request.responsibilities},
