@@ -477,14 +477,32 @@ class GoalExecutionContractTests(unittest.TestCase):
             "$defs": schema["$defs"], **array["anyOf"][0],
         })
         full = Draft202012Validator({"$defs": schema["$defs"], **array})
+        complete = Draft202012Validator(schema)
         values = [
             intent_goal("Blink twice.", "body_action"),
             intent_goal("Tell a joke.", "speech", source_responsibility_refs=["r2"]),
         ]
-        for valid in (values, list(reversed(values))):
+        # The body Work is mandatory; ordinary speech may either become a Goal
+        # or be classified non_goal by GA. The array shape therefore permits one
+        # or two Goals, while top-level conservation still owns r2 exactly once.
+        for valid in (values, list(reversed(values)), values[:1]):
             self.assertTrue(exposed.is_valid(valid))
             self.assertTrue(full.is_valid(valid))
-        for invalid in ([], values[:1], values + values[:1], [False, values[1]]):
+        self.assertTrue(complete.is_valid({
+            **create_goals(*values),
+            "referent_updates": [], "resolved_references": [],
+        }))
+        social_only_r2 = {
+            **create_goals(values[0]),
+            "non_goal_responsibility_refs": ["r2"],
+            "referent_updates": [], "resolved_references": [],
+        }
+        self.assertTrue(complete.is_valid(social_only_r2))
+        self.assertFalse(complete.is_valid({
+            **create_goals(values[0]),
+            "referent_updates": [], "resolved_references": [],
+        }))
+        for invalid in ([], values + values[:1], [False, values[1]]):
             with self.subTest(invalid=invalid):
                 self.assertFalse(exposed.is_valid(invalid))
                 self.assertFalse(full.is_valid(invalid))
@@ -493,9 +511,12 @@ class GoalExecutionContractTests(unittest.TestCase):
             del missing[0][field]
             with self.subTest(missing=field):
                 self.assertFalse(exposed.is_valid(missing))
-        # The redundant branch cannot enforce cross-item identity. Keep the
-        # original conservation clauses and the downstream Host check intact.
-        self.assertFalse(full.is_valid([values[0], values[0]]))
+        duplicate = {
+            **create_goals(values[0], values[0]),
+            "non_goal_responsibility_refs": ["r2"],
+            "referent_updates": [], "resolved_references": [],
+        }
+        self.assertFalse(complete.is_valid(duplicate))
 
     def test_decoder_object_alternative_requires_complete_association_result(self):
         for refs in (["r1"], ["r1", "r2"]):
@@ -579,26 +600,49 @@ class GoalExecutionContractTests(unittest.TestCase):
                 self.assertTrue(complete.is_valid(payload))
                 array = schema["properties"]["new_goals"]
                 with self.subTest(count=count, mode=mode):
-                    self.assertIn("anyOf", array)
-                    # Exercise the alternative selected by the pinned decoder.
-                    exposed = Draft202012Validator({
-                        "$defs": schema["$defs"], **array["anyOf"][0],
-                    })
-                    for valid in (goals, list(reversed(goals))):
-                        self.assertTrue(exposed.is_valid(valid))
-                        self.assertTrue(complete.is_valid({**payload, "new_goals": valid}))
-                    for invalid in (
-                        {}, None, [], goals[:-1], goals + [goals[0]],
-                        [None, *goals[1:]], [7, *goals[1:]], [{}, *goals[1:]],
-                        [{**goals[0], "output_mode": "unknown"}, *goals[1:]],
-                        [{**goals[0], "source_responsibility_refs": ["unknown"]}, *goals[1:]],
-                        [{**goals[0], "bindings": "invalid"}, *goals[1:]],
-                    ):
-                        with self.subTest(invalid=invalid):
-                            self.assertFalse(exposed.is_valid(invalid))
-                            self.assertFalse(complete.is_valid({**payload, "new_goals": invalid}))
-                    duplicate = [goals[0], *goals[:-1]]
-                    self.assertFalse(complete.is_valid({**payload, "new_goals": duplicate}))
+                    if mode == "body_action":
+                        self.assertIn("anyOf", array)
+                        exposed = Draft202012Validator({
+                            "$defs": schema["$defs"], **array["anyOf"][0],
+                        })
+                        for valid in (goals, list(reversed(goals))):
+                            self.assertTrue(exposed.is_valid(valid))
+                            self.assertTrue(complete.is_valid({**payload, "new_goals": valid}))
+                        for invalid in (
+                            {}, None, [], goals[:-1], goals + [goals[0]],
+                            [None, *goals[1:]], [7, *goals[1:]], [{}, *goals[1:]],
+                            [{**goals[0], "output_mode": "unknown"}, *goals[1:]],
+                            [{**goals[0], "source_responsibility_refs": ["unknown"]}, *goals[1:]],
+                            [{**goals[0], "bindings": "invalid"}, *goals[1:]],
+                        ):
+                            with self.subTest(invalid=invalid):
+                                self.assertFalse(exposed.is_valid(invalid))
+                                self.assertFalse(complete.is_valid({**payload, "new_goals": invalid}))
+                        duplicate = [goals[0], *goals[:-1]]
+                        self.assertFalse(complete.is_valid({**payload, "new_goals": duplicate}))
+                    else:
+                        # Speech is allowed to remain a Goal when continuity requires
+                        # one, but GA may instead classify any relation-free subset as
+                        # non_goal. The schema must not hard-force a Goal count.
+                        self.assertEqual(array["minItems"], 0)
+                        no_goal = {
+                            "decision": "no_goal",
+                            "new_goals": [],
+                            "non_goal_responsibility_refs": refs,
+                            "referent_updates": [],
+                            "resolved_references": [],
+                            "confidence": 1.0,
+                            "reason_summary": "Conversation is complete without Goal state.",
+                        }
+                        self.assertTrue(complete.is_valid(no_goal))
+                        mixed = {
+                            **create_goals(goals[0]),
+                            "non_goal_responsibility_refs": refs[1:],
+                            "referent_updates": [],
+                            "resolved_references": [],
+                        }
+                        self.assertTrue(complete.is_valid(mixed))
+
 
 
 

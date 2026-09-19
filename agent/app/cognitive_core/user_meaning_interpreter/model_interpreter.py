@@ -698,7 +698,8 @@ class OllamaUserMeaningInterpreter:
             "result and whenever information/evidence, embodied/media/stateful work, or "
             "pending-Goal change remains; goal may complete before the next user turn. "
             "Use turn only for ordinary current-conversation speech completed directly "
-            "by Social Cognition with no separate user/world objective."
+            "by Social Cognition with no separate user/world objective. This does not suppress "
+            "GA's continuity check and is not an explicit Planner routing flag."
         )
         item["properties"]["continuity_scope"].pop("default", None)
         item["properties"]["local_ref"] = {
@@ -707,6 +708,42 @@ class OllamaUserMeaningInterpreter:
         item["properties"]["source_evidence"] = {
             "$ref": "#/$defs/ResponsibilitySourceEvidence",
         }
+
+        # Make Planner-readiness semantics visible to the native decoder instead
+        # of leaving output_mode and continuity_scope as an unconstrained cross
+        # product. Ordinary speech may be interaction-first or explicitly
+        # continuity-bearing; every non-speech result is structurally goal-scoped.
+        # Put turn first for speech so a small greedy model is not biased toward
+        # fabricating Work/Goal continuity for ordinary conversation.
+        base_item = copy.deepcopy(item)
+        speech_item = copy.deepcopy(base_item)
+        speech_item["properties"]["output_mode"] = {
+            "type": "string",
+            "const": "speech",
+            "description": item["properties"]["output_mode"]["description"],
+        }
+        speech_item["properties"]["continuity_scope"] = {
+            "type": "string",
+            "enum": ["turn", "goal"],
+            "description": item["properties"]["continuity_scope"]["description"],
+        }
+        work_item = copy.deepcopy(base_item)
+        work_item["properties"]["output_mode"] = {
+            "type": "string",
+            "enum": [
+                value
+                for value in item["properties"]["output_mode"]["enum"]
+                if value != "speech"
+            ],
+            "description": item["properties"]["output_mode"]["description"],
+        }
+        work_item["properties"]["continuity_scope"] = {
+            "type": "string",
+            "const": "goal",
+            "description": item["properties"]["continuity_scope"]["description"],
+        }
+        item.clear()
+        item["oneOf"] = [speech_item, work_item]
         schema["properties"]["responsibilities"]["maxItems"] = 12
         uncertainty = schema["$defs"]["UserMeaningUncertainty"]
         uncertainty["properties"] = {

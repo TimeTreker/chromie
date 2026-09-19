@@ -113,14 +113,20 @@ does not grant authority over unrelated Goals. Required facts must not be silent
 truncated to meet a fast budget. Memory, Goal, Work and Interaction stores retain
 their existing owners; two inference sessions do not create two conversations.
 
-One accepted UMI result can make Social Cognition, Planner and GA independently
-ready. Optional communication does not gate planning or safe dispatch, and Work
-completion does not gate an already-grounded conversational answer. Eligibility
-comes from the declared authority/input contract; no phrase router or extra model
-decides which brain to use. Not every event requires all three calls. Missing
-canonical Goal identity alone does not block a source-grounded Communicative Act;
-GA later binds it without regenerating speech. Understanding, planning, commitment,
-execution and verified completion remain distinct facts.
+One accepted UMI result can make Social Cognition and GA independently ready, and
+can also make Planner ready when UMI marks the accepted Responsibility continuity_scope=goal
+(plus any Responsibility semantically coupled to that Work by accepted
+before/after/parallel relations). continuity_scope=turn does not wake Planner
+speculatively: SC may interact immediately while GA checks whether
+that apparently simple turn is socially complete, belongs to retained Goal continuity,
+or establishes a new Goal. If GA discovers Goal relevance, Planner becomes ready then.
+Optional communication does not gate already-ready planning or safe dispatch, and Work
+completion does not gate an already-grounded conversational answer. Eligibility comes
+from the declared authority/input contract; no phrase router or extra model decides
+which brain to use. Not every event requires all three calls. Missing canonical Goal
+identity alone does not block a source-grounded Communicative Act. Understanding,
+planning readiness, canonical continuity, commitment, execution and verified completion
+remain distinct facts.
 
 Planner owns execution-input completeness and proposes Work under trusted
 confirmation policy; Host independently enforces the required confirmation.
@@ -285,13 +291,18 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   A disabled or unavailable review may fail open to cognition, but it is explicitly
   unreviewed/unknown evidence and must not fabricate high-confidence addressedness.
 - **TURN-GOAL-BOUNDARY-001** — An admitted Responsibility whose complete meaning can be
-  satisfied by the current ordinary conversation and leaves no unfinished user/world
-  objective is turn-local: Social Cognition may complete it without fabricating a
-  canonical Goal. A Responsibility that requests information, an effect, communication
-  to another person, or changes/answers pending Goal meaning remains goal-scoped and
-  enters Goal Association. The semantic distinction comes from bounded meaning and
-  context, never phrase tables or hardware profiles. GA still exclusively owns which
-  canonical Goal a goal-scoped Responsibility creates, continues, modifies, or cancels.
+  satisfied by the current ordinary conversation and leaves no separate user/world
+  objective is interaction-complete: Social Cognition may express it immediately, but
+  this does **not** suppress Goal Association. GA still performs bounded continuity
+  inspection because a terse greeting, acknowledgement or attention ping can carry deeper
+  meaning when retained Goal/dialogue evidence supports it. GA may classify relation-free
+  ordinary speech as `non_goal`, associate it with retained Goal state, or create a new
+  Goal when continuity truly exists. A Responsibility that UMI marks continuity_scope=goal is already Planner-ready and
+  may begin bounded Fast planning while GA runs. Any Responsibility semantically coupled to
+  that Work by accepted ordering/concurrency relations travels with the same Planner-ready
+  component. continuity_scope=turn remains interaction-first, but GA can still discover
+  deeper retained-Goal continuity and wake Planner afterward. The distinction comes from bounded meaning and context,
+  never phrase tables or hardware profiles. GA exclusively owns canonical Goal identity.
 - **SPEECH-OWNER-001** — Social Cognition is the sole ordinary semantic owner of whether and when to
   communicate, the Communicative Activity, its exact wording, truth stage, and source
   provenance. UMI, committed GA/Planner state, Runtime/Evidence or trusted Situation
@@ -447,10 +458,12 @@ pipeline or an always-running cognition loop:
 flowchart TD
     U["Person-authored input"] --> GW["Cognitive Gateway"]
     GW --> UMI["User Meaning Interpretation / complete WHAT"]
-    UMI --> SC["Social Cognition / communication"]
-    UMI --> P["Planner / Work HOW"]
-    UMI --> GA["Goal Association / canonical continuity"]
+    UMI --> SC["Social Cognition / immediate interaction"]
+    UMI --> GA["Goal Association / continuity inspection"]
+    UMI -. substantive WHAT .-> P["Planner / Work HOW"]
+    GA --> NG["non_goal / social-only continuity result"]
     GA --> G["Canonical Goals"]
+    G --> P
     WORLD["Trusted world / social transition"] --> SIT["Situation / existing source owner"]
     SIT --> ST
     ST["Bounded shared context / Stable Mind, Memory, Situation,<br/>Goals, Work, Evidence and Interaction records"] --> SC
@@ -622,10 +635,13 @@ Read the diagram with these boundaries:
   provider requests, authorization, or readiness flags. Planner derives whether work
   or fresh Evidence is still needed from canonical Goal state, current Evidence, and
   available Capability truth.
-- A semantically complete immutable UMI result can independently start Goal Association,
-  Social Cognition and Planner. If UMI reports typed semantic uncertainty, Social Cognition
-  may still run, but Planner waits for GA's continuity attempt and receives only uncertainty
-  still unresolved afterward. Social Cognition emits its complete typed communication
+- A semantically complete immutable UMI result independently starts Goal Association and
+  Social Cognition. Planner also starts immediately only for the Responsibility component
+  whose accepted WHAT already requires substantive Work; ordinary speech alone waits for
+  GA's continuity result. If GA maps that speech to retained/new Goal state, Planner becomes
+  ready then. If UMI reports typed semantic uncertainty on a Planner-ready component, Planner
+  waits for GA's continuity attempt and receives only uncertainty still unresolved afterward.
+  Social Cognition emits its complete typed communication
   decision, including exact wording, source scope, timing and truth/Evidence
   provenance; intentional silence is valid. Only complete validated commitments
   reach presentation. Planner produces a separate complete Work decision and

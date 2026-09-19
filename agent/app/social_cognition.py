@@ -98,11 +98,12 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "you actually have. Host protective controls suppress SC before inference when interaction "
     "must remain silent. Duplicate pending/delivered interaction may still suppress another "
     "acknowledgement. "
-    "At interpretation ingress a goal-scoped Responsibility still has an independent Work "
-    "decision pending, so do not answer that task or invent an input question before that "
-    "decision. A Responsibility marked continuity_scope=turn has no pending task Work and may "
-    "be answered directly from supplied conversational context; do not create or imply a Goal "
-    "for it. Silence remains valid for trusted state changes with no useful interaction or for "
+    "At interpretation ingress ordinary output_mode=speech may be answered directly from "
+    "supplied conversational context while Goal Association independently checks whether the "
+    "same turn carries retained Goal continuity. That immediate reply does not create, erase, "
+    "or decide a Goal relationship. Non-speech task Responsibilities still have an independent "
+    "Work decision pending, so do not answer that task or invent an input question before that "
+    "decision. Silence remains valid for trusted state changes with no useful interaction or for "
     "a fresh turn whose reply is already pending/delivered. Never invent a task just to create "
     "an interaction need. "
     "Use exact eligible social-expression Capability IDs and schema-valid arguments only "
@@ -307,12 +308,23 @@ def social_cognition_response_schema(
     auxiliary = schema["$defs"]["AuxiliaryPlanActivity"]
     auxiliary["properties"]["anchor_kind"] = {"type": "string", "const": "communicative_act"}
     if candidates:
-        auxiliary["allOf"] = [{"anyOf": [
-            {"properties": {"capability_id": {"const": item["capability_id"]},
-                            "args": item["input_schema"]},
-             "required": ["capability_id", "args"]}
-            for item in candidates
-        ]}]
+        # Keep capability identity and its argument schema in one complete native
+        # branch. Intersecting a generic object with allOf(anyOf(...)) let deployed
+        # constrained decoders mix fields from different social Capabilities.
+        base_auxiliary = copy.deepcopy(auxiliary)
+        base_auxiliary.pop("allOf", None)
+        branches = []
+        for item in candidates:
+            branch = copy.deepcopy(base_auxiliary)
+            branch["properties"]["capability_id"] = {
+                "type": "string", "const": item["capability_id"],
+            }
+            branch["properties"]["args"] = copy.deepcopy(item["input_schema"])
+            branch["required"] = list(dict.fromkeys([
+                *(branch.get("required") or []), "capability_id", "args",
+            ]))
+            branches.append(branch)
+        schema["$defs"]["AuxiliaryPlanActivity"] = {"oneOf": branches}
     else:
         act["auxiliary_activities"]["maxItems"] = 0
         act["text"]["minLength"] = 1
@@ -431,13 +443,13 @@ def social_cognition_response_schema(
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": question_branches}
     if request.trigger == "interpretation" and not request.communication_needs:
         # Native decoding must see the same semantic boundary as Host validation.
-        # A direct respond/ask branch is legal only for turn-local conversation;
-        # goal-scoped input remains acknowledgement-only until Planner establishes
-        # a communication need.
-        turn_local_refs = sorted(
+        # Ordinary speech can be answered directly while GA independently checks
+        # continuity. Non-speech task content remains acknowledgement-only until
+        # Planner establishes a communication need.
+        direct_speech_refs = sorted(
             item.local_ref
             for item in request.responsibilities
-            if item.continuity_scope == "turn"
+            if item.output_mode == "speech"
         )
         existing = schema["$defs"]["SocialCommunicativeAct"]
         continuity_branches = []
@@ -453,13 +465,13 @@ def social_cognition_response_schema(
                 variant = copy.deepcopy(branch)
                 variant["properties"]["function"] = {"type": "string", "enum": other}
                 continuity_branches.append(variant)
-            if direct and turn_local_refs:
+            if direct and direct_speech_refs:
                 variant = copy.deepcopy(branch)
                 properties = variant["properties"]
                 properties["function"] = {"type": "string", "enum": direct}
                 source_refs = copy.deepcopy(properties["source_responsibility_refs"])
                 source_refs["minItems"] = 1
-                source_refs["items"] = {"type": "string", "enum": turn_local_refs}
+                source_refs["items"] = {"type": "string", "enum": direct_speech_refs}
                 properties["source_responsibility_refs"] = source_refs
                 continuity_branches.append(variant)
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": continuity_branches}
@@ -521,16 +533,16 @@ def validate_social_cognition_output(
     }
     for act in output.activities:
         if request.trigger == "interpretation" and not request.communication_needs and act.function in {"respond", "ask"}:
-            turn_local_refs = {
+            direct_speech_refs = {
                 item.local_ref
                 for item in request.responsibilities
-                if item.continuity_scope == "turn"
+                if item.output_mode == "speech"
             }
             cited_refs = set(act.source_responsibility_refs)
-            if not cited_refs or not cited_refs.issubset(turn_local_refs):
+            if not cited_refs or not cited_refs.issubset(direct_speech_refs):
                 raise ValueError(
                     "interpretation-triggered respond/ask cannot fulfill an unestablished "
-                    "Work communication need unless it cites only turn-local "
+                    "Work communication need unless it cites only ordinary speech "
                     "Responsibility provenance"
                 )
         for name, values in scopes.items():

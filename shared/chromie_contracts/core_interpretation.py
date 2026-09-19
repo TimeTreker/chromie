@@ -241,8 +241,11 @@ class CognitiveResponsibilityProposal(BaseModel):
             "when that work can finish before the next user turn. turn is reserved for "
             "ordinary current-conversation speech that Social Cognition can complete "
             "directly and that leaves no separate user/world objective. This is a semantic "
-            "property of WHAT in context, never a keyword or hardware rule; GA still owns "
-            "which canonical Goal is created, continued, modified, or cancelled."
+            "property of WHAT in context, never a keyword or hardware rule. It is not a GA "
+            "bypass flag: GA may still inspect conversational continuity and associate a terse "
+            "re-engagement with retained Goal state when evidence supports it. Planner readiness "
+            "is derived from substantive output domains/relations and later canonical Goal "
+            "ownership, not from continuity_scope alone."
         ),
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)

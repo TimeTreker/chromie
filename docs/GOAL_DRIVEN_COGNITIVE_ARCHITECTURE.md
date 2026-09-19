@@ -10,10 +10,14 @@ Cognition owns whether/when/how to communicate, and Planner owns Work HOW.
 All use the same existing Mind, Memory, Situation, Goal, Work and Interaction
 truth; a separate inference task creates no separate personality or truth store.
 
-The runtime admits independently ready GA, communication and planning tasks from
-one complete UMI result. New trusted state may reactivate the appropriate owner;
-it does not require every event to run every role. Optional acknowledgement
-cannot gate Work, and communication cannot authorize or claim unobserved effects.
+The runtime admits independently ready GA and communication tasks from one complete
+UMI result. Planner readiness is narrower: Responsibilities that UMI marks
+continuity_scope=goal may start bounded Fast planning in parallel, together with any
+Responsibility semantically coupled to that Work by accepted ordering/concurrency relations.
+continuity_scope=turn runs SC + GA first; GA may classify it `non_goal` or discover retained/new Goal continuity, and
+only the latter makes Planner ready. New trusted state may reactivate the appropriate owner;
+it does not require every event to run every role. Optional acknowledgement cannot gate
+already-ready Work, and communication cannot authorize or claim unobserved effects.
 One primary result per distinct authority remains required; neither role is a
 reviewer or repairer of the other. See the
 [target lifecycle and source inventory](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle).
@@ -120,19 +124,19 @@ User Meaning Interpretation
       ▼
 Responsibility / WHAT
       │
-      ├──────────────────────┐
-      ▼                      ▼
-Planner fast pass        Goal Association
-speech + ordinary HOW     Goal continuity
-      │                      │
-      ├─ complex HOW ──> Deep Planner
-      ├─ provisional ──> bounded Planner deliberation
-      │                      │
-      ▼                      ▼
-Plan / Activities       Canonical Goals
-      │                      │
-      └──────────┬───────────┘
-                 ▼
+      ├──────────────┬──────────────────────────┐
+      ▼              ▼                          ▼
+Social Cognition  Goal Association      Fast Planner when WHAT
+immediate social  continuity check      already contains Work
+interaction          │                         │
+      │              ├─ non_goal ──> done      ├─ complex HOW ──> Deep Planner
+      │              │                         │
+      │              └─ canonical Goal ────────┤
+      │                                        ▼
+      │                                  Plan / Activities
+      │                                        │
+      └────────────────────┬───────────────────┘
+                           ▼
        Trusted Capability Runtime
                  │
                  ▼
@@ -671,14 +675,17 @@ for unfinished responsibility, not a mandatory ticket that every immediate
 interaction act must acquire before useful progress can begin.
 
 Fast User Meaning Interpretation may establish a fully understood, low-risk Responsibility
-quickly, but it still stops at Responsibility evidence. Fast Planner then owns the
-smallest HOW advancement. For an ordinary greeting that can be satisfied immediately,
-Fast Planner may author one ready Communicative Act and no Goal Association is
-needed. When work must persist, wait for evidence/provider effects, modify retained
-continuity, or survive the current instant, Fast Planner requests Goal Association while
-any separately safe immediate progress Activity may start in parallel. If HOW exceeds
-the fast planning budget, Fast Planner may additionally request Deep Planner; Deep
-planning receives canonical Goal grounding before commitment-bearing work executes.
+quickly, but it still stops at Responsibility evidence. Social Cognition and Goal Association
+may both act on that accepted WHAT immediately. For an ordinary greeting or conversational
+turn, SC may respond while GA checks whether the turn is truly social-only or carries deeper
+continuity with retained Goal state; GA's explicit `non_goal` result ends the task path without
+Planner. If UMI marks a Responsibility continuity_scope=goal, Fast Planner owns the smallest
+HOW advancement and may run in parallel with GA; any Responsibility connected to that Work
+by accepted before/after/parallel relations stays in the same Planner-ready component.
+If GA later discovers additional Goal relevance that was not Planner-ready from UMI alone, the
+same Planner authority wakes then. If HOW exceeds the fast planning budget, Fast Planner may
+additionally request Deep Planner; Deep planning receives canonical Goal grounding before
+commitment-bearing work executes.
 
 An executable capability is one possible means of satisfying a responsibility.
 An Agent Skill is a reusable method that may help an Agent decide how to use one

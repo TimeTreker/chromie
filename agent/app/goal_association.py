@@ -168,16 +168,6 @@ class GoalAssociationResolver:
     async def _resolve(self, request: CognitiveWorkRequest) -> GoalAssociationResolution:
         """Resolve one turn through the bounded Goal semantic transaction."""
 
-        turn_local_refs = [
-            item.local_ref
-            for item in request.responsibilities
-            if item.continuity_scope != "goal"
-        ]
-        if turn_local_refs:
-            raise ValueError(
-                "Goal Association accepts only goal-scoped Responsibilities; "
-                "turn-local refs belong to Social Cognition: " + ",".join(turn_local_refs)
-            )
         candidate_goals = self._candidate_goals(request)
         turn_id = self._turn_id(request)
         output_type: (
@@ -338,7 +328,7 @@ class GoalAssociationResolver:
                 ref
                 for association in getattr(model_output, "associations", [])
                 for ref in association.source_responsibility_refs
-            ] + [
+            ] + list(model_output.non_goal_responsibility_refs) + [
                 ref
                 for goal in model_output.new_goals
                 for ref in goal.source_responsibility_refs
@@ -510,6 +500,36 @@ class GoalAssociationResolver:
 
         # Preserve UMI's human-level result type without letting GA re-author it.
         by_ref = {item.local_ref: item for item in request.responsibilities}
+        relation_keys = {"before", "after", "parallel_with"}
+        relation_coupled_refs: set[str] = set()
+        for source_ref, responsibility in by_ref.items():
+            for key, raw in responsibility.bindings.items():
+                if str(key).strip().casefold() not in relation_keys:
+                    continue
+                relation_coupled_refs.add(source_ref)
+                values = raw if isinstance(raw, list) else [raw]
+                relation_coupled_refs.update(
+                    str(value).strip()
+                    for value in values
+                    if str(value or "").strip() in by_ref
+                )
+        non_goal_refs = list(model_output.non_goal_responsibility_refs)
+        unknown_non_goal = sorted(set(non_goal_refs) - set(by_ref))
+        if unknown_non_goal:
+            raise ValueError(
+                "GA non_goal references unknown UMI Responsibilities: "
+                + ",".join(unknown_non_goal)
+            )
+        invalid_non_goal = sorted(
+            ref
+            for ref in non_goal_refs
+            if by_ref[ref].output_mode != "speech" or ref in relation_coupled_refs
+        )
+        if invalid_non_goal:
+            raise ValueError(
+                "non_goal requires ordinary relation-free conversational speech: "
+                + ",".join(invalid_non_goal)
+            )
         model_output = model_output.model_copy(update={"new_goals": [
             item.model_copy(update={"output_mode": (
                 by_ref[item.source_responsibility_refs[0]].output_mode
@@ -1087,7 +1107,7 @@ class GoalAssociationResolver:
             ref
             for association in associations
             for ref in association.source_responsibility_refs
-        ] + [
+        ] + list(model_output.non_goal_responsibility_refs) + [
             ref
             for goal in new_goals
             for ref in goal.source_responsibility_refs
@@ -1101,6 +1121,7 @@ class GoalAssociationResolver:
             turn_id=turn_id,
             resolution_status="resolved",
             associations=associations,
+            non_goal_responsibility_refs=list(model_output.non_goal_responsibility_refs),
             new_goals=new_goals,
             referent_updates=referent_updates,
             resolved_references=resolved_references,
@@ -1162,6 +1183,7 @@ class GoalAssociationResolver:
                 "candidate_goal_count": len(candidate_goals),
                 "accepted_association_count": len(accepted),
                 "new_goal_count": len(new_goals),
+                "non_goal_count": len(resolution.non_goal_responsibility_refs),
                 "referent_update_count": len(resolution.referent_updates),
                 "resolved_reference_count": len(resolution.resolved_references),
                 "rejected_associations": rejected,
@@ -1173,6 +1195,7 @@ class GoalAssociationResolver:
         if (
             not accepted
             and not new_goals
+            and not resolution.non_goal_responsibility_refs
             and not resolution.referent_updates
         ):
             return GoalAssociationResolution(

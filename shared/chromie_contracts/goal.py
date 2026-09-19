@@ -229,6 +229,7 @@ class GoalAssociationResolution(BaseModel):
         "fail_closed",
     ]
     associations: list[GoalAssociation] = Field(default_factory=list)
+    non_goal_responsibility_refs: list[str] = Field(default_factory=list)
     new_goals: list[SemanticGoal] = Field(default_factory=list)
     referent_updates: list[DiscourseReferentUpdate] = Field(default_factory=list)
     resolved_references: list[ResolvedDiscourseReference] = Field(default_factory=list)
@@ -248,6 +249,19 @@ class GoalAssociationResolution(BaseModel):
 
     @model_validator(mode="after")
     def validate_resolution_shape(self) -> "GoalAssociationResolution":
+        if len(self.non_goal_responsibility_refs) != len(set(self.non_goal_responsibility_refs)):
+            raise ValueError("non_goal_responsibility_refs must be unique")
+        goal_owned_refs = {
+            ref
+            for association in self.associations
+            for ref in association.source_responsibility_refs
+        } | {
+            ref
+            for goal in self.new_goals
+            for ref in goal.source_responsibility_refs
+        }
+        if goal_owned_refs.intersection(self.non_goal_responsibility_refs):
+            raise ValueError("one Responsibility cannot be both Goal-owned and non_goal")
         existing_targets = {
             goal_id
             for association in self.associations
@@ -275,6 +289,7 @@ class GoalAssociationResolution(BaseModel):
             if (
                 self.new_goals
                 or self.associations
+                or self.non_goal_responsibility_refs
                 or self.referent_updates
                 or self.resolved_references
                 or self.confidence != 0.0
@@ -287,11 +302,12 @@ class GoalAssociationResolution(BaseModel):
         if (
             not self.new_goals
             and not self.associations
+            and not self.non_goal_responsibility_refs
             and not self.referent_updates
         ):
             raise ValueError(
                 "resolved Goal Association must contain associations, new_goals, "
-                "or referent_updates"
+                "non_goal_responsibility_refs, or referent_updates"
             )
         return self
 
@@ -347,6 +363,7 @@ class GoalAssociationResolution(BaseModel):
             "turn_id": self.turn_id,
             "resolution_status": self.resolution_status,
             "associations": associations,
+            "non_goal_responsibility_refs": list(self.non_goal_responsibility_refs),
             "new_goals": new_goals,
             "referent_updates": referent_updates,
             "resolved_references": [

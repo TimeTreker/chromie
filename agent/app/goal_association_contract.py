@@ -31,7 +31,7 @@ CANONICAL_LOCATION_ENTITY_TYPES = (
     "relative_location", "region",
 )
 
-GoalSegmentationDecision = Literal["create_goals"]
+GoalSegmentationDecision = Literal["create_goals", "no_goal"]
 InformationResourceDomain = Literal[
     "local_clock",
     "weather_forecast",
@@ -172,10 +172,12 @@ class GoalAssociationModelAssociation(BaseModel):
             "advances unfinished unchanged work; reference requests retrieval, "
             "restatement, explanation, comparison, or another answer from an open retained "
             "Goal without changing it. Terminal Goals are historical context for new Goal "
-            "related_goal_ids, never association targets. A social reaction, personal feeling, practical "
-            "decision, acknowledgement, or new conversational judgment is a fresh "
-            "vocal_output Goal even when prior Goal evidence supplies context. "
-            "clarify means the current user "
+            "related_goal_ids, never association targets. Ordinary socially complete speech may "
+            "instead be non_goal. A terse greeting or attention check may reference an open "
+            "Goal when bounded dialogue and Goal state show re-engagement with unfinished work; "
+            "do not infer that relationship from wording or recency alone. A genuinely new "
+            "evaluation, practical decision, or conversational obligation that needs canonical "
+            "continuity becomes a new Goal. clarify means the current user "
             "turn supplies missing information for that Goal, not that the user "
             "is asking for more explanation."
         )
@@ -766,6 +768,15 @@ class GoalSegmentationModelOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: GoalSegmentationDecision = "create_goals"
+    non_goal_responsibility_refs: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description=(
+            "Ordinary conversational speech Responsibilities that need no canonical "
+            "Goal after bounded continuity inspection. This is a Goal Association "
+            "continuity result, not a Social Cognition or Planner decision."
+        ),
+    )
     new_goals: list[GoalAssociationModelGoal] = Field(
         default_factory=list,
         max_length=8,
@@ -797,14 +808,19 @@ class GoalSegmentationModelOutput(BaseModel):
     def validate_shape(self) -> "GoalSegmentationModelOutput":
         if self.decision == "create_goals" and not self.new_goals:
             raise ValueError("decision=create_goals requires new_goals")
+        if self.decision == "no_goal":
+            if self.new_goals:
+                raise ValueError("decision=no_goal cannot create Goals")
+            if not self.non_goal_responsibility_refs:
+                raise ValueError("decision=no_goal requires non_goal_responsibility_refs")
         return self
 
 class GoalAssociationModelOutput(BaseModel):
     """One complete candidate-aware semantic result from Goal Association.
 
-    Associations and new Goals are independent per-Responsibility outcomes, not
-    mutually exclusive branches.  The dynamic decoder and trusted Host conserve
-    every accepted UMI Responsibility across the union of both collections.
+    Associations, new Goals and explicit non_goal conversation are independent
+    per-Responsibility outcomes. The dynamic decoder and trusted Host conserve every
+    accepted UMI Responsibility across exactly one of those continuity results.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -816,6 +832,14 @@ class GoalAssociationModelOutput(BaseModel):
     new_goals: list[GoalAssociationModelGoal] = Field(
         default_factory=list,
         max_length=8,
+    )
+    non_goal_responsibility_refs: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description=(
+            "Ordinary conversational speech Responsibilities that are complete as "
+            "interaction and do not belong to retained or new canonical Goal state."
+        ),
     )
     referent_updates: list[GoalAssociationModelReferentUpdate] = Field(
         default_factory=list,

@@ -3023,6 +3023,14 @@ class VoiceAssistant:
                 json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
             )
         fast_first_scheduled = fast_planner_vocal_scheduled
+        if response.metadata.get("presentation_already_dispatched") is True:
+            # SC may have delivered a social-only interaction while GA completed
+            # its continuity check. Preserve that exact response in conversation
+            # history, but never schedule the already-dispatched presentation twice.
+            self.conversation_state.record_interaction_response(
+                session_id, response
+            )
+            return True
         if await self._stage_interaction_confirmation(
             response,
             session_id,

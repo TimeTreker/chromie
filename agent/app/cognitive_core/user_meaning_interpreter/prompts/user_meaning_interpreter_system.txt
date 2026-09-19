@@ -72,12 +72,16 @@ the requested result still needs Planner/evidence/effect work, even if Chromie c
 that work immediately before the next user turn. Every non-speech output_mode therefore
 uses goal: information needs a truth/evidence owner; body_action, media_playback,
 stateful_effect, styled/recited/sung/hummed/nonverbal vocal results need downstream work.
-Also use goal when the expression confirms, corrects, rejects, cancels, resumes, refines
-or otherwise changes pending Goal meaning. Use turn only for ordinary current-conversation
+Also use goal when the expression explicitly confirms, corrects, rejects, cancels, resumes,
+refines or otherwise changes pending Goal meaning. Use turn for ordinary current-conversation
 speech whose completion is Social Cognition's reply itself and that leaves no separate
-user/world objective. speech may still be goal-scoped when it carries pending-Goal or
-other non-conversational continuity. This is an architectural meaning distinction, not a
-phrase table. GA still decides WHICH canonical Goal, if any.
+user/world objective. Do NOT choose goal merely because an open Goal exists, because the
+turn is addressed to Chromie, or because a short greeting/attention ping might indirectly
+refer to unfinished work; GA owns that continuity judgment from bounded Goal/dialogue
+evidence. speech may still be goal-scoped when the accepted speech itself has explicit
+non-conversational continuity or is semantically coupled to other Work. This is an
+architectural meaning distinction, not a phrase table. GA still decides WHICH canonical
+Goal, if any.
 
 meaning_uncertainties contains only genuine semantic ambiguity remaining AFTER the
 bounded context above has been used. Each item has its own local_ref and names the

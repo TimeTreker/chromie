@@ -381,7 +381,11 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
             UserMeaningInterpretationRequest(text=text, language="zh-CN")
         )["format"]
         responsibility = schema["$defs"]["CognitiveResponsibilityProposal"]
-        self.assertIn("source_evidence", responsibility["required"])
+        self.assertIn("oneOf", responsibility)
+        self.assertTrue(all(
+            "source_evidence" in branch["required"]
+            for branch in responsibility["oneOf"]
+        ))
         evidence = schema["$defs"]["ResponsibilitySourceEvidence"]
         refs = [item["ref"] for item in _source_tokens(text)]
         self.assertEqual(evidence["properties"]["source_start_token_ref"]["enum"], refs)
@@ -603,4 +607,5 @@ def test_user_meaning_interpreter_scope_prompt_distinguishes_work_from_duration(
     )
     assert "goal does\nNOT mean long-term, cross-session" in prompt
     assert "Every non-speech output_mode therefore\nuses goal" in prompt
-    assert "Use turn only for ordinary current-conversation\nspeech" in prompt
+    assert "Use turn for ordinary current-conversation\nspeech" in prompt
+    assert "GA owns that continuity judgment" in prompt

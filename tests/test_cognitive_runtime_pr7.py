@@ -7,6 +7,7 @@ import json
 import os
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest import mock
 from pathlib import Path
 
@@ -132,6 +133,17 @@ class FakeRuntime:
         for definition in definitions or []:
             registry.register(definition)
         self.runtime = CapabilityRuntime(registry)
+
+    async def submit_response(self, response, **kwargs):
+        del kwargs
+        return response
+
+    async def wait_dispatch(self, dispatch):
+        del dispatch
+        return SimpleNamespace(results=[])
+
+    async def record_social_delivery(self, *args, **kwargs):
+        del args, kwargs
 
     async def ensure_capability_definitions(self, capability_ids):
         ids = list(capability_ids)
