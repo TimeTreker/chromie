@@ -766,3 +766,35 @@ def test_fast_argument_source_canonicalization_minimizes_unique_literal_only() -
     span = narrowed.activities[0].argument_sources["direction"]
     assert span.source_start_token_ref == "t2"
     assert span.source_end_token_ref == "t2"
+
+
+@pytest.mark.asyncio
+async def test_fast_uses_library_lookup_instead_of_substituting_unrelated_common_body_capability():
+    text = "wave your hand"
+    request = request_for(text)
+    walk = CatalogCapability(
+        capability_id="test.walk", agent_id="test", description="Walk forward.",
+        input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        interaction_executable=True, prompt_tier="common", can_run_parallel=False,
+        effects=["physical_motion"], hints={"semantic_type": "body_action"},
+        parallel_metadata_declared=True,
+    )
+    wave = CatalogCapability(
+        capability_id="test.wave", agent_id="test", description="Wave one hand.",
+        input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+        interaction_executable=True, prompt_tier="rare", can_run_parallel=True,
+        effects=["physical_motion"], hints={"semantic_type": "body_action"},
+        parallel_metadata_declared=True,
+    )
+    model = Model([
+        {"requested_capability_ids": ["test.wave"]},
+        work([activity("wave", {}, {})]),
+    ])
+    frames = [frame async for frame in FastPlannerResolver(model, Catalog([walk, wave])).stream_advance(request)]
+    assert isinstance(frames[0], FastPlannerStreamTerminal)
+    assert len(model.packets) == 2
+    first_prompt = model.packets[0][0]
+    assert "test.walk" in first_prompt and "test.wave" in first_prompt
+    assert "Never substitute an unrelated loaded Capability" in first_prompt
+    assert "test.wave" in model.packets[1][0]
+    assert frames[0].advance.activities[0].capability_id == "test.wave"

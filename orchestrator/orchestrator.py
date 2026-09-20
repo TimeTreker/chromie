@@ -5870,6 +5870,7 @@ class VoiceAssistant:
             request_id=f"activation:{phase}:{reentry_ref}"[:200],
             state={
                 "goal_association": context.get("goal_association_resolution"),
+                "goal_state": context.get("active_goal_snapshots", []),
                 "canonical_plan": context.get("canonical_plan_resolution"),
                 "existing_work_activities": context.get("existing_work_activities", []),
                 "situation": context.get("situation"),

@@ -63,13 +63,20 @@ except ImportError:  # pragma: no cover - repository development path
 
 CAPABILITY_LOOKUP_PROMPT = (
     "You have complete common Capability contracts and an index of the available library. "
-    "If planning needs another Capability's details, return only requested_capability_ids "
-    "with exact index IDs, up to eight in one batch, before authoring any Plan. "
-    "The Host supplies their full contracts with the original source context. One lookup "
-    "batch is allowed; after it, produce the complete Plan or the existing non-executing "
-    "outcome. Never guess missing schemas or use a lookup to revise a completed decision. "
-    "An uncommon Capability does not itself require Deep Planner. Restricted entries "
-    "remain restricted. Catalog lookup authorizes no execution. "
+    "Capability IDs are not interchangeable merely because they share output_mode, effect "
+    "class, provider, or body lane. For every independently observable requested effect, "
+    "select only a loaded Capability whose description and declared semantic scope actually "
+    "support that effect. Never substitute an unrelated loaded Capability just to avoid a "
+    "catalog lookup or to make coverage appear complete. If the loaded common contracts do "
+    "not support an accepted effect and the library index contains a plausible exact ability, "
+    "return only requested_capability_ids with exact index IDs, up to eight in one batch, "
+    "before authoring any Plan. The Host supplies their full contracts with the original "
+    "source context. One lookup batch is allowed; after it, produce the complete Plan or the "
+    "existing non-executing outcome. Never guess missing schemas or use a lookup to revise a "
+    "completed decision. If no loaded/lookup Capability actually covers an accepted effect, "
+    "retain that unmet requirement and choose the appropriate unavailable/escalation outcome "
+    "instead of fabricating substitute Work. An uncommon Capability does not itself require "
+    "Deep Planner. Restricted entries remain restricted. Catalog lookup authorizes no execution. "
 )
 
 EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (

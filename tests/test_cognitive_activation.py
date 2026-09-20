@@ -5,6 +5,7 @@ import asyncio
 import pytest
 
 from agent.app.cognitive_activation import CognitiveActivationResolver
+from orchestrator.runtime.cognitive_activation import _compact_activation_state
 from shared.chromie_contracts.cognitive_activation import (
     CognitiveActivationContext,
     CognitiveActivationDecision,
@@ -105,3 +106,76 @@ def test_cognitive_activation_endpoint_is_exposed() -> None:
     from agent.app.main import app
 
     assert "/cognitive-activation" in {route.path for route in app.routes}
+
+
+def test_activation_prompt_treats_fresh_information_evidence_as_remaining_obligation() -> None:
+    request = planner_request().model_copy(update={
+        "state": {
+            "trusted_state_change": {
+                "trusted_terminal_evidence": [{
+                    "evidence_id": "evidence-1",
+                    "tool_id": "chromie.weather.lookup",
+                    "status": "completed",
+                    "data": {"temperature_c": 25, "forecast": "x" * 10000},
+                }]
+            }
+        }
+    })
+    model = Model({
+        "cognitive_requests": [{
+            "authority": "planner",
+            "goal_ids": ["goal-weather"],
+            "responsibility_refs": ["r1"],
+            "source_refs": ["evidence-1"],
+            "reason_summary": "Fresh information Evidence requires result reasoning.",
+        }],
+        "confidence": 1.0,
+        "reason_summary": "Planner should establish the remaining answer obligation.",
+    })
+    asyncio.run(CognitiveActivationResolver(model).resolve(request))
+    assert "acquisition completion is not the same" in model.kwargs["system"]
+    assert "delivering the requested information" in model.kwargs["system"]
+
+
+def test_compact_activation_state_drops_large_owner_envelopes_but_retains_lifecycle() -> None:
+    compact = _compact_activation_state({
+        "goal_association": {
+            "resolution_status": "resolved",
+            "reason_summary": "x" * 20000,
+            "new_goals": [{
+                "goal_id": "goal-weather",
+                "description": "Check weather",
+                "source_responsibility_refs": ["r1"],
+                "metadata": {"huge": "x" * 20000},
+            }],
+        },
+        "canonical_plan": {
+            "plan_id": "plan-weather", "disposition": "execute",
+            "coverage": "complete", "goal_ids": ["goal-weather"],
+            "response_text": "x" * 20000,
+            "steps": [{"step_id": "lookup", "capability_id": "chromie.weather.lookup",
+                       "source_goal_ids": ["goal-weather"], "args": {"huge": "x" * 20000}}],
+        },
+        "existing_work_activities": [{
+            "activity_id": "lookup", "capability_id": "chromie.weather.lookup",
+            "status": "completed", "provider_blob": "x" * 20000,
+        }],
+        "trusted_state_change": {
+            "trusted_execution_outcome": {
+                "outcome_id": "outcome-1", "aggregate_status": "completed",
+                "goal_outcomes": [{"goal_id": "goal-weather", "status": "completed",
+                                   "evidence_ids": ["evidence-1"], "huge": "x" * 20000}],
+            },
+            "trusted_terminal_evidence": [{
+                "evidence_id": "evidence-1", "tool_id": "chromie.weather.lookup",
+                "status": "completed", "data": {"huge": "x" * 20000},
+            }],
+        },
+    })
+    import json
+    encoded = json.dumps(compact, ensure_ascii=False)
+    assert len(encoded) < 5000
+    assert "response_text" not in encoded
+    assert "provider_blob" not in encoded
+    assert '"aggregate_status": "completed"' in encoded
+    assert '"evidence_id": "evidence-1"' in encoded

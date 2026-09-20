@@ -27,7 +27,12 @@ explicitly allowed existing cognitive authorities should run now.
 
 Request Planner only when the current Goal/Work/Evidence/Situation state makes a new HOW
 or remaining-Work decision useful. Do not request Planner merely because an event happened,
-a Goal exists, or an earlier Plan exists. Request Social Cognition only when the trusted
+a Goal exists, or an earlier Plan exists. A fresh trusted terminal result for an open
+information Responsibility is materially new state: acquisition completion is not the same
+as delivering the requested information. Request Planner when it must decide whether that
+Evidence satisfies the information Goal, establish the resulting answer obligation, or plan
+remaining Work. Do not request it when supplied state already establishes that the Goal is
+closed and its required delivery is complete. Request Social Cognition only when the trusted
 current situation makes a new human interaction decision useful. Use [] when no further
 cognition is warranted. Preserve the exact Goal, Responsibility, and source scopes supplied
 by the request. Return only the supplied JSON schema.
