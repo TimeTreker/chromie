@@ -761,8 +761,9 @@ class GoalAssociationModelGoal(BaseModel):
 class GoalSegmentationModelOutput(BaseModel):
     """Semantic goal segmentation used when no association target exists.
 
-    The absent discriminant has one fixed default. An explicitly conflicting
-    value is rejected rather than overwritten by Host normalization.
+    ``new_goals`` and ``non_goal_responsibility_refs`` own the semantic
+    segmentation result. ``decision`` remains only as a legacy model-wire
+    compatibility field and must not become a second cross-field authority.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -795,7 +796,7 @@ class GoalSegmentationModelOutput(BaseModel):
         max_length=320,
         description=(
             "Non-authoritative compact rationale for the emitted segmentation result; "
-            "decision and new_goals own the semantic result."
+            "the ownership collections own the semantic result."
         ),
     )
 
@@ -806,13 +807,10 @@ class GoalSegmentationModelOutput(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalSegmentationModelOutput":
-        if self.decision == "create_goals" and not self.new_goals:
-            raise ValueError("decision=create_goals requires new_goals")
-        if self.decision == "no_goal":
-            if self.new_goals:
-                raise ValueError("decision=no_goal cannot create Goals")
-            if not self.non_goal_responsibility_refs:
-                raise ValueError("decision=no_goal requires non_goal_responsibility_refs")
+        if not self.new_goals and not self.non_goal_responsibility_refs:
+            raise ValueError(
+                "segmentation requires new_goals or non_goal_responsibility_refs"
+            )
         return self
 
 class GoalAssociationModelOutput(BaseModel):

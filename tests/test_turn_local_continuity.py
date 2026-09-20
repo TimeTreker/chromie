@@ -118,7 +118,10 @@ async def test_goal_association_can_complete_turn_local_speech_as_non_goal() -> 
     class Model:
         async def generate(self, *args, **kwargs):
             return {
-                "decision": "no_goal",
+                # The dynamic Schema permits this legacy first-enum value while
+                # the ownership collections correctly classify the turn as
+                # interaction-only. It must not override the actual GA result.
+                "decision": "create_goals",
                 "new_goals": [],
                 "non_goal_responsibility_refs": ["r1"],
                 "referent_updates": [],

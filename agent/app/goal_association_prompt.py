@@ -327,7 +327,7 @@ def build_repair_prompt(
         else "GoalAssociationModelOutput"
     )
     semantic_fields = (
-        "decision, new Goal ownership"
+        "new Goal and non-Goal ownership"
         if output_type is GoalSegmentationModelOutput
         else "association and new Goal ownership"
     )

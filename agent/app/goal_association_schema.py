@@ -937,16 +937,9 @@ def goal_association_response_schema(
                     }
                     for source_ref in non_goal_eligible_refs
                 )
-                schema.setdefault("allOf", []).append({
-                    "if": {"properties": {"decision": {"const": "no_goal"}}},
-                    "then": {
-                        "properties": {
-                            "new_goals": {"maxItems": 0},
-                            "non_goal_responsibility_refs": {"minItems": 1},
-                        },
-                        "required": ["non_goal_responsibility_refs"],
-                    },
-                })
+                # ``decision`` is legacy wire compatibility only. The
+                # ownership collections above are the complete semantic result.
+                # Do not add a second cross-field authority here.
         else:
             # Existing-Goal continuity and independent new work retain the old
             # two-way conservation for substantive refs. Eligible ordinary speech

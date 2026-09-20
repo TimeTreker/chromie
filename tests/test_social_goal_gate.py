@@ -57,7 +57,17 @@ def test_ga_no_goal_is_available_only_for_relation_free_ordinary_speech() -> Non
         "confidence": 1.0,
         "reason_summary": "The current interaction is socially complete.",
     }
-    Draft202012Validator(schema).validate(valid)
+    validator = Draft202012Validator(schema)
+    validator.validate(valid)
+
+    # The legacy discriminant is not semantic authority. The ownership
+    # collections already encode the complete result, so a decoder choosing
+    # the first enum value must not produce a Schema-valid / DTO-invalid object.
+    first_enum_compat = {**valid, "decision": "create_goals"}
+    validator.validate(first_enum_compat)
+    parsed = GoalSegmentationModelOutput.model_validate(first_enum_compat)
+    assert parsed.new_goals == []
+    assert parsed.non_goal_responsibility_refs == ["r1"]
 
     related = goal_association_response_schema(
         GoalSegmentationModelOutput,
