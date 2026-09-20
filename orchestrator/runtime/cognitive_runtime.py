@@ -359,6 +359,33 @@ class CognitiveEvidenceRecorder:
             else None
         )
 
+        response = resolution.interaction_response
+        transported_lineage: SemanticArtifactLineage | None = None
+        transported_refs: dict[tuple[str, str], SemanticArtifactRef] = {}
+        if response is not None and isinstance(response.metadata, dict):
+            raw_lineage = response.metadata.get("semantic_artifact_lineage")
+            if raw_lineage is not None:
+                transported_lineage = SemanticArtifactLineage.model_validate(
+                    raw_lineage
+                )
+                transported_refs = {
+                    (ref.artifact_kind, ref.artifact_id): ref
+                    for ref in transported_lineage.refs
+                }
+
+        def response_lineage_carries(ref: SemanticArtifactRef) -> bool:
+            if transported_lineage is None:
+                return True
+            carried = transported_refs.get((ref.artifact_kind, ref.artifact_id))
+            if carried is None:
+                return False
+            if carried.payload_sha256 != ref.payload_sha256:
+                raise ValueError(
+                    "semantic artifact lineage digest mismatch for "
+                    f"{ref.artifact_kind}:{ref.artifact_id}"
+                )
+            return True
+
         metadata = resolution.metadata if isinstance(resolution.metadata, dict) else {}
         raw_core = metadata.get("core_interpretation")
         umi_ref: SemanticArtifactRef | None = None
@@ -435,12 +462,13 @@ class CognitiveEvidenceRecorder:
             if plan_ref not in plan_refs:
                 plan_refs.append(plan_ref)
 
-        response = resolution.interaction_response
         raw_social = (
             response.metadata.get("social_cognition_resolution")
             if response is not None and isinstance(response.metadata, dict)
             else None
         )
+        social_ref: SemanticArtifactRef | None = None
+        communicative_act_refs: list[SemanticArtifactRef] = []
         if isinstance(raw_social, dict):
             social = SocialCognitionResolution.model_validate(raw_social)
             social_ref = pack(
@@ -449,12 +477,15 @@ class CognitiveEvidenceRecorder:
                 artifact_id=social.request_id,
                 authority="social_cognition",
                 parents=[
-                    *[ref for ref in (umi_ref, ga_ref) if ref is not None],
-                    *plan_refs,
+                    *[
+                        ref for ref in (umi_ref, ga_ref)
+                        if ref is not None and response_lineage_carries(ref)
+                    ],
+                    *[ref for ref in plan_refs if response_lineage_carries(ref)],
                 ],
             )
             for act in social.activities:
-                pack(
+                act_ref = pack(
                     act,
                     kind="communicative_act",
                     artifact_id=act.activity_id,
@@ -465,21 +496,48 @@ class CognitiveEvidenceRecorder:
                             responsibility_refs[ref]
                             for ref in act.source_responsibility_refs
                             if ref in responsibility_refs
+                            and response_lineage_carries(responsibility_refs[ref])
                         ),
                         *(
                             goal_refs[goal_id]
                             for goal_id in act.source_goal_ids
                             if goal_id in goal_refs
+                            and response_lineage_carries(goal_refs[goal_id])
                         ),
                     ],
                 )
+                communicative_act_refs.append(act_ref)
 
-        if response is not None and isinstance(response.metadata, dict):
-            raw_lineage = response.metadata.get("semantic_artifact_lineage")
-            if raw_lineage is not None:
-                transported = SemanticArtifactLineage.model_validate(raw_lineage)
-                for packet in packets:
-                    transported.require(packet.ref)
+        if transported_lineage is not None:
+            # Response lineage is the set that existed when that presentation
+            # artifact was authored. Concurrent sibling cognition may finish later
+            # and legitimately appear in the final resolution without becoming an
+            # ancestor of an already-authored SC response. Validate the immutable
+            # refs that the response actually carried; never serialize the DAG by
+            # requiring future GA/Planner siblings retroactively.
+            for expected in (
+                *[ref for ref in (turn_ref, umi_ref) if ref is not None],
+                *responsibility_refs.values(),
+                *([social_ref] if social_ref is not None else []),
+                *communicative_act_refs,
+            ):
+                transported_lineage.require(expected)
+            packet_refs = {
+                (packet.ref.artifact_kind, packet.ref.artifact_id): packet.ref
+                for packet in packets
+            }
+            for carried in transported_lineage.refs:
+                expected = packet_refs.get(
+                    (carried.artifact_kind, carried.artifact_id)
+                )
+                if (
+                    expected is not None
+                    and expected.payload_sha256 != carried.payload_sha256
+                ):
+                    raise ValueError(
+                        "semantic artifact lineage digest mismatch for "
+                        f"{carried.artifact_kind}:{carried.artifact_id}"
+                    )
 
         return packets
 

@@ -189,6 +189,55 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
             "sid",
         )
 
+    def test_already_dispatched_social_only_response_closes_session(self):
+        response = InteractionResponse(
+            speech=[{"text": "Hi!", "timing": "immediate"}],
+            metadata={
+                "source": "goal_driven_cognitive_runtime",
+                "presentation_already_dispatched": True,
+            },
+        )
+        resolution = CognitiveRuntimeResolution(
+            mode="apply",
+            status="applied",
+            interaction_response=response,
+            timings_ms={"total": 20.0},
+        )
+        assistant = self._assistant(resolution)
+        assistant.sessions = SimpleNamespace(
+            state={
+                "sid-social-only": {
+                    "llm_done": False,
+                    "response_chars": 0,
+                }
+            }
+        )
+        done_calls = []
+        assistant.maybe_session_done = lambda sid: done_calls.append(sid)
+        core, envelope = _core_and_envelope(
+            "hello", sid="sid-social-only", language="en-US"
+        )
+
+        async def run():
+            handled = await assistant._try_apply_cognitive_runtime(
+                object(),
+                user_text="hello",
+                session_id="sid-social-only",
+                context={"history": []},
+                core_interpretation=core,
+                core_interpretation_latency_ms=10.0,
+                turn_envelope=envelope,
+            )
+            self.assertTrue(handled)
+
+        asyncio.run(run())
+        state = assistant.sessions.state["sid-social-only"]
+        self.assertTrue(state["llm_done"])
+        self.assertEqual(state["response_chars"], len("Hi!"))
+        self.assertEqual(done_calls, ["sid-social-only"])
+        self.assertEqual(assistant._launch_interaction_calls, [])
+        self.assertEqual(len(assistant.conversation_state.agent_results), 1)
+
     def test_apply_uses_responsibility_only_core_and_defers_first_wording_to_planner(self):
         response = InteractionResponse(
             speech=[{"text": "北京今天没有雨。", "timing": "after_capabilities"}],

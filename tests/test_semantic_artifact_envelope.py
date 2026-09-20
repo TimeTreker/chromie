@@ -19,7 +19,9 @@ from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.semantic_artifact import (
     SemanticArtifactPacket,
+    merge_semantic_artifact_lineage,
     semantic_artifact_packet,
+    semantic_artifact_ref,
 )
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -174,6 +176,101 @@ def test_cognitive_evidence_archives_semantic_artifact_lineage() -> None:
         "responsibility",
         "goal",
     }
+
+
+def test_cognitive_evidence_allows_concurrent_social_lineage_before_ga() -> None:
+    core, envelope = admitted_core(
+        "hello", sid="sid-concurrent-artifacts", language="en-US"
+    )
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="Respond to the greeting.",
+        output_mode="speech",
+        continuity_scope="turn",
+        confidence=0.95,
+        source_evidence={
+            "source_start_token_ref": "t0",
+            "source_end_token_ref": "t0",
+        },
+    )
+    core = CoreInterpretationResult(
+        turn_id=envelope.turn_id,
+        session_id=envelope.session_id,
+        confidence=0.95,
+        language="en-US",
+        responsibilities=[responsibility],
+    )
+    association = GoalAssociationResolution(
+        turn_id=envelope.turn_id,
+        resolution_status="resolved",
+        non_goal_responsibility_refs=["r1"],
+        confidence=1.0,
+        reason_summary="No canonical Goal is needed.",
+    )
+    social = SocialCognitionResolution(
+        request_id="sc-concurrent-hello",
+        snapshot_digest="b" * 64,
+        disposition="communicate",
+        activities=[{
+            "activity_id": "talk-concurrent-hello",
+            "text": "Hi!",
+            "function": "respond",
+            "truth_stage": "context_grounded",
+            "source_responsibility_refs": ["r1"],
+        }],
+        reason_summary="Reply while GA checks continuity independently.",
+        model_call_count=1,
+    )
+    social_lineage = merge_semantic_artifact_lineage(
+        semantic_artifact_ref(
+            envelope, artifact_kind="user_turn", artifact_id=envelope.turn_id
+        ),
+        semantic_artifact_ref(
+            core,
+            artifact_kind="user_meaning_interpretation",
+            artifact_id=core.turn_id,
+        ),
+        semantic_artifact_ref(
+            responsibility,
+            artifact_kind="responsibility",
+            artifact_id=f"{core.turn_id}:r1",
+        ),
+        semantic_artifact_ref(
+            social, artifact_kind="social_cognition", artifact_id=social.request_id
+        ),
+        semantic_artifact_ref(
+            social.activities[0],
+            artifact_kind="communicative_act",
+            artifact_id=social.activities[0].activity_id,
+        ),
+    )
+    interaction = InteractionResponse(
+        interaction_id="interaction-concurrent-hello",
+        metadata={
+            "social_cognition_resolution": social.model_dump(mode="json"),
+            "semantic_artifact_lineage": social_lineage.model_dump(mode="json"),
+        },
+    )
+    resolution = CognitiveRuntimeResolution(
+        mode="apply",
+        status="applied",
+        turn_envelope=envelope,
+        goal_association=association,
+        interaction_response=interaction,
+        metadata={"core_interpretation": core.model_dump(mode="json")},
+    )
+
+    packets = CognitiveEvidenceRecorder.semantic_artifact_packets(
+        resolution, sid=envelope.session_id
+    )
+    by_kind = {packet.ref.artifact_kind: packet for packet in packets}
+    assert "goal_association" in by_kind
+    social_parent_kinds = {
+        ref.artifact_kind
+        for ref in by_kind["social_cognition"].envelope.parent_refs
+    }
+    assert "user_meaning_interpretation" in social_parent_kinds
+    assert "goal_association" not in social_parent_kinds
 
 
 def test_cognitive_evidence_keeps_full_packets_behind_text_retention_policy() -> None:

@@ -3030,6 +3030,18 @@ class VoiceAssistant:
             self.conversation_state.record_interaction_response(
                 session_id, response
             )
+            # start_state_interaction() already waited for the complete Runtime
+            # dispatch, including speech/capability terminal delivery. The normal
+            # _launch_interaction() path closes the session from its detached
+            # completion consumer; this already-dispatched branch bypasses that
+            # owner, so transfer the same terminal bookkeeping here exactly once.
+            state = self.sessions.state.get(session_id)
+            if state is not None:
+                state["llm_done"] = True
+                state["response_chars"] = state.get("response_chars", 0) + sum(
+                    len(item.text) for item in response.speech
+                )
+            self.maybe_session_done(session_id)
             return True
         if await self._stage_interaction_confirmation(
             response,
