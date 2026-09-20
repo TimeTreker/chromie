@@ -39,6 +39,7 @@ from .semantic_artifact import (
     semantic_artifact_payload_sha256,
 )
 from .core_interpretation import (
+    CognitiveActivationRequest,
     CognitiveResponsibilityProposal,
     CognitiveWorkRequest,
     CoreInterpretationResult,

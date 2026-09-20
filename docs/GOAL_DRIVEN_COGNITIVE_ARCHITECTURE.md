@@ -700,17 +700,18 @@ for unfinished responsibility, not a mandatory ticket that every immediate
 interaction act must acquire before useful progress can begin.
 
 Fast User Meaning Interpretation may establish a fully understood, low-risk Responsibility
-quickly, but it still stops at Responsibility evidence. Social Cognition and Goal Association
-may both act on that accepted WHAT immediately. For an ordinary greeting or conversational
-turn, SC may respond while GA checks whether the turn is truly social-only or carries deeper
-continuity with retained Goal state; GA's explicit `non_goal` result ends the task path without
-Planner. If UMI marks a Responsibility continuity_scope=goal, Fast Planner owns the smallest
-HOW advancement and may run in parallel with GA; any Responsibility connected to that Work
-by accepted before/after/parallel relations stays in the same Planner-ready component.
-If GA later discovers additional Goal relevance that was not Planner-ready from UMI alone, the
-same Planner authority wakes then. If HOW exceeds the fast planning budget, Fast Planner may
-additionally request Deep Planner; Deep planning receives canonical Goal grounding before
-commitment-bearing work executes.
+quickly and, in the same primary result, request which existing cognitive authorities are
+useful next. Initial Social Cognition, Goal Association, and Fast Planner activation follows
+those explicit `cognitive_requests[]`; Runtime does not infer Planner readiness from
+`continuity_scope` or another semantic field. The requests may overlap so SC, GA, and Fast
+can run concurrently over the same accepted WHAT while retaining separate authority.
+A GA `non_goal` result ends Goal-owned task continuity without fabricated Planner Work.
+If GA later discovers additional retained-Goal relevance, the same Planner authority may
+still wake through the current bounded post-GA re-entry path; migrating that subsequent
+activation decision onto the model-authored request contract is the next implementation
+slice. If HOW exceeds the fast planning budget, Fast Planner may additionally request Deep
+Planner; Deep planning receives canonical Goal grounding before commitment-bearing work
+executes.
 
 An executable capability is one possible means of satisfying a responsibility.
 An Agent Skill is a reusable method that may help an Agent decide how to use one

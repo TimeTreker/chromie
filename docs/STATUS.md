@@ -615,8 +615,21 @@ not bypass the effect boundary; safe reads may be qualified for pre-GA execution
 effectful Work remains prepared. Later GA/Evidence/Situation changes re-enter Planner over
 actual queued/running/completed/cancelled/provisional Work so the model decides the delta.
 
-**Implementation status:** approved target only. Current source still contains deterministic
-cognitive-readiness logic and has not yet been migrated or qualified against this amendment.
+**Implementation status — Slice 1 implemented in source.** UMI now emits required
+`cognitive_requests[]` on the live model wire. Each request names one existing authority
+(`goal_association`, `social_cognition`, or `planner`) plus exact Responsibility refs. The
+initial Runtime fan-out schedules only those requests; `continuity_scope`/`output_mode` no
+longer decide initial Fast activation. Runtime still owns mechanical validation, stale-result
+containment, compute/effect admission, authorization, confirmation, resources and provider
+execution. The previous terminal-history GA constrained-decoder repair is folded into this
+slice as well. Focused source verification covers UMI schema/validation, social-only turns,
+mixed social+Work scope, GA decoder conservation and SGLang schema transport.
+
+**Still open — Slice 2:** post-GA, Evidence and Situation re-entry readiness still contains
+existing deterministic wake mechanics. Those paths must move onto the same model-authored
+cognitive activation contract without losing current continuity/recovery behavior. Native
+model qualification is also required before this new UMI field is promoted as behaviorally
+reliable.
 
 ## Current architecture
 

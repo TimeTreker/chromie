@@ -567,6 +567,7 @@ async def interpret_cognitive_turn(
             for item in interpretation.responsibilities
         ],
         meaning_uncertainties=list(interpretation.meaning_uncertainties),
+        cognitive_requests=list(interpretation.cognitive_requests),
     )
 
 @app.post("/fast-advance")

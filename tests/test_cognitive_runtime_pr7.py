@@ -72,6 +72,7 @@ def admitted_core(
     language: str,
     responsibilities: list[dict] | None = None,
     meaning_uncertainties: list[str] | None = None,
+    cognitive_requests: list[dict] | None = None,
 ):
     gateway = CognitiveGateway()
     capture = gateway.capture(
@@ -114,6 +115,43 @@ def admitted_core(
         }
         for index, description in enumerate(meaning_uncertainties or [], start=1)
     ]
+    refs = [str(item.get("local_ref") or "r1") for item in rows]
+    default_requests = (
+        [
+            {
+                "authority": "goal_association",
+                "responsibility_refs": refs,
+                "reason_summary": "Fixture requests canonical Goal continuity.",
+            },
+            {
+                "authority": "social_cognition",
+                "responsibility_refs": refs,
+                "reason_summary": "Fixture requests interaction cognition.",
+            },
+        ]
+        if all(
+            str(item.get("output_mode") or "speech") == "speech"
+            and str(item.get("continuity_scope") or "goal") == "turn"
+            for item in rows
+        )
+        else [
+            {
+                "authority": "goal_association",
+                "responsibility_refs": refs,
+                "reason_summary": "Fixture requests canonical Goal continuity.",
+            },
+            {
+                "authority": "social_cognition",
+                "responsibility_refs": refs,
+                "reason_summary": "Fixture requests interaction cognition.",
+            },
+            {
+                "authority": "planner",
+                "responsibility_refs": refs,
+                "reason_summary": "Fixture requests Work cognition.",
+            },
+        ]
+    )
     core = CoreInterpretationResult(
         turn_id=envelope.turn_id,
         session_id=envelope.session_id,
@@ -121,6 +159,7 @@ def admitted_core(
         language=language,
         responsibilities=rows,
         meaning_uncertainties=uncertainties,
+        cognitive_requests=(cognitive_requests if cognitive_requests is not None else default_requests),
     )
     return core, envelope
 

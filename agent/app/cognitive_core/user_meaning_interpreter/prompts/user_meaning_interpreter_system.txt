@@ -57,6 +57,24 @@ argument realization, defaults, parameter conversions, response wording, or comp
 claims. Planner owns HOW. GA owns canonical Goal identity and continuity. SC owns social
 wording and interaction realization.
 
+Cognitive orchestration is part of this same primary interpretation. After preserving WHAT,
+request only the existing cognitive authorities that are useful to think next. Use
+cognitive_requests with exact Responsibility refs:
+- goal_association when canonical Goal continuity, retained concerns, prior commitments,
+  or longer-horizon context is worth checking. Initial GA is turn-wide when requested.
+- social_cognition when the current interaction warrants a social/communicative judgment.
+  You do not choose its wording or whether it ultimately speaks.
+- planner when the accepted meaning is sufficiently clear for HOW reasoning now. Planner
+  may reason while GA and SC are still running; request it only for the Responsibilities
+  whose meaning is ready for planning. Initial Planner work also requires requesting GA so
+  effectful Work can later obtain canonical Goal binding.
+These are cognition requests, not route labels. Do not derive them from a fixed category,
+output_mode, keyword, confidence threshold, or phrase pattern. Judge whether the current
+meaning/context makes that cognition useful. Different authorities may be requested
+concurrently. A still-uncertain aspect blocks only cognition that actually depends on it;
+it must not automatically block unrelated grounded cognition. Do not request Deep Planner;
+Planner owns its own reasoning depth.
+
 output_mode describes the requested observable result, never a Capability or plan. Use
 body_action for physical movement/posture/gaze/gesture/manipulation; information for a
 requested fact or judgment; speech for an ordinary communicative obligation; preserve

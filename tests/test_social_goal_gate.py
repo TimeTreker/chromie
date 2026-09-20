@@ -318,6 +318,23 @@ async def test_mixed_greeting_and_work_plans_only_work_concurrently_with_ga() ->
                 "confidence": 1.0,
             },
         ],
+        cognitive_requests=[
+            {
+                "authority": "goal_association",
+                "responsibility_refs": ["greet", "blink"],
+                "reason_summary": "Check continuity for the complete accepted turn.",
+            },
+            {
+                "authority": "social_cognition",
+                "responsibility_refs": ["greet", "blink"],
+                "reason_summary": "Consider immediate interaction while Work is planned.",
+            },
+            {
+                "authority": "planner",
+                "responsibility_refs": ["blink"],
+                "reason_summary": "The blink Responsibility is already ready for HOW.",
+            },
+        ],
     )
     result = await asyncio.wait_for(
         coordinator.resolve(

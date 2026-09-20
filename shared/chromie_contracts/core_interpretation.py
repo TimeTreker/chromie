@@ -329,6 +329,54 @@ class UserMeaningUncertainty(BaseModel):
             )
         )
 
+
+
+CognitiveActivationAuthority = Literal[
+    "goal_association",
+    "social_cognition",
+    "planner",
+]
+
+
+class CognitiveActivationRequest(BaseModel):
+    """UMI-authored request to wake an existing cognitive authority.
+
+    The request decides only which already-defined cognitive owner is useful now
+    and which accepted Responsibilities motivate that cognition.  It grants none
+    of that owner's semantic authority: GA still owns Goal continuity, Planner
+    still owns HOW, and SC still owns interaction.  Runtime may validate and
+    schedule this request but must not infer an equivalent request from semantic
+    labels when it is absent.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    authority: CognitiveActivationAuthority
+    responsibility_refs: list[str] = Field(min_length=1, max_length=12)
+    reason_summary: str = Field(default="", max_length=320)
+
+    @field_validator("responsibility_refs", mode="before")
+    @classmethod
+    def normalize_refs(cls, value: Any) -> list[str]:
+        if isinstance(value, str):
+            value = [value]
+        if not isinstance(value, list):
+            raise ValueError("cognitive activation responsibility_refs must be an array")
+        normalized = [
+            text
+            for item in value
+            if (text := normalize_turn_text(str(item or "")))
+        ]
+        if len(normalized) != len(set(normalized)):
+            raise ValueError("cognitive activation responsibility_refs must be unique")
+        return normalized
+
+    @field_validator("reason_summary", mode="before")
+    @classmethod
+    def normalize_reason(cls, value: Any) -> str:
+        return normalize_turn_text(str(value or ""))
+
+
 class CoreInterpretationResult(BaseModel):
     """User Meaning Interpretation result in the current architecture.
 
@@ -368,6 +416,13 @@ class CoreInterpretationResult(BaseModel):
             "an instruction to ask the user."
         ),
     )
+    cognitive_requests: list[CognitiveActivationRequest] = Field(
+        default_factory=list, max_length=3,
+        description=(
+            "Model-authored requests to wake existing cognitive authorities. These requests "
+            "schedule cognition only; they never author another role's semantic result."
+        ),
+    )
 
     @field_validator("turn_id", "session_id", "language", mode="before")
     @classmethod
@@ -399,6 +454,31 @@ class CoreInterpretationResult(BaseModel):
                     "one meaning uncertainty cannot span turn-local and goal-scoped "
                     "Responsibilities; UMI must keep those semantic uncertainties separate"
                 )
+        authorities = [item.authority for item in self.cognitive_requests]
+        if len(authorities) != len(set(authorities)):
+            raise ValueError("UMI may request each cognitive authority at most once")
+        for request in self.cognitive_requests:
+            unknown = set(request.responsibility_refs) - known
+            if unknown:
+                raise ValueError(
+                    "cognitive activation references unknown Responsibilities: "
+                    + ",".join(sorted(unknown))
+                )
+        planner_requested = "planner" in authorities
+        ga_requested = "goal_association" in authorities
+        if planner_requested and not ga_requested:
+            raise ValueError(
+                "initial Planner cognition requires a Goal Association request so effectful "
+                "Work can reach canonical Goal binding"
+            )
+        ga_request = next(
+            (item for item in self.cognitive_requests if item.authority == "goal_association"),
+            None,
+        )
+        if ga_request is not None and set(ga_request.responsibility_refs) != known:
+            raise ValueError(
+                "initial Goal Association cognition is turn-wide and must cover every Responsibility"
+            )
         return self
 
 
@@ -502,6 +582,7 @@ class CognitiveWorkRequest(BaseModel):
     responsibilities: list[CognitiveResponsibilityProposal] = Field(min_length=1)
     interpretation_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     meaning_uncertainties: list[UserMeaningUncertainty] = Field(default_factory=list, max_length=12)
+    cognitive_requests: list[CognitiveActivationRequest] = Field(default_factory=list, max_length=3)
     planner_reentry_scope: PlannerReentryScope | None = None
     context: dict[str, Any] = Field(default_factory=dict)
     history: list[dict[str, Any]] = Field(default_factory=list)

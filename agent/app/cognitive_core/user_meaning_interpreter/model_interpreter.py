@@ -595,8 +595,9 @@ class OllamaUserMeaningInterpreter:
             logger.warning("User Meaning Interpreter system prompt not found: %s", self.prompt_path)
             return (
                 "You are Chromie's User Meaning Interpretation model. Understand only WHAT the "
-                "human means and return provider-neutral responsibilities, confidence, "
-                "and remaining semantic uncertainties as JSON."
+                "human means, propose bounded next cognitive authorities, and return "
+                "provider-neutral responsibilities, confidence, remaining semantic "
+                "uncertainties, and cognitive_requests as JSON."
             )
 
     def build_system_prompt(self, request: UserMeaningInterpretationRequest) -> str:
@@ -652,8 +653,9 @@ class OllamaUserMeaningInterpreter:
             "deictic references and implicit conversational relations when the evidence "
             "supports one meaning. Context may complete meaning but must never create a "
             "new Responsibility that the current expression does not support.\n\n"
-            "Apply the system WHAT-only contract to this authoritative turn and bounded "
-            "human-meaning Context. Return one complete schema-valid JSON decision only."
+            "Apply the system meaning-and-cognitive-orchestration contract to this "
+            "authoritative turn and bounded human-meaning Context. Return one complete "
+            "schema-valid JSON decision only."
         )
 
     @staticmethod
@@ -666,7 +668,10 @@ class OllamaUserMeaningInterpreter:
         by other owners. None of those defaults grant UMI model-write authority.
         """
         schema = UserMeaningInterpretationDecision.model_json_schema()
-        schema["required"] = ["confidence", "responsibilities", "meaning_uncertainties"]
+        schema["required"] = [
+            "confidence", "responsibilities", "meaning_uncertainties",
+            "cognitive_requests",
+        ]
         item = schema["$defs"]["CognitiveResponsibilityProposal"]
         fields = (
             "local_ref",
@@ -760,6 +765,23 @@ class OllamaUserMeaningInterpreter:
             "type": "string", "enum": [f"r{i}" for i in range(1, 13)],
         }
         schema["properties"]["meaning_uncertainties"]["maxItems"] = 12
+        activation = schema["$defs"]["CognitiveActivationRequest"]
+        activation["properties"] = {
+            name: activation["properties"][name]
+            for name in ("authority", "responsibility_refs", "reason_summary")
+        }
+        activation["required"] = [
+            "authority", "responsibility_refs", "reason_summary"
+        ]
+        activation["properties"]["authority"] = {
+            "type": "string",
+            "enum": ["goal_association", "social_cognition", "planner"],
+        }
+        activation["properties"]["responsibility_refs"]["items"] = {
+            "type": "string", "enum": [f"r{i}" for i in range(1, 13)],
+        }
+        schema["properties"]["cognitive_requests"]["minItems"] = 1
+        schema["properties"]["cognitive_requests"]["maxItems"] = 3
         token_refs = [token["ref"] for token in _source_tokens(admitted_turn)]
         if token_refs:
             evidence = schema["$defs"]["ResponsibilitySourceEvidence"]
@@ -826,8 +848,15 @@ class OllamaUserMeaningInterpreter:
         response_schema: dict[str, Any] | None = None,
     ) -> UserMeaningInterpretationDecision:
         parsed = _extract_json_object(content)
-        if set(parsed) - {"confidence", "responsibilities", "meaning_uncertainties"}:
-            raise _UserMeaningInterpretationAuthorityViolation("UMI output contains fields outside human-meaning authority")
+        if "cognitive_requests" not in parsed:
+            raise ValueError("UMI model output must author cognitive_requests")
+        if set(parsed) - {
+            "confidence", "responsibilities", "meaning_uncertainties",
+            "cognitive_requests",
+        }:
+            raise _UserMeaningInterpretationAuthorityViolation(
+                "UMI output contains fields outside meaning/cognitive-orchestration authority"
+            )
         proposals = parsed.get("responsibilities")
         fields = {
             "local_ref", "outcome", "bindings", "output_mode", "continuity_scope",

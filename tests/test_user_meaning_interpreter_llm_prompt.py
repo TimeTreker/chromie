@@ -24,6 +24,27 @@ from agent.app.cognitive_core.user_meaning_interpreter.schema import (
 )
 
 
+def _cognitive_requests(*refs: str) -> list[dict[str, object]]:
+    scope = list(refs)
+    return [
+        {
+            "authority": "goal_association",
+            "responsibility_refs": scope,
+            "reason_summary": "Check canonical continuity for the accepted meaning.",
+        },
+        {
+            "authority": "social_cognition",
+            "responsibility_refs": scope,
+            "reason_summary": "Consider the current interaction.",
+        },
+        {
+            "authority": "planner",
+            "responsibility_refs": scope,
+            "reason_summary": "The accepted meaning is ready for HOW reasoning.",
+        },
+    ]
+
+
 def _valid_output(
     text: str = "What's the weather in Chongqing today?",
     *,
@@ -46,6 +67,7 @@ def _valid_output(
                 },
             }
         ],
+        "cognitive_requests": _cognitive_requests(local_ref),
         "meaning_uncertainties": [
             {
                 "local_ref": f"u{index}",
@@ -80,6 +102,7 @@ def _compound_output() -> dict[str, object]:
             responsibility("r1", "nod", "t0", {"before": "r2"}),
             responsibility("r2", "blink", "t2", {"after": "r1"}),
         ],
+        "cognitive_requests": _cognitive_requests("r1", "r2"),
         "meaning_uncertainties": [],
     }
 

@@ -73,7 +73,14 @@ async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
         "continuity_scope": "goal",
         "source_evidence": {"source_start_token_ref": "t0",
             "source_end_token_ref": _source_tokens(text)[-1]["ref"]},
-    }], "meaning_uncertainties": []}
+    }], "cognitive_requests": [
+        {"authority": "goal_association", "responsibility_refs": ["r1"],
+         "reason_summary": "Check canonical continuity."},
+        {"authority": "social_cognition", "responsibility_refs": ["r1"],
+         "reason_summary": "Consider interaction."},
+        {"authority": "planner", "responsibility_refs": ["r1"],
+         "reason_summary": "Meaning is ready for HOW."},
+    ], "meaning_uncertainties": []}
     interpreted = OllamaUserMeaningInterpreter._validate_interpretation_content(
         source, json.dumps(primary), response_schema=schema,
     )

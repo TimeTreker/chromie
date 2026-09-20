@@ -1028,6 +1028,47 @@ def goal_association_response_schema(
         },
         "required": ["source_responsibility_refs", "related_goal_ids", "supersedes_goal_ids"],
     }
+    # When there is no live Goal that can own a Responsibility and no
+    # interaction-only speech alternative, ownership is not a semantic branch:
+    # every Responsibility must become a new Goal.  Do not leave that mandatory
+    # mapping only inside cross-field allOf/oneOf/contains clauses.  XGrammar can
+    # preserve the array shape while failing to force those intersections during
+    # generation, which lets a terminal historical candidate turn an otherwise
+    # ordinary new body-action request into a later conservation/DTO failure.
+    #
+    # Canonicalize the wire order to the accepted UMI Responsibility order and
+    # expose each exact source ref through prefixItems.  Ordering is transport
+    # mechanism only: GA still owns continuity, the Host still validates
+    # conservation, and retained terminal Goals remain available solely through
+    # related_goal_ids.
+    new_goal_only = (
+        output_type is GoalAssociationModelOutput
+        and bool(active_ids)
+        and not open_goal_ids
+    )
+    if (
+        new_goal_only
+        and responsibility_refs
+        and not non_goal_eligible_refs
+    ):
+        compact_goal = schema["$defs"]["GoalAssociationModelGoal"]
+        fixed_items: list[dict[str, Any]] = []
+        for source_ref in responsibility_refs:
+            fixed = copy.deepcopy(compact_goal)
+            source_refs = fixed["properties"]["source_responsibility_refs"]
+            source_refs["items"] = {
+                "type": "string",
+                "enum": [source_ref],
+            }
+            fixed_items.append(fixed)
+        new_goal_array = schema.get("properties", {}).get("new_goals")
+        if isinstance(new_goal_array, dict):
+            new_goal_array["minItems"] = len(fixed_items)
+            new_goal_array["maxItems"] = len(fixed_items)
+            new_goal_array["prefixItems"] = fixed_items
+            # Keep the existing schema-valued suffix surface. maxItems makes a
+            # suffix impossible, while the retained $ref keeps the canonical Goal
+            # definition reachable for decoder/validator consumers.
     if active_ids:
         schema["$defs"]["GoalAssociationModelGoal"]["allOf"] = [
             {"not": {"properties": {

@@ -10,10 +10,11 @@ from orchestrator.runtime.cognitive_runtime import (
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CognitiveWorkRequest,
+    CoreInterpretationResult,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-from tests.test_cognitive_runtime_pr7 import FakeRuntime, RecordingPlannerAdapter, admitted_core
+from tests.test_cognitive_runtime_pr7 import FakeRuntime, RecordingPlannerAdapter, admitted_core, body_goal_association
 
 
 def test_turn_local_scope_is_semantic_and_speech_only() -> None:
@@ -224,3 +225,90 @@ async def test_turn_local_interaction_returns_social_response_without_goal_or_pl
     assert len(agent.social_requests) == 1
     assert agent.goal_association_calls == 1
     assert agent.social_requests[0].context["work_decision_pending"] is True
+
+
+def test_umi_cognitive_requests_are_required_and_source_scoped() -> None:
+    schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(
+        admitted_turn="Check the weather."
+    )
+    assert "cognitive_requests" in schema["required"]
+    activation = schema["$defs"]["CognitiveActivationRequest"]
+    assert activation["properties"]["authority"]["enum"] == [
+        "goal_association", "social_cognition", "planner"
+    ]
+
+
+def test_core_rejects_planner_activation_without_ga() -> None:
+    with pytest.raises(ValueError, match="requires a Goal Association request"):
+        CoreInterpretationResult(
+            turn_id="turn-activation",
+            session_id="sid-activation",
+            confidence=1.0,
+            responsibilities=[{
+                "local_ref": "r1",
+                "outcome": "Check the weather.",
+                "output_mode": "information",
+                "continuity_scope": "goal",
+                "confidence": 1.0,
+            }],
+            cognitive_requests=[{
+                "authority": "planner",
+                "responsibility_refs": ["r1"],
+                "reason_summary": "Current meaning is ready for HOW.",
+            }],
+        )
+
+
+@pytest.mark.asyncio
+async def test_goal_scoped_meaning_does_not_wake_planner_without_model_request() -> None:
+    class Agent(TurnLocalAgent):
+        def __init__(self) -> None:
+            super().__init__()
+            self.planner_calls = 0
+
+        async def resolve_goal_association(self, *args, **kwargs):
+            self.goal_association_calls += 1
+            return body_goal_association(source_ref="r1")
+
+        async def stream_fast_advance(self, *args, **kwargs):
+            self.planner_calls += 1
+            raise AssertionError("Runtime must not infer Planner activation from continuity_scope")
+            yield  # pragma: no cover
+
+    agent = Agent()
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=agent,
+        adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+        goal_state_apply=lambda *args, **kwargs: [],
+    )
+    core, envelope = admitted_core(
+        "Blink your eyes.",
+        sid="model-driven-no-planner",
+        language="en-US",
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": "Blink your eyes.",
+            "bindings": {},
+            "output_mode": "body_action",
+            "continuity_scope": "goal",
+            "confidence": 1.0,
+        }],
+        cognitive_requests=[
+            {
+                "authority": "goal_association",
+                "responsibility_refs": ["r1"],
+                "reason_summary": "Check canonical continuity.",
+            },
+        ],
+    )
+    result = await coordinator.resolve(
+        object(), text="Blink your eyes.", sid="model-driven-no-planner",
+        core_interpretation=core, turn_envelope=envelope, context={"history": []},
+        history=[], language="en-US",
+    )
+    assert result.status == "applied", result.fallback_reason
+    assert result.goal_association is not None
+    assert result.terminal_plan is None
+    assert agent.planner_calls == 0
+    assert result.metadata["planner_not_requested_by_umi"] is True

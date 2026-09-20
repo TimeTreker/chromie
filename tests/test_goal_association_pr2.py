@@ -488,10 +488,13 @@ class GoalExecutionContractTests(unittest.TestCase):
         for valid in (values, list(reversed(values)), values[:1]):
             self.assertTrue(exposed.is_valid(valid))
             self.assertTrue(full.is_valid(valid))
-        self.assertTrue(complete.is_valid({
+        complete_payload = {
             **create_goals(*values),
             "referent_updates": [], "resolved_references": [],
-        }))
+        }
+        if "non_goal_responsibility_refs" in schema["required"]:
+            complete_payload["non_goal_responsibility_refs"] = []
+        self.assertTrue(complete.is_valid(complete_payload))
         social_only_r2 = {
             **create_goals(values[0]),
             "non_goal_responsibility_refs": ["r2"],
@@ -596,6 +599,8 @@ class GoalExecutionContractTests(unittest.TestCase):
                 payload = {
                     **create_goals(*goals), "referent_updates": [], "resolved_references": [],
                 }
+                if "non_goal_responsibility_refs" in schema["required"]:
+                    payload["non_goal_responsibility_refs"] = []
                 complete = Draft202012Validator(schema)
                 self.assertTrue(complete.is_valid(payload))
                 array = schema["properties"]["new_goals"]
@@ -2169,6 +2174,54 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             goal["properties"]["related_goal_ids"]["items"]["enum"],
             ["goal-weather"],
         )
+
+    def test_terminal_history_exposes_new_goal_only_ownership_to_decoder(self):
+        terminal = active_goal("goal-weather", "Check Chongqing weather.")
+        terminal["responsibility_status"] = "satisfied"
+        terminal["work_status"] = "done"
+        terminal["goal"]["responsibility_status"] = "satisfied"
+        schema = ga_schema.goal_association_response_schema(
+            GoalAssociationModelOutput,
+            [terminal],
+            [],
+            responsibility_count=2,
+            responsibility_refs=["walk", "gesture"],
+            responsibility_output_modes={
+                "walk": "body_action",
+                "gesture": "body_action",
+            },
+        )
+
+        self.assertEqual(schema["properties"]["associations"]["maxItems"], 0)
+        new_goals = schema["properties"]["new_goals"]
+        self.assertEqual(new_goals["minItems"], 2)
+        self.assertEqual(new_goals["maxItems"], 2)
+        self.assertEqual(len(new_goals["prefixItems"]), 2)
+        self.assertEqual(
+            new_goals["prefixItems"][0]["properties"]
+            ["source_responsibility_refs"]["items"]["enum"],
+            ["walk"],
+        )
+        self.assertEqual(
+            new_goals["prefixItems"][1]["properties"]
+            ["source_responsibility_refs"]["items"]["enum"],
+            ["gesture"],
+        )
+        payload = {
+            "associations": [],
+            "new_goals": [
+                intent_goal("Walk.", "body_action", source_responsibility_refs=["walk"]),
+                intent_goal("Gesture.", "body_action", source_responsibility_refs=["gesture"]),
+            ],
+            "referent_updates": [],
+            "resolved_references": [],
+            "confidence": 1.0,
+            "reason_summary": "Both new embodied outcomes require new Goal ownership.",
+        }
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid(payload))
+        reversed_payload = {**payload, "new_goals": list(reversed(payload["new_goals"]))}
+        self.assertFalse(validator.is_valid(reversed_payload))
 
     def test_decoder_associations_target_only_open_goals_while_terminal_remains_related_context(self):
         open_goal = active_goal("goal-open", "Walk forward.")

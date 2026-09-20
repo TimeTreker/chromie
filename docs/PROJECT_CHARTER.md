@@ -97,11 +97,11 @@ architecture/terminology freeze; it does not close #24/#32 or authorize a releas
 
 | Owner | Complete semantic responsibility | Authority it does not acquire |
 |---|---|---|
-| User Meaning Interpretation | Complete current-turn intent in natural language, source provenance, confidence and unresolved meaning | Communication wording, Capability choice, Work planning |
+| User Meaning Interpretation | Complete current-turn intent in natural language, source provenance, confidence, unresolved meaning, and bounded requests for which existing cognitive authorities should work next | Another role's semantic result, communication wording, Capability choice, Work planning |
 | Goal Association | Canonical Goal identity, continuity and source-preserving updates | Reinterpreting WHAT, communication, Work compatibility |
 | Social Cognition | Whether, when and how to interact with people; exact grounded communication and bounded eligible social-expression Capability proposals | Reinterpreting UMI, changing Goals or Work, planning requested tasks, authorizing effects |
 | Planner | Capability selection, execution-input resolution, complete Work plans, dependencies, reuse/revision and planning limitations | Ordinary reply wording or review of Social Cognition's decision |
-| Host / Runtime / Providers | Admission, privacy, authorization, safety, scheduling, exact lifecycle and Evidence | Ordinary semantic communication or action selection |
+| Host / Runtime / Providers | Admission, privacy, authorization, safety, compute/execution scheduling, exact lifecycle and Evidence | Deciding which semantic cognition is needed, ordinary semantic communication, or action selection |
 
 Social Cognition consumes one bounded, versioned view of existing truth: complete
 accepted UMI meaning and read-only source provenance; the current Goal overview
@@ -113,20 +113,19 @@ does not grant authority over unrelated Goals. Required facts must not be silent
 truncated to meet a fast budget. Memory, Goal, Work and Interaction stores retain
 their existing owners; two inference sessions do not create two conversations.
 
-One accepted UMI result can make Social Cognition and GA independently ready, and
-can also make Planner ready when UMI marks the accepted Responsibility continuity_scope=goal
-(plus any Responsibility semantically coupled to that Work by accepted
-before/after/parallel relations). continuity_scope=turn does not wake Planner
-speculatively: SC may interact immediately while GA checks whether
-that apparently simple turn is socially complete, belongs to retained Goal continuity,
-or establishes a new Goal. If GA discovers Goal relevance, Planner becomes ready then.
-Optional communication does not gate already-ready planning or safe dispatch, and Work
-completion does not gate an already-grounded conversational answer. Eligibility comes
-from the declared authority/input contract; no phrase router or extra model decides
-which brain to use. Not every event requires all three calls. Missing canonical Goal
-identity alone does not block a source-grounded Communicative Act. Understanding,
-planning readiness, canonical continuity, commitment, execution and verified completion
-remain distinct facts.
+One accepted UMI result carries explicit `cognitive_requests[]` naming which existing
+authorities should work next and the exact Responsibility refs motivating each request.
+Initial SC, GA, and Fast Planner fan-out follows those model-authored requests; Runtime
+does not recreate readiness from `continuity_scope`, `output_mode`, bindings, keywords,
+or task classes. `continuity_scope` remains semantic ownership evidence and is not a
+routing flag. Optional communication does not gate already-requested planning or safe
+dispatch, and Work completion does not gate an already-grounded conversational answer.
+Not every turn requires all three calls. Missing canonical Goal identity alone does not
+block a source-grounded Communicative Act. Understanding, cognitive activation, planning
+readiness, canonical continuity, commitment, execution and verified completion remain
+distinct facts. Post-GA/Evidence/Situation re-entry is being migrated separately and may
+still use the current bounded readiness mechanism until those owners gain the same
+model-authored activation contract.
 
 Planner owns execution-input completeness and proposes Work under trusted
 confirmation policy; Host independently enforces the required confirmation.
@@ -297,12 +296,13 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   inspection because a terse greeting, acknowledgement or attention ping can carry deeper
   meaning when retained Goal/dialogue evidence supports it. GA may classify relation-free
   ordinary speech as `non_goal`, associate it with retained Goal state, or create a new
-  Goal when continuity truly exists. A Responsibility that UMI marks continuity_scope=goal is already Planner-ready and
-  may begin bounded Fast planning while GA runs. Any Responsibility semantically coupled to
-  that Work by accepted ordering/concurrency relations travels with the same Planner-ready
-  component. continuity_scope=turn remains interaction-first, but GA can still discover
-  deeper retained-Goal continuity and wake Planner afterward. The distinction comes from bounded meaning and context,
-  never phrase tables or hardware profiles. GA exclusively owns canonical Goal identity.
+  Goal when continuity truly exists. UMI now authors bounded `cognitive_requests[]`; an
+  explicit Planner request may begin Fast cognition in parallel with GA/SC for exactly the
+  cited Responsibilities. `continuity_scope` no longer wakes Planner by itself. A later GA
+  discovery of retained-Goal continuity may still wake Planner through the current bounded
+  post-GA re-entry path until Slice 2 moves that re-entry decision onto the same model-authored
+  activation contract. The distinction comes from bounded meaning and context, never phrase
+  tables or hardware profiles. GA exclusively owns canonical Goal identity.
 - **SPEECH-OWNER-001** — Social Cognition is the sole ordinary semantic owner of whether and when to
   communicate, the Communicative Activity, its exact wording, truth stage, and source
   provenance. UMI, committed GA/Planner state, Runtime/Evidence or trusted Situation

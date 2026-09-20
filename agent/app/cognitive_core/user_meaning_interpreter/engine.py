@@ -32,7 +32,7 @@ user_meaning_interpreter = OllamaUserMeaningInterpreter(
 
 
 async def initialize_user_meaning_interpreter() -> None:
-    """Warm the WHAT-only model when configured.
+    """Warm the meaning-and-orchestration model when configured.
 
     User Meaning Interpretation intentionally does not initialize or query Capability
     Catalog state. Capability availability belongs to Planner/Capability Runtime.
@@ -63,10 +63,13 @@ def interpretation_profile() -> dict[str, Any]:
     """Describe the maintained User Meaning Interpretation authority."""
 
     return {
-        "authority": "what_only",
+        "authority": "meaning_and_cognitive_orchestration",
         "model": settings.model,
         "deep_model": settings.deep_model,
-        "output": ["responsibilities", "confidence", "meaning_uncertainties"],
+        "output": [
+            "responsibilities", "confidence", "meaning_uncertainties",
+            "cognitive_requests",
+        ],
         "forbidden_authority": [
             "route",
             "intent",
@@ -84,7 +87,7 @@ def interpretation_profile() -> dict[str, Any]:
 async def interpret_user_meaning(
     request: UserMeaningInterpretationRequest,
 ) -> UserMeaningInterpretationDecision:
-    """Interpret one already-admitted turn into provider-neutral WHAT evidence."""
+    """Interpret one admitted turn into WHAT plus bounded next-cognition requests."""
 
     request.text = " ".join(request.text.strip().split())
     if not request.text:

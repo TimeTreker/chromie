@@ -5,10 +5,10 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 try:
-    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
+    from chromie_contracts.core_interpretation import CognitiveActivationRequest, CognitiveResponsibilityProposal, UserMeaningUncertainty
     from chromie_contracts.user_turn import UserTurnEnvelope
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
+    from shared.chromie_contracts.core_interpretation import CognitiveActivationRequest, CognitiveResponsibilityProposal, UserMeaningUncertainty
     from shared.chromie_contracts.user_turn import UserTurnEnvelope
 
 
@@ -79,11 +79,12 @@ class UserMeaningInterpretationRequest(BaseModel):
 
 
 class UserMeaningInterpretationDecision(BaseModel):
-    """Canonical model-facing User Meaning Interpretation contract: WHAT only.
+    """Canonical model-facing meaning plus bounded cognitive orchestration.
 
-    Fast/Deep depth may change how much cognition is used, but never this authority.
-    No route/intent label, response Activity, Work, Capability, provider, execution
-    contract, or canonical lifecycle identity belongs here.
+    UMI still owns WHAT and never authors another role's semantic result.  Its
+    cognitive_requests may wake existing authorities from the accepted meaning, but
+    contain no Goal relationship, Work, Capability/provider choice, execution contract,
+    response wording, or canonical lifecycle identity.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -101,6 +102,13 @@ class UserMeaningInterpretationDecision(BaseModel):
             "These are not clarification instructions."
         ),
     )
+    cognitive_requests: list[CognitiveActivationRequest] = Field(
+        default_factory=list, max_length=3,
+        description=(
+            "Which existing cognitive authorities should work next from this accepted "
+            "meaning. This is orchestration only, never another role's decision."
+        ),
+    )
 
     @model_validator(mode="after")
     def validate_local_refs(self) -> "UserMeaningInterpretationDecision":
@@ -116,6 +124,29 @@ class UserMeaningInterpretationDecision(BaseModel):
         if len(uncertainty_refs) != len(set(uncertainty_refs)):
             raise ValueError("meaning uncertainty local_ref values must be unique")
         known_refs = set(refs)
+        authorities = [item.authority for item in self.cognitive_requests]
+        if len(authorities) != len(set(authorities)):
+            raise ValueError("UMI may request each cognitive authority at most once")
+        for request in self.cognitive_requests:
+            unknown = set(request.responsibility_refs) - known_refs
+            if unknown:
+                raise ValueError(
+                    "cognitive activation references unknown Responsibilities: "
+                    + ",".join(sorted(unknown))
+                )
+        if "planner" in authorities and "goal_association" not in authorities:
+            raise ValueError(
+                "initial Planner cognition requires Goal Association so Work can reach "
+                "canonical Goal binding"
+            )
+        ga_request = next(
+            (item for item in self.cognitive_requests if item.authority == "goal_association"),
+            None,
+        )
+        if ga_request is not None and set(ga_request.responsibility_refs) != known_refs:
+            raise ValueError(
+                "initial Goal Association cognition is turn-wide and must cover every Responsibility"
+            )
         scope_by_ref = {
             item.local_ref: item.continuity_scope for item in self.responsibilities
         }
