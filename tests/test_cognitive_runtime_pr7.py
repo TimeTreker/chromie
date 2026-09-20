@@ -809,6 +809,65 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         }
 
+    def test_ga_does_not_replan_retained_work_without_model_request(self):
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-weather-no-reentry",
+            associations=[{
+                "association_id": "association-weather-no-reentry",
+                "relationship": "continue",
+                "source_responsibility_refs": ["weather"],
+                "target_goal_ids": ["goal-weather"],
+                "confidence": 0.98,
+            }],
+            cognitive_requests=[],
+            confidence=0.98,
+        )
+
+        class NoImplicitReplanClient(ScriptedClient):
+            async def resolve_fast_plan(self, *args, **kwargs):
+                raise AssertionError("Runtime must not infer GA-triggered Planner re-entry")
+
+        client = NoImplicitReplanClient(association=association, fast_plans=[])
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FastAdvanceRuntime([weather_definition()])),
+            policy=CognitiveRuntimePolicy(mode="report_only"),
+        )
+        core, envelope = admitted_core(
+            "继续刚才的天气查询。",
+            sid="turn-weather-no-reentry",
+            language="zh-CN",
+            responsibilities=[{
+                "local_ref": "weather",
+                "outcome": "Continue the existing weather lookup.",
+                "confidence": 0.98,
+            }],
+            cognitive_requests=[{
+                "authority": "goal_association",
+                "responsibility_refs": ["weather"],
+                "reason_summary": "Check continuity only; do not start Work yet.",
+            }],
+        )
+
+        result = asyncio.run(coordinator.resolve(
+            object(),
+            text="继续刚才的天气查询。",
+            sid="turn-weather-no-reentry",
+            core_interpretation=core,
+            turn_envelope=envelope,
+            context={
+                "history": [],
+                "active_task_snapshots": [self._retained_weather_snapshot()],
+            },
+            history=[],
+            language="zh-CN",
+        ))
+
+        self.assertIn(result.status, {"applied", "report_only"})
+        self.assertNotIn("fast", client.calls)
+        self.assertFalse(result.metadata["work_reconciliation_required"])
+
     def test_retained_running_work_is_reused_only_by_explicit_planner_selection(self):
         class RetainedRuntime(FastAdvanceRuntime):
             async def reusable_request_snapshot(self, *, interaction_id, request_id):
@@ -832,6 +891,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         association = GoalAssociationResolution(
             resolution_status="resolved",
             turn_id="turn-weather-status",
+            cognitive_requests=[{
+                "authority": "planner",
+                "responsibility_refs": ["weather"],
+                "reason_summary": "GA continuity materially changes the Work decision.",
+            }],
             associations=[
                 {
                     "association_id": "association-weather-status",
@@ -1062,6 +1126,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         association = GoalAssociationResolution(
             resolution_status="resolved",
             turn_id="turn-weather-change",
+            cognitive_requests=[{
+                "authority": "planner",
+                "responsibility_refs": ["weather"],
+                "reason_summary": "GA continuity materially changes the Work decision.",
+            }],
             associations=[
                 {
                     "association_id": "association-weather-change",
@@ -1524,6 +1593,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         association = GoalAssociationResolution(
             resolution_status="resolved",
             turn_id="turn-gap-reconsideration",
+            cognitive_requests=[{
+                "authority": "planner",
+                "responsibility_refs": ["r1"],
+                "reason_summary": "GA continuity materially changes the Work decision.",
+            }],
             associations=[
                 {
                     "association_id": "association-gap-reconsideration",
@@ -1925,6 +1999,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         association = GoalAssociationResolution(
             resolution_status="resolved",
             turn_id="turn-weather-correction",
+            cognitive_requests=[{
+                "authority": "planner",
+                "responsibility_refs": ["weather"],
+                "reason_summary": "GA continuity materially changes the Work decision.",
+            }],
             associations=[
                 {
                     "association_id": "association-weather-correction",
@@ -2087,6 +2166,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         association = GoalAssociationResolution(
             resolution_status="resolved",
             turn_id="turn-weather-reuse",
+            cognitive_requests=[{
+                "authority": "planner",
+                "responsibility_refs": ["weather"],
+                "reason_summary": "GA continuity materially changes the Work decision.",
+            }],
             associations=[
                 {
                     "association_id": "association-weather-reuse",
@@ -5006,6 +5090,11 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
         goal_planned = asyncio.Event()
         association = GoalAssociationResolution(
             resolution_status="resolved", turn_id="turn-independent",
+            cognitive_requests=[{
+                "authority": "planner",
+                "responsibility_refs": ["r1"],
+                "reason_summary": "GA continuity materially changes the Work decision.",
+            }],
             associations=[{"association_id": "update", "relationship": "modify",
                 "source_responsibility_refs": ["r1"], "target_goal_ids": ["goal-1"],
                 "goal_update": {"description": "Respond to the revised request."}, "confidence": 0.98}],

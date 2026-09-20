@@ -625,11 +625,18 @@ execution. The previous terminal-history GA constrained-decoder repair is folded
 slice as well. Focused source verification covers UMI schema/validation, social-only turns,
 mixed social+Work scope, GA decoder conservation and SGLang schema transport.
 
-**Still open — Slice 2:** post-GA, Evidence and Situation re-entry readiness still contains
-existing deterministic wake mechanics. Those paths must move onto the same model-authored
-cognitive activation contract without losing current continuity/recovery behavior. Native
-model qualification is also required before this new UMI field is promoted as behaviorally
-reliable.
+**Implementation status — Slice 2 implemented in source.** Goal Association now emits its
+own bounded downstream `cognitive_requests[]` after continuity resolution. Runtime no longer
+infers a second Planner pass from relationship type, Goal replacement, retained Work, or
+Planner-scope differences; it validates and schedules only the GA-authored Planner/SC request.
+Focused GA/Runtime tests cover retained continuity, new Goal ownership, no-op activation,
+and exact Responsibility conservation.
+
+**Still open — Slice 3:** trusted internal state transitions (Execution Evidence, provider
+state, time conditions, restart revalidation, and Goal-free Situation) still enter Planner
+or SC through Host-selected wake paths. These must converge on one bounded model-authored
+activation decision without transferring Goal/Plan/wording authority into that model. Native
+model qualification remains required.
 
 ## Current architecture
 

@@ -1125,6 +1125,7 @@ class GoalAssociationResolver:
             new_goals=new_goals,
             referent_updates=referent_updates,
             resolved_references=resolved_references,
+            cognitive_requests=list(model_output.cognitive_requests),
             confidence=model_output.confidence,
             reason_summary=model_output.reason_summary,
             metadata={

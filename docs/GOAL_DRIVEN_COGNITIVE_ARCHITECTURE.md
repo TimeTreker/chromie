@@ -706,10 +706,10 @@ those explicit `cognitive_requests[]`; Runtime does not infer Planner readiness 
 `continuity_scope` or another semantic field. The requests may overlap so SC, GA, and Fast
 can run concurrently over the same accepted WHAT while retaining separate authority.
 A GA `non_goal` result ends Goal-owned task continuity without fabricated Planner Work.
-If GA later discovers additional retained-Goal relevance, the same Planner authority may
-still wake through the current bounded post-GA re-entry path; migrating that subsequent
-activation decision onto the model-authored request contract is the next implementation
-slice. If HOW exceeds the fast planning budget, Fast Planner may additionally request Deep
+If GA later discovers additional retained-Goal relevance, GA itself may request the same
+Planner authority over the exact affected Responsibilities. Runtime validates and schedules
+that request but does not infer a Planner wake from relationship type, Goal replacement,
+or retained Work. If HOW exceeds the fast planning budget, Fast Planner may additionally request Deep
 Planner; Deep planning receives canonical Goal grounding before commitment-bearing work
 executes.
 

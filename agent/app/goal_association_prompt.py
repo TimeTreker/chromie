@@ -275,6 +275,15 @@ def build_association_prompt(
         "Never resolve uncertainty from lexical similarity, general memory, guessed intent, "
         "external facts, or execution assumptions. Leave every other uncertainty unresolved; "
         "later cognition decides whether clarification is actually required. SC owns wording. "
+        "After authoring continuity, decide whether that new canonical continuity makes another "
+        "existing cognitive authority useful now. Use cognitive_requests only for Planner or "
+        "Social Cognition, with exact Responsibility refs. Request Planner when this continuity "
+        "result materially changes what Work should be considered beyond the already-running UMI "
+        "planning request; request Social Cognition only when the continuity result itself adds "
+        "interaction-relevant meaning worth reconsidering. Use [] when no additional cognition is "
+        "needed. A cognitive request schedules thought only: it does not author Work, wording, "
+        "Capability choice, or execution. UMI cognitive requests are prior in-flight cognition, "
+        "not semantic truth and not a requirement to repeat the same authority. "
         "Return the supplied schema only.\n\n"
         "Candidate Goal evidence JSON:\n"
         + required_json(association_goal_projection(candidate_goals), None, label="Goal requirement evidence")
@@ -286,6 +295,8 @@ def build_association_prompt(
              "source_evidence": item.source_evidence.model_dump() if item.source_evidence else None}
             for item in request.responsibilities
         ], None, label="UMI Responsibility evidence")
+        + "\nUMI cognitive requests already in flight JSON:\n"
+        + bounded_json([item.model_dump(mode="json") for item in request.cognitive_requests], 1800)
         + "\nUMI semantic uncertainty JSON:\n" + bounded_json([item.model_dump(mode="json") for item in request.meaning_uncertainties], 1600)
         + "\nScoped discourse referents JSON:\n" + bounded_json(discourse_referents(request), 1400)
         + "\nAccepted dialogue JSON:\n"

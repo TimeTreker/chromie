@@ -298,10 +298,10 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   ordinary speech as `non_goal`, associate it with retained Goal state, or create a new
   Goal when continuity truly exists. UMI now authors bounded `cognitive_requests[]`; an
   explicit Planner request may begin Fast cognition in parallel with GA/SC for exactly the
-  cited Responsibilities. `continuity_scope` no longer wakes Planner by itself. A later GA
-  discovery of retained-Goal continuity may still wake Planner through the current bounded
-  post-GA re-entry path until Slice 2 moves that re-entry decision onto the same model-authored
-  activation contract. The distinction comes from bounded meaning and context, never phrase
+  cited Responsibilities. `continuity_scope` no longer wakes Planner by itself. GA now also
+  authors bounded downstream `cognitive_requests[]` after continuity resolution; Runtime may
+  schedule Planner or SC only when GA explicitly requests that existing authority. The
+  distinction comes from bounded meaning and context, never phrase
   tables or hardware profiles. GA exclusively owns canonical Goal identity.
 - **SPEECH-OWNER-001** — Social Cognition is the sole ordinary semantic owner of whether and when to
   communicate, the Communicative Activity, its exact wording, truth stage, and source

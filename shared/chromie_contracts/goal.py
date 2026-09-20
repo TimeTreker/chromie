@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .text import normalize_whitespace
 from .interaction import reject_forbidden_low_level_fields
+from .core_interpretation import CognitiveActivationRequest
 from .semantic_task import InformationGap, ResponsibilityStatus, SemanticGoal, TaskContextSnapshot
 from .discourse import DiscourseReferentUpdate, ResolvedDiscourseReference
 
@@ -233,6 +234,7 @@ class GoalAssociationResolution(BaseModel):
     new_goals: list[SemanticGoal] = Field(default_factory=list)
     referent_updates: list[DiscourseReferentUpdate] = Field(default_factory=list)
     resolved_references: list[ResolvedDiscourseReference] = Field(default_factory=list)
+    cognitive_requests: list[CognitiveActivationRequest] = Field(default_factory=list, max_length=2)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = ""
     metadata: dict[str, Any] = Field(default_factory=dict)
@@ -285,6 +287,27 @@ class GoalAssociationResolution(BaseModel):
             raise ValueError(
                 "a retained Goal cannot be both associated and superseded in one resolution"
             )
+        authorities = [item.authority for item in self.cognitive_requests]
+        if len(authorities) != len(set(authorities)):
+            raise ValueError("GA may request each downstream cognitive authority at most once")
+        forbidden = sorted(set(authorities) - {"planner", "social_cognition"})
+        if forbidden:
+            raise ValueError(
+                "GA may request only planner or social_cognition after continuity: "
+                + ",".join(forbidden)
+            )
+        known_refs = goal_owned_refs | set(self.non_goal_responsibility_refs)
+        for request in self.cognitive_requests:
+            unknown = set(request.responsibility_refs) - known_refs
+            if unknown:
+                raise ValueError(
+                    "GA cognitive activation references unknown Responsibilities: "
+                    + ",".join(sorted(unknown))
+                )
+            if request.authority == "planner" and not set(request.responsibility_refs).issubset(goal_owned_refs):
+                raise ValueError(
+                    "GA may request Planner only for canonically Goal-owned Responsibilities"
+                )
         if self.resolution_status == "fail_closed":
             if (
                 self.new_goals
@@ -292,6 +315,7 @@ class GoalAssociationResolution(BaseModel):
                 or self.non_goal_responsibility_refs
                 or self.referent_updates
                 or self.resolved_references
+                or self.cognitive_requests
                 or self.confidence != 0.0
             ):
                 raise ValueError(
@@ -369,6 +393,10 @@ class GoalAssociationResolution(BaseModel):
             "resolved_references": [
                 item.model_dump(mode="json", exclude_none=True)
                 for item in self.resolved_references
+            ],
+            "cognitive_requests": [
+                item.model_dump(mode="json", exclude_none=True)
+                for item in self.cognitive_requests
             ],
             "confidence": self.confidence,
             "reason_summary": self.reason_summary,

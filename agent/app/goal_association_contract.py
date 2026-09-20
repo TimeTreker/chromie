@@ -21,8 +21,10 @@ from pydantic.json_schema import JsonSchemaValue
 
 try:
     from chromie_contracts.text import normalize_whitespace
+    from chromie_contracts.core_interpretation import CognitiveActivationRequest
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.text import normalize_whitespace
+    from shared.chromie_contracts.core_interpretation import CognitiveActivationRequest
 
 
 # Existing location-binding vocabulary shared by the decoder and Host validator.
@@ -790,6 +792,15 @@ class GoalSegmentationModelOutput(BaseModel):
         default_factory=list,
         max_length=12,
     )
+    cognitive_requests: list[CognitiveActivationRequest] = Field(
+        default_factory=list,
+        max_length=2,
+        description=(
+            "Bounded requests for downstream Planner and/or Social Cognition after "
+            "this continuity result. These requests schedule cognition only and do "
+            "not author Work or communication."
+        ),
+    )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = Field(
         default="",
@@ -804,6 +815,19 @@ class GoalSegmentationModelOutput(BaseModel):
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
+
+    @model_validator(mode="after")
+    def validate_cognitive_requests(self):
+        authorities = [item.authority for item in self.cognitive_requests]
+        if len(authorities) != len(set(authorities)):
+            raise ValueError("GA may request each downstream cognitive authority at most once")
+        forbidden = sorted(set(authorities) - {"planner", "social_cognition"})
+        if forbidden:
+            raise ValueError(
+                "GA may request only planner or social_cognition after continuity: "
+                + ",".join(forbidden)
+            )
+        return self
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalSegmentationModelOutput":
@@ -847,6 +871,15 @@ class GoalAssociationModelOutput(BaseModel):
         default_factory=list,
         max_length=12,
     )
+    cognitive_requests: list[CognitiveActivationRequest] = Field(
+        default_factory=list,
+        max_length=2,
+        description=(
+            "Bounded requests for downstream Planner and/or Social Cognition after "
+            "this continuity result. These requests schedule cognition only and do "
+            "not author Work or communication."
+        ),
+    )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason_summary: str = Field(
         default="",
@@ -861,3 +894,16 @@ class GoalAssociationModelOutput(BaseModel):
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
+
+    @model_validator(mode="after")
+    def validate_cognitive_requests(self):
+        authorities = [item.authority for item in self.cognitive_requests]
+        if len(authorities) != len(set(authorities)):
+            raise ValueError("GA may request each downstream cognitive authority at most once")
+        forbidden = sorted(set(authorities) - {"planner", "social_cognition"})
+        if forbidden:
+            raise ValueError(
+                "GA may request only planner or social_cognition after continuity: "
+                + ",".join(forbidden)
+            )
+        return self

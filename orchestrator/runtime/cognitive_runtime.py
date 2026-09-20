@@ -2578,6 +2578,9 @@ class GoalDrivenRuntimeCoordinator:
         turn_id: str,
         plan: CanonicalPlan | None = None,
         work_decision_pending: bool | None = None,
+        trigger: str | None = None,
+        source_refs: list[str] | None = None,
+        goal_ids: list[str] | None = None,
     ) -> SocialCognitionRequest:
         sid = str(work_request.sid or "")
         social_context = dict(work_request.context)
@@ -2589,11 +2592,15 @@ class GoalDrivenRuntimeCoordinator:
                 ),
             )
         pending = plan is None if work_decision_pending is None else work_decision_pending
+        resolved_trigger = trigger or ("work_state" if plan is not None else "interpretation")
+        resolved_source_refs = list(source_refs or ([plan.plan_id] if plan is not None else [turn_id]))
+        resolved_goal_ids = list(goal_ids or (list(plan.goal_ids) if plan is not None else []))
+        request_identity = "|".join([resolved_trigger, *resolved_source_refs, *resolved_goal_ids, turn_id])
         return SocialCognitionRequest(
-            request_id="sc:" + hashlib.sha256(("plan:" + plan.plan_id if plan is not None else "umi:" + turn_id).encode("utf-8")).hexdigest(),
-            trigger="work_state" if plan is not None else "interpretation",
-            source_refs=[plan.plan_id] if plan is not None else [turn_id],
-            goal_ids=list(plan.goal_ids) if plan is not None else [],
+            request_id="sc:" + hashlib.sha256(request_identity.encode("utf-8")).hexdigest(),
+            trigger=resolved_trigger,
+            source_refs=resolved_source_refs,
+            goal_ids=resolved_goal_ids,
             language=work_request.language or "auto",
             responsibilities=list(work_request.responsibilities),
             meaning_uncertainties=list(work_request.meaning_uncertainties),
@@ -2609,6 +2616,9 @@ class GoalDrivenRuntimeCoordinator:
     def start_state_interaction(
         self, session: Any, *, work_request: CognitiveWorkRequest, turn_id: str,
         plan: CanonicalPlan | None = None,
+        trigger: str | None = None,
+        source_refs: list[str] | None = None,
+        goal_ids: list[str] | None = None,
     ) -> asyncio.Task[Any] | None:
         """Let a new UMI or committed Plan state invite SC without holding Work."""
         if self.policy.mode != "apply" or user_turn_prohibits_speech(work_request.context.get("user_turn_envelope")):
@@ -2620,6 +2630,7 @@ class GoalDrivenRuntimeCoordinator:
             previous[1].cancel()
         request = self._state_social_request(
             work_request=work_request, turn_id=turn_id, plan=plan,
+            trigger=trigger, source_refs=source_refs, goal_ids=goal_ids,
         )
         def current() -> bool:
             entry = self._social_turns.get(key)
@@ -4104,9 +4115,25 @@ class GoalDrivenRuntimeCoordinator:
         )
         mapping = self._goal_ids_by_responsibility(association)
         goal_responsibility_refs = set(mapping)
+        ga_planner_request = next(
+            (item for item in association.cognitive_requests if item.authority == "planner"),
+            None,
+        )
+        ga_planner_refs = set(ga_planner_request.responsibility_refs) if ga_planner_request else set()
+        if not ga_planner_refs.issubset(goal_responsibility_refs):
+            raise CognitiveStageFailure(
+                "goal_association",
+                {
+                    "failure_class": "invalid_cognitive_activation_scope",
+                    "failure_domain": "model_contract",
+                    "architecture_attribution": "goal_association",
+                    "retryable": False,
+                    "reason": "GA requested Planner for non-Goal-owned Responsibilities",
+                },
+            )
         planning_work_request = (
-            self._subset_work_request(work_request, goal_responsibility_refs)
-            if goal_responsibility_refs
+            self._subset_work_request(work_request, ga_planner_refs)
+            if ga_planner_refs
             else None
         )
         planning_context = {
@@ -4143,11 +4170,8 @@ class GoalDrivenRuntimeCoordinator:
         planning_context["existing_work_activities"] = list(by_id.values())
         planning_context["interaction_context"] = self._interaction_context(sid=sid, context=planning_context, goal_ids=goal_ids)
         planning_task = None
-        if planning_work_request is not None and not has_named_goal_cancellation and (
-            retained or any(item.get("turn_id") != turn_id for item in actual_work if item.get("origin") == "provisional_fast")
-            or has_goal_replacement or any(item.goal_update for item in association.associations)
-        ):
-            planning_context["canonical_fast_revision_reason"] = "goal_state_planning"
+        if planning_work_request is not None and not has_named_goal_cancellation:
+            planning_context["canonical_fast_revision_reason"] = "ga_model_requested_reentry"
             planning_task = asyncio.create_task(self._observe_workflow_stage(
                 sid=sid,
                 stage="fast_planner",
@@ -4865,14 +4889,40 @@ class GoalDrivenRuntimeCoordinator:
                 speculative_ref_set != goal_responsibility_refs
             )
 
+            ga_planner_requested = any(
+                item.authority == "planner" for item in association.cognitive_requests
+            )
+            ga_social_request = next(
+                (item for item in association.cognitive_requests if item.authority == "social_cognition"),
+                None,
+            )
+            ga_social_task = None
+            if ga_social_request is not None and self.policy.mode == "apply":
+                ga_social_refs = set(ga_social_request.responsibility_refs)
+                ga_social_request_work = self._subset_work_request(
+                    post_ga_request.model_copy(
+                        deep=True, update={"context": planning_context, "history": history}
+                    ),
+                    ga_social_refs,
+                )
+                ga_social_task = self.start_state_interaction(
+                    session,
+                    work_request=ga_social_request_work,
+                    turn_id=turn_id,
+                    trigger="goal_state",
+                    source_refs=["ga:" + goal_association_fingerprint(association)],
+                    goal_ids=association_goal_ids,
+                )
+
             if (
                 fast_advance is None
                 and association_stage.planning_task is None
                 and not planner_refs
-                and not association.associations
+                and not ga_planner_requested
             ):
-                if initial_social_task is not None:
-                    social_resolved = await initial_social_task
+                selected_social_task = ga_social_task or initial_social_task
+                if selected_social_task is not None:
+                    social_resolved = await selected_social_task
                     if social_resolved is None:
                         raise CognitiveStageFailure(
                             "social_cognition",
@@ -4906,19 +4956,18 @@ class GoalDrivenRuntimeCoordinator:
                     },
                 )
 
-            if fast_advance is None and association_stage.planning_task is None:
-                if not planner_refs:
-                    planner_waited_for_goal_continuity = True
+            if fast_advance is None and association_stage.planning_task is None and planner_refs:
                 await plan_current_responsibilities(
-                    work_request, planning_context, history
+                    self._subset_work_request(post_ga_request, set(planner_refs)),
+                    planning_context, history
                 )
-            if fast_advance is None and association_stage.planning_task is None:
+            if fast_advance is None and association_stage.planning_task is None and (planner_refs or ga_planner_requested):
                 raise CognitiveStageFailure(
                     "fast_planner_advance",
                     {
-                        "failure_class": "missing_responsibility_activity_plan",
+                        "failure_class": "missing_requested_responsibility_activity_plan",
                         "failure_domain": "model_contract",
-                        "architecture_attribution": "user_meaning_interpretation",
+                        "architecture_attribution": "cognitive_orchestration",
                         "retryable": False,
                     },
                 )
@@ -4936,39 +4985,17 @@ class GoalDrivenRuntimeCoordinator:
 
             retained_work_activities = [item for item in planning_context.get("existing_work_activities", [])
                                         if item.get("origin") == "retained_runtime"]
-            work_reconciliation_required = not has_named_goal_cancellation and (
-                bool(retained_work_activities) or association_stage.planning_task is not None
+            work_reconciliation_required = association_stage.planning_task is not None
+            canonical_fast_revision_reason = (
+                "ga_model_requested_reentry"
+                if association_stage.planning_task is not None
+                else ""
             )
-            goal_update_reconciliation_required = any(
-                bool(item.goal_update) for item in association.associations
-            )
-            canonical_fast_revision_reason = "goal_state_planning" if association_stage.planning_task is not None else ""
             planning_snapshot = association_stage.planning_snapshot
             if work_reconciliation_required:
-                canonical_fast_revision_reason = (
-                    "provisional_work_goal_reconciliation"
-                    if ready_fast_capability_execution is not None
-                    else "goal_replacement_work_reconciliation"
-                    if has_goal_replacement
-                    else "retained_goal_work_reconciliation"
-                )
                 work_reconciliation_activity_count = len(
                     planning_context["existing_work_activities"]
                 )
-            elif goal_update_reconciliation_required:
-                # Fast Advance and Goal Association share the UMI result but run
-                # concurrently. When GA authors an update to retained canonical
-                # Goal meaning, only a new Fast Planner pass may decide whether
-                # the provisional Activities or InformationGaps still apply.
-                canonical_fast_revision_reason = (
-                    "goal_association_update_reconciliation"
-                )
-            elif fast_advance is not None and planner_scope_changed_after_ga:
-                # UMI exposed some Work early, but GA discovered additional Goal
-                # continuity (for example a conversational re-engagement attached
-                # to retained work). Re-run the same Planner authority over the full
-                # canonical Goal-owned Responsibility set.
-                canonical_fast_revision_reason = "goal_scope_expanded_after_association"
             if canonical_fast_revision_reason:
                 planning_context["canonical_fast_revision_reason"] = (
                     canonical_fast_revision_reason
@@ -5143,12 +5170,10 @@ class GoalDrivenRuntimeCoordinator:
                 if deep_failure is not None:
                     raise CognitiveStageFailure("deep_planner", deep_failure)
             elif canonical_fast_revision_reason:
-                # A material canonical-state change after the streamed Fast result
-                # receives one same-Planner revision. GA supplies Goal continuity only;
-                # it never decides Work compatibility. Provisional safe Work remains
-                # available until Planner explicitly selects reuse or authors replacement
-                # Work. A terminal unavailable/refused decision is not itself a revision
-                # trigger.
+                # GA explicitly requested another Planner decision after continuity.
+                # Runtime supplies current Goal/Work/Evidence state but does not infer
+                # that a Goal update, retained Activity, scope change, or field equality
+                # requires replanning.
                 stage = time.perf_counter()
                 if association_stage.planning_task is not None:
                     fast_plan = await association_stage.planning_task

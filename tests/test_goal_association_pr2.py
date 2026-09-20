@@ -155,6 +155,7 @@ def create_goals(*goals: dict) -> dict:
     return {
         "decision": "create_goals",
         "new_goals": list(goals),
+        "cognitive_requests": [],
         "confidence": 1.0,
         "reason_summary": "The candidate set represents the current responsibility.",
     }
@@ -533,6 +534,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                     "target_goal_ids": ["goal-a"], "confidence": 1.0,
                 }],
                 "new_goals": [], "referent_updates": [], "resolved_references": [],
+                "cognitive_requests": [],
                 "confidence": 1.0, "reason_summary": "Continue retained work.",
             }
             complete = Draft202012Validator(schema)
@@ -636,6 +638,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                             "non_goal_responsibility_refs": refs,
                             "referent_updates": [],
                             "resolved_references": [],
+                            "cognitive_requests": [],
                             "confidence": 1.0,
                             "reason_summary": "Conversation is complete without Goal state.",
                         }
@@ -1849,6 +1852,7 @@ class GoalExecutionContractTests(unittest.TestCase):
                 "new_goals",
                 "referent_updates",
                 "resolved_references",
+                "cognitive_requests",
                 "confidence",
                 "reason_summary",
             ],
@@ -1864,8 +1868,8 @@ class GoalExecutionContractTests(unittest.TestCase):
         contradictory_replacement = {
             "associations": [],
             "new_goals": [intent_goal("unused", "body_action", related_goal_ids=["goal-walk"], supersedes_goal_ids=["goal-walk"])],
-            "referent_updates": [], "resolved_references": [], "confidence": 1.0,
-            "reason_summary": "Replace the retained Goal.",
+            "referent_updates": [], "resolved_references": [], "cognitive_requests": [],
+            "confidence": 1.0, "reason_summary": "Replace the retained Goal.",
         }
         self.assertTrue(list(validator.iter_errors(contradictory_replacement)))
         contradictory_replacement["new_goals"][0]["related_goal_ids"] = []
@@ -2215,6 +2219,7 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             ],
             "referent_updates": [],
             "resolved_references": [],
+            "cognitive_requests": [],
             "confidence": 1.0,
             "reason_summary": "Both new embodied outcomes require new Goal ownership.",
         }
@@ -2561,7 +2566,8 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
                     "source_responsibility_refs": ["r1"], "binding_changes": [{
                         "path": ["object", "bindings", "count", "value"],
                         "source_responsibility_ref": "r1", "source_binding": "count"}]}]}],
-                "new_goals": [], "referent_updates": [], "resolved_references": [], "reason_summary": "Refine the second retained requirement.", "confidence": 1.0}
+                "new_goals": [], "referent_updates": [], "resolved_references": [], "cognitive_requests": [],
+                "reason_summary": "Refine the second retained requirement.", "confidence": 1.0}
             model = ScriptedOllama([raw])
             resolution = asyncio.run(GoalAssociationResolver(model).resolve(req))
             self.assertEqual(resolution.resolution_status, "resolved")
@@ -2654,8 +2660,8 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
                 "target_goal_id": "goal-region", "replace_requirement_indices": [0],
                 "source_responsibility_refs": ["r1"], "binding_changes": [{"path": ["constraints", "region"],
                     "source_responsibility_ref": "r1", "source_binding": "region"}]}]}],
-            "new_goals": [], "referent_updates": [], "resolved_references": [], "confidence": 1.0,
-            "reason_summary": "Apply the accepted region to the retained requirement."}
+            "new_goals": [], "referent_updates": [], "resolved_references": [], "cognitive_requests": [],
+            "confidence": 1.0, "reason_summary": "Apply the accepted region to the retained requirement."}
         model = ScriptedOllama([raw])
         result = asyncio.run(GoalAssociationResolver(model).resolve(req))
         self.assertEqual(result.resolution_status, "resolved")

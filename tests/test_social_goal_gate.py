@@ -16,9 +16,11 @@ from orchestrator.runtime.cognitive_runtime import (
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.goal import GoalAssociation, GoalAssociationResolution
 from shared.chromie_contracts.plan import (
+    CanonicalPlan,
     FastPlannerAdvance,
     FastPlannerCapabilityActivity,
     FastPlannerStreamTerminal,
+    SocialCommunicationNeed,
 )
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.social_cognition import (
@@ -54,6 +56,7 @@ def test_ga_no_goal_is_available_only_for_relation_free_ordinary_speech() -> Non
         "non_goal_responsibility_refs": ["r1"],
         "referent_updates": [],
         "resolved_references": [],
+        "cognitive_requests": [],
         "confidence": 1.0,
         "reason_summary": "The current interaction is socially complete.",
     }
@@ -104,6 +107,11 @@ async def test_conversational_ping_wakes_planner_only_after_ga_finds_goal() -> N
             return GoalAssociationResolution(
                 turn_id="turn-ping",
                 resolution_status="resolved",
+                cognitive_requests=[{
+                    "authority": "planner",
+                    "responsibility_refs": ["r1"],
+                    "reason_summary": "Retained Goal continuity makes Work cognition useful now.",
+                }],
                 associations=[GoalAssociation(
                     association_id="ping-old-goal",
                     relationship="reference",
@@ -152,6 +160,26 @@ async def test_conversational_ping_wakes_planner_only_after_ga_finds_goal() -> N
                     "addressed_need_ids": [need.need_id],
                     "delivery_phase": need.delivery_phase or "immediate",
                 }],
+            )
+
+        async def resolve_fast_plan(self, session, *, request, **kwargs):
+            del session, kwargs
+            assert ga_done is True
+            calls.append("planner:" + ",".join(
+                item.local_ref for item in request.responsibilities
+            ))
+            return CanonicalPlan(
+                plan_id="goal-ping-plan",
+                planner_tier="fast",
+                disposition="respond",
+                coverage="complete",
+                confidence=1.0,
+                goal_ids=["goal-old"],
+                communication_needs=[SocialCommunicationNeed(
+                    need_id="goal-ping-response", owner="planner", kind="answer",
+                    source_goal_ids=["goal-old"], source_responsibility_refs=["r1"],
+                    reference_id="goal-ping-plan", delivery_phase="immediate",
+                )],
             )
 
         async def stream_fast_advance(self, session, *, request, **kwargs):
@@ -209,7 +237,7 @@ async def test_conversational_ping_wakes_planner_only_after_ga_finds_goal() -> N
     assert result.status == "applied", result.fallback_reason
     assert "planner:r1" in calls
     assert calls.index("ga") < calls.index("planner:r1")
-    assert result.metadata["planner_waited_for_goal_continuity"] is True
+    assert result.goal_association.cognitive_requests[0].authority == "planner"
     assert result.goal_association.associations[0].target_goal_ids == ["goal-old"]
 
 

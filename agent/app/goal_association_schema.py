@@ -157,6 +157,17 @@ def goal_association_response_schema(
         if " ".join(str(item or "").strip().split())
     ]
     properties = schema.get("properties", {})
+    activation_schema = schema.get("$defs", {}).get("CognitiveActivationRequest")
+    if isinstance(activation_schema, dict):
+        activation_properties = activation_schema.get("properties", {})
+        if isinstance(activation_properties, dict):
+            authority = activation_properties.get("authority")
+            if isinstance(authority, dict):
+                authority["enum"] = ["planner", "social_cognition"]
+            refs = activation_properties.get("responsibility_refs")
+            if isinstance(refs, dict):
+                refs["items"] = {"type": "string", "enum": responsibility_refs}
+                refs["uniqueItems"] = True
     new_goals = properties.get("new_goals")
     if isinstance(new_goals, dict):
         new_goals["maxItems"] = (
@@ -854,6 +865,7 @@ def goal_association_response_schema(
             "new_goals",
             "referent_updates",
             "resolved_references",
+            "cognitive_requests",
             "confidence",
             "reason_summary",
         ]
@@ -863,6 +875,7 @@ def goal_association_response_schema(
             "new_goals",
             "referent_updates",
             "resolved_references",
+            "cognitive_requests",
             "confidence",
             "reason_summary",
         ]
