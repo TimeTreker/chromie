@@ -10,15 +10,35 @@ Cognition owns whether/when/how to communicate, and Planner owns Work HOW.
 All use the same existing Mind, Memory, Situation, Goal, Work and Interaction
 truth; a separate inference task creates no separate personality or truth store.
 
-The runtime admits independently ready GA and communication tasks from one complete
-UMI result. Planner readiness is narrower: Responsibilities that UMI marks
-continuity_scope=goal may start bounded Fast planning in parallel, together with any
-Responsibility semantically coupled to that Work by accepted ordering/concurrency relations.
-continuity_scope=turn runs SC + GA first; GA may classify it `non_goal` or discover retained/new Goal continuity, and
-only the latter makes Planner ready. New trusted state may reactivate the appropriate owner;
-it does not require every event to run every role. Optional acknowledgement cannot gate
-already-ready Work, and communication cannot authorize or claim unobserved effects.
-One primary result per distinct authority remains required; neither role is a
+The target architecture separates **cognitive orchestration** from **execution/compute
+scheduling**. The model-facing cognitive owner decides which existing cognitive authorities
+are useful next from the accepted state; Runtime does not derive that decision from
+`output_mode`, task category, keywords, confidence thresholds, or another deterministic
+semantic router. A complete UMI result may therefore request GA, SC, and Planner in
+parallel when its current understanding is sufficient for each requested branch, while a
+different UMI result may request only a subset. Requesting an authority grants none of its
+semantic power to UMI: GA still authors Goal continuity, Planner still authors HOW, and SC
+still authors interaction.
+
+Trusted Runtime owns the mechanical half: source/version integrity, task lifetime,
+dependency waits, stale-result rejection, compute admission, priority/pre-emption,
+authorization, confirmation, safety, resource arbitration, provider execution, and exact
+Evidence. It may hold an Activity or model transaction because one of those prerequisites
+is not satisfied; it must not infer that a cognitive role is semantically necessary.
+
+This is **progressive cognitive commitment**. A branch advances as soon as its own
+information dependency is sufficiently resolved, without waiting for unrelated branches.
+Optional acknowledgement cannot gate already-grounded planning. A well-grounded observation
+need does not wait for GA to discover a possible long-horizon motive. Conversely, early
+planning never implies early effect permission: only explicitly qualified side-effect-free
+safe reads may execute before canonical Goal binding; effectful Work remains prepared.
+When GA, Evidence, Situation, or later user meaning materially changes the relevant state,
+the Planner receives the current Goal plus actual queued/running/completed/cancelled/
+provisional Work and decides the remaining Work delta rather than starting from an empty
+world. Identity-only binding may remain mechanical when no Work judgment changed.
+
+New trusted state may reactivate the appropriate owner without requiring every event to run
+every role. One primary result per distinct authority remains required; neither role is a
 reviewer or repairer of the other. See the
 [target lifecycle and source inventory](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle).
 
@@ -27,6 +47,11 @@ ordinary turns, required communication and trusted Situation wakes. Planner mode
 outputs are word-free Work decisions. The [status record](STATUS.md#social-cognition-migration)
 owns validation and deployment claims; source integration alone does not prove
 native-model reliability, latency or physical behavior.
+
+The model-driven orchestration amendment above is an **approved target**, not a claim that
+the current Runtime has already removed all deterministic cognitive-readiness rules. Until
+that migration is implemented and qualified, Status must distinguish current behavior from
+this target contract.
 
 ## Provider-neutral resource acquisition and delivery
 

@@ -635,27 +635,51 @@ Read the diagram with these boundaries:
   provider requests, authorization, or readiness flags. Planner derives whether work
   or fresh Evidence is still needed from canonical Goal state, current Evidence, and
   available Capability truth.
-- A semantically complete immutable UMI result independently starts Goal Association and
-  Social Cognition. Planner also starts immediately only for the Responsibility component
-  whose accepted WHAT already requires substantive Work; ordinary speech alone waits for
-  GA's continuity result. If GA maps that speech to retained/new Goal state, Planner becomes
-  ready then. If UMI reports typed semantic uncertainty on a Planner-ready component, Planner
-  waits for GA's continuity attempt and receives only uncertainty still unresolved afterward.
-  Social Cognition emits its complete typed communication
-  decision, including exact wording, source scope, timing and truth/Evidence
-  provenance; intentional silence is valid. Only complete validated commitments
-  reach presentation. Planner produces a separate complete Work decision and
-  does not wait for optional speech or re-author it. GA owns canonical continuity.
-  Failure of a communication invocation preserves independent Work and established
-  Evidence; failure of planning cannot fabricate action progress. Neither role
-  repairs the other's decision. The original admitted UserTurn remains read-only
-  provenance; neither role can repair UMI meaning from it.
-  Runtime may prepare a complete valid Work Plan before GA. Only explicitly
-  available side-effect-free safe reads without confirmation may execute before
-  canonical Goal binding; remaining Work waits for binding and all prerequisites.
-  Planner owns execution-input completeness, Capability selection and source/default
-  strategy. It provides a grounded input or confirmation need to Social Cognition
-  when communication is required. Only genuinely complex HOW uses Deep Planner.
+- **Cognitive orchestration is model-authored, not a Runtime intent router.** A complete
+  UMI result may include bounded proposals for which existing cognitive authorities should
+  work next from the accepted meaning—for example GA continuity inspection, SC interaction,
+  and/or Planner deliberation. This does not give UMI the semantic authority of those roles:
+  it may request their cognition but cannot pre-author a Goal relationship, Work Plan, or
+  utterance. The proposal is reasoning about what cognition is useful now, not a route/intent
+  label, phrase table, output-mode switch, or deterministic `if body_action -> Planner` rule.
+  Later GA, Planner, SC, trusted Evidence, or Situation cognition may likewise request a
+  bounded re-entry of an existing authority when new state materially changes what remains
+  worth considering.
+- **Runtime schedules requested cognition; it does not decide what Chromie should think
+  about.** Trusted code validates source identity, admissible authority edges, stale-result
+  versions, deadlines, compute/resource availability, authorization, confirmation, safety,
+  and effect prerequisites. It may delay, reject, cancel, coalesce, or pre-empt an already
+  requested computation for those mechanical reasons, but must not infer from semantic
+  labels that GA, Planner, SC, Deep cognition, clarification, or replanning is needed.
+- **Progressive cognitive commitment:** cognition that is already sufficiently grounded for
+  its own next step should not wait for unrelated cognition merely because another branch is
+  still running. UMI may therefore request GA, SC, and Planner concurrently when the model
+  judges their inputs sufficiently established. A genuine dependency waits only the affected
+  cognition or Activity, not the whole turn. Optional interaction does not gate independent
+  planning; unresolved long-horizon motive does not gate a well-grounded weather lookup; and
+  GA continuity reasoning does not retroactively erase a valid Planner result.
+  Conversely, a model request to think or plan early does not bypass effect permission:
+  explicitly side-effect-free safe reads may execute before canonical Goal binding when all
+  trusted contracts allow it, while physical, private, costly, irreversible, confirmation-
+  gated, or otherwise effectful Work remains prepared until its canonical and execution
+  prerequisites hold.
+  When later GA, Evidence, Situation, or user input changes Goal scope or meaning relevant to
+  existing Work, Planner sees actual queued/running/completed/cancelled/provisional Activities
+  and decides the remaining delta: retain, reuse, add, wait, cancel, replace, or do nothing.
+  Runtime never derives semantic Work compatibility from Goal IDs or field equality.
+  A purely identity-preserving GA result may still be mechanically bound without another
+  model call when no semantic Work judgment is required.
+  Social Cognition emits its complete typed communication decision, including exact wording,
+  source scope, timing and truth/Evidence provenance; intentional silence is valid. Only
+  complete validated commitments reach presentation. Planner produces a separate complete
+  Work decision and does not wait for optional speech or re-author it. GA owns canonical
+  continuity. Failure of a communication invocation preserves independent Work and
+  established Evidence; failure of planning cannot fabricate action progress. Neither role
+  repairs the other's decision. The original admitted UserTurn remains read-only provenance;
+  neither role can repair UMI meaning from it. Planner owns execution-input completeness,
+  Capability selection and source/default strategy. It provides a grounded input or
+  confirmation need to Social Cognition when communication is required. Only genuinely
+  complex HOW uses Deep Planner.
 
 - Planner input resolution is not a second User Meaning Interpretation. Capability schemas
   constrain realization; they cannot redefine, widen, narrow, or invent what the

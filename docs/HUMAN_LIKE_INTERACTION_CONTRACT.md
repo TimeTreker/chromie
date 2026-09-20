@@ -328,13 +328,38 @@ cancellable tasks, but completed Evidence remains immutable and is never convert
 into “did not happen.” GA supplies Goal continuity but never authors or selects that
 Plan.
 
-A clear observational request must not wait for Goal Association merely to learn its
-canonical Goal ID. After Fast Planner verifies complete arguments, availability,
-schema validity, no confirmation, `safe_read`, `side_effect_free=true`, and an explicit
-parallel-safety declaration, Trusted Runtime may start the lookup under UMI-local
-Responsibility refs while GA runs. This is ordinary human-like anticipation: begin a
-cheap observation while deciding how it fits ongoing concerns. It is not permission to
-speculate with effects, private or materially costly access, or undeclared concurrency.
+Human-like cognition should not be approximated by a fixed Runtime rule such as
+`body_action -> Planner`, `speech -> SC`, or `uncertainty -> wait for GA`. Once a model
+has understood enough of the current state, it may request the next useful cognitive
+authorities. Runtime schedules those requests under trusted mechanical constraints; it
+does not decide the semantic question of what Chromie should think about next.
+
+This makes the timing rule explicit:
+
+> **Later cognition must not block an earlier cognitive commitment that is already
+> sufficiently grounded for its own next step.**
+
+A clear observational request may therefore let Planner begin acquisition while GA still
+considers how the request fits ongoing concerns. If the user asks for weather, Planner can
+obtain the weather while GA considers whether that request relates to an already-supported
+trip, lodging, activity, or other retained Goal. GA must not invent a hidden motive merely
+because one is plausible, and absence of that long-horizon answer does not block the
+current lookup. After Fast Planner verifies complete arguments, availability, schema
+validity, no confirmation, `safe_read`, `side_effect_free=true`, and an explicit
+parallel-safety declaration, Trusted Runtime may start the lookup under Responsibility
+provenance while continuity cognition remains in flight.
+
+The same principle does **not** authorize speculative physical effects. For a request such
+as “walk fifty meters, get a cup of water and bring it back,” UMI may request SC, GA, and
+Planner concurrently. SC may decide whether an acknowledgement is useful. Planner may
+immediately reason about mobility, manipulation, acquisition, return, delivery, current
+body/provider state, and the complete end-to-end user objective. GA may independently
+establish whether this is a fresh obligation or continuity with an existing concern.
+Physical, private, costly, irreversible, or confirmation-gated Work remains prepared until
+its canonical Goal binding and all trusted execution prerequisites hold. A failure to walk
+or grasp is not whole-task completion; the Responsibility remains open unless the actual
+user objective is satisfied, cancelled, refused, superseded, or truthfully reported as
+unavailable.
 
 A changed Goal ID, association relationship, or exact argument equality cannot by itself
 decide Work compatibility. GA emits only Canonical Goal continuity. When that commit
@@ -351,6 +376,13 @@ binds/reuses validated Work or cancels pending/cancellable Work only after the P
 decision and executes the corrected Plan. Already-completed
 incompatible observations remain immutable unbound audit Evidence and cannot ground
 Goal completion or speech.
+
+Planner re-entry is therefore continuation of one responsibility, not a restart from an
+empty world. The model sees current queued/running/completed/cancelled/provisional Work,
+current Situation and qualified Evidence, and decides whether the remaining obligation
+requires retaining, reusing, adding, waiting, cancelling, replacing, or no new Activity.
+The fact that GA, a provider, or another cognitive branch returned later is only a new
+piece of state; it is not itself a rule saying “replan everything.”
 
 This behaves like a person continuing an already-started check rather than starting it
 again merely because they thought about it once more. Retained-work reuse is explicit

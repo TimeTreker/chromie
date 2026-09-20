@@ -601,6 +601,23 @@ The archive audit did not reopen the authority architecture; it found six implem
 Focused current-worktree evidence: `tests/test_cognitive_runtime_pr7.py` passes 71 tests plus 2 subtests; `tests/test_prompt_projection.py`, `tests/test_goal_association_pr2.py`, and PR7 together pass 153 tests plus 2 subtests; the migrated prompt/re-entry/API focused set passes 94 tests plus 2 subtests; `multi_goal_daily_life` Level A passes 10/10; one broad pytest partition passes 475 tests plus 50 subtests. A second very large partition exceeded this audit environment's single-command timeout, so no complete canonical-gate pass is claimed here. The next required evidence is a clean checkout with pinned dependencies running the documented full gate and recording the actual pytest collection count.
 Corrective order is now: (1) retain a clean revision-bound full source qualification with the new complete test collection; (2) re-run frozen-transaction model/provider qualification on that exact source; (3) then resume live voice/simulator/provider qualification and latency work. No new cognitive authority or product feature is justified by these fixes.
 
+## Approved model-driven cognitive orchestration target — 2026-09-20
+
+Owner-approved architecture now distinguishes model-authored **cognitive orchestration**
+from trusted **execution/compute scheduling**. A cognitive model may request GA, SC,
+Planner, or a bounded later re-entry when current meaning/state makes that cognition
+useful. Runtime validates and schedules those requests under identity, version, dependency,
+compute, authorization, confirmation, safety and resource constraints; it must not decide
+semantic cognitive need from output modes, keywords, task classes, or fixed routing rules.
+The governing principle is progressive cognitive commitment: cognition that is sufficiently
+grounded for its own next step should not wait for unrelated cognition. Early reasoning does
+not bypass the effect boundary; safe reads may be qualified for pre-GA execution while
+effectful Work remains prepared. Later GA/Evidence/Situation changes re-enter Planner over
+actual queued/running/completed/cancelled/provisional Work so the model decides the delta.
+
+**Implementation status:** approved target only. Current source still contains deterministic
+cognitive-readiness logic and has not yet been migrated or qualified against this amendment.
+
 ## Current architecture
 
 The maintained authority line is:
@@ -646,10 +663,15 @@ The authoritative definitions live in `docs/PROJECT_CHARTER.md`. In particular:
 - Goal Association owns canonical Goal identity and continuity, not replanning.
 - Planner is one HOW authority; fast and deep are cognition passes of that same owner.
 - SC owns ordinary Communicative Acts and exact wording.
+- The target cognitive-orchestration contract lets models request which existing cognitive
+  authorities should work next; Runtime owns mechanical scheduling/admission, not semantic
+  routing. This target is not yet fully implemented.
 - The same primary SC result may own bounded `auxiliary_activities[]`; these remain
   interaction expression, never Goal-owned Work or task-completion Evidence.
 - Trusted Capability Runtime and Providers own effect realization/lifecycle, not Goal
   interpretation.
+- Progressive cognitive commitment permits independent grounded cognition to advance without
+  waiting for unrelated branches; effectful execution still obeys canonical/safety boundaries.
 - Runtime events report what happened. Host-correlated Evidence records what is true.
 - `CognitiveOpportunity` is an ephemeral readiness carrier, not Goal/Evidence/Situation/response/execution truth. Goal-bound readiness may re-enter Planner; exact trusted Goal-free Situation readiness may enter the shared SC transaction; either path may do nothing.
 - Auxiliary-only events cannot create a `CognitiveOpportunity`; Goal-free readiness requires independently trusted primary Situation/source provenance.

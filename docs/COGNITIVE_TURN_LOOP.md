@@ -394,20 +394,54 @@ Interpretation itself stops at Responsibility evidence; once that WHAT is suffic
 Fast Planner is the first HOW owner. It must not be implemented as a greeting/weather
 phrase rule, route shortcut, or second semantic authority.
 
-One validated UMI result starts Goal Association, SC and one Fast Work transaction.
-SC may acknowledge understanding using its captured facts; Work remains independently
-owned. GA alone commits canonical Goal identity. All branches retain the immutable
-admitted user turn. The Host rejects stale SC results and cancels pending delivery
-when a replacement interaction supersedes them.
+The **choice of which cognition to start is itself cognitive**, not a semantic decision
+owned by Runtime. A complete UMI result may propose a bounded set of next cognitive
+authorities from its accepted understanding. Later GA, Planner, SC, Evidence-driven or
+Situation-driven cognition may propose another bounded re-entry when new state makes more
+thought useful. These proposals are not route labels and do not let one role author another
+role's result. Trusted Runtime validates the allowed authority edge and schedules the
+requested work; it does not infer that Planner, GA, SC, Deep cognition, clarification, or
+replanning is required from field values or task classes.
+
+For a sufficiently understood task, UMI may therefore fan out immediately:
 
 ```text
 validated UMI result
-  -> GA -> canonical Goal continuity
-  -> SC -> complete communicate / silence decision -> qualified delivery
-  -> Fast Work -> complete validated result -> canonical Goal binding
-  -> immutable Plan + required Needs -> SC join when needed
-  -> Runtime authorization, ordered delivery and Work dispatch
+  |-> SC   -> communicate / silence decision -> qualified delivery
+  |-> GA   -> canonical Goal continuity
+  `-> Fast -> provisional Work decision
+                  |
+             effect boundary
+             |          |
+       safe read      effectful
+       may dispatch   prepare only
+             \          /
+              GA / new Evidence / Situation
+                         |
+                  Planner reconciliation
+                         |
+          retain / reuse / add / wait /
+          cancel / replace / no change
+                         |
+                  canonical validation
+                         |
+                       Runtime
 ```
+
+Not every turn requests all three branches. The model may decide that one branch lacks
+enough meaning to begin while another is already useful. Waiting is scoped to the true
+dependency: unresolved Goal motive does not block an otherwise grounded lookup; unresolved
+execution input does not block an independent social response; optional speech does not
+block Work. Conversely, side-effectful Work cannot cross its execution boundary merely
+because Fast reasoning finished early.
+
+GA does not produce a new interpretation of WHAT. It establishes canonical identity and
+continuity. If that result changes the scope or ownership relevant to provisional or
+retained Work, Planner reasons again from the **actual current Work state**, including
+queued, running, completed, cancelled, and provisional Activities and current Evidence.
+The Planner decides semantic compatibility and the remaining delta. Runtime may
+mechanically bind a conserving identity-only result, but cannot infer Work compatibility,
+cancel/reuse semantics, or a replanning need from Goal IDs or argument equality.
 
 No partial Work result is dispatchable. Optional communication cannot hold Work;
 required confirmation and exact before/after communication preserve causal ordering.
