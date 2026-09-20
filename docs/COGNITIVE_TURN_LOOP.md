@@ -369,6 +369,17 @@ bounded continuation reasons forward from authoritative source state rather than
 or qualifying prior model text. Later speech, if any, is a new Activity that reconciles
 with immutable delivered history.
 
+### 3.0.1 Internal state-transition activation
+
+A trusted internal transition is not itself a semantic instruction to Planner or SC. Execution
+Evidence, provider state, due-time state, restored provider truth, cancellation, and Situation
+first form a bounded `CognitiveActivationContext` with exact provenance and the authorities
+structurally legal for that ingress. One narrow model decision may request an existing owner or
+no cognition. Runtime cannot replace that decision with `if event -> Planner/SC`. Goal-bound
+activation starts Fast Planner; only Fast may escalate to Deep. Goal-free Situation activation
+starts primary SC; only SC may request its deeper pass. Invalid or unavailable Activation fails
+closed and never fabricates progress.
+
 ### 3.1 Continuous progress and the critical path
 
 The state machine above records authoritative semantic, authorization, and

@@ -11,6 +11,8 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from tests.cognitive_activation_support import allow_activation
+
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.planner_reentry import incremental_execution_outcome_truth
 from shared.chromie_contracts.core_interpretation import (
@@ -87,8 +89,11 @@ def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind
     })
     if failure_kind == "goal_scope":
         failure = semantic_escalation.model_copy(update={"goal_ids": ["foreign-goal"]})
-    client = SimpleNamespace(resolve_fast_plan=AsyncMock(return_value=semantic_escalation),
-                             resolve_deep_plan=AsyncMock(return_value=failure))
+    client = SimpleNamespace(
+        resolve_cognitive_activation=AsyncMock(side_effect=allow_activation),
+        resolve_fast_plan=AsyncMock(return_value=semantic_escalation),
+        resolve_deep_plan=AsyncMock(return_value=failure),
+    )
     selected = getattr(client, f"resolve_{tier}_plan")
     selected.return_value = failure
     if failure_kind == "raised":
@@ -287,6 +292,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         class Client:
+            async def resolve_cognitive_activation(self, session, *, request, timeout_ms):
+                return await allow_activation(session, request=request, timeout_ms=timeout_ms)
             async def resolve_social_cognition(self, session, *, request, **kwargs):
                 return await _social_result(request, replanned)
             request = None
@@ -371,7 +378,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                             "outcome": "Determine whether rain is expected this morning.",
                             "bindings": {},
                             "output_mode": "information",
-                            "relationship": "new",
                             "confidence": 1.0,
                         },
                         {
@@ -379,7 +385,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                             "outcome": "Blink twice.",
                             "bindings": {"count": 2},
                             "output_mode": "body_action",
-                            "relationship": "new",
                             "confidence": 1.0,
                         }
                     ]
@@ -522,6 +527,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         class Client:
+            async def resolve_cognitive_activation(self, session, *, request, timeout_ms):
+                return await allow_activation(session, request=request, timeout_ms=timeout_ms)
             async def resolve_social_cognition(self, session, *, request, **kwargs):
                 return await _social_result(request, replanned)
             request = None
@@ -569,7 +576,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             local_ref="resp-reminder",
             outcome="Remind the user at the requested time.",
             output_mode="stateful_effect",
-            relationship="new",
             confidence=1.0,
         )
 
@@ -637,6 +643,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         class Client:
+            async def resolve_cognitive_activation(self, session, *, request, timeout_ms):
+                return await allow_activation(session, request=request, timeout_ms=timeout_ms)
             async def resolve_social_cognition(self, session, *, request, **kwargs):
                 return await _social_result(request, replanned)
             fast_calls = 0
@@ -644,7 +652,16 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
 
             async def resolve_fast_plan(self, _session, *, request, timeout_ms):
                 self.fast_calls += 1
-                raise AssertionError("slow readiness must not spend a Fast Planner pass")
+                self.request = request
+                return CanonicalPlan(
+                    plan_id="activation-fast-escalation",
+                    planner_tier="fast",
+                    disposition="escalate",
+                    coverage="uncertain",
+                    confidence=0.8,
+                    goal_ids=[goal_id],
+                    escalation_reason="deeper HOW is required",
+                )
 
             async def resolve_deep_plan(self, _session, *, request, timeout_ms):
                 self.deep_calls += 1
@@ -690,7 +707,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             local_ref="resp-recover",
             outcome="Continue the responsibility safely after the blockage.",
             output_mode="stateful_effect",
-            relationship="new",
             confidence=1.0,
         )
 
@@ -716,7 +732,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         self.assertIsNotNone(response)
-        self.assertEqual(assistant.agent_client.fast_calls, 0)
+        self.assertEqual(assistant.agent_client.fast_calls, 1)
         self.assertEqual(assistant.agent_client.deep_calls, 1)
         self.assertEqual(
             assistant.agent_client.request.context["cognitive_opportunity"][
@@ -979,6 +995,8 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
 
         class Client:
+            async def resolve_cognitive_activation(self, session, *, request, timeout_ms):
+                return await allow_activation(session, request=request, timeout_ms=timeout_ms)
             async def resolve_social_cognition(self, session, *, request, **kwargs):
                 return await _social_result(request, replanned)
             called = False
@@ -1055,6 +1073,8 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                     confidence=1.0, goal_ids=[goal_id], response_text=wording,
                     goal_outcomes=[RespondGoalPlanOutcome(goal_id=goal_id, disposition="respond", coverage="complete", response_text=wording)])
                 class Client:
+                    async def resolve_cognitive_activation(self, session, *, request, timeout_ms):
+                        return await allow_activation(session, request=request, timeout_ms=timeout_ms)
                     async def resolve_social_cognition(self, session, *, request, **kwargs):
                         return await _social_result(request, replanned)
                     request = None
@@ -1083,7 +1103,7 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                 ledger.record_playback_event(delivered)
                 source = InteractionResponse(interaction_id="mixed", metadata={"turn_id": "turn",
                     "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r1", "outcome": "Blink twice.",
-                        "bindings": {"count": 2}, "output_mode": "body_action", "relationship": "new", "confidence": 1.0}]},
+                        "bindings": {"count": 2}, "output_mode": "body_action", "confidence": 1.0}]},
                     "goal_association": {"associations": [], "new_goals": [
                         {"goal_id": goal_id, "source_responsibility_refs": ["r1"], "metadata": {"output_mode": "body_action"}},
                         {"goal_id": "goal-chat", "source_responsibility_refs": ["r2"], "metadata": {"output_mode": "speech"}}]}})

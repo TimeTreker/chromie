@@ -393,7 +393,9 @@ async def test_only_unresolved_source_can_deepen_once_without_candidate_review()
     deep = Model(response())
     result = await SocialCognitionResolver(model, Catalog(), deep_model=deep).resolve(request())
     assert result.model_call_count == 2
-    assert model.calls[0][0] == deep.calls[0][0]
+    primary_source = model.calls[0][0].split("\nRequired output contract JSON:\n", 1)[0]
+    deep_source = deep.calls[0][0].split("\nRequired output contract JSON:\n", 1)[0]
+    assert primary_source == deep_source
     assert "Need deeper reasoning." not in deep.calls[0][0]
     assert deep.calls[0][1]["response_format"]["properties"]["disposition"]["enum"] == ["communicate", "silence"]
 

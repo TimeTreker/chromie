@@ -7,6 +7,10 @@ from urllib.parse import quote
 
 import aiohttp
 from pydantic import TypeAdapter
+from shared.chromie_contracts.cognitive_activation import (
+    CognitiveActivationContext,
+    CognitiveActivationDecision,
+)
 from shared.chromie_contracts.core_interpretation import (
     CognitiveWorkRequest,
     CoreInterpretationResult,
@@ -118,6 +122,28 @@ class AgentClient:
                     f"Cognitive Core returned HTTP {resp.status}: {body[:500]}"
                 )
             return CoreInterpretationResult.model_validate_json(body)
+
+
+    async def resolve_cognitive_activation(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        request: CognitiveActivationContext,
+        timeout_ms: int | None = None,
+    ) -> CognitiveActivationDecision:
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+        async with session.post(
+            f"{self.base_url}/cognitive-activation",
+            json=request.model_dump(mode="json"),
+            timeout=timeout,
+        ) as resp:
+            body = await resp.text()
+            if resp.status != 200:
+                raise RuntimeError(
+                    f"Cognitive Activation returned HTTP {resp.status}: {body[:500]}"
+                )
+            return CognitiveActivationDecision.model_validate_json(body)
 
     async def health(self, session: aiohttp.ClientSession) -> dict[str, Any]:
         timeout = aiohttp.ClientTimeout(total=self.timeout_ms / 1000.0)

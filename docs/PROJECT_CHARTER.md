@@ -651,6 +651,15 @@ Read the diagram with these boundaries:
   and effect prerequisites. It may delay, reject, cancel, coalesce, or pre-empt an already
   requested computation for those mechanical reasons, but must not infer from semantic
   labels that GA, Planner, SC, Deep cognition, clarification, or replanning is needed.
+- **Internal Cognitive Activation is a narrow wake decision, not another semantic brain.**
+  Trusted Evidence, provider/runtime state, due-time state, restart revalidation, or Situation
+  may create an exact provenance-bound activation context. A bounded Activation model may
+  request only the structurally legal existing authority (`planner` for Goal-bound Work
+  reconsideration, `social_cognition` for Goal-free Situation interaction) or request none.
+  It cannot reinterpret WHAT, create/change Goals, plan Work, choose Capabilities, author
+  words, authorize effects, or claim completion. Runtime validates exact scope and schedules
+  the selected authority; unavailable/invalid Activation fails closed rather than restoring
+  an event-type routing rule. Planner and SC own their own Fast→Deep depth decisions.
 - **Progressive cognitive commitment:** cognition that is already sufficiently grounded for
   its own next step should not wait for unrelated cognition merely because another branch is
   still running. UMI may therefore request GA, SC, and Planner concurrently when the model

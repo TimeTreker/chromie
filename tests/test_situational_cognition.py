@@ -5,6 +5,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from tests.cognitive_activation_support import allow_activation
+
 from agent.app.social_cognition import SocialCognitionResolver, social_cognition_response_schema
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution, SocialCommunicativeAct
 from orchestrator.orchestrator import VoiceAssistant
@@ -16,6 +18,7 @@ from orchestrator.runtime.situation import (
     derive_situation_revision_opportunity,
     resolve_goal_free_situation_response,
 )
+from shared.chromie_contracts.cognitive_activation import CognitiveActivationDecision
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
     InteractionSpeech,
@@ -27,6 +30,20 @@ from shared.chromie_contracts.situation import (
     SituationSourceRef,
 )
 
+
+
+def activation_for(request, authority: str) -> CognitiveActivationDecision:
+    return CognitiveActivationDecision(
+        cognitive_requests=[{
+            "authority": authority,
+            "goal_ids": list(request.goal_ids),
+            "responsibility_refs": list(request.responsibility_refs),
+            "source_refs": list(request.source_refs),
+            "reason_summary": "Fixture explicitly requests the cognitive owner.",
+        }],
+        confidence=1.0,
+        reason_summary="Fixture activation decision.",
+    ).validate_request(request)
 
 def goal_free_observation(
     *, revision: int = 1, audience_refs: list[str] | None = None
@@ -236,13 +253,17 @@ def test_situational_cognition_binds_model_wording_to_runtime_provenance() -> No
     assert observation.projection.digest in ollama.prompt
 
 
-def test_slow_goal_free_readiness_reports_unavailable_deep_without_fabricating_silence() -> None:
+def test_host_readiness_mode_does_not_select_social_cognition_depth() -> None:
     request = request_for(goal_free_observation())
     request.opportunity = request.opportunity.model_copy(update={"recommended_cognition": "slow"})
-    model = FakeOllama({})
-    with pytest.raises(ValueError, match="unavailable"):
-        asyncio.run(SocialCognitionResolver(model, EmptyCatalog()).resolve(request))
-    assert model.calls == 0
+    model = FakeOllama({
+        "disposition": "silence",
+        "activities": [],
+        "reason_summary": "No interaction is useful right now.",
+    })
+    result = asyncio.run(SocialCognitionResolver(model, EmptyCatalog()).resolve(request))
+    assert result.disposition == "silence"
+    assert model.calls == 1
 
 
 def test_voice_assistant_uses_social_cognition_without_goal_work_api() -> None:
@@ -253,6 +274,10 @@ def test_voice_assistant_uses_social_cognition_without_goal_work_api() -> None:
     class Agent:
         planner_calls = 0
         situation_calls = 0
+
+        async def resolve_cognitive_activation(self, _session, *, request, timeout_ms):
+            assert timeout_ms >= 10000
+            return activation_for(request, "social_cognition")
 
         async def resolve_social_cognition(self, _session, *, request, timeout_ms):
             self.situation_calls += 1
@@ -379,6 +404,10 @@ def test_routine_presence_still_uses_core_semantic_judgment_not_host_rules() -> 
     class Agent:
         situation_calls = 0
 
+        async def resolve_cognitive_activation(self, _session, *, request, timeout_ms):
+            assert timeout_ms >= 10000
+            return activation_for(request, "social_cognition")
+
         async def resolve_social_cognition(self, _session, *, request, timeout_ms):
             self.situation_calls += 1
             assert request.situation.interpretations[0].value == "present"
@@ -434,6 +463,10 @@ def test_trusted_audience_is_used_by_memory_privacy_gate() -> None:
     captured: dict[str, object] = {}
 
     class Agent:
+        async def resolve_cognitive_activation(self, _session, *, request, timeout_ms):
+            assert timeout_ms >= 10000
+            return activation_for(request, "social_cognition")
+
         async def resolve_social_cognition(self, _session, *, request, timeout_ms):
             return SocialCognitionResolution(
                 request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
@@ -511,6 +544,10 @@ def test_goal_free_apply_path_treats_silence_and_no_change_as_success() -> None:
     )
 
     class Agent:
+        async def resolve_cognitive_activation(self, _session, *, request, timeout_ms):
+            assert timeout_ms >= 10000
+            return activation_for(request, "social_cognition")
+
         async def resolve_social_cognition(self, _session, *, request, timeout_ms):
             return SocialCognitionResolution(
                 request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
@@ -650,12 +687,12 @@ async def test_completed_goal_free_decision_does_not_call_a_second_model(disposi
 async def test_direct_deep_goal_free_call_preserves_its_scope():
     request = request_for(goal_free_observation())
     request = request.model_copy(update={"opportunity": request.opportunity.model_copy(update={"recommended_cognition": "slow"})})
-    fast = FakeOllama({})
+    fast = FakeOllama({'disposition': 'deliberate', 'activities': [], 'reason_summary': 'Deeper social reasoning is useful.'})
     deep = FakeOllama({'disposition': 'communicate', 'activities': [{'activity_id': 'deep-act', 'text': 'Hello.', 'function': 'acknowledge', 'truth_stage': 'context_grounded'}], 'reason_summary': 'Controlled SC decision.'})
     result = await SocialCognitionResolver(fast, EmptyCatalog(), deep_model=deep).resolve(request)
     assert result.snapshot_digest == request.snapshot_digest()
     assert result.request_id == request.request_id
-    assert fast.calls == 0 and deep.calls == 1
+    assert fast.calls == 1 and deep.calls == 1
 
 
 @pytest.mark.asyncio
@@ -706,7 +743,7 @@ async def test_host_validates_complete_social_cognition_result_before_any_memory
     host = SimpleNamespace(build_context=lambda sid: {}, conversation_state=state,
         cognitive_runtime=SimpleNamespace(interaction_ledger=None), session_log=lambda *args: None,
         sessions=SimpleNamespace(current_sid=None), get_http_session=session,
-        agent_client=SimpleNamespace(resolve_social_cognition=resolve),
+        agent_client=SimpleNamespace(resolve_cognitive_activation=allow_activation, resolve_social_cognition=resolve),
         cognitive_runtime_policy=CognitiveRuntimePolicy(mode="apply", fast_planner_timeout_ms=3000))
     with pytest.raises(ValueError):
         await resolve_goal_free_situation_response(host, observation=observation, opportunity=opportunity,
@@ -738,7 +775,7 @@ async def test_newer_situation_supersedes_inflight_speech_and_memory():
     host = SimpleNamespace(
         build_context=lambda sid: {}, session_log=lambda *args: None,
         get_http_session=lambda: asyncio.sleep(0, result=object()),
-        agent_client=SimpleNamespace(resolve_social_cognition=resolve),
+        agent_client=SimpleNamespace(resolve_cognitive_activation=allow_activation, resolve_social_cognition=resolve),
         cognitive_runtime=SimpleNamespace(interaction_ledger=None),
         cognitive_runtime_policy=CognitiveRuntimePolicy(mode="apply"),
         sessions=SimpleNamespace(current_sid=None),
@@ -789,7 +826,7 @@ async def test_environment_nonverbal_sc_uses_existing_soridormi_expression_runti
     host = SimpleNamespace(
         build_context=lambda sid: {}, session_log=lambda *args: None,
         get_http_session=lambda: asyncio.sleep(0, result=object()),
-        agent_client=SimpleNamespace(resolve_social_cognition=resolve),
+        agent_client=SimpleNamespace(resolve_cognitive_activation=allow_activation, resolve_social_cognition=resolve),
         cognitive_runtime=SimpleNamespace(interaction_ledger=None, adapter=CanonicalPlanRuntimeAdapter(provider)),
         cognitive_runtime_policy=CognitiveRuntimePolicy(mode="apply"),
         sessions=SimpleNamespace(current_sid=None), _execute_cognitive_outcome_response=deliver,

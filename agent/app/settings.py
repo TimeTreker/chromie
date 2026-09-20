@@ -259,6 +259,38 @@ class Settings(BaseModel):
         ge=32,
         le=1024,
     )
+    cognitive_activation_enabled: bool = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_COGNITIVE_ACTIVATION_ENABLED", "1"
+        ).strip().lower() not in {"0", "false", "no", "off"}
+    )
+    cognitive_activation_model: str = Field(
+        default_factory=lambda: os.getenv(
+            "AGENT_COGNITIVE_ACTIVATION_MODEL",
+            os.getenv("AGENT_FAST_PLANNER_MODEL", "qwen3:4b"),
+        )
+    )
+    cognitive_activation_timeout_ms: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS", "10000")
+        ),
+        ge=100,
+        le=120000,
+    )
+    cognitive_activation_num_ctx: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_COGNITIVE_ACTIVATION_NUM_CTX", "8192")
+        ),
+        ge=2048,
+        le=131072,
+    )
+    cognitive_activation_num_predict: int = Field(
+        default_factory=lambda: int(
+            os.getenv("AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT", "384")
+        ),
+        ge=128,
+        le=4096,
+    )
     goal_association_enabled: bool = Field(
         default_factory=lambda: os.getenv("AGENT_GOAL_ASSOCIATION_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}

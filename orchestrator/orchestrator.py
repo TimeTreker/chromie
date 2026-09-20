@@ -78,6 +78,10 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveStageFailure,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.cognitive_activation import (
+    activation_requested,
+    resolve_cognitive_activation,
+)
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.cognitive_gateway import (
     CognitiveGateway,
@@ -5832,6 +5836,55 @@ class VoiceAssistant:
         )
         context["existing_work_activities"] = planning_runtime.planning_work_activities(planning_snapshot)
         request = request.model_copy(deep=True, update={"context": context})
+
+        activation_trigger = {
+            "capability_result_reentry": "execution_outcome",
+            "post_execution": "post_execution",
+            "goal_cancellation_reentry": "goal_cancellation",
+            "situation_revision_reentry": (
+                "provider_state"
+                if context_updates.get("trusted_provider_state_event") is not None
+                else "situation_revision"
+            ),
+            "time_condition_reentry": "time_condition",
+            "restored_provider_state_revalidation": "restored_provider_state",
+        }.get(phase)
+        if activation_trigger is None:
+            self.session_log(
+                session_id,
+                "planner_state_reentry_rejected: reason=unknown_activation_trigger phase=%s",
+                phase,
+            )
+            return None
+        activation_source_refs = list(normalized_evidence_refs)
+        if not activation_source_refs and opportunity is not None:
+            activation_source_refs = list(opportunity.source_refs)
+        activation = await resolve_cognitive_activation(
+            self,
+            trigger=activation_trigger,
+            allowed_authorities=["planner"],
+            goal_ids=normalized_goal_ids,
+            responsibilities=responsibilities,
+            source_refs=activation_source_refs,
+            session_id=session_id,
+            request_id=f"activation:{phase}:{reentry_ref}"[:200],
+            state={
+                "goal_association": context.get("goal_association_resolution"),
+                "canonical_plan": context.get("canonical_plan_resolution"),
+                "existing_work_activities": context.get("existing_work_activities", []),
+                "situation": context.get("situation"),
+                "trusted_state_change": dict(context_updates),
+            },
+        )
+        if not activation_requested(activation, "planner"):
+            self.session_log(
+                session_id,
+                "planner_state_reentry_not_requested: phase=%s ref=%s",
+                phase,
+                reentry_ref,
+            )
+            return None
+
         session = await self.get_http_session()
         workflow_input = {
             "source_goal_ids": normalized_goal_ids,
@@ -5839,20 +5892,6 @@ class VoiceAssistant:
             "evidence_refs": normalized_evidence_refs,
             "phase": phase,
         }
-        preferred_mode = (
-            opportunity.recommended_cognition
-            if opportunity is not None
-            else "fast"
-        )
-        if preferred_mode == "local":
-            self.session_log(
-                session_id,
-                "planner_state_reentry_local_only: phase=%s opportunity_id=%s",
-                phase,
-                opportunity_ref,
-            )
-            return None
-
         async def resolve_reentry_plan(tier, operation, workflow_stage, stage_metadata):
             started_ms = now_ms()
             result = None
@@ -5891,18 +5930,17 @@ class VoiceAssistant:
             )
             return result
 
-        replanned: CanonicalPlan | None = None
-        if preferred_mode != "slow":
-            replanned = await resolve_reentry_plan(
-                "fast", self.agent_client.resolve_fast_plan(
-                    session, request=request,
-                    timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
-                ), fast_workflow_stage, {"planner_pass": "fast"},
-            )
+        # Activation decides whether Planner should run; Fast Planner owns the first
+        # HOW pass and may itself request Deep. Runtime never selects reasoning depth
+        # from event type or a Host-authored readiness mode.
+        replanned: CanonicalPlan | None = await resolve_reentry_plan(
+            "fast", self.agent_client.resolve_fast_plan(
+                session, request=request,
+                timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+            ), fast_workflow_stage, {"planner_pass": "fast"},
+        )
 
-        if preferred_mode == "slow" or (
-            replanned is not None and replanned.disposition == "escalate"
-        ):
+        if replanned.disposition == "escalate":
             deep_call = getattr(self.agent_client, "resolve_deep_plan", None)
             if not callable(deep_call):
                 self.session_log(
@@ -5916,7 +5954,7 @@ class VoiceAssistant:
                     session, request=request,
                     timeout_ms=self.cognitive_runtime_policy.deep_planner_timeout_ms,
                 ), deep_workflow_stage,
-                {"planner_pass": "deep", "readiness_mode": preferred_mode},
+                {"planner_pass": "deep", "activation_owner": "planner"},
             )
         if replanned is None:
             return None

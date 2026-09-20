@@ -35,6 +35,7 @@ _COMPUTE_RANK: dict[CognitionComputeClass, int] = {
 
 _PURPOSE_COMPUTE_CLASS: dict[str, CognitionComputeClass] = {
     "cognitive_gateway_attention_review": CognitionComputeClass.REALTIME,
+    "cognitive_activation": CognitionComputeClass.INTERPRETATION,
     "agent_default": CognitionComputeClass.INTERACTIVE,
     "agent_skill_selection": CognitionComputeClass.INTERACTIVE,
     "user_meaning_interpreter_fast": CognitionComputeClass.INTERPRETATION,

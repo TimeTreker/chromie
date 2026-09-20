@@ -736,8 +736,10 @@ class SocialCognitionResolver:
         entries = await self.catalog.prompt_entries(scope="all", refresh=False)
         candidates = auxiliary_social_capability_payloads(entries)
         prompt = social_cognition_prompt(request, candidates, num_ctx=self.num_ctx)
-        direct_deep = request.opportunity is not None and request.opportunity.recommended_cognition == "slow"
-        output = await self._generate(request, candidates, prompt, deep=direct_deep)
+        # Runtime/Opportunity never chooses Social Cognition depth. Start with the
+        # primary SC authority; that model may request its one deeper pass by returning
+        # disposition=deliberate.
+        output = await self._generate(request, candidates, prompt, deep=False)
         calls = 1
         if output.disposition == "deliberate":
             if self.deep_model is None:

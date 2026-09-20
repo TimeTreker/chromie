@@ -27,6 +27,7 @@ from .clients.ollama_client import OllamaGenerationError, llm_failure_metadata
 from .clients.weather_client import OpenMeteoWeatherClient
 from .local_tool_execution import LocalToolExecutor
 from .cognitive_gateway import AttentionReviewer
+from .cognitive_activation import CognitiveActivationResolver
 
 try:
     from chromie_contracts.agent_skill import (
@@ -40,6 +41,10 @@ try:
         CognitiveWorkRequest,
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
+    )
+    from chromie_contracts.cognitive_activation import (
+        CognitiveActivationContext,
+        CognitiveActivationDecision,
     )
     from chromie_contracts.tool_result import (
         ToolExecutionRequest,
@@ -62,6 +67,10 @@ except ImportError:  # pragma: no cover
         CognitiveWorkRequest,
         CoreInterpretationResult,
         CoreInterpretationUnavailable,
+    )
+    from shared.chromie_contracts.cognitive_activation import (
+        CognitiveActivationContext,
+        CognitiveActivationDecision,
     )
     from shared.chromie_contracts.tool_result import (
         ToolExecutionRequest,
@@ -287,6 +296,26 @@ logger.info(
     settings.agent_skill_projection_total_max_chars,
     settings.agent_skill_projection_count_limit,
 )
+cognitive_activation_client = (
+    build_model_client(
+        model=settings.cognitive_activation_model,
+        timeout_ms=settings.cognitive_activation_timeout_ms,
+        purpose="cognitive_activation",
+        service_settings=settings,
+    )
+    if settings.use_llm and settings.cognitive_activation_enabled
+    else None
+)
+cognitive_activation_resolver = (
+    CognitiveActivationResolver(
+        cognitive_activation_client,
+        num_ctx=settings.cognitive_activation_num_ctx,
+        num_predict=settings.cognitive_activation_num_predict,
+    )
+    if cognitive_activation_client is not None
+    else None
+)
+
 goal_association_client = (
     build_model_client(
         model=settings.goal_association_model,
@@ -491,6 +520,10 @@ async def health() -> HealthResponse:
         goal_association_model=(
             settings.goal_association_model if goal_association_resolver is not None else None
         ),
+        cognitive_activation_enabled=cognitive_activation_resolver is not None,
+        cognitive_activation_model=(
+            settings.cognitive_activation_model if cognitive_activation_resolver is not None else None
+        ),
         fast_planner_enabled=fast_planner_resolver is not None,
         fast_planner_model=(settings.fast_planner_model if fast_planner_resolver is not None else None),
         deep_planner_enabled=deep_planner_resolver is not None,
@@ -569,6 +602,23 @@ async def interpret_cognitive_turn(
         meaning_uncertainties=list(interpretation.meaning_uncertainties),
         cognitive_requests=list(interpretation.cognitive_requests),
     )
+
+@app.post(
+    "/cognitive-activation",
+    response_model=CognitiveActivationDecision,
+)
+async def resolve_cognitive_activation(
+    request: CognitiveActivationContext,
+) -> CognitiveActivationDecision:
+    if cognitive_activation_resolver is None:
+        raise HTTPException(status_code=503, detail="Cognitive Activation is unavailable")
+    try:
+        return await cognitive_activation_resolver.resolve(request)
+    except OllamaGenerationError as exc:
+        raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
 
 @app.post("/fast-advance")
 async def resolve_fast_advance(request: CognitiveWorkRequest):

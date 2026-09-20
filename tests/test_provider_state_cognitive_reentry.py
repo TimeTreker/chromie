@@ -141,8 +141,6 @@ class _RestoredState:
                         "outcome": "Walk forward and blink.",
                         "bindings": {},
                         "output_mode": "stateful_effect",
-                        "relationship": "new",
-                        "target_goal_ids": [],
                         "confidence": 1.0,
                     }
                 ],

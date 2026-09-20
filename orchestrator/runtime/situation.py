@@ -9,6 +9,10 @@ import time
 from typing import Any, Iterable
 
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
+from orchestrator.runtime.cognitive_activation import (
+    activation_requested,
+    resolve_cognitive_activation,
+)
 from orchestrator.runtime.response_plan import build_social_interaction_response
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
@@ -618,15 +622,6 @@ async def apply_goal_free_situation_opportunity(
         return "no_change"
     if opportunity.goal_ids:
         raise ValueError("goal-free Situation opportunity unexpectedly carries Goals")
-    if opportunity.recommended_cognition == "local":
-        if hasattr(host, "session_log"):
-            host.session_log(
-                session_id,
-                "goal_free_situation_cognition_local: opportunity_id=%s",
-                opportunity.opportunity_id,
-            )
-        return "local_only"
-
     response = await resolve_goal_free_situation_response(
         host,
         observation=observation,
@@ -752,10 +747,36 @@ async def resolve_goal_free_situation_response(
             turn_id=observation.observation_id,
         ).model_dump(mode="json")
 
-    # Semantic relevance, non-interruption, relationship meaning, and whether any
-    # outward response is worthwhile are model-owned cognition.  Runtime supplies the
-    # trusted Situation, disclosure-safe Memory, and actual Interaction context without
-    # reducing them to social keyword/priority rules.
+    # Whether this trusted Goal-free state change deserves a social cognition pass is
+    # itself model-owned. Runtime supplies only the structurally legal authority plus
+    # trusted Situation/Memory/Interaction provenance; silence at this boundary means SC
+    # is never invoked for this opportunity.
+    activation = await resolve_cognitive_activation(
+        host,
+        trigger="situation_revision",
+        allowed_authorities=["social_cognition"],
+        goal_ids=[],
+        responsibilities=[],
+        source_refs=list(observation.source_refs),
+        session_id=session_id,
+        request_id=f"activation:{observation.observation_id}"[:200],
+        state={
+            "situation": observation.projection.prompt_projection(),
+            "memory_summary": relational_memory["summary"],
+            "relational_memory_selection": relational_memory["selection"],
+            "interaction_context": context.get("interaction_context", {}),
+        },
+    )
+    if not activation_requested(activation, "social_cognition"):
+        host.session_log(
+            session_id,
+            "situational_cognition_not_requested: opportunity_id=%s",
+            opportunity.opportunity_id,
+        )
+        return None
+
+    # Semantic relevance, non-interruption, relationship meaning, and exact outward
+    # response remain Social Cognition authority after activation.
     request = SocialCognitionRequest(
         request_id=observation.observation_id, trigger="situation",
         source_refs=list(observation.source_refs), opportunity=opportunity,

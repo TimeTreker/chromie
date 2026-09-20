@@ -38,6 +38,11 @@ from .semantic_artifact import (
     merge_semantic_artifact_lineage,
     semantic_artifact_payload_sha256,
 )
+from .cognitive_activation import (
+    CognitiveActivationContext,
+    CognitiveActivationDecision,
+    CognitiveActivationSelection,
+)
 from .core_interpretation import (
     CognitiveActivationRequest,
     CognitiveResponsibilityProposal,

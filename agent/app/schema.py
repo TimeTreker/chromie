@@ -37,6 +37,8 @@ class HealthResponse(BaseModel):
     capability_catalog_version: int = 0
     goal_association_enabled: bool = False
     goal_association_model: str | None = None
+    cognitive_activation_enabled: bool = False
+    cognitive_activation_model: str | None = None
     fast_planner_enabled: bool = False
     fast_planner_model: str | None = None
     deep_planner_enabled: bool = False

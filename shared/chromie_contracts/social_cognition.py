@@ -85,8 +85,6 @@ class SocialCognitionRequest(BaseModel):
                     raise ValueError("Social Cognition opportunity changed Situation signature")
                 if not set(opportunity.subject_refs).issubset(item.subject_ref for item in self.situation.interpretations):
                     raise ValueError("Social Cognition opportunity widens Situation subjects")
-            if opportunity.recommended_cognition == "local":
-                raise ValueError("local mechanical readiness must not invoke Social Cognition")
         if self.trigger == "interpretation" and not self.source_turn:
             raise ValueError("interpretation-triggered communication requires source provenance")
         refs = {item.local_ref for item in self.responsibilities}

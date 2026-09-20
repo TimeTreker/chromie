@@ -141,6 +141,7 @@ running.
 | `POST` | `/capabilities/search` | Return a bounded model-neutral catalog view for inspection; it never scores language, suggests an ordinary route, or selects agents. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog LLM context; `text` is accepted at the interface but does not filter capabilities. |
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
+| `POST` | `/cognitive-activation` | Decide whether a trusted internal state transition should wake one of the exact existing authorities allowed by the Host scope. It cannot author Goal meaning, Work, wording, Capability selection, execution, or completion truth. |
 | `POST` | `/fast-plan` | Produce a complete `CanonicalPlan`, with one optional indexed capability-detail read before planning, or terminal Deep escalation. |
 | `POST` | `/deep-plan` | Produce a terminal full-catalog `CanonicalPlan`; only one mechanical DTO regeneration is permitted. |
 | `POST` | `/social-cognition` | One interaction-planning transaction for trusted UMI, Goal, Work, Evidence and Situation snapshots. Preserves pending communication obligations, exact acts and optional eligible expression; no task Work or Goal mutation. |

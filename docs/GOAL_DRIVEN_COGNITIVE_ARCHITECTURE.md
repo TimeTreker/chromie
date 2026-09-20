@@ -48,10 +48,12 @@ outputs are word-free Work decisions. The [status record](STATUS.md#social-cogni
 owns validation and deployment claims; source integration alone does not prove
 native-model reliability, latency or physical behavior.
 
-The model-driven orchestration amendment above is an **approved target**, not a claim that
-the current Runtime has already removed all deterministic cognitive-readiness rules. Until
-that migration is implemented and qualified, Status must distinguish current behavior from
-this target contract.
+The model-driven orchestration amendment is implemented across initial UMI fan-out, post-GA
+activation, and trusted internal state-transition re-entry. UMI and GA author their bounded
+next-cognition requests directly; internal Evidence/provider/time/restart/Situation transitions
+use the narrow Cognitive Activation role. Runtime still owns mechanical admission/scheduling
+and effect boundaries. Native model quality, latency, and physical behavior remain qualification
+questions rather than source-architecture claims.
 
 ## Provider-neutral resource acquisition and delivery
 

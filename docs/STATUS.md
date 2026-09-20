@@ -632,11 +632,16 @@ Planner-scope differences; it validates and schedules only the GA-authored Plann
 Focused GA/Runtime tests cover retained continuity, new Goal ownership, no-op activation,
 and exact Responsibility conservation.
 
-**Still open — Slice 3:** trusted internal state transitions (Execution Evidence, provider
-state, time conditions, restart revalidation, and Goal-free Situation) still enter Planner
-or SC through Host-selected wake paths. These must converge on one bounded model-authored
-activation decision without transferring Goal/Plan/wording authority into that model. Native
-model qualification remains required.
+**Implementation status — Slice 3 implemented in source.** Trusted internal state transitions
+now enter one narrow `CognitiveActivationDecision` before Goal-bound Planner or Goal-free SC
+re-entry. Host supplies only trusted trigger/provenance, exact legal authority set, current
+Goal/Responsibility scope, Situation and Work/Evidence snapshot; the Activation model may
+request an existing authority or request nothing, but cannot author Goals, Work, wording,
+Capabilities, execution or completion truth. Goal-bound re-entry begins with Fast Planner and
+lets Planner itself escalate to Deep; Goal-free Situation begins with primary SC and lets SC
+request its own deeper pass. `CognitiveOpportunity.recommended_cognition` is no longer used
+to select Planner/SC depth. This closes the planned orchestration migration; no Slice 4 is
+required. Native model/provider/latency qualification remains open.
 
 ## Current architecture
 
