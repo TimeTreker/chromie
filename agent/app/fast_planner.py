@@ -66,6 +66,7 @@ from .planner_fast_validation import (
     qualify_fast_canonical_plan,
     canonicalize_fast_argument_source_spans,
     collapse_redundant_idempotent_read_activities,
+    normalize_fast_capability_activity_purpose,
     validate_fast_advance_output,
     validate_work_reuse_selection,
 )
@@ -222,6 +223,9 @@ class FastPlannerResolver:
                     continue
                 Draft202012Validator(schema).validate(raw)
                 output = FastPlannerAdvanceModelOutput.model_validate(raw)
+                output = normalize_fast_capability_activity_purpose(
+                    output, capabilities=capabilities
+                )
                 # Validate/ground every authored Activity before any representation
                 # deduplication. Validation also removes exact optional schema defaults
                 # that have no semantic owner. Two side-effect-free idempotent reads

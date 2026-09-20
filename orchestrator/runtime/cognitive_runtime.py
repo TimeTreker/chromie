@@ -3398,6 +3398,8 @@ class GoalDrivenRuntimeCoordinator:
                         capability_id=activity.capability_id,
                         args=dict(activity.args),
                         timing=activity.timing,
+                        step_purpose=activity.step_purpose,
+                        expected_outcome=activity.expected_outcome,
                         source_goal_ids=activity_goal_ids,
                         reason_summary=activity.reason_summary,
                         metadata={
@@ -3467,12 +3469,33 @@ class GoalDrivenRuntimeCoordinator:
                 if activity.role == "complete_response"
             ]
             if goal_steps:
-                satisfaction = GoalSatisfactionAssessment(
-                    score=max(0.95, advance.confidence),
-                    status="exact",
-                    satisfied_goal_ids=[goal_id],
-                    rationale="Fast Planner supplied executable Activities for this Goal.",
-                )
+                acquisition_steps = [
+                    step.step_id for step in steps
+                    if goal_id in step.source_goal_ids
+                    and step.step_purpose == "acquire_information"
+                ]
+                if acquisition_steps:
+                    satisfaction = GoalSatisfactionAssessment(
+                        score=min(0.5, advance.confidence),
+                        status="partial",
+                        satisfied_goal_ids=[],
+                        unmet_goal_ids=[goal_id],
+                        unmet_requirements=[
+                            "Interpret the acquired Evidence and complete the remaining "
+                            "user-facing information obligation."
+                        ],
+                        rationale=(
+                            "Fast Planner supplied information-acquisition Work; acquisition "
+                            "alone is not terminal Responsibility fulfillment."
+                        ),
+                    )
+                else:
+                    satisfaction = GoalSatisfactionAssessment(
+                        score=max(0.95, advance.confidence),
+                        status="exact",
+                        satisfied_goal_ids=[goal_id],
+                        rationale="Fast Planner supplied executable Activities for this Goal.",
+                    )
                 outcomes.append(
                     ExecuteGoalPlanOutcome(
                         goal_id=goal_id,
@@ -3480,7 +3503,11 @@ class GoalDrivenRuntimeCoordinator:
                         coverage="complete",
                         step_ids=goal_steps,
                         satisfaction=satisfaction,
-                        rationale="Runtime execution and Evidence remain required.",
+                        rationale=(
+                            "Runtime acquisition Evidence and subsequent cognition remain required."
+                            if acquisition_steps
+                            else "Runtime execution and Evidence remain required."
+                        ),
                     )
                 )
             elif clarifications:
@@ -3570,12 +3597,39 @@ class GoalDrivenRuntimeCoordinator:
         )
         global_satisfaction = None
         if dispositions.issubset({"execute", "respond"}):
-            global_satisfaction = GoalSatisfactionAssessment(
-                score=max(0.95, advance.confidence),
-                status="exact",
-                satisfied_goal_ids=goal_ids,
-                rationale="Every canonical Goal has a complete Fast Planner outcome.",
-            )
+            acquisition_goal_ids = {
+                goal_id
+                for step in steps if step.step_purpose == "acquire_information"
+                for goal_id in step.source_goal_ids
+            }
+            if acquisition_goal_ids:
+                global_satisfaction = GoalSatisfactionAssessment(
+                    score=min(0.5, advance.confidence),
+                    status="partial",
+                    satisfied_goal_ids=[
+                        goal_id for goal_id in goal_ids
+                        if goal_id not in acquisition_goal_ids
+                    ],
+                    unmet_goal_ids=[
+                        goal_id for goal_id in goal_ids
+                        if goal_id in acquisition_goal_ids
+                    ],
+                    unmet_requirements=[
+                        "Information-acquisition Work must re-enter Planner with trusted "
+                        "Evidence before the information Responsibility can be completed."
+                    ],
+                    rationale=(
+                        "The current Plan completes acquisition Work but retains the "
+                        "remaining information-delivery obligation."
+                    ),
+                )
+            else:
+                global_satisfaction = GoalSatisfactionAssessment(
+                    score=max(0.95, advance.confidence),
+                    status="exact",
+                    satisfied_goal_ids=goal_ids,
+                    rationale="Every canonical Goal has a complete Fast Planner outcome.",
+                )
         return CanonicalPlan(
             plan_id=plan_id,
             planner_tier="fast",

@@ -4770,6 +4770,7 @@ class ConversationStateManager:
                     and qualification["required"]
                     and not qualification["established"]
                 )
+                execution_task_status = status_projection[outcome.status]
                 lifecycle_status = (
                     "recoverable"
                     if completion_unqualified
@@ -4778,7 +4779,10 @@ class ConversationStateManager:
                         and outcome.status
                         in {"failed", "timed_out", "cancelled", "not_run"}
                     )
-                    else status_projection[outcome.status]
+                    else "planning"
+                    if outcome.status == "completed"
+                    and outcome.requires_planner_continuation
+                    else execution_task_status
                 )
                 evidence_summary = context.get("evidence_summary")
                 if not isinstance(evidence_summary, dict):
@@ -4837,7 +4841,9 @@ class ConversationStateManager:
                         raise RuntimeError(
                             "pending task metadata must be an object during outcome reconciliation"
                         )
-                    task["status"] = lifecycle_status
+                    # The exact execution task is terminal even when the broader Goal
+                    # remains open for post-acquisition cognition/delivery.
+                    task["status"] = execution_task_status
                     task["updated_ms"] = timestamp_ms
                     task["metadata"] = {
                         **task_metadata,

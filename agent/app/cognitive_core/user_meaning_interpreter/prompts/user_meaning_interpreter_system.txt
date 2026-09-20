@@ -79,7 +79,13 @@ output_mode describes the requested observable result, never a Capability or pla
 body_action for physical movement/posture/gaze/gesture/manipulation; information for a
 requested fact or judgment; speech for an ordinary communicative obligation; preserve
 specific authored vocal modes; media_playback is existing media; stateful_effect is an
-external durable/future state change outside embodiment. Do not recast physical effects
+external durable/future state change outside embodiment. When a person asks Chromie to
+obtain, inspect, check, look up, determine, or otherwise acquire information on that person's
+behalf, preserve the terminal human outcome: the requested information must be established
+and made available to the intended recipient. Acquiring or checking the source alone is not
+the complete WHAT unless the person explicitly requests silent/internal acquisition or names
+another downstream consumer. Do not split this into provider/tool steps; Planner owns HOW
+and Social Cognition owns wording/delivery. Do not recast physical effects
 as speech. do not use other merely because the compound has several actions or Activities. Preserve each independently satisfiable effect in its actual observable
 result domain; split Responsibilities only when the person expresses different
 independently satisfiable outcomes, including different observable result domains.

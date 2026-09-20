@@ -88,6 +88,80 @@ class FastAdvanceMechanicalSchedulingError(PlannerDTOContractError):
     """A timing label is mechanically unusable without changing its meaning."""
 
 
+def normalize_fast_capability_activity_purpose(
+    output: FastPlannerAdvanceModelOutput,
+    *,
+    capabilities: list[dict[str, Any]],
+) -> FastPlannerAdvanceModelOutput:
+    """Materialize provider-declared acquisition purpose without interpreting WHAT.
+
+    Capability resource contracts already declare whether a selected provider only
+    acquires information and leaves final delivery to later cognition.  Preserve an
+    explicit compatible model value, reject an explicit contradiction, and fill an
+    omitted value mechanically from that provider-owned contract.  Ordinary effect
+    capabilities retain the model/default ``achieve_effect`` purpose.
+    """
+
+    by_id = {
+        str(item.get("capability_id") or "").strip(): item
+        for item in capabilities
+        if isinstance(item, dict) and str(item.get("capability_id") or "").strip()
+    }
+    changed = False
+    activities = []
+    for activity in output.activities:
+        if getattr(activity, "role", "") != "capability":
+            activities.append(activity)
+            continue
+        definition = by_id.get(activity.capability_id) or {}
+        hints = definition.get("hints") if isinstance(definition, dict) else {}
+        metadata = definition.get("metadata") if isinstance(definition, dict) else {}
+        hints = hints if isinstance(hints, dict) else {}
+        metadata = metadata if isinstance(metadata, dict) else {}
+        resource_contract = hints.get("resource_contract")
+        if not isinstance(resource_contract, dict) or not resource_contract:
+            resource_contract = metadata.get("resource_contract")
+        resource_contract = resource_contract if isinstance(resource_contract, dict) else {}
+        provider_role = " ".join(str(resource_contract.get("provider_role") or "").strip().split())
+        final_owner = " ".join(str(resource_contract.get("final_delivery_owner") or "").strip().split())
+        plan_provides = {
+            " ".join(str(value or "").strip().split())
+            for value in resource_contract.get("plan_provides") or []
+            if " ".join(str(value or "").strip().split())
+        }
+        declared_acquisition = (
+            provider_role == "acquire_information"
+            or ("resource_acquired" in plan_provides and final_owner == "planner_communicative_activity")
+        )
+        explicitly_authored = "step_purpose" in activity.model_fields_set
+        if declared_acquisition:
+            if explicitly_authored and activity.step_purpose != "acquire_information":
+                raise PlannerDTOContractError(
+                    "Fast Planner step_purpose contradicts Capability resource contract: "
+                    + activity.capability_id
+                )
+            description = " ".join(str(definition.get("description") or "").strip().split())
+            expected = activity.expected_outcome or (
+                f"Trusted result Evidence from {activity.capability_id} is available for Planner re-entry."
+                if not description
+                else f"Trusted result Evidence is available after: {description}"
+            )
+            activity = activity.model_copy(
+                update={
+                    "step_purpose": "acquire_information",
+                    "expected_outcome": expected[:500],
+                }
+            )
+            changed = True
+        elif explicitly_authored and activity.step_purpose == "acquire_information":
+            raise PlannerDTOContractError(
+                "Fast Planner marked a Capability as information acquisition without "
+                "a provider-declared acquisition contract: " + activity.capability_id
+            )
+        activities.append(activity)
+    return output.model_copy(update={"activities": activities}) if changed else output
+
+
 def _contains_exact_material_value(container: Any, expected: Any) -> bool:
     """Return whether a declared structured realization conserves one UMI value.
 

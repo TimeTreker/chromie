@@ -353,10 +353,12 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
         ),
     )
     timing: PlanTiming = "sequential"
+    step_purpose: PlanStepPurpose = "achieve_effect"
+    expected_outcome: str = Field(default="", max_length=500)
     source_responsibility_refs: list[str] = Field(min_length=1)
     reason_summary: str = ""
 
-    @field_validator("activity_id", "reason_summary", mode="before")
+    @field_validator("activity_id", "reason_summary", "expected_outcome", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
@@ -370,6 +372,7 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     @classmethod
     def reject_low_level_args(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
+
 
 
 class AuxiliaryActivityTarget(BaseModel):

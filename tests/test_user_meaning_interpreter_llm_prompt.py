@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+from pathlib import Path
 import unittest
 from unittest import mock
 
@@ -203,6 +204,17 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
     def test_extract_json_object_accepts_fenced_json(self) -> None:
         self.assertEqual(_extract_json_object("```json\n{\"confidence\":1}\n```"), {"confidence": 1})
 
+
+
+
+def test_umi_system_prompt_preserves_information_delivery_as_terminal_what() -> None:
+    prompt = (
+        Path(__file__).parents[1]
+        / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
+    ).read_text(encoding="utf-8")
+    assert "made available to the intended recipient" in prompt
+    assert "Acquiring or checking the source alone is not" in prompt
+    assert "the complete WHAT" in prompt
 
 class UserMeaningInterpreterPromptTests(unittest.TestCase):
     def _interpreter(self) -> OllamaUserMeaningInterpreter:

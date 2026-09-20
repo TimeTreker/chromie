@@ -5083,6 +5083,69 @@ if __name__ == "__main__":
     unittest.main()
 
 
+
+
+class FastInformationAcquisitionLifecycleTests(unittest.TestCase):
+    def test_fast_acquisition_activity_keeps_goal_partial_until_evidence_reentry(self):
+        association = GoalAssociationResolution(
+            resolution_status="resolved",
+            turn_id="turn-weather-acquisition",
+            new_goals=[
+                SemanticGoal(
+                    goal_id="goal-weather-acquisition",
+                    source_responsibility_refs=["weather"],
+                    description="Provide today's weather for Chongqing.",
+                    source_text="Please help me check the weather in Chongqing today.",
+                    metadata={"output_mode": "information"},
+                )
+            ],
+            confidence=1.0,
+            reason_summary="New information responsibility.",
+        )
+        advance = FastPlannerAdvance(
+            turn_id="turn-weather-acquisition",
+            disposition="execute",
+            coverage="complete",
+            covered_responsibility_refs=["weather"],
+            activities=[
+                FastPlannerCapabilityActivity(
+                    activity_id="lookup-weather",
+                    role="capability",
+                    capability_id="chromie.weather.lookup",
+                    args={"location": "Chongqing", "date": "today"},
+                    timing="sequential",
+                    step_purpose="acquire_information",
+                    expected_outcome=(
+                        "Fresh weather Evidence for Chongqing today is available for the answer."
+                    ),
+                    source_responsibility_refs=["weather"],
+                    reason_summary="Acquire fresh weather Evidence before answering.",
+                )
+            ],
+            continuations=[],
+            confidence=1.0,
+            unresolved=[],
+            reason_summary="Acquire the requested information first.",
+        )
+
+        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+            advance=advance,
+            association=association,
+            user_text="Please help me check the weather in Chongqing today.",
+        )
+
+        self.assertEqual(plan.steps[0].step_purpose, "acquire_information")
+        self.assertEqual(plan.goal_outcomes[0].satisfaction.status, "partial")
+        self.assertEqual(
+            plan.goal_outcomes[0].satisfaction.unmet_goal_ids,
+            ["goal-weather-acquisition"],
+        )
+        self.assertEqual(plan.goal_satisfaction.status, "partial")
+        self.assertEqual(
+            plan.goal_satisfaction.unmet_goal_ids,
+            ["goal-weather-acquisition"],
+        )
+
 class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
     async def test_goal_planner_finishes_while_umi_planner_is_still_waiting(self):
         umi_started = asyncio.Event()

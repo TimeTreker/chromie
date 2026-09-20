@@ -19,6 +19,10 @@
       "prompt_tier": "common",
       "reason": "Simple social expression commonly requested in conversation."
     },
+    "soridormi.wave_hand": {
+      "prompt_tier": "common",
+      "reason": "Simple hand-wave expression commonly requested in conversation."
+    },
     "soridormi.express_attention": {
       "prompt_tier": "common",
       "reason": "Simple attention expression commonly requested in conversation."

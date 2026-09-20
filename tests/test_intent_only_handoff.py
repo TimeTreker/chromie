@@ -226,6 +226,69 @@ async def test_compound_intent_becomes_three_grounded_activities_and_one_goal():
     assert all(item.source_goal_ids == [association.new_goals[0].goal_id] for item in plan.parameter_resolutions)
 
 
+
+
+@pytest.mark.asyncio
+async def test_provider_resource_contract_materializes_information_acquisition_purpose():
+    text = "Check the weather in Chongqing today."
+    result = intent_result(text, "information")
+    result["responsibilities"][0]["outcome"] = "Provide today's weather for Chongqing."
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+        UserMeaningInterpretationRequest(text=text), json.dumps(result),
+    )
+    request = CognitiveWorkRequest(
+        sid="weather-acquisition-purpose",
+        text=text,
+        responsibilities=decision.responsibilities,
+        interpretation_confidence=1.0,
+    )
+    weather = CatalogCapability(
+        capability_id="chromie.weather.lookup",
+        agent_id="chromie.weather",
+        description="Retrieve current weather or forecast data for a named place.",
+        input_schema={
+            "type": "object",
+            "properties": {"location": {"type": "string"}},
+            "required": ["location"],
+            "additionalProperties": False,
+        },
+        interaction_executable=True,
+        prompt_tier="common",
+        can_run_parallel=True,
+        side_effect_free=True,
+        effects=["read_only", "external_read", "weather_lookup"],
+        hints={
+            "semantic_scope": {
+                "responsibility_type": "acquire_and_deliver_resource",
+                "resource_kinds": ["information"],
+            },
+            "resource_contract": {
+                "provider_role": "acquire_information",
+                "plan_requires": [],
+                "plan_provides": ["resource_acquired"],
+                "final_delivery_owner": "planner_communicative_activity",
+            },
+        },
+        parallel_metadata_declared=True,
+    )
+    raw = work([{
+        "role": "capability",
+        "activity_id": "weather-read",
+        "capability_id": "chromie.weather.lookup",
+        "args": {"location": "Chongqing"},
+        "argument_sources": {},
+        "timing": "sequential",
+        "source_responsibility_refs": ["r1"],
+        "reason_summary": "Acquire fresh weather Evidence before answering.",
+    }])
+    frames = [
+        frame async for frame in FastPlannerResolver(Model([raw]), Catalog([weather])).stream_advance(request)
+    ]
+    assert isinstance(frames[0], FastPlannerStreamTerminal), frames[0]
+    activity = frames[0].advance.activities[0]
+    assert activity.step_purpose == "acquire_information"
+    assert activity.expected_outcome
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("fault", [None, "unknown_id", "second_lookup", "mixed_plan", "invented_quote"])
 async def test_indexed_capability_lookup_precedes_one_complete_plan(fault):
@@ -243,6 +306,8 @@ async def test_indexed_capability_lookup_precedes_one_complete_plan(fault):
         final["activities"][0]["argument_sources"]["rotation_degrees"] = {"source_start_token_ref": "t999", "source_end_token_ref": "t999"}
     model = Model([lookup, final])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
+    first_schema = model.packets[0][1]["response_format"]
+    assert first_schema["oneOf"][0]["required"] == ["requested_capability_ids"]
     assert "test.turn" in model.packets[0][0]
     assert "rotation_degrees" not in model.packets[0][0]
     if fault:

@@ -3230,14 +3230,23 @@ def capability_lookup_response_schema(schema: dict[str, Any], entries: list[Any]
         return schema
     definitions = schema.get("$defs", {})
     plan = {key: value for key, value in schema.items() if key != "$defs"}
-    return {"$defs": definitions, "oneOf": [plan, {
+    lookup = {
         "type": "object", "additionalProperties": False,
         "required": ["requested_capability_ids"],
         "properties": {"requested_capability_ids": {
             "type": "array", "items": {"type": "string", "enum": ids},
             "minItems": 1, "maxItems": 8, "uniqueItems": True,
+            "description": (
+                "Request full contracts for indexed abilities needed to realize accepted "
+                "Responsibilities. Use this branch instead of substituting an unrelated "
+                "already-loaded Capability."
+            ),
         }},
-    }]}
+    }
+    # Put lookup first. Native constrained decoders may commit to a oneOf branch from
+    # the first emitted member; plan-first ordering previously trapped semantically
+    # correct indexed-ability reasoning inside the loaded-capability enum.
+    return {"$defs": definitions, "oneOf": [lookup, plan]}
 
 
 
