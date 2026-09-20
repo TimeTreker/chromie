@@ -58,6 +58,10 @@ def test_ga_no_goal_is_available_only_for_relation_free_ordinary_speech() -> Non
         "reason_summary": "The current interaction is socially complete.",
     }
     validator = Draft202012Validator(schema)
+    # The deployed guided decoder must see the ownership collection on the
+    # top-level required surface. Cross-field allOf/oneOf validation alone is
+    # insufficient to make SGLang/XGrammar emit an otherwise optional field.
+    assert "non_goal_responsibility_refs" in schema["required"]
     validator.validate(valid)
 
     # The legacy discriminant is not semantic authority. The ownership
@@ -78,6 +82,7 @@ def test_ga_no_goal_is_available_only_for_relation_free_ordinary_speech() -> Non
         responsibility_output_modes={"move": "body_action", "say": "speech"},
         responsibility_bindings={"move": {}, "say": {"after": ["move"]}},
     )
+    assert "non_goal_responsibility_refs" not in related["required"]
     assert "say" not in (
         related["properties"].get("non_goal_responsibility_refs", {})
         .get("items", {})

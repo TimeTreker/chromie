@@ -866,6 +866,20 @@ def goal_association_response_schema(
             "confidence",
             "reason_summary",
         ]
+    if non_goal_eligible_refs:
+        # SGLang/XGrammar reliably preserves the top-level required object
+        # surface, but a field whose necessity exists only inside the
+        # conservation allOf/oneOf below is not guaranteed to be emitted. GA
+        # ownership must therefore be explicit on the decoder-visible object:
+        # when interaction-only ownership is a legal outcome, the model must
+        # always author this collection, using [] when it selects Goal
+        # ownership and exact Responsibility refs when it selects non_goal.
+        # DTO/Host conservation below remains the semantic authority over the
+        # collection contents.
+        ordered_required.insert(
+            ordered_required.index("new_goals") + 1,
+            "non_goal_responsibility_refs",
+        )
     if responsibility_refs:
         def source_ref_item(source_ref: str) -> dict[str, Any]:
             return {
