@@ -467,6 +467,51 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
 
+
+    def test_decoder_forbids_associate_and_supersede_same_retained_goal(self):
+        retained = active_goal("goal-weather", "Provide weather information to the user.")
+        schema = ga_schema.goal_association_response_schema(
+            GoalAssociationModelOutput, [retained], [],
+            responsibility_count=2,
+            responsibility_refs=["r1", "r2"],
+            responsibility_output_modes={"r1": "body_action", "r2": "body_action"},
+        )
+        validator = Draft202012Validator(schema)
+        illegal = {
+            "associations": [{
+                "relationship": "continue",
+                "source_responsibility_refs": ["r1"],
+                "target_goal_ids": ["goal-weather"],
+                "confidence": 1.0,
+            }],
+            "new_goals": [{
+                "source_responsibility_refs": ["r2"],
+                "related_goal_ids": [],
+                "supersedes_goal_ids": ["goal-weather"],
+            }],
+            "referent_updates": [],
+            "resolved_references": [],
+            "cognitive_requests": [],
+            "confidence": 1.0,
+            "reason_summary": "Contradictory continuity result.",
+        }
+        assert not validator.is_valid(illegal)
+        independent = copy.deepcopy(illegal)
+        independent["new_goals"][0]["supersedes_goal_ids"] = []
+        assert validator.is_valid(independent)
+
+    def test_ga_prompt_declares_responsibility_refs_turn_local(self):
+        req = request(
+            "Walk ahead and wave.",
+            language="en-US",
+            active_goals=[active_goal("goal-weather", "Provide weather information to the user.")],
+            responsibility_outcomes=["Walk ahead.", "Wave your hands."],
+        )
+        rendered = ga_prompt.system_prompt(GoalAssociationModelOutput)
+        assert "turn-local identifiers" in rendered
+        assert "same spelling" in rendered
+        assert "only open candidate" in rendered
+
     def test_decoder_array_alternative_preserves_item_shape_and_cardinality(self):
         schema = ga_schema.goal_association_response_schema(
             GoalSegmentationModelOutput, [], [],
@@ -1999,7 +2044,9 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             responsibility_refs=["r1", "r2"],
             responsibility_output_modes={"r1": "body_action", "r2": "speech"},
         )
-        self.assertEqual(len(schema["allOf"]), 2)
+        self.assertEqual(len(schema["allOf"]), 3)
+        # Two Responsibility-conservation constraints plus one retained-Goal
+        # continuity-fate exclusivity constraint.
         goal_schema = schema["$defs"]["GoalAssociationModelGoal"]
         # An ID still cannot be both retained and superseded.
         self.assertEqual(len(goal_schema["allOf"]), 1)

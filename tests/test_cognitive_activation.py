@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from agent.app.cognitive_activation import CognitiveActivationResolver
 from orchestrator.runtime.cognitive_activation import _compact_activation_state
@@ -64,7 +65,12 @@ def test_activation_model_can_request_exact_existing_authority() -> None:
     schema = model.kwargs["response_format"]
     selection = schema["$defs"]["CognitiveActivationSelection"]
     assert selection["properties"]["authority"]["enum"] == ["planner"]
-    assert selection["properties"]["goal_ids"]["items"]["enum"] == ["goal-weather"]
+    assert selection["required"] == [
+        "authority", "goal_ids", "responsibility_refs", "source_refs", "reason_summary",
+    ]
+    assert selection["properties"]["goal_ids"]["const"] == ["goal-weather"]
+    assert selection["properties"]["responsibility_refs"]["const"] == ["r1"]
+    assert selection["properties"]["source_refs"]["const"] == ["evidence-1"]
 
 
 def test_activation_model_can_choose_no_further_cognition() -> None:
@@ -179,3 +185,30 @@ def test_compact_activation_state_drops_large_owner_envelopes_but_retains_lifecy
     assert "provider_blob" not in encoded
     assert '"aggregate_status": "completed"' in encoded
     assert '"evidence_id": "evidence-1"' in encoded
+
+
+def test_activation_decoder_requires_exact_trusted_scope_fields() -> None:
+    request = planner_request()
+    schema = CognitiveActivationResolver.response_schema(request)
+    validator = Draft202012Validator(schema)
+    omitted_scope = {
+        "cognitive_requests": [{
+            "authority": "planner",
+            "reason_summary": "Fresh Evidence requires Planner continuation.",
+        }],
+        "confidence": 1.0,
+        "reason_summary": "Planner should reconsider the open information Goal.",
+    }
+    assert not validator.is_valid(omitted_scope)
+    exact = {
+        "cognitive_requests": [{
+            "authority": "planner",
+            "goal_ids": ["goal-weather"],
+            "responsibility_refs": ["r1"],
+            "source_refs": ["evidence-1"],
+            "reason_summary": "Fresh Evidence requires Planner continuation.",
+        }],
+        "confidence": 1.0,
+        "reason_summary": "Planner should reconsider the open information Goal.",
+    }
+    assert validator.is_valid(exact)

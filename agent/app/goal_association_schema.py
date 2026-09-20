@@ -1090,6 +1090,52 @@ def goal_association_response_schema(
             }, "required": ["related_goal_ids", "supersedes_goal_ids"]}}
             for goal_id in active_ids
         ]
+
+        # A retained Goal has one continuity fate in a single GA transaction.
+        # Host materialization already rejects a Goal that is both retained by an
+        # association and retired by a new Goal; expose the same invariant to the
+        # constrained decoder so the primary model cannot author that impossible
+        # state and then fail after generation.
+        for goal_id in active_ids:
+            associated = {
+                "properties": {
+                    "associations": {
+                        "contains": {
+                            "type": "object",
+                            "properties": {
+                                "target_goal_ids": {
+                                    "contains": {"const": goal_id},
+                                    "minContains": 1,
+                                }
+                            },
+                            "required": ["target_goal_ids"],
+                        },
+                        "minContains": 1,
+                    }
+                },
+                "required": ["associations"],
+            }
+            superseded = {
+                "properties": {
+                    "new_goals": {
+                        "contains": {
+                            "type": "object",
+                            "properties": {
+                                "supersedes_goal_ids": {
+                                    "contains": {"const": goal_id},
+                                    "minContains": 1,
+                                }
+                            },
+                            "required": ["supersedes_goal_ids"],
+                        },
+                        "minContains": 1,
+                    }
+                },
+                "required": ["new_goals"],
+            }
+            schema.setdefault("allOf", []).append(
+                {"not": {"allOf": [associated, superseded]}}
+            )
     _expose_intersection_shapes(schema)
     return _prune_unreferenced_definitions(schema)
 

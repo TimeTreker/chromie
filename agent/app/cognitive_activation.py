@@ -70,12 +70,19 @@ class CognitiveActivationResolver:
                 node = selection_props.get(field)
                 if not isinstance(node, dict):
                     continue
-                node["items"] = {"type": "string", "enum": list(values)}
-                node["maxItems"] = len(values)
-                node["uniqueItems"] = True
-                if values:
-                    node["minItems"] = len(values)
-                    node["maxItems"] = len(values)
+                # Activation may choose whether an existing authority runs, but it
+                # may not choose or abbreviate the trusted scope.  Make the exact
+                # Host-supplied arrays decoder-visible rather than relying on DTO
+                # defaults plus a later Host rejection.
+                node.clear()
+                node.update({"type": "array", "const": list(values)})
+            selection["required"] = [
+                "authority",
+                "goal_ids",
+                "responsibility_refs",
+                "source_refs",
+                "reason_summary",
+            ]
         schema["required"] = ["cognitive_requests", "confidence", "reason_summary"]
         return schema
 
