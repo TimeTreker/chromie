@@ -238,25 +238,52 @@ def test_umi_cognitive_requests_are_required_and_source_scoped() -> None:
     ]
 
 
-def test_core_rejects_planner_activation_without_ga() -> None:
-    with pytest.raises(ValueError, match="requires a Goal Association request"):
-        CoreInterpretationResult(
-            turn_id="turn-activation",
-            session_id="sid-activation",
+def test_core_accepts_planner_activation_without_redundant_ga_request() -> None:
+    result = CoreInterpretationResult(
+        turn_id="turn-activation",
+        session_id="sid-activation",
+        confidence=1.0,
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": "Check the weather.",
+            "output_mode": "information",
+            "continuity_scope": "goal",
+            "confidence": 1.0,
+        }],
+        cognitive_requests=[{
+            "authority": "planner",
+            "responsibility_refs": ["r1"],
+            "reason_summary": "Current meaning is ready for HOW.",
+        }],
+    )
+    assert [item.authority for item in result.cognitive_requests] == ["planner"]
+
+
+def test_runtime_closes_planner_goal_association_dependency_without_mutating_umi() -> None:
+    request = CognitiveWorkRequest(
+        sid="turn-activation",
+        text="Check the weather.",
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1",
+            outcome="Check the weather.",
+            output_mode="information",
+            continuity_scope="goal",
             confidence=1.0,
-            responsibilities=[{
-                "local_ref": "r1",
-                "outcome": "Check the weather.",
-                "output_mode": "information",
-                "continuity_scope": "goal",
-                "confidence": 1.0,
-            }],
-            cognitive_requests=[{
-                "authority": "planner",
-                "responsibility_refs": ["r1"],
-                "reason_summary": "Current meaning is ready for HOW.",
-            }],
-        )
+        )],
+        cognitive_requests=[{
+            "authority": "planner",
+            "responsibility_refs": ["r1"],
+            "reason_summary": "Current meaning is ready for HOW.",
+        }],
+    )
+
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
+        request, "planner"
+    ) == ["r1"]
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
+        request, "goal_association"
+    ) == ["r1"]
+    assert [item.authority for item in request.cognitive_requests] == ["planner"]
 
 
 @pytest.mark.asyncio

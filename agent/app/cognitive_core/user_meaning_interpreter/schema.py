@@ -134,11 +134,6 @@ class UserMeaningInterpretationDecision(BaseModel):
                     "cognitive activation references unknown Responsibilities: "
                     + ",".join(sorted(unknown))
                 )
-        if "planner" in authorities and "goal_association" not in authorities:
-            raise ValueError(
-                "initial Planner cognition requires Goal Association so Work can reach "
-                "canonical Goal binding"
-            )
         ga_request = next(
             (item for item in self.cognitive_requests if item.authority == "goal_association"),
             None,

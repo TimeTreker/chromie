@@ -3157,11 +3157,13 @@ class GoalDrivenRuntimeCoordinator:
     def _cognitive_request_responsibility_refs(
         request: CognitiveWorkRequest, authority: str,
     ) -> list[str]:
-        """Return exact UMI-authored activation scope for one cognitive owner.
+        """Return effective initial activation scope for one cognitive owner.
 
-        Runtime validates and schedules this already-authored request; it does not
-        recreate cognitive readiness from output_mode, continuity_scope, bindings,
-        keywords, or task classes.
+        UMI still authors semantic cognitive readiness. Runtime may close only hard
+        architectural prerequisites of an authority UMI explicitly requested. Initial
+        Planner therefore mechanically implies turn-wide Goal Association so later Work
+        can obtain canonical Goal binding. This never infers Planner, SC, or GA readiness
+        from output_mode, continuity_scope, bindings, keywords, or task classes.
         """
 
         known = [item.local_ref for item in request.responsibilities]
@@ -3171,6 +3173,10 @@ class GoalDrivenRuntimeCoordinator:
             None,
         )
         if activation is None:
+            if authority == "goal_association" and any(
+                item.authority == "planner" for item in request.cognitive_requests
+            ):
+                return known
             return []
         unknown = set(activation.responsibility_refs) - known_set
         if unknown:
@@ -4462,6 +4468,7 @@ class GoalDrivenRuntimeCoordinator:
         initial_meaning_uncertainty_count = len(work_request.meaning_uncertainties)
         post_ga_meaning_uncertainty_count = initial_meaning_uncertainty_count
         planner_waited_for_goal_continuity = False
+        goal_association_dependency_added = False
 
         def goal_planning_started() -> bool:
             return bool(association_task is not None and association_task.done()
@@ -4487,6 +4494,9 @@ class GoalDrivenRuntimeCoordinator:
                 "requested_cognitive_authorities": [
                     item.authority for item in work_request.cognitive_requests
                 ],
+                "goal_association_dependency_added": (
+                    goal_association_dependency_added
+                ),
                 "fast_planner_advance": (
                     fast_advance.model_dump(mode="json", exclude_none=True)
                     if fast_advance is not None
@@ -4642,9 +4652,14 @@ class GoalDrivenRuntimeCoordinator:
             social_refs = self._cognitive_request_responsibility_refs(
                 work_request, "social_cognition"
             )
+            explicit_ga_requested = any(
+                item.authority == "goal_association"
+                for item in work_request.cognitive_requests
+            )
             ga_refs = self._cognitive_request_responsibility_refs(
                 work_request, "goal_association"
             )
+            goal_association_dependency_added = bool(planner_refs and not explicit_ga_requested)
             speculative_ref_set = set(planner_refs)
             speculative_work_request = (
                 self._subset_work_request(work_request, speculative_ref_set)
@@ -4653,8 +4668,10 @@ class GoalDrivenRuntimeCoordinator:
             )
 
             # UMI authors which existing cognitive authorities are useful now.
-            # Runtime only validates their exact Responsibility scope and schedules
-            # the requested computations; it never reconstructs readiness from WHAT.
+            # Runtime validates their Responsibility scope and schedules those
+            # computations. It may close a hard dependency of an explicitly requested
+            # authority (Planner -> turn-wide GA), but never reconstructs semantic
+            # readiness from WHAT labels or fields.
             initial_social_task = (
                 self.start_state_interaction(
                     session,

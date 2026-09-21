@@ -345,8 +345,11 @@ class CognitiveActivationRequest(BaseModel):
     and which accepted Responsibilities motivate that cognition.  It grants none
     of that owner's semantic authority: GA still owns Goal continuity, Planner
     still owns HOW, and SC still owns interaction.  Runtime may validate and
-    schedule this request but must not infer an equivalent request from semantic
-    labels when it is absent.
+    schedule this request. Runtime may also close a hard architectural prerequisite
+    of an explicitly requested authority, such as turn-wide Goal Association for
+    an explicitly requested initial Planner. That is mechanical scheduling, not a
+    second semantic activation decision. Runtime must not infer cognitive readiness
+    from output_mode, continuity_scope, bindings, keywords, or task classes.
     """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
@@ -464,13 +467,6 @@ class CoreInterpretationResult(BaseModel):
                     "cognitive activation references unknown Responsibilities: "
                     + ",".join(sorted(unknown))
                 )
-        planner_requested = "planner" in authorities
-        ga_requested = "goal_association" in authorities
-        if planner_requested and not ga_requested:
-            raise ValueError(
-                "initial Planner cognition requires a Goal Association request so effectful "
-                "Work can reach canonical Goal binding"
-            )
         ga_request = next(
             (item for item in self.cognitive_requests if item.authority == "goal_association"),
             None,

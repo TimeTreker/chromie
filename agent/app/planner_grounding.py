@@ -21,8 +21,12 @@ def literal_intent_argument(value: Any, *, outcome: str, source_text: str) -> bo
     A non-numeric string may be copied from both the owning complete intent and
     the immutable source without a duplicate UMI classification. Measurements,
     conversions and inferred values still require their existing typed evidence.
-    Latin substrings inside another word are not independent source values;
-    unsegmented scripts retain exact contiguous surface matching.
+    ASCII letter case is representation-only only when the Planner copied the
+    spelling from at least one authoritative surface exactly and the other surface
+    differs by case alone. This tolerates natural sentence capitalization without
+    accepting a third spelling, translation, alias, or inferred value. Latin
+    substrings inside another word are not independent source values; unsegmented
+    scripts retain exact contiguous surface matching.
     """
 
     if not isinstance(value, str) or not value.strip() or value != value.strip():
@@ -34,7 +38,16 @@ def literal_intent_argument(value: Any, *, outcome: str, source_text: str) -> bo
         pattern = r"(?<![A-Za-z0-9_])" + pattern
     if value[-1].isascii() and (value[-1].isalnum() or value[-1] == "_"):
         pattern += r"(?![A-Za-z0-9_])"
-    return bool(re.search(pattern, outcome) and re.search(pattern, source_text))
+    exact_outcome = bool(re.search(pattern, outcome))
+    exact_source = bool(re.search(pattern, source_text))
+    if exact_outcome and exact_source:
+        return True
+    if not value.isascii() or not (exact_outcome or exact_source):
+        return False
+    return bool(
+        re.search(pattern, outcome, flags=re.IGNORECASE)
+        and re.search(pattern, source_text, flags=re.IGNORECASE)
+    )
 
 def intent_source_quote(quote: Any, *, outcome: str) -> bool:
     """Check an exact owning-intent citation, never infer an argument from words.

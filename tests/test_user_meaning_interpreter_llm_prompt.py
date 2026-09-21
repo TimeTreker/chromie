@@ -133,6 +133,25 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         )
         self.assertEqual(decision.responsibilities[0].local_ref, "r1")
 
+    def test_primary_planner_activation_does_not_require_redundant_ga_request(self) -> None:
+        parsed = _valid_output()
+        parsed["cognitive_requests"] = [{
+            "authority": "planner",
+            "responsibility_refs": ["r1"],
+            "reason_summary": "The accepted meaning is ready for HOW reasoning.",
+        }]
+
+        decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+            UserMeaningInterpretationRequest(
+                text="What's the weather in Chongqing today?"
+            ),
+            json.dumps(parsed),
+        )
+
+        self.assertEqual(
+            [item.authority for item in decision.cognitive_requests], ["planner"]
+        )
+
     def test_primary_source_evidence_rejects_unknown_refs(self) -> None:
         parsed = _valid_output()
         parsed["responsibilities"][0]["source_evidence"][  # type: ignore[index]

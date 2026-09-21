@@ -3977,39 +3977,24 @@ class VoiceAssistant:
         failure_class: str | None,
         failure_error: str | None,
     ) -> str:
-        """Project recorded operational failure evidence into debug speech."""
+        """Project bounded operational failure identity into debug speech.
+
+        Detailed provider, protocol, validation, and HTTP text remains available in
+        logs/evidence and response metadata. It must not be serialized into TTS merely
+        because a qualification console enables diagnostic speech.
+        """
 
         stage = " ".join(str(failure_stage or "cognition").split())
         failure_kind = " ".join(
             str(failure_class or "semantic_failure").split()
         )
-        detail = " ".join(str(failure_error or "").split())
-        duplicate_prefix = f"{stage}:{failure_kind}:"
-        if detail.startswith(duplicate_prefix):
-            detail = detail[len(duplicate_prefix):].strip()
-        elif detail == failure_kind:
-            detail = ""
-        if len(detail) > 320:
-            detail = f"{detail[:317].rstrip()}..."
 
         stage_label = stage.replace("_", " ").strip()
         failure_label = failure_kind.replace("_", " ").strip()
         if zh:
-            base = f"{stage_label} 失败"
-            if not detail:
-                return f"{base}（{failure_label}）。"
-            ending = (
-                ""
-                if detail.endswith(("。", "！", "？", ".", "!", "?"))
-                else "。"
-            )
-            return f"{base}：{detail}{ending}"
+            return f"{stage_label} 失败（{failure_label}）。"
 
-        base = f"{stage_label.capitalize()} failed"
-        if not detail:
-            return f"{base} ({failure_label})."
-        ending = "" if detail.endswith((".", "!", "?")) else "."
-        return f"{base}: {detail}{ending}"
+        return f"{stage_label.capitalize()} failed ({failure_label})."
 
     def _cognitive_core_exception_safe_response(
         self,

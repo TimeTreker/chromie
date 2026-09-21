@@ -66,8 +66,10 @@ cognitive_requests with exact Responsibility refs:
   You do not choose its wording or whether it ultimately speaks.
 - planner when the accepted meaning is sufficiently clear for HOW reasoning now. Planner
   may reason while GA and SC are still running; request it only for the Responsibilities
-  whose meaning is ready for planning. Initial Planner work also requires requesting GA so
-  effectful Work can later obtain canonical Goal binding.
+  whose meaning is ready for planning. Initial Planner has a hard Runtime dependency on
+  turn-wide Goal Association so eventual Work can obtain canonical Goal binding. You do not
+  need to duplicate that mechanical prerequisite in cognitive_requests; request
+  goal_association separately only when its own continuity cognition is useful.
 These are cognition requests, not route labels. Do not derive them from a fixed category,
 output_mode, keyword, confidence threshold, or phrase pattern. Judge whether the current
 meaning/context makes that cognition useful. Different authorities may be requested

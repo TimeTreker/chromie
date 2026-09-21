@@ -345,9 +345,10 @@ def _configure_environment(root: Path, args: argparse.Namespace, output_dir: Pat
     if not args.speaker:
         os.environ.setdefault("ORCH_DISCARD_PLAYBACK_REALTIME", "0")
     os.environ["ORCH_COGNITIVE_RUNTIME_MODE"] = "apply"
-    # This console is an explicit qualification/debug surface. Speak the
-    # already-recorded operational failure reason instead of asking the operator
-    # to repeat input that cognition may already have understood successfully.
+    # This console is an explicit qualification/debug surface. Speak only the
+    # bounded recorded failure identity instead of asking the operator to repeat
+    # input that cognition may already have understood successfully. Full failure
+    # detail remains in retained logs/evidence rather than being serialized to TTS.
     os.environ["ORCH_FAILURE_SPEECH_MODE"] = "diagnostic"
     os.environ["ORCH_CONVERSATION_ID"] = args.conversation_id
     os.environ["ORCH_EVENT_LOG_PATH"] = str(output_dir / "events.jsonl")

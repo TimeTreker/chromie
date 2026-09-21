@@ -115,11 +115,15 @@ their existing owners; two inference sessions do not create two conversations.
 
 One accepted UMI result carries explicit `cognitive_requests[]` naming which existing
 authorities should work next and the exact Responsibility refs motivating each request.
-Initial SC, GA, and Fast Planner fan-out follows those model-authored requests; Runtime
-does not recreate readiness from `continuity_scope`, `output_mode`, bindings, keywords,
-or task classes. `continuity_scope` remains semantic ownership evidence and is not a
-routing flag. Optional communication does not gate already-requested planning or safe
-dispatch, and Work completion does not gate an already-grounded conversational answer.
+Initial SC and Fast Planner activation follows those model-authored requests. Runtime may
+close only a hard architectural prerequisite of an explicitly requested authority; in
+particular, initial Planner mechanically schedules turn-wide GA so eventual Work can obtain
+canonical Goal binding. That dependency closure is scheduling, not another semantic
+cognitive-activation decision. Runtime does not recreate readiness from `continuity_scope`,
+`output_mode`, bindings, keywords, or task classes. `continuity_scope` remains semantic
+ownership evidence and is not a routing flag. Optional communication does not gate
+already-requested planning or safe dispatch, and Work completion does not gate an
+already-grounded conversational answer.
 Not every turn requires all three calls. Missing canonical Goal identity alone does not
 block a source-grounded Communicative Act. Understanding, cognitive activation, planning
 readiness, canonical continuity, commitment, execution and verified completion remain

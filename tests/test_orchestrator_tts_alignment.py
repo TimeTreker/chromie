@@ -1086,8 +1086,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "Fast planner stream failed: "
-            "SGLang stream ended without a finish_reason.",
+            "Fast planner stream failed (stream transport invalid).",
         )
         self.assertEqual(
             response.metadata["semantic_failure_stage"],
@@ -1102,6 +1101,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "fast_planner_stream:stream_transport_invalid:"
             "SGLang stream ended without a finish_reason",
         )
+        self.assertNotIn("SGLang", response.speech[0].text)
+        self.assertNotIn("finish_reason", response.speech[0].text)
+        self.assertNotIn("{", response.speech[0].text)
+        self.assertNotIn("HTTP", response.speech[0].text)
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
 

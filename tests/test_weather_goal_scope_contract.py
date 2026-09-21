@@ -201,6 +201,7 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
 @pytest.mark.parametrize("text,outcome,location,bindings,accepted", [
     ("What is the weather today in Chongqing?", "what the weather is today in Chongqing", "Chongqing", {}, True),
     ("明天重庆天气怎么样？", "明天重庆天气怎么样", "重庆", {}, True),
+    ("Can you help me check the weather today in chongqing?", "Provide the current weather conditions for Chongqing as of today.", "chongqing", {}, True),
     ("What is the weather in Paris?", "what the weather is in Chongqing", "Chongqing", {}, False),
     ("Check Chongqing weather and Beijing time.", "determine Beijing time", "Chongqing", {}, False),
     ("Check Chongqing weather.", "check Chongqing weather", "Chong", {}, False),
@@ -318,6 +319,16 @@ def test_literal_intent_provenance_cannot_replace_typed_measurement_evidence(val
 
     source = "Use " + str(value)
     assert not literal_intent_argument(value, outcome=source, source_text=source)
+
+
+def test_literal_intent_provenance_tolerates_only_authoritative_ascii_case_drift():
+    from agent.app.planner_grounding import literal_intent_argument
+
+    outcome = "Provide the current weather conditions for Chongqing as of today."
+    source = "Can you help me check the weather today in chongqing?"
+    assert literal_intent_argument("chongqing", outcome=outcome, source_text=source)
+    assert literal_intent_argument("Chongqing", outcome=outcome, source_text=source)
+    assert not literal_intent_argument("CHONGQING", outcome=outcome, source_text=source)
 
 
 @pytest.mark.parametrize("source,description,source_id,bound_location,accepted", [

@@ -703,10 +703,13 @@ interaction act must acquire before useful progress can begin.
 
 Fast User Meaning Interpretation may establish a fully understood, low-risk Responsibility
 quickly and, in the same primary result, request which existing cognitive authorities are
-useful next. Initial Social Cognition, Goal Association, and Fast Planner activation follows
-those explicit `cognitive_requests[]`; Runtime does not infer Planner readiness from
-`continuity_scope` or another semantic field. The requests may overlap so SC, GA, and Fast
-can run concurrently over the same accepted WHAT while retaining separate authority.
+useful next. Initial Social Cognition and Fast Planner activation follows those explicit
+`cognitive_requests[]`. Runtime may close a hard architectural prerequisite of an explicitly
+requested authority: an initial Planner request mechanically schedules turn-wide Goal
+Association so eventual Work can obtain canonical Goal binding. This dependency closure is
+not a second semantic activation decision and does not infer Planner readiness from
+`continuity_scope` or another semantic field. The resulting computations may overlap so SC,
+GA, and Fast can run concurrently over the same accepted WHAT while retaining separate authority.
 A GA `non_goal` result ends Goal-owned task continuity without fabricated Planner Work.
 If GA later discovers additional retained-Goal relevance, GA itself may request the same
 Planner authority over the exact affected Responsibilities. Runtime validates and schedules
