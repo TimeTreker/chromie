@@ -158,9 +158,12 @@ def test_compact_activation_state_drops_large_owner_envelopes_but_retains_lifecy
         "canonical_plan": {
             "plan_id": "plan-weather", "disposition": "execute",
             "coverage": "complete", "goal_ids": ["goal-weather"],
+            "goal_satisfaction": {"status": "partial", "score": 0.5,
+                                  "unmet_requirements": ["Deliver the acquired information."]},
             "response_text": "x" * 20000,
             "steps": [{"step_id": "lookup", "capability_id": "chromie.weather.lookup",
-                       "source_goal_ids": ["goal-weather"], "args": {"huge": "x" * 20000}}],
+                       "source_goal_ids": ["goal-weather"], "step_purpose": "acquire_information",
+                       "args": {"huge": "x" * 20000}}],
         },
         "existing_work_activities": [{
             "activity_id": "lookup", "capability_id": "chromie.weather.lookup",
@@ -170,6 +173,9 @@ def test_compact_activation_state_drops_large_owner_envelopes_but_retains_lifecy
             "trusted_execution_outcome": {
                 "outcome_id": "outcome-1", "aggregate_status": "completed",
                 "goal_outcomes": [{"goal_id": "goal-weather", "status": "completed",
+                                   "acquisition_step_ids": ["lookup"],
+                                   "planned_satisfaction": {"status": "partial", "score": 0.5,
+                                                            "unmet_requirements": ["Deliver the acquired information."]},
                                    "evidence_ids": ["evidence-1"], "huge": "x" * 20000}],
             },
             "trusted_terminal_evidence": [{
@@ -185,6 +191,11 @@ def test_compact_activation_state_drops_large_owner_envelopes_but_retains_lifecy
     assert "provider_blob" not in encoded
     assert '"aggregate_status": "completed"' in encoded
     assert '"evidence_id": "evidence-1"' in encoded
+    assert compact["canonical_plan"]["steps"][0]["step_purpose"] == "acquire_information"
+    assert compact["canonical_plan"]["goal_satisfaction"]["status"] == "partial"
+    outcome = compact["trusted_state_change"]["trusted_execution_outcome"]["goal_outcomes"][0]
+    assert outcome["acquisition_step_ids"] == ["lookup"]
+    assert outcome["planned_satisfaction"]["unmet_requirements"] == ["Deliver the acquired information."]
 
 
 def test_activation_decoder_requires_exact_trusted_scope_fields() -> None:

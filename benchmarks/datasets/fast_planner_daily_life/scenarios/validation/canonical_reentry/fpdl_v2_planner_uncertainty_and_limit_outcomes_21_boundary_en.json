@@ -92,9 +92,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [
-        "The intended referent remains unresolved upstream."
-      ],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -116,18 +113,26 @@
           "local_ref": "r1",
           "outcome": "Look at an unresolved person referent for three seconds.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_planner_uncertainty_and_limit_outcomes_21_boundary_en",
-      "text": "For the detail that was unclear, look at them for three seconds; nobody has established who 'them' means."
+      "text": "For the detail that was unclear, look at them for three seconds; nobody has established who 'them' means.",
+      "meaning_uncertainties": [
+        {
+          "local_ref": "u1",
+          "kind": "referent",
+          "description": "The intended referent remains unresolved upstream.",
+          "responsibility_refs": [
+            "r1"
+          ]
+        }
+      ]
     },
     "runtime_variant": "canonical_reentry"
   },

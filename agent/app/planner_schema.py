@@ -14,6 +14,7 @@ try:
     )
     from chromie_contracts.plan import (
         FastPlannerAdvanceModelOutput,
+        GOAL_SATISFACTION_SCORE_BANDS,
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
@@ -24,11 +25,13 @@ except ImportError:  # pragma: no cover
     )
     from shared.chromie_contracts.plan import (
         FastPlannerAdvanceModelOutput,
+        GOAL_SATISFACTION_SCORE_BANDS,
     )
 
 from .prompt_projection import bounded_json
 from .planner_validation import _capability_acquires_information
 from .planner_grounding import (
+    _argument_realization_contract,
     _argument_schema_accepts_canonical_binding,
     _count_argument_names,
     _goal_binding_map,
@@ -558,6 +561,62 @@ def fast_evidence_reentry_response_schema(
             allowed_capabilities=allowed_capabilities,
             capability_input_schemas=capability_input_schemas,
         )
+
+    # Compile the existing DTO invariants into complete native alternatives.
+    # Cross-field if/then alone is not a native-decoder guarantee. Keep the
+    # same semantic fields and allow mixed multi-Goal decisions, including a
+    # single unresolved Goal requesting depth alongside resolved siblings.
+    definitions = schema["$defs"]
+    decision_base = copy.deepcopy(definitions["PlannerEvidenceReentryGoalDecision"])
+    allowed_actions = decision_base["properties"]["next_action"]["enum"]
+
+    def decision_branches(actions: list[str]) -> dict[str, Any]:
+        branches = []
+        for status, (minimum, maximum) in GOAL_SATISFACTION_SCORE_BANDS.items():
+            permitted = [
+                action for action in actions
+                if status != "exact" or action in {"respond", "execute"}
+            ]
+            if not permitted:
+                continue
+            branch = copy.deepcopy(decision_base)
+            fields = branch["properties"]
+            fields["next_action"]["enum"] = permitted
+            fields["satisfaction_status"]["enum"] = [status]
+            # Keep fractional bands in full Schema validation. The serving
+            # decoder's float-range compiler loses valid interior values (for
+            # example 0.5 in [0.01, 0.749999]); its native range stays [0, 1].
+            fields["satisfaction_score"]["allOf"] = [
+                {"minimum": minimum, "maximum": maximum}
+            ]
+            branches.append(branch)
+        return {"anyOf": branches}
+
+    definitions["PlannerEvidenceReentryGoalDecision"] = decision_branches(allowed_actions)
+    definitions["NonEscalatingReentryDecision"] = decision_branches(
+        [action for action in allowed_actions if action != "escalate"]
+    )
+    definitions["EscalatingReentryDecision"] = decision_branches(["escalate"])
+    base = {key: copy.deepcopy(value) for key, value in schema.items() if key != "$defs"}
+    normal = copy.deepcopy(base)
+    normal["properties"]["goal_decisions"]["items"] = {
+        "$ref": "#/$defs/NonEscalatingReentryDecision"
+    }
+    normal["properties"]["escalation_reason"] = {"type": "string", "const": ""}
+    alternatives = [normal]
+    for index in range(len(goals)):
+        branch = copy.deepcopy(base)
+        fields = branch["properties"]
+        fields["new_work"]["maxItems"] = 0
+        fields["escalation_reason"].update(minLength=1, pattern=r"\S")
+        # Witness an actual escalation at any array position without changing
+        # Goal order or forcing all sibling Goals to escalate.
+        fields["goal_decisions"]["prefixItems"] = [
+            {"$ref": "#/$defs/PlannerEvidenceReentryGoalDecision"}
+            for _ in range(index)
+        ] + [{"$ref": "#/$defs/EscalatingReentryDecision"}]
+        alternatives.append(branch)
+    schema["anyOf"] = alternatives
 
     return schema
 
@@ -1858,13 +1917,7 @@ def fast_multi_goal_response_schema(
         """Align decoder branches with the satisfaction validator bands."""
 
         branches: list[dict[str, Any]] = []
-        bands = (
-            ("exact", 0.95, 1.0),
-            ("substantial", 0.75, 0.949999),
-            ("partial", 0.01, 0.749999),
-            ("unsatisfied", 0.0, 0.0),
-        )
-        for status_value, minimum, maximum in bands:
+        for status_value, (minimum, maximum) in GOAL_SATISFACTION_SCORE_BANDS.items():
             branch = copy.deepcopy(base)
             branch_properties = branch.setdefault("properties", {})
             status = branch_properties.setdefault("status", {})
@@ -2878,17 +2931,19 @@ def fast_advance_response_schema(
                 branch_properties["args"] = _ordered_capability_arguments(input_schema)
                 hints = capability.get("hints")
                 derivation_targets: set[str] = set()
-                realization_contracts: dict[str, Any] = {}
                 if isinstance(hints, dict):
-                    raw_realizations = hints.get("argument_realization")
-                    if isinstance(raw_realizations, dict):
-                        realization_contracts = raw_realizations
                     raw_derivations = hints.get("argument_derivation")
                     if isinstance(raw_derivations, dict):
                         derivation_targets = {
                             str(name) for name in raw_derivations
                         }
                 trusted_grounded_parameters = {"target_ref"} | derivation_targets
+                index_grounded_parameters = (
+                    {"evidence_id", "tool_id", "material_args"}
+                    if capability_id_value == "chromie.memory.retrieve_verified_tool_result"
+                    else set()
+                )
+                trusted_grounded_parameters |= index_grounded_parameters
                 if capability_id_value == VOCAL_PERFORMANCE_CAPABILITY_ID:
                     trusted_grounded_parameters.add("mode")
                 # Match the Host's existing exact vocal-provider/mode invariant.
@@ -2918,7 +2973,7 @@ def fast_advance_response_schema(
                         }
                         realized_parameters: set[str] = set()
                         for binding_name in bound_parameters:
-                            realization = realization_contracts.get(binding_name)
+                            realization = _argument_realization_contract(capability, binding_name)
                             if isinstance(realization, dict):
                                 realized_parameters.update(
                                     str(name)
@@ -2944,6 +2999,7 @@ def fast_advance_response_schema(
                                 "properties": {
                                     str(name): copy.deepcopy(span_contract)
                                     for name in sorted(input_properties)
+                                    if name not in index_grounded_parameters
                                 },
                                 "required": required_source_inputs,
                                 "additionalProperties": False,

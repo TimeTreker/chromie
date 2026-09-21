@@ -272,7 +272,10 @@ class Settings(BaseModel):
     )
     cognitive_activation_timeout_ms: int = Field(
         default_factory=lambda: int(
-            os.getenv("AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS", "10000")
+            os.getenv(
+                "AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS",
+                os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "60000"),
+            )
         ),
         ge=100,
         le=120000,

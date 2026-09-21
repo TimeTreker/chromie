@@ -92,7 +92,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 assistant.playback_generation = 0
                 assistant.conversation_state = SimpleNamespace(
                     snapshot=lambda: {"history": [{"role": "user", "text": "hello"}]},
-                    active_goal_snapshots=lambda: [],
+                    active_goal_snapshots=lambda *, limit=None: [],
                 )
                 assistant.mind = SimpleNamespace(context=lambda: {})
                 assistant._interaction_engagement_context = lambda *a, **k: {}

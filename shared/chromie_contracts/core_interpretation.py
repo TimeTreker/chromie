@@ -269,7 +269,7 @@ class CognitiveResponsibilityProposal(BaseModel):
     @classmethod
     def normalize_and_reject_low_level_bindings(
         cls, value: Any,
-    ) -> dict[str, Any]:
+    ) -> Any:
         normalized = _normalize_umi_binding_values(value)
         if not isinstance(normalized, dict):
             return normalized
@@ -681,16 +681,16 @@ class CognitiveWorkRequest(BaseModel):
         """
 
         if self.turn_envelope is not None:
-            envelope = self.turn_envelope
-            original = envelope.original_input.text
+            typed_envelope = self.turn_envelope
+            source_original = typed_envelope.original_input.text
             return {
                 "schema_version": 1,
-                "turn_id": envelope.turn_id,
-                "original_text": original,
+                "turn_id": typed_envelope.turn_id,
+                "original_text": source_original,
                 "original_text_sha256": hashlib.sha256(
-                    original.encode("utf-8")
+                    source_original.encode("utf-8")
                 ).hexdigest(),
-                "language": envelope.normalized_input.language,
+                "language": typed_envelope.normalized_input.language,
                 "authority": "read_only_source_provenance",
             }
 
@@ -716,9 +716,9 @@ class CognitiveWorkRequest(BaseModel):
                     ),
                     "authority": "read_only_source_provenance",
                 }
-        envelope = context.get("user_turn_envelope")
-        if isinstance(envelope, dict):
-            original = envelope.get("original_input")
+        context_envelope = context.get("user_turn_envelope")
+        if isinstance(context_envelope, dict):
+            original = context_envelope.get("original_input")
             if isinstance(original, dict):
                 value = original.get("text")
                 if (
@@ -726,7 +726,7 @@ class CognitiveWorkRequest(BaseModel):
                     and value
                     and normalize_turn_text(value) == self.text
                 ):
-                    normalized = envelope.get("normalized_input")
+                    normalized = context_envelope.get("normalized_input")
                     language = (
                         normalized.get("language")
                         if isinstance(normalized, dict)
@@ -734,7 +734,7 @@ class CognitiveWorkRequest(BaseModel):
                     )
                     return {
                         "schema_version": 1,
-                        "turn_id": str(envelope.get("turn_id") or ""),
+                        "turn_id": str(context_envelope.get("turn_id") or ""),
                         "original_text": value,
                         "original_text_sha256": hashlib.sha256(
                             value.encode("utf-8")

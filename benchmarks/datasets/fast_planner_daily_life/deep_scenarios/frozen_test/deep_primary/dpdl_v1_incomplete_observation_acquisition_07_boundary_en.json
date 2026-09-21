@@ -410,7 +410,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -422,18 +421,17 @@
           "local_ref": "r1",
           "outcome": "Acquire a fresh observation of whether the study-room doorway is clear.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_incomplete_observation_acquisition_07_boundary_en",
-      "text": "Check whether the study-room doorway is clear before deciding whether to proceed."
+      "text": "Check whether the study-room doorway is clear before deciding whether to proceed.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_primary"
   },

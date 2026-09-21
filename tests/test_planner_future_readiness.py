@@ -13,7 +13,7 @@ from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts import CognitiveWorkRequest
 from tests.capability_runtime_test_support import submit_and_wait_terminal
-from tests.cognitive_work_test_support import social_fixture_response, word_free_model_fixture, social_fixture_resolution
+from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_response, word_free_model_fixture, social_fixture_resolution
 from tests.test_planner_staged_progress import episode_runtime, read_reply, resolve, status
 
 
@@ -270,7 +270,7 @@ def test_future_intention_survives_restart_and_due_host_reentry_dispatches_once(
         bindings=request.context['goal_association_resolution']['new_goals'][0]['resource_responsibility']['resource']['attributes']
         raw['steps'][0]['args']={k:bindings[k]['value'] for k in ('location','date','period')}
 
-        class Client:
+        class Client(PlannerActivationFixture):
             requests=[]
             async def resolve_social_cognition(self, session, *, request, **kwargs):
                 return social_fixture_resolution(request)

@@ -1361,6 +1361,79 @@ async def test_sc_expression_uses_real_runtime_queue_and_completion_ledger(fresh
         assert any(event.event_type == "social_decoration_" + terminal_status for event in events)
         assert not any(event.event_type == "speech_playback_completed" for event in events)
 
+
+@pytest.mark.asyncio
+async def test_social_terminal_ledger_has_one_writer_through_cognitive_closure():
+    from orchestrator.orchestrator import VoiceAssistant
+    from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+    from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+    from orchestrator.runtime.interaction_ledger import InteractionLedger
+    from shared.chromie_contracts.interaction import CapabilityRequest, InteractionResponse
+    from tests.test_planner_auxiliary_activity_contract import _definition
+
+    class CountingLedger(InteractionLedger):
+        def __init__(self):
+            super().__init__()
+            self.social_result_calls = 0
+
+        def record_social_results(self, **kwargs):
+            self.social_result_calls += 1
+            return super().record_social_results(**kwargs)
+
+    ledger = CountingLedger()
+    runtime = InteractionRuntimeCoordinator(
+        lambda _: {"scheduled": True},
+        interaction_ledger=ledger,
+    )
+    provider = MockCapabilityProvider("test.social")
+    runtime.registry.register(
+        _definition("test.social.blink").model_copy(
+            update={
+                "provider_id": provider.provider_id,
+                "output_schema": {"type": "object"},
+            }
+        )
+    )
+    runtime.runtime.register_provider(provider)
+    packet = InteractionResponse(
+        interaction_id="single-social-ledger-writer",
+        capabilities=[CapabilityRequest(
+            request_id="blink",
+            capability_id="test.social.blink",
+            args={"count": 1},
+            timing="parallel",
+            metadata={
+                "source": "social_cognition_auxiliary_activity",
+                "semantic_owner": "social_cognition",
+                "execution_role": "social_decoration",
+                "auxiliary_plan_activity": True,
+                "source_goal_ids": [],
+            },
+        )],
+        metadata={
+            "social_expression_materialized": True,
+            "turn_id": "turn-social-ledger",
+            "session_id": "sid-social-ledger",
+        },
+    )
+    dispatch = await runtime.submit_response(packet, session_id="sid-social-ledger")
+    execution = await runtime.wait_dispatch(dispatch)
+    assert ledger.social_result_calls == 1
+
+    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant.interaction_runtime = runtime
+    assistant.session_log = lambda *args, **kwargs: None
+    status = await assistant._close_cognitive_execution(
+        response=dispatch.source_response,
+        execution=execution,
+        session_id="sid-social-ledger",
+        generation=0,
+        provider_status=None,
+    )
+    assert status == "not_applicable"
+    assert ledger.social_result_calls == 1
+
+
 @pytest.mark.asyncio
 async def test_optional_provider_loss_does_not_suppress_anchored_speech():
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator

@@ -12,6 +12,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AgentSettingsTests(unittest.TestCase):
+    def test_activation_inherits_active_model_budget_unless_explicitly_overridden(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(Settings().cognitive_activation_timeout_ms, 60000)
+        with patch.dict(os.environ, {"AGENT_FAST_PLANNER_TIMEOUT_MS": "45000"}, clear=True):
+            self.assertEqual(Settings().cognitive_activation_timeout_ms, 45000)
+            os.environ["AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS"] = "18000"
+            self.assertEqual(Settings().cognitive_activation_timeout_ms, 18000)
+
     def test_service_settings_capture_typed_environment(self) -> None:
         with patch.dict(
             os.environ,

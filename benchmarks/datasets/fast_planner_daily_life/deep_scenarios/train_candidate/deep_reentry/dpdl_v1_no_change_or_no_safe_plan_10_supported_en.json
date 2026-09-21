@@ -128,7 +128,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -150,18 +149,17 @@
           "local_ref": "r1",
           "outcome": "Acknowledge that the requested supportive response was already delivered without replaying it.",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_no_change_or_no_safe_plan_10_supported_en",
-      "text": "Thanks; you already said the supportive sentence, so don't repeat it."
+      "text": "Thanks; you already said the supportive sentence, so don't repeat it.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_reentry"
   },

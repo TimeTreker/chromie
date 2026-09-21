@@ -409,31 +409,41 @@
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t5"
-            }
+            },
+            "continuity_scope": "goal"
           }
         ],
-        "unresolved": []
+        "meaning_uncertainties": [],
+        "cognitive_requests": [
+          {
+            "authority": "planner",
+            "responsibility_refs": [
+              "r1"
+            ],
+            "reason_summary": "Run the explicitly authored role transaction."
+          }
+        ]
       },
-      "role": "gi",
+      "role": "umi",
       "required_prompt_fragments": [
         "请点头4次。"
       ],
       "fixture_kind": "authored_reference",
       "training_eligible": false,
       "request": {
-        "model": "fixture-gi",
+        "model": "fixture-umi",
         "stream": false,
         "think": false,
         "messages": [
           {
             "role": "system",
             "content": {
-              "$artifact": "4dd082f6a24a1d7600bcbd856e46ccfdc50a83dc98bc11dc3c966cea59591356"
+              "$artifact": "0f0e5f6742c248a7e1060f799051824e5bb2212b87b046f1270642e927927e70"
             }
           },
           {
             "role": "user",
-            "content": "Current Turn:\nIMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; Goal Interpretation owns current-turn WHAT):\n{\"original_text\":\"请点头4次。\",\"speaker_role\":\"user\",\"addressee\":\"Chromie\",\"authority\":\"read_only_source_provenance\"}\nlanguage_hint=zh-CN\n\nAuthoritative source tokens (cite inclusive refs in each Responsibility.source_evidence):\n[{\"end\":1,\"ref\":\"t0\",\"start\":0,\"surface\":\"请\"},{\"end\":2,\"ref\":\"t1\",\"start\":1,\"surface\":\"点\"},{\"end\":3,\"ref\":\"t2\",\"start\":2,\"surface\":\"头\"},{\"end\":4,\"ref\":\"t3\",\"start\":3,\"surface\":\"4\"},{\"end\":5,\"ref\":\"t4\",\"start\":4,\"surface\":\"次\"},{\"end\":6,\"ref\":\"t5\",\"start\":5,\"surface\":\"。\"}]\n\nBounded Identity Context:\n{\"self_identity\":{\"name\":\"Chromie\"}}\nThese semantic self facts may resolve identity or self-reference. Presentation style and internal profile identifiers are intentionally absent.\n\nSemantic Continuity Context:\nBounded session/world context JSON:{}\nInteraction context JSON:{}\nRecent accepted dialogue JSON:[]\nRetained active/recent Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:[]\nActive Task/Activity progress with identity and pending clarification JSON:[]\n\nApply the system WHAT-only contract to this authoritative turn and bounded semantic Context. Return one complete schema-valid JSON decision only."
+            "content": "Current Turn:\nIMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; User Meaning Interpretation owns current-turn WHAT):\n{\"original_text\":\"请点头4次。\",\"speaker_role\":\"user\",\"addressee\":\"Chromie\",\"authority\":\"read_only_source_provenance\"}\nlanguage_hint=zh-CN\n\nAuthoritative source tokens (cite inclusive refs in each Responsibility.source_evidence):\n[{\"end\":1,\"ref\":\"t0\",\"start\":0,\"surface\":\"请\"},{\"end\":2,\"ref\":\"t1\",\"start\":1,\"surface\":\"点\"},{\"end\":3,\"ref\":\"t2\",\"start\":2,\"surface\":\"头\"},{\"end\":4,\"ref\":\"t3\",\"start\":3,\"surface\":\"4\"},{\"end\":5,\"ref\":\"t4\",\"start\":4,\"surface\":\"次\"},{\"end\":6,\"ref\":\"t5\",\"start\":5,\"surface\":\"。\"}]\n\nBounded Identity Context:\n{\"self_identity\":{\"name\":\"Chromie\"}}\nThese semantic self facts may resolve identity or self-reference. Presentation style and internal profile identifiers are intentionally absent.\n\nBounded Human-Meaning Context (read-only evidence):\nRecent accepted dialogue JSON:[]\nGoal meaning context JSON (semantic continuity hints only; no canonical Goal identity):[]\nSituation/perception context JSON (evidence only; never a new request):{}\nInteraction context JSON (what Chromie has already communicated):{}\nUse context to resolve ellipsis, pronouns, corrections, confirmations, deictic references and implicit conversational relations when the evidence supports one meaning. Context may complete meaning but must never create a new Responsibility that the current expression does not support.\n\nApply the system meaning-and-cognitive-orchestration contract to this authoritative turn and bounded human-meaning Context. Return one complete schema-valid JSON decision only."
           }
         ],
         "options": {
@@ -443,7 +453,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "11d73f4dbff794942c5bee7d678a9086aa4d947d350cc0ab287ec1eed636434a"
+          "$artifact": "21f0afd6bde341f780f3c9799178d30a1814dcd2663c57e00d6cc3eda2693d25"
         }
       }
     },
@@ -470,7 +480,8 @@
         "referent_updates": [],
         "resolved_references": [],
         "confidence": 1.0,
-        "reason_summary": "Preserve the accepted requested body effect."
+        "reason_summary": "Preserve the accepted requested body effect.",
+        "cognitive_requests": []
       },
       "role": "ga",
       "fixture_kind": "fault_injection",
@@ -481,12 +492,12 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "d1bf34fc222ac80a0d8cc883cda5bb7676a9be4c0a2f37a7a7d11a8d3d8fa921"
+              "$artifact": "d197d0a75b2cfd255600bdafcfe286ca0988c1409f2659de7e1c9d99786430bb"
             }
           },
           {
             "role": "user",
-            "content": "Owner-approved Chromie identity JSON:\nnull\n\n\nAssociate the complete accepted GI intentions with the supplied Goals. Every Responsibility ref must occur exactly once across associations and new_goals. Preserve compound intentions intact; Planner decomposes Activities. Choose continuity from the accepted meaning, candidate requirements, state and dialogue. Candidate presence, lexical overlap or recency alone is insufficient. GI does not supply relationship labels; you own that judgment. Use exact supplied IDs. Recent terminal Goals may be referenced but not reopened. For changed requirements, select the exact target and replaced requirement indices; Host inherits the complete new requirements from the cited GI outcomes. Keep unrelated retained requirements. Supersede a Goal only when the accepted intent explicitly replaces it; an additional intention leaves it intact. A replaced Goal must not also be listed as related context. No candidates means new_goals only. Emit source_responsibility_refs, related_goal_ids and supersedes_goal_ids for each new Goal. Host supplies descriptions and IDs. Host inherits GI's expected result type unchanged. Do not extract duration, direction, count, speed, resource fields, or reclassify output modes or other execution details. Planner owns parameter realization and Work. Preserve GI uncertainty; do not resolve it or choose a clarification strategy. SC owns communication. Return the supplied schema only.\n\nCandidate Goal evidence JSON:\n[]\nGI complete intentions JSON:\n[{\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"请点头4次\",\"output_mode\":\"body_action\",\"source_evidence\":{\"source_end_token_ref\":\"t5\",\"source_start_token_ref\":\"t0\"}}]\nGI unresolved meaning JSON:\n[]\nScoped discourse referents JSON:\n[]\nAccepted dialogue JSON:\n[]\nIMMUTABLE SOURCE TURN JSON (read-only; GI Responsibilities own current-turn WHAT; GA owns continuity, never silent semantic repair):\n{\"original_text\":\"请点头4次。\",\"authority\":\"normalized_transport_fallback\"}"
+            "content": "Owner-approved Chromie identity JSON:\nnull\n\n\nAssociate the complete accepted UMI Responsibilities with the supplied bounded candidate Goals. Runtime may also supply ordinary conversational speech so you can decide whether an apparently simple interaction actually carries retained Goal continuity. Every supplied Responsibility ref must occur exactly once across associations, new_goals and non_goal_responsibility_refs. Use non_goal only for ordinary relation-free speech that Social Cognition can satisfy as the current interaction and that does not refer to, modify, query, resume, prod, or otherwise depend on retained Goal meaning. A brief greeting or attention check after unfinished or unanswered work may therefore associate with that Goal when bounded Goal/dialogue evidence supports it; wording alone never decides this. Preserve compound meaning intact; Planner decomposes Activities. Choose continuity from accepted meaning, candidate requirements, retained state and dialogue. Candidate presence, lexical overlap or recency alone is insufficient. Candidates may include restored cross-session persistent Goals; their presence only makes them eligible for comparison. GA alone decides canonical continuity identity. UMI does not supply relationship labels or Goal IDs; you own that judgment. Use exact supplied IDs. Only candidates with responsibility_status=open may receive continue/modify/clarify/confirm/reject/cancel/pause/resume/merge/split. A retained non-open Goal is historical continuity evidence only, never an association target for a current Responsibility. When that history matters, create the current Goal and cite the terminal Goal in related_goal_ids for retrieval, restatement, explanation or comparison. An independent current obligation becomes a new Goal even when a terminal Goal is nearby in time. For changed requirements, select the exact target and replaced requirement indices; Host inherits complete new requirements from cited UMI outcomes. Keep unrelated retained requirements. Supersede a Goal only when accepted meaning explicitly replaces it; an additional Responsibility leaves it intact. A replaced Goal must not also be listed as related context. With no candidates, emit new_goals for substantive continuity-bearing outcomes and non_goal_responsibility_refs for ordinary conversational speech that needs no Goal. Emit source_responsibility_refs, related_goal_ids and supersedes_goal_ids for each new Goal. Host supplies descriptions and IDs. Host inherits UMI's expected result type unchanged. Do not extract duration, direction, count, speed, resource fields, or reclassify output modes or other execution details. Planner owns parameter realization and Work. A UMI meaning uncertainty is not a request to ask the user. You may list its exact local_ref in resolved_meaning_uncertainty_refs only when the selected canonical Goal itself supplies the missing continuity meaning for every cited Responsibility. Never resolve uncertainty from lexical similarity, general memory, guessed intent, external facts, or execution assumptions. Leave every other uncertainty unresolved; later cognition decides whether clarification is actually required. SC owns wording. After authoring continuity, decide whether that new canonical continuity makes another existing cognitive authority useful now. Use cognitive_requests only for Planner or Social Cognition, with exact Responsibility refs. Request Planner when this continuity result materially changes what Work should be considered beyond the already-running UMI planning request; request Social Cognition only when the continuity result itself adds interaction-relevant meaning worth reconsidering. Use [] when no additional cognition is needed. A cognitive request schedules thought only: it does not author Work, wording, Capability choice, or execution. UMI cognitive requests are prior in-flight cognition, not semantic truth and not a requirement to repeat the same authority. Return the supplied schema only.\n\nCandidate Goal evidence JSON:\n[]\nUMI Responsibilities JSON:\n[{\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"请点头4次\",\"output_mode\":\"body_action\",\"source_evidence\":{\"source_end_token_ref\":\"t5\",\"source_start_token_ref\":\"t0\"}}]\nUMI cognitive requests already in flight JSON:\n[]\nUMI semantic uncertainty JSON:\n[]\nScoped discourse referents JSON:\n[]\nAccepted dialogue JSON:\n[]\nIMMUTABLE SOURCE TURN JSON (read-only; UMI Responsibilities own current-turn WHAT; GA owns continuity, never silent semantic repair):\n{\"original_text\":\"请点头4次。\",\"authority\":\"normalized_transport_fallback\"}"
           }
         ],
         "stream": false,
@@ -498,7 +509,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "eb062474d7b065371ffa6a100224248d348bc1514c5f5b7701369d4f8aaeaa6e"
+          "$artifact": "ecaeb108bda81acf255c7698f86faf8fff95949d60be5761a091956742ca5730"
         }
       }
     }
@@ -519,7 +530,7 @@
   "contrast_set": "nod-2",
   "split": "train_candidate",
   "training_eligible": false,
-  "reference_review": "Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent.",
+  "reference_review": "2026-09-21 current UMI activation and compact Evidence re-entry contract migration; original inputs, fault intent, provider outcomes and expected statuses preserved; authored non-independent offline references.",
   "expected_verdict": "expected_rejection",
   "parameters": {
     "action": "nod",

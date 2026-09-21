@@ -59,7 +59,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -75,13 +74,11 @@
           "local_ref": "r1",
           "outcome": "Look at the identified user for two seconds before blinking.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -94,18 +91,17 @@
           "local_ref": "r2",
           "outcome": "Blink exactly twice after looking at the user.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_atomic_plan_integrity_and_safe_alternatives_49_supported_en",
-      "text": "For my preference for a quiet interaction, treat this as one ordered request: look at me for two seconds and then blink twice."
+      "text": "For my preference for a quiet interaction, treat this as one ordered request: look at me for two seconds and then blink twice.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

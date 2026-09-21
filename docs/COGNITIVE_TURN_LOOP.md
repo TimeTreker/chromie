@@ -1311,6 +1311,15 @@ validators run. Historical Plan/Runtime envelopes are input provenance, never ou
 examples. No second model qualifies or repairs the semantic decision. Host validates
 provenance and structured claim boundaries; SC owns delivery wording.
 
+The compact re-entry Schema permits new Work when a verified acquisition completed
+while its source Plan explicitly retained an unmet Goal obligation, as well as for
+the existing recoverable-read path. This permission does not select the next action
+or authorize replay of completed Work. A response decision must cite completed Work
+Evidence correlated to that same Goal; materialization rejects missing or foreign
+correlations instead of silently dropping the completed-Work dependency. Fast's
+structured-argument Schema uses the same Capability-owned `source_entity_type`
+realization lookup as its Host validator.
+
 The canonical Fast prompt preserves the request's response-language value for
 both single-Goal and multiple-Goal plans. Internal English Goal descriptions,
 Capability metadata, or provider results do not change the requested language

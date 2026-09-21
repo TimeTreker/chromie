@@ -30,7 +30,7 @@ from agent.app.planner_validation import (
     validate_planner_model_output,
 )
 from agent.app.capabilities.catalog import CatalogCapability
-from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest, UserMeaningUncertainty
 from shared.chromie_contracts.user_turn import user_turn_source_tokens
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
@@ -1674,7 +1674,9 @@ class FastPlannerResolverTests(unittest.TestCase):
                 run_request, raw = CanonicalDeepPlanContractTests.speech_outcomes("clarify", True)
                 unresolved = "The referenced content is not identified."
                 run_request = run_request.model_copy(update={
-                    "language": language, "meaning_uncertainties": [unresolved],
+                    "language": language, "meaning_uncertainties": [
+                        UserMeaningUncertainty(
+                            local_ref="u1", kind="referent", description=unresolved, responsibility_refs=["r1"])],
                     "responsibilities": [
                         CognitiveResponsibilityProposal(local_ref="r1", outcome="say the referenced content", output_mode="speech", confidence=1.0),
                         CognitiveResponsibilityProposal(local_ref="r2", outcome="say goodnight", output_mode="speech", confidence=1.0),
@@ -1878,7 +1880,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(result.disposition, "unavailable")
         self.assertEqual(result.activities, [])
         # The native Schema now rejects the substitution before DTO/Host.
-        self.assertIn("mode-specific vocal Responsibility", result.metadata["error"])
+        self.assertEqual(result.metadata["error_type"], "ValidationError")
         with self.assertRaisesRegex(PlannerDTOContractError, "exact qualified vocal provider"):
             planner_fast_validation.validate_fast_advance_output(
                 FastPlannerAdvanceModelOutput.model_validate(raw), request=run_request,
@@ -1937,7 +1939,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(result.disposition, "unavailable")
         self.assertEqual(result.activities, [])
-        self.assertIn("missing=sing", result.metadata["error"])
+        self.assertEqual(result.metadata["error_type"], "ValidationError")
 
 
     def test_advance_cannot_replace_explicit_quantity_with_capability_default(self):
@@ -2083,7 +2085,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 self.assertNotIn("contract_revision_attempted", result.metadata)
                 if accepted:
                     self.assertEqual(result.disposition, "execute", result.metadata)
-                    self.assertEqual(result.activities[0].args, args)
+                    self.assertEqual(result.activities[0].args, bindings)
                 else:
                     self.assertEqual(result.disposition, "unavailable", result.metadata)
                     self.assertEqual(result.activities, [])
@@ -2159,7 +2161,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         )
                     if actual_count == count:
                         validate()
-                        self.assertEqual(output.activities[0].args, args)
+                        self.assertEqual(output.activities[0].args, {"count": count})
                     else:
                         with self.assertRaisesRegex((PlannerDTOContractError, planner_fast_validation.AuthoritativeGroundingValidationError), "numeric Capability input contradicts UMI binding|omitted explicit numeric Responsibility bindings"):
                             validate()
@@ -2383,7 +2385,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 0.72,
                 }
             ],
-            meaning_uncertainties=[unresolved],
+            meaning_uncertainties=[{"local_ref": "u1", "kind": "referent", "description": unresolved, "responsibility_refs": ["weather"]}],
         )
 
         advance = asyncio.run(
@@ -2415,7 +2417,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "confidence": 0.72,
                 }
             ],
-            meaning_uncertainties=["The intended device is not identified."],
+            meaning_uncertainties=[{"local_ref": "u1", "kind": "referent", "description": "The intended device is not identified.", "responsibility_refs": ["weather"]}],
         )
 
         advance = asyncio.run(
@@ -2511,7 +2513,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             any(activity.role == "capability" for activity in advance.activities)
         )
         self.assertIn(
-            "cannot invent an unbound required Capability input",
+            "cannot invent an unbound Capability input",
             advance.metadata["error"],
         )
 
@@ -2551,7 +2553,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(advance.disposition, "unavailable")
-        self.assertEqual(advance.metadata["error_type"], "PlannerDTOContractError")
+        self.assertEqual(advance.metadata["error_type"], "ValidationError")
 
     def test_bundle_weather_result_is_not_a_user_resolvable_input_gap(self):
         invalid_clarification = self._clarification_output(
@@ -2622,7 +2624,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
-        self.assertEqual(advance.metadata["error_type"], "PlannerDTOContractError")
+        self.assertEqual(advance.metadata["error_type"], "ValidationError")
 
     def test_first_activity_plan_preserves_profile_context_topology(self):
         ollama = FakeOllama(
@@ -3193,7 +3195,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(result.disposition, "unavailable")
         self.assertEqual(result.activities, [])
-        self.assertEqual(result.metadata["error_type"], "PlannerDTOContractError")
+        self.assertEqual(result.metadata["error_type"], "ValidationError")
 
     def test_malformed_execute_fails_closed_without_a_second_model_call(self):
         initial = {
@@ -3258,7 +3260,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 {
                     "local_ref": "r2",
                     "outcome": "Blink once",
-                    "bindings": {"action": "blink", "count": 1},
+                    "bindings": {"count": 1},
                     "output_mode": "body_action",
                     "confidence": 0.95,
                 },
@@ -3273,7 +3275,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(result.disposition, "unavailable")
         self.assertEqual(result.activities, [])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("capability_id", result.metadata["error"])
+        self.assertEqual(result.metadata["error_type"], "ValidationError")
 
 
     def test_committed_body_progress_is_not_advertised_again_in_advance_schema(self):
@@ -3509,7 +3511,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("contradicts typed Responsibility order", advance.metadata["error"])
+        self.assertEqual(advance.metadata["error_type"], "ValidationError")
 
     def test_daytime_weather_can_check_and_speak_in_parallel(self):
         ollama = FakeOllama(
@@ -3565,7 +3567,8 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(advance.disposition, "execute")
         self.assertEqual([item.role for item in advance.activities], ["capability"])
-        self.assertEqual(advance.activities[0].args["period"], 'day')
+        self.assertNotIn("period", advance.activities[0].args)
+        self.assertEqual(next(item for item in WeatherCatalog().items if item.capability_id == "chromie.weather.lookup").input_schema["properties"]["period"]["default"], "day")
         self.assertEqual(advance.continuations, [])
         self.assertFalse(hasattr(advance.activities[0], "text"))
 
@@ -4027,7 +4030,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 context=context,
             )
 
-    def test_effectful_zero_step_false_satisfaction_escalates_without_same_tier_repair(self):
+    def test_effectful_zero_step_false_satisfaction_fails_closed_without_repair(self):
         invalid = {
             "disposition": "respond",
             "coverage": "complete",
@@ -4065,8 +4068,10 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         self.assertEqual(plan.escalation_reason, "fast_planner_semantic_validation_failed")
+        self.assertFalse(plan.metadata["execution_allowed"])
+        self.assertFalse(plan.metadata["retryable"])
         self.assertIn(
             "unresolved effectful goal requires an executable step",
             plan.metadata["error"],
@@ -5151,7 +5156,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn('goal_outcome', ollama.prompts[0][0])
 
-    def test_explicit_numeric_grounding_mismatch_requires_deeper_semantic_plan(self):
+    def test_explicit_numeric_grounding_mismatch_fails_closed_without_deep_repair(self):
         invalid = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -5220,7 +5225,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(
             plan.metadata["validation_feedback"][0]["type"],
@@ -5835,6 +5840,110 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
+
+    def test_fast_advance_verified_memory_uses_exact_index_provenance(self):
+        from agent.app.capabilities.local import chromie_manifests
+
+        capability_id = "chromie.memory.retrieve_verified_tool_result"
+        tool = next(tool for manifest in chromie_manifests() for tool in manifest.tools
+                    if tool.name == capability_id)
+        args = {"evidence_id": "evidence-weather", "tool_id": "chromie.weather.lookup",
+                "material_args": {"location": "chongqing", "date": "today"}}
+        definition = {
+            "capability_id": capability_id,
+            "hints": tool.llm_hints,
+            "input_schema": {"type": "object", "properties": {
+                "evidence_id": {"type": "string"}, "tool_id": {"type": "string"},
+                "material_args": {"type": "object", "additionalProperties": True}},
+                "required": ["evidence_id", "tool_id", "material_args"],
+                "additionalProperties": False},
+        }
+        for variant in ("exact", "absent", "wrong_id", "wrong_tool", "wrong_args", "wrong_current_location"):
+            with self.subTest(variant=variant):
+                index = [{"evidence_id": args["evidence_id"], "tool_id": args["tool_id"],
+                          "request_args": dict(args["material_args"]), "status": "completed"}]
+                if variant == "absent":
+                    index = []
+                elif variant == "wrong_id":
+                    index[0]["evidence_id"] = "unrelated-evidence"
+                elif variant == "wrong_tool":
+                    index[0]["tool_id"] = "chromie.unrelated.lookup"
+                elif variant == "wrong_args":
+                    index[0]["request_args"]["location"] = "beijing"
+                run_request = _work_request(
+                    sid="memory-followup", text="will it rain today?", language="en-US",
+                    responsibilities=[{"local_ref": "r1", "outcome": "Determine rain today in Chongqing.",
+                                       "bindings": {"location": "beijing" if variant == "wrong_current_location" else "chongqing"},
+                                       "output_mode": "information", "confidence": 1.0}],
+                    context={"verified_tool_memory_index": index},
+                )
+                output = FastPlannerAdvanceModelOutput.model_validate({
+                    "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+                    "activities": [{"activity_id": "retrieve", "role": "capability", "capability_id": capability_id,
+                                    "args": args, "argument_sources": {}, "timing": "sequential",
+                                    "source_responsibility_refs": ["r1"], "reason_summary": "Retrieve the verified result."}],
+                    "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Use prior evidence.",
+                })
+                if variant == "exact":
+                    normalized = planner_fast_validation.normalize_fast_capability_activity_purpose(
+                        output, capabilities=[definition],
+                    )
+                    self.assertEqual(normalized.activities[0].step_purpose, "acquire_information")
+                    self.assertTrue(normalized.activities[0].expected_outcome)
+                    schema = planner_schema.fast_advance_response_schema(
+                        ["r1"], responsibilities=run_request.responsibilities,
+                        capabilities=[definition],
+                        source_token_refs=[item["ref"] for item in user_turn_source_tokens(run_request.text)],
+                    )
+                    validator = Draft202012Validator(schema)
+                    raw = output.model_dump(mode="json", exclude={"metadata"})
+                    self.assertTrue(validator.is_valid(raw))
+                    forged = copy.deepcopy(raw)
+                    forged["activities"][0]["argument_sources"] = {
+                        "evidence_id": {"source_start_token_ref": "t0", "source_end_token_ref": "t4"}
+                    }
+                    self.assertFalse(validator.is_valid(forged))
+                    planner_fast_validation.validate_fast_advance_output(
+                        output, request=run_request, responsibilities=run_request.responsibilities,
+                        capabilities=[definition],
+                    )
+                else:
+                    with self.assertRaisesRegex(ValueError, "verified-memory"):
+                        planner_fast_validation.validate_fast_advance_output(
+                            output, request=run_request, responsibilities=run_request.responsibilities,
+                            capabilities=[definition],
+                        )
+
+    def test_fast_binding_equivalence_matches_canonical_location_grounding(self):
+        run_request = _work_request(
+            sid="location-followup", text="will it rain today?", language="en-US",
+            responsibilities=[{"local_ref": "r1", "outcome": "Determine rain in Chongqing.",
+                               "bindings": {"location": "Chongqing"}, "output_mode": "information",
+                               "confidence": 1.0}],
+        )
+        definition = {"capability_id": "chromie.weather.lookup", "input_schema": {
+            "type": "object", "properties": {"location": {"type": "string"}},
+            "required": ["location"], "additionalProperties": False}}
+        for location, accepted in (("Chongqing", True), ("chongqing", True), ("CHONGQING", True), ("Beijing", False)):
+            with self.subTest(location=location):
+                output = FastPlannerAdvanceModelOutput.model_validate({
+                    "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+                    "activities": [{"activity_id": "lookup", "role": "capability", "capability_id": "chromie.weather.lookup",
+                                    "args": {"location": location}, "argument_sources": {}, "timing": "sequential",
+                                    "source_responsibility_refs": ["r1"], "reason_summary": "Resolve the forecast."}],
+                    "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Retrieve evidence.",
+                })
+                if accepted:
+                    planner_fast_validation.validate_fast_advance_output(
+                        output, request=run_request, responsibilities=run_request.responsibilities,
+                        capabilities=[definition],
+                    )
+                else:
+                    with self.assertRaisesRegex(ValueError, "contradicts UMI binding"):
+                        planner_fast_validation.validate_fast_advance_output(
+                            output, request=run_request, responsibilities=run_request.responsibilities,
+                            capabilities=[definition],
+                        )
 
     def test_detached_verified_result_provenance_fails_closed_without_repair(self):
         catalog = FakeCatalog()

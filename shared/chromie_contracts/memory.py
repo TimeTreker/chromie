@@ -91,7 +91,10 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
     purpose = {
         "umi": "Interpret the current user meaning using only activated relevant memory as context.",
         "ga": "Relate authoritative UMI Responsibilities to current and lasting Goal continuity.",
-        "planner": "Plan from canonical meaning, current Runtime Work and Evidence, with relevant remembered context.",
+        "planner": (
+            "Plan from canonical meaning, current Runtime Work and Evidence, with relevant remembered context. "
+            "Consider relevant activated Memory before creating new Work, but require current trusted Evidence or exact verified-memory retrieval for factual completion."
+        ),
     }[role]
     return (
         "Activated Memory JSON (context only):\n"

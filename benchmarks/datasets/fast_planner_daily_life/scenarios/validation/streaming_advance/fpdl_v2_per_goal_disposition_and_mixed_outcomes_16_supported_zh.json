@@ -30,7 +30,6 @@
       "context": {},
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -40,13 +39,11 @@
           "local_ref": "r1",
           "outcome": "讲一个相关的轻松笑话。",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -56,18 +53,17 @@
           "local_ref": "r2",
           "outcome": "正好眨眼一次。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_per_goal_disposition_and_mixed_outcomes_16_supported_zh",
-      "text": "请讲一个关于今天的学习安排的轻松笑话，并眨眼一次。"
+      "text": "请讲一个关于今天的学习安排的轻松笑话，并眨眼一次。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

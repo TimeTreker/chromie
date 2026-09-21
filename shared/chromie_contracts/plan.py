@@ -897,6 +897,14 @@ class PlanParameterResolution(BaseModel):
         return self
 
 
+GOAL_SATISFACTION_SCORE_BANDS = {
+    "exact": (0.95, 1.0),
+    "substantial": (0.75, 0.949999),
+    "partial": (0.01, 0.749999),
+    "unsatisfied": (0.0, 0.0),
+}
+
+
 class GoalSatisfactionAssessment(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -919,9 +927,8 @@ class GoalSatisfactionAssessment(BaseModel):
 
     @model_validator(mode="after")
     def validate_status_band(self) -> "GoalSatisfactionAssessment":
-        minimums = {"exact": 0.95, "substantial": 0.75, "partial": 0.01, "unsatisfied": 0.0}
-        maximums = {"exact": 1.0, "substantial": 0.949999, "partial": 0.749999, "unsatisfied": 0.0}
-        if self.score < minimums[self.status] or self.score > maximums[self.status]:
+        minimum, maximum = GOAL_SATISFACTION_SCORE_BANDS[self.status]
+        if self.score < minimum or self.score > maximum:
             raise ValueError("goal satisfaction score is inconsistent with status")
         if self.status == "exact" and (self.unmet_goal_ids or self.unmet_requirements):
             raise ValueError("exact goal satisfaction cannot report unmet goals or requirements")

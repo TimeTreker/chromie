@@ -114,7 +114,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -126,13 +125,11 @@
           "local_ref": "r1",
           "outcome": "Walk forward for five seconds as one atomic member.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -143,18 +140,17 @@
           "local_ref": "r2",
           "outcome": "Create an 8:00 p.m. reminder as the other atomic member.",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_atomic_plan_integrity_and_safe_alternatives_50_boundary_en",
-      "text": "For using the shared room without disturbing anyone, walk forward five seconds and create an 8:00 p.m. reminder; do both or neither."
+      "text": "For using the shared room without disturbing anyone, walk forward five seconds and create an 8:00 p.m. reminder; do both or neither.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

@@ -260,7 +260,7 @@ class InterpreterSemanticTaskPromptTests(unittest.TestCase):
         self.assertIn("Prepare or obtain coffee", prompt)
         self.assertIn("Goal meaning context JSON", prompt)
         self.assertIn("no canonical Goal identity", prompt)
-        self.assertIn("system WHAT-only contract", prompt)
+        self.assertIn("system meaning-and-cognitive-orchestration contract", prompt)
         self.assertIn("authoritative turn", prompt)
         self.assertIn("bounded human-meaning Context", prompt)
         self.assertNotIn('"route"', prompt)

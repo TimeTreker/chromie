@@ -209,7 +209,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -235,18 +234,17 @@
           "local_ref": "r1",
           "outcome": "获取并交付所请求的杭州天气信息。",
           "output_mode": "information",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_blocked_degraded_failed_or_unsafe_reentry_03_supported_zh",
-      "text": "如果仍然安全，请重试失败的杭州天气查询。"
+      "text": "如果仍然安全，请重试失败的杭州天气查询。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_reentry"
   },

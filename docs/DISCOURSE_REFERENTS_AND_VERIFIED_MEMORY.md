@@ -184,6 +184,20 @@ this Goal while sending `location=重庆`.
 
 ## Verified memory retrieval
 
+Memory is a shared cognitive substrate, not another semantic decision owner. UMI,
+GA, Social Cognition and Planner receive role-bounded activated Memory projections;
+Planner combines the current canonical Goal, actual Runtime Work/Evidence, relevant
+activated Memory and the verified-tool-memory index before authoring new Work.
+Memory may make reuse relevant, but it never establishes execution, completion or
+authorization by itself.
+
+The committed `ExecutionOutcomeBundle` is the authoritative write boundary for
+verified tool-result Memory. Once a provider observation is schema-valid, exact-bound
+to committed Work and accepted into ExecutionOutcome, conversation state immediately
+retains its bounded evidence ID, tool ID, original material arguments, age/provenance
+and result payload. Reuse therefore does not depend on a later spoken response carrying
+the outcome bundle again. Only completed observations are advertised for retrieval.
+
 Raw prior result contents are not injected into Goal Association or ordinary
 Planner prompts. Instead, the Planner sees a bounded index containing
 only:
@@ -228,6 +242,13 @@ speech was actually delivered and the Host marks it with its source Goal and
 Canonical Plan IDs. Fast Planner may use this delivered
 evidence-bound dialogue to interpret or restate the same completed Goal without
 reopening it or repeating the external read.
+
+When Social Cognition delivers the final evidence-bound answer, playback completion is
+also the lifecycle boundary for the covered information Goal. The delivered dialogue is
+recorded with its exact source Goal, Plan and Evidence references, and the Goal is closed
+only when those references match committed completed execution Evidence. Progress speech,
+undelivered speech, or an answer lacking matching Evidence cannot close an information
+Goal. This keeps conversation continuity, Memory reuse and Goal lifecycle consistent.
 
 This projection is deliberately narrower than raw result memory:
 

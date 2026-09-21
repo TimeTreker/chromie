@@ -83,7 +83,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -103,18 +102,17 @@
           "local_ref": "r1",
           "outcome": "Blink a user-chosen number of times that is not yet specified.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_parameter_resolution_and_provenance_12_boundary_en",
-      "text": "For the detail that was unclear, blink a suitable number of times, but I have not chosen how many."
+      "text": "For the detail that was unclear, blink a suitable number of times, but I have not chosen how many.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

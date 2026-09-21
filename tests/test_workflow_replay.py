@@ -262,7 +262,7 @@ def test_valid_candidate_variation_stops_at_uncovered_downstream_branch(tmp_path
 
 def test_candidate_mode_rejects_fault_injection_references():
     from benchmarks.integration.model_replay import load_case
-    case = load_case(CORPUS/'workflow-umi_unknown_binding-blink-0-0.json')
+    case = load_case(CORPUS/'workflow-gi_unknown_binding-blink-0-0.json')
     with pytest.raises(ValueError, match='intentional model faults'):
         ModelReplay(case, candidate={'role':'umi','url':'http://127.0.0.1:1','model':'unused'})
 

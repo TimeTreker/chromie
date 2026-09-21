@@ -2296,6 +2296,64 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
             ["goal-open", "goal-done"],
         )
 
+    def test_terminal_history_cannot_be_replaced_or_both_related_and_replaced(self):
+        for status in ("satisfied", "cancelled", "refused", "superseded"):
+            terminal = active_goal("goal-weather", "Check Chongqing weather.")
+            terminal["responsibility_status"] = status
+            terminal["goal"]["responsibility_status"] = status
+            for related in ([], ["goal-weather"]):
+                with self.subTest(status=status, related=related):
+                    raw = {
+                        "associations": [],
+                        "new_goals": [intent_goal(
+                            "Will it rain today?", "information",
+                            related_goal_ids=related,
+                            supersedes_goal_ids=["goal-weather"],
+                        )],
+                        "referent_updates": [], "resolved_references": [],
+                        "cognitive_requests": [], "confidence": 1.0,
+                        "reason_summary": "Follow up on the previous weather result.",
+                    }
+                    schema = ga_schema.goal_association_response_schema(
+                        GoalAssociationModelOutput, [terminal], [],
+                        responsibility_count=1, responsibility_refs=["r1"],
+                        responsibility_output_modes={"r1": "information"},
+                    )
+                    self.assertFalse(Draft202012Validator(schema).is_valid(raw))
+                    req = request("Will it rain today?", active_goals=[terminal])
+                    result = self._resolve([raw], req)
+                    self.assertEqual(result.resolution_status, "fail_closed")
+                    self.assertEqual(result.new_goals, [])
+                    valid = copy.deepcopy(raw)
+                    valid["new_goals"][0]["supersedes_goal_ids"] = []
+                    self.assertTrue(Draft202012Validator(schema).is_valid(valid))
+                    self.assertEqual(self._resolve([valid], req).resolution_status, "resolved")
+
+    def test_mixed_candidates_allow_only_open_replacement_targets(self):
+        current = active_goal("goal-open", "An unfinished lookup.")
+        terminal = active_goal("goal-done", "A completed lookup.")
+        terminal["responsibility_status"] = "satisfied"
+        terminal["goal"]["responsibility_status"] = "satisfied"
+        schema = ga_schema.goal_association_response_schema(
+            GoalAssociationModelOutput, [current, terminal], [],
+            responsibility_count=1, responsibility_refs=["r1"],
+            responsibility_output_modes={"r1": "information"},
+        )
+        raw = {
+            "associations": [],
+            "new_goals": [intent_goal(
+                "Replace the unfinished lookup.", "information",
+                related_goal_ids=["goal-done"], supersedes_goal_ids=["goal-open"],
+            )],
+            "referent_updates": [], "resolved_references": [],
+            "cognitive_requests": [], "confidence": 1.0, "reason_summary": "Replace.",
+        }
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid(raw))
+        raw["new_goals"][0]["related_goal_ids"] = []
+        raw["new_goals"][0]["supersedes_goal_ids"] = ["goal-done"]
+        self.assertFalse(validator.is_valid(raw))
+
     def test_existing_goal_continuity_commits_without_creation_or_audit(self):
         ollama = ScriptedOllama(
             [

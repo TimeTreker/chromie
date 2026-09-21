@@ -363,11 +363,15 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
         self.assertEqual(projected["Prior dialogue"][0]["text"], "x" * 32000)
 
     def test_all_planner_packets_preserve_authoritative_unresolved_meaning(self):
-        marker = "UMI unresolved-meaning evidence (exact strings or empty):\n"
+        marker = "UMI semantic uncertainty evidence (exact objects or empty):\n"
         for sibling in (False, True):
-            for unresolved in ([], ["Which content?", '对象含有引号："小明"'], ["x" * 1200]):
+            for unresolved in ([], ["Which content?", '对象含有引号："小明"'], ["x" * 320]):
                 run_request, _ = self.speech_outcomes("clarify", sibling)
-                run_request = run_request.model_copy(update={"meaning_uncertainties": unresolved})
+                from shared.chromie_contracts.core_interpretation import UserMeaningUncertainty
+                uncertainties = [UserMeaningUncertainty(local_ref=f"u{i}", kind="referent", description=text,
+                    responsibility_refs=[item.local_ref for item in run_request.responsibilities])
+                    for i, text in enumerate(unresolved)]
+                run_request = run_request.model_copy(update={"meaning_uncertainties": uncertainties})
                 renderers = {
                     "canonical_fast": lambda: planner_prompt.fast_plan_prompt(run_request, [], response_schema={}),
                     "canonical_deep": lambda: planner_prompt.deep_plan_prompt(run_request, [], response_schema={}, expected_goal_ids=[]),
@@ -378,7 +382,7 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
                         packet = str(render())
                         self.assertEqual(packet.count(marker), 1)
                         projected, _ = json.JSONDecoder().raw_decode(packet.split(marker, 1)[1])
-                        self.assertEqual(projected, unresolved)
+                        self.assertEqual(projected, [item.model_dump(mode="json") for item in uncertainties])
 
     @staticmethod
     def speech_outcomes(disposition, sibling=False):

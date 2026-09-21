@@ -129,7 +129,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -153,18 +152,17 @@
           "local_ref": "r1",
           "outcome": "Move toward the requester only if safe movement is available.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_no_change_or_no_safe_plan_10_boundary_en",
-      "text": "Move toward me even though the safety state says motion is blocked."
+      "text": "Move toward me even though the safety state says motion is blocked.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_reentry"
   },

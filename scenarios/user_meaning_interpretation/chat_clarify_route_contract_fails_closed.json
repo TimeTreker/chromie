@@ -22,7 +22,8 @@
           "route": "chat",
           "confidence": 0.95,
           "responsibilities": [],
-          "meaning_uncertainties": []
+          "meaning_uncertainties": [],
+          "cognitive_requests": []
         }
       }
     ]

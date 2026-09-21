@@ -27,9 +27,9 @@ def test_user_meaning_interpretation_prompt_uses_general_rules_not_casebook_lite
         "'tonight'",
     ):
         assert literal not in prompt
-    assert "ordering and concurrency" in prompt.casefold()
-    assert "inclusive source-token span" in prompt
-    assert "difference between asking whether" in prompt
+    assert "ordering, concurrency" in prompt.casefold()
+    assert "source_evidence span must cover every current-turn material clause" in prompt
+    assert "Do not convert a question about whether P is true into an assertion that P is true." in prompt
 
 
 def test_deep_user_meaning_interpretation_atomicity_rule_is_language_independent() -> None:
@@ -55,8 +55,8 @@ def test_goal_association_prompt_does_not_embed_weather_or_tonight_templates() -
         "tonight uses one constraint",
     ):
         assert literal not in source
-    assert "Every Responsibility ref must occur exactly once across" in source
-    assert "Preserve compound intentions intact; Planner decomposes Activities" in source
+    assert "Every supplied Responsibility ref must occur exactly once across" in source
+    assert "intact; Planner decomposes Activities" in source
 
 
 def test_fast_planner_truth_prompt_preserves_epistemic_strength_without_phrase_table() -> None:
@@ -89,12 +89,12 @@ def test_weather_capability_prompt_metadata_has_no_place_phrase_table() -> None:
 
 def test_concrete_cases_remain_as_regression_evidence_outside_production_prompts() -> None:
     umi_tests = _text("tests/test_user_meaning_interpreter_llm_prompt.py") + "\n".join(
-        p.read_text() for p in (ROOT / "benchmarks/datasets/user_meaning_interpretation_daily_life/scenarios").rglob("*.json"))
+        p.read_text() for p in (ROOT / "benchmarks/datasets/goal_interpretation_daily_life/scenarios").rglob("*.json"))
     fast_tests = _text("tests/test_fast_planner_pr3.py")
     ga_tests = _text("tests/test_goal_association_pr2.py") + "\n".join(
         p.read_text() for p in (ROOT / "benchmarks/datasets/goal_association_daily_life/scenarios").rglob("*.json"))
     primary = "\n".join(p.read_text() for p in
-        (ROOT / "benchmarks/datasets/user_meaning_interpreter_primary/scenarios").glob("*.json"))
+        (ROOT / "benchmarks/datasets/goal_interpreter_primary/scenarios").glob("*.json"))
     assert "Sing a short song while waving." in primary
     assert "今晚重庆会不会下雨哦？" in primary
     assert "76%" in fast_tests

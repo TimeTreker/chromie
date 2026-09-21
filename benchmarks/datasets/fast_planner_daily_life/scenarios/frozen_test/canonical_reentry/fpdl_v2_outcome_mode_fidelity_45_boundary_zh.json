@@ -83,7 +83,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -103,18 +102,17 @@
           "local_ref": "r1",
           "outcome": "演唱一句愉快的话。",
           "output_mode": "singing",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_outcome_mode_fidelity_45_boundary_zh",
-      "text": "请唱一句关于我刚才好奇的一件小事的愉快句子。"
+      "text": "请唱一句关于我刚才好奇的一件小事的愉快句子。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

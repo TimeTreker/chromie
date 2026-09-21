@@ -30,7 +30,6 @@
       "context": {},
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -40,18 +39,17 @@
           "local_ref": "r1",
           "outcome": "Provide one warm concise sentence about our morning greeting.",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_direct_communicative_planning_04_supported_en",
-      "text": "Give me a warm, concise sentence about our morning greeting; do not perform any action."
+      "text": "Give me a warm, concise sentence about our morning greeting; do not perform any action.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

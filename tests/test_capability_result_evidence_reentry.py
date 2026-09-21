@@ -67,8 +67,10 @@ async def _social_result(request, plan):
     )
 
 
-@pytest.mark.parametrize("tier", ["fast", "deep"])
-@pytest.mark.parametrize("failure_kind", ["returned", "raised", "goal_scope"])
+@pytest.mark.parametrize("tier,failure_kind", [
+    (tier, kind) for tier in ("fast", "deep")
+    for kind in ("returned", "raised", "goal_scope")
+] + [("fast", "invalid_model_dto")])
 def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind):
     from orchestrator.runtime.cognitive_runtime import CognitiveStageFailure
 
@@ -98,6 +100,31 @@ def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind
     selected.return_value = failure
     if failure_kind == "raised":
         selected.side_effect = TimeoutError("transport deadline")
+    if failure_kind == "invalid_model_dto":
+        from agent.app.fast_planner import FastPlannerResolver
+        from agent.app.planner_model_contract import PlannerEvidenceReentryModelOutput
+        from pydantic import ValidationError
+
+        # Replay the recorded Pydantic failure through the real Fast resolver and
+        # Host join. A transport-shaped mock Plan cannot test misclassification.
+        with pytest.raises(ValidationError) as invalid:
+            PlannerEvidenceReentryModelOutput.model_validate({
+                "goal_decisions": [{
+                    "goal_id": goal_id, "next_action": "respond",
+                    "satisfaction_status": "substantial", "satisfaction_score": 1.0,
+                    "evidence_refs": ["weather-result"],
+                }],
+                "new_work": [], "confidence": 1.0, "plan_relation": "exact",
+                "user_confirmation_required": False, "escalation_reason": "",
+            })
+        model = SimpleNamespace(generate=AsyncMock(side_effect=invalid.value))
+        catalog = SimpleNamespace(prompt_entries=AsyncMock(return_value=[]))
+        resolver = FastPlannerResolver(model, catalog)
+
+        async def resolve_invalid(_session, *, request, **_kwargs):
+            return await resolver.resolve(request)
+
+        selected.side_effect = resolve_invalid
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = client
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(mode="apply")
@@ -116,7 +143,10 @@ def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind
         "goal_association": {"associations": [], "new_goals": [{"goal_id": goal_id,
             "source_responsibility_refs": ["r-weather"], "source_text": "Check the weather."}]},
     })
-    expected_error = {"returned": CognitiveStageFailure, "raised": TimeoutError, "goal_scope": ValueError}[failure_kind]
+    expected_error = {
+        "returned": CognitiveStageFailure, "raised": TimeoutError,
+        "goal_scope": ValueError, "invalid_model_dto": CognitiveStageFailure,
+    }[failure_kind]
     with pytest.raises(expected_error):
         asyncio.run(_planner_evidence_reentry(
             assistant, source_response=source, canonical_plan=semantic_escalation,

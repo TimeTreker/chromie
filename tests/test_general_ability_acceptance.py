@@ -41,6 +41,29 @@ from scripts.general_ability_acceptance import (
 from scripts.interaction_text_mujoco_check import build_parser as build_text_check_parser
 
 
+@pytest.mark.parametrize("status", [None, "open", "abandoned", "satisfied"])
+def test_spoken_answer_does_not_hide_unfinished_created_goal(status):
+    case = TextScenarioCase(case_id="answer_completion", text="Answer the question.",
+                            expect_created_goals_satisfied=True)
+    summary = {
+        "interaction_response": {"speech": [], "capabilities": []},
+        "preview_only": False,
+        "cognitive_runtime": {"goal_association": {"new_goals": [{"goal_id": "goal:answer"}]}},
+        "session_state": {"scheduled_tts": 1, "played_tts": 1, "queued_tts": 0,
+                          "workflow_events": [{"event": "tts_schedule", "message": "order=1 text='The answer.'"},
+                                              {"event": "playback_end", "message": "order=1"}]},
+    }
+    if status is not None:
+        summary["final_goal_snapshots"] = [
+            {"goal": {"goal_id": "goal:answer", "responsibility_status": status}},
+            {"goal": {"goal_id": "unrelated", "responsibility_status": "open"}},
+        ]
+    errors = validate_live_text_result(case, summary)
+    assert (errors == []) == (status == "satisfied"), errors
+    if status != "satisfied":
+        assert any("Goal" in error for error in errors)
+
+
 @pytest.mark.parametrize("stage", ["must_pass", "core"])
 @pytest.mark.parametrize("failure", [
     {"turn_id": "scenario-turn", "sid": "cbe8a87b", "cognitive_runtime": {"status": "error", "metadata": {
@@ -229,17 +252,18 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertIn("qualification_workdag_walk_blink_once", live_ids)
         self.assertIn("qualification_continuous_weather_reentry", live_ids)
         self.assertIn("standalone_greeting_one_natural_reply", live_ids)
+        self.assertIn("weather_rain_followup_after_completed_lookup", live_ids)
         self.assertFalse(
             (DEFAULT_LEVEL_A_SCENARIO_ROOT / "general_ability_acceptance.json").exists()
         )
         self.assertEqual(
             [(stage.stage_id, len(stage.scenario_paths)) for stage in manifest.stages],
-            [("must_pass", 51), ("core", 15), ("challenge", 8)],
+            [("must_pass", 52), ("core", 15), ("challenge", 8)],
         )
-        self.assertEqual(len(live_ids), 74)
+        self.assertEqual(len(live_ids), 75)
         self.assertEqual(
             len({ref.source_path for ability in manifest.ability_classes for ref in ability.live_text_cases}),
-            74,
+            75,
         )
         generated = [
             ref

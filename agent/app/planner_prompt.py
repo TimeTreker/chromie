@@ -53,12 +53,14 @@ try:
         CognitiveWorkRequest,
     )
     from chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
+    from chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.core_interpretation import (
         CognitiveResponsibilityProposal,
         CognitiveWorkRequest,
     )
     from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
+    from shared.chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS
 
 
 CAPABILITY_LOOKUP_PROMPT = (
@@ -687,6 +689,10 @@ def fast_evidence_reentry_prompt(
     scope = request.planner_reentry_scope
     goal_ids = set(scope.goal_ids)
     evidence_refs = set(scope.evidence_refs)
+    score_bands = "; ".join(
+        f"{status}={minimum:g}..{maximum:g}"
+        for status, (minimum, maximum) in GOAL_SATISFACTION_SCORE_BANDS.items()
+    )
     contract = (
         "You are Chromie's Fast Planner handling a trusted post-execution Evidence re-entry. "
         "There is no new user meaning and no new Goal Association decision. Decide only what "
@@ -702,6 +708,9 @@ def fast_evidence_reentry_prompt(
         "only for a real user-resolvable blocker; unavailable/refused are terminal limitations; "
         "escalate delegates unresolved HOW without Work. SC owns all user-facing wording. "
         "satisfaction_score/status assess how fully the selected next action covers the Goal; "
+        f"the score must lie in the selected status band: {score_bands}. "
+        "Use an empty escalation_reason unless at least one Goal actually chooses escalate; "
+        "an escalation needs a nonblank reason and no new_work. "
         "pending execution alone does not lower prospective adequacy. Preserve uncertainty and "
         "epistemic strength from Evidence. Historical source Work and execution facts are input "
         "provenance only, never examples of the output shape. plan_relation normally stays exact; "

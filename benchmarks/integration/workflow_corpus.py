@@ -10,8 +10,11 @@ import hashlib
 import json
 from pathlib import Path
 
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import _source_tokens
+from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
 from agent.app.goal_association_contract import GoalAssociationModelOutput
+from agent.app.planner_model_contract import (
+    PlannerEvidenceReentryModelOutput, materialize_evidence_reentry_model_output,
+)
 from benchmarks.integration.model_replay import encoded
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -77,6 +80,17 @@ def _raw_reference_case(family, action, value_index, form):
     conditional = family in {'conditional_rain','conditional_dry','acquisition_false_completion'}
     seed = 'delayed' if delayed else 'conditional-dry' if family == 'conditional_dry' else 'conditional-rain' if conditional else 'cancellation' if family == 'cancellation' else 'normal'
     case = json.loads((SEEDS/f'workflow-{seed}.json').read_text())
+    # Author contrasts using the canonical representation, then freeze the current
+    # wire shape below. Strict replay never performs this authoring conversion.
+    for step in case['model_steps']:
+        if 'goal_decisions' in step['response']:
+            compact = PlannerEvidenceReentryModelOutput.model_validate(step['response'])
+            step['response'] = materialize_evidence_reentry_model_output(
+                compact, expected_goal_ids_for_turn=[item.goal_id for item in compact.goal_decisions],
+                allowed_evidence_refs={'${evidence}'},
+                completed_step_evidence={'read': {'evidence_id': '${evidence}',
+                    'source_goal_ids': [item.goal_id for item in compact.goal_decisions]}},
+            )
     value = VALUES[action][value_index]
     zh = form in {2,3}
     language = 'zh-CN' if zh else 'en-US' if form in {0,1} else 'auto'
@@ -142,7 +156,7 @@ def _raw_reference_case(family, action, value_index, form):
         prior['object']['bindings'] = {**{b['name']:b for b in bindings}, 'ready_at':readiness}
     for step in case['model_steps']:
         step.pop('request', None)
-        role = step['name'].split('-')[0]
+        role = step['role']
         if role in {'fast','deep'}:
             source_step_name = step['name']
             role = case['initial_planner'] if step['name'].endswith('initial') else role
@@ -184,7 +198,7 @@ def _raw_reference_case(family, action, value_index, form):
         association = GoalAssociationModelOutput.model_validate({'confidence':1.0, 'associations':[{
             'relationship':'cancel','source_responsibility_refs':['r1'],'target_goal_ids':['scheduled-blink'],
             'confidence':1.0,'reason_summary':'Cancel the explicitly referenced scheduled Goal.'}]}).model_dump(mode='json')
-        case['model_steps'] += [{'name':'gi-cancel','role':'gi','response':cancelled}, {'name':'ga-cancel','role':'ga','response':association}]
+        case['model_steps'] += [{'name':'gi-cancel','role':'umi','response':cancelled}, {'name':'ga-cancel','role':'ga','response':association}]
     if family == 'early_work':
         raw = json.loads((SEEDS/'workflow-normal.json').read_text())['model_steps'][2]['response']
         raw['steps'][0].update(capability_id=capability,args={argument:value})
@@ -195,7 +209,7 @@ def _raw_reference_case(family, action, value_index, form):
         if family == 'gi_duplicate_ref': gi['responsibilities'].append(copy.deepcopy(responsibility))
         if family == 'gi_bad_source': responsibility['source_evidence']['source_end_token_ref'] = 't9999'
         if family == 'gi_unknown_binding': responsibility['binding_items']['invented_owner_field'] = 'unsupported'
-        reject(case,'gi')
+        reject(case,'umi')
     if family.startswith('ga_'):
         if family == 'ga_missing_source': ga['new_goals'][0]['source_responsibility_refs'] = []
         if family == 'ga_foreign_source': ga['new_goals'][0]['source_responsibility_refs'] = ['r-foreign']
@@ -247,7 +261,7 @@ def _raw_reference_case(family, action, value_index, form):
             del raw['goal_outcomes']['${goal2}']
             reject(case,'deep')
     for index, step in enumerate(case['model_steps']):
-        if step['role'] == 'gi':
+        if step['role'] == 'umi':
             step['required_prompt_fragments'] = [case.get('followup',case['input'])['text'] if step['name'] == 'gi-cancel' else case['input']['text']]
         elif step['role'] in {'fast','deep'}:
             step['required_prompt_fragments'] = ['${goal}'] + (['${goal2}'] if family in {'multi_goal','multi_goal_omission'} else [])
@@ -331,7 +345,7 @@ def extended_case(family, action, value_index, form):
                 association = GoalAssociationModelOutput.model_validate({'confidence':1.0,'associations':[{
                     'relationship':'cancel','source_responsibility_refs':['r1'],'target_goal_ids':['${goal}'],
                     'confidence':1.0,'reason_summary':'Cancel the explicitly referenced newly scheduled Goal.'}]}).model_dump(mode='json')
-                case['model_steps'] += [{'name':'gi-cancel','role':'gi','response':cancelled},{'name':'ga-cancel','role':'ga','response':association}]
+                case['model_steps'] += [{'name':'gi-cancel','role':'umi','response':cancelled},{'name':'ga-cancel','role':'ga','response':association}]
         else:
             case['model_steps'].append({'name':'fast-due','role':'fast','response':raw})
     elif family in {'ambiguous_readiness','gi_depth_resolved','gi_depth_unresolved'}:
@@ -356,7 +370,7 @@ def extended_case(family, action, value_index, form):
         else:
             _speech_plan(raw, '请说明具体时间和时区。' if family == 'ambiguous_readiness' and zh else 'Please specify the time, timezone and AM or PM.' if family == 'ambiguous_readiness' else '你指的是哪个对象？' if zh else 'Which one do you mean?', clarify=True)
             case.update(probe='clarification', expected_goal_status='open', expected_provider_calls=[])
-        case['model_steps'].insert(1,{'name':'gi-deep','role':'gi','response':deeper})
+        case['model_steps'].insert(1,{'name':'gi-deep','role':'umi','response':deeper})
     elif family in {'speech_fast','speech_deep','speech_exact_quote','mixed_action_speech'}:
         names = {'blink':('眨眼','blinking'), 'walk':('向前走','walking forward'), 'nod':('点头','nodding'), 'shake':('摇头','shaking your head')}
         descriptions = {'blink':('眨眼是短暂闭上再睁开眼睛。','Blinking means briefly closing and reopening the eyes.'),
@@ -441,7 +455,7 @@ def extended_case(family, action, value_index, form):
         raise ValueError(f'Unimplemented authored family: {family}')
     for index,step in enumerate(case['model_steps']):
         step.pop('request',None)
-        step['required_prompt_fragments'] = [case['followup']['text'] if step['name']=='gi-cancel' else case['input']['text']] if step['role']=='gi' else ['${goal}'] if step['role'] in {'fast','deep'} else []
+        step['required_prompt_fragments'] = [case['followup']['text'] if step['name']=='gi-cancel' else case['input']['text']] if step['role']=='umi' else ['${goal}'] if step['role'] in {'fast','deep'} else []
         step['fixture_kind'] = 'fault_injection' if case.get('expected_rejection') and index==len(case['model_steps'])-1 else 'authored_reference'
         step['training_eligible'] = False
     return _separate_interaction(case)
@@ -451,7 +465,7 @@ def reject(case, role):
     case['probe'] = case['coverage_family']
     case['expected_rejection'] = role
     if case['expected_verdict'] != 'known_contract_gap': case['expected_verdict'] = 'expected_rejection'
-    case['model_steps'] = case['model_steps'][:{'gi':1,'ga':2,'deep':3,'fast':3}[role]]
+    case['model_steps'] = case['model_steps'][:{'umi':1,'ga':2,'deep':3,'fast':3}[role]]
 
 
 def reference_case(family, action, value_index, form):
@@ -470,7 +484,7 @@ def _intent_reference(case):
     expected_calls = {item['capability']:item['args'] for item in case['expected_provider_calls']}
     for step in case['model_steps']:
         raw = step['response']
-        if step['role'] == 'gi':
+        if step['role'] == 'umi':
             raw.pop('coordination', None)
             for r in raw['responsibilities']:
                 forbidden = r.get('binding_items', {}).get('invented_owner_field')
@@ -478,7 +492,20 @@ def _intent_reference(case):
                     r.pop(key, None)
                 if forbidden is not None:
                     r['binding_items'] = {'invented_owner_field':forbidden}
+                r['continuity_scope'] = 'turn' if r['output_mode'] == 'speech' else 'goal'
+            refs = list(dict.fromkeys(r['local_ref'] for r in raw['responsibilities']))
+            if 'unresolved' in raw:
+                raw['meaning_uncertainties'] = [
+                    {'local_ref': f'u{i+1}', 'kind': 'referent', 'description': text,
+                     'responsibility_refs': refs}
+                    for i, text in enumerate(raw.pop('unresolved'))
+                ]
+            raw['cognitive_requests'] = [{'authority': 'planner', 'responsibility_refs': refs,
+                'reason_summary': 'Run the explicitly authored role transaction.'}]
         elif step['role'] == 'ga':
+            raw['cognitive_requests'] = []
+            if any(r['output_mode'] == 'speech' for r in primary):
+                raw['non_goal_responsibility_refs'] = []
             for g in raw.get('new_goals', []):
                 mutant = g.get('bindings') if family == 'ga_binding_mutation' else None
                 for key in tuple(g):
@@ -502,6 +529,21 @@ def _intent_reference(case):
                         'blocking':False,'rationale':'Realize the exact owning intent through the selected capability.',
                         'source_goal_ids':sources,'source_quote':quote})
             raw['parameter_resolutions'] = proofs
+            if step['name'] == 'fast-result':
+                step['response'] = {
+                    'goal_decisions': [{'goal_id': gid, 'next_action': outcome['disposition'],
+                        'satisfaction_status': outcome['satisfaction']['status'],
+                        'satisfaction_score': outcome['satisfaction']['score'],
+                        'evidence_refs': ['${evidence}'],
+                        'unresolved_needs': outcome.get('unresolved', []),
+                        'unmet_requirements': outcome['satisfaction'].get('unmet_requirements', []),
+                        'rationale': outcome['satisfaction'].get('rationale', '')}
+                        for gid, outcome in raw['goal_outcomes'].items()],
+                    'new_work': raw['steps'], 'confidence': raw['confidence'],
+                    'plan_relation': raw['plan_relation'],
+                    'user_confirmation_required': raw['user_confirmation_required'],
+                    'escalation_reason': raw.get('escalation_reason', ''),
+                }
     case['reference_review'] = 'Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent.'
     case['provenance']['authority_migration'] = 'GI preserves complete intent/type, GA inherits intent and owns continuity, Planner authors arguments and source-bound readiness.'
     return case

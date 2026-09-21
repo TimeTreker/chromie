@@ -58,6 +58,8 @@ def materialize_fast_escalation(
                 **llm_failure_metadata(error),
             }
         )
+    if path_classification == "contract_failure":
+        detail.update(execution_allowed=False, retryable=False)
     retained_progress = " ".join(str(response_text or "").strip().split())
     if retained_progress:
         detail["retained_progress_response_text"] = {

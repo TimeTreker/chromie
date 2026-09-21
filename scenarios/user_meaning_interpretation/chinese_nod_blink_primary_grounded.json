@@ -47,7 +47,17 @@
               "continuity_scope": "goal"
             }
           ],
-          "meaning_uncertainties": []
+          "meaning_uncertainties": [],
+          "cognitive_requests": [
+            {
+              "authority": "planner",
+              "responsibility_refs": [
+                "r1",
+                "r2"
+              ],
+              "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+            }
+          ]
         }
       }
     ]

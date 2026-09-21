@@ -128,7 +128,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -150,18 +149,17 @@
           "local_ref": "r1",
           "outcome": "确认请求的安慰回应已经送达，不要重播。",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_no_change_or_no_safe_plan_10_supported_zh",
-      "text": "谢谢；你已经说过那句安慰的话了，不要重复。"
+      "text": "谢谢；你已经说过那句安慰的话了，不要重复。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_reentry"
   },

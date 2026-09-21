@@ -98,6 +98,7 @@ class TextScenarioCase:
     expected_observation_sequence: tuple[str, ...] = field(default_factory=tuple)
     min_new_goal_count: int = 0
     min_goal_outcome_count: int = 0
+    expect_created_goals_satisfied: bool = False
     forbidden_plan_agent_skills: tuple[str, ...] = field(default_factory=tuple)
     require_llm_integrity: bool = True
     require_safe_idle: bool = False
@@ -904,6 +905,21 @@ def validate_live_text_result(
             f"expected at least {case.min_goal_outcome_count}, got "
             f"{structured_metrics['goal_outcome_count']}"
         )
+    if case.expect_created_goals_satisfied:
+        association = (summary.get("cognitive_runtime") or {}).get("goal_association") or {}
+        created_ids = {row.get("goal_id") for row in association.get("new_goals", [])
+                       if isinstance(row, dict) and row.get("goal_id")}
+        snapshots = summary.get("final_goal_snapshots")
+        if not created_ids or not isinstance(snapshots, list) or summary.get("preview_only"):
+            errors.append("created Goals require executed final Goal snapshots")
+        else:
+            goals = {row["goal"]["goal_id"]: row["goal"] for row in snapshots
+                     if isinstance(row, dict) and isinstance(row.get("goal"), dict)
+                     and row["goal"].get("goal_id")}
+            for goal_id in sorted(created_ids):
+                status = goals.get(goal_id, {}).get("responsibility_status")
+                if status != "satisfied":
+                    errors.append(f"created Goal {goal_id} is not satisfied at session end: {status!r}")
     if structured_metrics["forbidden_plan_agent_skills_selected"]:
         errors.append(
             "stale or unrelated Agent Skill provenance selected: "
@@ -1060,6 +1076,7 @@ def _text_scenario_case(
             raw.get("expected_observation_sequence")
         ),
         min_new_goal_count=max(0, int(raw.get("min_new_goal_count", 0))),
+        expect_created_goals_satisfied=bool(raw.get("expect_created_goals_satisfied", False)),
         min_goal_outcome_count=max(
             0,
             int(raw.get("min_goal_outcome_count", 0)),
@@ -1926,6 +1943,7 @@ def _live_case_namespace(
 ) -> argparse.Namespace:
     return argparse.Namespace(
         text=case.text,
+        output_format="json",
         agent_url=args.agent_url,
         soridormi_mcp_url=args.soridormi_mcp_url,
         soridormi_repo=args.soridormi_repo,

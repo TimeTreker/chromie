@@ -212,7 +212,7 @@ def test_build_context_uses_disclosure_safe_memory_projection_not_raw_snapshot()
                 }
             ],
         },
-        active_goal_snapshots=lambda: [],
+        active_goal_snapshots=lambda *, limit=None: [],
     )
 
     context = assistant.build_context(None)
@@ -237,7 +237,7 @@ def test_role_memory_preserves_scope_independent_of_storage_and_provenance() -> 
         assert projected[0]["source_turn_ids"] == ["turn-current"]
         assert projected[1]["persistence_policy"] == "durable_with_explicit_consent"
         assert projected[1]["source_turn_ids"] == ["turn-old"]
-        assert "Never infer completion" in prompt
+        assert "Never turn remembered context into a new Responsibility or infer completion" in prompt
 
 
 def test_role_memory_uses_only_activated_entries_and_keeps_whole_records() -> None:

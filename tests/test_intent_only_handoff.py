@@ -86,7 +86,7 @@ def test_complete_intent_needs_no_capability_fields(text):
 
 @pytest.mark.parametrize("name,value", [
     ("binding_items", {"duration": "10 seconds"}),
-    ("bindings", {"direction": "ahead"}),
+    ("bindings", {"capability_id": "test.walk"}),
     ("capability_id", "test.walk"),
     ("relationship", "new"),
     ("target_goal_ids", []),

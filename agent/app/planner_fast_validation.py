@@ -858,9 +858,45 @@ def validate_fast_advance_output(
             for ref in activity.source_responsibility_refs
             for name, value in by_ref[ref].bindings.items()
         }
+        memory_parameters: set[str] = set()
+        if activity.capability_id == "chromie.memory.retrieve_verified_tool_result":
+            # The opaque evidence/tool identities come from trusted context,
+            # never from the user's utterance. Validate the whole selected tuple
+            # before accepting any of its arguments as grounded. Runtime still
+            # checks freshness and returns the actual result after selection.
+            index = request.context.get("verified_tool_memory_index")
+            material = activity.args.get("material_args")
+            matches = [
+                item for item in (index if isinstance(index, list) else [])
+                if isinstance(item, dict)
+                and item.get("evidence_id") == activity.args.get("evidence_id")
+                and item.get("tool_id") == activity.args.get("tool_id")
+                and isinstance(item.get("request_args"), dict)
+                and isinstance(material, dict) and material
+                and all(
+                    key in item["request_args"]
+                    and _material_values_equal(value, item["request_args"][key])
+                    for key, value in material.items()
+                )
+            ]
+            if len(matches) != 1:
+                raise AuthoritativeGroundingValidationError(
+                    "verified-memory retrieval requires one exact trusted index match"
+                )
+            if any(
+                name in authoritative_bindings
+                and not _material_values_equal(value, authoritative_bindings[name])
+                for name, value in material.items()
+            ):
+                raise AuthoritativeGroundingValidationError(
+                    "verified-memory material arguments contradict UMI bindings"
+                )
+            memory_parameters = {"evidence_id", "tool_id", "material_args"}
         for parameter in sorted(required_inputs | set(activity.args)):
             parameter_schema = properties.get(parameter)
             if not isinstance(parameter_schema, dict):
+                continue
+            if parameter in memory_parameters:
                 continue
             # Omitted unbound defaults are executable below Planner. A user/Goal
             # binding still owns WHAT even when the provider declares a default, so
@@ -1019,7 +1055,10 @@ def validate_fast_advance_output(
                 )
             actual = activity.args.get(parameter)
             expected = authoritative_bindings[parameter]
-            if actual != expected and str(actual).strip() != str(expected).strip():
+            # Use the same material-value equivalence as canonical Goal
+            # grounding; capitalization/whitespace must not change whether an
+            # otherwise identical bound value is admitted at the earlier stage.
+            if not _material_values_equal(actual, expected):
                 raise AuthoritativeGroundingValidationError(
                     "Fast Planner required Capability input contradicts UMI "
                     f"binding: {activity.capability_id}.{parameter}"

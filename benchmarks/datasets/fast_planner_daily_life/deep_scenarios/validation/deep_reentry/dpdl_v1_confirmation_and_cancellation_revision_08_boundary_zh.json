@@ -102,7 +102,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -127,18 +126,17 @@
           "local_ref": "r1",
           "outcome": "在重新确认后创建晚上八点的提醒。",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_confirmation_and_cancellation_revision_08_boundary_zh",
-      "text": "取消那个晚上八点的提醒。"
+      "text": "取消那个晚上八点的提醒。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_reentry"
   },

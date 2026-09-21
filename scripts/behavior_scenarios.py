@@ -646,7 +646,7 @@ class _CognitiveScenarioClient:
                 ["deep_planner"] if plan.disposition == "escalate" else []
             ),
             confidence=plan.confidence,
-            unresolved=list(plan.meaning_uncertainties),
+            unresolved=list(plan.unresolved),
             reason_summary=(
                 plan.escalation_reason
                 or str(plan.metadata.get("reason") or "")
@@ -1394,6 +1394,7 @@ async def evaluate_cognitive_runtime_scenario(
         confidence=min(item.confidence for item in responsibilities),
         language=envelope.normalized_input.language,
         responsibilities=responsibilities,
+        cognitive_requests=stub["cognitive_requests"],
     )
     resolution = await coordinator.resolve(
         object(),

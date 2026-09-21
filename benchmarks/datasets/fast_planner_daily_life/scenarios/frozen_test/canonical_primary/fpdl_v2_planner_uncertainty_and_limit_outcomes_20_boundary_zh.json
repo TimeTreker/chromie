@@ -73,9 +73,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [
-        "The intended referent remains unresolved upstream."
-      ],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -87,18 +84,26 @@
           "local_ref": "r1",
           "outcome": "看向一个尚未解析的人物指代三秒。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh",
-      "text": "为了我希望安静互动的偏好，请看着“他们”三秒；但目前没有任何信息说明“他们”是谁。"
+      "text": "为了我希望安静互动的偏好，请看着“他们”三秒；但目前没有任何信息说明“他们”是谁。",
+      "meaning_uncertainties": [
+        {
+          "local_ref": "u1",
+          "kind": "referent",
+          "description": "The intended referent remains unresolved upstream.",
+          "responsibility_refs": [
+            "r1"
+          ]
+        }
+      ]
     },
     "runtime_variant": "canonical_primary"
   },

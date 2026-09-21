@@ -128,7 +128,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -152,18 +151,17 @@
           "local_ref": "r1",
           "outcome": "获取并交付所请求的杭州天气信息。",
           "output_mode": "information",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_resource_contract_composition_42_supported_zh",
-      "text": "请获取杭州明早为在共享房间里不打扰别人所需的天气预报，并向我说明结果。"
+      "text": "请获取杭州明早为在共享房间里不打扰别人所需的天气预报，并向我说明结果。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

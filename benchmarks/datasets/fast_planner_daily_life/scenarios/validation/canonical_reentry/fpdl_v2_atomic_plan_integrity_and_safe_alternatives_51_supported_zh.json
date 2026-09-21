@@ -140,7 +140,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -167,13 +166,11 @@
           "local_ref": "r1",
           "outcome": "在眨眼前看向已识别用户两秒。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -186,18 +183,17 @@
           "local_ref": "r2",
           "outcome": "在看向用户后正好眨眼两次。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_supported_zh",
-      "text": "为了准备晚餐，请把这当作一个有顺序的请求：先看着我两秒，然后眨眼两次。"
+      "text": "为了准备晚餐，请把这当作一个有顺序的请求：先看着我两秒，然后眨眼两次。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

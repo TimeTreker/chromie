@@ -3421,8 +3421,12 @@ class ConversationStateManager:
         for item in self._recent_tool_evidence:
             evidence_id = str(item.get("evidence_id") or "").strip()
             tool_id = str(item.get("tool_id") or "").strip()
+            status = str(item.get("status") or "").strip().casefold()
             request_args = item.get("request_args")
-            if not evidence_id or not tool_id or not isinstance(request_args, dict):
+            if (
+                not evidence_id or not tool_id or status != "completed"
+                or not isinstance(request_args, dict)
+            ):
                 continue
             if not request_args:
                 # A provenance-only record with no original arguments cannot
@@ -3433,7 +3437,7 @@ class ConversationStateManager:
                 {
                     "evidence_id": evidence_id,
                     "tool_id": tool_id,
-                    "status": str(item.get("status") or ""),
+                    "status": status,
                     "request_args": copy.deepcopy(request_args),
                     "recorded_ms": item.get("recorded_ms"),
                     "age_ms": max(
@@ -3474,6 +3478,8 @@ class ConversationStateManager:
             if evidence_id and str(item.get("evidence_id") or "") != evidence_id:
                 continue
             if tool_id and str(item.get("tool_id") or "") != tool_id:
+                continue
+            if str(item.get("status") or "").strip().casefold() != "completed":
                 continue
             request_args = item.get("request_args")
             if not isinstance(request_args, dict):
@@ -3547,6 +3553,8 @@ class ConversationStateManager:
         for raw in evidence_items:
             if not isinstance(raw, dict):
                 continue
+            if str(raw.get("status") or "").strip().casefold() != "completed":
+                continue
             observation = raw.get("observation")
             if not isinstance(observation, dict):
                 continue
@@ -3566,6 +3574,7 @@ class ConversationStateManager:
             request_args = evidence_metadata.get("request_args")
             if not isinstance(request_args, dict):
                 request_args = {}
+            evidence_goal_ids = self._string_list(raw.get("source_goal_ids")) or goal_ids
             entry = {
                 "evidence_id": evidence_id,
                 "tool_id": str(raw.get("capability_id") or "").strip(),
@@ -3577,12 +3586,31 @@ class ConversationStateManager:
                 ).strip(),
                 "recorded_ms": _now_ms(),
                 "user_request": user_request,
-                "goal_ids": goal_ids,
+                "goal_ids": evidence_goal_ids,
                 "canonical_plan_id": canonical_plan_id,
                 "source": "trusted_execution_outcome",
             }
             self._recent_tool_evidence.append(entry)
             known_ids.add(evidence_id)
+
+    def _record_execution_outcome_tool_evidence(
+        self,
+        bundle: ExecutionOutcomeBundle,
+    ) -> None:
+        """Promote committed trusted observations into reusable Memory immediately.
+
+        ExecutionOutcome is the authoritative point at which provider output has
+        already been schema-validated, correlated to exact Work, and committed to
+        Goal state.  Reuse must not depend on a later speech/response object carrying
+        that bundle again.  ``_record_tool_evidence`` keeps the existing bounded,
+        provenance-preserving storage and duplicate suppression policy.
+        """
+
+        self._record_tool_evidence({
+            "canonical_plan_id": bundle.canonical_plan_id,
+            "source_goal_ids": list(bundle.canonical_goal_ids),
+            "execution_outcome_bundle": bundle.model_dump(mode="json"),
+        })
 
     def _memory_activation_texts(self) -> list[str]:
         """Project current context into bounded deterministic Memory cues."""
@@ -3976,16 +4004,38 @@ class ConversationStateManager:
         compact = self._compact_text(text)
         if not compact:
             return
-        self._turns.append(
-            {
+        turn_metadata = dict(metadata or {})
+        activity_ids = self._string_list(turn_metadata.get("communicative_activity_ids"))
+        turn_id = str(turn_metadata.get("turn_id") or "").strip()
+        existing = None
+        if (sid and turn_id and activity_ids
+                and turn_metadata.get("wording_owner") == "social_cognition"
+                and turn_metadata.get("playback_completed") is True):
+            for candidate in reversed(self._turns):
+                prior = candidate.get("metadata") or {}
+                if (candidate.get("role") == "assistant" and candidate.get("sid") == sid
+                        and prior.get("turn_id") == turn_id
+                        and prior.get("wording_owner") == "social_cognition"
+                        and prior.get("playback_completed") is True
+                        and self._string_list(prior.get("communicative_activity_ids")) == activity_ids):
+                    existing = candidate
+                    break
+        if existing is not None:
+            # Runtime has validated full immutable wording before history
+            # compaction. A later Need receipt enriches that delivered act;
+            # it must not become a second utterance in Memory or the console.
+            if existing.get("text") != compact:
+                raise ValueError("Delivered communicative Activity wording cannot change")
+            existing["metadata"] = {**existing["metadata"], **turn_metadata}
+        else:
+            self._turns.append({
                 "role": "assistant",
                 "sid": sid,
                 "text": compact,
                 "ts_ms": _now_ms(),
                 "conversation_id": self.conversation_id,
-                "metadata": metadata or {},
-            }
-        )
+                "metadata": turn_metadata,
+            })
         current_task = self._current_task_context()
         if current_task is not None:
             current_task["last_assistant_response"] = compact
@@ -4892,6 +4942,7 @@ class ConversationStateManager:
             self._pending_tasks = pending_backup
             self._task_contexts = contexts_backup
             raise
+        self._record_execution_outcome_tool_evidence(validated)
         self.last_activity_ms = timestamp_ms
         return results
 
@@ -4902,36 +4953,55 @@ class ConversationStateManager:
     ) -> dict[str, Any]:
         return goal_completion_qualification_summary(bundle, outcome)
 
-    def reconcile_fast_communicative_goal_completion(
+    def reconcile_communicative_goal_completion(
         self,
         sid: str | None,
         goal_ids: list[str],
         *,
         metadata: dict[str, Any] | None = None,
     ) -> list[dict[str, Any]]:
-        """Close no-work speech Goals from delivered Fast Planner speech evidence.
+        """Close Goals only from model-authorized communication actually delivered.
 
-        Fast Planner may deliver a ``complete_response`` before Goal Association
-        has canonical Goal IDs.  The Interaction Runtime binds that already-trusted
-        ``chromie.speak`` completion back to Goal IDs after GA commits.  This method
-        performs only lifecycle reconciliation: it never decides wording, semantic
-        ownership, or whether an Activity was complete.
+        Fast Planner can complete a no-Work speech Goal before GA has canonical IDs;
+        SC can complete a Planner-established answer need only after playback.  For
+        information Goals, delivery alone is insufficient: the delivered act must
+        cite exact trusted execution Evidence already recorded on that Goal.  This
+        boundary performs lifecycle reconciliation only; Planner/SC own semantic
+        eligibility and wording, while Runtime/Evidence own factual truth.
         """
 
         if not self.enabled:
             return []
         evidence = dict(metadata or {})
-        if str(evidence.get("delivery_role") or "") != "complete_response":
+        source = " ".join(str(evidence.get("source") or "").strip().split())
+        fast_delivery = source == "fast_planner_communicative_completion"
+        social_delivery = source == "social_cognition_communicative_completion"
+        if not (fast_delivery or social_delivery):
+            return []
+        if (
+            fast_delivery
+            and str(evidence.get("delivery_role") or "") != "complete_response"
+        ):
             return []
         normalized_sid = " ".join(str(sid or "").strip().split())
-        activity_id = " ".join(
-            str(evidence.get("fast_activity_id") or "").strip().split()
+        delivery_id = " ".join(
+            str(
+                evidence.get("speech_event_id")
+                or evidence.get("fast_activity_id")
+                or evidence.get("interaction_id")
+                or ""
+            ).strip().split()
         )
         evidence_ref = (
-            f"fast_communicative:{activity_id}"
-            if activity_id
-            else "fast_communicative:delivered"
+            f"communicative_delivery:{delivery_id}"
+            if delivery_id
+            else "communicative_delivery:delivered"
         )
+        delivered_evidence_refs = {
+            " ".join(str(value or "").strip().split())
+            for value in evidence.get("evidence_refs") or []
+            if str(value or "").strip()
+        }
         results: list[dict[str, Any]] = []
         changed = False
         now = _now_ms()
@@ -4966,7 +5036,49 @@ class ConversationStateManager:
                     continue
             goal = self._semantic_goal_from_context(context)
             goal_metadata = goal.metadata if isinstance(goal.metadata, dict) else {}
-            if str(goal_metadata.get("output_mode") or "") != "speech":
+            output_mode = str(goal_metadata.get("output_mode") or "").strip()
+            if output_mode == "information":
+                if not social_delivery:
+                    results.append(
+                        {
+                            "goal_id": goal_id,
+                            "changed": False,
+                            "reason": "goal_requires_evidence_bound_social_delivery",
+                        }
+                    )
+                    continue
+                evidence_summary = context.get("evidence_summary")
+                execution_outcome = (
+                    evidence_summary.get("execution_outcome")
+                    if isinstance(evidence_summary, dict)
+                    else None
+                )
+                execution_evidence_refs = {
+                    " ".join(str(value or "").strip().split())
+                    for value in (
+                        execution_outcome.get("evidence_ids")
+                        if isinstance(execution_outcome, dict)
+                        else []
+                    ) or []
+                    if str(value or "").strip()
+                }
+                if (
+                    not isinstance(execution_outcome, dict)
+                    or str(execution_outcome.get("status") or "").strip()
+                    != "completed"
+                    or not delivered_evidence_refs.intersection(
+                        execution_evidence_refs
+                    )
+                ):
+                    results.append(
+                        {
+                            "goal_id": goal_id,
+                            "changed": False,
+                            "reason": "information_delivery_lacks_committed_execution_evidence",
+                        }
+                    )
+                    continue
+            elif output_mode != "speech":
                 results.append(
                     {
                         "goal_id": goal_id,
@@ -4991,7 +5103,7 @@ class ConversationStateManager:
             self._set_goal_responsibility_status(
                 context,
                 "satisfied",
-                source="fast_planner_communicative_completion",
+                source=source,
                 evidence_refs=[evidence_ref],
             )
             context["status"] = "done"
@@ -5001,7 +5113,7 @@ class ConversationStateManager:
             evidence_summary = context.get("evidence_summary")
             if not isinstance(evidence_summary, dict):
                 evidence_summary = {}
-            evidence_summary["fast_communicative_completion"] = {
+            evidence_summary["communicative_completion"] = {
                 **evidence,
                 "evidence_ref": evidence_ref,
                 "goal_id": goal_id,

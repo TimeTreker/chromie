@@ -30,7 +30,6 @@
       "context": {},
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -42,18 +41,17 @@
           "local_ref": "r1",
           "outcome": "眨眼一次，并且只在有可信结果 Evidence 后报告完成。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_truthful_response_staging_and_deduplication_25_boundary_zh",
-      "text": "为了我们的早晨问候眨眼一次，然后在它确实完成后告诉我。"
+      "text": "为了我们的早晨问候眨眼一次，然后在它确实完成后告诉我。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

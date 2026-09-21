@@ -186,7 +186,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -212,18 +211,17 @@
           "local_ref": "r1",
           "outcome": "Report whether rain is expected from the scoped trusted weather Evidence.",
           "output_mode": "information",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_evidence_reentry_interpretation_33_supported_en",
-      "text": "Use the retained weather Evidence for the task we were already discussing and tell me whether rain is expected."
+      "text": "Use the retained weather Evidence for the task we were already discussing and tell me whether rain is expected.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

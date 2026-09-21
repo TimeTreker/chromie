@@ -83,7 +83,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -103,18 +102,17 @@
           "local_ref": "r1",
           "outcome": "Wave one hand exactly once.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_capability_grounding_and_non_substitution_09_boundary_en",
-      "text": "Right now, as a small part of a small thing I was curious about, wave your hand exactly once."
+      "text": "Right now, as a small part of a small thing I was curious about, wave your hand exactly once.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

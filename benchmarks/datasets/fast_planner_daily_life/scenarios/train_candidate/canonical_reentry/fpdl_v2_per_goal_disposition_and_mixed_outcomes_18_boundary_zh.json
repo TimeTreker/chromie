@@ -136,7 +136,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -158,13 +157,11 @@
           "local_ref": "r1",
           "outcome": "讲一个相关的轻松笑话。",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -174,13 +171,11 @@
           "local_ref": "r2",
           "outcome": "正好眨眼一次。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {},
@@ -188,18 +183,17 @@
           "local_ref": "r3",
           "outcome": "挥手一次。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_per_goal_disposition_and_mixed_outcomes_18_boundary_zh",
-      "text": "请讲一个关于课后和朋友见面的轻松笑话、眨眼一次并挥手一次；这三个请求彼此独立。"
+      "text": "请讲一个关于课后和朋友见面的轻松笑话、眨眼一次并挥手一次；这三个请求彼此独立。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

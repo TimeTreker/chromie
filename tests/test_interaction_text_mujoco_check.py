@@ -170,7 +170,11 @@ def test_admitted_runtime_rejection_retains_final_status_without_dispatch(tmp_pa
         _run_cognitive_runtime_pipeline=AsyncMock(return_value=CognitiveRuntimeResolution(
             mode="apply", status="error", fallback_reason="controlled contract rejection")),
         _host_speech_response=Mock(return_value=InteractionResponse(interaction_id="rejected", status="ok")),
-        conversation_state=SimpleNamespace(record_user_turn=Mock(), record_interaction_response=Mock()),
+        conversation_state=SimpleNamespace(
+            record_user_turn=Mock(), record_interaction_response=Mock(),
+            active_goal_snapshots=Mock(return_value=[{"goal": {"goal_id": "goal:open", "responsibility_status": "open"}}]),
+            recent_goal_snapshots=Mock(return_value=[{"goal": {"goal_id": "goal:done", "responsibility_status": "satisfied"}}]),
+        ),
         sessions=SimpleNamespace(state={"admitted": {}}), cognitive_evidence=None,
         _dispatch_detached_interaction=AsyncMock(),
     )
@@ -182,6 +186,10 @@ def test_admitted_runtime_rejection_retains_final_status_without_dispatch(tmp_pa
     assert result["ok"] is False
     assert result["sid"] == "admitted"
     assert result["cognitive_runtime"]["status"] == "error"
+    assert result["final_goal_snapshots"] == [
+        {"goal": {"goal_id": "goal:open", "responsibility_status": "open"}},
+        {"goal": {"goal_id": "goal:done", "responsibility_status": "satisfied"}},
+    ]
     assistant._dispatch_detached_interaction.assert_not_awaited()
     assistant.conversation_state.record_user_turn.assert_called_once()
     assert probe.await_count == (1 if preview else 2)

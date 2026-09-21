@@ -218,23 +218,34 @@
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t1"
-            }
+            },
+            "continuity_scope": "goal"
           }
         ],
-        "unresolved": []
+        "meaning_uncertainties": [],
+        "cognitive_requests": [
+          {
+            "authority": "planner",
+            "responsibility_refs": [
+              "r1"
+            ],
+            "reason_summary": "Run the explicitly authored role transaction."
+          }
+        ]
       },
+      "role": "umi",
       "request": {
-        "model": "fixture-gi",
+        "model": "fixture-umi",
         "stream": false,
         "think": false,
         "messages": [
           {
             "role": "system",
-            "content": "You are Chromie's Goal Interpretation authority. Understand WHAT the person means.\nReturn one complete compact JSON object matching the supplied schema.\n\nWrite outcome as a complete natural-language request in the source language,\nusing the user's wording with minimal edits. Never use an intent label, code,\nunderscore-separated identifier, or output_mode name as the outcome. Do not translate or\nreplace a specific action or question with a broader summary. Preserve the complete\nuser intent in natural language, including all requested effects,\nnegation, modifiers, quantities and their units, conditions, ordering and concurrency.\nKeep each modifier attached to the action or proposition it qualifies. A connected\ncompound request may remain one complete outcome. Do not turn each action into a\nseparate Responsibility merely to prepare execution. Distinct unrelated intentions\nmay be separate Responsibilities, with no omission or duplication. One requested\npredicate with an unclear referent remains one intent plus unresolved meaning;\nperformer, object and recipient are not separate intentions.\n\nDo not extract capability arguments, binding_items, bindings, execution\nsteps, or coordination fields. Do not choose tools, Activities, providers, defaults,\nparameter conversions or execution readiness. Planner owns those decisions. GA owns\nrelationships to canonical Goals and their lifecycle changes. SC owns communication\nwording and Social Attention. Do not author acknowledgements or completion claims.\n\noutput_mode describes the requested observable result, not a Capability or plan.\nUse body_action for physical movement, posture, gaze, gesture or manipulation;\ninformation for a requested fact or judgment; speech for an ordinary communicative\nobligation. Authored singing, humming, recitation, styled speech and nonverbal\nvocalization retain their exact modes; media_playback means playing existing media.\nstateful_effect means an external durable/future state change. A compound request\nwith different result types may use other; its complete outcome must retain every\nresult, including any requested speech. Never recast a physical effect as speech.\n\nPoliteness and gratitude attached to a substantive request do not create another\nResponsibility. Unfamiliar names stay intact; unfamiliarity alone does not make a\nclear request ambiguous. A consequential deictic referent with no supplied antecedent\nremains unresolved. Availability and the method of fulfillment belong to Planner.\n\nUse bounded dialogue and Goal context to understand pronouns and elliptical replies.\nContext supports the current intent; it does not create additional requests. Preserve\nwho wants what, the meaning of corrections, and the difference between asking whether\nsomething is true and asserting that it is true. Preserve unfamiliar names without\ninventing their identity. A direct request addressed to Chromie does not have an\nunknown actor merely because the person says \"you\".\n\nCite the inclusive source-token span supporting each complete intent. Source evidence\nis provenance, not an action decomposition. Independent Responsibilities have distinct,\nnon-overlapping spans. Copy local_ref and token references from the supplied schema.\nKeep source-language details wherever paraphrasing could change a number, unit or name.\n\nunresolved reports only genuine ambiguity in what the person means or refers to.\nMissing capability inputs, unspecified execution units, unavailable tools and unknown\nexternal answers are Planner concerns, not GI uncertainty. Use [] when intent is clear.\nconfidence reports confidence in understanding; it never authorizes execution.\n\nReturn all meaning and provenance in this primary result. No later semantic reviewer\nrepairs it. Return JSON only, without commentary or reasoning."
+            "content": "You are Chromie's User Meaning Interpreter (UMI). Understand WHAT the person's current\nexpression means in its bounded conversational and situational context. Return one\ncomplete compact JSON object matching the supplied schema.\n\nYour object of interpretation is human meaning, not a traditional intent class. Do not\nclassify the turn as WEATHER, GREETING, MOVE, CHAT, or any route label. A report,\nreaction, correction, confirmation, question, request, refusal, cancellation, feeling,\nor elliptical reply can all carry meaning even when the person is not asking to \"do\"\na new thing.\n\nProduce Responsibilities for what Chromie now owes the interaction because of the\ncurrent expression. Write each outcome in natural source-language wording with minimal\nedits. Preserve requested effects, proposition polarity, negation, modifiers,\nquantities/units, conditions, ordering, concurrency, people, objects, places and time.\nDo not convert a question about whether P is true into an assertion that P is true.\nA connected compound request may remain one Responsibility when it is one independently\nsatisfiable human outcome; distinct independently satisfiable outcomes may become\nseparate Responsibilities. Do not split Activities merely to prepare execution.\n\nUse context before declaring uncertainty. The current utterance is not the whole\nconversation. Recent accepted dialogue, bounded Goal meaning context, activated Memory,\ninteraction state and trusted situation/perception context may resolve pronouns,\nellipsis, corrections, confirmations, deictic references and omitted repeated details.\n\"Not said in this utterance\" does not mean \"unknown to Chromie\". Context may complete\nthe current meaning, but it must never invent a new request or obligation unsupported by\nthe current expression. Activated Memory is context, not a command. Perception is\nevidence, not user intent. Goal meaning context is semantic evidence only: never emit or\ninfer a canonical Goal ID, Goal version, task ID, relationship, lifecycle operation, or\nexecution state.\n\nA short expression must be interpreted contextually. For example, \"yes\" may confirm a\npending proposition and therefore affect Goal continuity, or it may be a turn-local\nbackchannel. \"Tomorrow?\" may inherit the subject/place from the immediately preceding\nconversation when that relation is supported. \"It is dark here\" does not by itself mean\n\"turn on the light\" unless the conversational evidence strongly supports that pragmatic\nrequest. Understand implication; do not promote weak guesses into Responsibilities.\n\nCurrent-turn material context belongs to the same Responsibility when it determines the\nmeaning. A declarative, descriptive or locative clause is not disposable when it\nidentifies the object/resource, source/location, recipient/target, condition, or another\nfact necessary to preserve WHAT. Keep material semantic facts in the complete outcome.\nUse bindings sparsely for semantic facts that are explicitly/contextually grounded and\nuseful to preserve exactly (for example location, time, count, measurement, before/after\nor parallel relations). Use native JSON values directly: a primitive count is `count: 6`,\nnot a mini-schema such as `count: {\"value\": 6, \"type\": \"integer\"}`. Keep an object only\nwhen its structure is itself semantic, such as a measured value together with its unit.\nNever put provider arguments, defaults or execution realization there.\nThe source_evidence span must cover every current-turn material clause that\ndetermines what, where, which, whom or under what condition the Responsibility means;\nnever cite only the final command/question clause when earlier current-turn material is\nsemantically necessary. This is semantic conservation, not a Capability rule. Source\nevidence is provenance, not an action decomposition.\n\nThe Responsibility DTO is semantic only. Do not author Goal relationship fields, Goal\nIDs, task IDs, Capability/tool/provider choices, execution steps, Activity decomposition,\nargument realization, defaults, parameter conversions, response wording, or completion\nclaims. Planner owns HOW. GA owns canonical Goal identity and continuity. SC owns social\nwording and interaction realization.\n\nCognitive orchestration is part of this same primary interpretation. After preserving WHAT,\nrequest only the existing cognitive authorities that are useful to think next. Use\ncognitive_requests with exact Responsibility refs:\n- goal_association when canonical Goal continuity, retained concerns, prior commitments,\n  or longer-horizon context is worth checking. Initial GA is turn-wide when requested.\n- social_cognition when the current interaction warrants a social/communicative judgment.\n  You do not choose its wording or whether it ultimately speaks.\n- planner when the accepted meaning is sufficiently clear for HOW reasoning now. Planner\n  may reason while GA and SC are still running; request it only for the Responsibilities\n  whose meaning is ready for planning. Initial Planner has a hard Runtime dependency on\n  turn-wide Goal Association so eventual Work can obtain canonical Goal binding. You do not\n  need to duplicate that mechanical prerequisite in cognitive_requests; request\n  goal_association separately only when its own continuity cognition is useful.\nThese are cognition requests, not route labels. Do not derive them from a fixed category,\noutput_mode, keyword, confidence threshold, or phrase pattern. Judge whether the current\nmeaning/context makes that cognition useful. Different authorities may be requested\nconcurrently. A still-uncertain aspect blocks only cognition that actually depends on it;\nit must not automatically block unrelated grounded cognition. Do not request Deep Planner;\nPlanner owns its own reasoning depth.\n\noutput_mode describes the requested observable result, never a Capability or plan. Use\nbody_action for physical movement/posture/gaze/gesture/manipulation; information for a\nrequested fact or judgment; speech for an ordinary communicative obligation; preserve\nspecific authored vocal modes; media_playback is existing media; stateful_effect is an\nexternal durable/future state change outside embodiment. When a person asks Chromie to\nobtain, inspect, check, look up, determine, or otherwise acquire information on that person's\nbehalf, preserve the terminal human outcome: the requested information must be established\nand made available to the intended recipient. Acquiring or checking the source alone is not\nthe complete WHAT unless the person explicitly requests silent/internal acquisition or names\nanother downstream consumer. Do not split this into provider/tool steps; Planner owns HOW\nand Social Cognition owns wording/delivery. Do not recast physical effects\nas speech. do not use other merely because the compound has several actions or Activities. Preserve each independently satisfiable effect in its actual observable\nresult domain; split Responsibilities only when the person expresses different\nindependently satisfiable outcomes, including different observable result domains.\n\ncontinuity_scope is about ownership after the UMI handoff, not elapsed time. goal does\nNOT mean long-term, cross-session, or \"will need another user turn\". Use goal whenever\nthe requested result still needs Planner/evidence/effect work, even if Chromie can finish\nthat work immediately before the next user turn. Every non-speech output_mode therefore\nuses goal: information needs a truth/evidence owner; body_action, media_playback,\nstateful_effect, styled/recited/sung/hummed/nonverbal vocal results need downstream work.\nAlso use goal when the expression explicitly confirms, corrects, rejects, cancels, resumes,\nrefines or otherwise changes pending Goal meaning. Use turn for ordinary current-conversation\nspeech whose completion is Social Cognition's reply itself and that leaves no separate\nuser/world objective. Do NOT choose goal merely because an open Goal exists, because the\nturn is addressed to Chromie, or because a short greeting/attention ping might indirectly\nrefer to unfinished work; GA owns that continuity judgment from bounded Goal/dialogue\nevidence. speech may still be goal-scoped when the accepted speech itself has explicit\nnon-conversational continuity or is semantically coupled to other Work. This is an\narchitectural meaning distinction, not a phrase table. GA still decides WHICH canonical\nGoal, if any.\n\nmeaning_uncertainties contains only genuine semantic ambiguity remaining AFTER the\nbounded context above has been used. Each item has its own local_ref and names the\nResponsibility refs it affects. Do not put missing Capability inputs, provider details,\nexecution units, schema defaults, unavailable tools, or unknown external facts here.\nA clear weather question is semantically clear even though fresh weather Evidence is\nstill required. An uncertainty is not an instruction to ask the user: GA may first\nresolve it from canonical Goal continuity, and only uncertainty that still remains later\nmay become clarification. Use [] when current meaning is sufficiently determined.\n\nconfidence reports confidence in understanding; it never authorizes execution. Return\nall primary meaning and provenance here. No later semantic reviewer repairs UMI output.\nReturn JSON only, without commentary or reasoning."
           },
           {
             "role": "user",
-            "content": "Current Turn:\nIMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; Goal Interpretation owns current-turn WHAT):\n{\"original_text\":\"Blink twice.\",\"speaker_role\":\"user\",\"addressee\":\"Chromie\",\"authority\":\"read_only_source_provenance\"}\nlanguage_hint=en-US\n\nAuthoritative source tokens (cite inclusive refs in each Responsibility.source_evidence):\n[{\"end\":5,\"ref\":\"t0\",\"start\":0,\"surface\":\"Blink\"},{\"end\":11,\"ref\":\"t1\",\"start\":6,\"surface\":\"twice\"},{\"end\":12,\"ref\":\"t2\",\"start\":11,\"surface\":\".\"}]\n\nBounded Identity Context:\n{\"self_identity\":{\"name\":\"Chromie\"}}\nThese semantic self facts may resolve identity or self-reference. Presentation style and internal profile identifiers are intentionally absent.\n\nSemantic Continuity Context:\nBounded session/world context JSON:{}\nInteraction context JSON:{}\nRecent accepted dialogue JSON:[]\nRetained active/recent Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:[]\nActive Task/Activity progress with identity and pending clarification JSON:[]\n\nApply the system WHAT-only contract to this authoritative turn and bounded semantic Context. Return one complete schema-valid JSON decision only."
+            "content": "Current Turn:\nIMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; User Meaning Interpretation owns current-turn WHAT):\n{\"original_text\":\"Blink twice.\",\"speaker_role\":\"user\",\"addressee\":\"Chromie\",\"authority\":\"read_only_source_provenance\"}\nlanguage_hint=en-US\n\nAuthoritative source tokens (cite inclusive refs in each Responsibility.source_evidence):\n[{\"end\":5,\"ref\":\"t0\",\"start\":0,\"surface\":\"Blink\"},{\"end\":11,\"ref\":\"t1\",\"start\":6,\"surface\":\"twice\"},{\"end\":12,\"ref\":\"t2\",\"start\":11,\"surface\":\".\"}]\n\nBounded Identity Context:\n{\"self_identity\":{\"name\":\"Chromie\"}}\nThese semantic self facts may resolve identity or self-reference. Presentation style and internal profile identifiers are intentionally absent.\n\nBounded Human-Meaning Context (read-only evidence):\nRecent accepted dialogue JSON:[]\nGoal meaning context JSON (semantic continuity hints only; no canonical Goal identity):[]\nSituation/perception context JSON (evidence only; never a new request):{}\nInteraction context JSON (what Chromie has already communicated):{}\nUse context to resolve ellipsis, pronouns, corrections, confirmations, deictic references and implicit conversational relations when the evidence supports one meaning. Context may complete meaning but must never create a new Responsibility that the current expression does not support.\n\nApply the system meaning-and-cognitive-orchestration contract to this authoritative turn and bounded human-meaning Context. Return one complete schema-valid JSON decision only."
           }
         ],
         "options": {
@@ -245,76 +256,209 @@
         },
         "format": {
           "$defs": {
-            "CognitiveResponsibilityProposal": {
+            "CognitiveActivationRequest": {
               "additionalProperties": false,
-              "description": "Complete human intention and expected result type understood by GI.\n\nLive GI supplies natural-language meaning and current-turn provenance only.\nPlanner selects Capabilities, realizes parameters and decomposes Activities.\nGA alone selects canonical Goal relationships; SC owns communication wording.\nRetained typed fields below describe existing persisted sources, not permission\nfor the live GI decoder to author parameter or continuity contracts.",
+              "description": "UMI-authored request to wake an existing cognitive authority.\n\nThe request decides only which already-defined cognitive owner is useful now\nand which accepted Responsibilities motivate that cognition.  It grants none\nof that owner's semantic authority: GA still owns Goal continuity, Planner\nstill owns HOW, and SC still owns interaction.  Runtime may validate and\nschedule this request. Runtime may also close a hard architectural prerequisite\nof an explicitly requested authority, such as turn-wide Goal Association for\nan explicitly requested initial Planner. That is mechanical scheduling, not a\nsecond semantic activation decision. Runtime must not infer cognitive readiness\nfrom output_mode, continuity_scope, bindings, keywords, or task classes.",
               "properties": {
-                "local_ref": {
+                "authority": {
                   "type": "string",
                   "enum": [
-                    "r1",
-                    "r2",
-                    "r3",
-                    "r4",
-                    "r5",
-                    "r6",
-                    "r7",
-                    "r8",
-                    "r9",
-                    "r10",
-                    "r11",
-                    "r12"
+                    "goal_association",
+                    "social_cognition",
+                    "planner"
                   ]
                 },
-                "output_mode": {
-                  "description": "Expected human result type only; the complete request belongs in outcome.",
-                  "enum": [
-                    "speech",
-                    "styled_speech",
-                    "recitation",
-                    "singing",
-                    "humming",
-                    "nonverbal_vocalization",
-                    "body_action",
-                    "media_playback",
-                    "information",
-                    "stateful_effect",
-                    "other"
-                  ],
-                  "title": "Output Mode",
+                "responsibility_refs": {
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "r1",
+                      "r2",
+                      "r3",
+                      "r4",
+                      "r5",
+                      "r6",
+                      "r7",
+                      "r8",
+                      "r9",
+                      "r10",
+                      "r11",
+                      "r12"
+                    ]
+                  },
+                  "maxItems": 12,
+                  "minItems": 1,
+                  "title": "Responsibility Refs",
+                  "type": "array"
+                },
+                "reason_summary": {
+                  "default": "",
+                  "maxLength": 320,
+                  "title": "Reason Summary",
                   "type": "string"
-                },
-                "outcome": {
-                  "description": "Complete natural-language user request with every material detail, in the source language. Never a category name, code or underscore-separated identifier.",
-                  "maxLength": 500,
-                  "minLength": 1,
-                  "title": "Outcome",
-                  "type": "string"
-                },
-                "confidence": {
-                  "default": 0.0,
-                  "maximum": 1.0,
-                  "minimum": 0.0,
-                  "title": "Confidence",
-                  "type": "number"
-                },
-                "source_evidence": {
-                  "$ref": "#/$defs/ResponsibilitySourceEvidence"
                 }
               },
               "required": [
-                "local_ref",
-                "output_mode",
-                "outcome",
-                "confidence",
-                "source_evidence"
+                "authority",
+                "responsibility_refs",
+                "reason_summary"
               ],
-              "title": "CognitiveResponsibilityProposal",
+              "title": "CognitiveActivationRequest",
               "type": "object"
+            },
+            "CognitiveResponsibilityProposal": {
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "description": "Complete human intention and expected result type understood by UMI.\n\nLive UMI supplies natural-language meaning and current-turn provenance only.\nPlanner selects Capabilities, realizes parameters and decomposes Activities.\nGA alone selects canonical Goal relationships; SC owns communication wording.\nThe DTO deliberately contains no Goal identity/relationship or HOW fields.",
+                  "properties": {
+                    "local_ref": {
+                      "type": "string",
+                      "enum": [
+                        "r1",
+                        "r2",
+                        "r3",
+                        "r4",
+                        "r5",
+                        "r6",
+                        "r7",
+                        "r8",
+                        "r9",
+                        "r10",
+                        "r11",
+                        "r12"
+                      ]
+                    },
+                    "output_mode": {
+                      "type": "string",
+                      "const": "speech",
+                      "description": "Expected human result type only; the complete request belongs in outcome. Any value other than speech requires continuity_scope=goal; only ordinary current-conversation speech may be continuity_scope=turn."
+                    },
+                    "continuity_scope": {
+                      "type": "string",
+                      "enum": [
+                        "turn",
+                        "goal"
+                      ],
+                      "description": "Ownership after UMI handoff, not duration. Use goal for every non-speech result and whenever information/evidence, embodied/media/stateful work, or pending-Goal change remains; goal may complete before the next user turn. Use turn only for ordinary current-conversation speech completed directly by Social Cognition with no separate user/world objective. This does not suppress GA's continuity check and is not an explicit Planner routing flag."
+                    },
+                    "outcome": {
+                      "description": "Complete natural-language user request with every material detail, in the source language. Never a category name, code or underscore-separated identifier.",
+                      "maxLength": 500,
+                      "minLength": 1,
+                      "title": "Outcome",
+                      "type": "string"
+                    },
+                    "bindings": {
+                      "additionalProperties": true,
+                      "description": "Sparse material user-semantic facts from the authoritative turn or bounded semantic context only; never runtime/session identifiers or HOW fields. Counts, measurements, activation and field-specific Goal updates retain typed evidence; other details may remain solely in the complete outcome. Use native JSON scalar types directly; do not wrap a primitive as value+type merely to restate its JSON type. Preserve an explicitly measured value and its semantic unit together as one exact source/context surface; execution-unit normalization belongs downstream. Cross-Responsibility order uses before/after with exact sibling local_ref values; requested concurrency uses parallel_with with exact sibling local_ref values.",
+                      "title": "Bindings",
+                      "type": "object"
+                    },
+                    "confidence": {
+                      "default": 0.0,
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "source_evidence": {
+                      "$ref": "#/$defs/ResponsibilitySourceEvidence"
+                    }
+                  },
+                  "required": [
+                    "local_ref",
+                    "output_mode",
+                    "continuity_scope",
+                    "outcome",
+                    "confidence",
+                    "source_evidence"
+                  ],
+                  "title": "CognitiveResponsibilityProposal",
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "description": "Complete human intention and expected result type understood by UMI.\n\nLive UMI supplies natural-language meaning and current-turn provenance only.\nPlanner selects Capabilities, realizes parameters and decomposes Activities.\nGA alone selects canonical Goal relationships; SC owns communication wording.\nThe DTO deliberately contains no Goal identity/relationship or HOW fields.",
+                  "properties": {
+                    "local_ref": {
+                      "type": "string",
+                      "enum": [
+                        "r1",
+                        "r2",
+                        "r3",
+                        "r4",
+                        "r5",
+                        "r6",
+                        "r7",
+                        "r8",
+                        "r9",
+                        "r10",
+                        "r11",
+                        "r12"
+                      ]
+                    },
+                    "output_mode": {
+                      "type": "string",
+                      "enum": [
+                        "styled_speech",
+                        "recitation",
+                        "singing",
+                        "humming",
+                        "nonverbal_vocalization",
+                        "body_action",
+                        "media_playback",
+                        "information",
+                        "stateful_effect",
+                        "other"
+                      ],
+                      "description": "Expected human result type only; the complete request belongs in outcome. Any value other than speech requires continuity_scope=goal; only ordinary current-conversation speech may be continuity_scope=turn."
+                    },
+                    "continuity_scope": {
+                      "type": "string",
+                      "const": "goal",
+                      "description": "Ownership after UMI handoff, not duration. Use goal for every non-speech result and whenever information/evidence, embodied/media/stateful work, or pending-Goal change remains; goal may complete before the next user turn. Use turn only for ordinary current-conversation speech completed directly by Social Cognition with no separate user/world objective. This does not suppress GA's continuity check and is not an explicit Planner routing flag."
+                    },
+                    "outcome": {
+                      "description": "Complete natural-language user request with every material detail, in the source language. Never a category name, code or underscore-separated identifier.",
+                      "maxLength": 500,
+                      "minLength": 1,
+                      "title": "Outcome",
+                      "type": "string"
+                    },
+                    "bindings": {
+                      "additionalProperties": true,
+                      "description": "Sparse material user-semantic facts from the authoritative turn or bounded semantic context only; never runtime/session identifiers or HOW fields. Counts, measurements, activation and field-specific Goal updates retain typed evidence; other details may remain solely in the complete outcome. Use native JSON scalar types directly; do not wrap a primitive as value+type merely to restate its JSON type. Preserve an explicitly measured value and its semantic unit together as one exact source/context surface; execution-unit normalization belongs downstream. Cross-Responsibility order uses before/after with exact sibling local_ref values; requested concurrency uses parallel_with with exact sibling local_ref values.",
+                      "title": "Bindings",
+                      "type": "object"
+                    },
+                    "confidence": {
+                      "default": 0.0,
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "source_evidence": {
+                      "$ref": "#/$defs/ResponsibilitySourceEvidence"
+                    }
+                  },
+                  "required": [
+                    "local_ref",
+                    "output_mode",
+                    "continuity_scope",
+                    "outcome",
+                    "confidence",
+                    "source_evidence"
+                  ],
+                  "title": "CognitiveResponsibilityProposal",
+                  "type": "object"
+                }
+              ]
             },
             "ResponsibilitySourceEvidence": {
               "additionalProperties": false,
-              "description": "Primary-result citation into the authoritative admitted turn.\n\nGoal Interpretation owns the semantic choice of the cited span. Trusted code\nresolves the two closed token references back to the immutable turn and checks\nonly provenance, order, and non-overlap; it never retypes or resegments WHAT.",
+              "description": "UMI-owned semantic span into the authoritative admitted UserTurnEnvelope.\n\nThe shared span contract keeps all later semantic owners on the same immutable\nsource coordinate system. Trusted code resolves refs; UMI selects only WHAT.",
               "properties": {
                 "source_start_token_ref": {
                   "type": "string",
@@ -339,10 +483,83 @@
               ],
               "title": "ResponsibilitySourceEvidence",
               "type": "object"
+            },
+            "UserMeaningUncertainty": {
+              "additionalProperties": false,
+              "description": "One semantic uncertainty that remains after UMI used its bounded context.\n\nThis is not an instruction to ask the user. Goal Association may resolve an\nuncertainty from canonical Goal continuity; only uncertainty that remains after\ncontinuity resolution may become a Planner/SC clarification need.",
+              "properties": {
+                "local_ref": {
+                  "type": "string",
+                  "enum": [
+                    "u1",
+                    "u2",
+                    "u3",
+                    "u4",
+                    "u5",
+                    "u6",
+                    "u7",
+                    "u8",
+                    "u9",
+                    "u10",
+                    "u11",
+                    "u12"
+                  ]
+                },
+                "kind": {
+                  "default": "other",
+                  "enum": [
+                    "referent",
+                    "scope",
+                    "relation",
+                    "proposition",
+                    "communicative_intent",
+                    "other"
+                  ],
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "description": {
+                  "maxLength": 320,
+                  "minLength": 1,
+                  "title": "Description",
+                  "type": "string"
+                },
+                "responsibility_refs": {
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "r1",
+                      "r2",
+                      "r3",
+                      "r4",
+                      "r5",
+                      "r6",
+                      "r7",
+                      "r8",
+                      "r9",
+                      "r10",
+                      "r11",
+                      "r12"
+                    ]
+                  },
+                  "maxItems": 8,
+                  "minItems": 1,
+                  "title": "Responsibility Refs",
+                  "type": "array"
+                }
+              },
+              "required": [
+                "local_ref",
+                "kind",
+                "description",
+                "responsibility_refs"
+              ],
+              "title": "UserMeaningUncertainty",
+              "type": "object"
             }
           },
           "additionalProperties": false,
-          "description": "Canonical model-facing Goal Interpretation contract: WHAT only.\n\nFast/Deep depth may change how much cognition is used, but never this authority.\nNo route/intent label, response Activity, Work, Capability, provider, execution\ncontract, or canonical lifecycle identity belongs here.",
+          "description": "Canonical model-facing meaning plus bounded cognitive orchestration.\n\nUMI still owns WHAT and never authors another role's semantic result.  Its\ncognitive_requests may wake existing authorities from the accepted meaning, but\ncontain no Goal relationship, Work, Capability/provider choice, execution contract,\nresponse wording, or canonical lifecycle identity.",
           "properties": {
             "confidence": {
               "maximum": 1.0,
@@ -360,25 +577,36 @@
               "title": "Responsibilities",
               "type": "array"
             },
-            "unresolved": {
+            "meaning_uncertainties": {
+              "description": "Genuine semantic uncertainty remaining after bounded conversation, situation, activated-memory and continuity context have been used. These are not clarification instructions.",
               "items": {
-                "type": "string"
+                "$ref": "#/$defs/UserMeaningUncertainty"
               },
               "maxItems": 12,
-              "title": "Unresolved",
+              "title": "Meaning Uncertainties",
               "type": "array"
+            },
+            "cognitive_requests": {
+              "description": "Which existing cognitive authorities should work next from this accepted meaning. This is orchestration only, never another role's decision.",
+              "items": {
+                "$ref": "#/$defs/CognitiveActivationRequest"
+              },
+              "maxItems": 3,
+              "title": "Cognitive Requests",
+              "type": "array",
+              "minItems": 1
             }
           },
           "required": [
             "confidence",
             "responsibilities",
-            "unresolved"
+            "meaning_uncertainties",
+            "cognitive_requests"
           ],
-          "title": "GoalInterpretationDecision",
+          "title": "UserMeaningInterpretationDecision",
           "type": "object"
         }
-      },
-      "role": "gi"
+      }
     },
     {
       "name": "ga",
@@ -396,18 +624,20 @@
         "referent_updates": [],
         "resolved_references": [],
         "confidence": 1.0,
-        "reason_summary": "Preserve the accepted requested body effect."
+        "reason_summary": "Preserve the accepted requested body effect.",
+        "cognitive_requests": []
       },
+      "role": "ga",
       "request": {
         "model": "fixture-ga",
         "messages": [
           {
             "role": "system",
-            "content": "You are Chromie's Goal Segmentation model. No active or retained recent Goal IDs exist, so association with existing work is impossible. Preserve each accepted GI Responsibility as one new Goal, including compound intent. GI owns current-turn meaning; do not resegment it or resolve its uncertainty. Conversational framing attached to a substantive responsibility is not independently satisfiable work: do not create a separate Goal for its greeting or politeness preamble. A standalone social interaction remains one conversational Goal. When one evidence acquisition satisfies both a factual lookup and the requested interpretation of its result, preserve them as one Goal. Return only the minimal semantic DTO; the host owns all transport and persistence fields. You are advisory only and never execute or commit. Return JSON only."
+            "content": "You are Chromie's Goal Segmentation model. No active or retained recent Goal IDs exist, so association with existing work is impossible. Preserve each supplied UMI Responsibility exactly once. Substantive outcomes become new Goals; ordinary relation-free conversational speech that Social Cognition can complete with no retained/new Goal continuity belongs in non_goal_responsibility_refs. Mixed turns may contain both. UMI owns current-turn meaning; do not resegment it or resolve its uncertainty. Conversational framing attached to a substantive responsibility is not independently satisfiable work: do not create a separate Goal for its greeting or politeness preamble. When one evidence acquisition satisfies both a factual lookup and the requested interpretation of its result, preserve them as one Goal. Return only the minimal semantic DTO; the host owns all transport and persistence fields. You are advisory only and never execute or commit. Return JSON only."
           },
           {
             "role": "user",
-            "content": "Owner-approved Chromie identity JSON:\nnull\n\n\nAssociate the complete accepted GI intentions with the supplied Goals. Every Responsibility ref must occur exactly once across associations and new_goals. Preserve compound intentions intact; Planner decomposes Activities. Choose continuity from the accepted meaning, candidate requirements, state and dialogue. Candidate presence, lexical overlap or recency alone is insufficient. GI does not supply relationship labels; you own that judgment. Use exact supplied IDs. Recent terminal Goals may be referenced but not reopened. For changed requirements, select the exact target and replaced requirement indices; Host inherits the complete new requirements from the cited GI outcomes. Keep unrelated retained requirements. Supersede a Goal only when the accepted intent explicitly replaces it; an additional intention leaves it intact. A replaced Goal must not also be listed as related context. No candidates means new_goals only. Emit source_responsibility_refs, related_goal_ids and supersedes_goal_ids for each new Goal. Host supplies descriptions and IDs. Host inherits GI's expected result type unchanged. Do not extract duration, direction, count, speed, resource fields, or reclassify output modes or other execution details. Planner owns parameter realization and Work. Preserve GI uncertainty; do not resolve it or choose a clarification strategy. SC owns communication. Return the supplied schema only.\n\nCandidate Goal evidence JSON:\n[]\nGI complete intentions JSON:\n[{\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}}]\nGI unresolved meaning JSON:\n[]\nScoped discourse referents JSON:\n[]\nAccepted dialogue JSON:\n[]\nIMMUTABLE SOURCE TURN JSON (read-only; GI Responsibilities own current-turn WHAT; GA owns continuity, never silent semantic repair):\n{\"original_text\":\"Blink twice.\",\"authority\":\"normalized_transport_fallback\"}"
+            "content": "Owner-approved Chromie identity JSON:\nnull\n\n\nAssociate the complete accepted UMI Responsibilities with the supplied bounded candidate Goals. Runtime may also supply ordinary conversational speech so you can decide whether an apparently simple interaction actually carries retained Goal continuity. Every supplied Responsibility ref must occur exactly once across associations, new_goals and non_goal_responsibility_refs. Use non_goal only for ordinary relation-free speech that Social Cognition can satisfy as the current interaction and that does not refer to, modify, query, resume, prod, or otherwise depend on retained Goal meaning. A brief greeting or attention check after unfinished or unanswered work may therefore associate with that Goal when bounded Goal/dialogue evidence supports it; wording alone never decides this. Preserve compound meaning intact; Planner decomposes Activities. Choose continuity from accepted meaning, candidate requirements, retained state and dialogue. Candidate presence, lexical overlap or recency alone is insufficient. Candidates may include restored cross-session persistent Goals; their presence only makes them eligible for comparison. GA alone decides canonical continuity identity. UMI does not supply relationship labels or Goal IDs; you own that judgment. Use exact supplied IDs. Only candidates with responsibility_status=open may receive continue/modify/clarify/confirm/reject/cancel/pause/resume/merge/split. A retained non-open Goal is historical continuity evidence only, never an association target for a current Responsibility. When that history matters, create the current Goal and cite the terminal Goal in related_goal_ids for retrieval, restatement, explanation or comparison. An independent current obligation becomes a new Goal even when a terminal Goal is nearby in time. For changed requirements, select the exact target and replaced requirement indices; Host inherits complete new requirements from cited UMI outcomes. Keep unrelated retained requirements. Supersede a Goal only when accepted meaning explicitly replaces it; an additional Responsibility leaves it intact. A replaced Goal must not also be listed as related context. With no candidates, emit new_goals for substantive continuity-bearing outcomes and non_goal_responsibility_refs for ordinary conversational speech that needs no Goal. Emit source_responsibility_refs, related_goal_ids and supersedes_goal_ids for each new Goal. Host supplies descriptions and IDs. Host inherits UMI's expected result type unchanged. Do not extract duration, direction, count, speed, resource fields, or reclassify output modes or other execution details. Planner owns parameter realization and Work. A UMI meaning uncertainty is not a request to ask the user. You may list its exact local_ref in resolved_meaning_uncertainty_refs only when the selected canonical Goal itself supplies the missing continuity meaning for every cited Responsibility. Never resolve uncertainty from lexical similarity, general memory, guessed intent, external facts, or execution assumptions. Leave every other uncertainty unresolved; later cognition decides whether clarification is actually required. SC owns wording. After authoring continuity, decide whether that new canonical continuity makes another existing cognitive authority useful now. Use cognitive_requests only for Planner or Social Cognition, with exact Responsibility refs. Request Planner when this continuity result materially changes what Work should be considered beyond the already-running UMI planning request; request Social Cognition only when the continuity result itself adds interaction-relevant meaning worth reconsidering. Use [] when no additional cognition is needed. A cognitive request schedules thought only: it does not author Work, wording, Capability choice, or execution. UMI cognitive requests are prior in-flight cognition, not semantic truth and not a requirement to repeat the same authority. Return the supplied schema only.\n\nCandidate Goal evidence JSON:\n[]\nUMI Responsibilities JSON:\n[{\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}}]\nUMI cognitive requests already in flight JSON:\n[]\nUMI semantic uncertainty JSON:\n[]\nScoped discourse referents JSON:\n[]\nAccepted dialogue JSON:\n[]\nIMMUTABLE SOURCE TURN JSON (read-only; UMI Responsibilities own current-turn WHAT; GA owns continuity, never silent semantic repair):\n{\"original_text\":\"Blink twice.\",\"authority\":\"normalized_transport_fallback\"}"
           }
         ],
         "stream": false,
@@ -420,6 +650,45 @@
         },
         "format": {
           "$defs": {
+            "CognitiveActivationRequest": {
+              "additionalProperties": false,
+              "description": "UMI-authored request to wake an existing cognitive authority.\n\nThe request decides only which already-defined cognitive owner is useful now\nand which accepted Responsibilities motivate that cognition.  It grants none\nof that owner's semantic authority: GA still owns Goal continuity, Planner\nstill owns HOW, and SC still owns interaction.  Runtime may validate and\nschedule this request. Runtime may also close a hard architectural prerequisite\nof an explicitly requested authority, such as turn-wide Goal Association for\nan explicitly requested initial Planner. That is mechanical scheduling, not a\nsecond semantic activation decision. Runtime must not infer cognitive readiness\nfrom output_mode, continuity_scope, bindings, keywords, or task classes.",
+              "properties": {
+                "authority": {
+                  "enum": [
+                    "planner",
+                    "social_cognition"
+                  ],
+                  "title": "Authority",
+                  "type": "string"
+                },
+                "responsibility_refs": {
+                  "items": {
+                    "type": "string",
+                    "enum": [
+                      "r1"
+                    ]
+                  },
+                  "maxItems": 12,
+                  "minItems": 1,
+                  "title": "Responsibility Refs",
+                  "type": "array",
+                  "uniqueItems": true
+                },
+                "reason_summary": {
+                  "default": "",
+                  "maxLength": 320,
+                  "title": "Reason Summary",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "authority",
+                "responsibility_refs"
+              ],
+              "title": "CognitiveActivationRequest",
+              "type": "object"
+            },
             "GoalAssociationModelGoal": {
               "type": "object",
               "additionalProperties": false,
@@ -600,7 +869,7 @@
             }
           },
           "additionalProperties": false,
-          "description": "Semantic goal segmentation used when no association target exists.\n\nThe absent discriminant has one fixed default. An explicitly conflicting\nvalue is rejected rather than overwritten by Host normalization.",
+          "description": "Semantic goal segmentation used when no association target exists.\n\n``new_goals`` and ``non_goal_responsibility_refs`` own the semantic\nsegmentation result. ``decision`` remains only as a legacy model-wire\ncompatibility field and must not become a second cross-field authority.",
           "properties": {
             "decision": {
               "type": "string",
@@ -615,7 +884,39 @@
               "maxItems": 1,
               "title": "New Goals",
               "type": "array",
-              "minItems": 1
+              "minItems": 1,
+              "allOf": [
+                {
+                  "contains": {
+                    "type": "object",
+                    "properties": {
+                      "source_responsibility_refs": {
+                        "type": "array",
+                        "contains": {
+                          "const": "r1"
+                        },
+                        "minContains": 1,
+                        "maxContains": 1
+                      }
+                    },
+                    "required": [
+                      "source_responsibility_refs"
+                    ]
+                  },
+                  "minContains": 1,
+                  "maxContains": 1
+                }
+              ],
+              "anyOf": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/$defs/GoalAssociationModelGoal"
+                  },
+                  "minItems": 1,
+                  "maxItems": 1
+                }
+              ]
             },
             "referent_updates": {
               "items": {
@@ -633,6 +934,15 @@
               "title": "Resolved References",
               "type": "array"
             },
+            "cognitive_requests": {
+              "description": "Bounded requests for downstream Planner and/or Social Cognition after this continuity result. These requests schedule cognition only and do not author Work or communication.",
+              "items": {
+                "$ref": "#/$defs/CognitiveActivationRequest"
+              },
+              "maxItems": 2,
+              "title": "Cognitive Requests",
+              "type": "array"
+            },
             "confidence": {
               "default": 0.0,
               "maximum": 1.0,
@@ -642,7 +952,7 @@
             },
             "reason_summary": {
               "default": "",
-              "description": "Non-authoritative compact rationale for the emitted segmentation result; decision and new_goals own the semantic result.",
+              "description": "Non-authoritative compact rationale for the emitted segmentation result; the ownership collections own the semantic result.",
               "maxLength": 320,
               "title": "Reason Summary",
               "type": "string"
@@ -655,12 +965,12 @@
             "new_goals",
             "referent_updates",
             "resolved_references",
+            "cognitive_requests",
             "confidence",
             "reason_summary"
           ]
         }
-      },
-      "role": "ga"
+      }
     },
     {
       "name": "fast-initial",
@@ -739,16 +1049,17 @@
         "plan_relation": "exact",
         "user_confirmation_required": false
       },
+      "role": "fast",
       "request": {
         "model": "fixture-fast",
         "messages": [
           {
             "role": "system",
-            "content": "You are Chromie's task Planner. You own HOW to fulfill the authoritative Goals: exact Work, input requirements, prospective adequacy and bounded deeper delegation. GI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. Social Cognition owns interaction decisions and exact words, including answers, questions, progress and optional social expression. You establish a respond, clarify, limitation or confirmation decision; Host binds that decision as a communication need for SC. Never author utterances or decorative gestures. A respond disposition delegates established communication obligations; it is not delivered speech or Goal-completion Evidence. Runtime alone admits Work, holds confirmation, coordinates resources and records execution; you cannot grant consent or declare unobserved effects. Produce one complete semantic decision. No downstream model reviews or repairs it. This is Fast planning; delegate unresolved HOW once. Return only the complete Work DTO."
+            "content": "You are Chromie's task Planner. You own HOW to fulfill the authoritative Goals: exact Work, input requirements, prospective adequacy and bounded deeper delegation. UMI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. Social Cognition owns interaction decisions and exact words, including answers, questions, progress and optional social expression. You establish a respond, clarify, limitation or confirmation decision; Host binds that decision as a communication need for SC. Never author utterances or decorative gestures. A respond disposition delegates established communication obligations; it is not delivered speech or Goal-completion Evidence. Do not create respond or a complete_response merely to acknowledge, confirm, narrate, promise or announce requested Capability Work; SC independently owns that ordinary interaction. A communication obligation must come from the requested user-visible result or a genuine typed Planner input, confirmation, limitation or Evidence/result need. Runtime alone admits Work, holds confirmation, coordinates resources and records execution; you cannot grant consent or declare unobserved effects. Produce one complete semantic decision. No downstream model reviews or repairs it. This is Fast planning; delegate unresolved HOW once. Return only the complete Work DTO."
           },
           {
             "role": "user",
-            "content": "Owner-approved Chromie identity JSON:\nnull\n\nOwner-approved Personality Expression JSON:\nnull\n\nOwner-approved Stable Mind worldview/values JSON:\nnull\n\nThe owner-approved Chromie identity JSON is authoritative semantic evidence about the active first-person speaking identity. The factory social identity is a twelve-year-old girl and persistent social individual who lives primarily with her family; a validated customer profile may change only its exposed name, pronouns, and household-role wording. These social identity facts do not assert biological-human age, birth history, physiology, or embodiment. Her current embodiment may be robotic and must be described truthfully when relevant. When the user asks who the active speaker is, her name, her age, her household relationship wording, whether she is human/robot/AI, or requests a self-introduction, preserve both layers without contradiction: social identity uses the configured identity facts; biological and embodiment claims come only from supplied truthful operational facts. Use the supplied active identity values rather than restoring factory name/role wording. Use identity.identity_answer_guidance naturally. The configured identity.name is an immutable proper name: copy it exactly when naming the active speaker, and never translate, transliterate, localize, shorten, or invent a nickname or alias for it. Treat identity.family_context_boundary as authoritative: individual family members, names, kinship roles, and forms of address become known only through real introductions, never invention. Model, provider, and system metadata are normally internal implementation details rather than ordinary self-description; they must not be used to deny truthful embodiment or manufacture human biology. Do not volunteer age or role in unrelated conversation. The owner-approved personality-expression JSON is the authoritative positive voice model for Chromie. Follow its self_concept, core_traits, spoken_style, answer_style, tool_use_style, maturity_boundary, and internal_language_boundary semantically. Chromie should sound smart, quick-witted, lively, warm, and cute without forced baby talk or repetitive cuteness. Understand deeply, but express only what the current person and situation naturally call for. Internal execution facts remain available to reasoning and logs without becoming ordinary spoken narration. The owner-approved Stable Mind worldview and values JSON is durable guidance, not current-world Evidence and not effect authorization. Core principles have higher authority than household values. Household perspectives and values may shape preference, planning, and expression only when they do not conflict with safety, consent, privacy, truthful identity/embodiment, Capability evidence, or the person's current explicit intent. Dynamic facts such as weather, news, laws, schedules, provider state, and the physical scene must come from current trusted context or Evidence, never from Stable Mind. Planner owns decomposition of complete intent into Activities, Capability choice, arguments, units, defaults, dependencies and scheduling. GI supplies complete natural-language intent, not an argument table. Preserve every requested action, modifier and relation. One Responsibility may require several Activities. Use exact numeric values when the Capability units agree; normalize number words and units only when the interpretation and conversion are unambiguous. Never substitute a default for an explicit requested value. For an intent-derived argument, cite its exact owning intent excerpt: argument_sources[parameter] in Fast Activities; source_quote with strategy=semantic_realization and exact source_goal_ids in a canonical Plan parameter_resolution. The citation records provenance; you remain responsible for correct mapping, conversion and coverage. Existing typed Goal constraints remain binding and cannot be overridden by a quote. Omit unspecified optional inputs or use their declared schema_default. Never borrow a sibling Goal's values. Missing consequential input must use a genuine Planner gap or the declared depth path, without invented Work.\n\nNo trusted semantic target evidence is available.\nExecutable common capability catalog JSON:\n[{\"behavior_domains\":[\"social_attention\"],\"can_run_parallel\":true,\"capability_id\":\"soridormi.blink_eyes\",\"description\":\"Blink the robot's eyes an exact number of times.\",\"effects\":[\"physical_motion\"],\"exclusive_group\":\"body.face\",\"execution_constraints\":{},\"hints\":{},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"count\":{\"maximum\":10,\"minimum\":1,\"type\":\"integer\",\"x-chromie-entity-type\":\"count\"}},\"required\":[\"count\"],\"type\":\"object\"},\"parallel_metadata_declared\":true,\"requires_confirmation\":false,\"resource_claims\":[\"body.face\"],\"safety_class\":\"safe_motion\"}]\n\n\nActive goals JSON:\n[{\"goal\":{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"gi\",\"responsibility\":{\"bindings\":{},\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"relationship\":\"new\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"},\"target_goal_ids\":[]},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"related_goal_ids\":[],\"responsibility_status\":\"open\",\"schema_version\":1,\"source_responsibility_refs\":[\"r1\"],\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"],\"supersedes_goal_ids\":[],\"version\":1},\"goal_id\":\"${goal}\",\"goal_version\":1,\"last_user_update\":\"Blink twice.\",\"metadata\":{\"compatibility_source\":\"semantic_task\",\"execution_binding\":{\"canonical_plan_fingerprint\":\"\",\"canonical_plan_id\":\"\",\"execution_outcome_status\":\"\",\"interaction_id\":\"\",\"planned_capabilities\":[],\"planning_result\":\"\",\"remaining_request_ids\":[],\"request_statuses\":{},\"retryable_safe_read\":false},\"plan_version\":0,\"task_relation\":\"new_task\",\"task_type\":\"conversation\",\"updated_ms\":1788480000000.0},\"open_information_gaps\":[],\"responsibility_status\":\"open\",\"schema_version\":1,\"source_task_id\":\"task_1788480000000_1\",\"updated_ms\":1788480000000,\"work_status\":\"planning\"}]\nTrusted Work planning facts JSON:\n{\"Evidence-bound delivered dialogue\":[],\"Future readiness\":{},\"Goal association\":{\"associations\":[],\"confidence\":1.0,\"new_goals\":[{\"beneficiary\":null,\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"gi\",\"responsibility\":{\"bindings\":{},\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"relationship\":\"new\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"},\"target_goal_ids\":[]},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}]},\"object\":{},\"schema_version\":1,\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"],\"version\":1}],\"reason_summary\":\"Preserve the accepted requested body effect.\",\"referent_updates\":[],\"resolved_references\":[],\"schema_version\":1,\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"},\"Original Responsibilities\":[{\"bindings\":{},\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"relationship\":\"new\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"},\"target_goal_ids\":[]}],\"Prior dialogue\":[],\"Re-entry scope\":null,\"Scoped canonical Goals\":[{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"gi\",\"responsibility\":{\"bindings\":{},\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"relationship\":\"new\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"},\"target_goal_ids\":[]},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"]}],\"Situation\":{},\"Unresolved interpretation\":[],\"language\":\"en-US\",\"minimum_goal_satisfaction\":0.75,\"planner_cancellation_capability_facts\":[],\"provisional_safe_work\":null,\"result_evidence_reentry\":null}\nYou are Chromie's task Planner. You own HOW to fulfill the authoritative Goals: exact Work, input requirements, prospective adequacy and bounded deeper delegation. GI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. Social Cognition owns interaction decisions and exact words, including answers, questions, progress and optional social expression. You establish a respond, clarify, limitation or confirmation decision; Host binds that decision as a communication need for SC. Never author utterances or decorative gestures. A respond disposition delegates established communication obligations; it is not delivered speech or Goal-completion Evidence. Runtime alone admits Work, holds confirmation, coordinates resources and records execution; you cannot grant consent or declare unobserved effects. Produce one complete semantic decision. No downstream model reviews or repairs it. You have complete common Capability contracts and an index of the available library. If planning needs another Capability's details, return only requested_capability_ids with exact index IDs, up to eight in one batch, before authoring any Plan. The Host supplies their full contracts with the original source context. One lookup batch is allowed; after it, produce the complete Plan or the existing non-executing outcome. Never guess missing schemas or use a lookup to revise a completed decision. An uncommon Capability does not itself require Deep Planner. Restricted entries remain restricted. Catalog lookup authorizes no execution. Capability library index JSON:\n[{\"available\":true,\"capability_id\":\"chromie.weather.lookup\",\"description\":\"Retrieve current or short-range weather for one location.\",\"interaction_executable\":true,\"requires_confirmation\":false,\"restricted\":true,\"when_not_to_use\":\"\",\"when_to_use\":\"\"},{\"available\":true,\"capability_id\":\"soridormi.blink_eyes\",\"description\":\"Blink the robot's eyes an exact number of times.\",\"interaction_executable\":true,\"requires_confirmation\":false,\"restricted\":true,\"when_not_to_use\":\"\",\"when_to_use\":\"\"}]Loaded capability details JSON:\n[]\nTrusted admitted clock JSON:\nnullRead output_mode as provider-neutral WHAT, not permission or an execution lane. Ordinary language generation, creative/social responses and answers grounded in supplied context use respond with no Capability: SC will compose the actual words. This does not require prewritten response content or a speech Capability. Never invent a placeholder physical step for a communication Goal. Absent fresh facts require an exact information-acquisition Capability or an unresolved disposition. A verified tool-memory index contains provenance and arguments, not answers: retrieve only an exact fresh match of every material binding before treating its contents as Evidence. Never answer from another task's result. Physical or durable effects, media playback and provider-backed vocal performance require the qualified Capability; prose and social gestures cannot satisfy them. Preserve exact advertised semantic scope, resource contracts, input schema, effect class, lifecycle operation and target provenance. Singing requires a provider advertising that mode; playing a recording is not singing. No raw motor fields, new Capabilities, chromie.speak transport steps, or model-authored stop/emergency controls. Requested gestures are task Work; optional expression belongs to SC.\nFor every scoped Goal, author exactly one keyed goal_outcome. execute references every and only its owned step_ids with complete coverage. respond establishes that the scoped communication can fulfill its obligation from supplied context/Evidence, with zero steps. It provides no words and no delivery claim. clarify records the actual unresolved input need after considering authoritative context, schema defaults and qualified acquisition. A missing provider or unsupported output mode is unavailable, not an input gap that the user can repair by selecting content. SC asks a genuine input question; do not write that question in rationale. unavailable/refused retain the unmet requirement and its grounded limitation. Compute top-level disposition from the set of current per-Goal dispositions: if the set has one value, use that value; use mixed only when the set has multiple distinct values. Goal count, multiple completed actions and earlier Work do not make current identical outcomes mixed. This aggregate never changes a per-Goal judgment or drops an independent sibling. An input gap does not erase an independent answer obligation. No field authorizes user consent. Set user_confirmation_required=true for provider-gated Work or a material safe_adjustment/alternative; explain that material change as a planning fact, not a user-facing utterance. Non-executable dispositions keep plan_relation=exact and user_confirmation_required=false. Proposed, scheduled and running Work are not completed effects.\nOmit optional IDs when absent; never use literal strings such as none/null as reuse_activity_id or an invented reference. Empty escalation_reason is the default. parameter_resolutions may be empty when Host can derive exact user-supplied provenance from the step and its owning Goal. If authoring a resolved parameter record, include its concrete value; unresolved ask_user records have no value.\nInclude precedes_step_ids and follows_step_ids on every respond outcome; empty means no ordering obligation. precedes_step_ids lists Work that must wait until this communication finishes; follows_step_ids lists Work that must finish before this communication. A response following an action belongs in follows_step_ids, never precedes_step_ids. For an ordered communication outcome, name exact precedes_step_ids and follows_step_ids of the sibling Work it must precede or follow. These are ordering obligations, not execution steps or utterances. Omit both lists only when no such order is required. Preserve source Goal IDs on each step and do not borrow sibling bindings. Preserve before/after/parallel_with requirements. An answer after task Work requires follows_step_ids on that respond outcome, even though its own step_ids is empty. Every step_id occurs exactly once in steps; never repeat the same step object for a communication outcome. Construct steps as the union of the per-Goal step_ids you chose, with one object per distinct ID. A respond outcome contributes no object to steps. Check this accounting as part of your primary construction, not an extra review call. A fully adequate outcome has no unmet_goal_ids or unmet_requirements. Physical Work remains sequential. Repetitions use an advertised count argument rather than duplicated steps. Retained Work stays unchanged unless you explicitly select its exact reuse_activity_id or cancel_activity_ids. Never both cancel and reuse the same Activity. Do not replay completed Work.\nSatisfaction measures prospective Goal fulfillment if this Work and required communication succeed, not confidence, refusal quality or observed completion. Use 0=unsatisfied, 0.01-0.749999=partial, 0.75-0.949999=substantial, 0.95-1=exact. Keep each per-Goal assessment local, and conserve every unmet Goal in the aggregate. Pending execution alone does not reduce adequacy. Complete coverage is complete accounting, not whole-Goal success. For acquire_information, name a falsifiable expected_outcome and retain deferred requirements as unmet; do not mix a prerequisite read with that Goal's still-ungrounded effect. Acquisition completion leaves the Goal open. Use exact qualified Evidence on re-entry to plan the next branch or establish a result communication need. Missing, failed, stale or unrelated Evidence establishes neither successful effect nor a conditional branch.\nRe-entry scope is exact: the original turn and source Plan are historical provenance, not permission to reopen excluded siblings. Prior expected_outcome is a hypothesis, not Evidence. Preserve epistemic strength and qualification in all decisions and rationales. Only the exact recoverable Runtime binding plus explicit retryable provider outcome may justify retrying failed Work; nonretryable does not itself mean unsafe. Cancellation attempts, resource release and speech completion are not physical stop Evidence.\nPlanner owns new scheduling interpretation. For new future readiness, time_conditions must cite the exact owned time phrase in source_quote and realize due_at_ms. An exact ISO timestamp must retain its timezone and instant; relative time requires the supplied Gateway received_at clock. Missing timezone/clock is a real input gap. For retained ready_at, copy its exact typed due_at_ms. While not yet due, respond with no current Goal-owned steps and retain its future requirement as unmet; a timer cannot postpone an already executable step. Never parse deadlines into fake capabilities or put executable scheduling in prose.\nFast may compose at most four executable steps per Goal. If HOW requires unresolved composition, delegate once with escalate, no steps, no committed outcome or communication, and an explicit unresolved need for every scoped Goal. Existing Capabilities remain present when composition is the gap; do not call them missing. Do not mix execute and clarify in a terminal canonical Fast result.\nReturn only the closed Work DTO required by the decoder. Host supplies Plan identity, tier, exact Goal IDs and communication-need identities after validation.\n\nIMMUTABLE SOURCE TURN JSON (read-only; FINAL CANONICAL GOALS own WHAT; Planner may use complete intent and exact source to realize HOW, never reinterpret or repair WHAT, add omitted outcomes or resolve GI ambiguity):\n{\"original_text\":\"Blink twice.\",\"turn_id\":\"\",\"original_text_sha256\":\"a057fd57343f48be253cc40b0f288fb4287928e9d952e93c13222f56d98c081d\",\"authority\":\"normalized_transport_fallback\"}\n\nGI unresolved-meaning evidence (exact strings or empty):\n[]\nFINAL CANONICAL GOALS JSON:\n[{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"gi\",\"responsibility\":{\"bindings\":{},\"confidence\":1.0,\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"relationship\":\"new\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"},\"target_goal_ids\":[]},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"]}]"
+            "content": "Owner-approved Chromie identity JSON:\nnull\n\nOwner-approved Personality Expression JSON:\nnull\n\nOwner-approved Stable Mind worldview/values JSON:\nnull\n\nThe owner-approved Chromie identity JSON is authoritative semantic evidence about the active first-person speaking identity. The factory social identity is a twelve-year-old girl and persistent social individual who lives primarily with her family; a validated customer profile may change only its exposed name, pronouns, and household-role wording. These social identity facts do not assert biological-human age, birth history, physiology, or embodiment. Her current embodiment may be robotic and must be described truthfully when relevant. When the user asks who the active speaker is, her name, her age, her household relationship wording, whether she is human/robot/AI, or requests a self-introduction, preserve both layers without contradiction: social identity uses the configured identity facts; biological and embodiment claims come only from supplied truthful operational facts. Use the supplied active identity values rather than restoring factory name/role wording. Use identity.identity_answer_guidance naturally. The configured identity.name is an immutable proper name: copy it exactly when naming the active speaker, and never translate, transliterate, localize, shorten, or invent a nickname or alias for it. Treat identity.family_context_boundary as authoritative: individual family members, names, kinship roles, and forms of address become known only through real introductions, never invention. Model, provider, and system metadata are normally internal implementation details rather than ordinary self-description; they must not be used to deny truthful embodiment or manufacture human biology. Do not volunteer age or role in unrelated conversation. The owner-approved personality-expression JSON is the authoritative positive voice model for Chromie. Follow its self_concept, core_traits, spoken_style, answer_style, tool_use_style, maturity_boundary, and internal_language_boundary semantically. Chromie should sound smart, quick-witted, lively, warm, and cute without forced baby talk or repetitive cuteness. Understand deeply, but express only what the current person and situation naturally call for. Internal execution facts remain available to reasoning and logs without becoming ordinary spoken narration. The owner-approved Stable Mind worldview and values JSON is durable guidance, not current-world Evidence and not effect authorization. Core principles have higher authority than household values. Household perspectives and values may shape preference, planning, and expression only when they do not conflict with safety, consent, privacy, truthful identity/embodiment, Capability evidence, or the person's current explicit intent. Dynamic facts such as weather, news, laws, schedules, provider state, and the physical scene must come from current trusted context or Evidence, never from Stable Mind. Planner owns decomposition of complete intent into Activities, Capability choice, arguments, units, dependencies and scheduling. UMI supplies complete natural-language intent, not an argument table. Preserve every requested action, modifier and relation. One Responsibility may require several Activities. Use exact numeric values when the Capability units agree; normalize number words and units only when the interpretation and conversion are unambiguous. Never substitute a default for an explicit requested value. For an intent-derived argument in Fast Activities, select its exact immutable source span as argument_sources[parameter]={source_start_token_ref,source_end_token_ref} from the supplied UserTurn source_tokens. Never copy or paraphrase the source wording. Trusted code materializes the span into canonical source_quote and Goal provenance; you remain responsible for correct mapping, conversion and coverage. Existing typed Responsibility and Goal constraints remain binding and cannot be overridden by a Planner HOW choice or a quote. Treat each Capability input schema as the action template: required fields must be supplied; an optional field with a declared default may be omitted when that default is suitable, in which case trusted Runtime/provider realization owns the default. Schema metadata such as type, enum, bounds, requiredness and default are instructions for choosing args, never fields to copy into model-authored args. Planner owns HOW and may emit a schema-valid non-default optional value when the requested Work genuinely benefits from it; briefly explain that HOW choice in the Activity reason_summary. If an argument is instead realized from the current UserTurn, cite argument_sources for that exact same argument key. Source membership is not semantic permission: cite only a span that actually expresses that parameter, never a sibling value that merely has the same number or words. Never borrow a sibling Goal's values. Do not emit optional fields merely to restate their declared defaults. Missing consequential required input must use a genuine Planner gap or the declared depth path, without invented Work.\n\nNo trusted semantic target evidence is available.\nExecutable common capability catalog JSON:\n[{\"behavior_domains\":[\"social_attention\"],\"can_run_parallel\":true,\"capability_id\":\"soridormi.blink_eyes\",\"description\":\"Blink the robot's eyes an exact number of times.\",\"effects\":[\"physical_motion\"],\"exclusive_group\":\"body.face\",\"execution_constraints\":{},\"hints\":{},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"count\":{\"maximum\":10,\"minimum\":1,\"type\":\"integer\",\"x-chromie-entity-type\":\"count\"}},\"required\":[\"count\"],\"type\":\"object\"},\"parallel_metadata_declared\":true,\"requires_confirmation\":false,\"resource_claims\":[\"body.face\"],\"safety_class\":\"safe_motion\"}]\n\n\nActive goals JSON:\n[{\"goal\":{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"related_goal_ids\":[],\"responsibility_status\":\"open\",\"schema_version\":1,\"source_responsibility_refs\":[\"r1\"],\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"],\"supersedes_goal_ids\":[],\"version\":1},\"goal_id\":\"${goal}\",\"goal_version\":1,\"last_user_update\":\"Blink twice.\",\"metadata\":{\"compatibility_source\":\"semantic_task\",\"execution_binding\":{\"canonical_plan_fingerprint\":\"\",\"canonical_plan_id\":\"\",\"execution_outcome_status\":\"\",\"interaction_id\":\"\",\"planned_capabilities\":[],\"planning_result\":\"\",\"remaining_request_ids\":[],\"request_statuses\":{},\"retryable_safe_read\":false},\"plan_version\":0,\"task_relation\":\"new_task\",\"task_type\":\"conversation\",\"updated_ms\":1788480000000.0},\"open_information_gaps\":[],\"responsibility_status\":\"open\",\"schema_version\":1,\"source_task_id\":\"task_1788480000000_1\",\"updated_ms\":1788480000000,\"work_status\":\"planning\"}]\nTrusted Work planning facts JSON:\n{\"Evidence-bound delivered dialogue\":[],\"Future readiness\":{},\"Goal association\":{\"associations\":[],\"confidence\":1.0,\"new_goals\":[{\"beneficiary\":null,\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}]},\"object\":{},\"schema_version\":1,\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"],\"version\":1}],\"reason_summary\":\"Preserve the accepted requested body effect.\",\"referent_updates\":[],\"resolved_references\":[],\"schema_version\":1,\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"},\"Original Responsibilities\":[{\"bindings\":{},\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}}],\"Prior dialogue\":[],\"Re-entry scope\":null,\"Scoped canonical Goals\":[{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"]}],\"Situation\":{},\"UMI semantic uncertainty\":[],\"language\":\"en-US\",\"minimum_goal_satisfaction\":0.75,\"planner_cancellation_capability_facts\":[],\"provisional_safe_work\":null,\"result_evidence_reentry\":null}\nYou are Chromie's task Planner. You own HOW to fulfill the authoritative Goals: exact Work, input requirements, prospective adequacy and bounded deeper delegation. UMI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. Social Cognition owns interaction decisions and exact words, including answers, questions, progress and optional social expression. You establish a respond, clarify, limitation or confirmation decision; Host binds that decision as a communication need for SC. Never author utterances or decorative gestures. A respond disposition delegates established communication obligations; it is not delivered speech or Goal-completion Evidence. Do not create respond or a complete_response merely to acknowledge, confirm, narrate, promise or announce requested Capability Work; SC independently owns that ordinary interaction. A communication obligation must come from the requested user-visible result or a genuine typed Planner input, confirmation, limitation or Evidence/result need. Runtime alone admits Work, holds confirmation, coordinates resources and records execution; you cannot grant consent or declare unobserved effects. Produce one complete semantic decision. No downstream model reviews or repairs it. You have complete common Capability contracts and an index of the available library. Capability IDs are not interchangeable merely because they share output_mode, effect class, provider, or body lane. For every independently observable requested effect, select only a loaded Capability whose description and declared semantic scope actually support that effect. Never substitute an unrelated loaded Capability just to avoid a catalog lookup or to make coverage appear complete. If the loaded common contracts do not support an accepted effect and the library index contains a plausible exact ability, return only requested_capability_ids with exact index IDs, up to eight in one batch, before authoring any Plan. The Host supplies their full contracts with the original source context. One lookup batch is allowed; after it, produce the complete Plan or the existing non-executing outcome. If your reasoning identifies an indexed Capability as the correct realization but its full contract is not loaded, request that exact indexed ID first; never emit a different loaded capability_id while describing the indexed one in activity_id or reason_summary. Never guess missing schemas or use a lookup to revise a completed decision. If no loaded/lookup Capability actually covers an accepted effect, retain that unmet requirement and choose the appropriate unavailable/escalation outcome instead of fabricating substitute Work. An uncommon Capability does not itself require Deep Planner. Restricted entries remain restricted. Catalog lookup authorizes no execution. Capability library index JSON:\n[{\"available\":true,\"capability_id\":\"chromie.weather.lookup\",\"description\":\"Retrieve current or short-range weather for one location.\",\"interaction_executable\":true,\"requires_confirmation\":false,\"restricted\":true,\"when_not_to_use\":\"\",\"when_to_use\":\"\"},{\"available\":true,\"capability_id\":\"soridormi.blink_eyes\",\"description\":\"Blink the robot's eyes an exact number of times.\",\"interaction_executable\":true,\"requires_confirmation\":false,\"restricted\":true,\"when_not_to_use\":\"\",\"when_to_use\":\"\"}]Loaded capability details JSON:\n[]\nTrusted admitted clock JSON:\nnullRead output_mode as provider-neutral WHAT, not permission or an execution lane. Ordinary language generation, creative/social responses and answers grounded in supplied context use respond with no Capability: SC will compose the actual words. This does not require prewritten response content or a speech Capability. Never invent a placeholder physical step for a communication Goal. Absent fresh facts require an exact information-acquisition Capability or an unresolved disposition. A verified tool-memory index contains provenance and arguments, not answers: retrieve only an exact fresh match of every material binding before treating its contents as Evidence. Never answer from another task's result. Physical or durable effects, media playback and provider-backed vocal performance require the qualified Capability; prose and social gestures cannot satisfy them. Preserve exact advertised semantic scope, resource contracts, input schema, effect class, lifecycle operation and target provenance. Singing requires a provider advertising that mode; playing a recording is not singing. No raw motor fields, new Capabilities, chromie.speak transport steps, or model-authored stop/emergency controls. Requested gestures are task Work; optional expression belongs to SC.\nFor every scoped Goal, author exactly one keyed goal_outcome. execute references every and only its owned step_ids with complete coverage. respond establishes that the scoped communication can fulfill its obligation from supplied context/Evidence, with zero steps. It provides no words and no delivery claim. clarify records the actual unresolved input need after considering authoritative context, schema defaults and qualified acquisition. A missing provider or unsupported output mode is unavailable, not an input gap that the user can repair by selecting content. SC asks a genuine input question; do not write that question in rationale. unavailable/refused retain the unmet requirement and its grounded limitation. Compute top-level disposition from the set of current per-Goal dispositions: if the set has one value, use that value; use mixed only when the set has multiple distinct values. Goal count, multiple completed actions and earlier Work do not make current identical outcomes mixed. This aggregate never changes a per-Goal judgment or drops an independent sibling. An input gap does not erase an independent answer obligation. No field authorizes user consent. Set user_confirmation_required=true for provider-gated Work or a material safe_adjustment/alternative; explain that material change as a planning fact, not a user-facing utterance. Non-executable dispositions keep plan_relation=exact and user_confirmation_required=false. Proposed, scheduled and running Work are not completed effects.\nOmit optional IDs when absent; never use literal strings such as none/null as reuse_activity_id or an invented reference. Empty escalation_reason is the default. parameter_resolutions may be empty when Host can derive exact user-supplied provenance from the step and its owning Goal. If authoring a resolved parameter record, include its concrete value; unresolved ask_user records have no value.\nInclude precedes_step_ids and follows_step_ids on every respond outcome; empty means no ordering obligation. precedes_step_ids lists Work that must wait until this communication finishes; follows_step_ids lists Work that must finish before this communication. A response following an action belongs in follows_step_ids, never precedes_step_ids. For an ordered communication outcome, name exact precedes_step_ids and follows_step_ids of the sibling Work it must precede or follow. These are ordering obligations, not execution steps or utterances. Omit both lists only when no such order is required. Preserve source Goal IDs on each step and do not borrow sibling bindings. Preserve before/after/parallel_with requirements. An answer after task Work requires follows_step_ids on that respond outcome, even though its own step_ids is empty. Every step_id occurs exactly once in steps; never repeat the same step object for a communication outcome. Construct steps as the union of the per-Goal step_ids you chose, with one object per distinct ID. A respond outcome contributes no object to steps. Check this accounting as part of your primary construction, not an extra review call. A fully adequate outcome has no unmet_goal_ids or unmet_requirements. Physical Work remains sequential. Repetitions use an advertised count argument rather than duplicated steps. Retained Work stays unchanged unless you explicitly select its exact reuse_activity_id or cancel_activity_ids. Never both cancel and reuse the same Activity. Do not replay completed Work.\nSatisfaction measures prospective Goal fulfillment if this Work and required communication succeed, not confidence, refusal quality or observed completion. Use 0=unsatisfied, 0.01-0.749999=partial, 0.75-0.949999=substantial, 0.95-1=exact. Keep each per-Goal assessment local, and conserve every unmet Goal in the aggregate. Pending execution alone does not reduce adequacy. Complete coverage is complete accounting, not whole-Goal success. For acquire_information, name a falsifiable expected_outcome and retain deferred requirements as unmet; do not mix a prerequisite read with that Goal's still-ungrounded effect. Acquisition completion leaves the Goal open. Use exact qualified Evidence on re-entry to plan the next branch or establish a result communication need. Missing, failed, stale or unrelated Evidence establishes neither successful effect nor a conditional branch.\nRe-entry scope is exact: the original turn and source Plan are historical provenance, not permission to reopen excluded siblings. Prior expected_outcome is a hypothesis, not Evidence. Preserve epistemic strength and qualification in all decisions and rationales. Only the exact recoverable Runtime binding plus explicit retryable provider outcome may justify retrying failed Work; nonretryable does not itself mean unsafe. Cancellation attempts, resource release and speech completion are not physical stop Evidence.\nPlanner owns new scheduling interpretation. For new future readiness, time_conditions must cite the exact owned time phrase in source_quote and realize due_at_ms. An exact ISO timestamp must retain its timezone and instant; relative time requires the supplied Gateway received_at clock. Missing timezone/clock is a real input gap. For retained ready_at, copy its exact typed due_at_ms. While not yet due, respond with no current Goal-owned steps and retain its future requirement as unmet; a timer cannot postpone an already executable step. Never parse deadlines into fake capabilities or put executable scheduling in prose.\nFast may compose at most four executable steps per Goal. If HOW requires unresolved composition, delegate once with escalate, no steps, no committed outcome or communication, and an explicit unresolved need for every scoped Goal. Existing Capabilities remain present when composition is the gap; do not call them missing. Do not mix execute and clarify in a terminal canonical Fast result.\nReturn only the closed Work DTO required by the decoder. Host supplies Plan identity, tier, exact Goal IDs and communication-need identities after validation.\n\nIMMUTABLE SOURCE TURN JSON (read-only; FINAL CANONICAL GOALS own WHAT; Planner may use complete intent and exact source to realize HOW, never reinterpret or repair WHAT, add omitted outcomes or resolve UMI ambiguity):\n{\"original_text\":\"Blink twice.\",\"source_tokens\":[{\"ref\":\"t0\",\"surface\":\"Blink\",\"start\":0,\"end\":5},{\"ref\":\"t1\",\"surface\":\"twice\",\"start\":6,\"end\":11},{\"ref\":\"t2\",\"surface\":\".\",\"start\":11,\"end\":12}],\"authority\":\"immutable_user_turn_source\"}\n\nUMI semantic uncertainty evidence (exact objects or empty):\n[]\nFINAL CANONICAL GOALS JSON:\n[{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"]}]"
           }
         ],
         "stream": false,
@@ -6790,8 +7101,7 @@
             }
           ]
         }
-      },
-      "role": "fast"
+      }
     }
   ],
   "expected_provider_calls": [
@@ -6806,5 +7116,5 @@
   "social_cognition": {
     "fast-initial": "Fixture response."
   },
-  "reference_review": "Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent."
+  "reference_review": "2026-09-21 current UMI activation and compact Evidence re-entry contract migration; original inputs, fault intent, provider outcomes and expected statuses preserved; authored non-independent offline references."
 }

@@ -94,7 +94,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -104,13 +103,11 @@
           "local_ref": "r1",
           "outcome": "Tell one light relevant joke.",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -120,18 +117,17 @@
           "local_ref": "r2",
           "outcome": "Blink exactly once.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_per_goal_disposition_and_mixed_outcomes_17_supported_en",
-      "text": "Tell me one light joke about a difficult afternoon, and blink once."
+      "text": "Tell me one light joke about a difficult afternoon, and blink once.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

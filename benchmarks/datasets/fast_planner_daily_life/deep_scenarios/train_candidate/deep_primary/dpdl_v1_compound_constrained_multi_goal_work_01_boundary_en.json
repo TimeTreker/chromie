@@ -505,7 +505,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -519,18 +518,17 @@
           "local_ref": "r1",
           "outcome": "Acquire the red mug from the kitchen and hand it to the requester.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_compound_constrained_multi_goal_work_01_boundary_en",
-      "text": "Bring the red mug from the kitchen and hand it to me."
+      "text": "Bring the red mug from the kitchen and hand it to me.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_primary"
   },

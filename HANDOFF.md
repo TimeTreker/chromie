@@ -1,5 +1,111 @@
 # Chromie Handoff
 
+## Owner-requested immediate delivery — 2026-09-21 (current)
+
+The owner explicitly requested **commit and push immediately without further tests**
+after asking to repair the 329 existing test failures. This section supersedes older
+current/resume claims below. No additional tests are authorized for this delivery.
+Pre-delivery base and fetched `origin/main`: `370e4764df0d18f754c6afe0237697463dd33f84`; branch: `main`.
+Resume from the latest commit containing this checkpoint and handoff. This is a
+work-in-progress repair delivery, not a declaration that every gate or live case passes.
+
+The active line remains canonical local gate → current-revision live voice proof →
+default target-evidence closure (#24/#32); no new feature/architecture line is opened.
+Existing local cognition changes present at diagnosis start are preserved in this
+combined delivery together with the weather follow-up repair and regression migration.
+
+Implemented boundary repairs and actual episode workflow:
+
+| Owner / ordered boundary | Authoritative input → observed wrong output | Restored contract / containment |
+| --- | --- | --- |
+| UMI/GA fixture authorship → DTO/Schema | Retired relationship/target fields, string uncertainties or missing cognition requests → rejection before the tested behavior | Frozen fixtures now explicitly author current typed meaning/activation; source cases, contrast splits and target outcomes preserved; production validators remain strict. |
+| Host state wake → Activation → Planner | Test clients omitted Activation → correct fail-closed suppression, no Planner invocation | Explicit test-owned Activation decisions exercise re-entry; no runtime semantic default was added. |
+| Fast evidence re-entry Schema | Verified read plus source Plan's unmet conditional effect → execute branch unavailable | Existing acquired Evidence plus explicitly retained unmet obligation permits the next Work decision; Planner still chooses the action and Runtime owns authorization. |
+| Compact re-entry materialization → canonical validator → SC | Cited Evidence with wrong Goal/step correlation → missing dependency silently discarded | Reject unmatched cited completion Evidence; derive dependencies only from verified same-Goal completed Work. No response is released from that invalid boundary. |
+| Fast Capability Schema → Host grounding | Declared structured resource realization keyed by source entity type → Schema looked up a different key and rejected valid args | Schema and Host share the existing Capability-owned realization lookup; exact-value negative cases still reject. |
+| Weather continuity / memory / SC (earlier work in this delivery) | Fresh weather and follow-up information lost across Goal, Evidence, Activation or expression identity boundaries | Preserve completed-turn context, information-delivery obligation, trusted memory tuple provenance and immutable SC identity; bounded Activation inherits the Fast budget; no second semantic repair model. |
+
+Validation observed **before** the immediate-delivery instruction:
+
+- Original full-suite observation: 329 failures, 3360 passes, 979 subtests passed.
+- Latest broad run excluding workflow replay: 17 failures, 3536 passes, 1013 subtests
+  passed. Subsequent targeted repairs passed, but this broad command was not rerun.
+- Contract round 4: 233 passes / 9 subtests and one failing scenario-suite subtest;
+  its stale `CanonicalPlan.meaning_uncertainties` harness access was then repaired.
+- Fast/seed strict replay round 6: 167 passes, 78 subtests; 67 deselected.
+- Miscellaneous round 6: 272 passes / 24 subtests, two failures; those two then passed
+  in a 12-test focused run after explicit Activation fixture and prompt guard repair.
+- Full 6000-case explicit authoring capture completed with 6000 passes and no missing
+  requests. Its current wire packets were frozen without launching another test.
+  **The full strict replay of the newly frozen cohort is not run.** These authored
+  offline cases do not qualify native model reasoning, audio or physical behavior.
+- Repository policy, pinned ruff, pinned mypy (37 source files), and docs checks
+  separately passed before final documentation/corpus publication. Configuration
+  inventory was regenerated. **Final `./scripts/run_tests.sh` and final full pytest:
+  not run, owner waiver.** No ignore/bypass was added to a gate.
+- Earlier weather two-turn console scenario passed on the then-deployed source.
+  The last 75-case live aggregate stopped at case 2 (singleton parallel Work / social
+  expression ownership); case 1 lacked sufficient speech/observation evidence and 73
+  cases were unrun. These remain failures/gaps, not a current-revision live pass.
+
+Four-axis status: source repairs and current fixture migration implemented; local
+validation partial; current-revision target/physical evidence open; development-only
+Git handoff. No new runtime switch, current document or architectural term was added.
+
+Next session, only after testing is authorized again: run strict 6000-case replay,
+then canonical gates, inspect every failure without weakening assertions, rebuild and
+verify one deployment, and run the directory-discovered live aggregate without editing
+between cases. Collect one debug bundle after it ends or stops. Physical microphone,
+speaker and robot evidence remains supervised. Do not claim the 329 failures closed
+until the final full suite has actually passed.
+
+### Operational snapshot and resume commands
+
+Repository `/home/chromie/github/chromie`, remote
+`https://github.com/TimeTreker/chromie.git`, branch `main`. Fetch/pull before resuming
+on another machine and use that machine's generated runtime profile; never copy or edit
+`.env.runtime` directly. The prior deployed Agent source digest was
+`ebaadd219403cbfbe171474a308df75f75514cc9de07e5a55c7094dd09e6c167`;
+it predates these latest re-entry/Schema repairs and is not current-delivery evidence.
+No service restart/redeployment was performed for the 329-failure repair.
+
+Retained local artifacts (ignored by Git; transfer separately if needed):
+
+- `.chromie/acceptance/existing-failures-repair-20260921/`: starting dirty patch,
+  fixture before/after hashes, full-excluding-replay-round5.log, contract-round4.log,
+  fast-seed-round6.log, misc-round6.log, policy/static/docs logs, capture-stop.json,
+  replay-all-capture.log and per-case replay-capture/{case}/ evidence.
+- Authoring scripts copied into that evidence directory: chromie_replay_recapture.py,
+  chromie_capture_all.py, chromie_capture_families.py. Recapture explicitly changes
+  fixture expectations; never use it as a substitute for strict replay validation.
+- `.chromie/acceptance/weather-followup-repair-20260921T105718Z/REPORT.zh-CN.md`:
+  originating two-turn case, complete boundary diagnosis and earlier live evidence.
+- `/home/chromie/Downloads/chromie_debug_bundle_20260921_202452.tar.gz`: last failed
+  aggregate; no physical audio/hardware claim. Downloaded original user bundle remains
+  `/home/chromie/Downloads/chromie_debug_bundle_20260921_184234.tar.gz`.
+
+The 6000 expanded frozen cases and five seed cases are committed, so strict replay is
+reproducible from Git without the local authoring captures. Pending source-generator
+changes have a 60-family construction smoke observation only, not a separate full
+semantic qualification. No background test should be relied on after this delivery.
+
+Once authorized to resume verification (these are **next commands, not newly run**):
+
+```bash
+conda activate Chromie
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir .chromie/acceptance/resume-strict-workflows
+python scripts/check_repository_policies.py
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/general_ability_acceptance.py --help
+python scripts/chromie_psm_live_text_console.py
+./scripts/collect_debug_bundle.sh
+```
+
+Use the retained weather case and the complete discovered live cohort after rebuilding
+and verifying the current deployed revision. Select appropriate general-ability classes
+from the script's current interface; do not assume the old partial Level A run passed.
+
 ## RTX 4090 Laptop SGLang source migration — 2026-09-17 (current)
 
 The owner identified that the maintained RTX 4090 Laptop still ran all cognition through

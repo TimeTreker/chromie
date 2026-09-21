@@ -109,7 +109,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -122,18 +121,17 @@
           "local_ref": "r1",
           "outcome": "Look at the identified user for three seconds.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_planner_uncertainty_and_limit_outcomes_20_supported_en",
-      "text": "For my preference for a quiet interaction, look at person:user for three seconds."
+      "text": "For my preference for a quiet interaction, look at person:user for three seconds.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

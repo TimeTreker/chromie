@@ -1068,6 +1068,18 @@ class GoalAssociationResolver:
                     "replacement Goal references unknown superseded Goal IDs: "
                     + ", ".join(unknown_superseded_goal_ids)
                 )
+            terminal_superseded_ids = sorted(
+                set(item.supersedes_goal_ids).intersection(
+                    str(goal.get("goal_id") or "")
+                    for goal in self._candidate_goals(request)
+                    if str(goal.get("responsibility_status") or "open") != "open"
+                )
+            )
+            if terminal_superseded_ids:
+                raise ValueError(
+                    "terminal Goal is immutable historical context, not a replacement target: "
+                    + ", ".join(terminal_superseded_ids)
+                )
             if set(item.related_goal_ids).intersection(item.supersedes_goal_ids):
                 raise ValueError(
                     "replacement Goal cannot also retain a superseded Goal as related context"

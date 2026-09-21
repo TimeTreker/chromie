@@ -149,7 +149,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -173,18 +172,17 @@
           "local_ref": "r1",
           "outcome": "只在有可信证据后报告眨眼完成。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_truthful_response_staging_and_deduplication_27_supported_zh",
-      "text": "用于我刚才好奇的一件小事的眨眼已经有可信完成证据后，只告诉我眨眼已完成。"
+      "text": "用于我刚才好奇的一件小事的眨眼已经有可信完成证据后，只告诉我眨眼已完成。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

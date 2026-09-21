@@ -128,7 +128,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -152,18 +151,17 @@
           "local_ref": "r1",
           "outcome": "Check current Hangzhou weather now.",
           "output_mode": "information",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_temporal_readiness_planning_36_boundary_en",
-      "text": "Check Hangzhou weather now for meeting my friend after class."
+      "text": "Check Hangzhou weather now for meeting my friend after class.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

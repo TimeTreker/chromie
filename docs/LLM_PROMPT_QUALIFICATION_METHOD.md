@@ -506,7 +506,7 @@ These results demonstrate the method; they are not permanent release thresholds.
 
 The retained corpora are:
 
-- [User Meaning Interpretation Daily-Life Dataset](../benchmarks/datasets/user_meaning_interpretation_daily_life/README.md)
+- [User Meaning Interpretation Daily-Life Dataset](../benchmarks/datasets/goal_interpretation_daily_life/README.md)
 - [Goal Association Daily-Life Corpus](../benchmarks/datasets/goal_association_daily_life/README.md)
 
 ## 7. Applying the method to Fast and Deep Planner

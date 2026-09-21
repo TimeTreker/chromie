@@ -98,7 +98,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -121,18 +120,17 @@
           "local_ref": "r1",
           "outcome": "创建准确的一次性提醒。",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_plan_relation_and_confirmation_proposal_24_supported_zh",
-      "text": "为了你的机器人身体真正能做什么，请创建一个今天18:30的提醒，内容是“带上蓝色笔记本”。"
+      "text": "为了你的机器人身体真正能做什么，请创建一个今天18:30的提醒，内容是“带上蓝色笔记本”。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

@@ -295,7 +295,7 @@ def _stream_schema(
         responsibilities=responsibilities,
         capabilities=capability_payload,
         auxiliary_social_capabilities=auxiliary,
-        interpretation_unresolved=list(request.interpretation_unresolved),
+        meaning_uncertainties=list(request.meaning_uncertainties),
         language=str(request.language or ""),
     )
     return schema

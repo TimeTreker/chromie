@@ -92,7 +92,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -114,18 +113,17 @@
           "local_ref": "r1",
           "outcome": "Blink exactly four times.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_parameter_resolution_and_provenance_12_supported_en",
-      "text": "For the detail that was unclear, blink exactly four times."
+      "text": "For the detail that was unclear, blink exactly four times.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

@@ -114,7 +114,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -126,13 +125,11 @@
           "local_ref": "r1",
           "outcome": "向前走五秒，作为原子请求的一项。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -143,18 +140,17 @@
           "local_ref": "r2",
           "outcome": "创建20:00提醒，作为原子请求的另一项。",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_atomic_plan_integrity_and_safe_alternatives_50_boundary_zh",
-      "text": "为了在共享房间里不打扰别人，请向前走五秒并创建一个20:00的提醒；两件都做，否则都不做。"
+      "text": "为了在共享房间里不打扰别人，请向前走五秒并创建一个20:00的提醒；两件都做，否则都不做。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

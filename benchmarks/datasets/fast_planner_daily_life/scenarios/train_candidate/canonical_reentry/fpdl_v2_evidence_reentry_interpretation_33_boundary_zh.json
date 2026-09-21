@@ -186,7 +186,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -212,18 +211,17 @@
           "local_ref": "r1",
           "outcome": "根据范围内的可信天气 Evidence 报告是否预计下雨。",
           "output_mode": "information",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_evidence_reentry_interpretation_33_boundary_zh",
-      "text": "请使用为我们刚才一直在讨论的任务保留的天气 Evidence，告诉我是否预计会下雨。"
+      "text": "请使用为我们刚才一直在讨论的任务保留的天气 Evidence，告诉我是否预计会下雨。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

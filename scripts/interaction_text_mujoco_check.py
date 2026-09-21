@@ -1525,6 +1525,10 @@ async def run_check(
             "status_before": status_before,
             "status_after": status_after,
             "session_state": assistant.sessions.state.get(sid),
+            "final_goal_snapshots": (
+                assistant.conversation_state.active_goal_snapshots()
+                + assistant.conversation_state.recent_goal_snapshots()
+            ),
             "provenance": collect_run_provenance(
                 manifest=Path(args.manifest),
                 cognitive_runtime=bool(args.cognitive_runtime),

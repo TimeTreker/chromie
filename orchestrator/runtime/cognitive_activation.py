@@ -58,13 +58,13 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
     plan = raw.get('canonical_plan')
     if isinstance(plan, dict):
         compact['canonical_plan'] = {
-            **select(plan, ('plan_id','disposition','coverage','goal_ids','planner_tier')),
+            **select(plan, ('plan_id','disposition','coverage','goal_ids','planner_tier','goal_satisfaction')),
             'steps': [
-                select(item, ('step_id','capability_id','source_goal_ids','timing','reuse_activity_id'))
+                select(item, ('step_id','capability_id','source_goal_ids','timing','reuse_activity_id','step_purpose'))
                 for item in rows(plan.get('steps'), limit=16)
             ],
             'goal_outcomes': [
-                select(item, ('goal_id','disposition','coverage','step_ids','unmet_requirements'))
+                select(item, ('goal_id','disposition','coverage','step_ids','unmet_requirements','satisfaction'))
                 for item in rows(plan.get('goal_outcomes'), limit=8)
             ],
             'communication_needs': [
@@ -105,7 +105,7 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
             projected['trusted_execution_outcome'] = {
                 **select(outcome, ('outcome_id','aggregate_status')),
                 'goal_outcomes': [
-                    select(item, ('goal_id','status','evidence_ids','completed_step_ids','unresolved_step_ids','requires_planner_continuation'))
+                    select(item, ('goal_id','status','evidence_ids','completed_step_ids','unresolved_step_ids','requires_planner_continuation','acquisition_step_ids','planned_satisfaction'))
                     for item in rows(outcome.get('goal_outcomes'), limit=8)
                 ],
             }

@@ -265,8 +265,13 @@ class InteractionRuntimeCoordinator:
         self, response: InteractionResponse, execution: CapabilityRuntimeResult,
         *, session_id: str | None,
     ) -> None:
-        """Persist SC words only from completed playback, never queue admission."""
-        if self.speech_delivery_waiter is None or self.communicative_delivery_recorder is None:
+        """Persist delivered SC words and reconcile exact communication completion.
+
+        Playback is the delivery authority.  Evidence-bound final answers become
+        bounded dialogue Memory only after playback, and only the exact Goal IDs
+        already marked complete by Planner+SC may receive lifecycle completion.
+        """
+        if self.speech_delivery_waiter is None:
             return
         by_request = {item.request_id: item for item in execution.results}
         for speech in response.speech:
@@ -277,16 +282,52 @@ class InteractionRuntimeCoordinator:
                 continue
             if not await self.speech_delivery_waiter(session_id, result.output):
                 continue
-            self.communicative_delivery_recorder(session_id, speech.text, {
-                "source": "social_cognition_communicative_delivery", "wording_owner": "social_cognition",
+            completion_goal_ids = [
+                str(value).strip()
+                for value in speech.metadata.get("communication_completion_goal_ids") or []
+                if str(value).strip()
+            ]
+            evidence_refs = list(speech.metadata.get("evidence_refs") or [])
+            evidence_bound = bool(completion_goal_ids and evidence_refs)
+            delivery_metadata = {
+                "source": (
+                    "evidence_bound_tool_result_interpretation"
+                    if evidence_bound
+                    else "social_cognition_communicative_delivery"
+                ),
+                "wording_owner": "social_cognition",
+                "evidence_bound": evidence_bound,
+                "phase": speech.metadata.get("phase"),
                 "turn_id": speech.metadata.get("turn_id"),
+                "speech_event_id": speech.id,
+                "canonical_plan_id": speech.metadata.get("canonical_plan_id"),
+                "delivery_role": speech.metadata.get("delivery_role"),
                 "communicative_activity_ids": list(speech.metadata.get("communicative_activity_ids") or []),
                 "source_responsibility_refs": list(speech.metadata.get("source_responsibility_refs") or []),
                 "source_goal_ids": list(speech.metadata.get("source_goal_ids") or []),
                 "addressed_need_ids": list(speech.metadata.get("addressed_need_ids") or []),
-                "evidence_refs": list(speech.metadata.get("evidence_refs") or []),
+                "communication_completion_goal_ids": completion_goal_ids,
+                "evidence_refs": evidence_refs,
                 "speech_act": speech.metadata.get("speech_act"), "playback_completed": True,
-            })
+            }
+            if self.communicative_delivery_recorder is not None:
+                self.communicative_delivery_recorder(
+                    session_id,
+                    speech.text,
+                    delivery_metadata,
+                )
+            if (
+                completion_goal_ids
+                and self.communicative_goal_completion_recorder is not None
+            ):
+                self.communicative_goal_completion_recorder(
+                    session_id,
+                    completion_goal_ids,
+                    {
+                        **delivery_metadata,
+                        "source": "social_cognition_communicative_completion",
+                    },
+                )
 
     async def start_fast_planner_communicative_act(
         self,
@@ -1057,6 +1098,32 @@ class InteractionRuntimeCoordinator:
             preexecuted_traces=preexecuted_traces,
         )
 
+    def _record_social_results_for_dispatch(
+        self,
+        dispatch: CapabilityInteractionDispatch,
+        execution: CapabilityRuntimeResult,
+    ) -> None:
+        """Append auxiliary terminal truth exactly once at the coordinator join.
+
+        ``wait_dispatch`` is the maintained terminal join for an accepted
+        InteractionResponse. Keep ledger ownership here for both live Runtime
+        receipts and immediate executions; higher cognitive closure may consume
+        these facts but must not replay them from a different response projection.
+        """
+
+        if self.interaction_ledger is None:
+            return
+        metadata = dispatch.runtime_response.metadata
+        self.interaction_ledger.record_social_results(
+            session_id=str(
+                metadata.get("session_id") or metadata.get("turn_id") or ""
+            ),
+            turn_id=str(metadata.get("turn_id") or ""),
+            interaction_id=dispatch.runtime_response.interaction_id,
+            requests=dispatch.source_response.capabilities,
+            results=execution.results,
+        )
+
     async def wait_dispatch(
         self,
         dispatch: CapabilityInteractionDispatch,
@@ -1064,34 +1131,28 @@ class InteractionRuntimeCoordinator:
         """Explicitly join one accepted coordinator dispatch when terminal truth is required."""
 
         if dispatch.immediate_execution is not None:
-            return dispatch.immediate_execution
-        if dispatch.receipt is None:
-            raise RuntimeError("capability interaction dispatch has no Runtime receipt")
-        execution = await self.runtime.wait_terminal(dispatch.receipt)
-        if (self.interaction_ledger is not None
-                and dispatch.runtime_response.metadata.get("social_expression_materialized") is True):
-            metadata = dispatch.runtime_response.metadata
-            self.interaction_ledger.record_social_results(
-                session_id=str(metadata.get("session_id") or metadata.get("turn_id") or ""),
-                turn_id=str(metadata.get("turn_id") or ""),
-                interaction_id=dispatch.runtime_response.interaction_id,
-                requests=dispatch.runtime_response.capabilities, results=execution.results)
-        if not dispatch.preexecuted_results:
-            return execution
-        merged_results = [*dispatch.preexecuted_results, *execution.results]
-        merged_traces = [*dispatch.preexecuted_traces, *execution.traces]
-        return execution.model_copy(
-            update={
-                "results": merged_results,
-                "traces": merged_traces,
-                "status": (
-                    "completed"
-                    if merged_results
-                    and all(item.status == "completed" for item in merged_results)
-                    else execution.status
-                ),
-            }
-        )
+            execution = dispatch.immediate_execution
+        else:
+            if dispatch.receipt is None:
+                raise RuntimeError("capability interaction dispatch has no Runtime receipt")
+            execution = await self.runtime.wait_terminal(dispatch.receipt)
+            if dispatch.preexecuted_results:
+                merged_results = [*dispatch.preexecuted_results, *execution.results]
+                merged_traces = [*dispatch.preexecuted_traces, *execution.traces]
+                execution = execution.model_copy(
+                    update={
+                        "results": merged_results,
+                        "traces": merged_traces,
+                        "status": (
+                            "completed"
+                            if merged_results
+                            and all(item.status == "completed" for item in merged_results)
+                            else execution.status
+                        ),
+                    }
+                )
+        self._record_social_results_for_dispatch(dispatch, execution)
+        return execution
 
     async def _dispatch_to_terminal(
         self,

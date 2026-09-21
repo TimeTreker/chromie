@@ -1858,6 +1858,63 @@ class PreparedWorkTests(unittest.IsolatedAsyncioTestCase):
 
 
 class SpeechCompletionAuthorityTests(unittest.IsolatedAsyncioTestCase):
+    async def test_evidence_bound_social_delivery_records_memory_and_closes_exact_goals(self):
+        from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
+        from shared.chromie_contracts.interaction import CapabilityResult, InteractionSpeech
+
+        recorded, closed = [], []
+
+        async def delivery(_sid, _output):
+            return True
+
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: {"scheduled": True, "playback_started": True, "voice_released": True},
+            speech_delivery_waiter=delivery,
+            communicative_delivery_recorder=lambda *args: recorded.append(args),
+            communicative_goal_completion_recorder=lambda *args: closed.append(args),
+        )
+        response = InteractionResponse(
+            interaction_id="weather-answer",
+            speech=[InteractionSpeech(
+                id="weather-speech",
+                text="Light showers are expected today.",
+                metadata={
+                    "wording_owner": "social_cognition",
+                    "phase": "final",
+                    "turn_id": "turn-weather",
+                    "canonical_plan_id": "plan-weather-answer",
+                    "delivery_role": "response",
+                    "source_goal_ids": ["goal-weather"],
+                    "source_responsibility_refs": ["r1"],
+                    "communicative_activity_ids": ["sc-weather-answer"],
+                    "addressed_need_ids": ["answer:goal-weather"],
+                    "communication_completion_goal_ids": ["goal-weather"],
+                    "evidence_refs": ["evidence-weather"],
+                    "speech_act": "respond",
+                },
+            )],
+        )
+        execution = CapabilityRuntimeResult(
+            interaction_id=response.interaction_id,
+            status="completed",
+            results=[CapabilityResult(
+                request_id="weather-speech",
+                capability_id="chromie.speak",
+                status="completed",
+                output={"scheduled": True},
+            )],
+        )
+
+        await coordinator.record_social_delivery(response, execution, session_id="sid-weather")
+
+        self.assertEqual(len(recorded), 1)
+        self.assertEqual(recorded[0][2]["source"], "evidence_bound_tool_result_interpretation")
+        self.assertTrue(recorded[0][2]["evidence_bound"])
+        self.assertEqual(recorded[0][2]["evidence_refs"], ["evidence-weather"])
+        self.assertEqual(len(closed), 1)
+        self.assertEqual(closed[0][1], ["goal-weather"])
+        self.assertEqual(closed[0][2]["source"], "social_cognition_communicative_completion")
+
     async def test_history_and_goal_completion_wait_for_actual_delivery(self):
         for completes in (True, False):
             with self.subTest(completes=completes):

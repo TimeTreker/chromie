@@ -30,7 +30,6 @@
       "context": {},
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -40,18 +39,17 @@
           "local_ref": "r1",
           "outcome": "Cheerfully acknowledge the user's curiosity without inventing its subject.",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_outcome_mode_fidelity_43_supported_en",
-      "text": "Cheerfully acknowledge my curiosity about our drawing game in one sentence, without inventing what the specific thing was."
+      "text": "Cheerfully acknowledge my curiosity about our drawing game in one sentence, without inventing what the specific thing was.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

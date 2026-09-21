@@ -115,7 +115,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -130,18 +129,17 @@
           "local_ref": "r1",
           "outcome": "Check Hangzhou weather only when the Goal becomes ready at the specified future time.",
           "output_mode": "information",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_temporal_readiness_planning_35_supported_en",
-      "text": "At 7:00 p.m. on September 4, 2099, check Hangzhou weather for the evening routine; do not check early."
+      "text": "At 7:00 p.m. on September 4, 2099, check Hangzhou weather for the evening routine; do not check early.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

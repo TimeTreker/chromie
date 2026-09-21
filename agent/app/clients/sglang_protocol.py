@@ -86,6 +86,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
             "FastPlannerWorkAdvanceOutput", "FastPlannerEvidenceReentryOutput", "SocialCognitionOutput",
+            "CognitiveActivationDecision",
         }:
             # Formatting belongs to this request, never to the shared model's
             # global settings. This also prevents the reproduced Planner/Skill JSON

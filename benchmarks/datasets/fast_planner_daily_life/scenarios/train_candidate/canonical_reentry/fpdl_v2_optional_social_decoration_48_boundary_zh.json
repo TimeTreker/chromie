@@ -89,7 +89,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -109,18 +108,17 @@
           "local_ref": "r1",
           "outcome": "温暖地回应用户所述计划，同时遵守当前社交注意边界。",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_optional_social_decoration_48_boundary_zh",
-      "text": "请用一句简短温暖的话回应我关于课后和朋友见面的计划；当前没有可信目标，而且我希望不要有手势动作。"
+      "text": "请用一句简短温暖的话回应我关于课后和朋友见面的计划；当前没有可信目标，而且我希望不要有手势动作。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

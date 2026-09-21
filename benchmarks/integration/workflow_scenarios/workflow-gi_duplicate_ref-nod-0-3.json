@@ -409,7 +409,8 @@
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t5"
-            }
+            },
+            "continuity_scope": "goal"
           },
           {
             "local_ref": "r1",
@@ -419,31 +420,41 @@
             "source_evidence": {
               "source_start_token_ref": "t0",
               "source_end_token_ref": "t5"
-            }
+            },
+            "continuity_scope": "goal"
           }
         ],
-        "unresolved": []
+        "meaning_uncertainties": [],
+        "cognitive_requests": [
+          {
+            "authority": "planner",
+            "responsibility_refs": [
+              "r1"
+            ],
+            "reason_summary": "Run the explicitly authored role transaction."
+          }
+        ]
       },
-      "role": "gi",
+      "role": "umi",
       "required_prompt_fragments": [
         "请点头2次。"
       ],
       "fixture_kind": "fault_injection",
       "training_eligible": false,
       "request": {
-        "model": "fixture-gi",
+        "model": "fixture-umi",
         "stream": false,
         "think": false,
         "messages": [
           {
             "role": "system",
             "content": {
-              "$artifact": "4dd082f6a24a1d7600bcbd856e46ccfdc50a83dc98bc11dc3c966cea59591356"
+              "$artifact": "0f0e5f6742c248a7e1060f799051824e5bb2212b87b046f1270642e927927e70"
             }
           },
           {
             "role": "user",
-            "content": "Current Turn:\nIMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; Goal Interpretation owns current-turn WHAT):\n{\"original_text\":\"请点头2次。\",\"speaker_role\":\"user\",\"addressee\":\"Chromie\",\"authority\":\"read_only_source_provenance\"}\nlanguage_hint=zh-CN\n\nAuthoritative source tokens (cite inclusive refs in each Responsibility.source_evidence):\n[{\"end\":1,\"ref\":\"t0\",\"start\":0,\"surface\":\"请\"},{\"end\":2,\"ref\":\"t1\",\"start\":1,\"surface\":\"点\"},{\"end\":3,\"ref\":\"t2\",\"start\":2,\"surface\":\"头\"},{\"end\":4,\"ref\":\"t3\",\"start\":3,\"surface\":\"2\"},{\"end\":5,\"ref\":\"t4\",\"start\":4,\"surface\":\"次\"},{\"end\":6,\"ref\":\"t5\",\"start\":5,\"surface\":\"。\"}]\n\nBounded Identity Context:\n{\"self_identity\":{\"name\":\"Chromie\"}}\nThese semantic self facts may resolve identity or self-reference. Presentation style and internal profile identifiers are intentionally absent.\n\nSemantic Continuity Context:\nBounded session/world context JSON:{}\nInteraction context JSON:{}\nRecent accepted dialogue JSON:[]\nRetained active/recent Goal semantics with commit-safe identity and Planner-owned pending gaps JSON:[]\nActive Task/Activity progress with identity and pending clarification JSON:[]\n\nApply the system WHAT-only contract to this authoritative turn and bounded semantic Context. Return one complete schema-valid JSON decision only."
+            "content": "Current Turn:\nIMMUTABLE SOURCE TURN JSON (exact Gateway wording; read-only; User Meaning Interpretation owns current-turn WHAT):\n{\"original_text\":\"请点头2次。\",\"speaker_role\":\"user\",\"addressee\":\"Chromie\",\"authority\":\"read_only_source_provenance\"}\nlanguage_hint=zh-CN\n\nAuthoritative source tokens (cite inclusive refs in each Responsibility.source_evidence):\n[{\"end\":1,\"ref\":\"t0\",\"start\":0,\"surface\":\"请\"},{\"end\":2,\"ref\":\"t1\",\"start\":1,\"surface\":\"点\"},{\"end\":3,\"ref\":\"t2\",\"start\":2,\"surface\":\"头\"},{\"end\":4,\"ref\":\"t3\",\"start\":3,\"surface\":\"2\"},{\"end\":5,\"ref\":\"t4\",\"start\":4,\"surface\":\"次\"},{\"end\":6,\"ref\":\"t5\",\"start\":5,\"surface\":\"。\"}]\n\nBounded Identity Context:\n{\"self_identity\":{\"name\":\"Chromie\"}}\nThese semantic self facts may resolve identity or self-reference. Presentation style and internal profile identifiers are intentionally absent.\n\nBounded Human-Meaning Context (read-only evidence):\nRecent accepted dialogue JSON:[]\nGoal meaning context JSON (semantic continuity hints only; no canonical Goal identity):[]\nSituation/perception context JSON (evidence only; never a new request):{}\nInteraction context JSON (what Chromie has already communicated):{}\nUse context to resolve ellipsis, pronouns, corrections, confirmations, deictic references and implicit conversational relations when the evidence supports one meaning. Context may complete meaning but must never create a new Responsibility that the current expression does not support.\n\nApply the system meaning-and-cognitive-orchestration contract to this authoritative turn and bounded human-meaning Context. Return one complete schema-valid JSON decision only."
           }
         ],
         "options": {
@@ -453,7 +464,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "11d73f4dbff794942c5bee7d678a9086aa4d947d350cc0ab287ec1eed636434a"
+          "$artifact": "21f0afd6bde341f780f3c9799178d30a1814dcd2663c57e00d6cc3eda2693d25"
         }
       }
     }
@@ -474,7 +485,7 @@
   "contrast_set": "nod-0",
   "split": "train_candidate",
   "training_eligible": false,
-  "reference_review": "Owner-approved GI/GA intent-authority migration; Planner quotes and expected values authored before replay; non-independent.",
+  "reference_review": "2026-09-21 current UMI activation and compact Evidence re-entry contract migration; original inputs, fault intent, provider outcomes and expected statuses preserved; authored non-independent offline references.",
   "expected_verdict": "expected_rejection",
   "parameters": {
     "action": "nod",
@@ -494,5 +505,5 @@
   ],
   "acceptable_variation": "Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.",
   "probe": "gi_duplicate_ref",
-  "expected_rejection": "gi"
+  "expected_rejection": "umi"
 }

@@ -124,7 +124,16 @@
         "activities": [],
         "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
       }
-    }
+    },
+    "cognitive_requests": [
+      {
+        "authority": "planner",
+        "responsibility_refs": [
+          "r1"
+        ],
+        "reason_summary": "Exercise the authored Goal and Work transaction, including rejected Work fixtures."
+      }
+    ]
   },
   "expect": {
     "status": "error",

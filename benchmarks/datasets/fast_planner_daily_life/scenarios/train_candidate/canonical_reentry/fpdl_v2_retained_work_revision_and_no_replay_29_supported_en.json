@@ -112,7 +112,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -134,18 +133,17 @@
           "local_ref": "r1",
           "outcome": "Continue the existing one-blink Goal without duplicate Work.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_retained_work_revision_and_no_replay_29_supported_en",
-      "text": "Continue the task we were already discussing: the existing one-blink Activity is still pending."
+      "text": "Continue the task we were already discussing: the existing one-blink Activity is still pending.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

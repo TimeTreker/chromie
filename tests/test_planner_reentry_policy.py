@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+import copy
+
+import pytest
 
 from orchestrator.runtime.planner_reentry import (
     execution_outcome_user_text,
@@ -70,14 +73,12 @@ def _response(*, include_interpretation: bool = True) -> InteractionResponse:
                     "local_ref": "responsibility-a",
                     "outcome": "Obtain the first requested result.",
                     "output_mode": "information",
-                    "relationship": "new",
                     "confidence": 1.0,
                 },
                 {
                     "local_ref": "responsibility-b",
                     "outcome": "Obtain the second requested result.",
                     "output_mode": "information",
-                    "relationship": "new",
                     "confidence": 1.0,
                 },
             ]
@@ -802,6 +803,67 @@ def test_fast_evidence_reentry_lifts_to_current_planner_contract() -> None:
     assert current.goal_outcomes["goal-weather"].follows_step_ids == ["weather-read"]
     assert current.goal_satisfaction is not None
     assert current.goal_satisfaction.status == "exact"
+
+
+def _reentry_decision_output(status="exact", score=1.0):
+    return {
+        "goal_decisions": [{
+            "goal_id": "goal-weather", "next_action": "respond",
+            "satisfaction_status": status, "satisfaction_score": score,
+            "evidence_refs": ["evidence-weather"],
+            "rationale": "Fresh weather Evidence answers the current request.",
+        }],
+        "new_work": [], "confidence": 1.0, "plan_relation": "exact",
+        "user_confirmation_required": False, "escalation_reason": "",
+    }
+
+
+@pytest.mark.parametrize("status", ["exact", "substantial", "partial", "unsatisfied"])
+@pytest.mark.parametrize("score", [0.0, 0.01, 0.5, 0.749999, 0.75, 0.949999, 0.95, 1.0])
+def test_reentry_decoder_satisfaction_bands_match_dto(status, score):
+    from jsonschema import Draft202012Validator
+    from pydantic import ValidationError
+
+    schema = fast_evidence_reentry_response_schema(
+        expected_goal_ids=["goal-weather"], evidence_refs=["evidence-weather"],
+        allowed_capability_ids=[], allow_new_work=False,
+    )
+    raw = _reentry_decision_output(status, score)
+    try:
+        PlannerEvidenceReentryModelOutput.model_validate(raw)
+        accepted = True
+    except ValidationError:
+        accepted = False
+    assert Draft202012Validator(schema).is_valid(raw) == accepted
+
+
+@pytest.mark.parametrize("goal_count", [1, 2])
+def test_reentry_decoder_escalation_reason_matches_actual_delegation(goal_count):
+    from jsonschema import Draft202012Validator
+
+    raw = _reentry_decision_output()
+    goals = ["goal-weather"]
+    if goal_count == 2:
+        goals.append("goal-other")
+        other = copy.deepcopy(raw["goal_decisions"][0])
+        other["goal_id"] = "goal-other"
+        raw["goal_decisions"].append(other)
+    schema = fast_evidence_reentry_response_schema(
+        expected_goal_ids=goals, evidence_refs=["evidence-weather"],
+        allowed_capability_ids=[], allow_new_work=False,
+    )
+    validator = Draft202012Validator(schema)
+    assert validator.is_valid(raw)
+    raw["escalation_reason"] = "none"
+    assert not validator.is_valid(raw)
+    raw["escalation_reason"] = "Unresolved source Evidence needs deeper reasoning."
+    raw["goal_decisions"][-1].update(
+        next_action="escalate", satisfaction_status="partial", satisfaction_score=0.5,
+    )
+    assert validator.is_valid(raw)
+    PlannerEvidenceReentryModelOutput.model_validate(raw)
+    raw["escalation_reason"] = ""
+    assert not validator.is_valid(raw)
 
 
 def test_fast_evidence_reentry_prompt_is_bounded_and_has_no_old_output_template() -> None:

@@ -83,7 +83,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -103,18 +102,17 @@
           "local_ref": "r1",
           "outcome": "正好挥手一次。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_capability_grounding_and_non_substitution_09_boundary_zh",
-      "text": "现在，作为我刚才好奇的一件小事的一小部分，请正好挥手一次。"
+      "text": "现在，作为我刚才好奇的一件小事的一小部分，请正好挥手一次。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

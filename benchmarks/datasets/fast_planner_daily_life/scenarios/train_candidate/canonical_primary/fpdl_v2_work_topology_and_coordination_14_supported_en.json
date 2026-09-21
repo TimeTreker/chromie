@@ -140,7 +140,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -156,13 +155,11 @@
           "local_ref": "r1",
           "outcome": "Look at the user for two seconds in parallel with blinking.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -175,18 +172,17 @@
           "local_ref": "r2",
           "outcome": "Blink twice in parallel with looking at the user.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_work_topology_and_coordination_14_supported_en",
-      "text": "During our drawing game, look at me for two seconds while blinking twice."
+      "text": "During our drawing game, look at me for two seconds while blinking twice.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

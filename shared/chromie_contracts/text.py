@@ -1,6 +1,14 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, overload
+
+
+@overload
+def normalize_whitespace(value: str) -> str: ...
+
+
+@overload
+def normalize_whitespace(value: Any) -> Any: ...
 
 
 def normalize_whitespace(value: Any) -> Any:

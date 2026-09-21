@@ -59,7 +59,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -75,13 +74,11 @@
           "local_ref": "r1",
           "outcome": "看着用户两秒，并与眨眼并行。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -94,18 +91,17 @@
           "local_ref": "r2",
           "outcome": "眨眼两次，并与看向用户并行。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_work_topology_and_coordination_13_supported_zh",
-      "text": "在家人准备出门时，请一边看着我两秒，一边眨眼两次。"
+      "text": "在家人准备出门时，请一边看着我两秒，一边眨眼两次。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

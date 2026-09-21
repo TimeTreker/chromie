@@ -129,7 +129,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -139,13 +138,11 @@
           "local_ref": "r1",
           "outcome": "Give one encouraging sentence.",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -155,13 +152,11 @@
           "local_ref": "r2",
           "outcome": "Blink exactly twice.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -171,18 +166,17 @@
           "local_ref": "r3",
           "outcome": "Walk forward for five seconds.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_boundary_en",
-      "text": "For today's study session, tell me one encouraging sentence, blink twice, and walk forward for five seconds; do nothing unless all three are possible."
+      "text": "For today's study session, tell me one encouraging sentence, blink twice, and walk forward for five seconds; do nothing unless all three are possible.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

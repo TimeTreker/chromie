@@ -59,7 +59,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -69,18 +68,17 @@
           "local_ref": "r1",
           "outcome": "温暖地回应用户所述计划，同时遵守当前社交注意边界。",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_optional_social_decoration_46_supported_zh",
-      "text": "请用一句简短温暖的话回应我关于我们的早晨问候的计划；我明确在你面前，而且一个轻微的专注注视会让我觉得自然。"
+      "text": "请用一句简短温暖的话回应我关于我们的早晨问候的计划；我明确在你面前，而且一个轻微的专注注视会让我觉得自然。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

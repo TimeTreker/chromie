@@ -42,7 +42,7 @@ from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.interaction import CapabilityResult
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_cognitive_runtime_pr7 import FakeRuntime
-from tests.cognitive_work_test_support import social_fixture_response, social_fixture_resolution
+from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_response, social_fixture_resolution
 
 
 class UnexpectedAdmission(AssertionError):
@@ -93,7 +93,7 @@ class Provider(MockCapabilityProvider):
             provider_id=self.provider_id, status=self.case.get('provider_status','completed'), output=copy.deepcopy(output))
 
 
-class Episode:
+class Episode(PlannerActivationFixture):
     def __init__(self, case, replay, url, root):
         self.case, self.replay, self.root = case, replay, root
         self.events = []
@@ -224,6 +224,8 @@ class Episode:
             plan=plan, requests=response.capabilities, results=result.results,
             output_schemas={r.request_id:self.case['provider_schemas'][r.capability_id] for r in response.capabilities},
             committed_auxiliary_result_capabilities=CognitiveTurnClosure._speech_result_bindings(response))
+        if self.case['family'] == 'conditional' and len(bundle.evidence) == 1 and bundle.evidence[0].capability_id == 'chromie.weather.lookup':
+            self.replay.bind('evidence', bundle.evidence[0].evidence_id)
         self.manager.record_execution_outcome_bundle(bundle, sid=sid)
         self.manager.reconcile_execution_outcome_responsibilities(bundle, sid=sid)
         self.events.append({'boundary':'runtime_result', 'aggregate_status':bundle.aggregate_status, 'goal_status':self.goal_status()})
@@ -270,7 +272,7 @@ class Episode:
 
         plan, response = await self.begin()
         if probe == 'clarification':
-            assert plan.disposition == 'clarify' and plan.meaning_uncertainties
+            assert plan.disposition == 'clarify' and plan.unresolved
             assert not plan.steps and not plan.time_conditions and not response.capabilities
             await self.execute(plan, response)
             assert self.goal_status() == 'open' and not self.provider.calls

@@ -125,7 +125,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -147,18 +146,17 @@
           "local_ref": "r1",
           "outcome": "Keep the pending blink Goal without duplicate or premature speech.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_truthful_response_staging_and_deduplication_27_boundary_en",
-      "text": "The acknowledgement about a small thing I was curious about was already delivered; do not repeat it and do not claim the pending blink completed."
+      "text": "The acknowledgement about a small thing I was curious about was already delivered; do not repeat it and do not claim the pending blink completed.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

@@ -1008,7 +1008,10 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             responsibility.source.bindings["source_location"]["value"],
             "100 meters ahead",
         )
-        self.assertEqual(resolution.new_goals[0].object, {})
+        self.assertEqual(
+            {name: binding["value"] for name, binding in resolution.new_goals[0].object["bindings"].items()},
+            {"resource": "a bottle of water", "source": "100 meters ahead"},
+        )
         serialized = responsibility.model_dump(mode="json")
         self.assertNotIn("provider_id", serialized)
         self.assertNotIn("capability_id", serialized)

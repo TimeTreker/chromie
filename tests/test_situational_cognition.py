@@ -664,8 +664,7 @@ async def test_goal_free_social_cognition_rejects_repair_of_unheard_activity():
     request.context["interaction_context"] = {"pending_speech": [{
         "text": "Unheard.", "metadata": {"communicative_activity_ids": ["pending"]},
     }]}
-    schema = social_cognition_response_schema(request, [])
-    fresh_id = schema['$defs']['SocialCommunicativeAct']['oneOf'][0]['properties']['activity_id']['enum'][0]
+    fresh_id = "fresh-act"
     model = FakeOllama({'disposition': 'communicate', 'activities': [{'activity_id': fresh_id, 'text': 'Correction.', 'function': 'repair', 'repair_of_activity_ids': ['pending'], 'truth_stage': 'context_grounded'}], 'reason_summary': 'Controlled SC decision.'})
     with pytest.raises(ValueError, match="raw Schema rejected"):
         await SocialCognitionResolver(model, EmptyCatalog()).resolve(request)
@@ -712,8 +711,7 @@ async def test_goal_free_social_cognition_preserves_same_words_without_semantic_
     request.context["interaction_context"] = {"already_spoken": [{
         "text": "Hello.", "metadata": {"communicative_activity_ids": ["old-act"]},
     }]}
-    schema = social_cognition_response_schema(request, [])
-    fresh_id = schema['$defs']['SocialCommunicativeAct']['oneOf'][0]['properties']['activity_id']['enum'][0]
+    fresh_id = "fresh-act"
     model = FakeOllama({'disposition': 'communicate', 'activities': [{'activity_id': 'old-act' if same_identity else fresh_id, 'text': 'Hello.', 'function': 'acknowledge', 'truth_stage': 'context_grounded'}], 'reason_summary': 'Controlled SC decision.'})
     result = await SocialCognitionResolver(model, EmptyCatalog()).resolve(request)
     assert result.activities[0].text == "Hello."

@@ -149,7 +149,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -173,18 +172,17 @@
           "local_ref": "r1",
           "outcome": "Report the blink completion only after trusted Evidence.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_truthful_response_staging_and_deduplication_27_supported_en",
-      "text": "After the blink for a small thing I was curious about has trusted completion evidence, tell me only that the blink completed."
+      "text": "After the blink for a small thing I was curious about has trusted completion evidence, tell me only that the blink completed.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

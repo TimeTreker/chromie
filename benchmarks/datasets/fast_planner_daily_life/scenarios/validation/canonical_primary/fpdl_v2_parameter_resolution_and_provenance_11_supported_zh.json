@@ -73,7 +73,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -85,18 +84,17 @@
           "local_ref": "r1",
           "outcome": "正好眨眼四次。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_parameter_resolution_and_provenance_11_supported_zh",
-      "text": "为了明天的实际安排，请正好眨眼四次。"
+      "text": "为了明天的实际安排，请正好眨眼四次。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

@@ -1035,12 +1035,24 @@ def goal_association_response_schema(
                 "type": "array", "items": {"type": "string", "enum": responsibility_refs},
                 "minItems": 1, "maxItems": 1, "uniqueItems": True,
             },
-            **{name: {"type": "array", "items": {"type": "string", "enum": active_ids},
-                      "maxItems": len(active_ids), "uniqueItems": True}
-               for name in ("related_goal_ids", "supersedes_goal_ids")},
+            **{name: {"type": "array", "items": {"type": "string", "enum": ids},
+                      "maxItems": len(ids), "uniqueItems": True}
+               for name, ids in (("related_goal_ids", active_ids),
+                                 ("supersedes_goal_ids", open_goal_ids))},
         },
         "required": ["source_responsibility_refs", "related_goal_ids", "supersedes_goal_ids"],
     }
+    # Complete the shared item before specializing prefixItems. JSON Schema
+    # applies `items` only after the prefix, so later changes to its $ref cannot
+    # protect copied terminal-history items.
+    if open_goal_ids:
+        schema["$defs"]["GoalAssociationModelGoal"]["allOf"] = [
+            {"not": {"properties": {
+                "related_goal_ids": {"contains": {"const": goal_id}},
+                "supersedes_goal_ids": {"contains": {"const": goal_id}},
+            }, "required": ["related_goal_ids", "supersedes_goal_ids"]}}
+            for goal_id in open_goal_ids
+        ]
     # When there is no live Goal that can own a Responsibility and no
     # interaction-only speech alternative, ownership is not a semantic branch:
     # every Responsibility must become a new Goal.  Do not leave that mandatory
@@ -1083,14 +1095,6 @@ def goal_association_response_schema(
             # suffix impossible, while the retained $ref keeps the canonical Goal
             # definition reachable for decoder/validator consumers.
     if active_ids:
-        schema["$defs"]["GoalAssociationModelGoal"]["allOf"] = [
-            {"not": {"properties": {
-                "related_goal_ids": {"contains": {"const": goal_id}},
-                "supersedes_goal_ids": {"contains": {"const": goal_id}},
-            }, "required": ["related_goal_ids", "supersedes_goal_ids"]}}
-            for goal_id in active_ids
-        ]
-
         # A retained Goal has one continuity fate in a single GA transaction.
         # Host materialization already rejects a Goal that is both retained by an
         # association and retired by a new Goal; expose the same invariant to the

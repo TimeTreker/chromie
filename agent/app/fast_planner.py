@@ -38,6 +38,7 @@ from .planner_schema import (
     fast_streaming_advance_response_schema,
 )
 from .planner_context import (
+    completed_acquisition_goal_ids,
     completed_work_step_evidence,
     auxiliary_social_capability_payloads,
     auxiliary_social_prompt_context,
@@ -361,6 +362,19 @@ class FastPlannerResolver:
             }
             and reentry_goal_ids
         )
+        # A completed acquisition may leave an explicitly unsatisfied effect in
+        # the source Plan. Permit its next decision without reopening settled Work.
+        deferred_goal_ids = {
+            item.get("goal_id")
+            for item in (context.get("canonical_plan_resolution") or {}).get("goal_outcomes", [])
+            if isinstance(item, dict)
+            and item.get("goal_id") in (item.get("satisfaction") or {}).get("unmet_goal_ids", [])
+        }
+        allow_reentry_work = requires_execution or bool(
+            deferred_goal_ids & completed_acquisition_goal_ids(
+                context, reentry_scope=request.planner_reentry_scope,
+            )
+        )
         if evidence_reentry:
             contract_schema = "FastPlannerEvidenceReentryOutput"
             response_schema = fast_evidence_reentry_response_schema(
@@ -373,7 +387,7 @@ class FastPlannerResolver:
                     item["capability_id"]: item["input_schema"]
                     for item in capability_payload
                 },
-                allow_new_work=requires_execution,
+                allow_new_work=allow_reentry_work,
             )
         else:
             contract_schema = (
@@ -481,7 +495,7 @@ class FastPlannerResolver:
                             request,
                             capability_payload,
                             goal_context=goal_context,
-                            allow_new_work=requires_execution,
+                            allow_new_work=allow_reentry_work,
                         ),
                         system=fast_evidence_reentry_system_prompt(),
                         options=options,
@@ -717,7 +731,7 @@ class FastPlannerResolver:
                     stage="fast_planner", exc=exc, request=request
                 )
                 mechanical_contract_error = isinstance(
-                    exc, (PlannerDTOContractError, json.JSONDecodeError)
+                    exc, (PlannerDTOContractError, json.JSONDecodeError, ValidationError)
                 )
                 authoritative_grounding_failure = isinstance(
                     exc, AuthoritativeGroundingValidationError
@@ -740,12 +754,10 @@ class FastPlannerResolver:
                         else "fast_planner_unavailable"
                     ),
                     error=exc,
-                    path_classification=(
-                        "semantic_escalation"
-                        if semantic_validation_failure
-                        or authoritative_grounding_failure
-                        else "contract_failure"
-                    ),
+                    # A rejected model result is not a model-authored request
+                    # for depth. Preserve the failure instead of asking Deep to
+                    # repair contradictory or ungrounded output.
+                    path_classification="contract_failure",
                     metadata={
                         "contract_schema": contract_schema,
                         "canonical_contract": "CanonicalPlan",

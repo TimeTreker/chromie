@@ -1180,7 +1180,7 @@ def _evaluate_user_meaning_interpreter_case_dimensions(
                 "coordination",
                 f"coordination {actual_relations!r} != {expected_relations!r}",
             )
-    if bool(decision_payload.get("unresolved")) != expected["unresolved"]:
+    if bool(decision_payload.get("meaning_uncertainties")) != expected["unresolved"]:
         add_error(
             "unresolved",
             "unresolved presence did not equal " + str(expected["unresolved"]),
@@ -1230,7 +1230,7 @@ def _evaluate_complete_intent(
     tokens = {token["ref"]: token for token in _source_tokens(case["text"])}
     previous_end = -1
     for item in wire.get("responsibilities", []):
-        if set(item) - {"local_ref", "outcome", "output_mode", "confidence", "source_evidence"}:
+        if set(item) - {"local_ref", "outcome", "output_mode", "continuity_scope", "confidence", "source_evidence"}:
             errors["intent_details"].append("UMI authored a downstream contract field")
         evidence = item.get("source_evidence") or {}
         first = tokens.get(evidence.get("source_start_token_ref"))
@@ -1239,7 +1239,7 @@ def _evaluate_complete_intent(
             errors["source_evidence"].append("Invalid, reversed or overlapping source span")
         else:
             previous_end = last["end"]
-    if bool(decision.get("unresolved")) != case["expected"]["unresolved"]:
+    if bool(decision.get("meaning_uncertainties")) != case["expected"]["unresolved"]:
         errors["unresolved"].append("Unresolved presence differs from reviewed intent ambiguity")
     return errors
 

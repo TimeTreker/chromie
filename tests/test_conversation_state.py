@@ -311,10 +311,11 @@ class ConversationStateTests(unittest.TestCase):
             ["goal-greeting"],
         )
 
-        results = manager.reconcile_fast_communicative_goal_completion(
+        results = manager.reconcile_communicative_goal_completion(
             "sid-greeting",
             ["goal-greeting"],
             metadata={
+                "source": "fast_planner_communicative_completion",
                 "delivery_role": "complete_response",
                 "fast_activity_id": "fast-greeting",
                 "interaction_id": "interaction-greeting",
@@ -352,10 +353,11 @@ class ConversationStateTests(unittest.TestCase):
             user_text="今晚会下雨吗？",
         )
 
-        results = manager.reconcile_fast_communicative_goal_completion(
+        results = manager.reconcile_communicative_goal_completion(
             "sid-weather",
             ["goal-weather"],
             metadata={
+                "source": "fast_planner_communicative_completion",
                 "delivery_role": "complete_response",
                 "fast_activity_id": "fast-weather",
             },
@@ -363,12 +365,36 @@ class ConversationStateTests(unittest.TestCase):
 
         self.assertEqual(
             results[0]["reason"],
-            "goal_requires_nontrivial_completion_evidence",
+            "goal_requires_evidence_bound_social_delivery",
         )
         self.assertEqual(
             [item["goal_id"] for item in manager.active_goal_snapshots()],
             ["goal-weather"],
         )
+
+        context = manager._task_context_by_goal_id("goal-weather")
+        assert context is not None
+        context["evidence_summary"] = {
+            "execution_outcome": {
+                "status": "completed",
+                "evidence_ids": ["evidence-weather"],
+            }
+        }
+        delivered = manager.reconcile_communicative_goal_completion(
+            "sid-weather",
+            ["goal-weather"],
+            metadata={
+                "source": "social_cognition_communicative_completion",
+                "delivery_role": "response",
+                "speech_event_id": "speech-weather",
+                "evidence_refs": ["evidence-weather"],
+            },
+        )
+
+        self.assertTrue(delivered[0]["changed"])
+        self.assertEqual(delivered[0]["responsibility_status"], "satisfied")
+        self.assertEqual(manager.active_goal_snapshots(), [])
+
 
     def test_ambiguous_cancellation_does_not_clear_all_goal_context(self) -> None:
         manager = ConversationStateManager(base_conversation_id="test")
@@ -927,6 +953,85 @@ class ConversationStateTests(unittest.TestCase):
 
 
 class GoalScopedLifecycleTests(unittest.TestCase):
+    def test_execution_outcome_commit_immediately_populates_verified_tool_memory(self) -> None:
+        manager = ConversationStateManager(base_conversation_id="outcome-memory")
+        self._create_goals(manager, "goal-weather")
+        manager.record_interaction_response(
+            "sid-weather",
+            InteractionResponse(
+                interaction_id="interaction-weather",
+                capabilities=[{
+                    "request_id": "request-weather",
+                    "capability_id": "chromie.weather.lookup",
+                    "args": {"location": "Chongqing", "date": "today"},
+                    "metadata": {
+                        "source_goal_ids": ["goal-weather"],
+                        "canonical_plan_id": "plan-lifecycle",
+                        "canonical_plan_fingerprint": "w" * 64,
+                    },
+                }],
+                metadata={
+                    "planning_result": "composed_plan",
+                    "turn_id": "turn-weather",
+                    "canonical_plan_id": "plan-lifecycle",
+                    "canonical_plan_fingerprint": "w" * 64,
+                    "canonical_plan": self._canonical_plan(
+                        "execute",
+                        [{"goal_id": "goal-weather", "disposition": "execute", "coverage": "complete", "step_ids": ["step-weather"]}],
+                    ),
+                },
+            ),
+        )
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-weather",
+            turn_id="turn-weather",
+            interaction_id="interaction-weather",
+            canonical_plan_id="plan-lifecycle",
+            canonical_plan_fingerprint="w" * 64,
+            canonical_goal_ids=["goal-weather"],
+            aggregate_status="completed",
+            evidence=[{
+                "evidence_id": "evidence-weather",
+                "request_id": "request-weather",
+                "step_id": "step-weather",
+                "capability_id": "chromie.weather.lookup",
+                "source_goal_ids": ["goal-weather"],
+                "status": "completed",
+                "observation": {
+                    "status": "available",
+                    "data": {"location": "Chongqing", "condition": "light showers"},
+                    "schema_validated": True,
+                    "output_sha256": "a" * 64,
+                    "output_size_bytes": 64,
+                },
+                "metadata": {
+                    "request_args": {"location": "Chongqing", "date": "today"},
+                    "safety_class": "safe_read",
+                },
+            }],
+            goal_outcomes=[{
+                "goal_id": "goal-weather",
+                "status": "completed",
+                "step_ids": ["step-weather"],
+                "evidence_ids": ["evidence-weather"],
+                "completed_step_ids": ["step-weather"],
+                "acquisition_step_ids": ["step-weather"],
+            }],
+        )
+
+        manager.record_execution_outcome_bundle(bundle, sid="sid-weather")
+
+        memory_index = manager.verified_tool_memory_index()
+        self.assertEqual(len(memory_index), 1)
+        self.assertEqual(memory_index[0]["evidence_id"], "evidence-weather")
+        self.assertEqual(memory_index[0]["tool_id"], "chromie.weather.lookup")
+        self.assertEqual(
+            memory_index[0]["request_args"],
+            {"location": "Chongqing", "date": "today"},
+        )
+        self.assertNotIn("data", memory_index[0])
+
+
     @staticmethod
     def _create_goals(
         manager: ConversationStateManager,

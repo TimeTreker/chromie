@@ -3970,7 +3970,7 @@ class VoiceAssistant:
         }
 
     @staticmethod
-    def _diagnostic_failure_speech(
+    def _operational_failure_notice(
         *,
         zh: bool,
         failure_stage: str | None,
@@ -4023,7 +4023,7 @@ class VoiceAssistant:
             and bool(failure_stage or failure_class or failure_error)
         )
         text = (
-            self._diagnostic_failure_speech(
+            self._operational_failure_notice(
                 zh=zh,
                 failure_stage=failure_stage,
                 failure_class=failure_class,
@@ -4416,32 +4416,6 @@ class VoiceAssistant:
             "interaction_ledger",
             None,
         )
-        envelope = response.metadata.get("user_turn_envelope")
-        interaction_turn_id = (
-            str(envelope.get("turn_id") or "").strip()
-            if isinstance(envelope, dict)
-            else ""
-        ) or response.interaction_id
-        if interaction_ledger is not None:
-            try:
-                interaction_ledger.record_social_results(
-                    session_id=str(session_id or interaction_turn_id),
-                    turn_id=interaction_turn_id,
-                    interaction_id=response.interaction_id,
-                    requests=response.capabilities,
-                    results=execution.results,
-                )
-            except Exception as exc:
-                response.metadata["interaction_ledger_error"] = (
-                    type(exc).__name__
-                )
-                self.session_log(
-                    session_id,
-                    "interaction_ledger_social_append_failed: "
-                    "error_type=%s error=%s",
-                    type(exc).__name__,
-                    exc,
-                )
         try:
             plan = closure.canonical_plan(response)
         except Exception as exc:

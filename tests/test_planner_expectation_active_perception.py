@@ -153,9 +153,9 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
     )
 
     from tests.test_cognitive_runtime_pr7 import work_fixture
-    from tests.cognitive_work_test_support import social_fixture_resolution
+    from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_resolution
 
-    class Client:
+    class Client(PlannerActivationFixture):
         request = None
 
         async def resolve_social_cognition(self, session, *, request, **kwargs):
@@ -215,7 +215,6 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
                     local_ref="resp-find-cup",
                     outcome="Bring the user's referenced cup.",
                     output_mode="stateful_effect",
-                    relationship="new",
                     confidence=1.0,
                 )
             ],

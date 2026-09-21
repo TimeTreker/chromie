@@ -100,6 +100,7 @@ class SGLangProtocolTests(unittest.TestCase):
             "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
+            "CognitiveActivationDecision",
             "UserMeaningInterpretationModelOutput", "FastPlannerOutput", "OtherOutput",
         ):
             with self.subTest(title=title):
@@ -116,6 +117,7 @@ class SGLangProtocolTests(unittest.TestCase):
                     "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
                     "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
                     "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
+                    "CognitiveActivationDecision",
                 }:
                     expected["x-guidance"] = {"whitespace_flexible": False}
                 self.assertEqual(wire, expected)

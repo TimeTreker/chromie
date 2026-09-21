@@ -610,6 +610,12 @@ def materialize_evidence_reentry_model_output(
                 if goal_id in set(evidence.get("source_goal_ids") or [])
                 and str(evidence.get("evidence_id") or "") in cited
             ]
+            proved_refs = {str(proved_steps[step_id].get("evidence_id") or "") for step_id in follows}
+            if cited - proved_refs:
+                raise PlannerDTOContractError(
+                    "evidence re-entry response lacks verified completed Work for its Goal: "
+                    + goal_id
+                )
         coverage: PlanCoverage = (
             "complete"
             if completion_action

@@ -1459,7 +1459,6 @@ class CanonicalPlanRuntimeAdapter:
         if not isinstance(response, InteractionResponse):
             return response
         requests = response.capabilities
-        interaction_id = response.interaction_id
         reasons = response.metadata.get("auxiliary_reasons", [])
         for request in requests:
             self._record_auxiliary_behavior_request(request, session_id=session_id)
@@ -1468,12 +1467,6 @@ class CanonicalPlanRuntimeAdapter:
             session_id=session_id,
         )
         execution = await self.interaction_runtime.wait_dispatch(dispatch)
-        ledger = getattr(self.interaction_runtime, "interaction_ledger", None)
-        if ledger is not None:
-            ledger.record_social_results(
-                session_id=session_id, turn_id=turn_id, interaction_id=interaction_id,
-                requests=requests, results=execution.results,
-            )
         return {
             "status": execution.status,
             "materialized_count": len(requests),

@@ -123,7 +123,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -149,13 +148,11 @@
           "local_ref": "r1",
           "outcome": "向前走五秒，并与另一个行走动作并行。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -168,18 +165,17 @@
           "local_ref": "r2",
           "outcome": "向前走八秒，并与另一个行走动作并行。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_work_topology_and_coordination_15_boundary_zh",
-      "text": "在在共享房间里不打扰别人时，请同时向前走五秒和向前走八秒。"
+      "text": "在在共享房间里不打扰别人时，请同时向前走五秒和向前走八秒。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

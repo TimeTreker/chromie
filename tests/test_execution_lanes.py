@@ -819,6 +819,10 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(starts, ["voice"] if mode.startswith("optional") else [])
                 self.assertEqual(runtime._resource_arbiter.active_count, 0)
                 self.assertTrue(any(row.status != "completed" for row in result.results))
+                self.assertEqual(
+                    result.status,
+                    "completed" if mode.startswith("optional") else "failed",
+                )
 
     async def test_cancel_before_release_drains_both_lanes_without_effect(self):
         from shared.chromie_contracts.reflex import CancellationDirective
@@ -887,3 +891,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual([row.reason_code for row in result.results if row.request_id.startswith("body")],
                     ["coordination_unsupported", "coordination_unsupported"])
                 self.assertEqual(runtime.scheduler_status().active_count, 0)
+                self.assertEqual(
+                    result.status,
+                    "completed" if optional else "failed",
+                )

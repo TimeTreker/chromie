@@ -116,7 +116,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -142,18 +141,17 @@
           "local_ref": "r1",
           "outcome": "查询天气，并且只有预计下雨时才有条件地创建提醒。",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_fast_completion_or_how_escalation_39_boundary_zh",
-      "text": "为了刚才不清楚的那个细节，请查询杭州明早天气，并且只有预计下雨时才创建7:30带伞提醒。"
+      "text": "为了刚才不清楚的那个细节，请查询杭州明早天气，并且只有预计下雨时才创建7:30带伞提醒。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

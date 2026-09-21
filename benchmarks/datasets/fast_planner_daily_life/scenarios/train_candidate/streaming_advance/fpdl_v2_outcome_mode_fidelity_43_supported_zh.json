@@ -30,7 +30,6 @@
       "context": {},
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -40,18 +39,17 @@
           "local_ref": "r1",
           "outcome": "愉快地回应用户的好奇，但不编造好奇对象。",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_outcome_mode_fidelity_43_supported_zh",
-      "text": "请用一句愉快的话回应我对我们的绘画游戏的好奇，但不要编造我好奇的具体事物。"
+      "text": "请用一句愉快的话回应我对我们的绘画游戏的好奇，但不要编造我好奇的具体事物。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

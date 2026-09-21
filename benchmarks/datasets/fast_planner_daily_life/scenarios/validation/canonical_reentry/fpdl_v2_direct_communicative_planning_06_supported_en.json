@@ -83,7 +83,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -103,18 +102,17 @@
           "local_ref": "r1",
           "outcome": "Provide one warm concise sentence about a small thing I was curious about.",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_direct_communicative_planning_06_supported_en",
-      "text": "Give me a warm, concise sentence about a small thing I was curious about; do not perform any action."
+      "text": "Give me a warm, concise sentence about a small thing I was curious about; do not perform any action.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

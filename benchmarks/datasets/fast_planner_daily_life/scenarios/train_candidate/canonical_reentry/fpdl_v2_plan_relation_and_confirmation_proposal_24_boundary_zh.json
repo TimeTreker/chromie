@@ -104,7 +104,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -128,18 +127,17 @@
           "local_ref": "r1",
           "outcome": "创建工作日重复提醒，或提出用户明确允许的2099年9月4日一次性替代方案。",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh",
-      "text": "为了你的机器人身体真正能做什么，请永久在每个工作日设置那个提醒；如果不支持重复提醒，就改为提议只在2099年9月4日设置一次。"
+      "text": "为了你的机器人身体真正能做什么，请永久在每个工作日设置那个提醒；如果不支持重复提醒，就改为提议只在2099年9月4日设置一次。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

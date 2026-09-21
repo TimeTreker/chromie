@@ -94,7 +94,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -104,18 +103,17 @@
           "local_ref": "r1",
           "outcome": "Warmly acknowledge the user's stated plan while respecting the current social-attention boundary.",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_optional_social_decoration_47_supported_en",
-      "text": "Give me one brief, warm sentence acknowledging my plan for a difficult afternoon; I am clearly in front of you and a small attentive glance would be welcome."
+      "text": "Give me one brief, warm sentence acknowledging my plan for a difficult afternoon; I am clearly in front of you and a small attentive glance would be welcome.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

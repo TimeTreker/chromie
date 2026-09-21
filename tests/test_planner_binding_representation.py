@@ -283,7 +283,8 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         )
         self.assertIn(
-            "Omit every optional input",
+            "Do not emit optional fields merely to restate their "
+            "declared defaults",
             EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         )
         self.assertNotIn(

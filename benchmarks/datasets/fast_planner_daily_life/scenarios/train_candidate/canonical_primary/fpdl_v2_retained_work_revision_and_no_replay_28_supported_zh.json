@@ -112,7 +112,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -124,18 +123,17 @@
           "local_ref": "r1",
           "outcome": "继续已有的一次眨眼 Goal，且不产生重复 Work。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_retained_work_revision_and_no_replay_28_supported_zh",
-      "text": "继续晚间日常安排：已有的一次眨眼 Activity 仍在等待。"
+      "text": "继续晚间日常安排：已有的一次眨眼 Activity 仍在等待。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_primary"
   },

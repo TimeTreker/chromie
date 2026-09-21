@@ -125,7 +125,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -147,18 +146,17 @@
           "local_ref": "r1",
           "outcome": "保留仍在等待的眨眼 Goal，不重复或提前说话。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_truthful_response_staging_and_deduplication_27_boundary_zh",
-      "text": "关于我刚才好奇的一件小事的确认已经送达；不要重复，也不要声称仍在等待的眨眼已经完成。"
+      "text": "关于我刚才好奇的一件小事的确认已经送达；不要重复，也不要声称仍在等待的眨眼已经完成。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

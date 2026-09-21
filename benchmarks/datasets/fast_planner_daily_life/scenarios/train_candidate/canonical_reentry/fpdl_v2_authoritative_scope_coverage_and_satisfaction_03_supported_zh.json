@@ -114,7 +114,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -135,13 +134,11 @@
           "local_ref": "r1",
           "outcome": "说一句鼓励的话。",
           "output_mode": "speech",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -151,18 +148,17 @@
           "local_ref": "r2",
           "outcome": "正好眨眼两次。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_authoritative_scope_coverage_and_satisfaction_03_supported_zh",
-      "text": "为了我们刚才一直在讨论的任务，请对我说一句鼓励的话，并眨眼两次。"
+      "text": "为了我们刚才一直在讨论的任务，请对我说一句鼓励的话，并眨眼两次。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

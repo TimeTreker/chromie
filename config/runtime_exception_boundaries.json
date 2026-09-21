@@ -176,9 +176,9 @@
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain inference/validation failures without authorizing unvalidated Work. Map required-context overflow to contract_failure with zero attempts and exact Goal scope; Host must not invoke Deep to repair missing input. Issue #50 regression: tests/test_planner_prompt_module.py; Host containment: tests/test_cognitive_runtime_pr7.py.",
+      "contract": "Contain inference and validation failures as contract_failure without authorizing Work or asking Deep to repair rejected output. Preserve valid semantic delegation. Required-context overflow retains zero attempts and exact Goal scope. Regressions: tests/test_capability_result_evidence_reentry.py and tests/test_fast_planner_pr3.py.",
       "review_status": "reviewed",
-      "body_sha256": "c2ecf913157812c921bd18d517db5894978b8d77175e3cd6babcf5a2f1b7116a",
+      "body_sha256": "834ab6ba49ced6991a181ee26a98a6d85dae43ba4a0fad030c5d90644e76006b",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -387,23 +387,9 @@
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._close_cognitive_execution",
       "ordinal": 1,
-      "classification": "diagnostic_cleanup",
+      "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Preserve trusted Social Attention execution when optional Interaction Ledger projection fails; retain a bounded diagnostic without inventing an action result.",
-      "review_status": "reviewed",
-      "body_sha256": "65995433b0b95ea552c23b53faeb5339a7bdcb21872e7df4436ef3233fa064c9",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 2,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "contract": "Reject an invalid canonical Plan, retain the error identity and return not_applicable without deriving result meaning.",
       "review_status": "reviewed",
       "body_sha256": "8c3551e305893ed2a4e41f1b2e90027ef23620335cef664199d4e24c491ba53b",
       "failure_signals": [
@@ -414,10 +400,10 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 3,
-      "classification": "diagnostic_cleanup",
+      "ordinal": 2,
+      "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "contract": "Fail closed when no trusted outcome bundle can be built; retain diagnostics and return reconciliation_failed without result speech.",
       "review_status": "reviewed",
       "body_sha256": "5f1258c4fb0fb621743349d701cf6e27f00c7f2beff2d0ab379edbfef651df0c",
       "failure_signals": [
@@ -429,10 +415,10 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 4,
+      "ordinal": 3,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Preserve the validated ExecutionOutcomeBundle and normal Goal-state closure when optional Interaction Ledger projection fails; retain a bounded diagnostic without upgrading evidence.",
+      "contract": "Retain the ledger append diagnostic in response metadata; the independently built trusted bundle and state owner still govern reconciliation.",
       "review_status": "reviewed",
       "body_sha256": "18eb175e23f8bc1150157fefcc431f7e0f8f6619680e89b458f329425ec7cacc",
       "failure_signals": [
@@ -443,12 +429,12 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 5,
-      "classification": "diagnostic_cleanup",
+      "ordinal": 4,
+      "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
+      "contract": "Retain Evidence when Goal/Responsibility state commit fails; record goal_state_commit_failed and return without result speech or further Work.",
       "review_status": "reviewed",
-      "body_sha256": "13872357e8eb97505892e4a208b51a578a6eb96d14feead6f724e3085d5941a5",
+      "body_sha256": "8d2656e6ebb93f111f9548ef37ddee3795998e70e7af329e0b4d637351f6ca3d",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -458,12 +444,12 @@
     {
       "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._close_cognitive_execution",
-      "ordinal": 6,
-      "classification": "diagnostic_cleanup",
+      "ordinal": 5,
+      "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Fail closed when Fast-Planner Evidence re-entry and its mechanical outcome projection cannot produce a valid response; retain the trusted outcome and diagnostic without inventing speech, completion, or effect authority.",
+      "contract": "Retain the trusted outcome and response_planning_failed diagnostic when re-entry fails; return without result speech or further Work.",
       "review_status": "reviewed",
-      "body_sha256": "12d339e6d275fa28ab09496d168f755a1d3316f2a1ff603d32ec7ea858a86d1c",
+      "body_sha256": "e9a56d05cb710c9a198000606e4e7ff72ed5a51114cb30be68c46973c4e28e9a",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -733,6 +719,33 @@
     },
     {
       "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._schedule_outcome_reflection",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Reject optional Reflection context admission with a visible diagnostic; preserve foreground result planning and trusted Goal/Evidence facts, with no background invocation or invented adaptation.",
+      "review_status": "reviewed",
+      "body_sha256": "41a0b68c7f7bbccefca47a0931b946176336a5ab4e6a8eefc60977d28273315f",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
+      "symbol": "VoiceAssistant._schedule_outcome_reflection.learn_forward",
+      "ordinal": 1,
+      "classification": "diagnostic_cleanup",
+      "owner": "orchestrator",
+      "contract": "Bound optional background Reflection by its deadline; log provider, expiry or state-admission failure without speech, Work, Goal completion or a second Planner review. Task cancellation propagates to the existing Host cleanup owner.",
+      "review_status": "reviewed",
+      "body_sha256": "b69dafef72ebcb308fb501ebe2a873c3dc3f4f725dfefd26ebe931775dac1c15",
+      "failure_signals": [
+        "diagnostic"
+      ]
+    },
+    {
+      "path": "orchestrator/orchestrator.py",
       "symbol": "VoiceAssistant._try_apply_cognitive_runtime",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -974,6 +987,20 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/cognitive_activation.py",
+      "symbol": "resolve_cognitive_activation",
+      "ordinal": 1,
+      "body_sha256": "9a56f12e313c82e4fd5aa3758315174d6f27586eba2bd69a247bcf8d08e2276c",
+      "failure_signals": [
+        "diagnostic",
+        "return"
+      ],
+      "owner": "orchestrator",
+      "review_status": "reviewed",
+      "classification": "fail_closed_boundary",
+      "contract": "Contain the single Activation call or its typed scope validation failure, log the cause and return no decision so no downstream cognition is authorized."
+    },
+    {
       "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "CanonicalPlanRuntimeAdapter._validation_errors",
       "ordinal": 1,
@@ -1028,19 +1055,6 @@
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "GoalDrivenRuntimeCoordinator._resolve_and_commit_goal_association",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "orchestrator.cognitive_runtime",
-      "contract": "Fail closed if canonical Goal state cannot be committed after Goal Association; record the failed commit and never continue planning against uncommitted Goal state.",
-      "review_status": "reviewed",
-      "body_sha256": "999b78b48326401ec07eb3affa0de11d012371df36960cb639109b3579322b61",
-      "failure_signals": [
-        "raise"
-      ]
-    },
-    {
-      "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "GoalDrivenRuntimeCoordinator._resolve",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -1077,6 +1091,19 @@
       "failure_signals": [
         "diagnostic",
         "state_update"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._resolve_and_commit_goal_association",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator.cognitive_runtime",
+      "contract": "Fail closed if canonical Goal state cannot be committed after Goal Association; record the failed commit and never continue planning against uncommitted Goal state.",
+      "review_status": "reviewed",
+      "body_sha256": "999b78b48326401ec07eb3affa0de11d012371df36960cb639109b3579322b61",
+      "failure_signals": [
+        "raise"
       ]
     },
     {
@@ -1749,33 +1776,6 @@
       "body_sha256": "1da14c5fde2aabf84c559f6b9bb11adef0de4c1f243cfff302d95cbc89de1cfd",
       "failure_signals": [
         "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._schedule_outcome_reflection",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Reject optional Reflection context admission with a visible diagnostic; preserve foreground result planning and trusted Goal/Evidence facts, with no background invocation or invented adaptation.",
-      "review_status": "reviewed",
-      "body_sha256": "41a0b68c7f7bbccefca47a0931b946176336a5ab4e6a8eefc60977d28273315f",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._schedule_outcome_reflection.learn_forward",
-      "ordinal": 1,
-      "classification": "diagnostic_cleanup",
-      "owner": "orchestrator",
-      "contract": "Bound optional background Reflection by its deadline; log provider, expiry or state-admission failure without speech, Work, Goal completion or a second Planner review. Task cancellation propagates to the existing Host cleanup owner.",
-      "review_status": "reviewed",
-      "body_sha256": "b69dafef72ebcb308fb501ebe2a873c3dc3f4f725dfefd26ebe931775dac1c15",
-      "failure_signals": [
-        "diagnostic"
       ]
     }
   ],

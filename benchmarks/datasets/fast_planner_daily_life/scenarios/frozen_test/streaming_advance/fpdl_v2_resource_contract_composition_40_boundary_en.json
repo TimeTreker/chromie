@@ -30,7 +30,6 @@
       "context": {},
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -43,18 +42,17 @@
           "local_ref": "r1",
           "outcome": "Acquire the red mug from the kitchen and physically hand it to the requester.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_resource_contract_composition_40_boundary_en",
-      "text": "Fetch the red mug from the kitchen and hand it to me for the family getting ready to leave."
+      "text": "Fetch the red mug from the kitchen and hand it to me for the family getting ready to leave.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

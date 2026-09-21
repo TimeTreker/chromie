@@ -54,7 +54,7 @@ class ModelReplay:
         self.candidate = copy.deepcopy(candidate)
         if candidate:
             parsed = urllib.parse.urlsplit(candidate['url'])
-            if candidate['role'] not in {'gi', 'ga', 'fast', 'deep'} or not candidate['model']:
+            if candidate['role'] not in {'umi', 'ga', 'fast', 'deep'} or not candidate['model']:
                 raise ValueError('select one supported candidate role and model')
             if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
                 raise ValueError('candidate URL must be an explicit HTTP(S) model service')

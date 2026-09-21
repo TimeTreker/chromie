@@ -65,7 +65,7 @@ def test_integrated_fast_validation_drops_exact_unbound_optional_default_after_g
     text = "turn left"
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         UserMeaningInterpretationRequest(text=text),
-        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","continuity_scope":"goal","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[]}',
+        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","continuity_scope":"goal","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[],"cognitive_requests":[{"authority":"planner","responsibility_refs":["r1"],"reason_summary":"Plan the requested turn."}]}',
     )
     request = CognitiveWorkRequest(
         sid="default-owner", text=text, responsibilities=decision.responsibilities,
@@ -114,20 +114,17 @@ def test_integrated_fast_validation_drops_exact_unbound_optional_default_after_g
     assert output.activities[0].args == {"direction": "left"}
 
 
-def test_integrated_fast_validation_keeps_nondefault_unbound_override_fail_closed() -> None:
+def test_integrated_fast_validation_preserves_schema_valid_planner_how_override() -> None:
     from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
     from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
-    from agent.app.planner_fast_validation import (
-        AuthoritativeGroundingValidationError,
-        validate_fast_advance_output,
-    )
+    from agent.app.planner_fast_validation import validate_fast_advance_output
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
     from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
 
     text = "turn left"
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         UserMeaningInterpretationRequest(text=text),
-        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","continuity_scope":"goal","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[]}',
+        '{"confidence":1.0,"responsibilities":[{"local_ref":"r1","outcome":"turn left","output_mode":"body_action","continuity_scope":"goal","confidence":1.0,"source_evidence":{"source_start_token_ref":"t0","source_end_token_ref":"t1"}}],"meaning_uncertainties":[],"cognitive_requests":[{"authority":"planner","responsibility_refs":["r1"],"reason_summary":"Plan the requested turn."}]}',
     )
     request = CognitiveWorkRequest(
         sid="default-owner-nondefault", text=text, responsibilities=decision.responsibilities,
@@ -167,26 +164,24 @@ def test_integrated_fast_validation_keeps_nondefault_unbound_override_fail_close
     }
     output = FastPlannerAdvanceModelOutput.model_validate(raw)
 
-    with __import__("pytest").raises(AuthoritativeGroundingValidationError):
-        validate_fast_advance_output(
-            output, request=request, responsibilities=list(request.responsibilities),
-            capabilities=[capability],
-        )
+    validate_fast_advance_output(
+        output, request=request, responsibilities=list(request.responsibilities),
+        capabilities=[capability],
+    )
 
     assert output.activities[0].args["turn_rate_radps"] == 0.01
 
 def test_planner_prompt_assigns_schema_defaults_to_trusted_runtime_not_model_work() -> None:
     prompt = EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT.lower()
 
-    assert "omit every optional input" in prompt
-    assert "even when its schema declares a default" in prompt
-    assert "do not copy, choose, modify or restate schema defaults" in prompt
-    assert "do not replace omission with a minimum, maximum, conservative, guessed" in prompt
-    assert "provider realization applies declared defaults" in prompt
-    assert "use their declared schema_default" not in prompt
+    assert "runtime/provider realization owns the default" in prompt
+    assert "never substitute a default for an explicit requested value" in prompt
+    assert "may emit a schema-valid non-default optional value" in prompt
+    assert "briefly explain that how choice in the activity reason_summary" in prompt
+    assert "do not emit optional fields merely to restate their declared defaults" in prompt
 
 
-def test_fast_streaming_prompt_hides_optional_default_value_but_preserves_override_contract() -> None:
+def test_fast_streaming_prompt_preserves_optional_default_and_override_contract() -> None:
     capability = {
         "capability_id": "test.turn",
         "description": "Turn left or right.",
@@ -210,9 +205,7 @@ def test_fast_streaming_prompt_hides_optional_default_value_but_preserves_overri
     projected, = fast_advance_streaming_capability_prompt_projection([capability])
     rate = projected["args_schema"]["properties"]["turn_rate_radps"]
 
-    assert "default" not in rate
-    assert rate["x-chromie-default-owner"] == "trusted_runtime"
+    assert rate["default"] == 0.12
     assert rate["minimum"] == 0.01 and rate["maximum"] == 0.2
-    assert "omit unless" in rate["description"].lower()
     assert projected["args_schema"]["required"] == ["direction"]
     assert capability["input_schema"]["properties"]["turn_rate_radps"] == before

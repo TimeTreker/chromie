@@ -116,7 +116,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -129,13 +128,11 @@
           "local_ref": "r1",
           "outcome": "在眨眼两次时看向已识别用户。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -145,18 +142,17 @@
           "local_ref": "r2",
           "outcome": "在注视时正好眨眼两次。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_resource_or_concurrency_conflict_alternative_05_supported_zh",
-      "text": "看着我两秒，同时眨眼两次。"
+      "text": "看着我两秒，同时眨眼两次。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_primary"
   },

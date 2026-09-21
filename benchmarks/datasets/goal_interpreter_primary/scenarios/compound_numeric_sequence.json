@@ -82,10 +82,20 @@
         "source_evidence": {
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t19"
-        }
+        },
+        "continuity_scope": "goal"
       }
     ],
-    "unresolved": []
+    "meaning_uncertainties": [],
+    "cognitive_requests": [
+      {
+        "authority": "planner",
+        "responsibility_refs": [
+          "r1"
+        ],
+        "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+      }
+    ]
   },
   "intent_only_contract": true
 }

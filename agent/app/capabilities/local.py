@@ -536,6 +536,13 @@ def chromie_manifests(
                         "the same tool_id and material arguments."
                     ),
                     "semantic_type": "verified_tool_memory_retrieval",
+                    "resource_contract": {
+                        "provider_role": "acquire_information",
+                        "plan_requires": [],
+                        "plan_provides": ["resource_acquired"],
+                        "completion_evidence": "trusted_tool_result",
+                        "final_delivery_owner": "planner_communicative_activity",
+                    },
                     "planner_context_requirements": {
                         "nonempty": ["verified_tool_memory_index"],
                     },

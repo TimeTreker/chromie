@@ -373,8 +373,10 @@ def test_planner_source_handoff_survives_transport_without_truncation(stage):
     header, body = tail.split("\n", 1)
     source, _ = json.JSONDecoder().raw_decode(body)
     assert source["original_text"] == original
-    assert source["original_text_sha256"] == hashlib.sha256(original.encode()).hexdigest()
-    assert source["turn_id"] == "original-turn"
-    assert source["authority"] == "read_only_source_provenance"
+    assert transported.source_turn_provenance["original_text_sha256"] == hashlib.sha256(original.encode()).hexdigest()
+    assert transported.source_turn_provenance["turn_id"] == "original-turn"
+    assert source["authority"] == "immutable_user_turn_source"
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+    assert source["source_tokens"] == user_turn_source_tokens(original)
     assert ("UMI Responsibilities" if stage == "advance" else "FINAL CANONICAL GOALS") in header
     assert str(prompt).count(json.dumps(original, ensure_ascii=False)) == 1

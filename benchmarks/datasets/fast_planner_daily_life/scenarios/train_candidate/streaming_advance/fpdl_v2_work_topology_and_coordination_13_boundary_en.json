@@ -30,7 +30,6 @@
       "context": {},
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -45,13 +44,11 @@
           "local_ref": "r1",
           "outcome": "Walk forward for five seconds in parallel with the sibling walk.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         },
         {
           "bindings": {
@@ -64,18 +61,17 @@
           "local_ref": "r2",
           "outcome": "Walk forward for eight seconds in parallel with the sibling walk.",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_work_topology_and_coordination_13_boundary_en",
-      "text": "During the family getting ready to leave, walk forward for five seconds while also walking forward for eight seconds."
+      "text": "During the family getting ready to leave, walk forward for five seconds while also walking forward for eight seconds.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "streaming_advance"
   },

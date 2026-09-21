@@ -8,6 +8,26 @@ from shared.chromie_contracts.core_interpretation import (
 )
 
 
+class PlannerActivationFixture:
+    """Explicit model decision for episodes whose next step is Planner re-entry."""
+
+    async def resolve_cognitive_activation(self, _session, *, request, **_kwargs):
+        from shared.chromie_contracts.cognitive_activation import CognitiveActivationDecision
+
+        decision = CognitiveActivationDecision(
+            cognitive_requests=[{
+                "authority": "planner", "goal_ids": request.goal_ids,
+                "responsibility_refs": request.responsibility_refs,
+                "source_refs": request.source_refs,
+                "reason_summary": "Scripted episode requires Planner continuation.",
+            }],
+            confidence=1.0,
+            reason_summary="Explicit Activation fixture; no native cognition claim.",
+        )
+        decision.validate_request(request)
+        return decision
+
+
 def cognitive_work_request(
     *,
     text: str,

@@ -46,7 +46,7 @@ from shared.chromie_contracts.tool_result import canonical_value_sha256
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_cognitive_runtime_pr7 import FakeRuntime
 
-from tests.cognitive_work_test_support import word_free_model_fixture, social_fixture_resolution, social_fixture_response
+from tests.cognitive_work_test_support import PlannerActivationFixture, word_free_model_fixture, social_fixture_resolution, social_fixture_response
 
 READ_SCHEMA = {
     "type": "object",
@@ -177,8 +177,27 @@ class CheckedReply(ReplayModel):
         return value
 
 
-async def resolve(request, catalog, raw, tier="deep"):
-    model = CheckedReply(json.dumps(word_free_model_fixture(raw)))
+async def resolve(request, catalog, raw, tier="deep", *, compact=True):
+    wire = word_free_model_fixture(raw)
+    scope = request.planner_reentry_scope
+    if tier == "fast" and compact and scope and scope.trigger in {"post_execution", "capability_result_reentry"}:
+        # Author the current compact wire fixture before inference. The model cites
+        # Evidence; the Host derives completed Work dependencies from verified results.
+        wire = {
+            "goal_decisions": [{"goal_id": gid, "next_action": item["disposition"],
+                "satisfaction_status": item["satisfaction"]["status"],
+                "satisfaction_score": item["satisfaction"]["score"],
+                "evidence_refs": list(scope.evidence_refs),
+                "unresolved_needs": item.get("unresolved", []),
+                "unmet_requirements": item["satisfaction"].get("unmet_requirements", []),
+                "rationale": item["satisfaction"].get("rationale", "")}
+                for gid, item in wire["goal_outcomes"].items()],
+            "new_work": wire["steps"], "confidence": wire["confidence"],
+            "plan_relation": wire.get("plan_relation", "exact"),
+            "user_confirmation_required": wire.get("user_confirmation_required", False),
+            "escalation_reason": wire.get("escalation_reason", ""),
+        }
+    model = CheckedReply(json.dumps(wire))
     cls = FastPlannerResolver if tier == "fast" else DeepPlannerResolver
     result = await cls(model, StaticCatalog(catalog)).resolve(request)
     assert model.calls == 1
@@ -296,7 +315,7 @@ async def begin_episode(language, rain):
 
 
 async def reenter(request, catalog, plan, adapter, response, bundle, raw):
-    class Client:
+    class Client(PlannerActivationFixture):
         seen = None
 
         async def resolve_social_cognition(self, session, *, request, **kwargs):
@@ -382,7 +401,9 @@ def test_unproved_prior_work_does_not_release_communication_order(fault):
                 with pytest.raises(ValueError, match="result-Evidence re-entry context does not match typed scope"):
                     await resolve(seen, catalog, raw, tier)
                 continue
-            resolved = await resolve(seen, catalog, raw, tier)
+            # Fast forbids model-authored step dependencies at Schema; Deep still
+            # authors them and must reject these invalid references at validation.
+            resolved = await resolve(seen, catalog, raw, tier, compact=fault not in {"unknown_step", "before"})
             assert resolved.disposition != "respond", resolved.metadata
             assert not resolved.steps and not resolved.communication_needs
     asyncio.run(run())

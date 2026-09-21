@@ -104,7 +104,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -129,18 +128,17 @@
           "local_ref": "r1",
           "outcome": "Create the 8 p.m. reminder after fresh confirmation.",
           "output_mode": "stateful_effect",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_confirmation_and_cancellation_revision_08_supported_en",
-      "text": "Please keep the 8 p.m. reminder pending for fresh confirmation."
+      "text": "Please keep the 8 p.m. reminder pending for fresh confirmation.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_reentry"
   },

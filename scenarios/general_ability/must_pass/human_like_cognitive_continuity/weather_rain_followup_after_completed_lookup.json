@@ -1,0 +1,79 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "weather_rain_followup_after_completed_lookup",
+  "stage": "must_pass",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "user_reported_episode",
+    "batch_id": "weather_followup_2026_09_21",
+    "derived_from_existing_scenario": false,
+    "training_eligible": false
+  },
+  "rationale": "A rain follow-up after a completed weather lookup must preserve the location, retain the completed Goal as immutable history, and answer from verified evidence.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": ["dialogue_continuity", "evidence_grounding", "truthfulness"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["dialogue_continuity", "evidence_grounding", "truthfulness"],
+    "primary_outcomes": [
+      "Obtain and report today's Chongqing weather from the live provider.",
+      "Interpret the second turn as asking about rain today in Chongqing, then answer with the uncertainty supported by fresh or verified retained weather evidence.",
+      "Retain the first completed Goal unchanged; a new follow-up Goal may relate to it but cannot supersede it."
+    ],
+    "acceptable_auxiliary": [
+      "Natural wording and current weather values vary.",
+      "The follow-up may retrieve verified prior tool evidence or make a fresh weather lookup."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Ask again for a location already resolved by the conversation.",
+      "List the same Goal as both related and superseded, or supersede a terminal Goal.",
+      "Invoke Deep to repair an invalid Fast output.",
+      "Invent precipitation or turn a probability into certainty."
+    ],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "description": "Retained English weather episode covering terminal Goal continuity and compact Evidence re-entry.",
+  "turns": [
+    {
+      "id": "chongqing_weather_today",
+      "text": "Can you help me check the weather today in chongqing?",
+      "language": "en-US",
+      "expected_capabilities": ["chromie.weather.lookup"],
+      "require_speech": true,
+      "expect_created_goals_satisfied": true,
+      "require_fast_planner_evidence_reentry": true,
+      "expect_no_fast_contract_failure": true,
+      "expect_deep_planner_invoked": false
+    },
+    {
+      "id": "rain_followup",
+      "text": "will it rain today?",
+      "language": "en-US",
+      "require_speech": true,
+      "expect_created_goals_satisfied": true,
+      "expect_no_fast_contract_failure": true,
+      "expect_deep_planner_invoked": false,
+      "min_new_goal_count": 1
+    }
+  ],
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "human_like_cognitive_continuity",
+        "title": "Human-like Cognitive Continuity",
+        "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
+        "rationale": "Follow-up meaning must survive completion without rewriting terminal Goal history.",
+        "root_cause_boundaries": ["Cognitive Gateway", "User Meaning Interpretation/Goal Association", "Planner", "Host interaction state", "Test evidence"]
+      }
+    ]
+  }
+}

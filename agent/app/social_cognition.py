@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from typing import Any, get_args
 
 from jsonschema import Draft202012Validator
@@ -60,6 +61,14 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "information and inappropriate interruption. A silence decision does not erase an "
     "outstanding required answer, input need, confirmation or promised result. "
     "Account for every supplied need ID in need_outcomes as covered or pending. "
+    "First decide whether each need is fulfilled by the exact current-turn pending/delivered "
+    "act or needs new words; only then decide whether there is anything to play. A trusted "
+    "state-change invocation is not a new user turn. Compare source_turn.turn_id with the "
+    "interaction row's turn_id, not the order of your invocations. When a same-turn answer "
+    "already fulfills a supplied need, return communicate with that exact activity_id and "
+    "unchanged text, bind the need, and mark it covered. This is delivery accounting: "
+    "Runtime reuses the activity without duplicate playback and verifies completion. "
+    "Do not leave that need pending merely because the person has already heard the answer. "
     "Covered means your exact addressed act will fulfill the communication need if "
     "actually delivered; it is never evidence that delivery or task completion occurred. "
     "Preserve each need's delivery_phase when specified: pre_action must precede "
@@ -103,8 +112,9 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "same turn carries retained Goal continuity. That immediate reply does not create, erase, "
     "or decide a Goal relationship. Non-speech task Responsibilities still have an independent "
     "Work decision pending, so do not answer that task or invent an input question before that "
-    "decision. Silence remains valid for trusted state changes with no useful interaction or for "
-    "a fresh turn whose reply is already pending/delivered. Never invent a task just to create "
+    "decision. Silence remains valid when no useful interaction or supplied-need accounting "
+    "is due. An already pending/delivered reply suppresses extra playback, not the exact-act "
+    "accounting required for a supplied need. Never invent a task just to create "
     "an interaction need. "
     "Use exact eligible social-expression Capability IDs and schema-valid arguments only "
     "when useful, with each proposal anchored to its own communicative act. Decide the immediate "
@@ -133,8 +143,15 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "silence as placeholder words or a repair act. Every act contains activity_id, "
     "text, function and truth_stage. "
     "Put actual words in text, not in reason_summary. Cite its supplied Goal and "
-    "Responsibility refs. When a need is covered, cite its ID in that act's "
-    "addressed_need_ids and retain the need's exact source bindings. Acknowledging "
+    "Responsibility refs. A covered need requires an explicit returned verbal act "
+    "with nonempty text, its ID in addressed_need_ids, and the need's exact source "
+    "bindings. If an exact current-turn pending or delivered act already satisfies "
+    "that need, return its unchanged activity_id and identical text with the need "
+    "binding: Runtime reuses that delivery rather than speaking it twice, and still "
+    "waits for playback completion. An acknowledgement alone does not cover an "
+    "answer need. Nonverbal acts cannot cover verbal needs. Silence returns no acts "
+    "and leaves needs pending; never mark a need covered while omitting its verbal "
+    "act merely because no additional playback is useful. Acknowledging "
     "a person's reported experience is context_grounded; pre_evidence and progress_kind "
     "describe prospective Chromie task Work, not every social acknowledgement. "
     "Repair means correcting a previously delivered communicative act, never a failed "
@@ -162,6 +179,30 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
                 for identity in ids:
                     known.setdefault(str(identity).strip(), set()).add(normalize_whitespace(row.get("text") or ""))
 
+    def fresh_identity_suffix(excluded: list[str]) -> str:
+        # The serving decoder ignores `not: {enum: ...}` and does not support
+        # negative lookahead. This finite-prefix complement excludes exactly
+        # the retained identities. Keep new IDs within JSON-safe lexical text:
+        # this decoder applies patterns to encoded strings without escaping
+        # wildcard matches. Retained IDs remain reusable through exact consts.
+        heads = sorted({value[0] for value in excluded if value})
+        safe_character = r'[^"\\\x00-\x1f]'
+        if not heads:
+            return safe_character + "+"
+        alternatives = [r'[^"\\\x00-\x1f' + re.escape(''.join(heads)) + "]" + safe_character + "*"]
+        alternatives.extend(
+            re.escape(head) + fresh_identity_suffix([
+                value[1:] for value in excluded if value.startswith(head)
+            ])
+            for head in heads
+        )
+        if "" not in excluded:
+            alternatives.append("")
+        return "(" + "|".join(alternatives) + ")"
+
+    safe_known = [identity for identity in sorted(known)
+                  if not re.search(r'["\\\x00-\x1f]', identity)]
+    fresh_pattern = "^" + fresh_identity_suffix(safe_known) + "$" if known else None
     contract = schema["$defs"]["SocialCommunicativeAct"]
     branches = []
     for branch in contract.get("oneOf", [contract]):
@@ -173,6 +214,7 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
                 "minLength": 1,
                 "maxLength": min(int(fresh_id.get("maxLength", 160)), 24),
                 **({"not": {"enum": sorted(known)}} if known else {}),
+                **({"pattern": fresh_pattern} if fresh_pattern else {}),
             }
         variants = [fresh]
         for identity, messages in known.items():
@@ -479,9 +521,11 @@ def social_cognition_response_schema(
     # Native decoding does not enforce conditional decision-state dependencies.
     # Realize the existing DTO/Host states without deciding whether speech is
     # useful: silence leaves needs pending, and deliberation commits no result.
-    # Account for reasons/Needs before committing a disposition and its acts.
-    # JSON field order changes decoder presentation only, not the DTO meaning.
-    first = ("reason_summary", "need_outcomes", "disposition", "activities")
+    # Account for Needs and the actual decision before explaining it. A leading
+    # silence rationale otherwise anchors a wordless act even after the decoder
+    # commits to covered Needs and communicate. Field order does not change the
+    # available decisions, expression cardinality, or DTO/Host meaning.
+    first = ("need_outcomes", "disposition", "activities", "reason_summary")
     properties = schema["properties"]
     schema["properties"] = {
         **{name: properties[name] for name in first},
@@ -681,12 +725,22 @@ def _social_interaction_opportunity(
     """Compact deterministic cue for SC; never a second social authority."""
     already = interaction.get("already_spoken") or []
     pending = interaction.get("pending_speech") or []
-    return {
+    opportunity: dict[str, Any] = {
         "kind": "fresh_addressed_turn" if request.trigger == "interpretation" else "trusted_state_change",
         "fresh_addressed_turn": request.trigger == "interpretation",
         "reply_already_pending_or_delivered": bool(already or pending),
         "work_decision_pending": bool(request.context.get("work_decision_pending")),
     }
+    if request.communication_needs:
+        turn_id = request.source_turn.get("turn_id")
+        opportunity["need_accounting"] = {
+            "current_turn_id": turn_id,
+            "supplied_need_count": len(request.communication_needs),
+            "same_turn_delivery_present": bool(turn_id) and any(
+                row.get("turn_id") == turn_id for row in already
+            ),
+        }
+    return opportunity
 
 
 def social_cognition_prompt(

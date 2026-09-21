@@ -1284,13 +1284,34 @@ class CapabilityRuntime:
                     traces=traces,
                 )
 
-            cancelled_results = [result for result in results if result.status == "cancelled"]
+            requests_by_id = {
+                request.request_id: request
+                for request, _definition in validated
+            }
+            required_results = [
+                result
+                for result in results
+                if not self._is_optional_social_decoration(
+                    requests_by_id.get(result.request_id)
+                )
+            ]
+            # Optional SC decoration is not an interaction obligation. Preserve
+            # every member result as evidence, but when required members exist the
+            # aggregate status follows only those required members. An auxiliary-
+            # only interaction still reports its own actual terminal status.
+            status_results = required_results or results
+            cancelled_results = [
+                result for result in status_results if result.status == "cancelled"
+            ]
             status = (
                 "completed"
-                if all(result.status == "completed" for result in results)
+                if all(result.status == "completed" for result in status_results)
                 else "cancelled"
                 if cancelled_results
-                and all(result.status in {"completed", "cancelled"} for result in results)
+                and all(
+                    result.status in {"completed", "cancelled"}
+                    for result in status_results
+                )
                 and all(
                     str(result.reason_code or "").startswith("cancelled")
                     for result in cancelled_results
@@ -2113,6 +2134,27 @@ class CapabilityRuntime:
         return request, definition
 
     @staticmethod
+    def _is_optional_social_decoration(
+        request: CapabilityRequest | None,
+    ) -> bool:
+        """Return whether one request is SC-owned optional expression.
+
+        The exact metadata tuple is already the maintained trust boundary for
+        optional prepared-start members. Reuse it for aggregate status instead
+        of letting a failed decorative gesture turn successful required speech or
+        task delivery into an interaction failure.
+        """
+
+        return bool(
+            request is not None
+            and request.metadata.get("execution_role") == "social_decoration"
+            and request.metadata.get("source") == "social_cognition_auxiliary_activity"
+            and request.metadata.get("auxiliary_plan_activity") is True
+            and request.metadata.get("semantic_owner") == "social_cognition"
+            and not request.metadata.get("source_goal_ids")
+        )
+
+    @staticmethod
     def _provider_group_key(
         request: CapabilityRequest,
         definition: CapabilityDefinition,
@@ -2131,12 +2173,11 @@ class CapabilityRuntime:
         authorization: RuntimeAuthorization,
     ) -> list[tuple[CapabilityResult, CapabilityTrace]]:
         identities = {request.request_id for request, _ in items}
-        optional = {request.request_id for request, _ in items
-                    if request.metadata.get("execution_role") == "social_decoration"
-                    and request.metadata.get("source") == "social_cognition_auxiliary_activity"
-                    and request.metadata.get("auxiliary_plan_activity") is True
-                    and request.metadata.get("semantic_owner") == "social_cognition"
-                    and not request.metadata.get("source_goal_ids")}
+        optional = {
+            request.request_id
+            for request, _ in items
+            if self._is_optional_social_decoration(request)
+        }
         barrier = CoordinatedStart(set(identities), set(optional))
         compiled: dict[str, list[str]] = {}
         for request, definition in items:

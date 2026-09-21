@@ -289,7 +289,6 @@ def test_situation_digest_opportunity_cannot_reenter_with_different_projection()
                     local_ref="resp-look",
                     outcome="Look again.",
                     output_mode="stateful_effect",
-                    relationship="new",
                     confidence=1.0,
                 )
             ],
@@ -333,8 +332,6 @@ def test_due_time_condition_runtime_cycle_reenters_same_planner_without_evidence
                             "outcome": "Remind the user at the requested time.",
                             "bindings": {},
                             "output_mode": "stateful_effect",
-                            "relationship": "new",
-                            "target_goal_ids": [],
                             "confidence": 1.0,
                         }
                     ],

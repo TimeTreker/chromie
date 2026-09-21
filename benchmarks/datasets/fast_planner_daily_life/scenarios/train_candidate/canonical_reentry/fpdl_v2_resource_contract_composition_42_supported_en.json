@@ -128,7 +128,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": {
         "evidence_refs": [],
@@ -152,18 +151,17 @@
           "local_ref": "r1",
           "outcome": "Acquire and deliver the requested Hangzhou weather information.",
           "output_mode": "information",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "fpdl_v2_resource_contract_composition_42_supported_en",
-      "text": "Get tomorrow morning's Hangzhou forecast for using the shared room without disturbing anyone and explain the result to me."
+      "text": "Get tomorrow morning's Hangzhou forecast for using the shared room without disturbing anyone and explain the result to me.",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "canonical_reentry"
   },

@@ -129,7 +129,6 @@
       },
       "history": [],
       "interpretation_confidence": 0.99,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": {
         "evidence_refs": [
@@ -153,18 +152,17 @@
           "local_ref": "r1",
           "outcome": "仅在安全移动可用时朝请求者移动。",
           "output_mode": "body_action",
-          "relationship": "new",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "t999",
             "source_start_token_ref": "t0"
-          },
-          "target_goal_ids": []
+          }
         }
       ],
       "schema_version": 1,
       "sid": "dpdl_v1_no_change_or_no_safe_plan_10_boundary_zh",
-      "text": "即使安全状态禁止移动，也朝我走过来。"
+      "text": "即使安全状态禁止移动，也朝我走过来。",
+      "meaning_uncertainties": []
     },
     "runtime_variant": "deep_reentry"
   },
