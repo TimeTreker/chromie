@@ -1,5 +1,129 @@
 # Chromie Current Status
 
+## Planner contracts and inference retention — 2026-09-22 (current)
+
+This owner-authorized development delivery, based on
+`0129915dbd57913be15661f9b7f38aff81b48c68`, retains
+Host SC continuity and clarification/lookup-decoder repairs, and fixes three additional
+reproduced boundaries. The Fast prompt's terminal-effect definition contradicted the
+Host's provider-owned acquisition purpose; prompt and per-Capability Schema now use that
+existing contract. Ordered source-span branches exclude reversed endpoints before Host
+admission. Native `$defs` share identical span grammars, reducing ~2.5 MB unshared
+candidate packets to ~148–151 KB. No semantic authority or physical scheduling changed.
+
+Pinned SGLang retained dynamic grammars in two unlimited caches. The maintained image
+now gives the compiler a 512 MiB retained-cache budget and removes the second backend
+cache owner. Its build exercises 64 distinct schemas against the actual patched backend.
+This is a retained-grammar limit, not an active/peak/process-memory bound. The preceding
+purpose-only live iteration reached 23.44 GiB and timed out; the final rebuilt-service
+four-case run had no timeout/disconnect and memory 12.31 →12.05 GiB. Long-run stability
+remains unqualified. Configuration ownership is documented in `docs/CONFIGURATION.md`.
+
+Automatic verification: **376 focused tests /143 subtests**, composable planning
+Level A **5/5**, repository policy, test ownership, pinned Ruff/mypy pass. Actual installed
+XGrammar rejects the original reversed-source output and accepts a structurally corrected
+probe. Frozen final native replay: 4/4 normal stop and Schema/DTO/purpose checks; full
+Host 3/4, milk correctly rejected on its UMI-owned source boundary. Previous replay's
+missing target-context reconstruction is fixed in the private adjudicator.
+
+Final live cohort: **4/4 attempted, mechanical 2/4, requested Work semantic 1/4**:
+
+| Case / correlation | Actual boundary and result |
+| --- | --- |
+| Compound `8cec7b59` | UMI preserves walk/nod/turn; Fast picks sidestep for turn. Host structural admission and simulator faithfully execute the wrong selected effect. SC silent; required-speech oracle also fails. |
+| Sequential `28429ba9` | Requested gaze 3 s then blink twice executes correctly. No purpose/source-order rejection. |
+| Simultaneous `708b6dc7` | UMI preserves “while”; Fast emits sequential gaze/blink and complete coverage. Mechanical pass is manually rejected as temporal semantic failure. SC emits no speech; internal execution-state rationale remains unqualified. |
+| Milk `f19f15c7` | UMI changes approximate robot-relative location to exact user-relative location and narrows source to t3..t15. Fast cites recipient t16..t17; Host rejects before Work. SC not invoked. |
+
+All cases returned safe idle. Final runtime identity, raw transactions, exact I/O audit,
+rejected candidates and one bundle per aggregate are in
+`.chromie/acceptance/planner-purpose-root-cause-20260922/REVIEW.md` and HANDOFF.md.
+A new six-case source-wording UMI experiment improves the original robot-relative case
+but fails four contrasts; rejected with no production UMI edit. Activity-ID and catalog
+ordering experiments also remain rejected. Do not weaken source containment or serialize
+concurrency silently to manufacture a pass.
+
+No new maintained document, environment variable, runtime mode or architecture term.
+Four axes: **implementation source repaired; automatic verification partial; target
+validation failing; deployment development only**. #24/#32, deferred full suite/replay/
+cohort, memory soak, supervised voice and default target-evidence closure remain open.
+Owned simulator stopped after safe idle; core services remain healthy. No physical audio,
+robot acquisition or release claim. Earlier pre-delivery “uncommitted/no push” entries
+below describe their historical evidence snapshots; this owner-authorized delivery and
+current results above take precedence.
+
+## SC continuity refresh — 2026-09-22
+
+Current uncommitted continuation on `0129915dbd57913be15661f9b7f38aff81b48c68` repairs
+the Host input boundary for optional state-triggered Social Cognition. After awaiting
+prior same-turn speech, it refreshes existing owned continuity, preserves admitted
+meaning/Plan, removes the fixed pending-admission assertion, and uses the same current
+context for expression. Scoped execution freshness remains. No model, prompt, Schema,
+semantic authority, Work lifecycle, setting or new current document changed.
+
+Native baseline packets combined old planning/evaluating Task/Goal state with fresh
+committed ledger events. Candidate packets now show scheduled/accepted state and
+current execution bindings. Three delayed-speech regressions fail on original source
+and pass after repair. **158 SC tests pass**; broader focused checks **248 pass,
+1 pre-existing failure, 17 subtests pass** (same failure proven on baseline).
+Truthful embodied speech Level A **6/6**, policy/ownership/Ruff/mypy pass.
+
+The unchanged four-case bounded live aggregate remains mechanical **2/4**, requested
+Work semantic **1/4**; hard model-contract stop on the last case. Fast still serializes
+“while” and substitutes sidestepping for turning. Milk UMI still shifts reference frame
+and omits relevant source coverage; Planner clarification fails closed. One SC raw
+silence rationale still mistakes committed Work for completion even with corrected
+input; existing freshness suppresses it. All four provider snapshots show safe idle.
+
+Evidence and exact module workflow: `.chromie/acceptance/sc-context-refresh-20260922/REVIEW.md`.
+One bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260922_205334.tar.gz`.
+Three-packet private native Schema-order experiment also failed and was rejected.
+Four axes: **source locally implemented**, **local validation partial**, **target
+validation failing for original behaviors**, **development support only**. Full
+tests/replay/cohort and latency remain owner-deferred; physical voice/robot unproved.
+Current checkpoint/handoff supersede the preceding audit's unchanged-source status.
+
+## Laptop bounded continuation — 2026-09-22
+
+Resumed clean `0129915dbd57913be15661f9b7f38aff81b48c68` after fetching upstream.
+The current machine is RTX 4090 Laptop / SGLang `chromie-qwen35-4b`, not the preceding
+Gemma deployment. Its stale Agent was rebuilt to current source and verified before
+and after live checks. No production prompt, model, Schema or code repair was retained.
+Previous September 22 private repair roots are absent from this checkout; their evidence
+has not been recovered or rerun. See the current checkpoint/handoff for identities.
+
+| Actual episode / earliest boundary | Observed result and claim |
+| --- | --- |
+| Sequential gaze/blink contrast, `d6ceefdc` | UMI preserves order; Fast selects gaze 3 s then blink twice; Runtime completes both in order. Requested Work passes this bounded semantic review. |
+| Simultaneous gaze/blink original, `5b3acc0a` | UMI preserves “while,” but Fast authors sequential actions and complete coverage. Runtime executes that incorrect Plan; Goal satisfaction inherits the bad coverage claim. Mechanical action/argument checks pass, but temporal semantics fail. |
+| Compound walk/nod/turn original, `ad2b903f` | UMI preserves the request; Fast selects sidestep for turning left despite distinct supplied turn/sidestep contracts. Walking/nodding/sidestepping complete; the requested turn is missing. Required speech also absent. Case fails. |
+| Milk acquisition original, `79b49022` | UMI changes “ahead of you about 50 meters” to “50 meters ahead of the user” and incompletely cites the source. Fast then asks for exact distance with an invalid context-consideration record. Host rejects before execution. UMI semantic failure is earlier than the contained DTO failure. |
+
+All four provider post-case snapshots report safe idle, with no active task/lanes,
+fall or emergency stop. Exact raw prompts/replies and workflow I/O are retained in
+`.chromie/acceptance/resume-bounded-20260922/REVIEW.md` and its evidence root. The native
+catalog advertises a scripted/mock acquisition provider; this run does not establish
+unavailability or real object acquisition. No microphone, audible speaker or robot proof.
+
+One private two-packet timing-prompt candidate was rejected: sequential contrast remains
+correct, while the simultaneous result labels only the blink parallel. Native Schema/DTO
+accept both packets, but the production Host scheduling invariant rejects the singleton
+parallel group. This is not a retained fix or authority amendment. Raw semantic inference
+failures are established; broader prompt/projection contributions remain unqualified.
+
+Focused timing/schema tests pass **13**; composable-action Level A passes **5/5**.
+Two live invocations retain mechanical **2/2** (temporal pair, only one semantic Work
+pass) and **0/2** (original compound/acquisition pair; integrity stop on final case).
+One debug bundle per invocation: `chromie_debug_bundle_20260922_200558.tar.gz` and
+`chromie_debug_bundle_20260922_200757.tar.gz`, under `/home/chromie/Downloads/`.
+Full tests/replay/cohort, latency and physical voice remain owner-deferred. Simulator
+stopped; current-source Agent retained. No commit/push. No new current document,
+configuration, architecture term or behavior fixture was added.
+
+Four axes: **source unchanged** from prior repair delivery; **local validation partial**;
+**target validation failing for the original cases on this laptop**; **support development
+only**. #24/#32 remain open, as do SC mixed-time context and retired Planner speech fields.
+
 ## Pending SC Work-state freshness repair — 2026-09-22
 
 The owner deferred failure-cause wording where it does not affect main Work. It remains

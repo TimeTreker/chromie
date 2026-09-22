@@ -2618,7 +2618,7 @@ class GoalDrivenRuntimeCoordinator:
             source_turn=work_request.source_turn_provenance,
             context=ContextAssembly.project_context({
                 **social_context, "work_decision_pending": pending,
-                **({"canonical_plan_resolution": plan.prompt_projection(), "runtime_admission": "pending"} if plan is not None else {}),
+                **({"canonical_plan_resolution": plan.prompt_projection()} if plan is not None else {}),
                 "history": list(work_request.history),
                 "interaction_context": self._interaction_context(sid=sid, context=social_context),
             }),
@@ -2661,8 +2661,15 @@ class GoalDrivenRuntimeCoordinator:
                 execution_snapshot = await self.adapter.interaction_runtime.runtime.planning_state_snapshot(
                     request.goal_ids, turn_id,
                 )
+            # Earlier same-turn expression may have held this decision while
+            # Work progressed. Read continuity and the ledger in the same event-
+            # loop turn, preserving the admitted meaning and immutable Plan.
+            social_context, social_history = self._refresh_continuity_context(
+                context={**work_request.context, "history": list(work_request.history)}, sid=sid,
+            )
             current_request = self._state_social_request(
-                work_request=work_request, turn_id=turn_id, plan=primary_plan,
+                work_request=work_request.model_copy(update={"context": social_context, "history": social_history}),
+                turn_id=turn_id, plan=primary_plan,
                 trigger=trigger, source_refs=source_refs, goal_ids=goal_ids,
             )
             resolved = await self.resolve_social_interaction(
@@ -2677,7 +2684,7 @@ class GoalDrivenRuntimeCoordinator:
                 self._social_dispatches[request.request_id] = response.interaction_id
                 runtime_dispatch = await self.adapter.interaction_runtime.submit_response(response, session_id=sid)
             if current():
-                self.schedule_social_expression(response, session_id=sid, context=request.context, snapshot_is_current=current)
+                self.schedule_social_expression(response, session_id=sid, context=current_request.context, snapshot_is_current=current)
             if runtime_dispatch is not None:
                 cancelled = False
                 try:

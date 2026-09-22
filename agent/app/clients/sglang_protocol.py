@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import Any
 
 from ..inference_compute import CognitionComputeClass, compute_rank
@@ -49,6 +50,17 @@ def candidate_compatible_schema(
 def _stream_decoder_constraints(node: Any) -> None:
     """Preserve the existing XGrammar streaming omissions; Host keeps authority."""
     if isinstance(node, dict):
+        membership = node.get("allOf")
+        if node.get("type") == "array" and isinstance(membership, list) and membership and all(
+            isinstance(item, dict) and set(item) == {"contains"}
+            and isinstance(item["contains"], dict)
+            and len(item["contains"].get("enum", [])) == 1
+            for item in membership
+        ):
+            # XGrammar ignores contains. Serialize mandatory members first;
+            # the canonical schema still validates membership in any order.
+            # This constrains generation, never fills or repairs model output.
+            node["prefixItems"] = [item["contains"] for item in node.pop("allOf")]
         # XGrammar 0.2.1 miscompiles string regexes and number bounds. These
         # remain in the original schema and deterministic validation.
         if node.get("type") == "string":
@@ -61,6 +73,35 @@ def _stream_decoder_constraints(node: Any) -> None:
     elif isinstance(node, list):
         for value in node:
             _stream_decoder_constraints(value)
+
+
+def _share_stream_source_spans(schema: dict[str, Any]) -> None:
+    """Keep identical provenance grammars shared across Capability/state branches."""
+    definitions = schema.setdefault("$defs", {})
+    known: dict[str, str] = {}
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            sources = node.get("properties", {}).get("argument_sources", {})
+            for name, contract in list(sources.get("properties", {}).items()):
+                if not isinstance(contract, dict) or "$ref" in contract:
+                    continue
+                encoded = json.dumps(contract, ensure_ascii=False, separators=(",", ":"))
+                if encoded not in known:
+                    key = f"FastArgumentSourceSpan{len(known)}"
+                    while key in definitions:
+                        key += "_"
+                    definitions[key] = contract
+                    known[encoded] = key
+                sources["properties"][name] = {"$ref": f"#/$defs/{known[encoded]}"}
+            for key, value in node.items():
+                if key != "$defs":
+                    visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema)
 
 
 def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
@@ -81,6 +122,8 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
             # Native intersections can hide required object/array fields. Repeat
             # their existing shape for decoding; original DTO/Host rules remain.
             expose_intersection_shapes(schema)
+        if schema.get("title") == "FastPlannerWorkAdvanceOutput":
+            _share_stream_source_spans(schema)
         if schema.get("title") in {
             "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
             "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",

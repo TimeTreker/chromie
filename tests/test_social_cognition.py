@@ -653,6 +653,87 @@ async def test_host_rejects_obsolete_state_without_delivery_or_work_mutation():
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["committed", "completed", "cancelled"])
+async def test_state_social_refreshes_continuity_after_previous_speech(state):
+    from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
+    from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
+    from orchestrator.runtime.interaction_ledger import InteractionLedger
+    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+
+    prior_speech = asyncio.Event()
+    previous = asyncio.create_task(prior_speech.wait())
+    ledger = InteractionLedger()
+    original = {"history": [{"sid": "earlier", "role": "user", "text": "Hello"}],
+                "active_goal_snapshots": [{"goal_id": "goal:1", "work_status": "planning"}],
+                "active_task_snapshots": [{"task_id": "task:1", "status": "planning"}],
+                "user_turn_envelope": {"turn_id": "turn"}}
+    live = copy.deepcopy(original)
+    requests, expression_contexts, refreshes = [], [], []
+
+    def refresh(sid):
+        refreshes.append(sid)
+        return live
+
+    class Agent:
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            requests.append(request)
+            return SocialCognitionResolution(
+                request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                disposition="silence", activities=[], reason_summary="No additional speech needed.", model_call_count=1,
+            )
+
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(),
+        adapter=SimpleNamespace(interaction_runtime=SimpleNamespace(runtime=CapabilityRuntime(CapabilityRegistry()))),
+        policy=CognitiveRuntimePolicy(mode="apply"), context_refresh=refresh, interaction_ledger=ledger,
+    )
+    coordinator.schedule_social_expression = lambda *args, context, **kwargs: expression_contexts.append(context)
+    coordinator._social_turns["sid"] = ("previous", previous, "turn")
+    coordinator._social_dispatches["previous"] = "previous-delivery"
+    plan = CanonicalPlan(plan_id="plan", planner_tier="fast", disposition="execute", coverage="complete",
+        goal_ids=["goal:1"], steps=[{"step_id": "nod", "capability_id": "soridormi.nod_yes", "source_goal_ids": ["goal:1"]}],
+        goal_outcomes=[{"goal_id": "goal:1", "disposition": "execute", "coverage": "complete", "step_ids": ["nod"]}])
+    work = CognitiveWorkRequest(sid="sid", text="Nod once", context=copy.deepcopy(original), history=original["history"],
+        responsibilities=[{"local_ref": "r1", "outcome": "Nod once", "output_mode": "body_action", "confidence": 1.0}])
+    pending = coordinator.start_state_interaction(None, work_request=work, turn_id="turn", plan=plan)
+    try:
+        await asyncio.sleep(0)
+        assert not requests and not refreshes
+        # The authoritative owners advance while the previous same-turn speech holds SC.
+        live["active_goal_snapshots"] = [{"goal_id": "goal:1", "work_status": "executing" if state == "committed" else state}]
+        live["active_task_snapshots"] = [] if state != "committed" else [{"task_id": "task:1", "status": "executing"}]
+        live["recent_goal_snapshots"] = [{"goal_id": "goal:1", "work_status": state}]
+        live["history"] += [{"sid": "sid", "role": "user", "text": "Nod once"},
+                            {"sid": "later", "role": "user", "text": "Future turn"}]
+        ledger.append(session_id="sid", owner="trusted_capability_runtime" if state == "committed" else "execution_closure", domain="activity",
+            event_type="activity_" + state, state=state, subject_id="nod", event_id="event:" + state,
+            turn_id="turn", interaction_id="work", goal_ids=["goal:1"], canonical_plan_id="plan", capability_id="soridormi.nod_yes",
+            evidence_refs=["execution:" + state] if state != "committed" else [])
+        prior_speech.set()
+        await asyncio.wait_for(pending, 1)
+        assert len(requests) == 1
+        packet = requests[0]
+        assert packet.context["active_goal_snapshots"] == live["active_goal_snapshots"]
+        assert packet.context["active_task_snapshots"] == live["active_task_snapshots"]
+        assert packet.context["recent_goal_snapshots"] == live["recent_goal_snapshots"]
+        assert packet.context["interaction_context"]["activity"][-1]["state"] == state
+        assert "runtime_admission" not in packet.context
+        assert packet.context["history"] == original["history"]
+        assert packet.responsibilities == work.responsibilities
+        assert packet.source_refs == [plan.plan_id] and packet.goal_ids == plan.goal_ids
+        assert packet.context["canonical_plan_resolution"] == plan.prompt_projection()
+        assert expression_contexts == [packet.context]
+        assert refreshes == ["sid"]
+        assert work.context == original
+    finally:
+        prior_speech.set()
+        coordinator._social_dispatches.pop("previous", None)
+        await coordinator.cancel_social_interaction()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["same_work", "cancelled_work", "other_work", "interpretation"])
 async def test_pending_state_social_result_rechecks_actual_work(change):
     from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime, MockCapabilityProvider

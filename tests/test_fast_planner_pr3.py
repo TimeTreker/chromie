@@ -5896,7 +5896,9 @@ class FastPlannerResolverTests(unittest.TestCase):
                         source_token_refs=[item["ref"] for item in user_turn_source_tokens(run_request.text)],
                     )
                     validator = Draft202012Validator(schema)
-                    raw = output.model_dump(mode="json", exclude={"metadata"})
+                    # Check the authored wire packet; an omitted purpose is not an
+                    # explicit achieve_effect claim from the model.
+                    raw = output.model_dump(mode="json", exclude_unset=True, exclude={"metadata"})
                     self.assertTrue(validator.is_valid(raw))
                     forged = copy.deepcopy(raw)
                     forged["activities"][0]["argument_sources"] = {

@@ -90,6 +90,60 @@ def _wire_output(payload):
     return json.dumps(payload, ensure_ascii=False)
 
 
+@pytest.mark.parametrize("with_lookup", [False, True])
+@pytest.mark.parametrize("source_kind", ["unresolved_meaning", "execution_input"])
+@pytest.mark.parametrize("sources", [
+    [], ["safe_default"], ["capability_schema"], ["authoritative_context"],
+    ["authoritative_context", "safe_default"],
+    ["authoritative_context", "capability_schema"],
+    ["authoritative_context", "capability_schema", "trusted_observation", "trusted_query", "owner_preference", "safe_default"],
+])
+def test_native_clarification_requires_owned_resolution_sources(source_kind, sources, with_lookup):
+    from agent.app.clients.sglang_protocol import build_sglang_chat_payload
+    from agent.app.planner_schema import capability_lookup_response_schema
+    from types import SimpleNamespace
+    from agent.app.inference_compute import CognitionComputeClass
+    from shared.chromie_contracts.core_interpretation import UserMeaningUncertainty
+    from shared.chromie_contracts.plan import PlannerInformationGap
+
+    responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome="Get weather for the requested place",
+        output_mode="information", confidence=0.9)
+    uncertainty = UserMeaningUncertainty(local_ref="u1", kind="referent", description="Which place", responsibility_refs=["r1"])
+    capability = {"capability_id": "test.weather", "input_schema": {"type": "object",
+        "properties": {"location": {"type": "string"}}, "required": ["location"]}}
+    schema = fast_streaming_advance_response_schema(["r1"], responsibilities=[responsibility], capabilities=[capability],
+        meaning_uncertainties=[uncertainty] if source_kind == "unresolved_meaning" else [])
+    if with_lookup:
+        schema = capability_lookup_response_schema(schema, [SimpleNamespace(capability_id="test.indexed")])
+    gap = {"gap_id": "place", "description": "Which place", "required_for": ["location"],
+        "preferred_resolution": "ask_user", "source_kind": source_kind,
+        "source_reference": "Which place" if source_kind == "unresolved_meaning" else "test.weather",
+        "resolution_sources_considered": sources}
+    raw = {"disposition": "clarify", "coverage": "partial", "covered_responsibility_refs": ["r1"],
+        "activities": [{"role": "clarification", "activity_id": "ask", "source_responsibility_refs": ["r1"],
+                        "information_gaps": [gap]}],
+        "continuations": [], "confidence": 0.9, "unresolved": ["Which place"], "reason_summary": "Missing place."}
+    try:
+        PlannerInformationGap.model_validate(gap)
+        expected = True
+    except ValueError:
+        expected = False
+    wire = build_sglang_chat_payload(model="fixed", messages=[], compute_class=CognitionComputeClass.REALTIME,
+        options={}, response_format=schema, stream=True, priority_step=100)["response_format"]["json_schema"]["schema"]
+    for contract in (schema, wire):
+        assert Draft202012Validator(contract).is_valid(raw) == expected
+    if expected and "capability_schema" in sources:
+        # Source order is not semantic. The native decoder may choose an order,
+        # but canonical validation must continue accepting existing valid DTOs.
+        gap["resolution_sources_considered"] = list(reversed(sources))
+        PlannerInformationGap.model_validate(gap)
+        assert Draft202012Validator(schema).is_valid(raw)
+        assert not Draft202012Validator(wire).is_valid(raw)
+    if with_lookup:
+        assert Draft202012Validator(wire).is_valid({"requested_capability_ids": ["test.indexed"]})
+        assert not Draft202012Validator(wire).is_valid({"requested_capability_ids": ["unknown"]})
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize('gap', ['actor', 'destination_location', '目标对象尚未确定'])
 @pytest.mark.parametrize('preserve_gap', [False, True])
@@ -570,3 +624,51 @@ def test_planner_authority_forbids_confirmation_only_complete_response_for_work(
         request, responsibilities=request.responsibilities, capabilities=[]
     ).render()
     assert "Never add complete_response just to acknowledge" in prompt
+
+
+@pytest.mark.parametrize("resource_contract,location", [
+    ({}, "hints"),
+    ({"provider_role": "acquire_information"}, "hints"),
+    ({"provider_role": "acquire_information"}, "metadata"),
+    ({"plan_provides": ["resource_acquired"], "final_delivery_owner": "planner_communicative_activity"}, "hints"),
+    ({"plan_provides": ["resource_acquired", "resource_delivered"]}, "hints"),
+])
+@pytest.mark.parametrize("purpose", [None, "achieve_effect", "acquire_information"])
+def test_fast_decoder_purpose_matches_provider_normalization(resource_contract, location, purpose):
+    from agent.app.planner_fast_validation import normalize_fast_capability_activity_purpose
+
+    definition = {"capability_id": "test.provider", "input_schema": {"type": "object", "properties": {}},
+                  location: {"resource_contract": resource_contract}}
+    responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome="Complete the requested work",
+                                                       output_mode="body_action", confidence=1.0)
+    raw = {"activities": [{"role": "capability", "capability_id": "test.provider", "activity_id": "step",
+                           "args": {}, "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+           "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+           "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Realize the owned effect."}
+    if purpose is not None:
+        raw["activities"][0]["step_purpose"] = purpose
+    output = FastPlannerAdvanceModelOutput.model_validate(raw)
+    try:
+        normalize_fast_capability_activity_purpose(output, capabilities=[definition])
+        expected = True
+    except PlannerDTOContractError:
+        expected = False
+    schema = fast_streaming_advance_response_schema(["r1"], responsibilities=[responsibility], capabilities=[definition])
+    assert Draft202012Validator(schema).is_valid(raw) == expected
+
+
+@pytest.mark.parametrize("start,end", [(0, 0), (0, 10), (9, 10), (10, 10), (10, 9), (10, 0), (0, 11)])
+def test_fast_decoder_source_span_matches_immutable_token_order(start, end):
+    from agent.app.planner_schema import _fast_source_span_contract
+    from shared.chromie_contracts.user_turn import UserTurnSourceSpan, resolve_user_turn_source_span, user_turn_source_tokens
+
+    source = "walk ahead slowly then stop and look at the blue door"
+    tokens = user_turn_source_tokens(source)
+    span = UserTurnSourceSpan(source_start_token_ref=f"t{start}", source_end_token_ref=f"t{end}")
+    try:
+        resolve_user_turn_source_span(source, span)
+        expected = True
+    except ValueError:
+        expected = False
+    contract = _fast_source_span_contract([token["ref"] for token in tokens])
+    assert Draft202012Validator(contract).is_valid(span.model_dump()) == expected

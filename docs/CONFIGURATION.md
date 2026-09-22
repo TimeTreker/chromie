@@ -1097,6 +1097,16 @@ because of retained Schema/Host and semantic failures. See the current checkpoin
 raw evidence; provider timing is not physical voice or complete interaction evidence.
 
 Build the pinned image with `docker build -t chromie-sglang:gemma4-fp8 llm/sglang`.
+The pinned image also bounds XGrammar's retained compiler cache to 512 MiB and
+removes the backend's second unbounded strong-reference cache. Dynamic per-turn schemas
+previously accumulated until the scheduler exhausted host RAM. In-flight requests retain
+their grammars, so this is a retained-cache budget, not a hard cap on total process or
+peak compilation memory. The same bound applies to both maintained SGLang profiles;
+model weights, context/KV budgets and request concurrency remain profile-owned. The
+image build exercises the real backend with distinct valid/invalid grammars. Remove
+this patch when a reviewed upstream image enforces both cache ownership bounds; no
+new environment variable or runtime behavior mode is introduced.
+
 Its Dockerfile fixes a reproduced missing `lm_head_is_tied` initialization in the
 unified Gemma constructor, preserving the existing GPU branch predicate. Remove the
 repair when a reviewed upstream image implements that constructor contract.

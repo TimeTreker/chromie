@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover
 
 from .prompt_projection import bounded_json
 from .planner_validation import _capability_acquires_information
+from .planner_fast_validation import fast_capability_acquires_information
 from .planner_grounding import (
     _argument_realization_contract,
     _argument_schema_accepts_canonical_binding,
@@ -2615,15 +2616,32 @@ def _fast_source_span_contract(
         if source_token_refs
         else {"type": "string", "minLength": 1, "maxLength": 24}
     )
-    return {
-        "type": "object",
-        "properties": {
-            "source_start_token_ref": copy.deepcopy(token_ref),
-            "source_end_token_ref": copy.deepcopy(token_ref),
-        },
-        "required": ["source_start_token_ref", "source_end_token_ref"],
-        "additionalProperties": False,
-    }
+    def span(starts: dict[str, Any], ends: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "source_start_token_ref": starts,
+                "source_end_token_ref": ends,
+            },
+            "required": ["source_start_token_ref", "source_end_token_ref"],
+            "additionalProperties": False,
+        }
+
+    if not source_token_refs:
+        return span(copy.deepcopy(token_ref), copy.deepcopy(token_ref))
+
+    def ordered(refs: list[str]) -> list[dict[str, Any]]:
+        if len(refs) == 1:
+            return [span({"enum": refs, "type": "string"}, {"enum": refs, "type": "string"})]
+        middle = len(refs) // 2
+        left, right = refs[:middle], refs[middle:]
+        # Every forward span is within one half or crosses left to right.
+        # Disjoint branches preserve all spans without a quadratic pair table.
+        return [span({"enum": left, "type": "string"}, {"enum": right, "type": "string"}),
+                *ordered(left), *ordered(right)]
+
+    return {"oneOf": ordered(list(source_token_refs))}
+
 
 def fast_advance_response_schema(
     responsibility_refs: list[str],
@@ -2838,6 +2856,23 @@ def fast_advance_response_schema(
                             variant["properties"].update(constraint["properties"])
                             native_gaps.append(variant)
                         information_gap_contract["oneOf"] = native_gaps
+            # Expose PlannerInformationGap's existing membership invariants.
+            # Source order remains irrelevant to the canonical contract.
+            source_variants = []
+            for gap in information_gap_contract.pop("oneOf", []) or [copy.deepcopy(information_gap_contract)]:
+                kind_schema = gap["properties"]["source_kind"]
+                kinds = [kind_schema["const"]] if "const" in kind_schema else kind_schema["enum"]
+                for kind in kinds:
+                    variant = copy.deepcopy(gap)
+                    variant["properties"]["source_kind"] = {"type": "string", "const": kind}
+                    required_sources = ["authoritative_context"]
+                    if kind == "execution_input":
+                        required_sources.append("capability_schema")
+                    sources = variant["properties"]["resolution_sources_considered"]
+                    sources["allOf"] = [{"contains": {"type": "string", "const": name}} for name in required_sources]
+                    sources["minItems"] = len(required_sources)
+                    source_variants.append(variant)
+            information_gap_contract["oneOf"] = source_variants
     clarification_contract = definitions.get("FastPlannerInputNeed")
     if isinstance(clarification_contract, dict):
         gaps = clarification_contract.get("properties", {}).get("information_gaps")
@@ -2930,6 +2965,12 @@ def fast_advance_response_schema(
                     "enum": [capability_id_value],
                 }
                 branch_properties["args"] = _ordered_capability_arguments(input_schema)
+                # This purpose is fixed by the provider, not by Goal terminality.
+                branch_properties["step_purpose"] = {
+                    "type": "string", "enum": [
+                        "acquire_information" if fast_capability_acquires_information(capability) else "achieve_effect"
+                    ],
+                }
                 hints = capability.get("hints")
                 derivation_targets: set[str] = set()
                 if isinstance(hints, dict):
@@ -3318,7 +3359,10 @@ def capability_lookup_response_schema(schema: dict[str, Any], entries: list[Any]
     # Put lookup first. Native constrained decoders may commit to a oneOf branch from
     # the first emitted member; plan-first ordering previously trapped semantically
     # correct indexed-ability reasoning inside the loaded-capability enum.
-    return {"$defs": definitions, "oneOf": [lookup, plan]}
+    # Keep provider decoder selection attached to this same semantic result
+    # when adding the read-only lookup alternative.
+    return {**({"title": schema["title"]} if "title" in schema else {}),
+            "$defs": definitions, "oneOf": [lookup, plan]}
 
 
 

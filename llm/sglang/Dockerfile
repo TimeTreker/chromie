@@ -86,3 +86,53 @@ if source.count(marker) != 1 or source.count(before) != 1:
 source = source.replace(marker, '\n' + helper + marker).replace(before, after)
 path.write_text(source)
 PY
+
+# Dynamic turn/Goal schemas must not accumulate for the lifetime of the server.
+# The compiler owns bounded reusable grammars; a second strong-reference cache
+# would retain evicted grammars indefinitely. Active requests keep their own refs.
+# Remove when the pinned upstream exposes and enforces this two-layer bound.
+RUN python3 - <<'PY'
+from pathlib import Path
+
+path = Path('/sgl-workspace/sglang/python/sglang/srt/constrained/xgrammar_backend.py')
+source = path.read_text()
+before = '        self.grammar_compiler = GrammarCompiler(tokenizer_info=tokenizer_info)\n'
+after = '''        self.grammar_compiler = GrammarCompiler(
+            tokenizer_info=tokenizer_info, cache_limit_bytes=512 * 1024 * 1024
+        )
+'''
+marker = '    def dispatch_json(self, key_string: str) -> BaseGrammarObject:\n'
+method = '''    def set_cache(self, key, value):
+        # GrammarCompiler reuses compiled grammars within its byte budget.
+        # BaseGrammarBackend.cache must not keep a second unbounded owner.
+        return None
+
+'''
+if source.count(before) != 1 or source.count(marker) != 1:
+    raise RuntimeError('Pinned grammar cache ownership changed; review memory bounds before building')
+path.write_text(source.replace(before, after).replace(marker, method + marker))
+
+# Exercise the actual patched backend, not a duplicate cache implementation.
+import json
+from xgrammar import TokenizerInfo
+from sglang.srt.constrained.xgrammar_backend import XGrammarGrammarBackend
+
+class Tokenizer:
+    def init_xgrammar(self):
+        return TokenizerInfo([bytes([i]) for i in range(256)], stop_token_ids=[255]), None
+
+backend = XGrammarGrammarBackend(Tokenizer(), 256)
+if backend.grammar_compiler.cache_limit_bytes != 512 * 1024 * 1024:
+    raise RuntimeError('Compiler cache budget was not applied')
+for i in range(64):
+    key = json.dumps({'type': 'string', 'enum': [f'value-{i}']})
+    grammar = backend.dispatch_json(key)
+    if not grammar.matcher.accept_string(json.dumps(f'value-{i}')):
+        raise RuntimeError('Bounded grammar rejected its declared value')
+    if backend.dispatch_json(key).matcher.accept_string(json.dumps('unlisted')):
+        raise RuntimeError('Bounded grammar accepted an undeclared value')
+    backend.set_cache(('json', key), grammar)
+if backend.cache:
+    raise RuntimeError('Backend retained a second unbounded grammar cache')
+backend.executor.shutdown(wait=True)
+PY

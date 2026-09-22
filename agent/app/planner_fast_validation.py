@@ -88,6 +88,29 @@ class FastAdvanceMechanicalSchedulingError(PlannerDTOContractError):
     """A timing label is mechanically unusable without changing its meaning."""
 
 
+def fast_capability_acquires_information(definition: dict[str, Any]) -> bool:
+    """Read the provider-owned purpose shared by Fast decoding and admission."""
+    hints = definition.get("hints") if isinstance(definition, dict) else {}
+    metadata = definition.get("metadata") if isinstance(definition, dict) else {}
+    hints = hints if isinstance(hints, dict) else {}
+    metadata = metadata if isinstance(metadata, dict) else {}
+    resource_contract = hints.get("resource_contract")
+    if not isinstance(resource_contract, dict) or not resource_contract:
+        resource_contract = metadata.get("resource_contract")
+    resource_contract = resource_contract if isinstance(resource_contract, dict) else {}
+    provider_role = " ".join(str(resource_contract.get("provider_role") or "").strip().split())
+    final_owner = " ".join(str(resource_contract.get("final_delivery_owner") or "").strip().split())
+    plan_provides = {
+        " ".join(str(value or "").strip().split())
+        for value in resource_contract.get("plan_provides") or []
+        if " ".join(str(value or "").strip().split())
+    }
+    return (
+        provider_role == "acquire_information"
+        or ("resource_acquired" in plan_provides and final_owner == "planner_communicative_activity")
+    )
+
+
 def normalize_fast_capability_activity_purpose(
     output: FastPlannerAdvanceModelOutput,
     *,
@@ -114,25 +137,7 @@ def normalize_fast_capability_activity_purpose(
             activities.append(activity)
             continue
         definition = by_id.get(activity.capability_id) or {}
-        hints = definition.get("hints") if isinstance(definition, dict) else {}
-        metadata = definition.get("metadata") if isinstance(definition, dict) else {}
-        hints = hints if isinstance(hints, dict) else {}
-        metadata = metadata if isinstance(metadata, dict) else {}
-        resource_contract = hints.get("resource_contract")
-        if not isinstance(resource_contract, dict) or not resource_contract:
-            resource_contract = metadata.get("resource_contract")
-        resource_contract = resource_contract if isinstance(resource_contract, dict) else {}
-        provider_role = " ".join(str(resource_contract.get("provider_role") or "").strip().split())
-        final_owner = " ".join(str(resource_contract.get("final_delivery_owner") or "").strip().split())
-        plan_provides = {
-            " ".join(str(value or "").strip().split())
-            for value in resource_contract.get("plan_provides") or []
-            if " ".join(str(value or "").strip().split())
-        }
-        declared_acquisition = (
-            provider_role == "acquire_information"
-            or ("resource_acquired" in plan_provides and final_owner == "planner_communicative_activity")
-        )
+        declared_acquisition = fast_capability_acquires_information(definition)
         explicitly_authored = "step_purpose" in activity.model_fields_set
         if declared_acquisition:
             if explicitly_authored and activity.step_purpose != "acquire_information":
