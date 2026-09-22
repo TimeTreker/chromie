@@ -40,16 +40,19 @@
           }
         },
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_work_topology_and_coordination_14_supported_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Look at the user for two seconds in parallel with blinking.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_work_topology_and_coordination_14_supported_en-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Look at the user for two seconds in parallel with blinking.",
+              "source_text": "During our drawing game, look at me for two seconds while blinking twice.",
               "object": {
                 "bindings": {
                   "duration": {
@@ -66,26 +69,26 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "During our drawing game, look at me for two seconds while blinking twice.",
+              "constraints": {},
               "success_criteria": [
                 "Look at the user for two seconds in parallel with blinking."
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
-            },
-            {
-              "constraints": {},
-              "description": "Blink twice in parallel with looking at the user.",
-              "goal_id": "goal-fpdl_v2_work_topology_and_coordination_14_supported_en-2",
               "metadata": {
                 "output_mode": "body_action"
-              },
+              }
+            },
+            {
+              "schema_version": 1,
+              "goal_id": "goal-fpdl_v2_work_topology_and_coordination_14_supported_en-2",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Blink twice in parallel with looking at the user.",
+              "source_text": "During our drawing game, look at me for two seconds while blinking twice.",
               "object": {
                 "bindings": {
                   "count": {
@@ -96,26 +99,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "During our drawing game, look at me for two seconds while blinking twice.",
+              "constraints": {},
               "success_criteria": [
                 "Blink twice in parallel with looking at the user."
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_work_topology_and_coordination_14_supported_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "9e81681ced0a5f3d12783455c867dfdd1368f74ce553c99b72314ba4a63a3858",

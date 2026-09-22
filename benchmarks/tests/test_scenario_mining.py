@@ -37,7 +37,7 @@ def _candidate(text: str = "Walk forward, not a social gesture.") -> dict:
             "auto_promotion_allowed": False,
         },
         "id": "candidate_walk_not_social",
-        "suite": "goal_interpretation",
+        "suite": "user_meaning_interpretation",
         "level": "module",
         "description": "Mined regression candidate.",
         "tags": ["candidate", "experience-mined", "wrong_action_class"],
@@ -75,7 +75,7 @@ def _candidate(text: str = "Walk forward, not a social gesture.") -> dict:
         "expect": {
             "confidence": 0.95,
             "llm_calls": 1,
-            "llm_stages": ["goal_interpretation"],
+            "llm_stages": ["user_meaning_interpretation"],
             "unresolved": [],
             "responsibilities": [
                 {

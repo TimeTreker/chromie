@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_work_topology_and_coordination_15_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "向前走五秒，并与另一个行走动作并行。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_work_topology_and_coordination_15_boundary_zh-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "向前走五秒，并与另一个行走动作并行。",
+              "source_text": "在在共享房间里不打扰别人时，请同时向前走五秒和向前走八秒。",
               "object": {
                 "bindings": {
                   "duration": {
@@ -49,26 +52,26 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "在在共享房间里不打扰别人时，请同时向前走五秒和向前走八秒。",
+              "constraints": {},
               "success_criteria": [
                 "向前走五秒，并与另一个行走动作并行。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
-            },
-            {
-              "constraints": {},
-              "description": "向前走八秒，并与另一个行走动作并行。",
-              "goal_id": "goal-fpdl_v2_work_topology_and_coordination_15_boundary_zh-2",
               "metadata": {
                 "output_mode": "body_action"
-              },
+              }
+            },
+            {
+              "schema_version": 1,
+              "goal_id": "goal-fpdl_v2_work_topology_and_coordination_15_boundary_zh-2",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "向前走八秒，并与另一个行走动作并行。",
+              "source_text": "在在共享房间里不打扰别人时，请同时向前走五秒和向前走八秒。",
               "object": {
                 "bindings": {
                   "duration": {
@@ -79,26 +82,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "在在共享房间里不打扰别人时，请同时向前走五秒和向前走八秒。",
+              "constraints": {},
               "success_criteria": [
                 "向前走八秒，并与另一个行走动作并行。"
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_work_topology_and_coordination_15_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "89f5ee3abd8f50b01bc93f3fcd8e67ae23342ca63a1ca6ecc3acd851195eb0a9",

@@ -34,37 +34,40 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "说一句鼓励的话。",
-              "goal_id": "goal-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_boundary_zh-1",
-              "metadata": {
-                "output_mode": "speech"
-              },
-              "object": {},
-              "related_goal_ids": [],
-              "responsibility_status": "open",
               "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
+              "goal_id": "goal-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_boundary_zh-1",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "说一句鼓励的话。",
               "source_text": "为了今天的学习安排，请对我说一句鼓励的话、眨眼两次并向前走五秒；除非三件事都能做到，否则一件也不要做。",
+              "object": {},
+              "constraints": {},
               "success_criteria": [
                 "说一句鼓励的话。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "speech"
+              }
             },
             {
-              "constraints": {},
-              "description": "正好眨眼两次。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_boundary_zh-2",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "正好眨眼两次。",
+              "source_text": "为了今天的学习安排，请对我说一句鼓励的话、眨眼两次并向前走五秒；除非三件事都能做到，否则一件也不要做。",
               "object": {
                 "bindings": {
                   "count": {
@@ -75,26 +78,26 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "为了今天的学习安排，请对我说一句鼓励的话、眨眼两次并向前走五秒；除非三件事都能做到，否则一件也不要做。",
+              "constraints": {},
               "success_criteria": [
                 "正好眨眼两次。"
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
-            },
-            {
-              "constraints": {},
-              "description": "向前走五秒。",
-              "goal_id": "goal-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_boundary_zh-3",
               "metadata": {
                 "output_mode": "body_action"
-              },
+              }
+            },
+            {
+              "schema_version": 1,
+              "goal_id": "goal-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_boundary_zh-3",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "向前走五秒。",
+              "source_text": "为了今天的学习安排，请对我说一句鼓励的话、眨眼两次并向前走五秒；除非三件事都能做到，否则一件也不要做。",
               "object": {
                 "bindings": {
                   "duration": {
@@ -105,26 +108,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r3"
-              ],
-              "source_text": "为了今天的学习安排，请对我说一句鼓励的话、眨眼两次并向前走五秒；除非三件事都能做到，否则一件也不要做。",
+              "constraints": {},
               "success_criteria": [
                 "向前走五秒。"
               ],
+              "source_responsibility_refs": [
+                "r3"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         }
       },
       "history": [],

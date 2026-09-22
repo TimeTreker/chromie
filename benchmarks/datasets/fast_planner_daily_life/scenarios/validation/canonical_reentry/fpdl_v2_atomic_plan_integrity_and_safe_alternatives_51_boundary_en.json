@@ -34,16 +34,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_boundary_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Walk forward for five seconds as one atomic member.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_boundary_en-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Walk forward for five seconds as one atomic member.",
+              "source_text": "For planning dinner, walk forward five seconds and create an 8:00 p.m. reminder; do both or neither.",
               "object": {
                 "bindings": {
                   "duration": {
@@ -54,26 +57,26 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "For planning dinner, walk forward five seconds and create an 8:00 p.m. reminder; do both or neither.",
+              "constraints": {},
               "success_criteria": [
                 "Walk forward for five seconds as one atomic member."
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             },
             {
-              "constraints": {},
-              "description": "Create an 8:00 p.m. reminder as the other atomic member.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_boundary_en-2",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Create an 8:00 p.m. reminder as the other atomic member.",
+              "source_text": "For planning dinner, walk forward five seconds and create an 8:00 p.m. reminder; do both or neither.",
               "object": {
                 "bindings": {
                   "due_at": {
@@ -90,26 +93,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "For planning dinner, walk forward five seconds and create an 8:00 p.m. reminder; do both or neither.",
+              "constraints": {},
               "success_criteria": [
                 "Create an 8:00 p.m. reminder as the other atomic member."
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_boundary_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "9392a5e1b8456b59cf313934d09ac0762fcc8b4d6fa70e6ff43988b35c3ab6b2",

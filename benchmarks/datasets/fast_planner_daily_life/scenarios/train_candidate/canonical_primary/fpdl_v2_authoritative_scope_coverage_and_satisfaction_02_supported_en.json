@@ -29,37 +29,40 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_supported_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Give one encouraging sentence.",
-              "goal_id": "goal-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_supported_en-1",
-              "metadata": {
-                "output_mode": "speech"
-              },
-              "object": {},
-              "related_goal_ids": [],
-              "responsibility_status": "open",
               "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
+              "goal_id": "goal-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_supported_en-1",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Give one encouraging sentence.",
               "source_text": "For today's study session, tell me one encouraging sentence and blink twice.",
+              "object": {},
+              "constraints": {},
               "success_criteria": [
                 "Give one encouraging sentence."
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "speech"
+              }
             },
             {
-              "constraints": {},
-              "description": "Blink exactly twice.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_supported_en-2",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Blink exactly twice.",
+              "source_text": "For today's study session, tell me one encouraging sentence and blink twice.",
               "object": {
                 "bindings": {
                   "count": {
@@ -70,26 +73,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "For today's study session, tell me one encouraging sentence and blink twice.",
+              "constraints": {},
               "success_criteria": [
                 "Blink exactly twice."
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_authoritative_scope_coverage_and_satisfaction_02_supported_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         }
       },
       "history": [],

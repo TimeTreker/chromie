@@ -91,7 +91,6 @@
       },
       "history": [],
       "interpretation_confidence": 1.0,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -109,7 +108,8 @@
       ],
       "schema_version": 1,
       "sid": "ga_daily_v1_09_00_pause_running",
-      "text": "Pause that running goal for now."
+      "text": "Pause that running goal for now.",
+      "meaning_uncertainties": []
     }
   },
   "invariants": {
@@ -150,7 +150,24 @@
       "new_goals": [],
       "reason_summary": "Map every accepted GI Responsibility exactly once.",
       "referent_updates": [],
-      "resolved_references": []
+      "resolved_references": [],
+      "cognitive_requests": [
+        {
+          "authority": "social_cognition",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Decide interaction using the established canonical continuity facts."
+        },
+        {
+          "authority": "planner",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
+        }
+      ],
+      "non_goal_responsibility_refs": []
     },
     "schema_expectation": "accept",
     "semantic_expectations": {

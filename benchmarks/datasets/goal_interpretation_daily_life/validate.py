@@ -17,11 +17,11 @@ ROOT = Path(__file__).resolve().parents[3]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from agent.app.cognitive_core.goal_interpreter.model_interpreter import (  # noqa: E402
-    OllamaGoalInterpreter,
+from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import (  # noqa: E402
+    OllamaUserMeaningInterpreter,
 )
-from agent.app.cognitive_core.goal_interpreter.schema import (  # noqa: E402
-    GoalInterpretationRequest,
+from agent.app.cognitive_core.user_meaning_interpreter.schema import (  # noqa: E402
+    UserMeaningInterpretationRequest,
 )
 
 
@@ -143,7 +143,7 @@ def _validate_case_shape(path: Path, case: dict[str, Any]) -> None:
     responsibilities = wire["responsibilities"]
     if semantic["responsibility_count"] != len(responsibilities):
         raise ValueError(f"{case_id}: responsibility count expectation drift")
-    if semantic["unresolved"] != bool(wire["unresolved"]):
+    if semantic["unresolved"] != bool(wire["meaning_uncertainties"]):
         raise ValueError(f"{case_id}: unresolved expectation drift")
     if len(semantic["responsibilities"]) != len(responsibilities):
         raise ValueError(f"{case_id}: semantic Responsibility list drift")
@@ -188,7 +188,7 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
     paths = scenario_paths(dataset_root)
     cases: list[dict[str, Any]] = []
     errors: list[str] = []
-    interpreter = OllamaGoalInterpreter(
+    interpreter = OllamaUserMeaningInterpreter(
         ollama_url="http://dataset-validator.invalid",
         model="dataset-validator",
         timeout_ms=1000,
@@ -204,7 +204,7 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
             if not isinstance(case, dict):
                 raise ValueError("scenario root must be an object")
             _validate_case_shape(path, case)
-            request = GoalInterpretationRequest(
+            request = UserMeaningInterpretationRequest(
                 text=case["input"]["text"],
                 language=case["input"]["language"],
                 context=case["input"]["context"],
@@ -221,7 +221,7 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
                 "host_validation_expectation", {"status": "accept"}
             )
             try:
-                OllamaGoalInterpreter._validate_interpretation_content(
+                OllamaUserMeaningInterpreter._validate_interpretation_content(
                     request, json.dumps(wire, ensure_ascii=False)
                 )
             except Exception as exc:
@@ -319,7 +319,7 @@ def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
     for case in cases:
         context_scenarios += bool(case["input"]["context"])
         wire = case["target"]["reference_wire_output"]
-        unresolved_scenarios += bool(wire["unresolved"])
+        unresolved_scenarios += bool(wire["meaning_uncertainties"])
         for responsibility, expectation in zip(wire["responsibilities"], case["target"]["semantic_expectations"]["responsibilities"], strict=True):
             binding_items = expectation["required_intent_details"]
             actual_dimensions.update(binding_items.keys())

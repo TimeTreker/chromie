@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Create a recurring weekday reminder, or propose the explicitly permitted one-time September 4, 2099 alternative.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_en-1",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Create a recurring weekday reminder, or propose the explicitly permitted one-time September 4, 2099 alternative.",
+              "source_text": "For what your robot body can really do, set that reminder every weekday forever; if recurring reminders are unavailable, offer one reminder for September 4, 2099 instead.",
               "object": {
                 "bindings": {
                   "due_at": {
@@ -61,26 +64,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "For what your robot body can really do, set that reminder every weekday forever; if recurring reminders are unavailable, offer one reminder for September 4, 2099 instead.",
+              "constraints": {},
               "success_criteria": [
                 "Create a recurring weekday reminder, or propose the explicitly permitted one-time September 4, 2099 alternative."
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "b5a16e3c665aede409f13c2e02d62b0ac99315d7244fea8dcd07fc974fa90d22",

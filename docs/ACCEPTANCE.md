@@ -15,6 +15,15 @@ and ASR; it does not clear the separately observed SC generation failure or the
 incomplete injected-text model/Runtime cohort. See the current
 [checkpoint](../DEVELOPMENT_CHECKPOINT.md) for those remaining failures.
 
+For live text/simulator acceptance, a primary `session_done` is not sufficient
+while the same Host still owns pending Social Cognition or auxiliary execution.
+The harness waits within the existing session deadline before snapshotting the
+result or closing service clients. A retained social-task exception becomes a
+structured `harness_failure` at `session_completion`, stopping the aggregate;
+it cannot disappear behind successful primary Work. This is an evidence-lifecycle
+check, not permission to delay physical Work, change cognition decisions, or
+promote the production session-completion policy as qualified.
+
 ## Scope of validation and semantic evidence
 
 For implementers, reviewers, and operators, this section owns the validation-claim

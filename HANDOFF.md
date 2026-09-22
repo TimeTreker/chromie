@@ -1,6 +1,131 @@
 # Chromie Handoff
 
-## Owner-requested immediate delivery — 2026-09-21 (current)
+## Resumed verification, full audit and live blockers — 2026-09-22 (current)
+
+Current base: `main` / `origin/main`
+`92edd5ba8cbf8f6c6b201e92ea59356ba65bf2de` before this delivery. The September 21
+no-more-tests instruction applied to that immediate delivery; the current owner request
+resumed verification and then authorized committing and pushing every current change.
+Expected resume revision: the latest `main` commit containing this handoff and
+`DEVELOPMENT_CHECKPOINT.md`. See the checkpoint for stable scope and four-axis status.
+#24/#32 remain open.
+
+### Repair workflow and evidence boundaries
+
+| Owner / actual ordered boundary | Authoritative input → observed output | Expected output / verdict and repair |
+| --- | --- | --- |
+| Benchmark manifest → inventory | Retired `scenarios/goal_interpretation` directory → missing-directory gate failure | Point to current UMI directory; retained legacy classification stays intact. Inventory parity remains 349 / 348 normalized. |
+| UMI validation harness → current role | Import of deleted `goal_interpreter` → benchmark collection failure | Import current `user_meaning_interpreter` and typed request; strict validation retained. |
+| Frozen UMI/GA/Fast reference authorship → Schema/DTO/Host | Retired uncertainties/activation shape and omitted projection defaults → contract rejections | Explicitly migrate 1,496 UMI, 1,500 GA and 152 Fast packets, refreeze manifest digests; no validation-time reference repair. Inputs/targets preservation audit retained. |
+| GA terminal-history oracle → Host | 100 historical restatements associate new work to terminal Goals → canonical rejection | Author new Goals related to historical Goals. This is a substantive oracle correction, not a runtime change; owner review pending. All 200 intentional typed-state Host rejects preserved. |
+| Primary completion → live harness → HTTP shutdown | Case `72966f09`: primary `session_done` while `social-interpretation:72966f09` still pending → `ok=true`, then `ServerDisconnectedError` after client closure | Acceptance now waits for retained social work and surfaces exceptions as `harness_failure/session_completion`; 146 focused tests and final full gate pass. Production `session_done`/workflow finalization remains a separately observed gap. |
+| Production Work completion → session lifecycle → SC/TTS | Case `f837523a`: `session_done` at 01:18:12.595 with zero TTS; SC completes at 01:18:16.417 and three utterances play afterward | Confirmed Host lifecycle defect. Join same-turn SC/delivery accounting before terminal workflow finalization without gating safe Work on optional communication. |
+| Canonical primary Work → independent SC auxiliary admission | Primary Plan already contains `blink_eyes(count=2)`; SC authors three blink proposals as task fulfillment; the independent SC response presents an empty primary capability set to duplicate validation | Confirmed Schema/Host-view defect. Validate optional expression against immutable canonical primary Work and suppress duplicate-primary behavior. |
+| UMI cognitive activation → SC fresh-interaction duty | All three live UMI results request Planner only; later work-state SC either stays silent or narrates Work. The migrated 1,496 UMI references all request SC | Mixed prompt/context/qualification gap. Freeze contrasts and adjudicate the authoritative activation criterion; do not add fixed Host routing. |
+| Shared Plan/maintained prose → `SPEECH-OWNER-001` | Active Planner model DTO is word-free, but `CanonicalPlan` and multiple maintained documents still accept or describe Planner-authored exact speech | Migration debt and competing authority surface. Remove or migrate under the existing Social Cognition amendment rather than treating it as compatibility precedent. |
+| Acceptance task retention → concurrent sessions | `_social_turns` is session-filtered, while the entire `_auxiliary_execution_tasks` set participates in one case's completion wait | Current serial evidence retained; overlapping-session evidence is unqualified until task ownership is scoped and tested. |
+
+The repository's offline validation now passes, including strict 6,000-case replay
+(manifest `cd2bc92d3111b9fef923de6f19e36e3dc09f907242ea24e4afb531b57e93f694`;
+1,400 pass, 1,800 expected states, 2,500 expected rejections, 300 expected
+nonexecuting rejections). The canonical gate was rerun after incorporating the audit.
+Final results: 145 benchmark tests, 3,658 main tests / 1,015 subtests, 20 legacy
+tests; policies/ownership/pinned ruff+mypy/config/docs
+passed. Level A: 45/45 across 15 classes. Frozen reference review, native semantic
+qualification, training promotion and physical evidence are separate and remain open.
+The complete audit, severity ordering, episode boundary judgments and repair order are
+retained in the current `docs/STATUS.md` section; no standalone document was added.
+
+### Actual live episodes and remaining failures
+
+All runs used addressed text, discarded audio playback and headless MuJoCo. The path
+was Gateway admission → UMI `r1` → concurrent GA/Fast → canonical validation →
+sequential provider Work, with SC running asynchronously. No production source changed
+between any cases. Every attempted case was reviewed, including mechanical passes.
+
+| Episode / correlation | Owner and material input → actual output | Expected / boundary verdict |
+| --- | --- | --- |
+| Compound, initial `fe072d96`, rerun `630f4c86` | Gateway admits walk at 0.2 for 10s → nod twice → turn left. UMI preserves one complete Responsibility; GA creates one Goal. Fast primary output `act_003` selects `sidestep`, with rationale calling it a turn; both distinct Capability descriptions exist in the exact supplied index. | UMI/GA meaning continuity correct; Fast semantic selection incorrect. Expected `turn_in_place`. Why the complete transaction produced that error remains an audit/qualification task, not a proven prompt-only cause. |
+| Same compound, downstream | Canonical validator admits legal sidestep args; Runtime executes walk/nod/sidestep sequentially, then safe idle. SC selects silence because the task is physical and has no communication needs; TTS count is zero. | Runtime faithfully propagates an upstream semantic error; legal args do not prove intent. SC silence rationale is not valid communication-authority evidence. Earlier cognitive-request sufficiency remains unqualified. |
+| Gaze/blink, initial `72966f09` | UMI preserves “look for three seconds while blinking twice”; Fast authors sequential gaze then blink; Runtime does exactly that. Primary completion at 01:07:02.764 +08 precedes pending SC response; harness closes client and logs disconnect at 01:07:02.923. Provider records SC output at 01:07:05.944. | Temporal overlap unproved; no permission to bypass sequential physical Work. Initial mechanical pass is invalid evidence. SC raw output after closure is not accepted/delivered output. |
+| Focused `b3033b9d`, rerun `f837523a` | Repaired harness remains open after primary completion. Focused run delivers 2 TTS items; rerun delivers 3, including spoken stage directions. SC proposes auxiliary blinking as primary task fulfillment. Final status is safe idle. | Originating premature-close regression fixed. Semantic case still fails: temporal fidelity, duplicate/primary-task expression intent and late narration remain. Host workflow report was already finalized before SC; native calls and cohort log retain the missing late stage. |
+| Milk 50m, initial `e636366b`, rerun `6b116449` | UMI/GA preserve retrieve-and-deliver obligation. Fast marks walking as `acquire_information`, although provider has no acquisition contract; initial output also proposes 0.25 m/s × 20s for 50m. | Earliest observed incorrect output is Fast. `planner_fast_validation.py` correctly rejects `fast_stream_contract_invalid`; no effect dispatch, Deep Planner or SC in this case. Simulator remains safe idle. No weakened validator or semantic retry. |
+| Aggregate owner | Initial and repaired complete-discovery runs each stop at 3/75; 1 mechanical pass, 2 failures, 72 unrun. | Incomplete, zero qualified semantic passes. Exactly one bundle per run, including the focused run. No physical microphone/speaker/robot claim. |
+
+### Runtime and retained artifacts
+
+Evidence root: `.chromie/acceptance/resume-verification-20260922/` (ignored/private;
+transfer separately, review prompts/payloads before external sharing).
+
+- `strict-workflows/summary.json`, `strict-workflows-run.log`, `level-a/summary.json`.
+- `canonical.log`, `canonical-after-inventory.log`, `benchmarks-after-import.log`
+  retain initial failures. `canonical-final.log` is the passing pre-harness gate;
+  **`canonical-with-completion.log` is the final passing gate**.
+- `inventory-diagnosis.json`, `inventory-repair.patch`,
+  `umi-ga-references-before.tar.gz`, `migrate-reference-contracts.py`,
+  `reference-migration-ledger.json`, `reference-preservation-audit.json`,
+  `fast-projection-migration.json`. The authoring script is provenance, not a
+  validator; do not rerun it or use it to regenerate expected answers during tests.
+- `live/`, `live-focused-completion/`, `live-after-completion/` each retain command,
+  runtime identity, exact native calls, before/after source hashes, case review,
+  cohort output and one bundle receipt. Initial cohort source tree SHA is
+  `86fa39d4d44ac664d2f947b39d05c0ce3e22fe3c187da30e83611cb93f028d63`;
+  later documentation updates naturally change the full tree, not evaluated runtime.
+- Bundles: `/home/chromie/Downloads/chromie_debug_bundle_20260922_010716.tar.gz`
+  (initial), `chromie_debug_bundle_20260922_011708.tar.gz` (focused),
+  `chromie_debug_bundle_20260922_011833.tar.gz` (final aggregate), same directory.
+
+RTX 4090 Laptop, generated `rtx4090_laptop` profile, SGLang
+`chromie-qwen35-4b`, interactive budgets, no validation profile. Agent was rebuilt
+and recreated; packaged source equals Host digest
+`715814252afb63b2e3caf8c99da9d291fe26b667778e0d0ff708bb52bdcb2d82`.
+Final runtime identity is
+`10db7bcad4521442b2ac032d683319e2415f8bed3fca0a4fd10d79b1f445d49e`;
+its dirty-tree qualification is diagnostic-only, `release_qualified=false`.
+Paired Soridormi `/home/chromie/github/soridormi` revision
+`013f46d19ec5101c4392532ab848e0b0819c2a50`, branch `codex/turn-count`;
+pre-existing dirty `workspace/Open_Duck_Playground` submodule preserved. The
+headless launcher started for this session was stopped afterward; existing
+Chromie Agent/LLM/ASR/TTS services remain running.
+
+### Commands and next resume
+
+Use the local Python 3.12 environment (pinned test requirements installed this session).
+Do not edit `.env.runtime`, copy another machine's profile, reuse an immutable cohort
+directory, or rerun an authoring script to obtain a pass.
+
+```bash
+conda activate Chromie
+git fetch origin
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir .chromie/acceptance/resume-strict-workflows
+./scripts/run_tests.sh
+python scripts/check_docs.py
+python scripts/check_test_ownership.py
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
+```
+
+The actual local deployed commands were `CHROMIE_OPERATOR_MODE=voice_mujoco
+./scripts/compose.sh -f .chromie/voice-runtime/compose.voice-mujoco.yaml build
+chromie-agent`, then the same wrapper with `up -d --no-deps chromie-agent` after
+the gate; Soridormi used `./scripts/start_soridormi_mujoco.sh --no-viewer` from its
+own checkout. Agent verification and full runtime capture are separate commands:
+`--verify-agent-source` exits after verification and does not write an identity.
+Each retained `run-cohort.py` loads its explicitly prepared `orchestrator.env`,
+uses the exact saved identity, then collects one bundle after the run. The final
+command discovers all 75 cases without a stage/case filter; the focused directory
+alone uses `--only-case look_while_blinking_twice`.
+
+Next bounded work starts with the confirmed production lifecycle boundary: join
+same-turn SC/TTS accounting before session/workflow finalization, then give auxiliary
+admission the immutable canonical Work view. Freeze UMI activation and Fast semantic
+contrasts before changing prompts, Schemas or profiles. Retire competing Planner speech
+surfaces/prose, scope acceptance tasks per session, and complete owner review of the
+migrated references before promotion. Prove each selected repair with a focused scenario
+and ability class, then run canonical and complete live cohorts on one source/runtime
+identity. Physical Work stays sequential; no additional model reviewer, phrase router,
+fixed semantic router or second semantic repair call is authorized by this evidence.
+
+## Owner-requested immediate delivery — 2026-09-21 (historical)
 
 The owner explicitly requested **commit and push immediately without further tests**
 after asking to repair the 329 existing test failures. This section supersedes older

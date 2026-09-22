@@ -29,25 +29,31 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_resource_contract_composition_41_supported_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Acquire and deliver the requested Hangzhou weather information.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_resource_contract_composition_41_supported_en-1",
-              "metadata": {
-                "output_mode": "information"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Acquire and deliver the requested Hangzhou weather information.",
+              "source_text": "Get tomorrow morning's Hangzhou forecast for planning dinner and explain the result to me.",
               "object": {},
-              "related_goal_ids": [],
+              "constraints": {},
+              "success_criteria": [
+                "Acquire and deliver the requested Hangzhou weather information."
+              ],
               "resource_responsibility": {
-                "delivery_mode": "spoken_explanation",
-                "metadata": {},
-                "recipient": {
-                  "description": "requester"
-                },
+                "schema_version": 1,
+                "responsibility_type": "acquire_and_deliver_resource",
                 "resource": {
+                  "kind": "information",
+                  "description": "Acquire and deliver the requested Hangzhou weather information.",
+                  "quantity": "",
                   "attributes": {
                     "date": {
                       "confidence": 1.0,
@@ -73,38 +79,34 @@
                       "name": "period",
                       "value": "morning"
                     }
-                  },
-                  "description": "Acquire and deliver the requested Hangzhou weather information.",
-                  "kind": "information",
-                  "quantity": ""
+                  }
                 },
-                "responsibility_type": "acquire_and_deliver_resource",
-                "schema_version": 1,
                 "source": {
-                  "bindings": {},
+                  "status": "unknown",
                   "description": "",
-                  "status": "unknown"
-                }
+                  "bindings": {}
+                },
+                "recipient": {
+                  "description": "requester"
+                },
+                "delivery_mode": "spoken_explanation",
+                "metadata": {}
               },
-              "responsibility_status": "open",
-              "schema_version": 1,
               "source_responsibility_refs": [
                 "r1"
               ],
-              "source_text": "Get tomorrow morning's Hangzhou forecast for planning dinner and explain the result to me.",
-              "success_criteria": [
-                "Acquire and deliver the requested Hangzhou weather information."
-              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "information"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_resource_contract_composition_41_supported_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         }
       },
       "history": [],

@@ -635,17 +635,31 @@ async def wait_for_session_done(
     timeout_s: float,
     allow_interrupted: bool = False,
 ) -> str:
-    """Wait for the normal or explicitly allowed interrupted terminal state."""
+    """Retain in-flight social work before judging the terminal session state."""
 
     deadline = time.monotonic() + timeout_s
+    social_tasks: set[asyncio.Task[Any]] = set()
     while time.monotonic() < deadline:
+        coordinator = getattr(assistant, "cognitive_runtime", None)
+        social_tasks.update(getattr(coordinator, "_auxiliary_execution_tasks", ()))
+        # The normal callback removes completed tasks from the active set. The
+        # current social turn retains its result, including an earlier failure.
+        social_tasks.update(
+            task for _, task in getattr(coordinator, "_social_turns", {}).values()
+            if task.get_name() == f"social-interpretation:{sid}"
+        )
+        for task in social_tasks:
+            if task.done() and not task.cancelled():
+                task.result()
+        social_pending = any(not task.done() for task in social_tasks)
         state = assistant.sessions.state.get(sid) or {}
-        if state.get("done_logged"):
+        if state.get("done_logged") and not social_pending:
             return "done"
         if (
             allow_interrupted
             and state.get("interrupted")
             and state.get("llm_done")
+            and not social_pending
         ):
             return "interrupted"
         await asyncio.sleep(0.05)
@@ -902,6 +916,7 @@ async def run_check(
         assistant = VoiceAssistant()
     errors: list[str] = []
     timings_ms: dict[str, float] = {}
+    completion_failure: dict[str, str] | None = None
     total_start = time.perf_counter()
     execution_payload: dict[str, Any] | None = None
     status_before: dict[str, Any] | None = None
@@ -1460,6 +1475,12 @@ async def run_check(
                 )
             except Exception as exc:
                 errors.append(f"session completion wait failed: {_exception_text(exc)}")
+                completion_failure = {
+                    "failure_domain": "harness",
+                    "failure_class": type(exc).__name__,
+                    "failure_stage": "session_completion",
+                    "error": _exception_text(exc),
+                }
 
             session_state = assistant.sessions.state.get(sid) or {}
             require_tts = should_require_tts_speech(require_speech=args.require_speech)
@@ -1544,6 +1565,8 @@ async def run_check(
                 ),
             ),
         }
+        if completion_failure is not None:
+            summary["harness_failure"] = completion_failure
         _write_json(evidence_dir / "summary.json", summary)
         return summary
     finally:

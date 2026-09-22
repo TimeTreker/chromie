@@ -29,37 +29,39 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_outcome_mode_fidelity_45_supported_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "愉快地回应用户的好奇，但不编造好奇对象。",
-              "goal_id": "goal-fpdl_v2_outcome_mode_fidelity_45_supported_zh-1",
-              "metadata": {
-                "output_mode": "speech"
-              },
-              "object": {},
-              "related_goal_ids": [],
-              "responsibility_status": "open",
               "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
+              "goal_id": "goal-fpdl_v2_outcome_mode_fidelity_45_supported_zh-1",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "愉快地回应用户的好奇，但不编造好奇对象。",
               "source_text": "请用一句愉快的话回应我对我刚才好奇的一件小事的好奇，但不要编造我好奇的具体事物。",
+              "object": {},
+              "constraints": {},
               "success_criteria": [
                 "愉快地回应用户的好奇，但不编造好奇对象。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "speech"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_outcome_mode_fidelity_45_supported_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "93cd06a9360122900b9dc915ad8eb047a592e35116ede48769f95c5d57557e24",

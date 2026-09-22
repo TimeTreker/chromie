@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_work_topology_and_coordination_15_boundary_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Walk forward for five seconds in parallel with the sibling walk.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_work_topology_and_coordination_15_boundary_en-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Walk forward for five seconds in parallel with the sibling walk.",
+              "source_text": "During using the shared room without disturbing anyone, walk forward for five seconds while also walking forward for eight seconds.",
               "object": {
                 "bindings": {
                   "duration": {
@@ -49,26 +52,26 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "During using the shared room without disturbing anyone, walk forward for five seconds while also walking forward for eight seconds.",
+              "constraints": {},
               "success_criteria": [
                 "Walk forward for five seconds in parallel with the sibling walk."
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
-            },
-            {
-              "constraints": {},
-              "description": "Walk forward for eight seconds in parallel with the sibling walk.",
-              "goal_id": "goal-fpdl_v2_work_topology_and_coordination_15_boundary_en-2",
               "metadata": {
                 "output_mode": "body_action"
-              },
+              }
+            },
+            {
+              "schema_version": 1,
+              "goal_id": "goal-fpdl_v2_work_topology_and_coordination_15_boundary_en-2",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Walk forward for eight seconds in parallel with the sibling walk.",
+              "source_text": "During using the shared room without disturbing anyone, walk forward for five seconds while also walking forward for eight seconds.",
               "object": {
                 "bindings": {
                   "duration": {
@@ -79,26 +82,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "During using the shared room without disturbing anyone, walk forward for five seconds while also walking forward for eight seconds.",
+              "constraints": {},
               "success_criteria": [
                 "Walk forward for eight seconds in parallel with the sibling walk."
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_work_topology_and_coordination_15_boundary_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "141e1b83e50cb2afd6b833156be580b3e2782285a8cab8640d869083338e0e34",

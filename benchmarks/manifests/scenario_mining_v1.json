@@ -22,7 +22,7 @@
       "candidate_fingerprint"
     ],
     "allowed_suites": [
-      "goal_interpretation",
+      "user_meaning_interpretation",
       "cognitive_core_dialogue",
       "cognitive_runtime",
       "cognitive_turn_loop"

@@ -34,16 +34,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_50_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "向前走五秒，作为原子请求的一项。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_50_boundary_zh-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "向前走五秒，作为原子请求的一项。",
+              "source_text": "为了在共享房间里不打扰别人，请向前走五秒并创建一个20:00的提醒；两件都做，否则都不做。",
               "object": {
                 "bindings": {
                   "duration": {
@@ -54,26 +57,26 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "为了在共享房间里不打扰别人，请向前走五秒并创建一个20:00的提醒；两件都做，否则都不做。",
+              "constraints": {},
               "success_criteria": [
                 "向前走五秒，作为原子请求的一项。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             },
             {
-              "constraints": {},
-              "description": "创建20:00提醒，作为原子请求的另一项。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_50_boundary_zh-2",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "创建20:00提醒，作为原子请求的另一项。",
+              "source_text": "为了在共享房间里不打扰别人，请向前走五秒并创建一个20:00的提醒；两件都做，否则都不做。",
               "object": {
                 "bindings": {
                   "due_at": {
@@ -90,26 +93,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "为了在共享房间里不打扰别人，请向前走五秒并创建一个20:00的提醒；两件都做，否则都不做。",
+              "constraints": {},
               "success_criteria": [
                 "创建20:00提醒，作为原子请求的另一项。"
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_50_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         }
       },
       "history": [],

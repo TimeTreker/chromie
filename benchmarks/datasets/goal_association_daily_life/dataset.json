@@ -4,7 +4,7 @@
     "contrast_set_size": 15,
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
     "scenario_count": 1500,
-    "scenario_tree_sha256": "6ee3aac66f7f8498a202dd243ca61e64a8d85a686d7cd4f99f49f3d9ffe1da7e",
+    "scenario_tree_sha256": "2efda57824b9d1754e3fe4f61e0759f92fb942d9ee786de5a5e3e99f8f6b21a0",
     "semantic_seed_count": 100
   },
   "authority": "offline qualification evidence only; never production Goal policy",

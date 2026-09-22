@@ -29,37 +29,40 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_per_goal_disposition_and_mixed_outcomes_18_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "讲一个相关的轻松笑话。",
-              "goal_id": "goal-fpdl_v2_per_goal_disposition_and_mixed_outcomes_18_boundary_zh-1",
-              "metadata": {
-                "output_mode": "speech"
-              },
-              "object": {},
-              "related_goal_ids": [],
-              "responsibility_status": "open",
               "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
+              "goal_id": "goal-fpdl_v2_per_goal_disposition_and_mixed_outcomes_18_boundary_zh-1",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "讲一个相关的轻松笑话。",
               "source_text": "请讲一个关于课后和朋友见面的轻松笑话、眨眼一次并挥手一次；这三个请求彼此独立。",
+              "object": {},
+              "constraints": {},
               "success_criteria": [
                 "讲一个相关的轻松笑话。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "speech"
+              }
             },
             {
-              "constraints": {},
-              "description": "正好眨眼一次。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_per_goal_disposition_and_mixed_outcomes_18_boundary_zh-2",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "正好眨眼一次。",
+              "source_text": "请讲一个关于课后和朋友见面的轻松笑话、眨眼一次并挥手一次；这三个请求彼此独立。",
               "object": {
                 "bindings": {
                   "count": {
@@ -70,47 +73,46 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "请讲一个关于课后和朋友见面的轻松笑话、眨眼一次并挥手一次；这三个请求彼此独立。",
+              "constraints": {},
               "success_criteria": [
                 "正好眨眼一次。"
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
-            },
-            {
-              "constraints": {},
-              "description": "挥手一次。",
-              "goal_id": "goal-fpdl_v2_per_goal_disposition_and_mixed_outcomes_18_boundary_zh-3",
               "metadata": {
                 "output_mode": "body_action"
-              },
-              "object": {},
-              "related_goal_ids": [],
-              "responsibility_status": "open",
+              }
+            },
+            {
               "schema_version": 1,
-              "source_responsibility_refs": [
-                "r3"
-              ],
+              "goal_id": "goal-fpdl_v2_per_goal_disposition_and_mixed_outcomes_18_boundary_zh-3",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "挥手一次。",
               "source_text": "请讲一个关于课后和朋友见面的轻松笑话、眨眼一次并挥手一次；这三个请求彼此独立。",
+              "object": {},
+              "constraints": {},
               "success_criteria": [
                 "挥手一次。"
               ],
+              "source_responsibility_refs": [
+                "r3"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_per_goal_disposition_and_mixed_outcomes_18_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "eb07577fdcc29dd57e8a75b9811379ba1fe44998063c892910f142ccf353b173",

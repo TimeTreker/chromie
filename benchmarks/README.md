@@ -16,6 +16,13 @@ fixed input-to-action mappings.
 - `reports/`: generated local reports. Generated JSON should not be committed
   unless a release process explicitly retains it as evidence.
 
+The maintained User Meaning Interpretation fixtures live in
+`scenarios/user_meaning_interpretation/`. The source manifest references that
+directory under its retained `goal_interpretation` inventory classification;
+the historical classification does not name a separate scenario directory.
+Candidate promotion uses the current `user_meaning_interpretation` suite name and
+still requires the existing immutable, approved review record.
+
 ## Commands
 
 Validate the repository inventory without writing generated files:

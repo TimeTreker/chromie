@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Check the forecast and conditionally create the reminder only when rain is forecast.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en-1",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Check the forecast and conditionally create the reminder only when rain is forecast.",
+              "source_text": "For the detail that was unclear, check tomorrow morning's Hangzhou weather and create a 7:30 a.m. umbrella reminder only if rain is forecast.",
               "object": {
                 "bindings": {
                   "date": {
@@ -73,26 +76,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "For the detail that was unclear, check tomorrow morning's Hangzhou weather and create a 7:30 a.m. umbrella reminder only if rain is forecast.",
+              "constraints": {},
               "success_criteria": [
                 "Check the forecast and conditionally create the reminder only when rain is forecast."
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_39_boundary_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "40e439a00a0e4627ec8f74a371c6c9c62ff0ffa602763796dc266b573bf19805",

@@ -50,6 +50,17 @@ All scenarios remain `training_eligible=false` and lack independent semantic rev
 Mechanical validity does not qualify the prompt, a deployed model, service behavior,
 voice, simulator, target robot, or release.
 
+The September 22 reference migration replaces the retired empty request uncertainty
+field with `meaning_uncertainties`, explicitly authors downstream cognition requests,
+and preserves the original text, retained Goal snapshots and splits. The 100 historical
+restatement cases now create a new Goal linked through `related_goal_ids`; they no
+longer associate a current Responsibility to a terminal Goal. This follows current
+terminal-history ownership and never reopens or mutates the historical Goal. Their
+Responsibility-map oracle changes with that ownership correction. The 200 retained
+typed-state update cases remain required Host rejections. This is explicit reference
+authorship, not automatic repair of candidate output; owner and independent semantic
+review requirements remain unchanged.
+
 To qualify the GA prompt with Codex as a same-model offline surrogate, freeze one
 target-blind batch and keep source unchanged until adjudication completes:
 

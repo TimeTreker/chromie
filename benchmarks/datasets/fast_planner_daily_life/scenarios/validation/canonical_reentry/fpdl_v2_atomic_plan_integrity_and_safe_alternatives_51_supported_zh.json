@@ -40,16 +40,19 @@
           }
         },
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_supported_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "在眨眼前看向已识别用户两秒。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_supported_zh-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "在眨眼前看向已识别用户两秒。",
+              "source_text": "为了准备晚餐，请把这当作一个有顺序的请求：先看着我两秒，然后眨眼两次。",
               "object": {
                 "bindings": {
                   "duration": {
@@ -66,26 +69,26 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "为了准备晚餐，请把这当作一个有顺序的请求：先看着我两秒，然后眨眼两次。",
+              "constraints": {},
               "success_criteria": [
                 "在眨眼前看向已识别用户两秒。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
-            },
-            {
-              "constraints": {},
-              "description": "在看向用户后正好眨眼两次。",
-              "goal_id": "goal-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_supported_zh-2",
               "metadata": {
                 "output_mode": "body_action"
-              },
+              }
+            },
+            {
+              "schema_version": 1,
+              "goal_id": "goal-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_supported_zh-2",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "在看向用户后正好眨眼两次。",
+              "source_text": "为了准备晚餐，请把这当作一个有顺序的请求：先看着我两秒，然后眨眼两次。",
               "object": {
                 "bindings": {
                   "count": {
@@ -96,26 +99,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r2"
-              ],
-              "source_text": "为了准备晚餐，请把这当作一个有顺序的请求：先看着我两秒，然后眨眼两次。",
+              "constraints": {},
               "success_criteria": [
                 "在看向用户后正好眨眼两次。"
               ],
+              "source_responsibility_refs": [
+                "r2"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_atomic_plan_integrity_and_safe_alternatives_51_supported_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "e12f4cbdfe83fd30119ec52851cfad59a185ca6bed26fc031e692b553b647d4c",

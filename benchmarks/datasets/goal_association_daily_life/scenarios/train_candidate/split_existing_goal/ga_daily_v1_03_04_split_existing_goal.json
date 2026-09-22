@@ -97,7 +97,6 @@
       },
       "history": [],
       "interpretation_confidence": 1.0,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -126,7 +125,8 @@
       ],
       "schema_version": 1,
       "sid": "ga_daily_v1_03_04_split_existing_goal",
-      "text": "Split this goal into two separately owed outcomes."
+      "text": "Split this goal into two separately owed outcomes.",
+      "meaning_uncertainties": []
     }
   },
   "invariants": {
@@ -168,7 +168,25 @@
       "new_goals": [],
       "reason_summary": "Map every accepted GI Responsibility exactly once.",
       "referent_updates": [],
-      "resolved_references": []
+      "resolved_references": [],
+      "cognitive_requests": [
+        {
+          "authority": "social_cognition",
+          "responsibility_refs": [
+            "r1",
+            "r2"
+          ],
+          "reason_summary": "Decide interaction using the established canonical continuity facts."
+        },
+        {
+          "authority": "planner",
+          "responsibility_refs": [
+            "r1",
+            "r2"
+          ],
+          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
+        }
+      ]
     },
     "schema_expectation": "accept",
     "semantic_expectations": {

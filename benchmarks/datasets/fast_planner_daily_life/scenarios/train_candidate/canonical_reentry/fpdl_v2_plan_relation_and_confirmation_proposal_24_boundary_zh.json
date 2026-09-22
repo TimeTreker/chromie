@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "创建工作日重复提醒，或提出用户明确允许的2099年9月4日一次性替代方案。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh-1",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "创建工作日重复提醒，或提出用户明确允许的2099年9月4日一次性替代方案。",
+              "source_text": "为了你的机器人身体真正能做什么，请永久在每个工作日设置那个提醒；如果不支持重复提醒，就改为提议只在2099年9月4日设置一次。",
               "object": {
                 "bindings": {
                   "due_at": {
@@ -61,26 +64,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "为了你的机器人身体真正能做什么，请永久在每个工作日设置那个提醒；如果不支持重复提醒，就改为提议只在2099年9月4日设置一次。",
+              "constraints": {},
               "success_criteria": [
                 "创建工作日重复提醒，或提出用户明确允许的2099年9月4日一次性替代方案。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "8a89b1a977f98f3f9f0450206f49b9b03ab75a7b59158a1df25cd9a06b7093e2",

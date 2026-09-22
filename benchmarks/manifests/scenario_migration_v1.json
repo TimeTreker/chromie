@@ -35,7 +35,7 @@
   "sources": [
     {
       "name": "goal_interpretation",
-      "path": "scenarios/goal_interpretation",
+      "path": "scenarios/user_meaning_interpretation",
       "glob": "**/*.json",
       "layer": "module",
       "datasets": [

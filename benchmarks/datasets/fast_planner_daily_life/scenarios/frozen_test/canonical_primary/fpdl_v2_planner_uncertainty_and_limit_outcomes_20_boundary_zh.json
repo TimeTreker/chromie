@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "看向一个尚未解析的人物指代三秒。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "看向一个尚未解析的人物指代三秒。",
+              "source_text": "为了我希望安静互动的偏好，请看着“他们”三秒；但目前没有任何信息说明“他们”是谁。",
               "object": {
                 "bindings": {
                   "duration": {
@@ -49,26 +52,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "为了我希望安静互动的偏好，请看着“他们”三秒；但目前没有任何信息说明“他们”是谁。",
+              "constraints": {},
               "success_criteria": [
                 "看向一个尚未解析的人物指代三秒。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_planner_uncertainty_and_limit_outcomes_20_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         }
       },
       "history": [],

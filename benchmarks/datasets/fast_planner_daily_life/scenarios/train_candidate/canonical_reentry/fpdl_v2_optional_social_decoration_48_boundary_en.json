@@ -29,37 +29,39 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_optional_social_decoration_48_boundary_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Warmly acknowledge the user's stated plan while respecting the current social-attention boundary.",
-              "goal_id": "goal-fpdl_v2_optional_social_decoration_48_boundary_en-1",
-              "metadata": {
-                "output_mode": "speech"
-              },
-              "object": {},
-              "related_goal_ids": [],
-              "responsibility_status": "open",
               "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
+              "goal_id": "goal-fpdl_v2_optional_social_decoration_48_boundary_en-1",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Warmly acknowledge the user's stated plan while respecting the current social-attention boundary.",
               "source_text": "Give me one brief, warm sentence acknowledging my plan for meeting my friend after class; there is no current trusted target and I prefer no gesture.",
+              "object": {},
+              "constraints": {},
               "success_criteria": [
                 "Warmly acknowledge the user's stated plan while respecting the current social-attention boundary."
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "speech"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_optional_social_decoration_48_boundary_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "mind": {
           "social_interaction_style": {

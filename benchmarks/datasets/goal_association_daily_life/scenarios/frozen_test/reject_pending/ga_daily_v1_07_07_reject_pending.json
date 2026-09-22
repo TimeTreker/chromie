@@ -115,7 +115,6 @@
       },
       "history": [],
       "interpretation_confidence": 1.0,
-      "interpretation_unresolved": [],
       "language": "zh-CN",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -133,7 +132,8 @@
       ],
       "schema_version": 1,
       "sid": "ga_daily_v1_07_07_reject_pending",
-      "text": "不，不要接受那个待确认的目标。"
+      "text": "不，不要接受那个待确认的目标。",
+      "meaning_uncertainties": []
     }
   },
   "invariants": {
@@ -174,7 +174,23 @@
       "new_goals": [],
       "reason_summary": "Map every accepted GI Responsibility exactly once.",
       "referent_updates": [],
-      "resolved_references": []
+      "resolved_references": [],
+      "cognitive_requests": [
+        {
+          "authority": "social_cognition",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Decide interaction using the established canonical continuity facts."
+        },
+        {
+          "authority": "planner",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
+        }
+      ]
     },
     "schema_expectation": "accept",
     "semantic_expectations": {

@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_truthful_response_staging_and_deduplication_26_supported_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "只在有可信证据后报告眨眼完成。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_truthful_response_staging_and_deduplication_26_supported_zh-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "只在有可信证据后报告眨眼完成。",
+              "source_text": "用于我们刚才一直在讨论的任务的眨眼已经有可信完成证据后，只告诉我眨眼已完成。",
               "object": {
                 "bindings": {
                   "count": {
@@ -49,26 +52,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "用于我们刚才一直在讨论的任务的眨眼已经有可信完成证据后，只告诉我眨眼已完成。",
+              "constraints": {},
               "success_criteria": [
                 "只在有可信证据后报告眨眼完成。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_truthful_response_staging_and_deduplication_26_supported_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "result_evidence_reentry": {
           "evidence_refs": [

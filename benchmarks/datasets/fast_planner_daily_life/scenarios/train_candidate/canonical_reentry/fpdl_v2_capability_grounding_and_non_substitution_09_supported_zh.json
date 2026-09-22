@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_capability_grounding_and_non_substitution_09_supported_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "正好眨眼三次。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_capability_grounding_and_non_substitution_09_supported_zh-1",
-              "metadata": {
-                "output_mode": "body_action"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "正好眨眼三次。",
+              "source_text": "现在，作为我刚才好奇的一件小事的一小部分，请正好眨眼三次。",
               "object": {
                 "bindings": {
                   "count": {
@@ -49,26 +52,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "现在，作为我刚才好奇的一件小事的一小部分，请正好眨眼三次。",
+              "constraints": {},
               "success_criteria": [
                 "正好眨眼三次。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "body_action"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_capability_grounding_and_non_substitution_09_supported_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "6a77f2ec7e9f27a40b16a0aabee75c714bc43ceb92b0643eb7a00a5e3160eca7",

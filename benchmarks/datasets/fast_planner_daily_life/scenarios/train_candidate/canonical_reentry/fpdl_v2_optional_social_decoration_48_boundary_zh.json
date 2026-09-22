@@ -29,37 +29,39 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_optional_social_decoration_48_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "温暖地回应用户所述计划，同时遵守当前社交注意边界。",
-              "goal_id": "goal-fpdl_v2_optional_social_decoration_48_boundary_zh-1",
-              "metadata": {
-                "output_mode": "speech"
-              },
-              "object": {},
-              "related_goal_ids": [],
-              "responsibility_status": "open",
               "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
+              "goal_id": "goal-fpdl_v2_optional_social_decoration_48_boundary_zh-1",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "温暖地回应用户所述计划，同时遵守当前社交注意边界。",
               "source_text": "请用一句简短温暖的话回应我关于课后和朋友见面的计划；当前没有可信目标，而且我希望不要有手势动作。",
+              "object": {},
+              "constraints": {},
               "success_criteria": [
                 "温暖地回应用户所述计划，同时遵守当前社交注意边界。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "speech"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_optional_social_decoration_48_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "mind": {
           "social_interaction_style": {

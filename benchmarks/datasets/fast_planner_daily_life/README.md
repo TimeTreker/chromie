@@ -5,6 +5,12 @@ transaction under [Issue #35](https://github.com/TimeTreker/chromie/issues/35).
 This is offline evaluation input, not production behavior policy or approved SFT
 data.
 
+The September 22 input refresh explicitly materializes the current GA projection's
+empty `non_goal_responsibility_refs` and `cognitive_requests` defaults in the 152
+canonical cases. All source inputs, target Plans, expectations and splits are preserved;
+the scenario-tree digest is refrozen after this offline authoring step. Validation
+still requires exact production projection equality and never refreshes fixtures.
+
 ## What the corpus covers
 
 The Fast corpus contains 204 current-production-shaped scenarios. Its count is

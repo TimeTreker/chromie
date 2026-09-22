@@ -29,25 +29,31 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_temporal_readiness_planning_34_supported_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "仅在指定未来时间 Goal 就绪后查询杭州天气。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_temporal_readiness_planning_34_supported_zh-1",
-              "metadata": {
-                "output_mode": "information"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "仅在指定未来时间 Goal 就绪后查询杭州天气。",
+              "source_text": "请在2099年9月4日19:00为学习安排查询杭州天气，不要提前查询。",
               "object": {},
-              "related_goal_ids": [],
+              "constraints": {},
+              "success_criteria": [
+                "仅在指定未来时间 Goal 就绪后查询杭州天气。"
+              ],
               "resource_responsibility": {
-                "delivery_mode": "spoken_explanation",
-                "metadata": {},
-                "recipient": {
-                  "description": "requester"
-                },
+                "schema_version": 1,
+                "responsibility_type": "acquire_and_deliver_resource",
                 "resource": {
+                  "kind": "information",
+                  "description": "仅在指定未来时间 Goal 就绪后查询杭州天气。",
+                  "quantity": "",
                   "attributes": {
                     "date": {
                       "confidence": 1.0,
@@ -79,38 +85,34 @@
                       "name": "ready_at",
                       "value": "2099-09-04T19:00:00+08:00"
                     }
-                  },
-                  "description": "仅在指定未来时间 Goal 就绪后查询杭州天气。",
-                  "kind": "information",
-                  "quantity": ""
+                  }
                 },
-                "responsibility_type": "acquire_and_deliver_resource",
-                "schema_version": 1,
                 "source": {
-                  "bindings": {},
+                  "status": "unknown",
                   "description": "",
-                  "status": "unknown"
-                }
+                  "bindings": {}
+                },
+                "recipient": {
+                  "description": "requester"
+                },
+                "delivery_mode": "spoken_explanation",
+                "metadata": {}
               },
-              "responsibility_status": "open",
-              "schema_version": 1,
               "source_responsibility_refs": [
                 "r1"
               ],
-              "source_text": "请在2099年9月4日19:00为学习安排查询杭州天气，不要提前查询。",
-              "success_criteria": [
-                "仅在指定未来时间 Goal 就绪后查询杭州天气。"
-              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "information"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_temporal_readiness_planning_34_supported_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         }
       },
       "history": [],

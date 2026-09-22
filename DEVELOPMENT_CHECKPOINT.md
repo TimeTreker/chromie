@@ -1,6 +1,83 @@
 # Development Checkpoint
 
-## Owner-requested immediate delivery — 2026-09-21 (current)
+## Resumed verification, full audit and live blockers — 2026-09-22 (current)
+
+This section supersedes the September 21 delivery-only test waiver. The owner asked
+this session to understand the project and resume unfinished work, including the
+recorded verification sequence. `main` was fetched and fast-forwarded from
+`370e4764` to `92edd5ba8cbf8f6c6b201e92ea59356ba65bf2de` before development;
+upstream was rechecked at 0 ahead / 0 behind before the harness repair and again before
+this delivery. The expected resume revision is the latest `main` commit containing
+this checkpoint and `HANDOFF.md`. The active line remains #24/#32: canonical local
+gate → current-revision live proof → default target-evidence closure.
+
+Implemented scope:
+
+- Repaired benchmark inventory/mining paths and the UMI validator's deleted-module
+  import. Migrated 1,496 UMI and 1,500 GA reference packets to current contracts;
+  152 Fast request projections now explicitly include two existing empty fields.
+  Original inputs, UMI semantic expectations and all Fast targets were preserved.
+  **100 GA terminal-history references changed substantively**: restated work now
+  creates a new related Goal instead of attaching to a terminal Goal. The retained
+  before/after audit documents this exception; 200 intentional GA Host rejections
+  remain. Frozen-test changes still require owner review. Schema/Host acceptance
+  does not promote these references to independently reviewed/training data.
+- Fixed the reproduced acceptance lifecycle error: the text/simulator harness now
+  observes pending Social Cognition and auxiliary tasks within its existing deadline
+  before judging completion or closing clients. Retained task exceptions become
+  structured `harness_failure` evidence and stop the aggregate. No production role,
+  prompt, validator, routing, or Host completion policy changed.
+- Completed the owner-requested full project audit and retained it in the current
+  `docs/STATUS.md` owner rather than adding a standalone current document. It confirms
+  production Host early finalization, an ineffective duplicate-primary check on the
+  independent SC route, UMI/SC activation-contract mismatch, three Fast transaction
+  failures, retired Planner speech surfaces, unreviewed reference-oracle evidence and
+  a cross-session acceptance-task risk. The audit itself changes no runtime behavior.
+
+Observed evidence:
+
+- Strict frozen replay: **6,000/6,000 expected outcomes**, source unchanged, zero
+  native calls. Level A general ability: **45/45 cases across 15 classes**.
+- Final `./scripts/run_tests.sh`, rerun after incorporating the audit: **145
+  benchmark tests, 3,658 tests, 1,015 subtests and 20 legacy Agent tests passed**,
+  including repository policies,
+  test ownership, pinned static checks, configuration and documentation gates.
+  Two existing FastAPI lifecycle deprecation warnings remain. The prior canonical
+  run before the harness repair passed 3,655 tests; three regressions were added.
+- Rebuilt and verified Agent source, then ran one complete-discovery baseline.
+  It stopped at case 3/75: one mechanical pass, two failures, 72 unrun. Review of
+  all attempted cases found **zero qualified live passes**. The mechanical pass
+  had hidden a pending-SC disconnect and lost the requested temporal relationship.
+- After the harness repair, the focused gaze/blink run retained both late TTS
+  deliveries without premature client closure. A fresh complete-discovery run
+  again stopped at case 3/75 (one mechanical pass, two failures, 72 unrun).
+  All attempted cases ended in simulator safe idle. Source/provider hashes stayed
+  unchanged within each run; exactly one debug bundle was collected per run.
+  Semantic review still finds zero qualified live passes: sidestep substituted
+  for turn; SC silence/task-fulfillment/stage-direction failures; and unsupported
+  acquisition-purpose claims rejected before dispatch. Full raw transactions and
+  per-case judgments are retained; underlying prompt/context/Schema causes remain
+  to be qualified before a semantic repair.
+
+Four axes: **source implemented** (benchmark and acceptance repairs); **local
+validation passed**; **target validation blocked/incomplete** (dirty-tree diagnostic
+live evidence only, no new physical audio/robot evidence); **support development
+only**. Existing owner microphone/ASR acceptance is preserved. No new runtime
+switch, current document or architectural term was introduced (102 Markdown files,
+15-file core reading path unchanged).
+
+Next: repair production session/SC/TTS joining and workflow-report finalization, then
+give auxiliary admission the immutable canonical Work view. Freeze UMI activation and
+Fast semantic contrasts before any prompt/Schema optimization; do not weaken the
+rejecting validator, add a semantic repair call or replace model activation with a
+fixed Host router. Retire the remaining Planner speech surfaces/prose, obtain owner
+review of the reference migration, and scope acceptance task retention per session.
+After each authorized boundary repair, run its focused scenario/ability, canonical
+gates, and a fresh full discovered cohort with one bundle. Current local-gate closure
+is not live or release closure. Exact episode I/O, identities, artifacts and commands
+are in `HANDOFF.md`; the full audit is in the current `docs/STATUS.md` section.
+
+## Owner-requested immediate delivery — 2026-09-21 (historical)
 
 The owner explicitly requested **commit and push immediately without further tests**
 after asking to repair the 329 existing test failures. This section supersedes older

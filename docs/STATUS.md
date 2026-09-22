@@ -1,5 +1,116 @@
 # Chromie Current Status
 
+## Local gate closed; live qualification blocked — 2026-09-22 (current)
+
+Resuming `92edd5ba` closed the recorded local validation gap. Benchmark path/import
+and frozen-reference contracts were migrated explicitly; a reproduced live harness
+completion race now waits for pending Social Cognition before closing service clients.
+No production semantic role/prompt/validator was changed. Frozen reference owner review
+remains pending, including 100 substantive terminal-history GA oracle corrections.
+
+Four axes: implementation complete for these benchmark/acceptance repairs; local
+validation passed (6,000 strict replay outcomes, 45 Level A cases, final canonical
+145 benchmark / 3,658 main / 1,015 subtests / 20 legacy tests); target validation
+incomplete and failing; support development only. The rebuilt, source-verified
+RTX 4090 Laptop SGLang Agent and headless MuJoCo ran the discovered 75-case baseline
+before and after the harness repair. Both stopped at case 3: 1 mechanical pass,
+2 failures, 72 unrun. Review finds zero qualified semantic passes. Fast substituted
+sidestep for turn and authored unsupported acquisition-purpose Work; SC silence,
+primary-task expression and spoken-stage-direction failures remain. The harness fix
+retains late SC/TTS evidence, while production Host workflow finalization remains
+an open boundary. All attempted cases retained safe idle; no new physical evidence
+or release qualification. See the current [checkpoint](../DEVELOPMENT_CHECKPOINT.md)
+and [handoff](../HANDOFF.md) for exact I/O, identities, case reviews and resume commands.
+
+### Full project audit — 2026-09-22
+
+The current delivery is **not release-qualified**. The local gate is green against
+the migrated source and references, but target evidence is both incomplete and
+failing: the current-revision aggregate stopped at case 3 of 75, and semantic review
+finds zero qualified passes among the three attempted cases. All attempted simulator
+cases reached safe idle. No new physical microphone, speaker or robot evidence exists.
+
+The audit followed the complete admitted-turn transaction and the accepted authority
+map: UMI owns WHAT and cognitive activation requests; Goal Association owns canonical
+Goal continuity; Planner owns HOW without ordinary wording; Social Cognition owns
+ordinary communication and optional social expression; Host/Runtime owns mechanical
+validation, scheduling, delivery and lifecycle without semantic reinterpretation.
+
+#### Confirmed release blockers
+
+1. **Production session finalization precedes same-turn Social Cognition and TTS.**
+   The execution-only path starts `initial_social_task` and returns the primary
+   interaction without joining it. Detached Work completion sets `llm_done`; with
+   no TTS scheduled yet, `SessionTracker.maybe_done` finalizes the session and its
+   workflow report. In rerun `f837523a`, SC started at `01:18:07.677`, production
+   recorded `session_done` with zero scheduled/played TTS at `01:18:12.595`, SC
+   completed at `01:18:16.417`, and three TTS items then played through
+   `01:18:22.241`. The acceptance wait preserves this late evidence but does not
+   repair production lifecycle or report finalization.
+2. **SC duplicate-primary containment lacks the canonical primary Work view on the
+   independent state-interaction route.** SC proposed `soridormi.blink_eyes` three
+   times and described it as primary task fulfillment after Planner/Runtime had
+   already admitted blink twice as Goal-owned Work. The independent SC response is
+   initialized with `capabilities=[]`; auxiliary admission derives
+   `primary_capability_ids` from that response, so its apparent exact-ID duplicate
+   check cannot see the immutable Plan. One auxiliary blink request was materialized.
+   SC also spoke stage directions `（看着你三秒）` and `（眨眼两次）`.
+3. **Fast Planner produced a wrong semantic result in every attempted live case.**
+   The compound case substituted `sidestep(left)` for `turn_in_place(left)` despite
+   both exact Capability descriptions being supplied. The gaze/blink case claimed
+   complete coverage of a simultaneous request while authoring sequential physical
+   Activities; because physical Work must remain sequential, the transaction needed
+   a truthful limitation or clarification rather than a false completion claim. The
+   milk case marked locomotion as information acquisition without a provider-declared
+   acquisition contract and proposed `0.25 m/s * 20 s` for 50 m. Host correctly
+   rejected that last output before effect dispatch.
+4. **UMI activation, the UMI prompt and the fresh-interaction SC contract are not
+   yet one qualified decision boundary.** All three live UMI outputs requested only
+   Planner, so SC started later from Work state. The UMI prompt says to request SC
+   when interaction warrants it, while the explicit fresh-addressed-turn duty lives
+   inside the downstream SC prompt. The migrated UMI references request SC in all
+   1,496 cases, but fixture agreement cannot decide whether that broad activation
+   policy is semantically correct. The Charter also states that not every turn needs
+   every authority, so Host must not replace the missing qualification with a fixed
+   output-mode, keyword or always-invoke rule.
+5. **Communication ownership remains split across maintained contracts and prose.**
+   Active Planner model DTOs are word-free and the current runtime rejects
+   Planner-authored communication before SC, but the shared `CanonicalPlan` still
+   accepts `response_text`, `communicative_acts` and `auxiliary_activities`; retained
+   classes and validators still describe Planner as exact wording owner. `README.md`,
+   `ROADMAP.md`, `orchestrator/README.md`, and runtime comments repeat that retired
+   rule despite Charter `SPEECH-OWNER-001`. The documentation gate does not detect
+   this authority contradiction.
+6. **Passing reference replay is mechanical compatibility evidence, not independent
+   semantic qualification.** This worktree migrates 1,496 UMI, 1,500 GA and 152 Fast
+   packets, including 100 substantive GA terminal-history oracle changes. The strict
+   6,000-case replay proves that source, Schema/Host and the newly authored references
+   agree. Frozen-reference owner review, independent semantic review, native inference
+   qualification and training promotion remain open.
+7. **The repaired acceptance wait is not fully session-scoped.** It filters retained
+   `_social_turns` by session task name but also waits on the coordinator's entire
+   `_auxiliary_execution_tasks` set. An unrelated session's pending or failed task can
+   delay or fail the case being judged. The repair is useful for the current serial
+   cohort, but overlapping-session evidence needs a scoped contract and regression.
+
+#### Actual episode workflow and earliest wrong boundaries
+
+| Episode | Authoritative input and ordered path | Actual output | Expected output / verdict |
+| --- | --- | --- | --- |
+| Compound `630f4c86` | Gateway admits walk at 0.2 m/s for 10 s, nod twice, then turn left → UMI `r1` → GA new Goal → Fast | Fast `act_003` selects sidestep and calls it a turn; canonical validation and Runtime execute walk/nod/sidestep; late SC chooses silence | UMI/GA correct. Fast is the earliest wrong boundary; legal Host admission cannot prove semantic equivalence. SC activation/silence remains independently unqualified. |
+| Gaze/blink `f837523a` | Gateway admits look for 3 s while blinking twice → UMI `r1` → GA new Goal → Fast → Host/Runtime, with asynchronous work-state SC | Fast executes sequential gaze then blink while claiming simultaneous completeness. Host finalizes before SC. SC later emits three utterances and one duplicate blink request. | Fast first loses temporal meaning. SC then violates wording/expression ownership, and Host fails duplicate containment and lifecycle joining. |
+| Milk `6b116449` | Gateway admits fetch milk 50 m ahead → UMI `r1` → GA new Goal → Fast → Fast Schema/Host validation | Fast authors unsupported acquisition-purpose steps and inconsistent distance realization; validator returns `fast_stream_contract_invalid`; no effect dispatch, Deep Planner or SC | Fast is wrong. Host containment is correct and preserves safe idle; the validator must not be weakened. |
+
+The next implementation order is: repair production session/SC/TTS joining and
+workflow-report finalization; give auxiliary admission the immutable canonical Work
+view; freeze and qualify UMI activation contrasts; freeze Fast contrasts for semantic
+substitution, simultaneity and acquisition grounding; retire the remaining competing
+Planner speech surfaces and prose; obtain owner review of migrated references; and
+make acceptance task retention session-scoped. Each authorized repair requires its
+focused scenario and general-ability class, the canonical gates, then one unchanged-
+revision complete 75-case aggregate with one debug bundle. Physical evidence remains
+a separate supervised gate.
+
 ## RTX 4090 Laptop SGLang source migration — 2026-09-17 (current)
 
 The owner identified that the maintained RTX 4090 Laptop still ran all cognition through

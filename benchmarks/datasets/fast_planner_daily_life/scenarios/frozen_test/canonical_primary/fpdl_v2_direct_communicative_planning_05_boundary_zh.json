@@ -29,37 +29,39 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_direct_communicative_planning_05_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "向邻居实际发送一条消息。",
-              "goal_id": "goal-fpdl_v2_direct_communicative_planning_05_boundary_zh-1",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
-              "object": {},
-              "related_goal_ids": [],
-              "responsibility_status": "open",
               "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
+              "goal_id": "goal-fpdl_v2_direct_communicative_planning_05_boundary_zh-1",
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "向邻居实际发送一条消息。",
               "source_text": "请替我给邻居发送一条关于一个难熬的下午的消息。",
+              "object": {},
+              "constraints": {},
               "success_criteria": [
                 "向邻居实际发送一条消息。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_direct_communicative_planning_05_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         }
       },
       "history": [],

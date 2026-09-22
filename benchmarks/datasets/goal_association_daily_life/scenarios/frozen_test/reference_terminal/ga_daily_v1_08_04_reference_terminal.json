@@ -97,7 +97,6 @@
       },
       "history": [],
       "interpretation_confidence": 1.0,
-      "interpretation_unresolved": [],
       "language": "en-US",
       "planner_reentry_scope": null,
       "responsibilities": [
@@ -115,7 +114,8 @@
       ],
       "schema_version": 1,
       "sid": "ga_daily_v1_08_04_reference_terminal",
-      "text": "Tell me again what that completed goal was about."
+      "text": "Tell me again what that completed goal was about.",
+      "meaning_uncertainties": []
     }
   },
   "invariants": {
@@ -138,25 +138,31 @@
   "target": {
     "contract_gap": null,
     "reference_model_output": {
-      "associations": [
+      "associations": [],
+      "confidence": 1.0,
+      "new_goals": [
         {
-          "confidence": 1.0,
-          "reason_summary": "The source-grounded continuity relationship is reference.",
-          "relationship": "reference",
-          "resolved_gap_ids": [],
           "source_responsibility_refs": [
             "r1"
           ],
-          "target_goal_ids": [
+          "related_goal_ids": [
             "goal_08_04_a"
-          ]
+          ],
+          "supersedes_goal_ids": []
         }
       ],
-      "confidence": 1.0,
-      "new_goals": [],
-      "reason_summary": "Map every accepted GI Responsibility exactly once.",
+      "reason_summary": "Create the requested historical restatement without reopening its terminal source Goal.",
       "referent_updates": [],
-      "resolved_references": []
+      "resolved_references": [],
+      "cognitive_requests": [
+        {
+          "authority": "social_cognition",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Decide interaction using the established canonical continuity facts."
+        }
+      ]
     },
     "schema_expectation": "accept",
     "semantic_expectations": {
@@ -168,12 +174,12 @@
       "responsibility_count": 1,
       "responsibility_map": [
         {
-          "operation": "association",
-          "relationship": "reference",
           "source_ref": "r1",
-          "target_goal_ids": [
-            "goal_08_04_a"
-          ]
+          "operation": "new_goal",
+          "relationship": "new",
+          "target_goal_ids": [],
+          "output_mode": "stateful_effect",
+          "supersedes_goal_ids": []
         }
       ]
     }

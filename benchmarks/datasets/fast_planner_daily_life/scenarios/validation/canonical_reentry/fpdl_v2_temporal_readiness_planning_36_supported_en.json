@@ -29,25 +29,31 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_temporal_readiness_planning_36_supported_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Check Hangzhou weather only when the Goal becomes ready at the specified future time.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_temporal_readiness_planning_36_supported_en-1",
-              "metadata": {
-                "output_mode": "information"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Check Hangzhou weather only when the Goal becomes ready at the specified future time.",
+              "source_text": "At 7:00 p.m. on September 4, 2099, check Hangzhou weather for meeting my friend after class; do not check early.",
               "object": {},
-              "related_goal_ids": [],
+              "constraints": {},
+              "success_criteria": [
+                "Check Hangzhou weather only when the Goal becomes ready at the specified future time."
+              ],
               "resource_responsibility": {
-                "delivery_mode": "spoken_explanation",
-                "metadata": {},
-                "recipient": {
-                  "description": "requester"
-                },
+                "schema_version": 1,
+                "responsibility_type": "acquire_and_deliver_resource",
                 "resource": {
+                  "kind": "information",
+                  "description": "Check Hangzhou weather only when the Goal becomes ready at the specified future time.",
+                  "quantity": "",
                   "attributes": {
                     "date": {
                       "confidence": 1.0,
@@ -79,38 +85,34 @@
                       "name": "ready_at",
                       "value": "2099-09-04T19:00:00+08:00"
                     }
-                  },
-                  "description": "Check Hangzhou weather only when the Goal becomes ready at the specified future time.",
-                  "kind": "information",
-                  "quantity": ""
+                  }
                 },
-                "responsibility_type": "acquire_and_deliver_resource",
-                "schema_version": 1,
                 "source": {
-                  "bindings": {},
+                  "status": "unknown",
                   "description": "",
-                  "status": "unknown"
-                }
+                  "bindings": {}
+                },
+                "recipient": {
+                  "description": "requester"
+                },
+                "delivery_mode": "spoken_explanation",
+                "metadata": {}
               },
-              "responsibility_status": "open",
-              "schema_version": 1,
               "source_responsibility_refs": [
                 "r1"
               ],
-              "source_text": "At 7:00 p.m. on September 4, 2099, check Hangzhou weather for meeting my friend after class; do not check early.",
-              "success_criteria": [
-                "Check Hangzhou weather only when the Goal becomes ready at the specified future time."
-              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "information"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_temporal_readiness_planning_36_supported_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "8f58a63ecef20268cfcf4679f860c8f2725348bbad0d2ee08e650c3c63ab8cfb",

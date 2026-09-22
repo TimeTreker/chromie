@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_39_boundary_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "查询天气，并且只有预计下雨时才有条件地创建提醒。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_fast_completion_or_how_escalation_39_boundary_zh-1",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "查询天气，并且只有预计下雨时才有条件地创建提醒。",
+              "source_text": "为了刚才不清楚的那个细节，请查询杭州明早天气，并且只有预计下雨时才创建7:30带伞提醒。",
               "object": {
                 "bindings": {
                   "date": {
@@ -73,26 +76,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "为了刚才不清楚的那个细节，请查询杭州明早天气，并且只有预计下雨时才创建7:30带伞提醒。",
+              "constraints": {},
               "success_criteria": [
                 "查询天气，并且只有预计下雨时才有条件地创建提醒。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_fast_completion_or_how_escalation_39_boundary_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "2a133090c8dc9e8dbc0457c5e2427fd3306e217febba5b85e227a113c563c826",

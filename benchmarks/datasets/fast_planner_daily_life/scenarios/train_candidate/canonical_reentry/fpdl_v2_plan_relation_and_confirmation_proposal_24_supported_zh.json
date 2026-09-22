@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_supported_zh",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "创建准确的一次性提醒。",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_plan_relation_and_confirmation_proposal_24_supported_zh-1",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "创建准确的一次性提醒。",
+              "source_text": "为了你的机器人身体真正能做什么，请创建一个今天18:30的提醒，内容是“带上蓝色笔记本”。",
               "object": {
                 "bindings": {
                   "due_at": {
@@ -55,26 +58,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "为了你的机器人身体真正能做什么，请创建一个今天18:30的提醒，内容是“带上蓝色笔记本”。",
+              "constraints": {},
               "success_criteria": [
                 "创建准确的一次性提醒。"
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_supported_zh"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "34ed06db6fb2f2af771309b702824c6cd473f837078c74440a2ca56c57a24193",

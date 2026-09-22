@@ -29,25 +29,31 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_evidence_reentry_interpretation_32_supported_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Report whether rain is expected from the scoped trusted weather Evidence.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_evidence_reentry_interpretation_32_supported_en-1",
-              "metadata": {
-                "output_mode": "information"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Report whether rain is expected from the scoped trusted weather Evidence.",
+              "source_text": "Use the retained weather Evidence for tomorrow's practical plan and tell me whether rain is expected.",
               "object": {},
-              "related_goal_ids": [],
+              "constraints": {},
+              "success_criteria": [
+                "Report whether rain is expected from the scoped trusted weather Evidence."
+              ],
               "resource_responsibility": {
-                "delivery_mode": "spoken_explanation",
-                "metadata": {},
-                "recipient": {
-                  "description": "requester"
-                },
+                "schema_version": 1,
+                "responsibility_type": "acquire_and_deliver_resource",
                 "resource": {
+                  "kind": "information",
+                  "description": "Report whether rain is expected from the scoped trusted weather Evidence.",
+                  "quantity": "",
                   "attributes": {
                     "date": {
                       "confidence": 1.0,
@@ -73,38 +79,34 @@
                       "name": "period",
                       "value": "morning"
                     }
-                  },
-                  "description": "Report whether rain is expected from the scoped trusted weather Evidence.",
-                  "kind": "information",
-                  "quantity": ""
+                  }
                 },
-                "responsibility_type": "acquire_and_deliver_resource",
-                "schema_version": 1,
                 "source": {
-                  "bindings": {},
+                  "status": "unknown",
                   "description": "",
-                  "status": "unknown"
-                }
+                  "bindings": {}
+                },
+                "recipient": {
+                  "description": "requester"
+                },
+                "delivery_mode": "spoken_explanation",
+                "metadata": {}
               },
-              "responsibility_status": "open",
-              "schema_version": 1,
               "source_responsibility_refs": [
                 "r1"
               ],
-              "source_text": "Use the retained weather Evidence for tomorrow's practical plan and tell me whether rain is expected.",
-              "success_criteria": [
-                "Report whether rain is expected from the scoped trusted weather Evidence."
-              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "information"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_evidence_reentry_interpretation_32_supported_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "result_evidence_reentry": {
           "evidence_refs": [

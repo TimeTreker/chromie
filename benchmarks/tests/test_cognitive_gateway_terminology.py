@@ -30,7 +30,7 @@ def test_runtime_adapter_manifest_uses_gateway_terminology() -> None:
 def test_goal_interpretation_paths_use_current_architecture_taxonomy() -> None:
     _, rules = load_config(ROOT / "benchmarks/manifests/suites.json")
     by_path = {item.path: item for item in rules}
-    for path in ("scenarios/goal_interpretation", "scenarios/cognitive_core_dialogue"):
+    for path in ("scenarios/user_meaning_interpretation", "scenarios/cognitive_core_dialogue"):
         source = by_path[path]
         assert source.layer in {"module", "integration"}
         assert any(tag in {"goal_interpretation", "cognitive_core_dialogue"} for tag in source.datasets)

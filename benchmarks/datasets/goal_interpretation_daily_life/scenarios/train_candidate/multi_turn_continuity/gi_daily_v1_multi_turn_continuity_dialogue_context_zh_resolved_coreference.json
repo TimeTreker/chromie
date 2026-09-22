@@ -40,10 +40,34 @@
           "source_evidence": {
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t9"
-          }
+          },
+          "continuity_scope": "goal"
         }
       ],
-      "unresolved": []
+      "meaning_uncertainties": [],
+      "cognitive_requests": [
+        {
+          "authority": "goal_association",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+        },
+        {
+          "authority": "social_cognition",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Decide grounded interaction for this addressed request without changing its meaning."
+        },
+        {
+          "authority": "planner",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Determine the Work or information acquisition needed for the requested outcome."
+        }
+      ]
     },
     "semantic_expectations": {
       "responsibility_count": 1,

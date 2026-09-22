@@ -29,16 +29,19 @@
     "request": {
       "context": {
         "goal_association_resolution": {
+          "schema_version": 1,
+          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_supported_en",
+          "resolution_status": "resolved",
           "associations": [],
-          "confidence": 0.99,
+          "non_goal_responsibility_refs": [],
           "new_goals": [
             {
-              "constraints": {},
-              "description": "Create the exact one-time reminder.",
+              "schema_version": 1,
               "goal_id": "goal-fpdl_v2_plan_relation_and_confirmation_proposal_24_supported_en-1",
-              "metadata": {
-                "output_mode": "stateful_effect"
-              },
+              "version": 1,
+              "responsibility_status": "open",
+              "description": "Create the exact one-time reminder.",
+              "source_text": "For what your robot body can really do, create one reminder at 6:30 p.m. today saying 'bring the blue notebook'.",
               "object": {
                 "bindings": {
                   "due_at": {
@@ -55,26 +58,25 @@
                   }
                 }
               },
-              "related_goal_ids": [],
-              "responsibility_status": "open",
-              "schema_version": 1,
-              "source_responsibility_refs": [
-                "r1"
-              ],
-              "source_text": "For what your robot body can really do, create one reminder at 6:30 p.m. today saying 'bring the blue notebook'.",
+              "constraints": {},
               "success_criteria": [
                 "Create the exact one-time reminder."
               ],
+              "source_responsibility_refs": [
+                "r1"
+              ],
+              "related_goal_ids": [],
               "supersedes_goal_ids": [],
-              "version": 1
+              "metadata": {
+                "output_mode": "stateful_effect"
+              }
             }
           ],
-          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope.",
           "referent_updates": [],
-          "resolution_status": "resolved",
           "resolved_references": [],
-          "schema_version": 1,
-          "turn_id": "turn-fpdl_v2_plan_relation_and_confirmation_proposal_24_supported_en"
+          "cognitive_requests": [],
+          "confidence": 0.99,
+          "reason_summary": "The accepted Responsibilities create the authoritative Planner Goal scope."
         },
         "situation": {
           "digest": "7d0bab69e1a6ea0c54fabb63fce32c80ab940bdfe9859761aa56cae031c53a16",

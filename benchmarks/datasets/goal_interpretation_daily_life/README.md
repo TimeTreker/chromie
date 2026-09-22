@@ -1,7 +1,7 @@
-# Goal Interpretation Daily-Life Dataset
+# User Meaning Interpretation Daily-Life Dataset
 
-Audience: Chromie maintainers evaluating or reviewing the isolated Goal
-Interpretation (GI) authority. The checked-in scenario JSON files are the
+Audience: Chromie maintainers evaluating or reviewing the isolated User Meaning
+Interpretation (UMI) authority. The checked-in scenario JSON files are the
 authoritative dataset assets; this directory does not ship a scenario generator.
 
 This dataset is separate from `daily_conversation` because it tests the current
@@ -64,3 +64,14 @@ replies must be understood from their supplied context in the primary GI result.
 
 These checks prove mechanical compatibility and internal consistency, not
 independent semantic correctness or live-model performance.
+
+The September 22 reference migration preserves all admitted text, context,
+outcomes, source spans, semantic detail expectations and contrast splits. References
+now explicitly carry `continuity_scope`, typed `meaning_uncertainties` and
+`cognitive_requests`. The 68 ambiguous-object/recipient cases retain their original
+uncertainty descriptions and cite their sole Responsibility. Draft-only conversation
+and repetition of already admitted speech use turn scope; separate recipient,
+information, performance and effect outcomes retain Goal scope. Activation choices
+are authored fixture data, never a Runtime routing rule or an inference-time repair.
+The frozen-test changes remain subject to owner review; no independent semantic,
+native-model or training promotion follows from current-Schema compatibility.

@@ -27,11 +27,35 @@
           "source_evidence": {
             "source_start_token_ref": "t8",
             "source_end_token_ref": "t12"
-          }
+          },
+          "continuity_scope": "goal"
         }
       ],
-      "unresolved": [
-        "The object referred to by 'that' is not identified."
+      "meaning_uncertainties": [
+        {
+          "local_ref": "u1",
+          "kind": "referent",
+          "description": "The object referred to by 'that' is not identified.",
+          "responsibility_refs": [
+            "r1"
+          ]
+        }
+      ],
+      "cognitive_requests": [
+        {
+          "authority": "goal_association",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Preserve canonical continuity for the requested independent outcome."
+        },
+        {
+          "authority": "social_cognition",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Decide grounded interaction for this addressed request without changing its meaning."
+        }
       ]
     },
     "semantic_expectations": {
