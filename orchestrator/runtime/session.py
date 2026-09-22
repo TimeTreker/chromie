@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -193,6 +194,7 @@ class SessionTracker:
         "playback_stream_incomplete",
         "session_idle_timeout",
         "session_done",
+        "social_task_failed",
     )
 
     def __init__(
@@ -247,6 +249,8 @@ class SessionTracker:
             "failed_tts": 0,
             "skipped_tts": 0,
             "llm_done": False,
+            "pending_social_tasks": 0,
+            "social_task_failures": [],
             "done_logged": False,
             "flow_summary_logged": False,
             "response_chars": 0,
@@ -650,6 +654,30 @@ class SessionTracker:
         )
         logger.log(level, "%s", line)
 
+    def track_social_task(self, sid: str | None, task: asyncio.Task[Any]) -> None:
+        """Join this session's detached SC/expression work before final reporting."""
+        state = self.state.get(sid or "")
+        if state is None:
+            return
+        state["pending_social_tasks"] = int(state.get("pending_social_tasks", 0)) + 1
+
+        def finished(completed: asyncio.Task[Any]) -> None:
+            state["pending_social_tasks"] -= 1
+            if not completed.cancelled():
+                error = completed.exception()
+                if error is not None:
+                    failure = {
+                        "task": completed.get_name(),
+                        "error_type": type(error).__name__,
+                        "error": str(error),
+                    }
+                    state.setdefault("social_task_failures", []).append(failure)
+                    self.log(sid, "social_task_failed: task=%s error_type=%s error=%s",
+                             failure["task"], failure["error_type"], failure["error"])
+            self.maybe_done(sid)
+
+        task.add_done_callback(finished)
+
     def maybe_done(self, sid: str | None) -> None:
         if not sid:
             return
@@ -660,11 +688,19 @@ class SessionTracker:
         played = int(s.get("played_tts", 0))
         failed = int(s.get("failed_tts", 0))
         skipped = int(s.get("skipped_tts", 0))
-        if s.get("llm_done") and scheduled == played + failed + skipped:
+        if (
+            s.get("llm_done")
+            and not s.get("pending_social_tasks", 0)
+            and scheduled == played + failed + skipped
+        ):
             s["done_logged"] = True
+            completion = "failed" if (
+                failed or skipped or s.get("social_task_failures") or s.get("semantic_status") == "failed"
+            ) else "complete"
             self.log(
                 sid,
-                "session_done: scheduled_tts=%s queued_tts=%s played_tts=%s failed_tts=%s skipped_tts=%s response_chars=%s total_ms=%.1f",
+                "session_done: state=%s scheduled_tts=%s queued_tts=%s played_tts=%s failed_tts=%s skipped_tts=%s response_chars=%s total_ms=%.1f",
+                completion,
                 scheduled,
                 s.get("queued_tts", 0),
                 played,
@@ -673,7 +709,7 @@ class SessionTracker:
                 s.get("response_chars", 0),
                 self.elapsed_ms(sid),
             )
-            self._log_session_flow_summary(sid, termination_state="complete")
+            self._log_session_flow_summary(sid, termination_state=completion)
             workflow = self._workflow_summary(sid)
             if workflow:
                 self.event_writer.write(
@@ -688,12 +724,13 @@ class SessionTracker:
                 summary = self._workflow_timing_summary(graph)
                 if summary:
                     self.log(sid, "session_workflow_summary: %s", summary)
-            self._finalize_workflow_report(sid, termination_state="complete")
+            self._finalize_workflow_report(sid, termination_state=completion)
             self.trace_mark(
                 sid,
                 "session_finished",
                 kind="session",
                 attributes={
+                    "completion_state": completion,
                     "scheduled_tts": scheduled,
                     "played_tts": played,
                     "failed_tts": failed,

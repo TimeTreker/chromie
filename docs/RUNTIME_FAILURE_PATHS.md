@@ -70,6 +70,14 @@ Canonical Fast uses `contract_failure` containment, so Host cannot invoke Deep t
 repair a technical failure. Deep returns an empty rejected Plan, without invented
 clarification speech. Streaming returns a typed `before_commit` failure.
 
+Fast's native argument contract requires a source span for a required, unbound
+string enum when none of its choices could be a literal copy from an owning
+Responsibility outcome. This exposes the existing Host provenance requirement
+before generation without choosing an enum value or translating user language.
+Literal/case-only copies, typed bindings, declared realizations and trusted target
+or verified-memory references retain their existing paths. Host still validates
+the selected span against the immutable input and its owning Responsibility.
+
 This includes rejected Fast Evidence re-entry DTOs, semantic-validation failures,
 and authoritative-grounding mismatches: an exception is not a model-authored
 request for depth. Keep the original failure and zero new Work; only a valid
@@ -191,6 +199,20 @@ session, turn and communicative Activity identity. Final Need/Evidence metadata
 updates the existing delivered record rather than adding another utterance; the
 console therefore publishes it once. Different identities or turns can still
 repeat identical words, and missing identity proof never triggers text deduplication.
+
+Independent SC delivery joins both the Runtime terminal result and playback
+completion. A failed expression/provider result or unplayed SC utterance is
+retained as a session social-task failure, even when requested Work succeeded.
+Conversely, GA/Planner failure stops uncommitted Work without cancelling the same
+turn's admitted independent SC interaction. The coordinator joins that interaction's
+delivery and retains the original Work failure; an SC failure is secondary diagnostic
+evidence. Outer deadline or explicit interruption still cancels delivery. Host keeps
+the exact delivered SC response without redispatch or an appended generic apology,
+and final session reporting remains failed even when its speech succeeded.
+The finalized workflow reports `failed`, not successful interaction completion.
+`session_done` still denotes a terminal session and a complete Runtime Trace still
+denotes a sealed trace; neither alone proves successful delivery. Optional failure
+does not replay Work, rewrite speech, or invoke a model repair.
 
 The same containment applies to result, provider, time and Situation re-entry:
 returned technical failures and thrown call errors are retained as failed workflow

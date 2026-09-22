@@ -1072,9 +1072,9 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Cancel pending independent SC inference and its queued playback, contain the owned runtime failure, and return an observable failed result without authorizing unvalidated Work. Cancellation failures propagate rather than claiming cleanup succeeded.",
+      "contract": "Stop uncommitted Planner Work, join the same turn's admitted independent SC delivery, and return the original observable failed result without authorizing unvalidated Work. Retain secondary SC failures as diagnostics; outer cancellation still cancels delivery and propagates. Cleanup failures propagate rather than claiming success.",
       "review_status": "reviewed",
-      "body_sha256": "ab4c9b8f7df986beca11b6153a8288191a24f804f1190dca2db6773dad4bdf9a",
+      "body_sha256": "59949b9694fb6088b11e879586e620792dabe2c4f5132ba32268a38dfdef044c",
       "failure_signals": [
         "return"
       ]

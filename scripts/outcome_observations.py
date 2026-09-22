@@ -162,11 +162,25 @@ def collect_observations(
         definition = behavior_map.get(capability_id, {})
         metadata = skill.get("metadata") if isinstance(skill.get("metadata"), dict) else {}
         args = skill.get("args") if isinstance(skill.get("args"), dict) else {}
+        receipt = execution_by_request.get(str(skill.get("request_id") or ""))
+        contracts = summary.get("capability_contracts") or {}
+        contract = contracts.get(skill.get("request_id"), {})
+        version = skill.get("capability_version")
+        if (version and contract.get("capability_id") == capability_id
+                and contract.get("capability_version") == version
+                and (receipt is None or (receipt.get("capability_id") == capability_id
+                                        and receipt.get("capability_version") == version))):
+            # Omission has meaning only under the exact retained execution contract.
+            # Preserve explicit values and leave required or unqualified fields unknown.
+            schema = contract.get("input_schema") or {}
+            defaults = {key: rule["default"] for key, rule in schema.get("properties", {}).items()
+                        if isinstance(rule, dict) and "default" in rule
+                        and key not in schema.get("required", [])}
+            args = {**defaults, **args}
         arg_fields = definition.get("arg_fields")
         if not isinstance(arg_fields, list):
             arg_fields = list(args)
         observed_args = {key: args[key] for key in arg_fields if key in args}
-        receipt = execution_by_request.get(str(skill.get("request_id") or ""))
         status = str((receipt or {}).get("status") or "planned")
         role = (
             "auxiliary_expression"

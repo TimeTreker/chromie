@@ -504,6 +504,7 @@ class VoiceAssistant:
             context_refresh=self.build_context,
             delivered_turn_speech_provider=self._delivered_turn_speech_events,
             workflow_stage_sink=host_support.sessions.record_cognitive_stage,
+            social_task_tracker=host_support.sessions.track_social_task,
         )
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s confirmation_ttl_s=%.1f",
@@ -2447,6 +2448,19 @@ class VoiceAssistant:
             source=source,
         )
 
+    def _finish_delivered_social_session(
+        self, session_id: str, response: InteractionResponse,
+    ) -> None:
+        # SC already waited for Runtime and playback delivery. This branch bypasses
+        # _launch_interaction's completion consumer, so close its LLM work here.
+        state = self.sessions.state.get(session_id)
+        if state is not None:
+            state["llm_done"] = True
+            state["response_chars"] = state.get("response_chars", 0) + sum(
+                len(item.text) for item in response.speech
+            )
+        self.maybe_session_done(session_id)
+
     async def _try_apply_cognitive_runtime(
         self,
         session: aiohttp.ClientSession,
@@ -2508,9 +2522,16 @@ class VoiceAssistant:
         )
         summary = self._cognitive_resolution_summary(resolution)
         if resolution.status != "applied" or resolution.interaction_response is None:
+            sessions = getattr(self, "sessions", None)
+            if sessions is not None and session_id in sessions.state:
+                sessions.state[session_id]["semantic_status"] = "failed"
             fallback_started_ms = now_ms()
             fast_first_scheduled = fast_planner_vocal_scheduled
-            safe_response = self._cognitive_core_exception_safe_response(
+            delivered_social = (
+                resolution.interaction_response is not None
+                and resolution.interaction_response.metadata.get("presentation_already_dispatched") is True
+            )
+            safe_response = resolution.interaction_response if delivered_social else self._cognitive_core_exception_safe_response(
                 user_text,
                 context=context,
                 failure_stage=str(
@@ -2524,27 +2545,27 @@ class VoiceAssistant:
                 ),
                 failure_error=str(resolution.fallback_reason or ""),
             )
-            # Earlier SC acknowledgement cannot communicate this later failure.
-            # Preserve its playback ordering, then dispatch the operational
-            # fallback through the normal terminal path even when speech is
-            # prohibited: that path also closes the session after delivery.
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="fallback_speech",
-                started_monotonic_ms=fallback_started_ms,
-                finished_monotonic_ms=now_ms(),
-                status="selected" if safe_response.speech else "silent",
-                input_payload={
-                    "cognitive_runtime_status": resolution.status,
-                    "failure_stage": resolution.metadata.get("failure_stage"),
-                    "fallback_reason": resolution.fallback_reason,
-                    "user_text": user_text,
-                    "early_communication_already_scheduled": fast_first_scheduled,
-                },
-                output_payload=safe_response,
-                errors=list(resolution.metadata.get("stage_diagnostics") or []),
-            )
+            # Preserve the exact independently delivered SC response. A Work
+            # failure remains failed evidence; it does not authorize a second
+            # greeting or a generic Host apology over that completed act.
+            if not delivered_social:
+                record_session_workflow_stage(
+                    self,
+                    session_id,
+                    stage="fallback_speech",
+                    started_monotonic_ms=fallback_started_ms,
+                    finished_monotonic_ms=now_ms(),
+                    status="selected" if safe_response.speech else "silent",
+                    input_payload={
+                        "cognitive_runtime_status": resolution.status,
+                        "failure_stage": resolution.metadata.get("failure_stage"),
+                        "fallback_reason": resolution.fallback_reason,
+                        "user_text": user_text,
+                        "early_communication_already_scheduled": fast_first_scheduled,
+                    },
+                    output_payload=safe_response,
+                    errors=list(resolution.metadata.get("stage_diagnostics") or []),
+                )
             self.conversation_state.record_user_turn(
                 session_id,
                 user_text,
@@ -2577,6 +2598,9 @@ class VoiceAssistant:
                 resolution, session_id=session_id, user_text=user_text,
                 session_log=self.session_log,
             )
+            if delivered_social:
+                self._finish_delivered_social_session(session_id, safe_response)
+                return True
             self._launch_interaction(
                 safe_response,
                 session_id,
@@ -3034,18 +3058,7 @@ class VoiceAssistant:
             self.conversation_state.record_interaction_response(
                 session_id, response
             )
-            # start_state_interaction() already waited for the complete Runtime
-            # dispatch, including speech/capability terminal delivery. The normal
-            # _launch_interaction() path closes the session from its detached
-            # completion consumer; this already-dispatched branch bypasses that
-            # owner, so transfer the same terminal bookkeeping here exactly once.
-            state = self.sessions.state.get(session_id)
-            if state is not None:
-                state["llm_done"] = True
-                state["response_chars"] = state.get("response_chars", 0) + sum(
-                    len(item.text) for item in response.speech
-                )
-            self.maybe_session_done(session_id)
+            self._finish_delivered_social_session(session_id, response)
             return True
         if await self._stage_interaction_confirmation(
             response,

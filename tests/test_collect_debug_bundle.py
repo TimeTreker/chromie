@@ -9,6 +9,9 @@ import tarfile
 import tempfile
 import textwrap
 import unittest
+from unittest.mock import Mock
+
+from shared.chromie_runtime.llm_diagnostics import log_llm_call_evidence
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -84,6 +87,34 @@ class CollectDebugBundleTest(unittest.TestCase):
             (text_mujoco_run / "recordings").mkdir()
             (text_mujoco_run / "recordings" / "private.wav").write_bytes(b"not copied")
 
+            logger = Mock()
+            request = {
+                "model": "chromie-gemma4-12b",
+                "system": "complete system prompt",
+                "prompt": "complete user prompt",
+                "response_format": {"type": "json_schema", "json_schema": {
+                    "name": "plan", "schema": {"type": "object", "properties": {
+                        "role": {"const": "capability"},
+                        "capability_id": {"const": "soridormi.blink_eyes"},
+                        "args": {"type": "object", "properties": {
+                            "intensity": {"type": "number"},
+                            "count": {"type": "integer"},
+                        }},
+                    }},
+                }},
+            }
+            log_llm_call_evidence(
+                logger, call_id="llmcall_test_bundle", purpose="fast_planner",
+                stage="fast_planner.primary", transport="sglang.chat_stream",
+                status="accepted", request=request,
+                response={"choices": [{"message": {"content": '{"decision":"continue"}'}}]},
+                correlations={"turn_id": "daily-case"},
+            )
+            (bin_dir / "llm.log").write_text(
+                "chromie-agent | llm_call_evidence " + logger.info.call_args.args[2] + "\n",
+                encoding="utf-8",
+            )
+
             fake_docker = bin_dir / "docker"
             fake_docker.write_text(
                 textwrap.dedent(
@@ -96,7 +127,7 @@ class CollectDebugBundleTest(unittest.TestCase):
                     case "$command_name" in
                       compose)
                         if [[ "$*" == "logs chromie-agent --tail=5000" ]]; then
-                          printf '%s\\n' 'chromie-agent | llm_call_evidence {"schema_version":1,"event":"chromie.llm_call_evidence","call_id":"llmcall_test_bundle","purpose":"goal_association","stage":"goal_association.primary","transport":"ollama.generate","status":"accepted","request":{"model":"gemma4:12b","system":"complete system prompt","prompt":"complete user prompt"},"response":{"raw_model_output":"{\\"decision\\":\\"continue\\"}"},"correlations":{"turn_id":"daily-case"}}'
+                          cat "$(dirname "$0")/llm.log"
                         else
                           printf 'fake compose output: %s\\n' "$*"
                         fi
@@ -206,6 +237,10 @@ class CollectDebugBundleTest(unittest.TestCase):
                 self.assertEqual(llm_record["call_id"], "llmcall_test_bundle")
                 self.assertEqual(
                     llm_record["request"]["system"], "complete system prompt"
+                )
+                # Equality of dict values alone hides decoder property reordering.
+                self.assertEqual(
+                    json.dumps(llm_record["request"]), json.dumps(request)
                 )
                 self.assertEqual(
                     llm_record["response"]["raw_model_output"],

@@ -597,6 +597,37 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(recorded_response.capabilities, [])
 
 
+def test_planner_failure_preserves_delivered_sc_and_finishes_as_failed():
+    from orchestrator.runtime.session import SessionTracker
+
+    response = InteractionResponse(
+        speech=[{"text": "Hello!", "timing": "immediate"}],
+        metadata={"presentation_already_dispatched": True, "semantic_owner": "social_cognition"},
+    )
+    assistant = OrchestratorCognitiveRuntimeTests._assistant(CognitiveRuntimeResolution(
+        mode="apply", status="error", interaction_response=response,
+        fallback_reason="direction provenance missing",
+        metadata={"failure_stage": "fast_planner", "failure_class": "fast_stream_contract_invalid"},
+    ))
+    assistant.sessions = SessionTracker(enabled=False)
+    sid = assistant.sessions.create()
+    state = assistant.sessions.state[sid]
+    state.update(scheduled_tts=1, played_tts=1)
+    core, envelope = _core_and_envelope("Hello, then turn left.", sid=sid, language="en-US")
+    asyncio.run(assistant._try_apply_cognitive_runtime(
+        object(), user_text=envelope.original_input.text, session_id=sid, context={},
+        core_interpretation=core, core_interpretation_latency_ms=1, turn_envelope=envelope,
+    ))
+    assert not assistant._launch_interaction_calls
+    assert len(assistant.conversation_state.agent_results) == 1
+    recorded = assistant.conversation_state.agent_results[0][0][1]
+    assert recorded == response
+    assert state["llm_done"] and state["done_logged"]
+    assert state["response_chars"] == len("Hello!")
+    assert state["workflow_report"]["termination_state"] == "failed"
+    assert assistant.conversation_state.user_turns[0][1]["metadata"]["semantic_status"] == "failed"
+
+
 @pytest.mark.parametrize("early_status", ["scheduled", "playback_started", "playback_completed"])
 @pytest.mark.parametrize("silence", [False, True])
 def test_failure_after_sc_reaches_session_terminal_without_resetting_audio(early_status, silence):

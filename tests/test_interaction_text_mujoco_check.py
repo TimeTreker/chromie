@@ -979,6 +979,14 @@ class ExecutionBindingTests(unittest.TestCase):
 
 
 class SessionCompletionTests(unittest.IsolatedAsyncioTestCase):
+    @staticmethod
+    def sessions():
+        from orchestrator.runtime.session import SessionTracker
+
+        sessions = SessionTracker(resource_sampling_mode="off")
+        sessions.state["sid-1"] = {"done_logged": True}
+        return sessions
+
     async def test_done_session_waits_for_social_response_before_client_shutdown(self) -> None:
         released = asyncio.Event()
         delivered: list[str] = []
@@ -988,12 +996,10 @@ class SessionCompletionTests(unittest.IsolatedAsyncioTestCase):
             delivered.append("acknowledgement")
 
         social = asyncio.create_task(social_response(), name="social-interpretation:sid-1")
+        sessions = self.sessions()
+        sessions.track_social_task("sid-1", social)
         assistant = SimpleNamespace(
-            sessions=SimpleNamespace(state={"sid-1": {"done_logged": True}}),
-            cognitive_runtime=SimpleNamespace(
-                _auxiliary_execution_tasks={social},
-                _social_turns={"conversation": ("request", social)},
-            ),
+            sessions=sessions,
         )
         waiter = asyncio.create_task(wait_for_session_done(assistant, "sid-1", timeout_s=1))
         await asyncio.sleep(0)
@@ -1007,26 +1013,44 @@ class SessionCompletionTests(unittest.IsolatedAsyncioTestCase):
             raise ConnectionError("social service disconnected")
 
         social = asyncio.create_task(failed_response(), name="social-interpretation:sid-1")
-        await asyncio.sleep(0)
+        sessions = self.sessions()
+        sessions.track_social_task("sid-1", social)
+        await asyncio.gather(social, return_exceptions=True)
         assistant = SimpleNamespace(
-            sessions=SimpleNamespace(state={"sid-1": {"done_logged": True}}),
-            cognitive_runtime=SimpleNamespace(
-                _auxiliary_execution_tasks=set(),
-                _social_turns={"conversation": ("request", social)},
-            ),
+            sessions=sessions,
         )
-        with self.assertRaisesRegex(ConnectionError, "social service disconnected"):
+        with self.assertRaisesRegex(RuntimeError, "social service disconnected"):
             await wait_for_session_done(assistant, "sid-1", timeout_s=1)
 
     async def test_social_wait_timeout_does_not_cancel_runtime_work(self) -> None:
         social = asyncio.create_task(asyncio.Event().wait(), name="social-interpretation:sid-1")
+        sessions = self.sessions()
+        sessions.track_social_task("sid-1", social)
         assistant = SimpleNamespace(
-            sessions=SimpleNamespace(state={"sid-1": {"done_logged": True}}),
-            cognitive_runtime=SimpleNamespace(_auxiliary_execution_tasks={social}),
+            sessions=sessions,
         )
         try:
             with self.assertRaises(TimeoutError):
                 await wait_for_session_done(assistant, "sid-1", timeout_s=0.01)
+            self.assertFalse(social.done())
+        finally:
+            social.cancel()
+            await asyncio.gather(social, return_exceptions=True)
+
+    async def test_unrelated_session_tasks_and_failures_do_not_block_completion(self) -> None:
+        social = asyncio.create_task(asyncio.Event().wait(), name="social-expression:other-turn")
+        sessions = self.sessions()
+        sessions.state["other-session"] = {
+            "done_logged": True,
+            "social_task_failures": [{"error_type": "ConnectionError", "error": "unrelated failure"}],
+        }
+        sessions.track_social_task("other-session", social)
+        assistant = SimpleNamespace(
+            sessions=sessions,
+            cognitive_runtime=SimpleNamespace(_auxiliary_execution_tasks={social}),
+        )
+        try:
+            self.assertEqual(await wait_for_session_done(assistant, "sid-1", timeout_s=0.01), "done")
             self.assertFalse(social.done())
         finally:
             social.cancel()

@@ -3643,6 +3643,50 @@ if __name__ == "__main__":
 
 
 class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
+    async def test_execution_snapshot_expires_on_provider_start_and_completion(self) -> None:
+        started = {name: asyncio.Event() for name in ("blocker", "work")}
+        release = {name: asyncio.Event() for name in started}
+
+        class Provider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):
+                started[request.request_id].set()
+                await release[request.request_id].wait()
+                return await super().execute(request, definition, context)
+
+        registry = CapabilityRegistry()
+        registry.register(_body_definition())
+        runtime = CapabilityRuntime(registry)
+        runtime.register_provider(Provider("mock.body"))
+        receipts = []
+        try:
+            for name, goal in (("blocker", "other-goal"), ("work", "goal")):
+                receipts.append(await runtime.submit(InteractionResponse(
+                    interaction_id=name, capabilities=[{
+                        "request_id": name, "capability_id": "soridormi.nod_yes",
+                        "metadata": {"source_goal_ids": [goal], "turn_id": name},
+                    }],
+                )))
+                if name == "blocker":
+                    await asyncio.wait_for(started[name].wait(), 1)
+            scheduled = await runtime.planning_state_snapshot(["goal"], "work")
+            self.assertFalse(started["work"].is_set())
+            self.assertTrue(runtime.execution_state_is_current(scheduled))
+            release["blocker"].set()
+            await asyncio.wait_for(started["work"].wait(), 1)
+            self.assertFalse(runtime.execution_state_is_current(scheduled))
+            # Work progress does not invalidate a Planner's semantic decision.
+            await runtime.validate_planning_state(scheduled)
+            running = await runtime.planning_state_snapshot(["goal"], "work")
+            self.assertTrue(runtime.execution_state_is_current(running))
+            release["work"].set()
+            await runtime.wait_terminal(receipts.pop())
+            self.assertFalse(runtime.execution_state_is_current(running))
+            await runtime.validate_planning_state(running)
+        finally:
+            for event in release.values():
+                event.set()
+            await asyncio.gather(*(runtime.wait_terminal(receipt) for receipt in receipts))
+
     async def test_provider_failure_is_terminal_evidence_not_a_new_plan(self) -> None:
         for status in ("completed", "failed", "refused", "timed_out"):
             with self.subTest(status=status):
@@ -3728,6 +3772,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         # Both requests share the Planner's turn, but neither is task Work.
         # Concurrent social delivery must not stale an otherwise-valid plan.
         await runtime.validate_planning_state(snapshot)
+        self.assertTrue(runtime.execution_state_is_current(snapshot))
         self.assertEqual(
             (await runtime.planning_state_snapshot(["goal-a"], "turn-a"))["work"],
             {},
@@ -3736,6 +3781,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         speech_release.set()
         body_release.set()
         await runtime.wait_terminal(receipt)
+        self.assertTrue(runtime.execution_state_is_current(snapshot))
 
     async def test_overlapping_plans_reject_late_commit_but_other_goals_proceed(self) -> None:
         runtime = CapabilityRuntime(CapabilityRegistry())

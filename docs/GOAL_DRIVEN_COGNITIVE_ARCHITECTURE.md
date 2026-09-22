@@ -3045,11 +3045,15 @@ Its primary invocation chooses the exact act, expression, target and arguments.
 
 Runtime validates catalog membership, schema, anchor identity, current target
 evidence, availability, confirmation, safety, low-level-field exclusion,
-parallelism, duplicate-primary rejection, resource conflicts, repetition, and
+parallelism, duplicate submission identity, resource conflicts, repetition, and
 bounded count. Runtime can execute the exact proposal or drop it. It cannot select
 a replacement Capability, retarget it, rewrite arguments, generate a gesture, or
 infer social intent. Malformed or stale decoration therefore fails soft without a
 repair/review model call.
+Equal primary and social Capability IDs alone do not establish semantic duplication:
+an independently intended SC expression remains separate from requested Work and
+its completion. The canonical distinction is owned by the
+[interaction contract](HUMAN_LIKE_INTERACTION_CONTRACT.md#social-decoration-during-interaction).
 
 An auxiliary-only target change, invalidation, execution result, or new decorative
 possibility cannot construct a `CognitiveOpportunity`: its schema requires real

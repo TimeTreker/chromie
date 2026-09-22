@@ -686,6 +686,14 @@ completed. UMI supplies meaning, Work Planner supplies execution and communicati
 obligations, and SC supplies words, timing and optional expression. The Host validates
 and delivers their exact decisions without rewriting semantics.
 
+For independently scheduled Plan-state SC, the Host binds pending inference to the
+Runtime's existing Goal/turn-scoped execution snapshot. On return from inference and
+expression preparation it checks both request identity and execution state, including
+provider start and termination. A changed snapshot suppresses the obsolete result;
+it does not rewrite words or request a semantic retry. Parallel Work changes do not
+invalidate independent interpretation-time acknowledgement. Already submitted delivery
+retains its existing interruption and completion ownership.
+
 Complete bounded capability work
 belongs on the Fast path. Once that Fast work is completely grounded, exactly
 capability-bound, deterministically safe/authorized, and needs no confirmation, it may
@@ -1168,6 +1176,13 @@ Planner emits no presentation prefix or social decoration. Requested gestures
 remain its Goal-owned Work; optional acknowledgement remains independent and
 cannot predict a Plan or claim an unobserved effect.
 
+Everyday gesture requests allow natural variation. Under the owner's 2026-09-22
+clarification, casual wording such as “眨一下眼睛” asks for a blink gesture;
+one, two or a few natural repetitions do not alone constitute failure. Precision
+must be material to the user's contextual intent before acceptance treats count
+as a strict constraint. This meaning belongs to cognition, not a Host phrase rule.
+Execution evidence, safety, task ownership and complete delivery remain required.
+
 The same motion has different semantics depending on ownership. A user request
 such as "blink twice" makes **blink twice** the semantic primary Activity. A blink
 selected while Chromie performs the semantic Activity **greet the user** is auxiliary
@@ -1177,10 +1192,14 @@ participates in Goal completion.
 
 An explicit action can also carry social framing. “Blink twice and be cute”
 still makes exactly two blinks mandatory primary Activity; it does not authorize
-optional decoration to replace, repeat, or alter them. From the supplied utterance
-and Core context, SC may optionally choose a
-**different**, compatible small cue when that improves the interaction and fits
-the owner-approved style and recent-decoration evidence. "Blink twice" as a
+optional decoration to replace, satisfy, or alter that Work. Under the owner's
+2026-09-22 clarification, SC may independently choose an additional blink for a
+distinct social purpose, anchored to its own communicative act. The same Capability
+does not imply the same semantic Activity. That extra expression contributes
+nothing to the requested two-blink task's completion and must not be justified as
+executing the request. SC decides whether it improves the interaction from the
+supplied context, style and recent-expression evidence; Runtime still enforces
+resource compatibility. "Blink twice" as a
 capability test may naturally receive no extra cue, while "do something cute"
 requires normal Cognitive Core / Goal reasoning because it asks Chromie to
 choose the primary behavior. The Host never implements this distinction with a
@@ -1188,7 +1207,8 @@ choose the primary behavior. The Host never implements this distinction with a
 
 Deterministic runtime code validates exact Capability IDs, schemas, target evidence,
 confirmation policy, execution availability, latency budget, parallel timing,
-duplicate-primary rejection, resource conflicts, and provider concurrency.
+duplicate submission identity, resource conflicts, and provider concurrency.
+It must not infer semantic duplication from equal Capability IDs alone.
 Accepted decoration executes
 through Activity with `auxiliary_plan_activity=true` and
 `execution_role=social_decoration`. It is suppressed rather than delaying or
@@ -1202,6 +1222,14 @@ speech/body/provider items realizing the same Activity do not create duplicate
 auxiliary items. A previous decoration on another Activity in the same turn is not
 a blanket suppression rule.
 Pure baseline embodiment/liveliness without a primary Activity is a separate concern.
+
+Overall completion joins the same request's Work, SC decision and admitted social
+delivery. For example, requested two-blink Work and an independently selected
+three-blink expression retain separate ownership and counts, but both must finish
+before the whole response can be reported successful. A returned SC decision,
+accepted dispatch or playback start is not completed delivery. Failed delivery
+must remain visible in the terminal response report; it does not erase completed
+Work or turn optional expression into Goal-completion Evidence.
 
 Runtime may suppress an exact stale or invalid proposal, but it cannot retarget or
 reselect. An auxiliary-only target change, failure, or completion never creates a

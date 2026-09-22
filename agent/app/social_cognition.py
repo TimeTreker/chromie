@@ -36,6 +36,23 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
 
 
+SOCIAL_COGNITION_WORK_STATE_PROMPT = (
+    "Ground any Work statement in the latest supplied state for that same activity. "
+    "The ledger event activity_committed with state=committed records a commitment to do "
+    "the Work, not physical execution. Task status=scheduled likewise establishes only "
+    "that Work is arranged. These facts support prospective wording about the established "
+    "plan or intention; they do not establish that the action is happening or will succeed. "
+    "An explicit running/started observation establishes a start; matching terminal "
+    "Evidence establishes its reported outcome. Describe the observed state, not the "
+    "expected next transition. Without a supplied start observation, whether execution "
+    "has begun remains unknown. Parallel describes scheduling compatibility, not a start. "
+    "In reason_summary, separate the supplied Work fact from your social reason for "
+    "responding or remaining silent. An already acknowledged interaction can justify "
+    "silence while Work is merely committed; silence never requires inventing an "
+    "in-progress action. Preserve upstream uncertainty and cite supplied Evidence for results. "
+)
+
+
 SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "You are Social Cognition inside Chromie's Cognitive Core. You own interaction "
     "with people: whether and when to communicate, exact wording, and coherent optional "
@@ -43,6 +60,11 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "Situation, disclosure-safe Memory, Stable Mind and delivered/pending interaction. "
     "UMI owns WHAT and Planner owns requested task Work. Never reinterpret their decisions, "
     "invent a user turn, change Goals, plan task actions, grant consent or authorize effects. "
+    "A task Responsibility is context for your interaction, never an instruction for you to "
+    "execute it. Planner must fulfill the requested action and its quantity. You may choose "
+    "the same eligible Capability for a separately intended social expression, anchored to "
+    "your communicative act, but never to fulfill or count toward requested Work. Explain "
+    "that expression's distinct social purpose; merely executing the request is not one. "
     "Your standing interaction goals are to respond to the person, maintain shared "
     "understanding of important task changes, and engage appropriately with people "
     "present in the supplied Situation. These duties exist even when there is no "
@@ -74,12 +96,6 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "Preserve each need's delivery_phase when specified: pre_action must precede "
     "Work and final must follow Work. Optional progress is immediate and must not "
     "block Work. Final timing never permits predicting an unobserved result. "
-    "Understanding, proposed plans, committed Work, execution and verified completion "
-    "are different facts. Read each Work row's exact state before deciding what it "
-    "establishes: scheduled means accepted but NOT started; running means started but "
-    "NOT finished. Parallel describes scheduling compatibility, never execution state. "
-    "Keep this distinction in both your reason_summary and your words. Preserve "
-    "upstream-authored uncertainty and cite supplied Evidence for results. "
     "Report each module's actual state. Do not infer that UMI is uncertain from "
     "missing Planner inputs, or claim execution from understanding alone. UMI, GA, "
     "Planner and Runtime may supply communication needs; their facts retain their "
@@ -132,7 +148,8 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "unsafe merely because low-level control is forbidden. Treat supplied Planner/Runtime "
     "Work state and explicit capability/authorization facts as authoritative. Do not infer "
     "a capability limitation from implementation details omitted from your social view. "
-    "Do not invent targets, extra task steps or gestures to satisfy requested Work. "
+    "Optional expression serves your communicative act; it never fulfills or replaces "
+    "requested Work, including while planning is pending. Do not invent targets or task steps. "
     "Nonverbal-only interaction is allowed with function=nonverbal, empty text and an "
     "explicit expression; never invent speech just to anchor a gesture. Runtime may "
     "suppress optional expression and owns all delivery and safety checks. "
@@ -179,30 +196,39 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
                 for identity in ids:
                     known.setdefault(str(identity).strip(), set()).add(normalize_whitespace(row.get("text") or ""))
 
-    def fresh_identity_suffix(excluded: list[str]) -> str:
+    def fresh_identity_suffix(excluded: list[str], remaining: int) -> str | None:
         # The serving decoder ignores `not: {enum: ...}` and does not support
         # negative lookahead. This finite-prefix complement excludes exactly
         # the retained identities. Keep new IDs within JSON-safe lexical text:
         # this decoder applies patterns to encoded strings without escaping
         # wildcard matches. Retained IDs remain reusable through exact consts.
+        if remaining == 0:
+            return "" if "" not in excluded else None
         heads = sorted({value[0] for value in excluded if value})
         safe_character = r'[^"\\\x00-\x1f]'
         if not heads:
-            return safe_character + "+"
-        alternatives = [r'[^"\\\x00-\x1f' + re.escape(''.join(heads)) + "]" + safe_character + "*"]
-        alternatives.extend(
-            re.escape(head) + fresh_identity_suffix([
+            minimum = 1 if "" in excluded else 0
+            return safe_character + f"{{{minimum},{remaining}}}"
+        alternatives = [r'[^"\\\x00-\x1f' + re.escape(''.join(heads)) + "]" + safe_character + f"{{0,{remaining - 1}}}"]
+        for head in heads:
+            suffix = fresh_identity_suffix([
                 value[1:] for value in excluded if value.startswith(head)
-            ])
-            for head in heads
-        )
+            ], remaining - 1)
+            if suffix is not None:
+                alternatives.append(re.escape(head) + suffix)
         if "" not in excluded:
             alternatives.append("")
         return "(" + "|".join(alternatives) + ")"
 
     safe_known = [identity for identity in sorted(known)
                   if not re.search(r'["\\\x00-\x1f]', identity)]
-    fresh_pattern = "^" + fresh_identity_suffix(safe_known) + "$" if known else None
+    # When a pattern is present the native decoder can ignore sibling length
+    # keywords. Compile the existing 1..24 bound into that same regex; retained
+    # identities keep their separate exact-reuse branches, including longer IDs.
+    fresh_suffix = fresh_identity_suffix([
+        "", *(identity for identity in safe_known if len(identity) <= 24),
+    ], 24)
+    fresh_pattern = "^" + fresh_suffix + "$" if known and fresh_suffix is not None else None
     contract = schema["$defs"]["SocialCommunicativeAct"]
     branches = []
     for branch in contract.get("oneOf", [contract]):
@@ -694,7 +720,9 @@ def _social_mind_projection(context: dict[str, Any]) -> dict[str, Any]:
     return projected
 
 
-def _social_model_context(context: dict[str, Any]) -> dict[str, Any]:
+def _social_model_context(
+    context: dict[str, Any], *, source_turn_id: str = "",
+) -> dict[str, Any]:
     projected = copy.deepcopy(context)
     if "mind" in projected:
         projected["mind"] = _social_mind_projection(context)
@@ -704,7 +732,18 @@ def _social_model_context(context: dict[str, Any]) -> dict[str, Any]:
     # current Responsibility.  Delivered prior speech remains available through
     # interaction_context.prior_delivered_speech for repetition/repair identity.
     projected.pop("history", None)
-    projected.pop("core_interpretation", None)
+    core = projected.pop("core_interpretation", None)
+    if source_turn_id and isinstance(core, dict) and core.get("turn_id") == source_turn_id:
+        # SC's own Responsibility list can be only one part of the admitted turn.
+        # Keep UMI's accepted meanings and cognitive routing as read-only context
+        # so SC sees which sibling Work is already assigned, without reinterpreting
+        # the original text or treating pending planning as unresolved user intent.
+        projected["core_interpretation"] = {
+            key: core[key] for key in (
+                "authority", "turn_id", "responsibilities", "meaning_uncertainties",
+                "cognitive_requests",
+            ) if key in core
+        }
     # Integrity lineage is trusted transport metadata rather than cognition.
     projected.pop("semantic_artifact_lineage", None)
     # The exact admitted source is already present once as request.source_turn.
@@ -747,7 +786,9 @@ def social_cognition_prompt(
     request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, num_ctx: int,
 ) -> str:
     payload = request.model_dump(mode="json")
-    payload["context"] = _social_model_context(payload.get("context", {}))
+    payload["context"] = _social_model_context(
+        payload.get("context", {}), source_turn_id=str(request.source_turn.get("turn_id") or ""),
+    )
     # Empty external Needs are not a social fact and previously became a false
     # silence cue in native inference. Non-empty Needs remain complete.
     if not payload.get("communication_needs"):
@@ -820,7 +861,7 @@ class SocialCognitionResolver:
         raw = await model.generate(
             prompt + "\nRequired output contract JSON:\n" + required_json(
                 schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
-            ), system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
+            ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT, system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
                 "This is the sole deeper pass; decide communicate or silence now." if deep else ""
             ),
             options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx,

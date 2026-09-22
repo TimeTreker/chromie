@@ -1544,6 +1544,11 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    complete a Goal, and cannot authorize a task effect. Planner-authored decoration
    is rejected at maintained ingress boundaries. An explicitly requested gesture remains ordinary Goal-owned Work in
    `steps[]`, even when the same Capability can also be used as optional decoration.
+   As clarified by the owner on 2026-09-22, SC may independently choose the same
+   Capability for a distinct social purpose. Such an expression has its own
+   communicative anchor and cannot satisfy, replace or change the requested Work.
+   Equal Capability IDs alone establish neither semantic duplication nor safe
+   concurrency; SC owns the former judgment and Runtime checks the latter.
    The Host may validate the exact proposed Capability, schema, anchor, target
    freshness, availability, confirmation, safety, parallelism, repetition, and
    resource compatibility, then execute it fail-soft through the Activity lane. It

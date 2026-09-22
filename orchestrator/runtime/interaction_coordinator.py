@@ -264,7 +264,7 @@ class InteractionRuntimeCoordinator:
     async def record_social_delivery(
         self, response: InteractionResponse, execution: CapabilityRuntimeResult,
         *, session_id: str | None,
-    ) -> None:
+    ) -> bool:
         """Persist delivered SC words and reconcile exact communication completion.
 
         Playback is the delivery authority.  Evidence-bound final answers become
@@ -272,15 +272,19 @@ class InteractionRuntimeCoordinator:
         already marked complete by Planner+SC may receive lifecycle completion.
         """
         if self.speech_delivery_waiter is None:
-            return
+            return not any(speech.metadata.get("wording_owner") == "social_cognition"
+                           for speech in response.speech)
+        delivered = True
         by_request = {item.request_id: item for item in execution.results}
         for speech in response.speech:
             if speech.metadata.get("wording_owner") != "social_cognition":
                 continue
             result = by_request.get(speech.id)
             if result is None or result.capability_id != "chromie.speak" or result.status != "completed" or not isinstance(result.output, dict):
+                delivered = False
                 continue
             if not await self.speech_delivery_waiter(session_id, result.output):
+                delivered = False
                 continue
             completion_goal_ids = [
                 str(value).strip()
@@ -328,6 +332,7 @@ class InteractionRuntimeCoordinator:
                         "source": "social_cognition_communicative_completion",
                     },
                 )
+        return delivered
 
     async def start_fast_planner_communicative_act(
         self,

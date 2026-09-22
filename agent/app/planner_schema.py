@@ -38,6 +38,7 @@ from .planner_grounding import (
     _is_count_binding,
     _material_values_equal,
     _normalized_entity_type,
+    literal_intent_argument,
     semantic_numeric_values,
 )
 from .planner_model_contract import (
@@ -2982,6 +2983,20 @@ def fast_advance_response_schema(
                         grounded_parameters = trusted_grounded_parameters | bound_parameters | realized_parameters
                         input_properties = input_schema.get("properties")
                         if isinstance(input_properties, dict):
+                            owning_outcomes = [item.outcome for item in responsibility_items if item.local_ref in compatible]
+                            # Host permits a literal string copy only when it occurs
+                            # in the owning intent AND immutable input. Test whether
+                            # even an exact source copy could match an owning intent,
+                            # including Host's case-only representation allowance.
+                            # If not, no real source could satisfy that exception.
+                            # Require the Planner's span; never infer an enum mapping.
+                            mapped_enum_inputs = {
+                                name for name, contract in input_properties.items()
+                                if isinstance(contract, dict) and contract.get("type") == "string"
+                                and contract.get("enum") and len(owning_outcomes) == len(compatible)
+                                and not any(literal_intent_argument(value, outcome=outcome, source_text=value)
+                                    for value in contract["enum"] for outcome in owning_outcomes)
+                            }
                             required_inputs = {
                                 str(name) for name in input_schema.get("required") or []
                             }
@@ -2990,8 +3005,9 @@ def fast_advance_response_schema(
                                 for name in required_inputs
                                 if name not in grounded_parameters
                                 and isinstance(input_properties.get(name), dict)
-                                and input_properties[name].get("type")
-                                in ("number", "integer", "boolean", "object", "array")
+                                and (input_properties[name].get("type")
+                                     in ("number", "integer", "boolean", "object", "array")
+                                     or name in mapped_enum_inputs)
                             )
                             span_contract = _fast_source_span_contract(source_token_refs)
                             properties["argument_sources"] = {

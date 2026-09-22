@@ -52,7 +52,7 @@
     "0:vx_mps=0.2",
     "0:duration_s=10.0",
     "1:count=2",
-    "2:yaw_radps=0.12"
+    "2:direction=left"
   ],
   "expected_observations": [
     {
@@ -70,11 +70,8 @@
     },
     {
       "type": "locomotion.turn",
-      "arg_ranges": {
-        "yaw_radps": {
-          "min": 1e-06
-        }
-      }
+      "status": "completed",
+      "args": {"direction": "left"}
     }
   ],
   "expected_observation_sequence": [

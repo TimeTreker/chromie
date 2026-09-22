@@ -27,6 +27,7 @@ if str(ROOT) not in sys.path:
 from orchestrator.runtime.evidence_identity import (  # noqa: E402
     load_runtime_evidence_identity,
 )
+from orchestrator.runtime.host_settings import HostSettingsSnapshot  # noqa: E402
 from orchestrator.runtime.playback_transport import (  # noqa: E402
     transport_for as playback_transport_for,
 )
@@ -35,6 +36,9 @@ from orchestrator.runtime.shutdown_lifecycle import (  # noqa: E402
 )
 from scripts.interaction_text_mujoco_check import (  # noqa: E402
     required_speech_delivery_errors,
+)
+from scripts.preflight_cognitive_gateway_core_qualification import (  # noqa: E402
+    _synthesize_tts_readiness,
 )
 
 DEFAULT_MANIFEST = (
@@ -223,6 +227,27 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         if missing:
             raise ValueError("unknown scenario IDs: " + ", ".join(sorted(missing)))
 
+    # Match startup's synthesis readiness, including default voice language routing.
+    # Health alone does not prime native generation. Keep these requests outside
+    # admitted dialogue, playback and per-turn latency measurements.
+    playback = HostSettingsSnapshot.from_env(project_root=ROOT).playback
+    readiness: dict[str, Any] = {"ready": False, "playback": "disabled", "probes": []}
+    readiness_path = output_dir / "tts-readiness.json"
+    try:
+        for text in ("你好。", "Hello.", "你好，Hello."):
+            readiness["probes"].append(await _synthesize_tts_readiness(
+                tts_url=playback.tts_url,
+                speaker_id=playback.speaker_id,
+                timeout_s=args.timeout_s,
+                text=text,
+            ))
+        readiness["ready"] = True
+    except Exception as exc:
+        readiness["error"] = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        _write_json(readiness_path, readiness)
+
     results: list[dict[str, Any]] = []
     for scenario in scenarios:
         if not isinstance(scenario, dict):
@@ -247,6 +272,7 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
         },
         "cognitive_events": str(output_dir / "cognitive_events.jsonl"),
         "session_events": str(output_dir / "session_events.jsonl"),
+        "tts_readiness": str(readiness_path),
         "scenarios": results,
         "ok": all(item["ok"] for item in results),
         "release_qualified": False,

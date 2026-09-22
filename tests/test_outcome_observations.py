@@ -10,6 +10,34 @@ from scripts.outcome_observations import (
 
 
 class OutcomeObservationTests(unittest.TestCase):
+    def test_omitted_arguments_use_only_retained_matching_optional_defaults(self) -> None:
+        for emitted, version, required, expected in (
+            ({}, "1", [], {"count": 2}),
+            ({"count": 1}, "1", [], {"count": 1}),
+            ({}, "stale", [], {}),
+            ({}, "1", ["count"], {}),
+        ):
+            with self.subTest(emitted=emitted, version=version, required=required):
+                summary = {
+                    "interaction_response": {"capabilities": [{
+                        "request_id": "blink", "capability_id": "soridormi.blink_eyes",
+                        "capability_version": "1", "args": dict(emitted),
+                    }]},
+                    "capability_contracts": {"blink": {
+                        "capability_id": "soridormi.blink_eyes", "capability_version": version,
+                        "input_schema": {"type": "object", "required": required,
+                                         "properties": {"count": {"type": "number", "default": 2}}},
+                    }},
+                    "execution": {"results": [{
+                        "request_id": "blink", "capability_id": "soridormi.blink_eyes",
+                        "capability_version": "1", "status": "completed",
+                    }]},
+                }
+                self.assertEqual(collect_observations(summary)[0]["args"], expected)
+                self.assertEqual(summary["interaction_response"]["capabilities"][0]["args"], emitted)
+        summary.pop("capability_contracts")
+        self.assertEqual(collect_observations(summary)[0]["args"], {})
+
     def _summary(self) -> dict:
         return {
             "interaction_response": {
@@ -55,7 +83,7 @@ class OutcomeObservationTests(unittest.TestCase):
         summary = {
             "interaction_response": {"capabilities": [{
                 "request_id": "turn", "capability_id": "soridormi.turn_in_place",
-                "args": {"count": 2, "duration_s": 1.0, "yaw_radps": -0.12},
+                "args": {"count": 2, "duration_s": 1.0, "direction": "right", "turn_rate_radps": 0.12},
             }]},
             "execution": {"results": [{"request_id": "turn", "status": "completed"}]},
         }
@@ -67,6 +95,29 @@ class OutcomeObservationTests(unittest.TestCase):
         self.assertTrue(validate_expected_observations(observations, [
             {"type": "locomotion.turn", "args": {"count": 1}},
         ]))
+
+    def test_turn_observation_preserves_semantic_direction_and_completion(self) -> None:
+        for direction in ("left", "right", None):
+            for status in ("completed", "failed"):
+                with self.subTest(direction=direction, status=status):
+                    args = {"turn_rate_radps": 0.01}
+                    if direction is not None:
+                        args["direction"] = direction
+                    summary = {
+                        "interaction_response": {"capabilities": [{
+                            "request_id": "turn", "capability_id": "soridormi.turn_in_place",
+                            "args": dict(args),
+                        }]},
+                        "execution": {"results": [{"request_id": "turn", "status": status}]},
+                    }
+                    observations = collect_observations(summary)
+                    self.assertEqual(observations[0]["args"], args)
+                    self.assertEqual(summary["interaction_response"]["capabilities"][0]["args"], args)
+                    errors = validate_expected_observations(observations, [{
+                        "type": "locomotion.turn", "status": "completed",
+                        "args": {"direction": "left"},
+                    }])
+                    self.assertEqual(not errors, direction == "left" and status == "completed")
 
     def test_normalizes_capabilities_into_user_observable_events(self) -> None:
         observations = collect_observations(self._summary())

@@ -7,13 +7,11 @@ import unittest
 from unittest import mock
 
 from jsonschema import Draft202012Validator
-from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from agent.app.clients.ollama_client import OllamaGenerationError
 from agent.app.cognitive_core.user_meaning_interpreter.engine import interpret_user_meaning
 from agent.app.cognitive_core.user_meaning_interpreter.errors import InterpretationUnavailableError
 from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import (
     OllamaUserMeaningInterpreter,
-    _UserMeaningInterpretationAuthorityViolation,
     _UserMeaningInterpretationSemanticStructureViolation,
     _extract_json_object,
     _payload_message_texts,
@@ -162,6 +160,35 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
                 UserMeaningInterpretationRequest(text="What's the weather in Chongqing today?"),
                 json.dumps(parsed),
             )
+
+    def test_mixed_greeting_and_work_requires_turn_wide_ga_but_scoped_sc_and_planner(self) -> None:
+        request = UserMeaningInterpretationRequest(text="Hi. Turn left.")
+        parsed = _compound_output()
+        parsed["responsibilities"][0].update(
+            outcome="Respond to the greeting", output_mode="speech", continuity_scope="turn",
+            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
+        )
+        parsed["responsibilities"][1].update(
+            outcome="Turn left", continuity_scope="goal",
+            source_evidence={"source_start_token_ref": "t2", "source_end_token_ref": "t4"},
+        )
+        parsed["cognitive_requests"][1]["responsibility_refs"] = ["r1"]
+        parsed["cognitive_requests"][2]["responsibility_refs"] = ["r2"]
+        for omitted_scope in (["r1"], ["r2"]):
+            with self.subTest(ga_refs=omitted_scope):
+                parsed["cognitive_requests"][0]["responsibility_refs"] = omitted_scope
+                with self.assertRaisesRegex(ValueError, "turn-wide"):
+                    OllamaUserMeaningInterpreter._validate_interpretation_content(
+                        request, json.dumps(parsed),
+                    )
+        parsed["cognitive_requests"][0]["responsibility_refs"] = ["r1", "r2"]
+        decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+            request, json.dumps(parsed),
+        )
+        self.assertEqual(
+            {item.authority: item.responsibility_refs for item in decision.cognitive_requests},
+            {"goal_association": ["r1", "r2"], "social_cognition": ["r1"], "planner": ["r2"]},
+        )
 
     def test_primary_source_evidence_rejects_reversed_refs(self) -> None:
         parsed = _valid_output()

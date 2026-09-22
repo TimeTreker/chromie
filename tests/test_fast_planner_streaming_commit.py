@@ -140,6 +140,63 @@ def _body_request() -> tuple[CognitiveWorkRequest, CognitiveResponsibilityPropos
 def _walk_capability() -> dict[str, Any]:
     return {'capability_id': 'soridormi.walk_forward', 'description': 'Walk the robot forward for the supplied duration.', 'input_schema': {'type': 'object', 'properties': {'duration_s': {'type': 'number', 'minimum': 0.1}}, 'required': ['duration_s'], 'additionalProperties': False}, 'effects': ['locomotion'], 'hints': {'semantic_type': 'body_action'}}
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("variant", ["zh_left", "zh_right", "en_literal", "en_case_only", "missing", "foreign_span"])
+async def test_streamed_string_argument_mapping_preserves_source_ownership(variant):
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    literal = variant in {"en_literal", "en_case_only"}
+    direction = "right" if variant == "zh_right" else "left"
+    outcome = "turn left" if literal else ("向右转" if direction == "right" else "向左转")
+    text = "Hello, turn left." if literal else "你好，" + outcome + "。"
+    tokens = user_turn_source_tokens(text)
+    start = next(item["ref"] for item in tokens if item["surface"] == ("turn" if literal else "向"))
+    selected = next(item["ref"] for item in tokens if item["surface"] == ("left" if literal else "右" if direction == "right" else "左"))
+    request = CognitiveWorkRequest(
+        sid="source-owner", text=text, language="en-US" if literal else "zh-CN",
+        interpretation_confidence=1,
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="turn", outcome="turn LEFT" if variant == "en_case_only" else outcome,
+            output_mode="body_action", confidence=1,
+            source_evidence={"source_start_token_ref": start, "source_end_token_ref": tokens[-1]["ref"]},
+        )],
+    )
+    capability = CatalogCapability(
+        capability_id="soridormi.turn_in_place", agent_id="capability_agent",
+        description="Turn left or right in place.", available=True, interaction_executable=True,
+        prompt_tier="common", effects=["locomotion"], hints={"semantic_type": "body_action"},
+        input_schema={"type": "object", "properties": {
+            "direction": {"type": "string", "enum": ["left", "right"]},
+            "duration_s": {"type": "number", "default": 2.0},
+        }, "required": ["direction"], "additionalProperties": False},
+    )
+    sources = {} if literal or variant == "missing" else {"direction": {
+        "source_start_token_ref": "t0" if variant == "foreign_span" else selected,
+        "source_end_token_ref": "t0" if variant == "foreign_span" else selected,
+    }}
+    raw = {"activities": [{"role": "capability", "activity_id": "turn", "capability_id": capability.capability_id,
+        "args": {"direction": direction}, "argument_sources": sources, "timing": "sequential",
+        "source_responsibility_refs": ["turn"]}], "disposition": "execute", "coverage": "complete",
+        "covered_responsibility_refs": ["turn"], "continuations": [], "confidence": 1,
+        "unresolved": [], "reason_summary": "Realize the requested turn."}
+    model = _StreamingModel([json.dumps(raw)])
+    events = [event async for event in FastPlannerResolver(model, _Catalog([capability])).stream_advance(request)]
+    assert model.calls == 1
+    assert len(events) == 1
+    schema = model.last_kwargs["response_format"]
+    for contract in (schema, {"$defs": schema.get("$defs", {}), "oneOf": schema["oneOf"]}):
+        assert Draft202012Validator(contract).is_valid(raw) is (variant != "missing")
+    if variant in {"missing", "foreign_span"}:
+        assert isinstance(events[0], FastPlannerStreamFailure)
+        assert events[0].failure_class == "fast_stream_contract_invalid"
+        assert events[0].failure_stage == "before_commit"
+    else:
+        assert isinstance(events[0], FastPlannerStreamTerminal)
+        activity, = events[0].advance.activities
+        assert activity.args == {"direction": direction}
+        assert {name: span.model_dump() for name, span in activity.argument_sources.items()} == sources
+
 def _walk_catalog_capability() -> CatalogCapability:
     return CatalogCapability(capability_id='soridormi.walk_forward', agent_id='capability_agent', description='Walk the robot forward for the supplied duration.', input_schema=_walk_capability()['input_schema'], effects=['locomotion'], available=True, interaction_executable=True, prompt_tier='common', hints={'semantic_type': 'body_action'})
 

@@ -166,7 +166,9 @@ for source_value in sys.argv[2:]:
 if records:
     destination.write_text(
         "".join(
-            json.dumps(records[call_id], ensure_ascii=False, sort_keys=True)
+            # Constrained decoders can follow Schema property order. Preserve
+            # the logged request order so replay does not change that contract.
+            json.dumps(records[call_id], ensure_ascii=False, sort_keys=False)
             + "\n"
             for call_id in order
         ),

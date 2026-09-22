@@ -1,81 +1,95 @@
 # Development Checkpoint
 
-## Resumed verification, full audit and live blockers — 2026-09-22 (current)
+## Bounded audit repairs delivery — 2026-09-22 (current)
 
-This section supersedes the September 21 delivery-only test waiver. The owner asked
-this session to understand the project and resume unfinished work, including the
-recorded verification sequence. `main` was fetched and fast-forwarded from
-`370e4764` to `92edd5ba8cbf8f6c6b201e92ea59356ba65bf2de` before development;
-upstream was rechecked at 0 ahead / 0 behind before the harness repair and again before
-this delivery. The expected resume revision is the latest `main` commit containing
-this checkpoint and `HANDOFF.md`. The active line remains #24/#32: canonical local
-gate → current-revision live proof → default target-evidence closure.
+The owner authorized committing and pushing **all current changes**, with this
+checkpoint and `HANDOFF.md` updated together. Pre-delivery `main` and fetched
+`origin/main`: `5566c6c4480abc3d729f8465031133e2e50bd0e6` (0 ahead / 0 behind).
+Resume from the latest `main` commit containing this pair, not the baseline hash.
+This section supersedes all older current/resume instructions below. The original
+[audit delivery](https://github.com/TimeTreker/chromie/blob/5566c6c4480abc3d729f8465031133e2e50bd0e6/DEVELOPMENT_CHECKPOINT.md)
+is historical evidence, not validation of these repairs.
 
-Implemented scope:
+Active Issue line remains **#24/#32**, communication ownership and evidence closure.
+The owner explicitly limits ongoing qualification to a few common cases; **full
+`./scripts/run_tests.sh`, full replay and the full live cohort are not run on this
+repair revision**. Latency optimization and failure-cause wording that does not
+block main Work are deferred. This is a development handoff, not release closure.
+No new benchmark corpus, product switch, model, architecture layer or current document.
 
-- Repaired benchmark inventory/mining paths and the UMI validator's deleted-module
-  import. Migrated 1,496 UMI and 1,500 GA reference packets to current contracts;
-  152 Fast request projections now explicitly include two existing empty fields.
-  Original inputs, UMI semantic expectations and all Fast targets were preserved.
-  **100 GA terminal-history references changed substantively**: restated work now
-  creates a new related Goal instead of attaching to a terminal Goal. The retained
-  before/after audit documents this exception; 200 intentional GA Host rejections
-  remain. Frozen-test changes still require owner review. Schema/Host acceptance
-  does not promote these references to independently reviewed/training data.
-- Fixed the reproduced acceptance lifecycle error: the text/simulator harness now
-  observes pending Social Cognition and auxiliary tasks within its existing deadline
-  before judging completion or closing clients. Retained task exceptions become
-  structured `harness_failure` evidence and stop the aggregate. No production role,
-  prompt, validator, routing, or Host completion policy changed.
-- Completed the owner-requested full project audit and retained it in the current
-  `docs/STATUS.md` owner rather than adding a standalone current document. It confirms
-  production Host early finalization, an ineffective duplicate-primary check on the
-  independent SC route, UMI/SC activation-contract mismatch, three Fast transaction
-  failures, retired Planner speech surfaces, unreviewed reference-oracle evidence and
-  a cross-session acceptance-task risk. The audit itself changes no runtime behavior.
+### Implemented boundaries
 
-Observed evidence:
+- Host session completion now joins its own SC decisions, admitted expression and
+  terminal playback before final reporting. Acceptance uses the same SID ownership;
+  unrelated sessions cannot delay or fail the selected case. Delivery and semantic
+  failures remain failed even when primary Work or a greeting succeeded.
+- A Planner/GA failure stops uncommitted Work while joining independently admitted
+  same-turn SC. Already delivered words are preserved without redispatch or a Host
+  apology; interruption/deadline still owns cancellation. Ordinary same-turn Plan
+  re-entry waits for submitted expression instead of cancelling it.
+- SC auxiliary admission sees the immutable primary Plan for resource checks.
+  The owner's clarified contract permits independently intended extra expressions,
+  including the same Capability; they never satisfy requested Work. Casual blink
+  repetition is not an exact-count oracle. Physical Work remains sequential.
+- UMI's requested initial GA covers the whole turn; SC and Planner keep their own
+  scopes. Fast's prompt constrains Activities to its supplied Responsibilities;
+  its Schema exposes existing source-span requirements for nonliteral enum values.
+  No semantic keyword router, translation rule, weaker Host validation or critic call.
+- SC receives current-turn UMI sibling meaning/routing as read-only context. The
+  identity decoder preserves the existing fresh-ID length limit. The SC prompt
+  distinguishes committed/scheduled Work from observed start and completion.
+- Pending optional Plan-state SC now expires when its scoped Runtime execution
+  snapshot changes, checked after inference and expression preparation. Independent
+  greeting remains valid while Work progresses. This does not cancel speech already
+  submitted or consolidate the initial mixed-time Task/Goal views.
+- Evidence tools retain native request property order, exact versioned Capability
+  defaults, semantic turn direction and completion. Live-text qualification warms
+  the effective TTS voice before admitting turns, with separate readiness evidence.
 
-- Strict frozen replay: **6,000/6,000 expected outcomes**, source unchanged, zero
-  native calls. Level A general ability: **45/45 cases across 15 classes**.
-- Final `./scripts/run_tests.sh`, rerun after incorporating the audit: **145
-  benchmark tests, 3,658 tests, 1,015 subtests and 20 legacy Agent tests passed**,
-  including repository policies,
-  test ownership, pinned static checks, configuration and documentation gates.
-  Two existing FastAPI lifecycle deprecation warnings remain. The prior canonical
-  run before the harness repair passed 3,655 tests; three regressions were added.
-- Rebuilt and verified Agent source, then ran one complete-discovery baseline.
-  It stopped at case 3/75: one mechanical pass, two failures, 72 unrun. Review of
-  all attempted cases found **zero qualified live passes**. The mechanical pass
-  had hidden a pending-SC disconnect and lost the requested temporal relationship.
-- After the harness repair, the focused gaze/blink run retained both late TTS
-  deliveries without premature client closure. A fresh complete-discovery run
-  again stopped at case 3/75 (one mechanical pass, two failures, 72 unrun).
-  All attempted cases ended in simulator safe idle. Source/provider hashes stayed
-  unchanged within each run; exactly one debug bundle was collected per run.
-  Semantic review still finds zero qualified live passes: sidestep substituted
-  for turn; SC silence/task-fulfillment/stage-direction failures; and unsupported
-  acquisition-purpose claims rejected before dispatch. Full raw transactions and
-  per-case judgments are retained; underlying prompt/context/Schema causes remain
-  to be qualified before a semantic repair.
+### Evidence and claim boundary
 
-Four axes: **source implemented** (benchmark and acceptance repairs); **local
-validation passed**; **target validation blocked/incomplete** (dirty-tree diagnostic
-live evidence only, no new physical audio/robot evidence); **support development
-only**. Existing owner microphone/ASR acceptance is preserved. No new runtime
-switch, current document or architectural term was introduced (102 Markdown files,
-15-file core reading path unchanged).
+Latest retained repair root: `.chromie/acceptance/sc-stale-work-20260922/`.
+Before repair, the corrected regression failed because completed Work still admitted
+pending old SC speech. After repair: **22 social tests + 3 Runtime tests / 4 subtests
+pass**; truthful embodied speech **Level A 6/6**; policy, ownership, pinned Ruff,
+mypy (37 files), and docs pass. These results precede the delivery-only document edit.
+Earlier bounded repairs and failed candidates are recorded in [Status](docs/STATUS.md)
+and the handoff evidence index; their counts must not be added into a full-suite claim.
+Delivery inspection also passed repository policy, test ownership, documentation
+consistency and whitespace checks. No new behavior test or live run was launched
+for the commit/push request.
 
-Next: repair production session/SC/TTS joining and workflow-report finalization, then
-give auxiliary admission the immutable canonical Work view. Freeze UMI activation and
-Fast semantic contrasts before any prompt/Schema optimization; do not weaken the
-rejecting validator, add a semantic repair call or replace model activation with a
-fixed Host router. Retire the remaining Planner speech surfaces/prose, obtain owner
-review of the reference migration, and scope acceptance task retention per session.
-After each authorized boundary repair, run its focused scenario/ability, canonical
-gates, and a fresh full discovered cohort with one bundle. Current local-gate closure
-is not live or release closure. Exact episode I/O, identities, artifacts and commands
-are in `HANDOFF.md`; the full audit is in the current `docs/STATUS.md` section.
+Latest selected live simulator case **1/1 passes**, SID `ce58f1d8`: UMI splits greeting
+and left turn; SC1 delivers `你好！`; Planner/Runtime complete one left turn; SC2
+returns after completion and is suppressed as stale; session ends after all tracked
+work settles. Real generated TTS: 1/1 segment to a discard sink, no failed/skipped
+segments, safe idle. No physical microphone/speaker/robot proof. Raw SC2 still blends
+planning/execution in its rationale; suppression is proven, universal semantic
+correctness is not. Prompt-only committed/running/completed contrasts pass 5/5, but
+its failed-state contrast remains semantically failing and owner-deferred.
+
+Four axes: **source implemented** for the bounded repairs; **local validation partial**;
+**target validation partial**; **support development only**. The old full local gate
+and 6,000-reference replay belong to the preceding delivery. Its raw audit directory
+is missing from this checkout; do not claim it has been recovered or rerun. Review of
+substantive reference changes and eventual target evidence closure remain open.
+
+### Ordered next work
+
+1. Reproduce the original simultaneous gaze/blink failure with that case and one
+   simple contrast. Preserve sequential physical Work and truthful coverage; no
+   semantic phrase rule or extra repair model call. Do not start the full cohort.
+2. Recheck the original compound walk/nod/turn and unsupported acquisition cases
+   separately. Simple greeting/turn success does not close these original failures.
+3. Address SC mixed-time input consistency and remaining state-truth reliability;
+   current freshness containment is not a complete semantic repair.
+4. Retire remaining Planner speech fields/prose; then complete broader local/live
+   and supervised voice qualification when the owner resumes that scope. Keep
+   failure-cause wording and latency deferred without labelling them passed.
+
+`HANDOFF.md` owns current commands, runtime identities, locally available artifacts,
+known missing evidence and cross-machine bootstrap. Historical sections below do not
+renew older full-test instructions or superseded duplicate-Capability restrictions.
 
 ## Owner-requested immediate delivery — 2026-09-21 (historical)
 

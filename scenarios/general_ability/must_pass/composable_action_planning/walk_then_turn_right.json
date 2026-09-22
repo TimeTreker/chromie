@@ -37,7 +37,7 @@
   "expected_capabilities": ["soridormi.walk_forward", "soridormi.turn_in_place"],
   "expected_observations": [
     {"type": "locomotion.walk_forward", "args": {"duration_s": 3.0}},
-    {"type": "locomotion.turn", "arg_ranges": {"yaw_radps": {"max": -0.000001}}}
+    {"type": "locomotion.turn", "status": "completed", "args": {"direction": "right"}}
   ],
   "expected_observation_sequence": ["locomotion.walk_forward", "locomotion.turn"],
   "require_speech": false,

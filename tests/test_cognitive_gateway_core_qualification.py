@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import hashlib
 import json
 import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 from orchestrator.runtime.evidence_identity import canonical_json_sha256
-from scripts.cognitive_gateway_core_live_text import _configure_environment
+from scripts.cognitive_gateway_core_live_text import _configure_environment, run
+from scripts.preflight_cognitive_gateway_core_qualification import PreflightError
 from scripts.verify_cognitive_gateway_core_qualification import verify
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -149,6 +151,63 @@ def runtime_event(
 
 
 class CognitiveGatewayCoreQualificationTests(unittest.TestCase):
+    def test_live_text_warms_effective_voice_before_admitting_any_turn(self) -> None:
+        order = []
+
+        async def probe(**kwargs):
+            order.append("probe")
+            self.assertEqual(kwargs["speaker_id"], "default")
+            self.assertEqual(kwargs["tts_url"], "ws://readiness-test:5000")
+            return {"ready": True, "pcm_bytes": 128, "sample_rate": 24000}
+
+        async def scenario(*args, **kwargs):
+            self.assertEqual(order, ["probe"] * 3)
+            order.append("turn")
+            return {"ok": True}
+
+        report, readiness = self._run_readiness_case(probe, scenario)
+        self.assertTrue(report["ok"])
+        self.assertEqual(order, ["probe", "probe", "probe", "turn"])
+        self.assertTrue(readiness["ready"])
+        self.assertEqual(readiness["playback"], "disabled")
+
+    def test_failed_voice_readiness_retains_failure_without_admitting_turn(self) -> None:
+        scenario = AsyncMock()
+        for failure in ("without PCM audio", "synthesis timed out"):
+            with self.subTest(failure=failure):
+                probe = AsyncMock(side_effect=PreflightError(failure))
+                report, readiness = self._run_readiness_case(probe, scenario, failure=failure)
+                self.assertIsNone(report)
+                self.assertFalse(readiness["ready"])
+                self.assertIn(failure, readiness["error"])
+                scenario.assert_not_awaited()
+
+    def _run_readiness_case(self, probe, scenario, *, failure=None):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            identity_path = root / "runtime-identity.json"
+            write_identity(identity_path)
+            manifest = root / "manifest.json"
+            manifest.write_text(json.dumps({
+                "schema_version": 1, "qualification_id": "readiness-test",
+                "scenarios": [{"scenario_id": "hello", "turns": [{"text": "hello?"}]}],
+            }))
+            args = argparse.Namespace(manifest=manifest, runtime_identity=identity_path,
+                                      output_dir=root, scenario=[], timeout_s=2)
+            with (
+                patch.dict(os.environ, {"TTS_URL": "ws://readiness-test:5000", "TTS_SPEAKER_ID": "default"}),
+                patch("scripts.cognitive_gateway_core_live_text._configure_environment"),
+                patch("scripts.cognitive_gateway_core_live_text._synthesize_tts_readiness", side_effect=probe),
+                patch("scripts.cognitive_gateway_core_live_text._run_scenario", side_effect=scenario),
+            ):
+                report = None
+                if failure:
+                    with self.assertRaisesRegex(PreflightError, failure):
+                        asyncio.run(run(args))
+                else:
+                    report = asyncio.run(run(args))
+            return report, json.loads((root / "tts-readiness.json").read_text())
+
     def test_live_text_runner_bootstraps_generated_runtime_profile(self) -> None:
         def load_profile() -> None:
             os.environ.setdefault("ORCH_GOAL_ASSOCIATION_TIMEOUT_MS", "150000")

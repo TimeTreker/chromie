@@ -179,10 +179,11 @@ class FakeRuntime:
 
     async def wait_dispatch(self, dispatch):
         del dispatch
-        return SimpleNamespace(results=[])
+        return SimpleNamespace(status="completed", results=[])
 
     async def record_social_delivery(self, *args, **kwargs):
         del args, kwargs
+        return True
 
     async def ensure_capability_definitions(self, capability_ids):
         ids = list(capability_ids)
@@ -1332,11 +1333,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 return response
 
             async def wait_dispatch(self, dispatch):
-                return SimpleNamespace(results=[])
+                return SimpleNamespace(status="completed", results=[])
 
             async def record_social_delivery(self, *args, **kwargs):
                 # Submission is not a playback receipt.
-                pass
+                return False
 
         class Client(ScriptedClient):
             async def resolve_goal_association(self, *args, **kwargs):

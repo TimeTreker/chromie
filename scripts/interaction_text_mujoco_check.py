@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import copy
 from contextlib import contextmanager
 import fcntl
 import hashlib
@@ -638,21 +639,11 @@ async def wait_for_session_done(
     """Retain in-flight social work before judging the terminal session state."""
 
     deadline = time.monotonic() + timeout_s
-    social_tasks: set[asyncio.Task[Any]] = set()
     while time.monotonic() < deadline:
-        coordinator = getattr(assistant, "cognitive_runtime", None)
-        social_tasks.update(getattr(coordinator, "_auxiliary_execution_tasks", ()))
-        # The normal callback removes completed tasks from the active set. The
-        # current social turn retains its result, including an earlier failure.
-        social_tasks.update(
-            task for _, task in getattr(coordinator, "_social_turns", {}).values()
-            if task.get_name() == f"social-interpretation:{sid}"
-        )
-        for task in social_tasks:
-            if task.done() and not task.cancelled():
-                task.result()
-        social_pending = any(not task.done() for task in social_tasks)
         state = assistant.sessions.state.get(sid) or {}
+        social_pending = bool(state.get("pending_social_tasks", 0))
+        if not social_pending and state.get("social_task_failures"):
+            raise RuntimeError(f"session {sid} social work failed: {state['social_task_failures']}")
         if state.get("done_logged") and not social_pending:
             return "done"
         if (
@@ -1225,7 +1216,11 @@ async def run_check(
                     f"status={cognitive_resolution.status!r} "
                     f"reason={cognitive_resolution.fallback_reason!r}"
                 )
-                response = assistant._host_speech_response(
+                assistant.sessions.state[sid]["semantic_status"] = "failed"
+                delivered = cognitive_resolution.interaction_response
+                response = delivered.model_copy(deep=True) if (
+                    delivered is not None and delivered.metadata.get("presentation_already_dispatched") is True
+                ) else assistant._host_speech_response(
                     "Goal-driven runtime did not produce an executable interaction.",
                     style="warning",
                     source="cognitive_text_check_failure",
@@ -1291,6 +1286,14 @@ async def run_check(
             },
         )
         response = _apply_soridormi_skill_timeout(response, args.capability_timeout_s)
+        capability_contracts = {}
+        for capability in response.capabilities:
+            definition = assistant.interaction_runtime.capability_definition(capability.capability_id)
+            capability_contracts[capability.request_id] = {
+                "capability_id": definition.capability_id,
+                "capability_version": definition.version,
+                "input_schema": copy.deepcopy(definition.input_schema),
+            }
         _write_json(
             evidence_dir / "interaction_response.json",
             response.model_dump(mode="json"),
@@ -1466,6 +1469,12 @@ async def run_check(
                             f"{result.capability_id} ended with status {result.status!r}: "
                             f"{result.reason_code or result.message}"
                         )
+
+        if not args.preview_only and execution_payload is None and response.metadata.get("presentation_already_dispatched") is True:
+            assistant._finish_delivered_social_session(sid, response)
+        if not args.preview_only and (
+            execution_payload is not None or response.metadata.get("presentation_already_dispatched") is True
+        ):
             try:
                 await wait_for_session_done(
                     assistant,
@@ -1537,6 +1546,7 @@ async def run_check(
             "errors": errors,
             "user_meaning_interpretation": core_interpretation.model_dump(mode="json"),
             "interaction_response": response.model_dump(mode="json"),
+            "capability_contracts": capability_contracts,
             "cognitive_runtime": cognitive_resolution_payload,
             "execution": execution_payload,
             "interrupt": interrupt_payload,

@@ -77,6 +77,11 @@ The supervised voice-acceptance runner independently performs a retained
 no-playback warm-up for the effective `TTS_SPEAKER_ID` after service readiness
 and before starting its microphone-owning Orchestrator. This keeps acceptance
 self-contained when `--start-services` is used instead of the normal launcher.
+The live-text runner (`scripts/cognitive_gateway_core_live_text.py`) also checks
+the effective Host voice with Chinese, English and mixed no-playback synthesis
+before admitting any scenario. It retains `tts-readiness.json` separately from
+turn timing and stops before dialogue admission if synthesis fails or returns no
+PCM. These probes establish synthesis readiness, not physical speaker delivery.
 
 When a request is cancelled, Chromie signals the native token generator and
 holds the singleton worker lock for a bounded drain. Native generation closes

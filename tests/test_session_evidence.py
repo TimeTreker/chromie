@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import tempfile
@@ -20,6 +21,67 @@ from shared.chromie_contracts.interaction import (
     CapabilityTrace,
     CapabilityTraceEvent,
 )
+
+
+class SocialSessionCompletionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_late_social_speech_defers_report_until_playback_finishes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            tracker = SessionTracker(workflow_report_root=Path(temp_dir), resource_sampling_mode="off")
+            sid = tracker.create()
+            release = asyncio.Event()
+
+            async def social() -> None:
+                await release.wait()
+                tracker.state[sid]["scheduled_tts"] = 1
+
+            task = asyncio.create_task(social())
+            tracker.track_social_task(sid, task)
+            tracker.state[sid]["llm_done"] = True
+            tracker.maybe_done(sid)
+            self.assertFalse(tracker.state[sid]["done_logged"])
+            reports = await asyncio.to_thread(lambda: list(Path(temp_dir).glob("*.json")))
+            self.assertEqual(reports, [])
+            release.set()
+            await task
+            await asyncio.sleep(0)
+            self.assertFalse(tracker.state[sid]["done_logged"])
+            tracker.state[sid]["played_tts"] = 1
+            tracker.maybe_done(sid)
+            self.assertTrue(tracker.state[sid]["done_logged"])
+            reports = await asyncio.to_thread(lambda: list(Path(temp_dir).glob("*.json")))
+            self.assertTrue(reports)
+
+    async def test_social_failure_is_retained_before_terminal_reporting(self) -> None:
+        tracker = SessionTracker(resource_sampling_mode="off")
+        sid = tracker.create()
+
+        async def social() -> None:
+            raise ConnectionError("social service disconnected")
+
+        task = asyncio.create_task(social())
+        tracker.track_social_task(sid, task)
+        tracker.state[sid]["llm_done"] = True
+        await asyncio.gather(task, return_exceptions=True)
+        self.assertTrue(tracker.state[sid]["done_logged"])
+        self.assertEqual(tracker.state[sid]["pending_social_tasks"], 0)
+        self.assertEqual(tracker.state[sid]["social_task_failures"][0]["error_type"], "ConnectionError")
+        self.assertEqual(tracker.state[sid]["workflow_report"]["termination_state"], "failed")
+
+    async def test_other_session_does_not_wait_for_cancelled_social_task(self) -> None:
+        tracker = SessionTracker(resource_sampling_mode="off")
+        old_sid = tracker.create()
+        task = asyncio.create_task(asyncio.Event().wait())
+        tracker.track_social_task(old_sid, task)
+        sid = tracker.create()
+        tracker.state[sid]["llm_done"] = True
+        tracker.maybe_done(sid)
+        self.assertTrue(tracker.state[sid]["done_logged"])
+        self.assertFalse(task.done())
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        self.assertEqual(tracker.state[old_sid]["pending_social_tasks"], 0)
+        self.assertEqual(tracker.state[old_sid]["social_task_failures"], [])
+        self.assertFalse(tracker.state[old_sid]["done_logged"])
 
 
 class SessionEvidenceTests(unittest.TestCase):

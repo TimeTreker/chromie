@@ -16,13 +16,19 @@ incomplete injected-text model/Runtime cohort. See the current
 [checkpoint](../DEVELOPMENT_CHECKPOINT.md) for those remaining failures.
 
 For live text/simulator acceptance, a primary `session_done` is not sufficient
-while the same Host still owns pending Social Cognition or auxiliary execution.
-The harness waits within the existing session deadline before snapshotting the
-result or closing service clients. A retained social-task exception becomes a
+while that session still owns pending Social Cognition or auxiliary execution.
+The production SessionTracker counts these tasks by their explicit session ID;
+normal completion/report finalization also requires their completion and terminal
+TTS accounting. This does not make communication a prerequisite to dispatching Work.
+The harness reads the same per-session pending count and retained failures within
+the existing deadline before snapshotting results or closing clients. It does not
+wait on another session's tasks or infer ownership from task names.
+A retained social-task exception becomes a
 structured `harness_failure` at `session_completion`, stopping the aggregate;
 it cannot disappear behind successful primary Work. This is an evidence-lifecycle
-check, not permission to delay physical Work, change cognition decisions, or
-promote the production session-completion policy as qualified.
+check, not permission to delay physical Work or change cognition decisions.
+Focused lifecycle and live-text evidence is recorded in Status; broader qualification
+and physical delivery remain separate.
 
 ## Scope of validation and semantic evidence
 
@@ -102,6 +108,17 @@ each role's output/coverage contract, permitted depth and call topology under th
 | Body expression and ordered voice | Social Cognition selects exact eligible social Capability proposals in its primary call; Runtime validates anchors, targets and safety. No decoration-only call; optional failure cannot delay/fail speech or required Work. Nonverbal-only delivery cannot be fabricated from empty speech. |
 | Environment-driven initiative with existing Goals but no UMI | Shared Goal state and trusted Situation are read-only inputs; no synthetic user turn, duplicate Goal store or inferred consent. Useful initiative and silence both remain representable. |
 | Foreground communication under SGLang contention | Request priority exceeds ordinary Planner priority, server ordering is enabled and verified, and measured task completion remains live. Deep communication is bounded; configuration proof is distinct from observed latency. |
+
+Independent Work-state SC admission must consult the exact canonical Plan snapshot
+for resource checks, even when its own response contains no
+task capabilities. This read-only check must not dispatch the Plan again. Evidence
+for that boundary does not qualify expression admitted before a Plan exists.
+Equal Capability IDs alone must not suppress an independently intended SC act.
+Judge requested Work quantity separately from optional SC expression, retain both
+owners and act identities, and reject social rationales that merely fulfill the
+request. An extra social blink is not task-completion Evidence. A missing optional
+argument may use a default only from a retained, matching Capability ID/version
+contract; never infer defaults from the current catalog for historical evidence.
 
 Retain a bilingual, coverage-designed frozen cohort and judge every case,
 including mechanical passes. Follow focused contracts, the affected general-
@@ -1049,8 +1066,14 @@ python scripts/interaction_text_mujoco_check.py \
   --expect-arg 0:vx_mps=0.2 \
   --expect-arg 0:duration_s=10 \
   --expect-arg 1:count=2 \
-  --expect-arg 2:yaw_radps=0.12
+  --expect-arg 2:direction=left
 ```
+
+Turn observations retain the semantic `direction` and optional `turn_rate_radps`
+from the versioned Capability request, together with its execution status. Check
+left/right directly instead of expecting the provider's internal `yaw_radps` or
+fixing a speed the person did not request. Provider realization traces remain
+separate evidence; normalized observations do not invent measured heading changes.
 
 This runner defaults to the maintained goal-driven path; use
 `--no-cognitive-runtime` only for an explicitly labelled diagnostic fail-closed run. It

@@ -542,6 +542,15 @@ class CapabilityRuntime:
         async with self._active_lock:
             return self._planning_state_locked(goal_ids, turn_id)
 
+    def execution_state_is_current(self, snapshot: dict[str, Any]) -> bool:
+        """Check the same event-loop owner's state without yielding at admission.
+
+        Unlike Planner commit validation, an outward state report cannot ignore
+        provider start or completion. Use the existing scoped snapshot, including
+        those facts, without creating another state store or revising Work.
+        """
+        return self._planning_state_locked(snapshot["goal_ids"], snapshot["turn_id"]) == snapshot
+
     @staticmethod
     def planning_work_activities(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
         """One actual request per Activity, even when several Goals share it."""

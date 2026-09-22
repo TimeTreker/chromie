@@ -1201,6 +1201,7 @@ class CanonicalPlanRuntimeAdapter:
         session_id: str,
         turn_id: str,
         interaction: InteractionResponse | None,
+        primary_plan: CanonicalPlan | None = None,
         context: dict[str, Any] | None = None,
         snapshot_is_current: Callable[[], bool] | None = None,
     ) -> InteractionResponse | dict[str, Any]:
@@ -1247,6 +1248,10 @@ class CanonicalPlanRuntimeAdapter:
         primary_capability_ids = {
             step.capability_id for step in primary_steps
         }
+        if primary_plan is not None:
+            # Independent SC packets contain no task Work. Consult the committed
+            # Plan for containment without copying its steps into this dispatch.
+            primary_capability_ids.update(step.capability_id for step in primary_plan.steps)
         primary_definitions: dict[str, Any] = {}
         unresolved_embodied_primary_ids: set[str] = set()
         for capability_id in sorted(primary_capability_ids):
@@ -1290,11 +1295,6 @@ class CanonicalPlanRuntimeAdapter:
                 if target_error:
                     reasons.append(
                         f"target_error:{behavior.capability_id}:{target_error}"
-                    )
-                    continue
-                if behavior.capability_id in primary_capability_ids:
-                    reasons.append(
-                        f"duplicates_primary_activity:{behavior.capability_id}"
                     )
                     continue
                 if unresolved_embodied_primary_ids:
@@ -1467,6 +1467,8 @@ class CanonicalPlanRuntimeAdapter:
             session_id=session_id,
         )
         execution = await self.interaction_runtime.wait_dispatch(dispatch)
+        if execution.status != "completed":
+            raise RuntimeError(f"social_expression_delivery_failed: status={execution.status}")
         return {
             "status": execution.status,
             "materialized_count": len(requests),
@@ -1479,13 +1481,14 @@ class CanonicalPlanRuntimeAdapter:
         self, response: InteractionResponse, *, social_cognition: SocialCognitionResolution,
         session_id: str, turn_id: str, context: dict[str, Any] | None = None,
         snapshot_is_current: Callable[[], bool] | None = None,
+        primary_plan: CanonicalPlan | None = None,
     ) -> InteractionResponse:
         """Materialize exact SC anchors before either modality enters Runtime."""
         if response.metadata.get("social_expression_materialized") is True:
             return response
         auxiliary = await self.prepare_auxiliary_response(social_cognition=social_cognition,
             session_id=session_id, turn_id=turn_id, interaction=response,
-            context=context, snapshot_is_current=snapshot_is_current)
+            context=context, snapshot_is_current=snapshot_is_current, primary_plan=primary_plan)
         response = response.model_copy(deep=True)
         response.metadata["social_expression_materialized"] = True
         response.metadata.update({"session_id": session_id, "turn_id": turn_id})
@@ -2491,6 +2494,7 @@ class GoalDrivenRuntimeCoordinator:
         delivered_turn_speech_provider: (Callable[[str], list[dict[str, Any]]] | None) = None,
         interaction_ledger: Any | None = None,
         workflow_stage_sink: Callable[..., None] | None = None,
+        social_task_tracker: Callable[[str | None, asyncio.Task[Any]], None] | None = None,
     ) -> None:
         self.agent_client = agent_client
         self.adapter = adapter
@@ -2501,13 +2505,14 @@ class GoalDrivenRuntimeCoordinator:
         self._goal_association_locks: dict[str, asyncio.Lock] = {}
         self.delivered_turn_speech_provider = delivered_turn_speech_provider
         self.workflow_stage_sink = workflow_stage_sink
+        self.social_task_tracker = social_task_tracker
         self.interaction_ledger = interaction_ledger or getattr(
             getattr(adapter, "interaction_runtime", None),
             "interaction_ledger",
             None,
         )
         self._auxiliary_execution_tasks: set[asyncio.Task[Any]] = set()
-        self._social_turns: dict[str, tuple[str, asyncio.Task[Any]]] = {}
+        self._social_turns: dict[str, tuple[str, asyncio.Task[Any], str]] = {}
         self._social_dispatches: dict[str, str] = {}
 
     async def cancel_social_interaction(self) -> None:
@@ -2523,16 +2528,29 @@ class GoalDrivenRuntimeCoordinator:
         for interaction_id in ids:
             await self.adapter.interaction_runtime.runtime.cancel_interaction(interaction_id)
 
-    async def _cancel_social_turn(self, previous: tuple[str, asyncio.Task[Any]] | None) -> None:
+    async def _cancel_social_turn(self, previous: tuple[str, asyncio.Task[Any], str] | None) -> None:
         if previous is None:
             return
-        request_id, task = previous
+        request_id, task, _ = previous
         if not task.done():
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
         interaction_id = self._social_dispatches.pop(request_id, None)
         if interaction_id is not None:
             await self.adapter.interaction_runtime.runtime.cancel_interaction(interaction_id)
+
+    async def _finish_or_cancel_social_turn(
+        self, previous: tuple[str, asyncio.Task[Any], str] | None, *, turn_id: str,
+    ) -> None:
+        if previous is not None and previous[2] == turn_id and previous[0] in self._social_dispatches:
+            # A same-turn state update does not retract already submitted expression.
+            try:
+                await asyncio.gather(previous[1], return_exceptions=True)
+            except asyncio.CancelledError:
+                await self._cancel_social_turn(previous)
+                raise
+        else:
+            await self._cancel_social_turn(previous)
 
     def schedule_social_expression(
         self, response: InteractionResponse, *, session_id: str | None,
@@ -2562,7 +2580,7 @@ class GoalDrivenRuntimeCoordinator:
             turn_id=str(response.metadata.get("turn_id") or result.request_id), context=context or {},
             snapshot_is_current=snapshot_is_current,
         ), name="social-expression:" + result.request_id)
-        self._track_auxiliary_execution_task(task)
+        self._track_auxiliary_execution_task(task, session_id=session_id)
 
     def _state_social_request(
         self,
@@ -2619,21 +2637,37 @@ class GoalDrivenRuntimeCoordinator:
         sid = str(work_request.sid or "")
         key = self._goal_association_lock_key(work_request.context, sid)
         previous = self._social_turns.get(key)
-        if previous is not None:
-            previous[1].cancel()
+        primary_plan = plan.model_copy(deep=True) if plan is not None else None
         request = self._state_social_request(
-            work_request=work_request, turn_id=turn_id, plan=plan,
+            work_request=work_request, turn_id=turn_id, plan=primary_plan,
             trigger=trigger, source_refs=source_refs, goal_ids=goal_ids,
         )
+        execution_snapshot: dict[str, Any] | None = None
         def current() -> bool:
             entry = self._social_turns.get(key)
-            return entry is not None and entry[0] == request.request_id
+            return entry is not None and entry[0] == request.request_id and (
+                execution_snapshot is None
+                or self.adapter.interaction_runtime.runtime.execution_state_is_current(execution_snapshot)
+            )
         async def run() -> None:
-            await self._cancel_social_turn(previous)
+            nonlocal execution_snapshot
+            await self._finish_or_cancel_social_turn(previous, turn_id=turn_id)
             if not current():
                 return
+            if primary_plan is not None:
+                # Bind optional Work-state reporting to its actual execution
+                # scope. Independent interpretation/greeting does not expire
+                # merely because parallel user Work starts or finishes.
+                execution_snapshot = await self.adapter.interaction_runtime.runtime.planning_state_snapshot(
+                    request.goal_ids, turn_id,
+                )
+            current_request = self._state_social_request(
+                work_request=work_request, turn_id=turn_id, plan=primary_plan,
+                trigger=trigger, source_refs=source_refs, goal_ids=goal_ids,
+            )
             resolved = await self.resolve_social_interaction(
-                session, request=request, session_id=sid, snapshot_is_current=current,
+                session, request=current_request, session_id=sid, snapshot_is_current=current,
+                primary_plan=primary_plan,
             )
             if resolved is None or not current():
                 return
@@ -2645,14 +2679,25 @@ class GoalDrivenRuntimeCoordinator:
             if current():
                 self.schedule_social_expression(response, session_id=sid, context=request.context, snapshot_is_current=current)
             if runtime_dispatch is not None:
-                execution = await self.adapter.interaction_runtime.wait_dispatch(runtime_dispatch)
-                await self.adapter.interaction_runtime.record_social_delivery(response, execution, session_id=sid)
-                self._social_dispatches.pop(request.request_id, None)
+                cancelled = False
+                try:
+                    execution = await self.adapter.interaction_runtime.wait_dispatch(runtime_dispatch)
+                    delivered = await self.adapter.interaction_runtime.record_social_delivery(response, execution, session_id=sid)
+                    if execution.status != "completed" or not delivered:
+                        raise RuntimeError(
+                            f"social_interaction_delivery_failed: status={execution.status} speech_delivered={delivered}"
+                        )
+                except asyncio.CancelledError:
+                    cancelled = True
+                    raise
+                finally:
+                    if not cancelled:
+                        self._social_dispatches.pop(request.request_id, None)
                 response.metadata["presentation_already_dispatched"] = True
             return result, response
         task = asyncio.create_task(run(), name="social-interpretation:" + turn_id)
-        self._social_turns[key] = (request.request_id, task)
-        self._track_auxiliary_execution_task(task)
+        self._social_turns[key] = (request.request_id, task, turn_id)
+        self._track_auxiliary_execution_task(task, session_id=sid)
         return task
 
     async def resolve_plan_interaction(
@@ -2667,7 +2712,9 @@ class GoalDrivenRuntimeCoordinator:
             raise ValueError("SC cannot review or rewrite a Planner-authored communicative decision")
         key = self._goal_association_lock_key(context, session_id)
         previous = self._social_turns.pop(key, None)
-        await self._cancel_social_turn(previous)
+        await self._finish_or_cancel_social_turn(
+            previous, turn_id=str(work_request.source_turn_provenance.get("turn_id") or session_id),
+        )
         source_context = ContextAssembly.project_context(context)
         source_context = _lineage_context(
             source_context,
@@ -2715,6 +2762,7 @@ class GoalDrivenRuntimeCoordinator:
     async def resolve_social_interaction(
         self, session: Any, *, request: SocialCognitionRequest,
         session_id: str, snapshot_is_current: Callable[[], bool],
+        primary_plan: CanonicalPlan | None = None,
     ) -> tuple[SocialCognitionResolution, InteractionResponse] | None:
         """Resolve trusted state into interaction without creating task Work.
 
@@ -2744,6 +2792,8 @@ class GoalDrivenRuntimeCoordinator:
         )
         current = snapshot_is_current()
         if not current:
+            logger.info("social_cognition_suppressed sid=%s request_id=%s reason=stale_snapshot",
+                        session_id, request.request_id)
             return None
         interaction_context = (
             self.interaction_ledger.context(session_id, goal_ids=request.goal_ids,
@@ -2763,7 +2813,11 @@ class GoalDrivenRuntimeCoordinator:
         if any(act.auxiliary_activities for act in result.activities):
             response = await self.adapter.prepare_social_response(response, social_cognition=result,
                 session_id=session_id, turn_id=str(request.source_turn.get("turn_id") or request.request_id),
-                context=request.context, snapshot_is_current=snapshot_is_current)
+                context=request.context, snapshot_is_current=snapshot_is_current, primary_plan=primary_plan)
+        if not snapshot_is_current():
+            logger.info("social_cognition_suppressed sid=%s request_id=%s reason=stale_snapshot",
+                        session_id, request.request_id)
+            return None
         logger.info(
             "social_cognition_done sid=%s request_id=%s disposition=%s activities=%d "
             "speech=%d capabilities=%d reason=%r",
@@ -2777,10 +2831,14 @@ class GoalDrivenRuntimeCoordinator:
         )
         return result, response
 
-    def _track_auxiliary_execution_task(self, task: asyncio.Task[Any]) -> None:
+    def _track_auxiliary_execution_task(
+        self, task: asyncio.Task[Any], *, session_id: str | None,
+    ) -> None:
         """Retain fail-soft Runtime execution without creating cognition work."""
 
         self._auxiliary_execution_tasks.add(task)
+        if self.social_task_tracker is not None:
+            self.social_task_tracker(session_id, task)
 
         def _done(completed: asyncio.Task[Any]) -> None:
             self._auxiliary_execution_tasks.discard(completed)
@@ -4457,7 +4515,7 @@ class GoalDrivenRuntimeCoordinator:
         umi_planning_superseded = False
         planning_snapshot: dict[str, Any] | None = None
         planning_commit: dict[str, Any] | None = None
-        initial_social_task: asyncio.Task[Any] | None = None
+        state_social_task: asyncio.Task[Any] | None = None
         initial_meaning_uncertainty_count = len(work_request.meaning_uncertainties)
         post_ga_meaning_uncertainty_count = initial_meaning_uncertainty_count
         planner_waited_for_goal_continuity = False
@@ -4482,7 +4540,7 @@ class GoalDrivenRuntimeCoordinator:
                 deep_planner_invocation_reasons[0] if deep_planner_invocation_reasons else ""
             )
             return {
-                "social_cognition_started": initial_social_task is not None,
+                "social_cognition_started": state_social_task is not None,
                 "model_driven_cognitive_orchestration": True,
                 "requested_cognitive_authorities": [
                     item.authority for item in work_request.cognitive_requests
@@ -4636,6 +4694,27 @@ class GoalDrivenRuntimeCoordinator:
                     cleanup_exc,
                 )
 
+        async def finish_independent_social_interaction() -> None:
+            """Work failure does not revoke this turn's already admitted SC work."""
+            nonlocal interaction
+            if state_social_task is None:
+                return
+            try:
+                result, = await asyncio.gather(state_social_task, return_exceptions=True)
+            except asyncio.CancelledError:
+                # The outer deadline or explicit interruption still owns cancellation,
+                # including Runtime delivery that has already been submitted.
+                await self.cancel_social_interaction()
+                raise
+            if isinstance(result, BaseException):
+                stage_diagnostics.append(self._stage_failure_metadata(
+                    "social_cognition",
+                    {"error_type": type(result).__name__, "error": str(result)},
+                    default_failure_class="social_interaction_failed",
+                ))
+            elif result is not None:
+                _social_result, interaction = result
+
         try:
             turn_id = self._context_turn_id(context, sid)
 
@@ -4665,7 +4744,7 @@ class GoalDrivenRuntimeCoordinator:
             # computations. It may close a hard dependency of an explicitly requested
             # authority (Planner -> turn-wide GA), but never reconstructs semantic
             # readiness from WHAT labels or fields.
-            initial_social_task = (
+            state_social_task = (
                 self.start_state_interaction(
                     session,
                     work_request=self._subset_work_request(
@@ -4692,7 +4771,7 @@ class GoalDrivenRuntimeCoordinator:
                 if ga_refs
                 else None
             )
-            if initial_social_task is not None or association_task is not None:
+            if state_social_task is not None or association_task is not None:
                 await asyncio.sleep(0)
 
             async def plan_current_responsibilities(
@@ -4797,8 +4876,8 @@ class GoalDrivenRuntimeCoordinator:
                 planner_waited_for_goal_continuity = False
 
             if association_task is None:
-                if initial_social_task is not None:
-                    social_resolved = await initial_social_task
+                if state_social_task is not None:
+                    social_resolved = await state_social_task
                     if social_resolved is None:
                         raise CognitiveStageFailure(
                             "social_cognition",
@@ -4896,7 +4975,7 @@ class GoalDrivenRuntimeCoordinator:
                             ),
                         },
                     )
-                if initial_social_task is None:
+                if state_social_task is None:
                     return self._finish(
                         mode="apply", status="applied", association=association,
                         fast_plan=None, terminal_plan=None,
@@ -4912,7 +4991,7 @@ class GoalDrivenRuntimeCoordinator:
                             "model_driven_cognitive_orchestration": True,
                         },
                     )
-                social_resolved = await initial_social_task
+                social_resolved = await state_social_task
                 if social_resolved is None:
                     raise CognitiveStageFailure(
                         "social_cognition",
@@ -4960,7 +5039,6 @@ class GoalDrivenRuntimeCoordinator:
                 (item for item in association.cognitive_requests if item.authority == "social_cognition"),
                 None,
             )
-            ga_social_task = None
             if ga_social_request is not None and self.policy.mode == "apply":
                 ga_social_refs = set(ga_social_request.responsibility_refs)
                 ga_social_request_work = self._subset_work_request(
@@ -4969,7 +5047,7 @@ class GoalDrivenRuntimeCoordinator:
                     ),
                     ga_social_refs,
                 )
-                ga_social_task = self.start_state_interaction(
+                state_social_task = self.start_state_interaction(
                     session,
                     work_request=ga_social_request_work,
                     turn_id=turn_id,
@@ -4984,9 +5062,8 @@ class GoalDrivenRuntimeCoordinator:
                 and not planner_refs
                 and not ga_planner_requested
             ):
-                selected_social_task = ga_social_task or initial_social_task
-                if selected_social_task is not None:
-                    social_resolved = await selected_social_task
+                if state_social_task is not None:
+                    social_resolved = await state_social_task
                     if social_resolved is None:
                         raise CognitiveStageFailure(
                             "social_cognition",
@@ -5468,7 +5545,7 @@ class GoalDrivenRuntimeCoordinator:
                 for step in terminal_plan.steps
             ):
                 if self.policy.mode == "apply":
-                    initial_social_task = self.start_state_interaction(
+                    state_social_task = self.start_state_interaction(
                         session, work_request=work_request.model_copy(update={"context": planning_context}),
                         turn_id=turn_id, plan=terminal_plan,
                     )
@@ -5609,8 +5686,8 @@ class GoalDrivenRuntimeCoordinator:
             await cancel_uncommitted_fast_work("foreground_deadline")
             raise
         except CognitiveStageFailure as exc:
-            await self.cancel_social_interaction()
             await cancel_uncommitted_fast_work(exc.stage)
+            await finish_independent_social_interaction()
             failure_metadata = {
                 **exc.failure_metadata,
                 "failure_stage": exc.stage,
@@ -5631,8 +5708,8 @@ class GoalDrivenRuntimeCoordinator:
                 metadata=failure_metadata,
             )
         except Exception as exc:
-            await self.cancel_social_interaction()
             await cancel_uncommitted_fast_work(type(exc).__name__)
+            await finish_independent_social_interaction()
             return self._finish(
                 mode=self.policy.mode,
                 status="error",

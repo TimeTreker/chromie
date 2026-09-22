@@ -243,11 +243,11 @@ class _CognitiveScenarioRuntime:
         return response
 
     async def wait_dispatch(self, dispatch: InteractionResponse) -> Any:
-        return SimpleNamespace(results=[])
+        return SimpleNamespace(status="completed", results=[])
 
-    async def record_social_delivery(self, *args: Any, **kwargs: Any) -> None:
-        # This Level A owner records no playback receipt or heard dialogue.
-        return None
+    async def record_social_delivery(self, *args: Any, **kwargs: Any) -> bool:
+        # Simulated Level A completion only; no real playback receipt or heard dialogue.
+        return True
 
     async def prepare_fast_planner_capability_activities(self, activities: list[Any], *, turn_id: str) -> list[Any]:
         await self.runtime.prepare_planner_work(turn_id, [item.model_dump(mode="json") for item in activities])

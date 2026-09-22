@@ -1,5 +1,605 @@
 # Chromie Current Status
 
+## Pending SC Work-state freshness repair — 2026-09-22
+
+The owner deferred failure-cause wording where it does not affect main Work. It remains
+unqualified; execution failures and their evidence are still handled normally. This repair
+addresses the independent Host defect that admitted obsolete optional Plan-state SC results.
+
+`start_state_interaction` previously checked only the active SC request ID, so Work could
+finish while the same request remained current. It now captures the existing Goal/turn-scoped
+Runtime snapshot and checks its execution facts after inference and expression preparation.
+Provider start, termination and relevant Goal/Work changes expire that pending result.
+Independent interpretation-time acknowledgement and already submitted delivery retain their
+existing ownership. No semantic phrase filter, rewording, retry, new model call or state store.
+
+| Actual boundary | Input → output / judgment |
+| --- | --- |
+| UMI → parallel SC1 / Planner | Live SID `ce58f1d8`: greeting r1 → `你好！`; r2 → one left turn. Correct independent ownership. |
+| Runtime → pending SC2 | SC2 starts at 17:47:25.339 from a planned-state snapshot; turn completes at 17:47:27.433. The old request identity alone would remain valid. |
+| SC2 → Host | At 17:47:31.267 the changed execution snapshot yields `stale`, no response dispatch. Raw rationale still blends “planning/execution”; it is retained but not counted as semantic qualification. |
+| Session / delivery | TTS 1/1 discarded segment, zero failed/skipped delivery, safe idle; session completes after SC settles. No added model invocation. |
+
+Regression: before repair, held SC still submitted speech after its Work completed; after
+repair, 22 focused social tests and 3 Runtime tests / 4 subtests pass, including actual start,
+completion/cancellation, unrelated Work, independent greeting and social-delivery exclusions.
+Truthful embodied speech Level A 6/6 and selected live simulator case 1/1 pass. Repository
+policy, test ownership, pinned Ruff/mypy and docs pass. No full suite/cohort, physical audio,
+hardware or latency qualification. Evidence: `.chromie/acceptance/sc-stale-work-20260922/`
+(`review.json`, raw calls, workflow and source identity). One run bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260922_174753.tar.gz`. The combined log split
+SC2's record; its complete raw JSON was recovered from separately retained Docker stderr.
+
+Four axes: **source implemented** for pending Plan-state result suppression; **local validation
+partial**; **target validation partial**; **support development only**. Mixed-time input views
+and overall SC semantic reliability remain open; failure wording is deferred, not passed.
+No new fixtures/configuration/current documents; simulator stopped; no commit/push.
+
+## Bounded SC committed-state prompt repair — 2026-09-22
+
+The owner requested a simple prompt repair with the current model and small common-case
+checks. The unchanged original packet again called committed/scheduled Work “in progress.”
+The retained prompt now explicitly distinguishes `activity_committed`/`scheduled` from an
+observed start, allows prospective plan/intention wording, and separates the Work fact from
+the social reason for speaking or silence. This replaces the old state paragraph and follows
+the input/output-contract prose. A first placement near the authority instructions failed
+and was rejected. No model, Schema, context, semantic filter or extra model call changed.
+
+Three independent retained committed snapshots plus running/completed contrasts pass this
+state check (5/5). All six packets pass mechanical validation; **the six-case semantic cohort
+does not pass**: the controlled failed-result case still invents a cause and misuses speech
+repair. Earlier context inconsistency and asynchronous snapshot freshness also remain open.
+
+Fresh live SID `f37ee74a` passes the selected greeting/left-turn check: SC greets and adds an
+independently intended wave; Planner/Runtime complete one left turn; SC2 describes a resolved
+plan preparing for action without claiming execution. Its snapshot precedes the left-turn
+commit, so fresh live evidence covers planned-versus-running; direct committed-state proof
+comes from the three retained native inputs. TTS 2/2 discarded segments, no failed delivery,
+and safe idle. Both raw SC calls match the new prompt; packaged Agent source matches before
+and after (`4012bd77d185af8dbb83a754981fad944edbc6bd55c6cb355d442c6a72439991`).
+
+Validation: 17 focused tests; truthful embodied speech Level A 6/6; pinned Ruff/mypy,
+repository policy, test ownership and docs pass. No full suite/live cohort, physical audio,
+hardware or latency qualification. Evidence and per-boundary review:
+`.chromie/acceptance/sc-committed-prompt-20260922/review.json`; one completed-run bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20260922_172813.tar.gz`. No tracked fixtures or
+new configuration; simulator stopped; no commit/push. Four axes: **source implemented** for
+this bounded prompt repair; **local validation partial**; **target validation partial**;
+**support development only**. Next address failure reporting and snapshot freshness separately.
+
+## Continued SC state diagnosis — 2026-09-22 (no production change)
+
+The owner requested continuation of the committed-versus-running defect. It remains
+open. Six frozen inputs cover three actual committed-state snapshots and controlled
+running/completed/failed contrasts. Consistent Task/Goal projections, reduced duplicate
+context, fact/output ordering, a consolidated authority prompt, and explicit Runtime-shaped
+Work/start fields did not produce a reliable repair. All trials remain private diagnostic
+artifacts; production prompts, context, Schema and code are unchanged from the preceding
+identity repair. No new tracked fixtures or benchmark expansion.
+
+The actual handoff contains old planning snapshots alongside newer scheduled Task records;
+SC also receives the planning-time empty `existing_work_activities`, rather than a fresh
+Runtime Work view. These are context-quality gaps, but correcting them in controlled
+inputs did not eliminate the bad raw SC result. Even a controlled `started=false` Work
+view was followed by an execution claim. That field was reconstructed for the contrast,
+not recovered as historical provider-start evidence. Do not claim a missing-field-only
+root cause or a proven model-wide inability from these experiments.
+
+A same-model thinking-mode diagnostic also failed: the existing 1,024-token bound
+truncated outputs; with a 4,096-token diagnostic bound, the original case still claimed
+execution and the failed-state case timed out. Thinking output also violates the current
+production transport contract. No parser, reasoning profile or service configuration was
+changed, and the interrupted diagnostic batch is incomplete.
+
+Evidence: `.chromie/acceptance/social-state-grounding-20260922b/review.json` retains
+the episode workflow, per-case verdicts, rejected hypotheses, exact packets/replies,
+source identity and limits. The initial order experiment had a harness-order defect and
+is explicitly unqualified. No live execution, full suite, physical audio or latency
+qualification ran. A six-input offline comparison with the already-cached Qwen3.5-9B
+was proposed to the owner; no model switch or comparison has been performed.
+Four axes remain **source implemented** only for earlier accepted repairs;
+**local validation partial**; **target validation partial, SC state/reporting open**;
+**support development only**. No commit/push.
+
+## SC state investigation and native identity repair — 2026-09-22 (current worktree)
+
+The owner resumed audit repairs with small common-case checks, no behavioral rules
+and no latency work. **The committed-versus-running SC defect is still open.**
+Prompt changes, foregrounded task state, planned-satisfaction labels, output ordering
+and removal of duplicate Schema prose were tested and rejected. Two candidates that
+improved retained inputs still failed a fresh live snapshot. All these production
+changes were reverted; the earlier accepted repairs remain intact. No missing state
+fact or context-only root cause was established. The earliest observed semantic
+divergence remains SC's primary result over committed/scheduled Work.
+
+One separate, reproduced **native identity-contract defect is repaired**. With a
+retained speech identity, the fresh-ID regex admitted empty strings and unlimited
+length, while sibling Schema keywords required 1–24 characters. The native decoder
+could ignore those sibling bounds when applying the pattern. A retained native call
+generated the 27-character `failure_acknowledgement_001`; strict validation rejected
+the entire result. The regex now directly enforces the existing length bound and
+excludes reserved identities. Longer historical identities retain their exact-wording
+reuse alternatives. No expression quota, semantic rule, output truncation, extra model
+call, relaxed validator or new setting was added. The SC authority prompt, full state
+projection and output-Schema prose are restored to their turn-start versions.
+
+| Actual episode / owner | Authoritative input → actual output | Verdict / retained change |
+| --- | --- | --- |
+| UMI → parallel SC / GA / Planner | Greeting r1 and left-turn r2 retain separate owners. SC delivers the greeting; Planner/Runtime commit requested left-turn Work. | Common interaction remains functional; no ownership change in this patch. |
+| Runtime/task view → SC primary | Original `bc6f276f` and new `02ec8361` / `cffc6162` snapshots contain `activity_committed`, task `scheduled`, and no start/result evidence. SC calls the action executing or mixes in-progress/committed. | Incorrect semantic state grounding. Prompt/input candidates are not qualified by isolated improvements; both live candidate runs remain semantic failures despite automated passes. |
+| Native SC decoder → strict Schema / Host | Controlled failed-result contrast generates a 27-character fresh ID under a regex that permits it; declared maximum is 24. | Earliest mechanical gap is decoder realization of the existing Schema bound (`contract_or_schema`). Host rejection is correct; no effect was dispatched by this isolated probe. |
+| Revised regex → exact failed native transaction | Identical retained experimental prompt/context/model; only native response Schema changes. Model generates a 24-character ID and the wire Schema passes. | Decoder now contains the malformed-ID trigger before Host admission, without rewriting model output. This does not qualify the experimental prompt or its failure-report semantics. |
+| Retained revision → Runtime / TTS / session | SID `15ec0b11`: `你好呀！`, one completed left turn, 1/1 discarded TTS segment, zero failed TTS/pending SC and safe idle. | Selected automated live check 1/1 passes; session joins delivery and Work. Later SC rationale still claims execution from committed/scheduled state, so the semantic audit remains open. |
+
+Regression: four boundary assertions fail before the identity change; afterward
+**27 focused tests pass**, including empty/overlong IDs, reserved prefixes, the
+24-character boundary, longer retained-ID reuse, native Need constraints and strict
+validation. Six small native packets pass Schema/DTO/Host checks, but only **2/6**
+pass the full semantic rubric: three committed snapshots still overclaim execution,
+and the controlled failed-result case invents a cause and misuses speech repair.
+The failed-result input is a controlled role contrast, not a live failed-provider
+qualification. The exact malformed-ID replay is separate mechanical evidence.
+`truthful_embodied_speech` Level A passes **6/6**. Pinned Ruff/mypy, repository policy,
+test ownership and documentation checks pass. No full suite or full live cohort ran;
+no microphone, audible speaker, physical robot or latency claim is made.
+
+Evidence: `.chromie/acceptance/social-work-state-focused-20260922/` retains all
+baselines, failed candidates, three live runs, raw calls, frozen contrast extensions,
+the exact ID replay and `retained-repair.patch`. `repair-review.json` is the final
+adjudication; earlier files naming a selected candidate are superseded. Retained Agent
+source matches before/after live:
+`85c93ea4b66be154b214dbe83970696b9472771edf6ffd8b66bffa5fc588764d`.
+One bundle per ended live run: `/home/chromie/Downloads/chromie_debug_bundle_20260922_141411.tar.gz`,
+`/home/chromie/Downloads/chromie_debug_bundle_20260922_142843.tar.gz`, and
+`/home/chromie/Downloads/chromie_debug_bundle_20260922_144127.tar.gz`.
+The owned simulators were stopped; the Agent runs the retained identity repair.
+No new current document, environment variable or architectural term; no commit/push.
+
+Four axes: **source implemented** for native fresh-ID bounds only; **local validation
+partial**; **target validation partial, semantic state/reporting failures remain**;
+**support development only**. Next investigate SC's use of authoritative execution
+state and real failed-result Evidence; do not repeat rejected candidates or present
+the identifier repair as closure of the originating semantic defect.
+
+## Focused SC context and turn-observation repairs — 2026-09-22 (current worktree)
+
+The owner requested both remaining defects be fixed without behavioral rules.
+The originating episode is `86d7f313`: left-turn execution and greeting delivery
+completed, but SC unnecessarily asked `你要我向左转吗？` and acceptance lost the
+direction. The two earliest wrong boundaries were different:
+
+- The observation map still retained `yaw_radps` although the current turn contract
+  supplies `direction` and `turn_rate_radps`. It now preserves those semantic fields
+  directly. Two current turn scenarios and the matching acceptance command use the
+  requested direction rather than a fixed provider speed. Completed status remains
+  required; wrong/missing direction and failed execution cannot pass. Historical
+  artifacts are untouched, and no sign conversion or invented telemetry was added.
+- The SC model projection unconditionally discarded `core_interpretation`. Host
+  already held UMI's full accepted meaning and cognitive routing, while SC's own
+  Responsibility list contained only the greeting. SC saw the full original request
+  and pending planning without the sibling task's established ownership. The existing
+  projection now retains current-turn UMI authority, turn ID, Responsibilities,
+  uncertainties and cognitive requests as read-only context. Stale UMI and generic
+  dialogue history remain excluded. SC's own fulfillment scope is unchanged.
+
+Two prompt-only trials were unstable and were rejected without deployment. **The
+final SC authority prompt is byte-for-byte unchanged**, as are its model, native
+Schema, DTO, validator and invocation budget. No keyword routing, fixed response,
+question filter, output rewrite or expression-count rule was added. Independent SC
+questions and extra social expression remain available.
+
+| Actual workflow / owner | Material input → output | Assessment |
+| --- | --- | --- |
+| UMI / Host admission | Greeting r1 → SC; body r2 → Planner; Host closes Planner's turn-wide GA dependency. | Correct accepted meaning and routing; current live raw calls retained. |
+| SC context projection → primary model | Before: r1 plus original full turn, but full UMI removed. After: same source plus exact current UMI sibling meaning/routing, still only r1 in SC fulfillment scope. | Earliest missing-context boundary repaired without re-authoring meaning or widening act provenance. |
+| Frozen primary SC contrasts → validation | Chinese greeting+turn, English greeting+blink, genuine missing location and genuine Runtime confirmation. | Baseline 2/4 → context-only candidate 4/4; wire/full Schema, DTO, Agent and reconstructed Host projection pass. Genuine questions remain; optional expression count is unrestricted. |
+| Deployed SC → TTS | SID `bc6f276f`, SC call `llmcall_agent_1eef986876dc465b`: `你好呀！很高兴见到你。` | No redundant task question or claimed execution; 2/2 segments delivered to discard sink. |
+| Planner → Runtime → observation | Exactly one left turn, owned direction span t8; provider completed; observation retains `direction=left`, `turn_rate_radps=0.01`, matching optional defaults and completed status. | Both requested repairs observed; automated selected live case **1/1 passes**, safe idle true. |
+| Session lifecycle / later SC | Pending SC = 0, failed TTS = 0; session completes after playback and motion. Later Work-state SC chooses silence. | Lifecycle remains correct. Its internal rationale calls committed Work “in progress” without a started event in that snapshot; this remains an unqualified state-distinction issue, with no additional speech or action. |
+
+Validation: observation regression fails six subcases before repair; afterward **28
+focused tests / 10 subtests** pass. Level A `composable_action_planning` **5/5** and
+`speech_identity_latency` **4/4** pass without latency qualification. Pinned Ruff,
+repository policy, test ownership and documentation checks pass. Scenario-library
+validation is structural only; no full test suite or full live cohort was executed.
+The Runtime-confirmation contrast is controlled SC input, not a claim that the actual
+turn provider requires consent. Physical microphone/speaker evidence remains open.
+
+Evidence: `.chromie/acceptance/social-confirmation-observation-focused-20260922/`.
+`freeze.json`, `context-freeze.json`, `comparison.json`, `semantic-review.json` and
+`review.json` preserve the unchanged baseline, rejected trials, restored Host context,
+final native packets, immutable re-adjudication and selected live run. Agent source
+matches before/after live: `08143de66fd08772118f1bd4ef15b6c5eb7f01ad20f10904d56f061be07abefa`.
+Exactly one bundle: `/home/chromie/Downloads/chromie_debug_bundle_20260922_133807.tar.gz`.
+The owned simulator was stopped. No new current document, setting or architectural
+term, and no Git delivery; earlier dirty work is preserved.
+
+Four axes: **source implemented** for these two defects; **local validation partial**;
+**target validation partial, selected interaction passes**; **support development only**.
+Next audit the retained Work-state rationale against committed/started/completed
+evidence before extending any SC state-truth claim. Full target qualification remains
+open; this bounded success does not close the whole communication migration.
+
+## Focused Fast Work-scope repair — 2026-09-22 (current worktree)
+
+The retained `你好，Chromie！然后向左转一下。` episode (`ed4fc9a4`) gave
+Fast only body Responsibility r2. Fast nevertheless added
+`chromie.weather.lookup(location=current_location)` under r2 to handle the greeting,
+which already belonged to independent SC. The earliest wrong boundary was Fast's
+primary semantic result; the scoped DTO, complete source tokens and catalog were
+available. Host correctly rejected the invented location before dispatch.
+
+The existing Fast streaming prompt now makes the supplied Responsibility array the
+complete scope of this invocation. Each Activity must realize its cited outcome or
+supply a necessary prerequisite. Immutable source/history/identity ground HOW without
+creating new tasks. Unique coverage refs are distinguished from multiple necessary
+Activities for one outcome, and responses dependent on unavailable results are deferred.
+This clarifies existing authority; it changes no model, Schema, DTO, validator, catalog,
+SC expression permission or invocation count. No benchmark reference was rewritten.
+
+| Actual workflow / owner | Input → observed output | Assessment |
+| --- | --- | --- |
+| UMI / admission → GA, SC and Fast | Full turn → greeting r1 to SC, body r2 to Fast, both refs to GA; GA creates only the body Goal. | Correct scope in retained live DTOs; raw UMI call was unavailable in the recovered bundle. |
+| Fast native primary → Host | Unchanged frozen origin again adds weather; a requested-weather contrast also adds a premature final response. | Baseline 2/4 passes. Scope confusion is reproduced; Host grounding contains the invented argument. |
+| Revised Fast primary → Host | Same four packets except operating-contract prose: greeting+turn, turn alone, requested weather+turn, and compound turn+blink. | 4/4 Schema, DTO, Host and inspected semantic passes. Genuine acquisition and multi-Activity composition remain available; casual blink count is unrestricted by the oracle. |
+| Deployed Fast → Runtime | SID `86d7f313`, call `llmcall_agent_793899fde9f74bd6`: only left-turn Work, direction grounded in t8; no Deep or capability lookup. | Provider reports completed motion; realization trace contains `yaw_radps=0.01`; body Goal becomes satisfied and simulator safe idle is true. |
+| Independent SC → TTS → session | `你好！我准备好啦。你要我向左转吗？` reaches the discard sink in 2/2 segments; later Work-state SC chooses silence. | Delivery complete, pending SC = 0, failed TTS = 0; session completes after speech and motion. The redundant confirmation question remains a separate semantic defect. |
+| Acceptance observation projection → case verdict | Semantic `direction` / `turn_rate_radps` are omitted by the legacy turn map, which retains `yaw_radps`; the focused scenario expects positive `yaw_radps`. | **Live case remains 0/1 failed**, despite provider completion. Do not convert the retained failed verdict into a pass or claim fully natural interaction. |
+
+Validation: **10 focused checks** and `stable_capability_grounding` Level A **7/7**
+passed. Pinned Ruff, repository policy, test ownership and documentation checks passed.
+Four native primary contrasts are bounded model evidence, not full-role qualification;
+the weather contrast does not prove later acquisition/result delivery. Full tests and
+full live cohort remain owner-deferred, as do latency and supervised physical audio.
+
+Evidence: `.chromie/acceptance/planner-work-scope-focused-20260922/` contains frozen
+inputs/hashes, unchanged baseline, candidate raw outputs, separate adjudication,
+`comparison.json`, `review.json` and the one current-revision live run. Agent packaged
+source matches before/after that run:
+`61571b82b1687b83359fce68d79c5be8ee1140c8d024d9dbcf028c1afc2c8368`.
+One bundle was collected: `/home/chromie/Downloads/chromie_debug_bundle_20260922_121346.tar.gz`.
+The owned simulator was stopped. No new current document, setting or architectural
+term was added; no commit/push was requested.
+
+Four axes: **source implemented** for Fast invocation scope; **local validation
+partial**; **target validation partial, complete live acceptance still failing**;
+**support development only**. Next repair the stale turn-observation contract with a
+focused regression, then qualify SC's redundant reconfirmation from this same episode.
+
+## Focused Fast enum-argument provenance repair — 2026-09-22 (current worktree)
+
+The next bounded repair addresses the missing direction source in the retained
+`你好，Chromie！然后向左转一下。` episode. Fast emitted `direction=left` without
+`argument_sources.direction`; the native Schema accepted that shape, while the
+unchanged Host correctly rejected the translated value. Its string exception permits
+literal copies, not translation: UMI's Chinese body intent and immutable source
+contain no literal `left`. All required source tokens were present.
+
+The native Schema now requires parameter-level source spans for required unbound
+string enums when no offered label could be a literal copy from any compatible owning
+outcome. This is a conservative necessary condition, including the existing case-only
+allowance; Host still verifies the actual source and selected ownership. Typed bindings,
+declared realizations, trusted targets/memory and literal strings remain supported.
+The change selects no argument value and adds no translation table. **Prompts, model,
+DTO and Host validation are unchanged.** No benchmark reference was rewritten.
+
+| Actual episode boundary / owner | Material input → output | Assessment |
+| --- | --- | --- |
+| UMI → independent SC / Fast / GA | Replay baseline `7302b3f3`: greeting r1, Chinese left-turn r2; SC owns the greeting and Fast receives body Responsibility r2 plus immutable full-turn source. | Scope/source available; native role inputs and admitted DTO retained. |
+| Native Fast Schema → primary output → Host | Baseline allows absent string provenance; Fast omits direction span and Host rejects before commit. | Decoder/Host contract gap reproduced by a failing focused regression. Native isolated baseline is 1/3 after corrected Host adjudication: both translated directions fail, literal English passes. |
+| Revised native Schema → primary output | Three frozen contrasts retain identical prompt/model/options; Chinese left/right now include valid owned spans, English literal remains accepted. | 3/3 Schema, DTO/Host and semantic checks pass. Only required-field lists differ in the native packets; field order is retained. |
+| Deployed Fast → canonical validation | Replay `ed4fc9a4`: actual wire Schema requires `argument_sources.direction`; Fast cites t8..t8 (`左`) for `direction=left`. It also invents `chromie.weather.lookup(location=current_location)` as a greeting response. | Direction provenance repaired. Unrequested Work remains a separate semantic failure; the full Plan is rejected on unbound weather location before action dispatch. No Deep repair call. |
+| Independent SC → TTS / final session | Greeting reaches the discard sink in 2/2 segments; pending SC = 0, terminal session = `failed`, simulator safe idle = true. | Earlier SC-survival repair retained. No successful turn, physical audio or complete mixed-command pass is claimed. |
+
+Two prompt trials were rejected for adding unrelated weather Work and fully reverted;
+they were never deployed. A diagnostic adapter initially failed to rename projected
+`args_schema` to the Host's `input_schema`, giving incorrect isolated Host-pass labels.
+All original packets/output remain retained; `corrected-adjudication.json` supersedes
+those labels. Final inference and adjudication use the corrected adapter. A preliminary
+schema replay had equivalent values but different keyword order; only `schema-final/`
+and `comparison-final.json` establish the final frozen native evidence.
+
+Validation: **19 focused tests / 15 subtests passed**; `stable_capability_grounding`
+Level A **7/7** passed. Pinned Ruff, repository policy, test ownership and documentation
+checks passed. Full tests/cohort and latency remain owner-deferred. The production
+change is confined to the existing Schema owner; no document, setting, architectural
+term or model invocation was added to the product.
+
+The unchanged live baseline and changed live replay each attempted one case and each
+failed (**0/1**); they qualify only the repaired boundary, not the whole interaction.
+Agent source was verified before/after; final packaged digest is
+`54b65aeceb84bdc12b6d293ff7a507cf03bd5b1614a36d432c489a4f1e973fd6`.
+Evidence: `.chromie/acceptance/planner-argument-source-focused-20260922/`.
+One bundle per ended live run:
+`/home/chromie/Downloads/chromie_debug_bundle_20260922_112808.tar.gz` and
+`/home/chromie/Downloads/chromie_debug_bundle_20260922_113713.tar.gz`.
+The owned simulator was stopped after collection; no commit/push was requested.
+
+Four axes: **source implemented** for missing nonliteral enum provenance;
+**local validation partial**; **target validation partial, mixed command still failing**;
+**support development only**. Next diagnose why Fast adds unrequested Work for a greeting
+already assigned to SC. Current cases do not qualify free-form string translation,
+all enum/context combinations, Deep/re-entry, full live coverage or physical voice.
+
+## Focused independent SC survival on Work failure — 2026-09-22 (current worktree)
+
+This iteration fixes the Host cancellation defect retained in the mixed-turn audit
+below. The originating turn was `你好，Chromie！然后向左转一下。` (`d06f3a6a`):
+UMI independently requested greeting SC and turn Planner; Fast's rejected direction
+argument then caused coordinator cleanup to cancel the still-generating greeting.
+The rejected Plan is the trigger; cancelling independent SC is the earliest wrong
+boundary for the lost greeting. The Planner semantic defect remains separate.
+
+The coordinator now discards uncommitted Work before joining this turn's admitted
+SC task. It returns the original Work failure plus the exact independently delivered
+SC response; secondary SC/provider failures remain diagnostics. Host preserves that
+response without replay or a generic apology, and SessionTracker records failed
+completion after all same-session social tasks and speech are terminal. Explicit
+interruption and the outer deadline retain cancellation authority. No semantic
+prompt, Schema, validator, model invocation, benchmark reference or setting changed.
+
+| Episode boundary / owner | Actual input → output and expected contract | Evidence / assessment |
+| --- | --- | --- |
+| Gateway → UMI → concurrent authorities | Current replay `9b0f29b7`: greeting r1 + left-turn r2; SC r1, Planner r2, GA r1+r2. GA commits only body Goal continuity. | Correct admission/scope, correlated by the same turn/SID; native calls retained. |
+| Fast → Host validation | `soridormi.turn_in_place(direction=left)` lacks argument-source binding; Host returns `fast_stream_contract_invalid` before requested Work dispatch. | Planner output remains incorrect; fail-closed validation is correct and unchanged. Deep is not invoked. |
+| Failed Work cleanup → independent SC | Previously cancelled SC and returned with zero TTS. Replay now retains SC through Runtime and playback completion, then returns the original error. | Focused before/after regression and live replay confirm this lifecycle boundary is repaired. |
+| SC → Runtime/TTS → session report | SC returns a greeting plus `你要我向左转吗？` and a wave; all 3 speech segments reach the discard sink, pending SC = 0, no speech failure, terminal report = `failed`, safe idle = true. | Delivery is observed; the unnecessary reconfirmation remains a separate semantic concern. No successful left turn or physical audio evidence is claimed. |
+| Returned failed resolution → normal Host | Exact delivered response enters history once; no second dispatch; session remains failed. | Controlled Host regression. Live replay uses the maintained text/simulator harness, not this Host entry method. |
+
+```text
+UMI ──→ SC greeting ─────────→ Runtime / playback ──→ terminal
+  └──→ GA / Planner → rejected → stop uncommitted Work ──┐
+                                    join SC delivery ←─┘ → failed session
+```
+
+Validation: **31 focused checks passed** (Planner contract/transport failure,
+SC/service/playback failure, interruption, delivery bookkeeping and session isolation);
+`speech_identity_latency` Level A **4/4** passed, without claiming latency qualification.
+Pinned Ruff, repository policy, test ownership and documentation checks passed.
+The existing broad-handler classification was re-audited for preserving independent
+SC while retaining fail-closed Work containment; no exception was added.
+
+One unchanged-source live case was replayed; it remains **0/1 passed**, stopped on
+Planner contract failure. This is narrow evidence for SC survival, not end-to-end or
+revision qualification. Agent digest matched
+`feed9d772b73743d437f295202e55958da3f28830157d89d147b77efaa48980a`
+before/after. Evidence and exact native calls are under
+`.chromie/acceptance/independent-social-failure-focused-20260922/`; the one post-run
+bundle is `/home/chromie/Downloads/chromie_debug_bundle_20260922_111601.tar.gz`.
+The owned simulator was stopped after evidence collection.
+
+Four axes: **source implemented** for independent-SC failure containment;
+**local validation partial**; **target validation partial, mixed command still failing**;
+**support development only**. Full tests/cohort, latency and physical microphone/speaker
+proof remain owner-deferred. Next repair Fast's missing argument provenance and
+separately diagnose SC's unnecessary reconfirmation. No commit/push was requested;
+current documents, environment settings and architecture terms have no net growth.
+
+## Focused mixed-turn activation repair — 2026-09-22 (current worktree)
+
+The next audit iteration preserves the owner's small-case scope and defers latency.
+An unchanged native UMI baseline accepted a greeting but rejected both greeting +
+turn and silent turn: each mixed result requested GA for only its body Responsibility,
+omitting its turn-local speech Responsibility. The existing Host correctly requires
+initial GA to consider the entire turn. This is an activation-scope error, not evidence
+that all physical requests need speech or that every turn must activate SC.
+
+The UMI prompt now explicitly says that requested GA includes every Responsibility,
+including turn-local speech, without thereby creating a Goal for each one. SC and
+Planner keep independently selected scopes. Model, context projection, Schema, DTO,
+validator and runtime scheduling are unchanged; no benchmark references were rewritten.
+
+| Boundary / owner | Actual input → output | Verdict and evidence |
+| --- | --- | --- |
+| UMI primary → activation DTO | `你好，Chromie！然后向左转一下。`: correct greeting/body meanings, SC r1 and Planner r2, but GA r2 only → whole interpretation rejected. Silent-turn contrast similarly omits its speech restriction from GA scope. | Earliest wrong output is UMI's GA reference set; Schema accepts it and DTO correctly rejects it. No downstream SC/Planner was reached in these role probes. |
+| Same three frozen inputs → revised UMI prompt | GA now includes both authored refs when requested; greeting still activates SC alone, quiet turn does not request SC. | All three native transactions pass separate wire-Schema and production DTO/Host checks, one invocation each. Exact wire comparison differs only in the declared system prompt. This qualifies only the selected activation contrasts. |
+| Current deployment → greeting `0407e6c0` | SC says `你好呀！很高兴见到你。`; both TTS segments reach the discard sink and the session completes with no pending social work. | Narrow service/text pass; no physical microphone/speaker evidence. |
+| Current deployment → mixed turn `d06f3a6a` | UMI passes with GA r1+r2, SC r1 and Planner r2; GA commits only body Work. Fast then omits direction provenance and also invents an unrelated weather lookup. | Host rejects the unbound direction before any Capability dispatch. Pending SC is cancelled by the failure path, so the greeting is not delivered. Both downstream defects remain open. |
+
+The three-case live cohort stopped at case 2 on that hard Planner contract failure:
+**one pass, one failure, one unrun**; both attempted cases retained safe idle. It is
+incomplete, not a passing revision. Agent source matched digest
+`feed9d772b73743d437f295202e55958da3f28830157d89d147b77efaa48980a`
+before/after; one debug bundle was collected at the stop:
+`/home/chromie/Downloads/chromie_debug_bundle_20260922_110209.tar.gz`.
+
+Focused validation passed **11 tests / 2 subtests**, including the unchanged strict
+GA-scope guard and independent SC/Planner subsets; `robust_intent_understanding`
+Level A passed **8/8**. Evidence, frozen inputs, exact native requests, boundary
+reviews, deployment identity and live results are retained under
+`.chromie/acceptance/communication-activation-focused-20260922/`.
+Four axes: **source implemented** for the bounded activation clarification;
+**local validation partial**; **target validation failing/incomplete** beyond UMI;
+**support development only**. Full tests/cohort, latency and physical evidence remain
+deferred. Next investigate Fast argument provenance/unrequested Work and the Host
+failure path cancelling an independent greeting. No commit/push was requested.
+
+Latest refinement: [independent expression and complete delivery](#independent-expression-and-complete-delivery--2026-09-22)
+supersedes the earlier equal-Capability duplicate policy and strengthens delivery completion.
+
+The owner's subsequent clarification allows natural repetition for casual gesture
+requests. The existing `blink_once_plain_request` case now checks supported blink
+execution without requiring count 1; its historical ID and raw evidence are retained.
+Earlier count-only failures for “眨一下” are no longer treated as product defects.
+No Planner quantity optimization is being pursued.
+
+The next bounded audit repair preserves model-request field order when exporting
+`llm_calls.jsonl`. In the retained `20260922_102129` bundle, original service logs
+preserve order while the collector sorted 20 of 23 recovered calls' requests;
+Schema property order therefore differed in subsequent frozen probes. The collector
+now preserves that order. This repairs evidence fidelity, not native model behavior;
+the previous sorted-packet probes do not qualify the exact production transaction.
+Original ordered records and the failing/passing collector regression are retained
+under `.chromie/acceptance/audit-evidence-order-focused-20260922/`. Four focused
+checks passed, covering the logger-to-bundle round trip and scenario-library validity.
+Four axes: **source implemented** for evidence export and the corrected casual-blink
+oracle; **local validation partial**; **target validation not rerun** (historical
+runs are not promoted to passes); **support development only**. Full tests, live
+cohorts and latency optimization remain owner-deferred. No runtime semantic change,
+new fixture, document, setting or model call was added.
+
+## Focused session completion repair — 2026-09-22 (current worktree)
+
+The owner approved beginning the audit repairs with **only a few common cases**;
+the full test suite and full 75-case live cohort are explicitly deferred for this
+iteration. This section updates audit findings 1 and 7 below for source scope only.
+No benchmark reference, semantic prompt, model profile or duplicate-action policy
+was changed. No commit/push was requested.
+
+| Boundary / owner | Before → implemented change | Evidence and remaining limit |
+| --- | --- | --- |
+| SC coordinator → Host SessionTracker | Detached inference/delivery/expression tasks were absent from the completion condition → register each task under its explicit SID; recheck completion after its terminal callback. | Controlled slow-SC/body-Work regression proves Work returns while SC is pending, without early session finalization. |
+| Host → playback and workflow reporting | `llm_done` plus zero queued TTS could finalize before SC supplied speech → require zero pending social tasks as well as terminal TTS accounting. | Late-speech regression holds final report creation until playback; failure and cancellation remain terminal facts, never fabricated delivery. |
+| Acceptance wait → session state | Wait inspected global auxiliary tasks and inferred SID from task names → read the owning session's pending count and retained failure records. | Cross-session regression excludes unrelated pending/failed work; current-session failures still fail acceptance. |
+
+Focused validation: **13 tests passed**, including ordinary greeting, delayed SC,
+late playback/reporting, failure, cancellation, explicit session/turn identity and
+session isolation; the `speech_identity_latency` Level A class passed **4/4**.
+Pinned Ruff, repository policy and test-ownership checks passed. These tests used
+the available Python 3.13 host; the complete supported-environment canonical gate
+was not run. No new document, runtime switch or architectural term was added.
+
+The deployed Agent initially differed from this checkout. It was rebuilt/recreated
+and verified against packaged-source digest
+`715814252afb63b2e3caf8c99da9d291fe26b667778e0d0ff708bb52bdcb2d82` before the baseline.
+Both small live runs used the existing RTX 5090 / SGLang `chromie-gemma4-12b`
+profile with text admission, real TTS and discarded audio; no simulator or physical
+device evidence is claimed. One unchanged-source run per iteration exercised
+Chinese identity/greeting and two consecutive English social turns, followed by
+one debug bundle per run.
+
+Baseline: English greeting and follow-up delivered; Chinese identity generated a
+reply but all four TTS parts were cancelled at the 3.5-second playback-start
+deadline. After the lifecycle patch, all three turns delivered and completed with
+zero pending social tasks: Chinese identity **11.56 s**, English greeting **11.96 s**,
+follow-up **12.42 s** total turn time. This does not qualify latency. Different
+generated wording and a warm service prevent attributing the vanished playback
+timeout to this lifecycle repair; that delivery failure remains open.
+
+Evidence: `.chromie/acceptance/session-completion-focused-20260922/` retains the
+three-turn manifest, baseline/after runtime identities, logs, summaries, bundle
+receipts, focused tests and Level A results. The post-change dirty-tree identity
+is diagnostic-only. Four axes: **source implemented** for lifecycle/accounting;
+**local validation partial** (focused only); **target validation partial** (three
+text/TTS turns, no physical audio); **support development only**. Next: investigate
+playback-start timeout/response latency and the retained duplicate-action admission
+defect in separate bounded iterations. Remaining audit findings stay open.
+
+### Focused TTS readiness follow-up — 2026-09-22
+
+The maintained live-text entry point omitted the synthesis readiness performed by
+normal startup. It now uses the effective Host voice for Chinese, English and
+mixed no-playback probes before admitting any turn, retaining `tts-readiness.json`.
+Failed synthesis or empty audio stops admission; no production timeout, prompt,
+model profile or playback policy changed.
+
+| Actual boundary / owner | Observed input → output | Assessment |
+| --- | --- | --- |
+| Live-text runner → TTS startup | Previously began scenarios after service health alone; now probes effective `chromie_mixed` voice and retains nonempty PCM for all three texts. | Confirmed harness readiness omission repaired; not proof of the original timeout's cause. |
+| UMI → concurrent GA / SC | After Chinese text admission, UMI took 6.99 s; GA and SC then took 4.46 / 4.74 s concurrently. Planner and physical Work were not invoked. | Most greeting delay precedes TTS; semantic optimization remains unqualified. |
+| SC → Host TTS / completion | Both post-change greetings produced speech, all scheduled audio reached the discard sink, and sessions ended with zero pending social tasks and no speech failures. | Narrow text/service delivery observed; no physical microphone or speaker evidence. |
+
+The restarted-service baseline **also passed both greetings** (Chinese 14.45 s,
+English 10.79 s), so the earlier playback-start timeout was not reproduced and
+remains unexplained. After the harness repair, Chinese completed in **13.70 s**
+and English in **12.55 s**; the three readiness probes took **3.04 s** separately.
+These two samples do not establish a latency improvement or release qualification.
+The existing RTX 5090 / SGLang profile and source-verified Agent were unchanged.
+
+Five focused tests passed (including two failure subtests); pinned Ruff, repository
+policy and test-ownership checks passed. Full tests and the full live cohort remain
+deferred by the owner. Evidence, runtime identities, per-session workflows and one
+debug-bundle receipt per baseline/after run are retained under
+`.chromie/acceptance/tts-readiness-focused-20260922/`. Four axes: **source implemented**
+for harness readiness; **local validation partial**; **target validation partial**
+(two text/TTS turns, dirty-tree diagnostic only); **support development only**.
+Response latency, the unconfirmed playback timeout and duplicate-action admission
+remain open. No commit/push was requested.
+
+### Independent expression and complete delivery — 2026-09-22
+
+Owner clarification supersedes the equal-Capability rejection described below:
+requested two-blink Work belongs to Planner, while SC may independently select
+additional blinks or other expression. Extra count, equal Capability ID and
+pre-Plan timing alone establish no defect. SC expression remains Goal-free and
+does not discharge requested Work; the whole response must still join its SC
+decision and admitted delivery. The canonical interaction contract now states
+this distinction. No new benchmark fixtures, document, setting or model call were
+added; latency and full tests/cohort remain owner-deferred.
+
+The Host now retains primary Plan visibility for resource checks without treating
+equal Capability IDs as semantic duplication. SC's existing prompt clarifies
+task ownership while permitting independently intended use of the same Capability.
+This is not a claim that native social meaning is fully qualified: recorded SC
+rationales still describe fulfilling the request, and rationale alone does not
+prove a transfer of Goal-completion authority. Planner quantity prompt candidates
+were ineffective and reverted; their failed native outputs are retained.
+
+| Boundary / owner | Actual episode and expected contract | Repair / evidence |
+| --- | --- | --- |
+| UMI → parallel GA, Planner and SC | `filler_blink_twice`: r1 is requested two-blink body Work. SC may independently acknowledge it; only Planner Work satisfies that action. | Final `10d983a7` retains separate primary and auxiliary request IDs; SC delivery has no Goal IDs. |
+| Planner → Runtime / observation oracle | Native Fast emits count 2, then legitimate default normalization leaves `args={}`. The provider's optional default is 2. For `blink_once_plain_request`, the same default is genuinely wrong. | Retain each dispatched Capability's exact ID/version/input schema and use only matching optional defaults when observing results. No production arguments or historical artifacts are rewritten. |
+| SC → Runtime → session completion | `d7648112` produced punctuation-only speech; TTS rejected it, but the old join ignored failed delivery and reported complete. Its mechanical case pass was insufficient. | Join Runtime status and actual speech completion; retain failures and report a failed workflow. Controlled provider/playback failures fail truthfully without replaying Work. |
+| Same-turn Plan update → existing SC delivery | `f1e4ff74` cancelled the already submitted SC blink on ordinary Work-state re-entry. The new delivery check correctly exposed the cancellation instead of passing it. | Wait for submitted same-turn expression, then build SC's next input from the refreshed interaction ledger. Stale unsubmitted decisions, new turns and explicit interruption retain cancellation. Both independent and Plan-bound SC paths use this join. |
+| All same-session work → final report | Final `10d983a7`: primary blink Work and SC blink expression completed; Work ended at about 22.6 s and the final SC decision at 28.1 s. | Session completion follows both, with zero pending social tasks/failures and safe idle. Latency is observed only, not optimized or qualified. |
+
+The final one-case text + headless MuJoCo replay passed. It is narrow service/sim
+evidence, without physical microphone, speaker or robot proof. The preceding
+two-case run completed with one mechanical pass and one count failure; the
+delivery-check-only run stopped on a retained cancellation failure. Neither is
+promoted to a passing revision. The simultaneous gaze/blink frozen contrast also
+retains invalid parallel scheduling or truncated output; it remains open.
+
+Focused ownership/delivery/cancellation checks passed **24 tests**; separate
+session/playback checks passed **5 tests / 2 subtests**. The default-observation
+regression passed with explicit, omitted, required and stale-contract contrasts.
+The affected `speech_identity_latency` Level A class passed **4/4**, using explicitly
+simulated delivery only. Full canonical tests and the full discovered live cohort
+were not run. Evidence and all failed candidates are under
+`.chromie/acceptance/social-task-ownership-focused-20260922/`, including source
+patches, runtime identities, native packets, reviewed case summaries and one bundle
+per live run. Four axes: **source implemented** for ownership admission and joined
+delivery; **local validation partial**; **target validation partial** (one final
+common case passes; once-count and broader semantic failures remain);
+**support development only**. No commit/push requested.
+
+### Focused duplicate-primary containment — 2026-09-22 (superseded policy)
+
+The owner explicitly deferred latency optimization and requested the next bounded
+repair, retaining the small-test scope. Independent Work-state SC admission now
+receives a deep copy of the canonical Plan from its calling coordinator. It checks
+the union of primary response and Plan Capability IDs through the existing
+duplicate/resource/availability rules; Plan steps never enter the social dispatch.
+No model-facing prompt, Schema, profile, benchmark reference or new switch changed.
+
+| Boundary / owner | Actual input → output and change | Evidence / limit |
+| --- | --- | --- |
+| Committed Work → independent SC coordinator | Canonical blink `count=2`; a separate SC response proposes blink `count=1`, with no task capabilities of its own. Previously the Host passed an empty primary view to admission. | Earliest reproduced defect is Host context handoff; the Plan already existed. |
+| Coordinator → auxiliary admission | Pass the same retained Plan snapshot alongside the social response; exact-ID duplicates and shared-body-resource conflicts now suppress the optional proposal. | Before: 4 controlled duplicate/conflict variants dispatched incorrectly. After: all rejected with retained reasons; speech and compatible expression still work, original Plan unchanged. |
+| Admission → Runtime | Submit only accepted social expression, without copying or replaying primary Work. | 11 focused tests pass, including spoken/nonverbal contrasts, compatible/no-primary expression, interruption and repeated-dispatch suppression. |
+
+The `composable_action_planning` Level A class passed **5/5**; pinned Ruff,
+repository-policy and test-ownership checks passed on the available Python 3.13
+host. Full tests/cohort remain deferred; no physical audio or robot proof.
+
+Native text + headless MuJoCo evidence remains **failing**. The two-case baseline
+stopped at gaze/blink (`a8b20f88`) on Fast's invalid singleton parallel group;
+one of two selected cases was unrun. After the patch both cases ran but failed:
+gaze/blink `0ed5a0ab` and plain blink `500fd481` both emitted blink `args={}`,
+so count assertions failed; the compound Plan also remained sequential. Providers
+returned completed results (blink `no_motion=true`), and every attempted case
+returned safe idle. Post-Plan SC chose silence, so these runs do not prove a native
+duplicate proposal was rejected. Plain blink also retained an earlier, pre-Plan
+SC blink dispatch followed by primary blink Work: that separate premature
+task-fulfillment path remains open and must not be called fixed by this patch.
+
+Evidence: `.chromie/acceptance/duplicate-primary-focused-20260922/` retains
+before/after tests, native workflows, identities, case reviews and one bundle per
+live run. Four axes: **source implemented** for committed-Plan containment;
+**local validation partial**; **target validation failing**; **support development
+only**. Next: qualify pre-Plan SC task fulfillment and exact blink count grounding
+as separate transactions; latency stays deferred. No commit/push requested.
+
 ## Local gate closed; live qualification blocked — 2026-09-22 (current)
 
 Resuming `92edd5ba` closed the recorded local validation gap. Benchmark path/import
