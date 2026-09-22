@@ -1,6 +1,41 @@
 # Chromie Current Status
 
-## Planner contracts and inference retention — 2026-09-22 (current)
+## Current continuation: temporal acceptance evidence — 2026-09-22
+
+Based on `4a1606fd0fc546601b38e664a5428c6a79ad489b`, the acceptance oracle now checks
+actual completed Runtime interval overlap for simultaneous gaze/blink. Previously,
+`collect_observations` discarded receipt timestamps, and the scenario checked only
+both effects/counts; sequential execution therefore mechanically passed. Correlated
+request/Capability/version intervals now reach the oracle; missing, malformed, failed,
+reversed, timezone-ambiguous or same-request records cannot prove overlap. This is a
+necessary execution-lifetime check, not physical-onset proof or complete semantic review.
+
+Current focused tests: **90 passed /20 subtests**, scenario library 75 live/45 Level A
+cases validates, composable Level A **5/5**. Regrading the unchanged retained four-case
+live evidence changes only simultaneous from pass to fail: **mechanical 1/4**, matching
+its previous manual requested-Work verdict. No new live run or product behavior repair
+is claimed. Full suite/replay/live cohort and latency remain deferred.
+
+The nine-case UMI field-order experiment improves some quoted referents but still loses
+qualifiers, source coverage or source language. The four-case Fast temporal-wording
+experiment still emits one sequential and one parallel member; existing Host validation
+correctly rejects that singleton group. Neither candidate is promoted. A further UMI
+source-order diagnostic was interrupted by the owner's explicit service restart;
+SIGTERM/Docker stop evidence is retained, with no OOM attribution. After authorized
+service recovery, complete nine-case UMI example and four-case Fast timing-first screens
+also fail semantic contrasts; neither changes production. The former still switches the
+addressee frame; the latter retains serialized simultaneity and invents invalid walking.
+
+Existing Charter authority permits independent Activities to overlap under declared
+provider/resource/dependency contracts; physical WorkDAG nodes remain sequential.
+Current production failures remain: turn selected as sidestep, simultaneous effects
+serialized, and acquisition meaning losing reference frame/qualifier/source coverage.
+Four axes: **acceptance implementation repaired; focused automated verification passed;
+production semantic target still failing; development only**. Exact evidence, service
+state and strengthened bounded resume scenarios are in HANDOFF.md. The previous delivery
+and historical observations below retain their original oracle/revision limits.
+
+## Planner contracts and inference retention — 2026-09-22 (previous delivery)
 
 This owner-authorized development delivery, based on
 `0129915dbd57913be15661f9b7f38aff81b48c68`, retains

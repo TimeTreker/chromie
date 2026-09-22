@@ -16,18 +16,24 @@ repository live cohort, latency optimization and failure wording that does not b
 main Work remain deferred. Canonical local gate → current-revision live voice proof →
 default target-evidence closure remains the delivery line; none is declared closed.
 No feature/architecture expansion, phrase routing or downstream semantic repair call.
-Physical Work remains sequential; unsupported simultaneous meaning must not silently
+Physical WorkDAG nodes remain sequential; unsupported simultaneous meaning must not silently
 become a complete sequential Plan. Independently intended SC expression remains allowed
 and cannot satisfy requested Work. Do not restore superseded duplicate-Capability bans.
 
 Branch `main`; pre-delivery HEAD/fetched origin
-`0129915dbd57913be15661f9b7f38aff81b48c68` (0 ahead / behind). The owner authorized
+`4a1606fd0fc546601b38e664a5428c6a79ad489b` (0 ahead / behind). The owner authorized
 commit and push of the verified improvements. Expected resume revision: the latest
 `main` commit containing this checkpoint and HANDOFF.md together. Fetch and compare
 upstream before further development and again before future delivery. This is a
 development checkpoint, not semantic qualification or release approval.
 
 ## Delivered changes and actual boundaries
+
+Current continuation repairs the **acceptance oracle only**: completed Capability
+observations retain correlated execution intervals, and the simultaneous gaze/blink
+scenario requires positive interval overlap. Missing, failed, stale-version, reversed,
+naive-time and same-execution evidence cannot establish overlap. No production prompt,
+model or scheduling change is promoted by this continuation.
 
 | Boundary | Failure → retained change | Claim limit |
 | --- | --- | --- |
@@ -47,7 +53,11 @@ installation or robot runtime routing was introduced.
 
 ## Current evidence and gaps
 
-- Final focused Fast/SGLang/UMI checks: **376 passed / 143 subtests passed**.
+- Current oracle checks: **90 passed /20 subtests passed**; scenario library check
+  validates 75 live cases and 45 Level A cases; composable Level A **5/5**. Retained
+  final four-case evidence regrades from mechanical 2/4 to **1/4**, changing only the
+  previously false-positive simultaneous case. This is offline regrading, not new live.
+- Previous delivered Fast/SGLang/UMI checks: **376 passed / 143 subtests passed**.
   Actual XGrammar rejects the original reversed-source output and accepts its
   structurally corrected probe. Composable planning Level A **5/5**. Pinned image
   build exercises 64 distinct grammars against the actual bounded backend.
@@ -57,7 +67,7 @@ installation or robot runtime routing was introduced.
   conflicts with retained independent silent SC. Truthful speech Level A **6/6**.
 - Repository policy, test ownership, pinned Ruff/mypy and documentation checks pass
   at their retained revisions. Full-suite results are not inferred from focused checks.
-- Final source/image live: **4/4 attempted, mechanical 2/4, requested Work semantic
+- Previous source/image live: **4/4 attempted, original mechanical 2/4, requested Work semantic
   1/4**. Compound still sidesteps instead of turning; simultaneous is serialized while
   claiming complete coverage. Sequential gaze/blink works. Milk's UMI source span
   excludes recipient; Host correctly rejects before dispatch. All safe idle.
@@ -77,6 +87,15 @@ installation or robot runtime routing was introduced.
 Four axes: **implementation source repaired; automatic verification partial; target
 validation failing; deployment development only**. Full semantic qualification and
 canonical gate/voice/default-target closure remain open. Delivery retains these gaps.
+
+New diagnostic roots: `meaning-first-20260922` (nine frozen UMI contrasts) and
+`activity-timing-20260922` (four native Fast packets), under `.chromie/acceptance/`.
+UMI meaning-first order improves some referents but loses qualifiers/source/language;
+Fast WorkDAG/Activity wording correction still emits a singleton parallel member and
+fails Host validation. A nine-case representation example still changes addressee frame;
+a four-case timing-first Schema order still serializes simultaneous effects and introduces
+an invalid 50-second walk in the acquisition packet. All candidates are rejected.
+Source-first UMI was interrupted by the owner's service restart; retain it as incomplete, not an OOM or valid cohort.
 
 ## Ordered next work
 

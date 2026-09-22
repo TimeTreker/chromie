@@ -43,6 +43,14 @@
   },
   "expected_capabilities": ["soridormi.look_at_person", "soridormi.blink_eyes"],
   "expected_args": ["0:duration_s=3.0", "1:count=2"],
+  "expected_observations": [
+    {
+      "type": "social_attention.gaze",
+      "args": {"duration_s": 3.0},
+      "overlaps": {"type": "social_attention.blink", "status": "completed", "args": {"count": 2}}
+    },
+    {"type": "social_attention.blink", "args": {"count": 2}}
+  ],
   "require_speech": false,
   "description": "A common while-construction tests compatible parallel effects.",
   "general_ability": {

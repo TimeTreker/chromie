@@ -41,6 +41,26 @@ from scripts.general_ability_acceptance import (
 from scripts.interaction_text_mujoco_check import build_parser as build_text_check_parser
 
 
+@pytest.mark.parametrize("blink_start,passes", [("03", True), ("05", False)])
+def test_simultaneous_scenario_requires_execution_overlap(blink_start, passes):
+    library = load_scenario_library()
+    case = next(ref.case for ability in library.ability_classes for ref in ability.live_text_cases
+                if ref.case.case_id == "look_while_blinking_twice")
+    capabilities = [
+        {"request_id": "gaze", "capability_id": "soridormi.look_at_person", "capability_version": "1", "args": {"duration_s": 3}},
+        {"request_id": "blink", "capability_id": "soridormi.blink_eyes", "capability_version": "1", "args": {"count": 2}},
+    ]
+    results = [
+        {**capabilities[0], "status": "completed", "started_at": "2026-09-22T14:15:02Z", "finished_at": "2026-09-22T14:15:05Z"},
+        {**capabilities[1], "status": "completed", "started_at": f"2026-09-22T14:15:{blink_start}Z", "finished_at": "2026-09-22T14:15:06Z"},
+    ]
+    errors = validate_live_text_result(case, {
+        "interaction_response": {"capabilities": capabilities, "speech": []},
+        "execution": {"results": results}, "preview_only": False,
+    })
+    assert not errors if passes else any("execution overlap" in error for error in errors)
+
+
 @pytest.mark.parametrize("status", [None, "open", "abandoned", "satisfied"])
 def test_spoken_answer_does_not_hide_unfinished_created_goal(status):
     case = TextScenarioCase(case_id="answer_completion", text="Answer the question.",

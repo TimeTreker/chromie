@@ -51,6 +51,15 @@ python scripts/scenario_author.py prompt --suite interaction --count 20 \
 The LLM should author candidate files only. The committed JSON expectations are
 the deterministic judge.
 
+Live `expected_observations` may attach an `overlaps` observation selector to require
+positive overlap between two distinct completed Runtime execution intervals. The oracle
+uses correlated request/Capability/version receipts with timezone-aware start/end times;
+missing, reversed, unmatched or merely touching intervals do not prove overlap. Planned
+`timing=parallel`, list order and intended durations are not execution evidence. This is
+an execution-lifetime check, not proof of physical onset or hardware synchronization.
+The simultaneous gaze/blink case requires this check in addition to both effects and
+arguments; a mechanical pass still does not replace its semantic review.
+
 ## Layout
 
 ```text

@@ -38,6 +38,44 @@ class OutcomeObservationTests(unittest.TestCase):
         summary.pop("capability_contracts")
         self.assertEqual(collect_observations(summary)[0]["args"], {})
 
+    def test_overlap_requires_correlated_completed_execution_intervals(self) -> None:
+        for start, finish, status, version, expected in (
+            ("2026-09-22T14:15:03Z", "2026-09-22T14:15:04Z", "completed", "1", True),
+            ("2026-09-22T22:15:03+08:00", "2026-09-22T22:15:04+08:00", "completed", "1", True),
+            ("2026-09-22T14:15:05.799822Z", "2026-09-22T14:15:06.674391Z", "completed", "1", False),
+            ("2026-09-22T14:15:05.799664Z", "2026-09-22T14:15:06Z", "completed", "1", False),
+            (None, None, "completed", "1", False),
+            ("2026-09-22T14:15:03", "2026-09-22T14:15:04", "completed", "1", False),
+            ("invalid", "invalid", "completed", "1", False),
+            ("2026-09-22T14:15:04Z", "2026-09-22T14:15:03Z", "completed", "1", False),
+            ("2026-09-22T14:15:03Z", "2026-09-22T14:15:04Z", "failed", "1", False),
+            ("2026-09-22T14:15:03Z", "2026-09-22T14:15:04Z", "completed", "stale", False),
+        ):
+            with self.subTest(start=start, finish=finish, status=status, version=version):
+                summary = {
+                    "interaction_response": {"capabilities": [
+                        {"request_id": "gaze", "capability_id": "soridormi.look_at_person", "capability_version": "1", "args": {"duration_s": 3}},
+                        {"request_id": "blink", "capability_id": "soridormi.blink_eyes", "capability_version": "1", "args": {"count": 2}},
+                    ]},
+                    "execution": {"results": [
+                        {"request_id": "gaze", "capability_id": "soridormi.look_at_person", "capability_version": "1", "status": "completed",
+                         "started_at": "2026-09-22T14:15:02.537304Z", "finished_at": "2026-09-22T14:15:05.799664Z"},
+                        {"request_id": "blink", "capability_id": "soridormi.blink_eyes", "capability_version": version, "status": status,
+                         "started_at": start, "finished_at": finish},
+                    ]},
+                }
+                observations = collect_observations(summary)
+                errors = validate_expected_observations(observations, [{
+                    "type": "social_attention.gaze", "status": "completed", "args": {"duration_s": 3},
+                    "overlaps": {"type": "social_attention.blink", "status": "completed", "args": {"count": 2}},
+                }])
+                self.assertEqual(not errors, expected)
+
+    def test_overlap_cannot_match_the_same_execution_twice(self) -> None:
+        observation = {"type": "gesture", "status": "completed", "request_id": "one",
+                       "started_at": "2026-09-22T14:15:03Z", "finished_at": "2026-09-22T14:15:04Z"}
+        self.assertTrue(validate_expected_observations([observation], [{"type": "gesture", "overlaps": {"type": "gesture"}}]))
+
     def _summary(self) -> dict:
         return {
             "interaction_response": {

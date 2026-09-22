@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import json
 import re
+from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -205,6 +206,13 @@ def collect_observations(
                 "request_id": skill.get("request_id"),
                 "planned_sequence": planned_sequence,
                 **(
+                    {key: receipt.get(key) for key in ("started_at", "finished_at")}
+                    if receipt is not None and version
+                    and receipt.get("capability_id") == capability_id
+                    and receipt.get("capability_version") == version
+                    else {}
+                ),
+                **(
                     {
                         "_chronology_elapsed_ms": capability_receipt_lower_bound_ms
                         + execution_order.get(request_id, planned_sequence) * 0.001
@@ -398,6 +406,29 @@ def observation_matches(actual: dict[str, Any], expected: dict[str, Any]) -> boo
     return True
 
 
+def _completed_interval(observation: dict[str, Any]) -> tuple[datetime, datetime] | None:
+    """Use correlated Runtime receipt lifetimes, never planned order/duration."""
+    if observation.get("status") != "completed" or not observation.get("request_id"):
+        return None
+    try:
+        start, end = (
+            datetime.fromisoformat(str(observation.get(key) or "").replace("Z", "+00:00"))
+            for key in ("started_at", "finished_at")
+        )
+    except ValueError:
+        return None
+    if start.utcoffset() is None or end.utcoffset() is None or start >= end:
+        return None
+    return start, end
+
+
+def _execution_intervals_overlap(left: dict[str, Any], right: dict[str, Any]) -> bool:
+    if left.get("request_id") == right.get("request_id"):
+        return False
+    first, second = _completed_interval(left), _completed_interval(right)
+    return bool(first and second and max(first[0], second[0]) < min(first[1], second[1]))
+
+
 def validate_expected_observations(
     actual: list[dict[str, Any]],
     expected: list[dict[str, Any]],
@@ -407,9 +438,19 @@ def validate_expected_observations(
     errors: list[str] = []
     for item in expected:
         matches = [observation for observation in actual if observation_matches(observation, item)]
+        overlap = item.get("overlaps")
+        if overlap is not None:
+            if not isinstance(overlap, dict) or not overlap:
+                errors.append("expected observation overlaps must be a non-empty observation selector")
+                continue
+            partners = [observation for observation in actual if observation_matches(observation, overlap)]
+            matches = [observation for observation in matches
+                       if any(_execution_intervals_overlap(observation, partner) for partner in partners)]
         minimum = int(item.get("min_occurrences", 1))
         maximum = item.get("max_occurrences")
         label = item.get("type") or item.get("domain") or item
+        if overlap is not None:
+            label = f"{label} with completed execution overlap {overlap}"
         if len(matches) < minimum:
             errors.append(
                 f"missing expected observation {label!r}: required {minimum}, found {len(matches)}"
