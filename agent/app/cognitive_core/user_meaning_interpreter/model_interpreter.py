@@ -27,9 +27,9 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.memory import role_memory_context
 
 try:
-    from chromie_contracts.user_turn import user_turn_source_tokens
+    from chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
 except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+    from shared.chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
 
 
 try:
@@ -635,7 +635,7 @@ class OllamaUserMeaningInterpreter:
             f"{clock_context}"
             "Authoritative source tokens (cite inclusive refs in each "
             "Responsibility.source_evidence):\n"
-            f"{_bounded_json(_source_tokens(request.text), max_chars=5000)}\n\n"
+            f"{required_json(_source_tokens(request.text), None, label='UMI authoritative source tokens')}\n\n"
             "Bounded Identity Context:\n"
             f"{_user_meaning_interpretation_identity_context(mind)}\n\n"
             "Bounded Human-Meaning Context (read-only evidence):\n"
@@ -784,9 +784,7 @@ class OllamaUserMeaningInterpreter:
         schema["properties"]["cognitive_requests"]["maxItems"] = 3
         token_refs = [token["ref"] for token in _source_tokens(admitted_turn)]
         if token_refs:
-            evidence = schema["$defs"]["ResponsibilitySourceEvidence"]
-            for name in evidence["properties"]:
-                evidence["properties"][name] = {"type": "string", "enum": token_refs}
+            schema["$defs"]["ResponsibilitySourceEvidence"] = user_turn_source_span_schema(token_refs)
         return schema
 
     def build_interpretation_payload(

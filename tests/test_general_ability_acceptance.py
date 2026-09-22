@@ -134,6 +134,49 @@ def test_live_cohort_stops_before_next_case_on_integrity_failure(stage, failure)
         assert report["integrity_stop"]["sid"] == "cbe8a87b"
 
 
+@pytest.mark.parametrize("failure", [
+    {"ok": False, "errors": ["wrong requested effect"]},
+    {"ok": True, "errors": [], "cognitive_runtime": {"status": "error", "metadata": {
+        "failure_domain": "model_contract", "failure_class": "fast_stream_contract_invalid",
+    }}},
+    {"ok": True, "errors": [], "status_after": {"safe_idle": False}},
+    TimeoutError("case deadline"),
+    ConnectionError("service unavailable"),
+])
+def test_live_keep_going_attempts_all_cases_without_erasing_failure(failure):
+    args = build_parser().parse_args(["--mode", "live-text", "--keep-going", "--no-write"])
+    runner = AsyncMock(side_effect=[copy.deepcopy(failure)] + [
+        {"ok": True, "errors": []} for _ in range(100)
+    ])
+    with patch("scripts.general_ability_acceptance._run_live_case", runner):
+        report = asyncio.run(run_live_text(args))
+    assert runner.await_count == report["planned_case_count"]
+    assert report["case_count"] == report["planned_case_count"]
+    assert report["case_attempt_coverage_percent"] == 100.0
+    assert report["failed"] == 1
+    assert report["passed"] == report["planned_case_count"] - 1
+    assert report["pass_rate_percent"] == round(100 * report["passed"] / report["planned_case_count"], 2)
+    assert report["ok"] is False
+    assert report["qualification_complete"] is False
+    assert report["cases"][0]["ok"] is False
+    assert report["skipped_cases"] == []
+    assert report["integrity_stop"] is None
+    assert report["stopped_after_stage"] is None
+    if isinstance(failure, Exception) or failure.get("ok"):
+        assert len(report["integrity_failures"]) == 1
+        assert report["cases"][0]["integrity_failure"] == report["integrity_failures"][0]
+
+
+def test_live_keep_going_does_not_enable_unsupervised_physical_testing():
+    args = build_parser().parse_args([
+        "--mode", "live-text", "--keep-going", "--allow-non-sim", "--no-write",
+    ])
+    with patch("scripts.general_ability_acceptance._run_live_case", AsyncMock()) as runner:
+        with pytest.raises(ValueError, match="simulator"):
+            asyncio.run(run_live_text(args))
+    runner.assert_not_awaited()
+
+
 def test_live_cohort_retains_stop_and_unrun_coverage_in_reviewer_packet(tmp_path):
     identity = tmp_path / "identity.json"
     identity.write_text(json.dumps({"identity_sha256": "fixture-only"}))

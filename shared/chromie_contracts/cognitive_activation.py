@@ -36,9 +36,9 @@ class CognitiveActivationContext(BaseModel):
     allowed_authorities: list[CognitiveActivationAuthority] = Field(
         min_length=1, max_length=2
     )
-    goal_ids: list[str] = Field(default_factory=list, max_length=8)
+    goal_ids: list[str] = Field(default_factory=list, max_length=16)
     responsibility_refs: list[str] = Field(default_factory=list, max_length=12)
-    source_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_refs: list[str] = Field(default_factory=list, max_length=32)
     responsibilities: list[CognitiveResponsibilityProposal] = Field(
         default_factory=list, max_length=12
     )
@@ -99,9 +99,9 @@ class CognitiveActivationSelection(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     authority: CognitiveActivationAuthority
-    goal_ids: list[str] = Field(default_factory=list, max_length=8)
+    goal_ids: list[str] = Field(default_factory=list, max_length=16)
     responsibility_refs: list[str] = Field(default_factory=list, max_length=12)
-    source_refs: list[str] = Field(default_factory=list, max_length=24)
+    source_refs: list[str] = Field(default_factory=list, max_length=32)
     reason_summary: str = Field(default="", max_length=320)
 
     @field_validator("goal_ids", "responsibility_refs", "source_refs", mode="before")
@@ -158,6 +158,6 @@ class CognitiveActivationDecision(BaseModel):
                 raise ValueError(
                     "activation must preserve exact Responsibility scope"
                 )
-            if request.source_refs and not item.source_refs:
-                raise ValueError("activation request must retain source provenance")
+            if set(item.source_refs) != known_sources:
+                raise ValueError("activation must preserve exact source scope")
         return self

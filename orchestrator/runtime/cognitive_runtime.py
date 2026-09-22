@@ -2722,7 +2722,13 @@ class GoalDrivenRuntimeCoordinator:
         await self._finish_or_cancel_social_turn(
             previous, turn_id=str(work_request.source_turn_provenance.get("turn_id") or session_id),
         )
-        source_context = ContextAssembly.project_context(context)
+        # Required communication can wait behind already submitted same-turn
+        # speech while Work advances. Refresh the existing state owners before
+        # assembling the ledger, preserving the admitted meaning and exact Plan.
+        current_context, _history = self._refresh_continuity_context(
+            context=context, sid=session_id,
+        )
+        source_context = ContextAssembly.project_context(current_context)
         source_context = _lineage_context(
             source_context,
             _plan_semantic_lineage(
@@ -2736,7 +2742,7 @@ class GoalDrivenRuntimeCoordinator:
             source_context["source_canonical_plan"] = source_context["canonical_plan_resolution"]
         source_context["canonical_plan_resolution"] = plan.prompt_projection()
         source_context["interaction_context"] = self._interaction_context(
-            sid=session_id, context=context, goal_ids=plan.goal_ids,
+            sid=session_id, context=current_context, goal_ids=plan.goal_ids,
         )
         request = SocialCognitionRequest(
             request_id="sc:" + hashlib.sha256(plan.plan_id.encode("utf-8")).hexdigest(), trigger="evidence" if evidence_refs else "work_state",
@@ -2755,7 +2761,7 @@ class GoalDrivenRuntimeCoordinator:
             ),
         )
         result.validate_request(request)
-        current_interaction = self._interaction_context(sid=session_id, context=context, goal_ids=plan.goal_ids)
+        current_interaction = self._interaction_context(sid=session_id, context=current_context, goal_ids=plan.goal_ids)
         for act in result.activities:
             validate_communicative_activity_identity(
                 activity_id=act.activity_id, text=act.text, interaction_context=current_interaction,

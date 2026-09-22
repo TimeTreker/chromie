@@ -9,14 +9,12 @@ from shared.chromie_contracts.cognitive_activation import (
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 
 
-def _unique(values: Iterable[Any], *, limit: int) -> list[str]:
+def _unique(values: Iterable[Any]) -> list[str]:
     result: list[str] = []
     for value in values:
         text = " ".join(str(value or "").strip().split())
         if text and text not in result:
             result.append(text)
-        if len(result) >= limit:
-            break
     return result
 
 
@@ -28,12 +26,15 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
     exhaust the small activation model budget.  This projection retains identity, current
     lifecycle, unresolved Work, and the existence/status of fresh trusted state changes;
     the selected owner receives the full authoritative context after activation.
+    Retain every supplied lifecycle row: a tail failure or pending obligation is
+    material. Contract and model-transport budgets reject oversized requests rather
+    than silently changing the scope or deciding which facts matter.
     """
 
     raw = state if isinstance(state, dict) else {}
 
-    def rows(value: Any, *, limit: int = 12) -> list[dict[str, Any]]:
-        return [dict(item) for item in value[:limit] if isinstance(item, dict)] \
+    def rows(value: Any) -> list[dict[str, Any]]:
+        return [dict(item) for item in value if isinstance(item, dict)] \
             if isinstance(value, list) else []
 
     def select(item: dict[str, Any], names: tuple[str, ...]) -> dict[str, Any]:
@@ -47,11 +48,11 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
             'resolution_status': association.get('resolution_status'),
             'associations': [
                 select(item, ('relationship','source_responsibility_refs','target_goal_ids','resolved_gap_ids'))
-                for item in rows(association.get('associations'), limit=8)
+                for item in rows(association.get('associations'))
             ],
             'new_goals': [
                 select(item, ('goal_id','source_responsibility_refs','description','responsibility_status'))
-                for item in rows(association.get('new_goals'), limit=8)
+                for item in rows(association.get('new_goals'))
             ],
         }
 
@@ -61,15 +62,15 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
             **select(plan, ('plan_id','disposition','coverage','goal_ids','planner_tier','goal_satisfaction')),
             'steps': [
                 select(item, ('step_id','capability_id','source_goal_ids','timing','reuse_activity_id','step_purpose'))
-                for item in rows(plan.get('steps'), limit=16)
+                for item in rows(plan.get('steps'))
             ],
             'goal_outcomes': [
                 select(item, ('goal_id','disposition','coverage','step_ids','unmet_requirements','satisfaction'))
-                for item in rows(plan.get('goal_outcomes'), limit=8)
+                for item in rows(plan.get('goal_outcomes'))
             ],
             'communication_needs': [
                 select(item, ('need_id','kind','source_goal_ids','delivery_phase'))
-                for item in rows(plan.get('communication_needs'), limit=8)
+                for item in rows(plan.get('communication_needs'))
             ],
         }
 
@@ -77,14 +78,14 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
     if isinstance(goal_state, list):
         compact['goal_state'] = [
             select(item, ('goal_id','goal_version','responsibility_status','work_status','open_information_gaps'))
-            for item in rows(goal_state, limit=8)
+            for item in rows(goal_state)
         ]
 
     work = raw.get('existing_work_activities')
     if isinstance(work, list):
         compact['existing_work_activities'] = [
             select(item, ('activity_id','capability_id','status','state','timing','source_goal_ids','source_responsibility_refs'))
-            for item in rows(work, limit=16)
+            for item in rows(work)
         ]
 
     situation = raw.get('situation')
@@ -93,7 +94,7 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
             **select(situation, ('revision','focus_goal_ids','digest','audience_refs')),
             'interpretations': [
                 select(item, ('subject_ref','relation','value','epistemic_status','relevance_goal_ids'))
-                for item in rows(situation.get('interpretations'), limit=12)
+                for item in rows(situation.get('interpretations'))
             ],
         }
 
@@ -106,19 +107,19 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
                 **select(outcome, ('outcome_id','aggregate_status')),
                 'goal_outcomes': [
                     select(item, ('goal_id','status','evidence_ids','completed_step_ids','unresolved_step_ids','requires_planner_continuation','acquisition_step_ids','planned_satisfaction'))
-                    for item in rows(outcome.get('goal_outcomes'), limit=8)
+                    for item in rows(outcome.get('goal_outcomes'))
                 ],
             }
         terminal = change.get('trusted_terminal_evidence')
         if isinstance(terminal, list):
             projected['trusted_terminal_evidence'] = [
                 select(item, ('evidence_id','tool_id','capability_id','status','source_goal_ids','reason_code'))
-                for item in rows(terminal, limit=16)
+                for item in rows(terminal)
             ]
         for name in ('result_evidence_refs','planner_cancellation_capability_facts'):
             value = change.get(name)
             if isinstance(value, list):
-                projected[name] = value[:16]
+                projected[name] = list(value)
         for name in ('result_evidence_reentry','trusted_provider_state_event','trusted_goal_cancellation_evidence'):
             value = change.get(name)
             if isinstance(value, dict):
@@ -127,6 +128,13 @@ def _compact_activation_state(state: dict[str, Any] | None) -> dict[str, Any]:
                     ('phase','source_goal_ids','evidence_refs','request_id','status','state','condition','waiting_for','blocked','degraded','paused','recovering','goal_id','cancelled'),
                 )
         compact['trusted_state_change'] = projected
+
+    # Situation's Memory owner has already filtered disclosure against the
+    # trusted audience. Pending/delivered interaction distinguishes a new social
+    # opportunity from one already being handled; neither can vanish at this gate.
+    for name in ('memory_summary', 'relational_memory_selection', 'interaction_context'):
+        if name in raw:
+            compact[name] = raw[name]
 
     return compact
 
@@ -164,34 +172,34 @@ async def resolve_cognitive_activation(
             )
         return None
 
-    scoped_responsibilities = list(responsibilities or [])[:12]
-    responsibility_refs = _unique(
-        (item.local_ref for item in scoped_responsibilities), limit=12
-    )
-    normalized_goal_ids = _unique(goal_ids or [], limit=8)
-    normalized_source_refs = _unique(source_refs or [], limit=24)
-    normalized_authorities = _unique(allowed_authorities, limit=2)
-    activation_request = CognitiveActivationContext(
-        request_id=(
-            request_id
-            or "activation:"
-            + ":".join(
-                [
-                    trigger,
-                    *(normalized_goal_ids or normalized_source_refs or ["state"]),
-                ]
-            )
-        )[:200],
-        trigger=trigger,
-        allowed_authorities=normalized_authorities,
-        goal_ids=normalized_goal_ids,
-        responsibility_refs=responsibility_refs,
-        source_refs=normalized_source_refs,
-        responsibilities=scoped_responsibilities,
-        state=_compact_activation_state(state),
-    )
-    session = await host.get_http_session()
     try:
+        scoped_responsibilities = list(responsibilities or [])
+        responsibility_refs = _unique(
+            item.local_ref for item in scoped_responsibilities
+        )
+        normalized_goal_ids = _unique(goal_ids or [])
+        normalized_source_refs = _unique(source_refs or [])
+        normalized_authorities = _unique(allowed_authorities)
+        activation_request = CognitiveActivationContext(
+            request_id=(
+                request_id
+                or "activation:"
+                + ":".join(
+                    [
+                        trigger,
+                        *(normalized_goal_ids or normalized_source_refs or ["state"]),
+                    ]
+                )
+            )[:200],
+            trigger=trigger,
+            allowed_authorities=normalized_authorities,
+            goal_ids=normalized_goal_ids,
+            responsibility_refs=responsibility_refs,
+            source_refs=normalized_source_refs,
+            responsibilities=scoped_responsibilities,
+            state=_compact_activation_state(state),
+        )
+        session = await host.get_http_session()
         decision = await cognition_call(
             session,
             request=activation_request,

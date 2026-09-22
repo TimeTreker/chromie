@@ -25,9 +25,9 @@ experience artifacts. See
 > **Current state:** Chromie uses one Goal-driven semantic authority with
 > event-driven, readiness-driven continuation. User Meaning Interpretation owns
 > provider-neutral Responsibility / WHAT. The same admitted meaning can enter
-> Planner and Goal Association concurrently: Planner owns detailed HOW, exact
-> Communicative Activities and Capability Work, while Goal Association alone owns
-> canonical Goal continuity. Planner has fast/deep cognition passes of the same
+> Social Cognition, Planner and Goal Association concurrently: SC owns interaction
+> and exact Communicative Activities, Planner owns detailed HOW and Capability Work,
+> and Goal Association alone owns canonical Goal continuity. Planner has fast/deep cognition passes of the same
 > authority; deep is used only when HOW warrants broader reasoning.
 >
 > Trusted Capability Runtime is asynchronous. Provider/Runtime events report what
@@ -35,8 +35,9 @@ experience artifacts. See
 > is true. Responsibility/Goal state says what remains owed. A meaningful trusted
 > Goal/Work/Evidence/Situation change may create an ephemeral
 > `CognitiveOpportunity`, which can reactivate Planner with the bounded current
-> state. Planner may answer, author genuinely new Work, reuse/cancel/replace
-> existing Work, clarify, wait, or produce no new Activity. A callback never
+> state. Planner may establish communication Needs, author new Work,
+> reuse/cancel/replace existing Work, clarify execution inputs, wait, or produce
+> no new Work. SC expresses established Needs. A callback never
 > selects speech/action itself, and `Work Reconciliation` is not a mandatory
 > cognitive stage.
 >
@@ -45,9 +46,8 @@ experience artifacts. See
 > decision while independent sibling Work is still running. Newly planned Work
 > returns through the same trusted asynchronous Runtime; confirmation, privacy,
 > safety, resource and provider contracts remain authoritative, and an internal
-> event is never user consent. SC-owned social expression remains optional
-> body-only decoration in the same primary Plan as a concrete Main Activity and never delays or
-> completes the primary Responsibility. Current implementation and qualification
+> event is never user consent. SC selects optional social expression in its primary
+> interaction decision; it cannot replace or complete requested Work. Current implementation and qualification
 > evidence are tracked separately in [Status](docs/STATUS.md).
 >
 > **Implemented Agent Skills architecture:** Agent Skills are passive,
@@ -71,13 +71,13 @@ experience artifacts. See
 
 ## Architecture
 
-[![Chromie cognitive and capability architecture overview](docs/assets/chromie-cognitive-capability-overview.png)](docs/assets/chromie-cognitive-capability-overview.svg)
-
-[Open the scalable overview](docs/assets/chromie-cognitive-capability-overview.svg)
-· [Open the detailed architecture reference](docs/assets/chromie-event-driven-cognition-flow-light.svg)
+The retained [overview](docs/assets/chromie-cognitive-capability-overview.svg) and
+[detailed diagram](docs/assets/chromie-event-driven-cognition-flow-light.svg)
+predate the Social Cognition ownership migration. The current owner summary is below;
+the [turn lifecycle](docs/COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle) owns its detail.
 
 <details>
-<summary>Text fallback: current implementation before Social Cognition migration</summary>
+<summary>Current communication and Work ownership</summary>
 
 ```text
 Person / World
@@ -90,15 +90,15 @@ User Meaning Interpretation
       ▼
 Responsibility / WHAT
       │
-      ├───────────────────┐
-      ▼                   ▼
-Planner              Goal Association
-fast/deep passes       Goal continuity
-      │                   │
-      ▼                   ▼
-Plan / Activities    Canonical Goals
-      │                   │
-      └─────────┬─────────┘
+      ├───────────────────┬───────────────────────┐
+      ▼                   ▼                       ▼
+Social Cognition      Planner                 Goal Association
+interaction          fast/deep HOW            Goal continuity
+      │                   │                       │
+      ▼                   ▼                       ▼
+Communicative Acts    Work / communication Needs   Canonical Goals
+      │                   │                       │
+      └───────────────────┴───────────┬───────────┘
                 ▼
       Trusted Capability Runtime
                 ▼
@@ -116,21 +116,21 @@ Plan / Activities    Canonical Goals
                 ▼
        CognitiveOpportunity
                 ▼
-          Planner re-entry
+          Planner re-entry -> SC for established communication Needs
                 │
      0..N Activity changes or none
                 └──────────────→ Trusted Capability Runtime
 
-Vocal/TTS is one Activity realization; Soridormi is a peer embodied Provider.
+SC also admits trusted Goal-free Situation interaction independently.
+Independent Goal-bound SC reactivation remains a migration gap.
+Vocal/TTS delivers SC wording; Soridormi is a peer embodied Provider.
 Protective Reflex stays deterministic and may stop/cancel without model wait.
 ```
 
 </details>
 
-The overview and text fallback above show the same current implementation path. The
-detailed reference expands the Runtime-event, Work-state, Host-validation, Evidence,
-safety, and Planner re-entry boundaries without adding another semantic authority. The
-complementary
+Current implementation and open re-entry qualification are tracked in
+[Status](docs/STATUS.md). The complementary
 [episode-centered Continuous Mind workflow](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#41412-human-like-behavior-emerges-across-time)
 shows how conversation, Work, Evidence, correction, waiting, and reactivation overlap
 over time to produce coherent human-like interaction without adding another semantic

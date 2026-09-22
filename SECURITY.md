@@ -92,7 +92,10 @@ Capability/provider, grants permission, modifies confirmation policy, or writes
 to the package root. Directory presence alone has no authority. Full `SKILL.md`
 and projection text are excluded from startup/API summaries and are loaded only
 by explicit read methods that recheck the approved digest. Model-authored Skill
-selection is not enabled in this implementation slice.
+selection chooses only among disclosed, approved candidates. The selection service
+validates exact IDs, versions, digests and role projections; it cannot register a
+provider, grant permission or bypass confirmation. Selected content informs Planner
+reasoning without gaining execution authority.
 
 ## Safety boundary
 

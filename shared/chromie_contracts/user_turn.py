@@ -60,6 +60,43 @@ class UserTurnSourceSpan(BaseModel):
         return normalize_turn_text(str(value or ""))
 
 
+def user_turn_source_span_schema(
+    source_token_refs: list[str] | None,
+) -> dict[str, Any]:
+    """Expose all and only ordered spans; semantic models still choose their scope."""
+    token_ref = (
+        {"type": "string", "enum": list(source_token_refs)}
+        if source_token_refs
+        else {"type": "string", "minLength": 1, "maxLength": 24}
+    )
+    def span(starts: dict[str, Any], ends: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "type": "object",
+            "properties": {
+                "source_start_token_ref": starts,
+                "source_end_token_ref": ends,
+            },
+            "required": ["source_start_token_ref", "source_end_token_ref"],
+            "additionalProperties": False,
+        }
+
+    if not source_token_refs:
+        return span(dict(token_ref), dict(token_ref))
+
+    def ordered(refs: list[str]) -> list[dict[str, Any]]:
+        if len(refs) == 1:
+            return [span({"enum": refs, "type": "string"}, {"enum": refs, "type": "string"})]
+        middle = len(refs) // 2
+        left, right = refs[:middle], refs[middle:]
+        # Every forward span is within one half or crosses left to right.
+        # Disjoint branches preserve all spans without a quadratic pair table.
+        return [span({"enum": left, "type": "string"}, {"enum": right, "type": "string"}),
+                *ordered(left), *ordered(right)]
+
+    return {"oneOf": ordered(list(source_token_refs))}
+
+
+
 def user_turn_prohibits_speech(envelope: Any) -> bool:
     """Read the trusted protective control without interpreting the utterance."""
 

@@ -654,7 +654,8 @@ async def test_host_rejects_obsolete_state_without_delivery_or_work_mutation():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("state", ["committed", "completed", "cancelled"])
-async def test_state_social_refreshes_continuity_after_previous_speech(state):
+@pytest.mark.parametrize("path", ["optional", "required"])
+async def test_state_social_refreshes_continuity_after_previous_speech(state, path):
     from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
     from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
@@ -681,23 +682,38 @@ async def test_state_social_refreshes_continuity_after_previous_speech(state):
             requests.append(request)
             return SocialCognitionResolution(
                 request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                need_outcomes={need.need_id: "pending" for need in request.communication_needs},
                 disposition="silence", activities=[], reason_summary="No additional speech needed.", model_call_count=1,
             )
 
+    async def build_response(**kwargs):
+        expression_contexts.append(kwargs["context"])
+        assert kwargs["plan"] == plan
+        return SimpleNamespace()
+
     coordinator = GoalDrivenRuntimeCoordinator(
         agent_client=Agent(),
-        adapter=SimpleNamespace(interaction_runtime=SimpleNamespace(runtime=CapabilityRuntime(CapabilityRegistry()))),
+        adapter=SimpleNamespace(
+            interaction_runtime=SimpleNamespace(runtime=CapabilityRuntime(CapabilityRegistry())),
+            build_social_cognition_response=build_response,
+        ),
         policy=CognitiveRuntimePolicy(mode="apply"), context_refresh=refresh, interaction_ledger=ledger,
     )
     coordinator.schedule_social_expression = lambda *args, context, **kwargs: expression_contexts.append(context)
-    coordinator._social_turns["sid"] = ("previous", previous, "turn")
+    coordinator._social_turns["sid"] = ("previous", previous, "turn" if path == "optional" else "sid")
     coordinator._social_dispatches["previous"] = "previous-delivery"
     plan = CanonicalPlan(plan_id="plan", planner_tier="fast", disposition="execute", coverage="complete",
         goal_ids=["goal:1"], steps=[{"step_id": "nod", "capability_id": "soridormi.nod_yes", "source_goal_ids": ["goal:1"]}],
-        goal_outcomes=[{"goal_id": "goal:1", "disposition": "execute", "coverage": "complete", "step_ids": ["nod"]}])
+        goal_outcomes=[{"goal_id": "goal:1", "disposition": "execute", "coverage": "complete", "step_ids": ["nod"]}],
+        communication_needs=[{"need_id": "progress", "owner": "planner", "kind": "answer", "reference_id": "plan", "source_goal_ids": ["goal:1"]}])
     work = CognitiveWorkRequest(sid="sid", text="Nod once", context=copy.deepcopy(original), history=original["history"],
         responsibilities=[{"local_ref": "r1", "outcome": "Nod once", "output_mode": "body_action", "confidence": 1.0}])
-    pending = coordinator.start_state_interaction(None, work_request=work, turn_id="turn", plan=plan)
+    pending = (
+        coordinator.start_state_interaction(None, work_request=work, turn_id="turn", plan=plan)
+        if path == "optional" else asyncio.create_task(coordinator.resolve_plan_interaction(
+            None, plan=plan, work_request=work, session_id="sid", language="en", context=copy.deepcopy(original),
+        ))
+    )
     try:
         await asyncio.sleep(0)
         assert not requests and not refreshes

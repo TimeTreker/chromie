@@ -1,117 +1,126 @@
 # Chromie Development Checkpoint
 
-Updated 2026-09-22. Audience: the owner and the next development session.
+Updated 2026-09-23. Audience: the owner and the next development session.
 This is the current resume point; [Status](docs/STATUS.md) owns implementation/evidence
 claims, [Roadmap](ROADMAP.md) owns delivery order, and [Handoff](HANDOFF.md) owns volatile
-identities, retained artifacts and commands. Earlier snapshots are in Git history;
-superseded development instructions are not renewed here.
+identities, retained artifacts and commands. Earlier snapshots remain in Git history.
 
 ## Active scope
 
 Current focus: Goal-driven single-authority architecture and current-revision evidence closure.
 
-Continue **#24/#32**, communication ownership and evidence closure. The owner limited
-qualification to a few common cases. Full `./scripts/run_tests.sh`, full replay/full
-repository live cohort, latency optimization and failure wording that does not block
-main Work remain deferred. Canonical local gate → current-revision live voice proof →
-default target-evidence closure remains the delivery line; none is declared closed.
-No feature/architecture expansion, phrase routing or downstream semantic repair call.
-Physical WorkDAG nodes remain sequential; unsupported simultaneous meaning must not silently
-become a complete sequential Plan. Independently intended SC expression remains allowed
-and cannot satisfy requested Work. Do not restore superseded duplicate-Capability bans.
+Continue **#24/#32**, communication ownership and evidence closure. The owner's
+18-iteration optimization batch is **complete**, with two additional mechanical fixes
+and no promoted semantic prompt candidate. The canonical local gate passes. Native
+live-text/simulator qualification still fails; supervised voice and default target
+evidence closure remain open. A subsequent all-case diagnostic attempted **75/75**
+and scored **1/75 (1.33%)**: 74 failures include 52 cases blocked by model-service
+unavailability after a native compiler crash on case 23. Attempt coverage is 100%;
+complete semantic and dependent-turn coverage is not established.
+No architecture expansion, phrase routing, downstream semantic repair or source-span
+widening. Physical WorkDAG nodes remain sequential; compatible independent Activities
+may overlap under existing contracts. SC remains the sole wording owner.
 
-Branch `main`; pre-delivery HEAD/fetched origin
-`4a1606fd0fc546601b38e664a5428c6a79ad489b` (0 ahead / behind). The owner authorized
-commit and push of the verified improvements. Expected resume revision: the latest
-`main` commit containing this checkpoint and HANDOFF.md together. Fetch and compare
-upstream before further development and again before future delivery. This is a
-development checkpoint, not semantic qualification or release approval.
+Branch `main`; HEAD/fetched origin before development:
+`542aefd08d4ca017e5ae11815dbf39ee8e2bae36` (0 ahead/behind). This owner-requested
+delivery includes the repairs, frozen replay migrations, full-case diagnostic runner
+and this handoff. Resume from the latest `main` commit containing this checkpoint
+and Handoff; this base is the pre-delivery revision, not the new commit ID. Fetch
+and compare upstream before development. No remote Issue was created. This is
+development delivery, not semantic or release approval.
 
-## Delivered changes and actual boundaries
+## Implemented repairs and actual workflows
 
-Current continuation repairs the **acceptance oracle only**: completed Capability
-observations retain correlated execution intervals, and the simultaneous gaze/blink
-scenario requires positive interval overlap. Missing, failed, stale-version, reversed,
-naive-time and same-execution evidence cannot establish overlap. No production prompt,
-model or scheduling change is promoted by this continuation.
-
-| Boundary | Failure → retained change | Claim limit |
+| Boundary | Reproduced failure → repair | Claim limit |
 | --- | --- | --- |
-| Host → optional Plan-state SC | Old planning-time Task/Goal projections survived the wait for previous same-turn speech, while the ledger was fresh. Refresh existing owned continuity after the wait, preserve admitted meaning/Plan, remove fixed pending admission, and use the same context for expression. | Delayed-speech regressions and live input packets prove refreshed input. Existing execution freshness still suppresses stale results; raw SC inference can still misread commitment as completion. |
-| Fast clarification Schema → SGLang decoder | DTO requires authoritative_context plus capability_schema for execution-input gaps, but native generation could omit them. Expose canonical membership; compile mandatory sources first only in the SGLang wire schema. | Canonical ordering remains flexible. No fields are filled after inference; valid source claims do not prove semantic necessity of a question. |
-| Capability lookup wrapper → provider projection | Wrapper discarded Schema title, bypassing native decoder rules in the live call despite isolated tests passing. Preserve title through the lookup alternative. | Same semantic owner and lookup budget; Host validation remains mandatory. |
-| Fast purpose → provider contract | Prompt restricted ordinary effects to terminal work, conflicting with Host's provider-owned purpose. Share the existing predicate with per-Capability Schema and correct the prompt. | Prevents undeclared acquisition purpose; does not prove action selection. |
-| Fast source-span Schema → decoder | Independent endpoints admitted reversed spans already rejected by Host. Encode ordered spans and share repeated native grammars through `$defs`. | Actual XGrammar rejects original reverse span; Host still checks owning Responsibility and semantic grounding remains unqualified. |
-| SGLang grammar retention | Pinned backend and compiler both retained unlimited dynamic grammars. Keep reuse in a 512 MiB compiler cache and remove the second retention owner. | Actual image self-test and bounded live run pass; active/peak/allocator memory and long-run stability are not qualified. |
+| Required Plan → SC context (prior batch) | Pending same-turn speech lets Goal/Work owners advance; stale planning tasks were combined with a fresh ledger. Refresh existing continuity after the wait, before assembling ledger/expression context. | Three failing-before transitions; preserves Plan/meaning/history. Native branch and broader SC state truth remain unqualified. |
+| Trusted re-entry → Activation (prior batch) | Eight-row truncation loses valid 9/16-Goal scope, source refs and lifecycle tails. Preserve canonical 16 Goals/32 refs and all rows, enforce exact selection scope; retain existing disclosure-safe social context. | Oversized scope/budget fails before inference. Native high-cardinality qualification remains open. |
+| Admitted source → UMI prompt (iteration 9) | A 5,000-character serializer silently truncates authoritative token rows, including recipient/negation tail, while schema permits all refs. Project the complete table through existing required JSON; existing transport preflight rejects oversize. | Four bilingual primary/deep regressions fail before/pass after; does not repair short-turn milk semantics. |
+| UMI schema → Host (iteration 10) | Native t14..t13 output passes independent endpoint enums but fails Host. Reuse existing Fast ordered-span grammar in shared source owner for UMI and Fast. | Excludes only already-invalid backward spans; never selects or widens source meaning. Native grammar proof and focused tests pass. |
+| Failed case → next independent simulator case | Owner-requested `--keep-going` attempts all selected cases/stages under unchanged per-case preflight and execution guards; retains every failure, full-set score and blocked dependent turns. | Diagnostic collection only, simulator-only; default fail-fast and failing exit/qualification remain. |
+| Current request → frozen replay | Prior UMI system-paragraph migration plus current ordered-span schema migration updates exact request artifacts/references. | 6,000 expanded packets preserve responses, faults, inputs and oracles; no native reasoning claim. |
 
-A six-case frozen UMI perspective/source-span prompt experiment was **rejected**:
-source coverage improved but reference-frame errors remained and one contrast lost
-approximation/delivery. No production UMI prompt/model change. Earlier timing-wording
-and reason-summary ordering candidates also remain rejected. Do not repeat them as fixes.
-The external agent-skills review informed context/evidence discipline; no bulk skill
-installation or robot runtime routing was introduced.
+No new maintained document, runtime setting, semantic stage or architectural term.
+API reference reflects the projection and decoder contracts. Prior README/component/
+security ownership corrections and independent-SC assertion fixes remain preserved.
+Detailed actual module I/O and correlations are in the two private reports named in Handoff.
 
-## Current evidence and gaps
+## Verification actually observed
 
-- Current oracle checks: **90 passed /20 subtests passed**; scenario library check
-  validates 75 live cases and 45 Level A cases; composable Level A **5/5**. Retained
-  final four-case evidence regrades from mechanical 2/4 to **1/4**, changing only the
-  previously false-positive simultaneous case. This is offline regrading, not new live.
-- Previous delivered Fast/SGLang/UMI checks: **376 passed / 143 subtests passed**.
-  Actual XGrammar rejects the original reversed-source output and accepts its
-  structurally corrected probe. Composable planning Level A **5/5**. Pinned image
-  build exercises 64 distinct grammars against the actual bounded backend.
-- SC prior tests **158 passed**; broader prior SC/Runtime checks **248 passed, 1
-  pre-existing failure, 17 subtests passed**. Baseline reproduces
-  `test_runtime_conflict_fails_closed_without_host_replan`; its no-response expectation
-  conflicts with retained independent silent SC. Truthful speech Level A **6/6**.
-- Repository policy, test ownership, pinned Ruff/mypy and documentation checks pass
-  at their retained revisions. Full-suite results are not inferred from focused checks.
-- Previous source/image live: **4/4 attempted, original mechanical 2/4, requested Work semantic
-  1/4**. Compound still sidesteps instead of turning; simultaneous is serialized while
-  claiming complete coverage. Sequential gaze/blink works. Milk's UMI source span
-  excludes recipient; Host correctly rejects before dispatch. All safe idle.
-- The purpose-only iteration reached 23.44 GiB and timed out on milk. After grammar
-  retention repair, the final cohort has no inference timeout/disconnect and memory
-  is 12.31 →12.05 GiB. This bounds the observed run, not all future memory growth.
-- Frozen native final four-packet replay: all Schema/DTO/purpose checks pass, full
-  Host 3/4; milk's incomplete UMI source still rejects. Earlier replay target-context
-  reconstruction gap is corrected in the current private adjudicator.
-- New six-case UMI source-wording candidate rejected: 6/6 mechanical, only 2/6 fully
-  preserve meaning/source; no production UMI edit. Activity-ID order and capability
-  catalog-order experiments also fail contrasts. Do not adopt isolated improvements.
-- Laptop RTX4090 / Qwen3.5-4B evidence does not requalify Gemma. No physical mic,
-  speaker, audible playback, hardware or real acquisition proof. Historical private
-  Gemma evidence absent from this checkout is not current evidence.
+- Final canonical `./scripts/run_tests.sh`: **145 benchmark tests; 3,795 main tests,
+  1,092 subtests; 20 legacy Agent tests passed**. Repository policy, test ownership,
+  pinned Ruff/mypy, configuration and documentation checks pass. Two FastAPI warnings.
+- Complete immutable offline replay: **6,000/6,000 expected verdicts**, source unchanged,
+  zero native calls (1,400 passes; 1,800 expected lifecycle states; 2,500 expected
+  rejections; 300 expected nonexecuting rejections). Level A: **45/45**, 15 classes.
+- Token projection: **45 tests/28 subtests**; source schema: **192/118**; replay focused:
+  **104**. Installed XGrammar rejects reversed and accepts ordered endpoints.
+- Eighteen iterations: 16 isolated native transaction candidates and two retained code
+  fixes. UMI's best diagnostic screens preserve 7/9 meanings but fail quotation/current
+  question contrasts. Fast improvements regress other effects/timing/acquisition.
+  No candidate qualifies for promotion; no change to fixed Qwen3.5-4B model/profile.
+- Three full-directory live invocations select all 75 cases. Baseline stops at case 4
+  (**0/4, 71 unrun**); after each retained fix, stops at case 3 (**0/3, 72 unrun**).
+  Each has one identity and one debug bundle; all attempted cases safely idle.
+- Latest SIDs: compound `5e9ad597`, simultaneous `286d246d`, milk `e6a7dc3d`.
+  Eleven native calls retained. Compound chooses sidestep for turn; simultaneous
+  gaze/blink has completed sequential intervals; milk fails provenance before dispatch.
+- Full-case diagnostic: **75 attempted, 1 pass, 74 failures; 1.33%**. Case 5
+  `walk_then_turn_right` passes. Cases 1–22 expose semantic/contract and three oracle
+  defects; case 23 crashes XGrammar; 24–75 fail service availability. Failed dependent
+  turns remain unrun. Exactly one bundle follows the aggregate. Six new harness
+  regressions fail before/pass after; focused suite **80 passed**.
+- Agent package equals host. Final simulator is standing/safe-idle/no active work and
+  task-owned simulator/MCP were stopped. Agent/LLM/TTS remain healthy; ASR off.
+  No physical microphone/speaker/robot or release evidence.
 
-Four axes: **implementation source repaired; automatic verification partial; target
-validation failing; deployment development only**. Full semantic qualification and
-canonical gate/voice/default-target closure remain open. Delivery retains these gaps.
+Four axes: **projection/decoder implementation repaired; canonical automatic verification
+passed; native target failing/incomplete; deployment development only**.
 
-New diagnostic roots: `meaning-first-20260922` (nine frozen UMI contrasts) and
-`activity-timing-20260922` (four native Fast packets), under `.chromie/acceptance/`.
-UMI meaning-first order improves some referents but loses qualifiers/source/language;
-Fast WorkDAG/Activity wording correction still emits a singleton parallel member and
-fails Host validation. A nine-case representation example still changes addressee frame;
-a four-case timing-first Schema order still serializes simultaneous effects and introduces
-an invalid 50-second walk in the acquisition packet. All candidates are rejected.
-Source-first UMI was interrupted by the owner's service restart; retain it as incomplete, not an OOM or valid cohort.
+## Remaining first wrong boundaries and ordered work
 
-## Ordered next work
+1. UMI preserves neither complete reference frames/qualifiers nor complete source scope
+   reliably. Latest milk changes approximate robot-relative location to exact user-relative
+   location and narrows source to t3..t11; walking+singing can collapse to speech-only.
+   GA carries accepted meaning forward. Repair primary meaning conservation, never
+   compensate through Planner/Host span widening or a second semantic reviewer.
+2. Fast receives correct turn/concurrency meaning and supported providers but chooses
+   sidestep or serializes concurrent effects with complete coverage. Correct-meaning
+   acquisition controls invent travel, decoration or duplicate delivery. Host catches
+   provenance/resources but cannot reconstruct lost WHAT/HOW semantics.
+3. Confirmed earliest boundaries do not establish a model-only root cause. Retained
+   18-iteration contrasts show prompt/schema serialization interactions; best focused
+   improvements regress the full diagnostic cohort. Do not rerun rejected candidates
+   as newly qualified fixes. Iteration 15 emitted lookup requests; private Work-only
+   DTO diagnostics are not production lookup rejections, continuation remains unproven.
+4. Independent Goal-bound SC reactivation, broader SC state truth/pending communication,
+   native high-cardinality Activation, deeper/re-entry variants and target/voice closure
+   remain open. Full-case attempts after the crash do not establish the semantics
+   of the 52 unavailable-service cases.
 
-1. Qualify UMI reference frame, approximation and complete source coverage. Final milk
-   f19f15c7 changes “ahead of you about 50 meters” into exact user-relative location and
-   cites t3..t15, excluding delivery recipient t16..t17. Host must not widen that span.
-2. Qualify Fast effect selection and temporal coverage on the frozen compound and
-   simultaneous/sequential pair. Turn and sidestep are distinct declared providers;
-   valid JSON and ordered source spans do not establish equivalent requested effects.
-3. Continue SC inference state-truth qualification, then retire remaining Planner
-   speech fields/prose. Current Host freshness repairs do not prove semantic correctness.
-4. Broader tests/live, memory soak and supervised voice require resumed scope; retain
-   the current mechanical repairs without claiming the complete transaction qualified.
+The completed 18-iteration batch remains historical. The owner subsequently authorized
+**up to six new repair loops**, then requested immediate commit/push for relocation.
+**Zero new repair loops completed**; diagnosis of loop 1 is retained, no compiler or
+prompt candidate promoted. Resume these bounded loops, beginning with:
 
-Before claiming a fix, retain actual module input/output and correlation through the
-first wrong boundary, focused failing regression, candidate result and every case's
-semantic judgment. Keep hard safety/provenance/service/Goal failures failed. Use a new
-identity and evidence directory for each changed revision; one debug bundle per complete
-or stopped bounded aggregate. Exact paths and resume commands are in HANDOFF.md.
+1. **Provider crash:** case 23 `contextless_turn_it_up` (SID `c16f6814`) reaches
+   Fast's valid 143,403-byte wire schema. XGrammar 0.2.1 crashes in native lookahead
+   compilation with the actual Qwen vocabulary, before model output. Both one/eight
+   compiler threads reproduce; byte-only vocabulary passes. This is not a model
+   reasoning failure or OOM. Automatic service restart invalidates stable-service proof.
+2. A normalized-grammar roundtrip fixes that request but crashes another retained
+   request: rejected and reverted. XGrammar 0.2.2/0.2.3/0.2.4 still crash; 0.2.6/0.2.7
+   compile the original crash request. **Do not deploy yet:** SGLang 0.5.19 pins 0.2.1;
+   0.2.6 also rejects 24 GA schemas containing empty enums. Private diagnostic conversion
+   of those impossible enums to false schemas compiles all 120 retained wire requests,
+   but is not a production patch or equivalence/behavior qualification. Preserve exact
+   meaning and Host validation; qualify compatibility before any upgrade.
+3. **Oracle default omission:** cases 15, 18 and 20 fail before dispatch because
+   `validate_contract` reads absent `count` as unknown despite a retained matching
+   Capability version declaring optional `count=2`. Reuse the exact request/ID/version
+   default-realization rule already in `outcome_observations`; test missing/mismatched
+   contracts, required properties and explicit overrides. This fix is not implemented.
+4. For each accepted minimal fix, prove focused regression then rerun all75 on one
+   unchanged deployed revision, with `--keep-going`, one final bundle and every case
+   reviewed. Do not count unavailable services or blocked dependent turns as semantic
+   passes. Keep the fixed Qwen model. Physical evidence remains supervised.

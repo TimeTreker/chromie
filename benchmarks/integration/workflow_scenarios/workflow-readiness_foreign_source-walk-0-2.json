@@ -443,7 +443,7 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "0f0e5f6742c248a7e1060f799051824e5bb2212b87b046f1270642e927927e70"
+              "$artifact": "69468ed6caf1c295a92a86a93e01cc47f3a67a5e2382388518a67da7eac43bfb"
             }
           },
           {
@@ -458,7 +458,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "b6ecef37aad1af15872993c72ecc4bc2303e2810c7753ff609d4aa85dd608c29"
+          "$artifact": "8e335138e54a17ebb9336f0990e6fdf97c1d6c2a5289b476010b1d141287ee2e"
         }
       }
     },

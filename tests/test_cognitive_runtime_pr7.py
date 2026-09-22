@@ -4436,7 +4436,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             [step.timing for step in result.terminal_plan.steps],
             ["parallel", "parallel"],
         )
-        self.assertIsNone(result.interaction_response)
+        # Independent SC may finish despite Work rejection. Its silent result
+        # cannot dispatch the invalid Work or conceal a Host replan.
+        self.assertIsNotNone(result.interaction_response)
+        self.assertEqual(result.interaction_response.capabilities, [])
+        self.assertEqual(result.interaction_response.speech, [])
+        self.assertEqual(
+            result.interaction_response.metadata["social_cognition_resolution"]["disposition"],
+            "silence",
+        )
 
     def test_goal_state_is_visible_even_when_later_activity_validation_fails(self):
         applied = []

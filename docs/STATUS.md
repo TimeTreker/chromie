@@ -1,6 +1,140 @@
 # Chromie Current Status
 
-## Current continuation: temporal acceptance evidence — 2026-09-22
+## Full-case diagnostic and delivery pause — 2026-09-23
+
+The owner-requested simulator diagnostic now uses `--keep-going`: it attempts every
+independent case and stage under unchanged preflight/dispatch guards, retaining all
+failures and the full-set score. Default fail-fast qualification is unchanged;
+physical mode is rejected with this option. Six new regressions pass; focused suite
+**80 passed**. Latest canonical gate: **145 benchmark; 3,795 main/1,092 subtests;
+20 legacy tests passed**, including policy, ownership, static, configuration and docs.
+
+**75/75 cases attempted; 1 passed, 74 failed; score 1.33%, attempt coverage 100%.**
+The one passing case is `walk_then_turn_right`. Case 23 caused XGrammar 0.2.1 to
+segfault in native grammar compilation before model output; cases 24–75 failed
+service availability. Those 52 cases do not establish semantic ability. Blocked
+dependent turns also remain incomplete. The aggregate fails qualification and
+returns failure; exactly one debug bundle follows it. Automatic LLM restart means
+this is not stable-service qualification. All retained simulator final probes are
+safe-idle; no physical microphone/speaker/robot claim.
+
+The native crash reproduces with the exact schema/Qwen vocabulary at one and eight
+compiler threads, without OOM. A grammar-roundtrip candidate regresses another
+request and is reverted. New compiler diagnostics remain private and undeployed;
+SGLang dependency compatibility and empty-enum schemas require further work. Three
+cases also reveal a pre-dispatch oracle bug: omitted optional defaults are not read
+from their exact retained Capability contracts. No repair to either owner is promoted.
+
+The owner authorized up to **six new repair loops**, then requested immediate delivery
+for relocation. **Zero loops completed**; retain the diagnosis and resume instructions
+in Checkpoint/Handoff. Four axes: **earlier projection/decoder and diagnostic runner
+implemented; canonical automatic verification passed; native target failing/incomplete;
+development delivery only**. Evidence: `.chromie/acceptance/all75-20260923/`.
+
+## Historical bounded 18-iteration optimization — 2026-09-23
+
+The owner's 18-iteration batch is complete: **two additional mechanical production
+fixes retained; no semantic prompt candidate promoted**. Long UMI source-token tables
+are now projected in full, with existing preflight budget rejection before HTTP;
+the previous 5,000-character serializer silently lost material tails. UMI and Fast
+now share the existing ordered-source-span grammar, preventing backward endpoints
+already forbidden by Host. Neither change selects meaning or widens model spans.
+Four bilingual primary/deep omissions and fifteen reversed endpoint pairs failed
+before repair. Focused verification: **45 tests/28 subtests** for projection,
+**192/118** for schema; installed XGrammar rejects reversed and accepts ordered spans.
+
+Final canonical gate: **145 benchmark tests; 3,789 main tests/1,092 subtests;
+20 legacy Agent tests passed**, including policy, test ownership, pinned static,
+configuration and documentation checks. Two FastAPI warnings remain. All **6,000**
+strict replay cases match expected verdicts with unchanged source/zero native calls;
+all **45 Level A** cases across 15 classes pass. Replay migration changes only the
+UMI source schema in five seeds, 23 shared artifacts and 6,000 request references;
+source inputs, responses, faults and oracles are unchanged.
+
+Sixteen isolated native candidate experiments accompany the two retained fix iterations;
+these are not eighteen complete live auditions. Best UMI screens preserve 7/9 meanings
+but fail quotation/current-question contrasts. Fast timing/effect improvements regress
+acquisition or other contrast cases; final candidates invent extra or duplicate Work.
+Iteration 15 emits catalog requests, whose continuation was not run in the private
+primary-only screen; its Work DTO diagnostics are not production lookup rejections.
+Fixed SGLang/Qwen3.5-4B model/profile remains unchanged. No second semantic critic,
+phrase routing, new setting, architecture layer or maintained document was added.
+
+Three full-directory live-text/MuJoCo invocations select all75: baseline **0/4**, then
+**0/3** after each fix, hard-stopped with **71/72/72 unrun**. One runtime identity and
+one debug bundle per invocation; all attempted cases safely idle. Latest compound
+`5e9ad597` selects sidestep for turn; simultaneous `286d246d` executes sequentially;
+milk `e6a7dc3d` changes approximate robot-relative meaning and narrows provenance,
+then Fast adds unsupported Work and Host correctly rejects `act_1.speed` before dispatch.
+Earlier walking+singing also loses its body result domain in UMI. Earliest wrong
+boundaries are proven; a unique model-only root cause is not established.
+
+Four axes: **projection/decoder implementation repaired; canonical automatic verification
+passed; native target failing/incomplete; deployment development only**. Agent package
+matches host. Task-owned simulator/MCP stopped after final standing/safe-idle proof;
+Agent/LLM/TTS remain healthy. No physical microphone/speaker/robot, supervised voice,
+default target closure or release claim. These changes are included in the later owner-requested delivery. Historical evidence:
+`.chromie/acceptance/iterate18-20260922/REPORT.md`; Checkpoint/Handoff own resume details.
+
+## Historical full audit repair and live baseline — 2026-09-22
+
+The owner resumed full local and live-scenario testing after the repository audit.
+On clean `542aefd08d4ca017e5ae11815dbf39ee8e2bae36`, the 75-case discovered
+live-text/simulator cohort stopped after three failures: Fast selected sidestep for
+turning, serialized simultaneous gaze/blink, and rejected milk delivery because UMI
+excluded the recipient from its source span. UMI also changed robot-relative,
+approximate distance to exact user-relative distance. All three final provider probes
+reported safe idle; the other 72 cases remain unrun. This is an incomplete cohort,
+not a whole-library ability score. The earlier launch without a complete runtime
+identity was interrupted and is excluded from qualification.
+
+The required Plan-to-SC path now refreshes owned Goal/task/history context after
+waiting for previous same-turn speech, before reading the InteractionLedger. This
+repairs the same stale-input mechanism already repaired in optional state SC; it
+preserves the exact Plan, accepted meaning and causal history. Three required-path
+transition regressions failed before the change and pass afterward. SC/Situation
+tests: **192 passed**; truthful-speech Level A: **6/6**. These checks establish input
+freshness at this boundary, not native semantic correctness or physical delivery.
+
+Four axes: **input implementation repaired; canonical automatic verification passed;
+full live target failing/incomplete; development only**. Private evidence is retained under
+`.chromie/acceptance/full-repair-20260922/`; no physical microphone/speaker/robot or
+release claim. Historical deferred-scope statements below describe earlier work.
+
+Activation now preserves the existing re-entry capacity of 16 Goals/32 source refs,
+retains every projected lifecycle row and the caller's disclosure-safe social context,
+and rejects oversized scope before any model call. The selection validator also enforces
+the exact source scope already required by the decoder. Thirteen regressions reproduced
+the old omissions; **53 activation/Situation tests pass** after repair, including
+transport-budget rejection without generation. Relevant Level A classes pass **8 distinct
+cases** (four continuity and six truthful-speech memberships overlap). No new semantic
+decision, prompt, model, setting or lifecycle was introduced. Whole-runtime native
+qualification remains blocked by the earlier UMI/Planner failures.
+
+The canonical local gate now passes: **145 benchmark tests; 3,786 main tests and
+1,039 subtests; 20 legacy Agent tests**, with repository policy, test ownership,
+pinned static analysis and documentation checks. Complete frozen offline replay is
+**6,000/6,000 expected verdicts**, unchanged source throughout and zero native calls:
+1,400 passes, 1,800 expected lifecycle states, 2,500 expected rejections and 300 expected
+nonexecuting rejections. General Ability Level A passes **45/45** distinct cases across
+15 classes. Replay drift was repaired by migrating only the current UMI GA-scope
+system paragraph in two shared request artifacts and their references; scenario inputs,
+reference outputs, faults, oracles and strict matching remain unchanged. Two stale test
+expectations now respect independent silent SC and avoid an incidental wording assertion.
+
+All three source-bound directory-discovered live iterations (baseline, required-SC,
+activation) attempted the full 75-case library and stopped at the same hard failure:
+**0/3 passed, 72 unrun**, all attempted cases safely idle. The last Agent source matches
+the host; no production change follows that live iteration. Native high-cardinality
+activation and required-SC branch qualification remain unproven. Latest correlations:
+compound `8b8a6aad`, simultaneous `c79faec9`, milk `6bd3abbe`. Wrong native meaning,
+effect selection and temporal coverage remain open; prior rejected wording/order
+candidates were not promoted. This does not establish a model-only root cause.
+The simulator/MCP started for this task were stopped after a final safe-idle probe;
+Agent/LLM/TTS remain healthy. Current work is uncommitted. No release, supervised voice
+or default target-evidence closure is claimed. Checkpoint/Handoff own the next steps.
+
+## Historical continuation: temporal acceptance evidence — 2026-09-22
 
 Based on `4a1606fd0fc546601b38e664a5428c6a79ad489b`, the acceptance oracle now checks
 actual completed Runtime interval overlap for simultaneous gaze/blink. Previously,

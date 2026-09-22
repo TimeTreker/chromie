@@ -746,12 +746,28 @@ summary and semantic-review bundle; then group failures by the earliest shared
 boundary. Use
 `--only-case` only after that diagnosis to validate one proposed fix, followed
 by the affected ability class and the complete directory-discovered cohort on the changed
-revision. Hard integrity or unsafe/unverified execution state stops collection
+revision. By default, hard integrity or unsafe/unverified execution state stops collection
 at the case boundary, including within `must_pass`; unrun cases remain explicit
 and cannot support a passing claim. Collect the one correlated bundle after
 normal runner exit, without an external polling watcher terminating it before
 the aggregate and reviewer artifacts are written. See
 [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-aggregate-first-live-iteration).
+
+For an owner-requested full diagnostic score, use `--keep-going` to attempt every
+selected simulator case, including later stages, despite earlier failures. This is
+an acceptance-runner option, not a product behavior switch. Every case still owns
+its normal Host teardown and a fresh provider/service/safe-idle preflight; invalid
+state prevents that case's input admission and execution. Do not bypass guards,
+reset an emergency, change source, or restart services to manufacture coverage.
+This option rejects `--allow-non-sim`. Failed dependent turns can still end their
+own multi-turn episode; subsequent independent cases are attempted.
+
+The summary retains every `integrity_failure`, case-attempt coverage and pass rate
+over the entire selected set. A blocked case scores as a failure, not a skipped
+success; missing dependent turns remain explicit. The score does not override
+hard failures, pending semantic review, qualification status or the failing exit
+code. Review all mechanically passing cases before presenting a behavioral score.
+Default fail-fast qualification remains available without `--keep-going`.
 
 Warm interaction cases retain two non-overlapping intervals: the accepted SC
 stage start to its complete decision (`max_warm_sc_decision_ms`), then that

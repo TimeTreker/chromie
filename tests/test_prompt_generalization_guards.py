@@ -73,8 +73,6 @@ def test_fast_planner_truth_prompt_preserves_epistemic_strength_without_phrase_t
     ):
         assert literal not in source
     assert "never reinterpret or repair WHAT" in source
-    from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
-    assert "upstream-authored uncertainty and cite supplied Evidence" in SOCIAL_COGNITION_AUTHORITY_PROMPT
 
 
 def test_weather_capability_prompt_metadata_has_no_place_phrase_table() -> None:

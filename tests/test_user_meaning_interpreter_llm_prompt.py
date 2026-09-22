@@ -271,6 +271,56 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
             timeout_ms=800,
         )
 
+    def test_primary_decoder_and_host_agree_on_source_span_order(self) -> None:
+        text = "Give the box to Dad."
+        request = UserMeaningInterpretationRequest(text=text)
+        validator = Draft202012Validator(self._interpreter().build_interpretation_payload(request)["format"])
+        for start in range(len(_source_tokens(text)) + 1):
+            for end in range(len(_source_tokens(text)) + 1):
+                parsed = _valid_output(text)
+                parsed["responsibilities"][0]["source_evidence"] = {
+                    "source_start_token_ref": f"t{start}", "source_end_token_ref": f"t{end}",
+                }
+                try:
+                    OllamaUserMeaningInterpreter._validate_interpretation_content(request, json.dumps(parsed))
+                    expected = True
+                except ValueError:
+                    expected = False
+                with self.subTest(start=start, end=end):
+                    self.assertEqual(validator.is_valid(parsed), expected)
+
+    def test_primary_and_deep_keep_complete_long_turn_source_tokens(self) -> None:
+        interpreter = self._interpreter()
+        for text in (
+            "The labelled box is beside " + "the marked shelf and " * 40 + "bring it to Dad, not me.",
+            "沿着走廊经过" + "左侧标记的架子和" * 30 + "把盒子交给爸爸，不要交给我。",
+        ):
+            request = UserMeaningInterpretationRequest(text=text)
+            expected = _source_tokens(request.text)
+            self.assertGreater(len(json.dumps(expected, ensure_ascii=False)), 5000)
+            for build in (interpreter.build_interpretation_payload, interpreter.build_deep_interpretation_payload):
+                with self.subTest(language=text[:8], variant=build.__name__):
+                    payload = build(request)
+                    prompt = payload["messages"][1]["content"]
+                    table, _ = json.JSONDecoder().raw_decode(prompt.split("Responsibility.source_evidence):\n", 1)[1])
+                    self.assertEqual(table, expected)
+                    evidence_schema = payload["format"]["$defs"]["ResponsibilitySourceEvidence"]
+                    validator = Draft202012Validator(evidence_schema)
+                    self.assertTrue(validator.is_valid({"source_start_token_ref": table[0]["ref"], "source_end_token_ref": table[-1]["ref"]}))
+
+    def test_oversized_complete_source_table_fails_before_transport(self) -> None:
+        import asyncio
+
+        interpreter = self._interpreter()
+        interpreter.num_ctx = 16384
+        request = UserMeaningInterpretationRequest(text="word " * 2000 + "bring it to Dad, not me.")
+        payload = interpreter.build_interpretation_payload(request)
+        with mock.patch("agent.app.cognitive_core.user_meaning_interpreter.model_interpreter.httpx.AsyncClient") as transport:
+            with self.assertRaises(OllamaGenerationError) as caught:
+                asyncio.run(interpreter._chat(payload, stage="user_meaning_interpretation"))
+        self.assertEqual(caught.exception.failure_class, "prompt_budget_exceeded")
+        transport.assert_not_called()
+
     def test_runtime_correlation_labels_do_not_change_model_input(self) -> None:
         interpreter = self._interpreter()
         for key in ("conversation_id", "session_id", "turn_id", "sid"):
@@ -469,8 +519,10 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
         ))
         evidence = schema["$defs"]["ResponsibilitySourceEvidence"]
         refs = [item["ref"] for item in _source_tokens(text)]
-        self.assertEqual(evidence["properties"]["source_start_token_ref"]["enum"], refs)
-        self.assertEqual(evidence["properties"]["source_end_token_ref"]["enum"], refs)
+        validator = Draft202012Validator(evidence)
+        for ref in refs:
+            self.assertTrue(validator.is_valid({"source_start_token_ref": ref, "source_end_token_ref": ref}))
+        self.assertFalse(validator.is_valid({"source_start_token_ref": refs[0], "source_end_token_ref": "t999"}))
         Draft202012Validator.check_schema(schema)
 
 

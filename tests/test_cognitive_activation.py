@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from types import SimpleNamespace
 
 import pytest
 from jsonschema import Draft202012Validator
 
 from agent.app.cognitive_activation import CognitiveActivationResolver
-from orchestrator.runtime.cognitive_activation import _compact_activation_state
+from orchestrator.runtime.cognitive_activation import _compact_activation_state, resolve_cognitive_activation
 from shared.chromie_contracts.cognitive_activation import (
     CognitiveActivationContext,
     CognitiveActivationDecision,
@@ -223,3 +224,108 @@ def test_activation_decoder_requires_exact_trusted_scope_fields() -> None:
         "reason_summary": "Planner should reconsider the open information Goal.",
     }
     assert validator.is_valid(exact)
+
+
+@pytest.mark.parametrize("goal_count", [1, 8, 9, 16])
+@pytest.mark.parametrize("reverse", [False, True])
+def test_host_activation_preserves_entire_reentry_scope(goal_count, reverse):
+    goals = [f"goal:{i}" for i in range(goal_count)]
+    states = [{"goal_id": goal, "work_status": "failed" if i == goal_count - 1 else "completed"}
+              for i, goal in enumerate(goals)]
+    if reverse:
+        goals.reverse()
+        states.reverse()
+    sources = [f"evidence:{i}" for i in range(32)]
+    calls = []
+
+    async def resolve(session, *, request, **kwargs):
+        calls.append(request)
+        return CognitiveActivationDecision(cognitive_requests=[{
+            "authority": "planner", "goal_ids": request.goal_ids, "source_refs": request.source_refs,
+        }], confidence=1.0)
+
+    async def session():
+        return None
+
+    host = SimpleNamespace(agent_client=SimpleNamespace(resolve_cognitive_activation=resolve), get_http_session=session)
+    decision = asyncio.run(resolve_cognitive_activation(host, trigger="post_execution",
+        allowed_authorities=["planner"], goal_ids=goals, source_refs=sources, state={"goal_state": states}))
+    assert len(calls) == 1 and decision is not None
+    assert calls[0].goal_ids == decision.cognitive_requests[0].goal_ids == goals
+    assert calls[0].source_refs == decision.cognitive_requests[0].source_refs == sources
+    assert calls[0].state["goal_state"] == states
+
+
+@pytest.mark.parametrize("overflow", ["goals", "sources", "responsibilities"])
+def test_host_activation_rejects_over_scope_before_calling_model(overflow):
+    calls, logs = [], []
+
+    async def resolve(*args, **kwargs):
+        calls.append(kwargs)
+        return CognitiveActivationDecision(cognitive_requests=[], confidence=1.0)
+
+    async def session():
+        return None
+
+    host = SimpleNamespace(agent_client=SimpleNamespace(resolve_cognitive_activation=resolve),
+                           get_http_session=session, session_log=lambda *args: logs.append(args))
+    result = asyncio.run(resolve_cognitive_activation(host, trigger="post_execution", allowed_authorities=["planner"],
+        goal_ids=[f"goal:{i}" for i in range(17 if overflow == "goals" else 1)],
+        source_refs=[f"source:{i}" for i in range(33 if overflow == "sources" else 1)],
+        responsibilities=[CognitiveResponsibilityProposal(local_ref=f"r{i}", outcome="A requested outcome", confidence=1.0)
+                          for i in range(13 if overflow == "responsibilities" else 1)]))
+    assert result is None and not calls
+    assert any("cognitive_activation_failed" in str(row) for row in logs)
+
+
+def test_activation_projection_retains_tail_lifecycle_and_disclosure_safe_social_context():
+    state = {
+        "goal_state": [{"goal_id": f"goal:{i}", "work_status": "completed"} for i in range(16)],
+        "existing_work_activities": [{"activity_id": f"work:{i}", "state": "completed"} for i in range(24)],
+        "trusted_state_change": {"trusted_terminal_evidence": [
+            {"evidence_id": f"evidence:{i}", "status": "completed"} for i in range(32)]},
+        "memory_summary": "A disclosure-safe shared experience selected by Memory.",
+        "relational_memory_selection": {"audience_refs": ["person:1"]},
+        "interaction_context": {"pending_speech": [{"activity_id": "greeting", "state": "queued"}]},
+    }
+    state["goal_state"][-1]["work_status"] = "failed"
+    state["existing_work_activities"][-1]["state"] = "failed"
+    state["trusted_state_change"]["trusted_terminal_evidence"][-1]["status"] = "failed"
+    assert _compact_activation_state(state) == state
+
+
+def test_activation_host_rejects_partial_source_scope():
+    request = planner_request().model_copy(update={"source_refs": ["evidence-1", "evidence-2"]})
+    decision = CognitiveActivationDecision(cognitive_requests=[{
+        "authority": "planner", "goal_ids": request.goal_ids,
+        "responsibility_refs": request.responsibility_refs, "source_refs": ["evidence-1"],
+    }], confidence=1.0)
+    with pytest.raises(ValueError, match="exact source scope"):
+        decision.validate_request(request)
+
+
+@pytest.mark.parametrize("provider", ["ollama", "sglang"])
+def test_complete_activation_packet_over_budget_never_reaches_inference(provider):
+    from unittest.mock import AsyncMock, patch
+    import httpx
+    from agent.app.clients.ollama_client import OllamaClient, OllamaGenerationError
+    from agent.app.clients.sglang_client import SGLangClient
+
+    current = planner_request().model_copy(update={"state": _compact_activation_state({
+        "memory_summary": "disclosure-safe material context " * 3000,
+    })})
+    client_type = SGLangClient if provider == "sglang" else OllamaClient
+    model = client_type(base_url="http://unused.invalid/v1", model="test-model", purpose="cognitive_activation", timeout_ms=1000)
+    transport = AsyncMock()
+    transport.__aenter__.return_value = transport
+    transport.post.return_value = httpx.Response(200, json={"count": 10000, "tokens": [1] * 10000, "max_model_len": 4096},
+        request=httpx.Request("POST", "http://unused.invalid/v1/tokenize"))
+    with patch(f"agent.app.clients.{provider}_client.httpx.AsyncClient", return_value=transport) as http:
+        with pytest.raises(OllamaGenerationError) as caught:
+            asyncio.run(CognitiveActivationResolver(model).resolve(current))
+        assert caught.value.failure_class == "prompt_budget_exceeded"
+        if provider == "sglang":
+            transport.post.assert_awaited_once()
+            assert transport.post.call_args.args[0].endswith("/tokenize")
+        else:
+            http.assert_not_called()

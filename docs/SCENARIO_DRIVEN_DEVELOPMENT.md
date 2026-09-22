@@ -292,6 +292,11 @@ class and the complete cohort before another broad iteration or a
 revision-level claim. The only early-stop exception is a hard safety,
 provenance, service-integrity, or safe-idle failure that makes continuation
 invalid; collect one bundle at the stop and report the cohort as incomplete.
+For an owner-requested complete simulator diagnostic, `--keep-going` instead
+attempts each independent case under its unchanged preflight/dispatch guards.
+Retain failures and blocked episodes in the score; this does not make a failing
+cohort qualified. No physical run, source change or service restart is authorized
+by this collection option. See [Acceptance](ACCEPTANCE.md) for scoring and limits.
 
 ### 7.3 Daily-life generated-voice repair loop
 
@@ -481,7 +486,7 @@ then run its complete ability class before the canonical repository gate.
 Every maintained general-ability live episode owns one file under
 `scenarios/general_ability/<must_pass|core|challenge>/` and declares its own
 ability and oracle metadata; there is no central scenario index. For broad changes,
-collect the complete `must_pass` stage for ordinary scenario mismatches, then block
+by default collect the complete `must_pass` stage for ordinary scenario mismatches, then block
 `core` and `challenge` if any non-overridable hard gate failed. The aggregate-first
 integrity exception applies within every stage: stop before the next case on
 structured Runtime/model-contract, LLM-integrity, Goal-omission/provenance,

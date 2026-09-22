@@ -659,7 +659,7 @@ def test_fast_decoder_purpose_matches_provider_normalization(resource_contract, 
 
 @pytest.mark.parametrize("start,end", [(0, 0), (0, 10), (9, 10), (10, 10), (10, 9), (10, 0), (0, 11)])
 def test_fast_decoder_source_span_matches_immutable_token_order(start, end):
-    from agent.app.planner_schema import _fast_source_span_contract
+    from shared.chromie_contracts.user_turn import user_turn_source_span_schema
     from shared.chromie_contracts.user_turn import UserTurnSourceSpan, resolve_user_turn_source_span, user_turn_source_tokens
 
     source = "walk ahead slowly then stop and look at the blue door"
@@ -670,5 +670,5 @@ def test_fast_decoder_source_span_matches_immutable_token_order(start, end):
         expected = True
     except ValueError:
         expected = False
-    contract = _fast_source_span_contract([token["ref"] for token in tokens])
+    contract = user_turn_source_span_schema([token["ref"] for token in tokens])
     assert Draft202012Validator(contract).is_valid(span.model_dump()) == expected

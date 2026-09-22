@@ -6,6 +6,7 @@ from itertools import product
 from typing import Any
 
 try:
+    from chromie_contracts.user_turn import user_turn_source_span_schema
     from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
     from chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
@@ -17,6 +18,7 @@ try:
         GOAL_SATISFACTION_SCORE_BANDS,
     )
 except ImportError:  # pragma: no cover
+    from shared.chromie_contracts.user_turn import user_turn_source_span_schema
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
     from shared.chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
@@ -2608,41 +2610,6 @@ def _fast_terminal_activity_contract() -> dict[str, Any]:
     }
 
 
-def _fast_source_span_contract(
-    source_token_refs: list[str] | None,
-) -> dict[str, Any]:
-    token_ref = (
-        {"type": "string", "enum": list(source_token_refs)}
-        if source_token_refs
-        else {"type": "string", "minLength": 1, "maxLength": 24}
-    )
-    def span(starts: dict[str, Any], ends: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "type": "object",
-            "properties": {
-                "source_start_token_ref": starts,
-                "source_end_token_ref": ends,
-            },
-            "required": ["source_start_token_ref", "source_end_token_ref"],
-            "additionalProperties": False,
-        }
-
-    if not source_token_refs:
-        return span(copy.deepcopy(token_ref), copy.deepcopy(token_ref))
-
-    def ordered(refs: list[str]) -> list[dict[str, Any]]:
-        if len(refs) == 1:
-            return [span({"enum": refs, "type": "string"}, {"enum": refs, "type": "string"})]
-        middle = len(refs) // 2
-        left, right = refs[:middle], refs[middle:]
-        # Every forward span is within one half or crosses left to right.
-        # Disjoint branches preserve all spans without a quadratic pair table.
-        return [span({"enum": left, "type": "string"}, {"enum": right, "type": "string"}),
-                *ordered(left), *ordered(right)]
-
-    return {"oneOf": ordered(list(source_token_refs))}
-
-
 def fast_advance_response_schema(
     responsibility_refs: list[str],
     *,
@@ -3050,7 +3017,7 @@ def fast_advance_response_schema(
                                      in ("number", "integer", "boolean", "object", "array")
                                      or name in mapped_enum_inputs)
                             )
-                            span_contract = _fast_source_span_contract(source_token_refs)
+                            span_contract = user_turn_source_span_schema(source_token_refs)
                             properties["argument_sources"] = {
                                 "type": "object",
                                 "properties": {

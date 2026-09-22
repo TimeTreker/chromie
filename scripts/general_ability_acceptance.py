@@ -1665,6 +1665,10 @@ def _write_reviewer_packet(
         "case_count": run_summary.get("case_count"),
         "skipped_cases": list(run_summary.get("skipped_cases") or []),
         "integrity_stop": run_summary.get("integrity_stop"),
+        "integrity_failures": run_summary.get("integrity_failures", []),
+        "stage_policy": run_summary.get("stage_policy"),
+        "case_attempt_coverage_percent": run_summary.get("case_attempt_coverage_percent"),
+        "pass_rate_percent": run_summary.get("pass_rate_percent"),
         "errors": list(run_summary.get("errors") or []),
         "cases": case_summaries,
         "claim_limits": {
@@ -2292,6 +2296,8 @@ def _semantic_review_bundle(
                 "planned_case_count": run_summary.get("planned_case_count"),
                 "skipped_cases": run_summary.get("skipped_cases") or [],
                 "integrity_stop": run_summary.get("integrity_stop"),
+                "integrity_failures": run_summary.get("integrity_failures", []),
+                "stage_policy": run_summary.get("stage_policy"),
             },
             "results": suite_results,
         },
@@ -2353,6 +2359,9 @@ def _live_integrity_stop(
 
 
 async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
+    keep_going = bool(getattr(args, "keep_going", False))
+    if keep_going and args.allow_non_sim:
+        raise ValueError("--keep-going is limited to simulator testing; per-case preflight remains mandatory")
     library = load_scenario_library(args.scenario_root, args.level_a_scenario_root)
     library_errors = validate_library(
         library,
@@ -2381,6 +2390,7 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
     skipped_cases: list[dict[str, str]] = []
     stopped_after_stage: str | None = None
     integrity_stop: dict[str, Any] | None = None
+    integrity_failures: list[dict[str, Any]] = []
     refs_by_stage: dict[str, list[tuple[AbilityClass, LiveCaseRef]]] = {}
     for ability, ref in selected_refs:
         refs_by_stage.setdefault(ref.stage, []).append((ability, ref))
@@ -2448,11 +2458,16 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
             result["root_cause_boundaries"] = list(ability.root_cause_boundaries)
             stop = _live_integrity_stop(result, execute=args.execute)
             if stop is not None:
-                integrity_stop = {**stop, "case_id": case.case_id, "stage": ref.stage}
-                result["integrity_stop"] = integrity_stop
+                failure = {**stop, "case_id": case.case_id, "stage": ref.stage}
+                integrity_failures.append(failure)
+                result["integrity_failure"] = failure
+                if not keep_going:
+                    integrity_stop = failure
+                    result["integrity_stop"] = failure
                 result["ok"] = False
                 result.setdefault("errors", []).append(
-                    "cohort stopped on hard integrity failure: "
+                    ("case failed on hard integrity failure: " if keep_going else
+                     "cohort stopped on hard integrity failure: ") +
                     f"{stop['failure_domain']}:{stop['failure_class']}"
                 )
                 if isinstance(result.get("user_outcome"), dict):
@@ -2492,7 +2507,9 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
                 ),
             }
         )
-        if integrity_stop is not None or (hard_failed and stage.stop_later_stages_on_hard_failure):
+        if integrity_stop is not None or (
+            not keep_going and hard_failed and stage.stop_later_stages_on_hard_failure
+        ):
             stopped_after_stage = stage.stage_id
             later_stage_ids = {
                 item.stage_id for item in library.stages if item.order > stage.order
@@ -2581,6 +2598,7 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "deterministic_ok": deterministic_ok,
         "cohort_complete": cohort_complete,
         "integrity_stop": integrity_stop,
+        "integrity_failures": integrity_failures,
         "qualification_complete": deterministic_ok
         and semantic_review_pending == 0
         and cohort_complete,
@@ -2601,7 +2619,10 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "execute": args.execute,
         "speaker": args.speaker,
         "errors": errors,
-        "stage_policy": "stop_on_integrity_failure_otherwise_finish_stage_then_gate",
+        "stage_policy": (
+            "attempt_all_cases_with_independent_preflight" if keep_going
+            else "stop_on_integrity_failure_otherwise_finish_stage_then_gate"
+        ),
         "selected_stages": list(args.stage),
         "stage_results": stage_results,
         "stopped_after_stage": stopped_after_stage,
@@ -2611,6 +2632,10 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
         "ability_class_count": len(ability_results),
         "case_count": len(case_results),
         "planned_case_count": len(selected_refs),
+        "case_attempt_coverage_percent": round(100 * len(case_results) / len(selected_refs), 2),
+        "pass_rate_percent": round(
+            100 * sum(1 for item in case_results if item.get("ok")) / len(selected_refs), 2,
+        ),
         "passed": sum(1 for item in case_results if item.get("ok")),
         "failed": sum(1 for item in case_results if not item.get("ok")),
         "ability_classes": ability_results,
@@ -2750,6 +2775,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true", help="Print full JSON summary.")
     parser.add_argument("--no-write", action="store_true", help="Do not write an evidence summary.")
     parser.add_argument("--allow-failures", action="store_true", help="Return success even when checks fail.")
+    parser.add_argument(
+        "--keep-going", action="store_true",
+        help=(
+            "Attempt every selected live simulator case despite earlier case/stage failures. "
+            "Each case retains its independent preflight and execution guards; failures "
+            "still fail qualification and the exit status. Not supported with --allow-non-sim."
+        ),
+    )
     parser.add_argument("--evidence-dir", help="Directory for retained evidence summary.")
     parser.add_argument(
         "--runtime-identity",

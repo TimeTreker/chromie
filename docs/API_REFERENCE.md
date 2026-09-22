@@ -148,6 +148,14 @@ running.
 | `POST` | `/reflection` | Run selective slow-cognition Reflection for one trusted evidence-bound `CognitiveOpportunity`; it may propose future replan, clarification, correction, or bounded task/session Memory for still-open Responsibility but cannot reopen completed outcomes, execution authority, or history. |
 | `POST` | `/tools/execute` | Execute one exact planner-selected, explicitly interaction-executable safe read-only local capability and return structured evidence only. |
 
+`POST /cognitive-activation` preserves the entire trusted re-entry scope (up to
+16 Goals, 32 source refs and 12 Responsibilities), matching the existing re-entry
+Goal/Evidence bounds. Every selected authority must retain the exact supplied
+scope. Host projection removes non-owned envelope fields, but never slices scoped
+lifecycle rows or discards the caller's disclosure-safe Memory and Interaction
+context. Oversized contracts and model-context budgets fail before inference;
+they do not authorize a partial-scope wake.
+
 `GET /agent-skills` reports the passive read-only cognitive-content registry.
 The maintained repository root is mounted read-only and contains the approved
 `chromie.grounded-external-information` and `chromie.weather-information`
@@ -240,7 +248,11 @@ executable args/actions, provider identity, execution methods,
 Activities, response wording, `route`, and `intent` are forbidden.
 
 UMI primary and depth use the same closed intent-only wire. Exact source spans are
-validated for identity, ordering and non-overlap. UMI does not receive Capability
+validated for identity, ordering and non-overlap. Both variants receive the complete
+authoritative token table; the existing transport budget rejects oversized input
+instead of silently dropping its tail. UMI and Fast share the ordered source-span
+decoder contract; backward endpoints are excluded before Host validation. This does
+not select a span or prove that its material meaning is complete. UMI does not receive Capability
 argument schemas or normalize duration, speed, direction or activation time into
 execution fields. GA inherits new Goal meaning and result type from the accepted
 source ref; Planner realizes inputs and scheduling. Source membership alone does

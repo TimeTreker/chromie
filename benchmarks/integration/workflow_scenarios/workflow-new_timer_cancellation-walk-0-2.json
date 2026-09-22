@@ -438,7 +438,7 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "0f0e5f6742c248a7e1060f799051824e5bb2212b87b046f1270642e927927e70"
+              "$artifact": "69468ed6caf1c295a92a86a93e01cc47f3a67a5e2382388518a67da7eac43bfb"
             }
           },
           {
@@ -453,7 +453,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "cd38af49f3c63f9e6621009d8694e06bf1b7f3bdab4a66380de2ac5c63a9f541"
+          "$artifact": "8a5077a28cbc982d7ddb0f58f4d8228af4dfb7b3b43c47bf379219b78f8f67f4"
         }
       }
     },
@@ -640,7 +640,7 @@
           {
             "role": "system",
             "content": {
-              "$artifact": "0f0e5f6742c248a7e1060f799051824e5bb2212b87b046f1270642e927927e70"
+              "$artifact": "69468ed6caf1c295a92a86a93e01cc47f3a67a5e2382388518a67da7eac43bfb"
             }
           },
           {
@@ -655,7 +655,7 @@
           "num_predict": 2048
         },
         "format": {
-          "$artifact": "0ec5d658d91a099f3e50a5f0957e95c9da249cccf3680b6f93fab55296f2a340"
+          "$artifact": "cd1b66679500dcb638972f1781fd6bb5751bd6f30effdd2f7dbcc639852f67fd"
         }
       }
     },

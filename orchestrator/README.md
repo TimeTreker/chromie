@@ -26,9 +26,10 @@ Runtime retains validated pre-GA preparation, admits only contract-declared safe
 
 - ASR converts complete PCM utterances to final text.
 - User Meaning Interpretation produces typed WHAT-only goal interpretation decisions and Responsibility candidates.
-- Agent exposes schema-constrained Goal Association, Fast/Deep Planning, and
-  Activity-attached Social-Attention proposals. Planner owns exact Communicative
-  Activity wording; terminal Evidence reactivates Fast Planner.
+- Agent exposes schema-constrained Goal Association, Fast/Deep Work Planning and
+  Social Cognition. SC owns exact Communicative Activity wording and optional
+  social expression. Terminal Evidence currently re-enters Planner before SC
+  expresses established Needs; independent Goal-bound SC reactivation remains open.
 - TTS delivers PCM synthesis chunks; the current Orchestrator buffers one
   complete request through the provider `end` event before ordered playback and
   interruption handling.
