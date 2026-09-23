@@ -609,13 +609,21 @@ class GoalAssociationResolver:
         if isinstance(explicit, list):
             raw = explicit
         else:
-            active = context.get("active_goal_snapshots")
-            recent = context.get("recent_goal_snapshots")
-            if not isinstance(active, list):
-                active = []
-            if not isinstance(recent, list):
-                recent = []
-            raw = [*active, *recent]
+            working = context.get("working_goal_memory")
+            long_term = context.get("long_term_goal_memory")
+            if isinstance(working, list) or isinstance(long_term, list):
+                raw = [
+                    *(working if isinstance(working, list) else []),
+                    *(long_term if isinstance(long_term, list) else []),
+                ]
+            else:
+                active = context.get("active_goal_snapshots")
+                recent = context.get("recent_goal_snapshots")
+                if not isinstance(active, list):
+                    active = []
+                if not isinstance(recent, list):
+                    recent = []
+                raw = [*active, *recent]
         out: list[dict[str, Any]] = []
         seen: set[str] = set()
         for index, item in enumerate(raw):

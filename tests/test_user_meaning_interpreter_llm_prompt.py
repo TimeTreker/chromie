@@ -432,6 +432,8 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
                     "source_goal_ids": ["goal-coffee-secret"],
                 }],
                 "discourse_focus": ["ref-coffee-secret"],
+                "working_goal_memory": [{"goal_id": "goal-working-secret"}],
+                "long_term_goal_memory": [{"goal_id": "goal-long-term-secret"}],
             },
         )
 
@@ -446,6 +448,8 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
         self.assertNotIn("goal-coffee-secret", user_text)
         self.assertNotIn("task-coffee-secret", user_text)
         self.assertNotIn("ref-coffee-secret", user_text)
+        self.assertNotIn("goal-working-secret", user_text)
+        self.assertNotIn("goal-long-term-secret", user_text)
 
     def test_working_conversational_memory_supports_elliptical_constraint_followup(self) -> None:
         interpreter = self._interpreter()

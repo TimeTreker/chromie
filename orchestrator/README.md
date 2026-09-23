@@ -285,11 +285,13 @@ metadata, compact task contexts, scoped discourse referents/focus, a
 provenance-only verified-tool-memory index, and one conversation identifier across
 utterances until reset or expiry. Each utterance still receives its own SID.
 
-State is process-local by default. When `ORCH_ENABLE_TASK_CONTEXT_STORE=1`,
-unfinished compact task contexts are saved locally and restored as recoverable
-after restart; physical work still requires fresh confirmation and never resumes
-blindly. This is not a long-term personal memory system. See
-[`../docs/conversation_state.md`](../docs/conversation_state.md) and
+State is process-local by default. Cognition distinguishes working RAM Memory from durable
+long-term projections without creating another semantic owner. When
+`ORCH_ENABLE_TASK_CONTEXT_STORE=1`, unfinished canonical Goals are saved locally and restored
+as recoverable after restart; GA may compare their abstract durable summaries with current
+working Goals, while physical work still requires fresh validation/confirmation and never
+resumes blindly. Consent-bound personal long-term Memory remains owned by the protected durable
+Memory store. See [`../docs/conversation_state.md`](../docs/conversation_state.md) and
 [`../docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](../docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 
 ## Scheduling, interruption, and cancellation

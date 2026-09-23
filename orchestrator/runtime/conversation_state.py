@@ -885,6 +885,9 @@ class ConversationStateManager:
                 "task_type": context.get("task_type"),
                 "task_relation": context.get("task_relation"),
                 "updated_ms": context.get("updated_ms"),
+                "persistence_policy": str(
+                    context.get("persistence_policy") or "persist_if_unfinished"
+                ),
                 **{
                     key: metadata.get(key)
                     for key in (
@@ -949,18 +952,32 @@ class ConversationStateManager:
             )
         return retained[-limit:]
 
-    def goal_association_candidate_snapshots(
-        self,
+    @staticmethod
+    def _goal_memory_projection_metadata(
+        snapshot: dict[str, Any],
         *,
-        limit: int | None = None,
-    ) -> list[dict[str, Any]]:
-        """Return the bounded canonical-Goal candidate set GA may compare.
+        tier: str,
+        backing: str,
+        abstracted: bool,
+    ) -> dict[str, Any]:
+        metadata = snapshot.get("metadata")
+        metadata = dict(metadata) if isinstance(metadata, dict) else {}
+        metadata.update(
+            {
+                "goal_memory_tier": tier,
+                "memory_backing": backing,
+                "abstracted_memory_projection": abstracted,
+            }
+        )
+        return metadata
 
-        Restored unfinished task contexts are represented by ``active_goal_snapshots``
-        and therefore survive conversation/session boundaries when persistence policy
-        permits. Candidate retrieval only decides what GA may inspect: active/restored
-        persistent Goals are preferred, then recent terminal Goals fill the bounded set.
-        It never decides continuity identity or reopens terminal Goals.
+    def working_goal_memory(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return RAM-resident Goal continuity memory for current cognition.
+
+        Working Goal memory contains active/recoverable Goals plus a bounded recent
+        terminal tail. It is detailed enough for immediate continuity but remains a
+        read-only projection; GA alone decides whether current meaning belongs to one
+        of these canonical Goals.
         """
 
         if limit is None:
@@ -971,7 +988,145 @@ class ConversationStateManager:
         active = self.active_goal_snapshots(limit=limit)
         remaining = max(0, limit - len(active))
         recent = self.recent_goal_snapshots(limit=remaining)
-        return [*active, *recent]
+        out: list[dict[str, Any]] = []
+        for snapshot in [*active, *recent]:
+            item = copy.deepcopy(snapshot)
+            metadata = self._goal_memory_projection_metadata(
+                item, tier="working", backing="ram", abstracted=False,
+            )
+            policy = str(metadata.get("persistence_policy") or "persist_if_unfinished")
+            metadata["durable_backing"] = bool(
+                self.task_store_enabled
+                and str(item.get("responsibility_status") or "open") == "open"
+                and policy.casefold()
+                not in {"ephemeral", "memory_only", "do_not_persist", "none"}
+            )
+            if metadata.get("restored_from_task_store") is True:
+                metadata["long_term_origin"] = True
+            item["metadata"] = metadata
+            out.append(item)
+        return out
+
+    def long_term_goal_memory(self, *, limit: int | None = None) -> list[dict[str, Any]]:
+        """Return abstract disk-backed Goal summaries for long-horizon continuity.
+
+        The durable task store keeps canonical semantic state needed for correct restart
+        recovery. Cognition does not receive that full retained record as "memory".
+        Instead this projection removes transient Work, raw source wording, gaps and
+        per-turn provenance while preserving stable Goal identity plus the abstract
+        human outcome needed by GA. Persistence does not itself create continuity.
+        """
+
+        if not self.task_store_enabled:
+            return []
+        if limit is None:
+            limit = self.max_pending_tasks
+        limit = max(0, int(limit))
+        if limit == 0:
+            return []
+        summaries: list[dict[str, Any]] = []
+        for context in self._durable_task_contexts()[-limit:]:
+            snapshot = ActiveGoalSnapshot.from_task_snapshot(
+                self._task_snapshot(context)
+            ).model_dump(mode="json", exclude_none=True)
+            goal = snapshot.get("goal")
+            if not isinstance(goal, dict):
+                continue
+            description = self._compact_text(str(goal.get("description") or ""), limit=360)
+            if not description:
+                continue
+            goal_metadata = goal.get("metadata")
+            goal_metadata = dict(goal_metadata) if isinstance(goal_metadata, dict) else {}
+            abstract_goal = {
+                "schema_version": int(goal.get("schema_version") or 1),
+                "goal_id": goal.get("goal_id") or snapshot.get("goal_id"),
+                "version": int(goal.get("version") or snapshot.get("goal_version") or 1),
+                "responsibility_status": goal.get("responsibility_status") or "open",
+                "description": description,
+                # Long-term memory retains meaning, not the verbatim historical turn.
+                "source_text": description,
+                "beneficiary": goal.get("beneficiary"),
+                "object": copy.deepcopy(goal.get("object") or {}),
+                "constraints": copy.deepcopy(goal.get("constraints") or {}),
+                "success_criteria": [
+                    self._compact_text(str(item), limit=260)
+                    for item in list(goal.get("success_criteria") or [])[:4]
+                    if str(item or "").strip()
+                ],
+                "source_responsibility_refs": [],
+                "related_goal_ids": list(goal.get("related_goal_ids") or [])[:8],
+                "supersedes_goal_ids": list(goal.get("supersedes_goal_ids") or [])[:8],
+                "metadata": {
+                    key: copy.deepcopy(goal_metadata[key])
+                    for key in ("output_mode", "body_effect_families", "body_effect_family")
+                    if goal_metadata.get(key) not in (None, "", [], {})
+                },
+            }
+            item = {
+                "schema_version": int(snapshot.get("schema_version") or 1),
+                "goal_id": snapshot.get("goal_id"),
+                "goal_version": int(snapshot.get("goal_version") or 1),
+                "responsibility_status": snapshot.get("responsibility_status") or "open",
+                "work_status": "stored",
+                "goal": abstract_goal,
+                "open_information_gaps": [],
+                "last_user_update": "",
+                "updated_ms": snapshot.get("updated_ms"),
+                "metadata": self._goal_memory_projection_metadata(
+                    snapshot, tier="long_term", backing="disk", abstracted=True,
+                ),
+            }
+            item["metadata"].pop("execution_binding", None)
+            item["metadata"]["persistence_policy"] = str(
+                context.get("persistence_policy") or "persist_if_unfinished"
+            )
+            try:
+                summaries.append(
+                    ActiveGoalSnapshot.model_validate(item).model_dump(
+                        mode="json", exclude_none=True
+                    )
+                )
+            except ValidationError as exc:
+                logger.debug(
+                    "Ignoring malformed long-term Goal memory goal_id=%s error=%s",
+                    item.get("goal_id"),
+                    exc,
+                )
+        return summaries
+
+    def goal_association_candidate_snapshots(
+        self,
+        *,
+        limit: int | None = None,
+    ) -> list[dict[str, Any]]:
+        """Return bounded Goal memory candidates that GA alone may associate.
+
+        Working RAM Goal memory is preferred because it contains current continuity.
+        Abstract long-term Goal memory may add durable cross-session candidates. The
+        same canonical Goal is never duplicated across tiers; when it is already in
+        working memory, that current projection wins. Storage tier is evidence about
+        retention only and never decides semantic continuity or reopens terminal Goals.
+        """
+
+        if limit is None:
+            limit = self.max_pending_tasks
+        limit = max(0, int(limit))
+        if limit == 0:
+            return []
+        candidates: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for snapshot in [
+            *self.working_goal_memory(limit=limit),
+            *self.long_term_goal_memory(limit=limit),
+        ]:
+            goal_id = str(snapshot.get("goal_id") or "").strip()
+            if not goal_id or goal_id in seen:
+                continue
+            seen.add(goal_id)
+            candidates.append(snapshot)
+            if len(candidates) >= limit:
+                break
+        return candidates
 
     @staticmethod
     def _semantic_operations_from_metadata(
@@ -3693,8 +3848,16 @@ class ConversationStateManager:
             activation_subject_refs=activation_subject_refs,
             audience_refs=audience_refs,
         )
+        working_entries = [
+            {**copy.deepcopy(entry), "memory_tier": "working", "memory_backing": "ram"}
+            for entry in extracted["entries"]
+        ]
+        long_term_entries = [
+            {**copy.deepcopy(entry), "memory_tier": "long_term", "memory_backing": "disk"}
+            for entry in durable_entries
+        ]
         combined_entries = rank_memory_prompt_entries(
-            [*durable_entries, *extracted["entries"]],
+            [*long_term_entries, *working_entries],
             activation_texts=combined_activation_texts,
             activation_subject_refs=activation_subject_refs,
             audience_refs=audience_refs,
@@ -3740,13 +3903,21 @@ class ConversationStateManager:
             limit=12,
             activation_texts=activation_texts,
         )
+        working_entries = [
+            {**copy.deepcopy(entry), "memory_tier": "working", "memory_backing": "ram"}
+            for entry in extracted_memory["entries"]
+        ]
+        long_term_entries = [
+            {**copy.deepcopy(entry), "memory_tier": "long_term", "memory_backing": "disk"}
+            for entry in durable_entries
+        ]
         combined_entries = rank_memory_prompt_entries(
-            [*durable_entries, *extracted_memory["entries"]],
+            [*long_term_entries, *working_entries],
             activation_texts=activation_texts,
             limit=12,
         )
         durable_entries = rank_memory_prompt_entries(
-            durable_entries,
+            long_term_entries,
             activation_texts=activation_texts,
             limit=8,
         )
@@ -3771,8 +3942,20 @@ class ConversationStateManager:
                 "task_context": current_task_context,
             }
         return {
-            "kind": "short_term_session_memory",
+            "kind": "tiered_conversation_memory",
             "conversation_id": self.conversation_id,
+            "memory_tiers": {
+                "working": {
+                    "storage": "ram",
+                    "entry_count": len(working_entries),
+                    "goal_count": len(self.working_goal_memory(limit=4)),
+                },
+                "long_term": {
+                    "storage": "disk",
+                    "entry_count": len(long_term_entries),
+                    "goal_count": len(self.long_term_goal_memory(limit=4)),
+                },
+            },
             "recent_user_request": latest_user.get("text") if latest_user else None,
             "recent_assistant_response": latest_assistant.get("text") if latest_assistant else None,
             "current_task": current_task,
@@ -3824,6 +4007,8 @@ class ConversationStateManager:
             "task_contexts": list(self._task_contexts),
             "active_task_contexts": self._active_task_contexts(),
             "active_task_snapshots": self.active_task_snapshots(),
+            "working_goal_memory": self.working_goal_memory(),
+            "long_term_goal_memory": self.long_term_goal_memory(),
             "goal_association_candidates": self.goal_association_candidate_snapshots(),
             "recent_goal_snapshots": self.recent_goal_snapshots(),
             "current_task_context": self._current_task_context(),

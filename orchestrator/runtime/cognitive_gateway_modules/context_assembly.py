@@ -26,6 +26,8 @@ class ContextAssembly:
         "active_task_contexts": "orchestrator.conversation_state",
         "active_task_snapshots": "orchestrator.conversation_state",
         "active_goal_snapshots": "orchestrator.conversation_state",
+        "working_goal_memory": "orchestrator.conversation_state",
+        "long_term_goal_memory": "orchestrator.conversation_state",
         "user_meaning_goal_context": "orchestrator.conversation_state",
         "goal_association_candidates": "orchestrator.conversation_state",
         "recent_goal_snapshots": "orchestrator.conversation_state",

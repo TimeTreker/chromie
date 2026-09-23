@@ -572,23 +572,30 @@ planning task; reviewing an earlier model answer does not. Concurrent model comp
 order never establishes semantic priority. Conflicting submissions must validate their
 source state before changing Work, and obsolete results cannot overwrite newer state.
 
-Memory provides both current working context and relevant retained context through its
-existing owner. UMI primarily resolves the current utterance; GA primarily establishes
-Goal continuity, including longer intent, without excluding relevant recent context.
-Their distinction is the question each owns, not a short-memory/long-memory split.
-UMI receives recent semantic context and currently activated relevant history. GA receives
-the accepted UMI result, relevant canonical Goals and bounded continuity history, plus
-applicable personal/relational Memory. Planner receives the relevant Responsibilities
-and available Goals together with actual Runtime Work, Evidence, communication records
-and applicable remembered preferences. Accepted UMI meaning may still carry typed semantic uncertainty. UMI is the sole producer
-of that uncertainty. GA may resolve only a cited uncertainty whose missing meaning is
-supplied by the selected canonical Goal continuity; Memory, GA, Planner, and Host may not
-silently resolve it as a guessed planning choice.
-No role is restricted to one memory lifetime. Short/long cognitive relevance and
-volatile/persistent storage are independent axes; persistence keeps existing consent,
-retention and deletion contracts. Planner consumes Memory together with current Goal,
-Work, delivery and Evidence projections. Memory never becomes a second execution queue,
-Goal authority, or source of fabricated completion.
+Memory has two retention tiers under one semantic owner. **Working Memory** is volatile,
+RAM-resident, comparatively detailed context for the current conversation and active work.
+**Long-term Memory** is durable storage exposed back to cognition only through bounded,
+more summarized/abstract projections. Storage lifetime does not create semantic authority:
+a long-term item is not more true merely because it is durable, and a working item is not
+less important merely because it is volatile. UMI primarily resolves the current utterance
+from working conversational context plus selectively activated relevant Memory. GA primarily
+establishes Goal continuity and may compare the accepted current Responsibility against both
+working Goal memory and abstract long-term Goal memory. Planner receives only the relevant
+Responsibilities/Goals plus current Work, Evidence, communication records and applicable
+remembered preferences.
+
+Canonical Goals still have exactly one Goal owner. A Goal may have a detailed RAM projection
+and a durable disk-backed summary at the same time, but those are two memory representations
+of one canonical Goal, not two Goal databases or two identities. Working detail wins when the
+same Goal appears in both tiers; durable storage mainly supports restart/cross-session
+continuity. Long-term Goal projections deliberately omit transient Work bindings, raw historical
+wording and per-turn provenance while retaining enough abstract human meaning for GA to judge
+continuity. Accepted UMI meaning may still carry typed semantic uncertainty. UMI is the sole
+producer of that uncertainty. GA may resolve only a cited uncertainty whose missing meaning is
+supplied by selected canonical Goal continuity; Memory, GA, Planner, and Host may not silently
+resolve it as a guessed planning choice. Persistence keeps existing consent, retention and
+deletion contracts. Memory never becomes a second execution queue, Goal authority, or source
+of fabricated completion.
 
 When terminal Evidence later arrives, the async event path creates one bounded
 `CognitiveOpportunity` for the exact affected Goal set. Planner receives the original

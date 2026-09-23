@@ -1712,6 +1712,21 @@ is not authority for another service or manager.
 Evidence history is not Memory. Evidence answers what happened; Memory is the
 selective retention of meaning worth making available to future cognition.
 Situation answers what matters now; Memory answers what may matter again later.
+Chromie therefore treats retention as a two-tier hierarchy rather than one flat prompt bag:
+
+- **Working / temporary Memory** lives in process memory and retains detailed recent dialogue,
+  discourse focus, active Goal meaning, session-scoped extracted Memory and current interaction
+  state needed for immediate cognition. It is bounded and disposable.
+- **Long-term Memory** is durable and deliberately more summarized/abstract. Consent-bound
+  profile Memory uses the protected durable Memory store; unfinished Goals may use the existing
+  task-context store and are projected back to cognition as compact Goal summaries.
+
+The tiers are representations, not new semantic authorities. A canonical Goal remains one Goal
+even when its current detailed projection is in RAM and a durable summary is on disk. GA may
+compare both tiers when deciding continuity; it never treats storage tier, lexical overlap or
+recency as proof of identity. UMI receives working Goal human meaning but not long-term Goal IDs;
+selectively activated long-term personal Memory may still provide ordinary human-level context.
+Planner does not manage either store.
 The default should be not to promote ordinary transient facts into durable
 Memory. Prompt availability is context-conditioned rather than a recent-N query: the
 existing owner derives bounded lexical/entity cues from the current user turn, open

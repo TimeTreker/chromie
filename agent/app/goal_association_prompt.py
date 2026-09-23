@@ -166,8 +166,16 @@ def association_goal_projection(
         goal = goal if isinstance(goal, dict) else {}
         metadata = goal.get("metadata")
         metadata = metadata if isinstance(metadata, dict) else {}
+        snapshot_metadata = snapshot.get("metadata")
+        snapshot_metadata = snapshot_metadata if isinstance(snapshot_metadata, dict) else {}
         item = {
             "goal_id": snapshot.get("goal_id") or goal.get("goal_id"),
+            "memory_tier": snapshot_metadata.get("goal_memory_tier") or "working",
+            "memory_backing": snapshot_metadata.get("memory_backing") or "ram",
+            "abstracted_memory_projection": bool(
+                snapshot_metadata.get("abstracted_memory_projection") is True
+            ),
+            "durable_backing": bool(snapshot_metadata.get("durable_backing") is True),
             "responsibility_status": (
                 snapshot.get("responsibility_status")
                 or goal.get("responsibility_status")
@@ -247,9 +255,12 @@ def build_association_prompt(
         "evidence supports it; wording alone never decides this. Preserve compound meaning "
         "intact; Planner decomposes Activities. "
         "Choose continuity from accepted meaning, candidate requirements, retained state and "
-        "dialogue. Candidate presence, lexical overlap or recency alone is insufficient. "
-        "Candidates may include restored cross-session persistent Goals; their presence only "
-        "makes them eligible for comparison. GA alone decides canonical continuity identity. "
+        "dialogue. Candidate presence, lexical overlap, recency, or storage tier alone is "
+        "insufficient. Candidate Goal memory may be working (RAM, detailed/current) or long_term "
+        "(durable, deliberately summarized/abstract). A long-term summary is eligible continuity "
+        "evidence, not current execution state; prefer neither tier mechanically. Restored or "
+        "durably backed Goals may cross session/process boundaries, but persistence never proves "
+        "that the current Responsibility belongs to them. GA alone decides canonical continuity identity. "
         "UMI does not supply relationship labels or Goal IDs; you own that judgment. "
         "Use exact supplied IDs. Only candidates with responsibility_status=open may "
         "receive continue/modify/clarify/confirm/reject/cancel/pause/resume/merge/split. "

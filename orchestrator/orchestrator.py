@@ -1802,10 +1802,12 @@ class VoiceAssistant:
             "active_task_contexts": conversation.get("active_task_contexts", []),
             "active_task_snapshots": conversation.get("active_task_snapshots", []),
             "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
-            # UMI receives only a small semantic projection of currently active/restored
-            # Goal meaning. It uses this to understand ellipsis/correction/confirmation,
-            # never to choose canonical Goal identity; GA receives the broader candidate set.
-            "user_meaning_goal_context": self.conversation_state.active_goal_snapshots(limit=4),
+            "working_goal_memory": conversation.get("working_goal_memory", []),
+            "long_term_goal_memory": conversation.get("long_term_goal_memory", []),
+            # UMI receives only a small semantic projection of RAM-resident Goal meaning.
+            # It uses this to understand ellipsis/correction/confirmation, never to choose
+            # canonical Goal identity; GA receives both working and long-term Goal memory.
+            "user_meaning_goal_context": list(conversation.get("working_goal_memory", []))[-4:],
             "goal_association_candidates": conversation.get(
                 "goal_association_candidates", []
             ),

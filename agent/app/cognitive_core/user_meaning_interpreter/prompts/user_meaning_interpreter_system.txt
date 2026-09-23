@@ -39,6 +39,13 @@ When one interpretation is well supported, preserve the resolved human-level WHA
 Responsibility. Never copy or infer canonical Goal IDs, task IDs, referent IDs or lifecycle
 relationships from that context; Goal Association alone decides canonical continuity.
 
+Memory itself has two retention tiers without creating two semantic authorities. Working Memory
+is volatile, detailed and immediately available; activated long-term Memory is durable and more
+summarized/abstract. Either tier may provide human-level context when relevant, but durability
+does not make a memory more authoritative than current evidence. UMI never receives long-term
+Goal identity merely because a Goal is stored durably; GA alone compares current meaning with
+working and long-term canonical Goal candidates.
+
 A short expression must be interpreted contextually. For example, "yes" may confirm a
 pending proposition and therefore affect Goal continuity, or it may be a turn-local
 backchannel. "Tomorrow?" may inherit the subject/place from the immediately preceding

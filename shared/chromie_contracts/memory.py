@@ -75,7 +75,7 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
         "id", "scope", "kind", "key", "text", "confidence", "relation",
         "subject_refs", "source_person_refs", "source_ref_ids", "source_turn_ids",
         "source_sids", "audience_refs", "disclosure_scope", "persistence_policy",
-        "consent_basis", "expires_ms",
+        "consent_basis", "expires_ms", "memory_tier", "memory_backing",
     )
     for entry in entries if isinstance(entries, list) else []:
         if not isinstance(entry, dict) or not entry.get("text"):
@@ -100,7 +100,9 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
         "Activated Memory JSON (context only):\n"
         + json.dumps(selected, ensure_ascii=False, separators=(",", ":"))
         + "\n" + purpose
-        + " Memory scope describes relevance; persistence_policy describes storage lifetime. "
+        + " memory_tier describes whether this activated context came from working RAM or "
+        "long-term durable storage; scope describes relevance and persistence_policy describes "
+        "retention policy. A long-term item is intentionally more stable, not more authoritative. "
         "Neither memory nor its confidence replaces current meaning, Goal state, Runtime state, "
         "execution Evidence, or authorization. Never turn remembered context into a new Responsibility or infer completion from it.\n\n"
     )

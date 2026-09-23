@@ -953,6 +953,107 @@ class ConversationStateTests(unittest.TestCase):
 
 
 class GoalScopedLifecycleTests(unittest.TestCase):
+
+    def test_goal_memory_exposes_working_and_abstract_long_term_tiers(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            store_path = Path(temp_dir) / "task_contexts.json"
+            manager = ConversationStateManager(
+                base_conversation_id="tiered-goal-memory",
+                task_store_enabled=True,
+                task_store_path=store_path,
+            )
+            manager.apply_semantic_task_operations_atomically(
+                [{
+                    "operation_id": "create-coffee-goal",
+                    "operation": "create",
+                    "goal": {
+                        "description": "Bring a cup of coffee to the user.",
+                        "source_text": "Please bring me a cup of coffee from the kitchen counter.",
+                        "object": {"resource": "cup of coffee"},
+                        "constraints": {"recipient": "user"},
+                        "source_responsibility_refs": ["r1"],
+                        "metadata": {"output_mode": "body_action"},
+                    },
+                    "metadata": {"task_type": "resource_delivery"},
+                }],
+                sid="coffee-sid",
+                user_text="Please bring me a cup of coffee from the kitchen counter.",
+                source="test_goal_association",
+            )
+
+            working = manager.working_goal_memory()
+            long_term = manager.long_term_goal_memory()
+            candidates = manager.goal_association_candidate_snapshots()
+
+            self.assertEqual(len(working), 1)
+            self.assertEqual(working[0]["metadata"]["goal_memory_tier"], "working")
+            self.assertEqual(working[0]["metadata"]["memory_backing"], "ram")
+            self.assertTrue(working[0]["metadata"]["durable_backing"])
+            self.assertEqual(len(long_term), 1)
+            self.assertEqual(long_term[0]["metadata"]["goal_memory_tier"], "long_term")
+            self.assertEqual(long_term[0]["metadata"]["memory_backing"], "disk")
+            self.assertTrue(long_term[0]["metadata"]["abstracted_memory_projection"])
+            self.assertEqual(long_term[0]["work_status"], "stored")
+            self.assertEqual(
+                long_term[0]["goal"]["source_text"],
+                long_term[0]["goal"]["description"],
+            )
+            self.assertEqual(long_term[0]["goal"]["source_responsibility_refs"], [])
+            self.assertNotIn("execution_binding", long_term[0]["metadata"])
+            # The same canonical Goal may be RAM-resident and disk-backed, but GA receives
+            # one canonical candidate; current working detail wins over its durable summary.
+            self.assertEqual(len(candidates), 1)
+            self.assertEqual(candidates[0]["metadata"]["goal_memory_tier"], "working")
+
+            restored = ConversationStateManager(
+                base_conversation_id="tiered-goal-memory",
+                task_store_enabled=True,
+                task_store_path=store_path,
+            )
+            restored_working = restored.working_goal_memory()
+            self.assertEqual(len(restored_working), 1)
+            self.assertTrue(restored_working[0]["metadata"]["long_term_origin"])
+
+    def test_memory_entries_are_tagged_working_or_long_term_without_changing_authority(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            manager = ConversationStateManager(
+                base_conversation_id="tiered-memory",
+                durable_memory_enabled=True,
+                durable_memory_path=Path(temp_dir) / "profile.json",
+            )
+            manager.record_interaction_response(
+                "sid",
+                {"metadata": {"memory_updates": [
+                    {
+                        "type": "extracted_memory",
+                        "value": {
+                            "scope": "session",
+                            "kind": "note",
+                            "text": "The current drink is coffee.",
+                            "persistence_policy": "ephemeral",
+                        },
+                    },
+                    {
+                        "type": "extracted_memory",
+                        "value": {
+                            "scope": "profile",
+                            "kind": "preference",
+                            "key": "drink_temperature",
+                            "text": "The user prefers iced drinks.",
+                            "persistence_policy": "durable_with_explicit_consent",
+                            "consent_basis": "explicit_current_turn",
+                            "retention_days": 30,
+                        },
+                    },
+                ]}},
+            )
+            tiers = {
+                item["text"]: item["memory_tier"]
+                for item in manager.session_memory()["extracted_memory"]
+            }
+            self.assertEqual(tiers["The current drink is coffee."], "working")
+            self.assertEqual(tiers["The user prefers iced drinks."], "long_term")
+
     def test_execution_outcome_commit_immediately_populates_verified_tool_memory(self) -> None:
         manager = ConversationStateManager(base_conversation_id="outcome-memory")
         self._create_goals(manager, "goal-weather")

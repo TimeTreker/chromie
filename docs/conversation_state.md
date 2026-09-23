@@ -181,15 +181,21 @@ The former `ORCH_CONTEXT_*` aliases are removed. Exact maintained settings and d
 
 ## Privacy and durability
 
-The default state lives only in memory, which reduces accidental long-term
-retention but does not make the content non-sensitive. Logs, optional audio
-recordings, acceptance artifacts, and external service logs may still contain
-user text or voice data.
+Conversation state now exposes an explicit two-tier cognitive projection while retaining the
+existing storage/privacy owners. Working Memory is process-local RAM state. Long-term Memory is
+only what an existing durable owner already permits: explicit-consent protected profile Memory
+and, when `ORCH_ENABLE_TASK_CONTEXT_STORE=1`, unfinished canonical Goals persisted for restart
+continuity. Durable Goal state is reloaded as recoverable and must be revalidated before new
+Work; physical execution never resumes blindly.
 
-Before expanding durable memory beyond compact unfinished task contexts:
+The model-facing long-term Goal surface is intentionally abstract: it keeps canonical Goal
+identity and stable human outcome/constraints needed by GA, while omitting transient execution
+bindings, raw historical wording, open per-turn gaps and source Responsibility IDs. The same
+Goal can therefore be RAM-resident and disk-backed without becoming two Goals. Working detail
+wins if both projections are present.
 
-- define explicit user consent and deletion behavior;
-- separate conversational hints from verified system state;
-- encrypt and scope stored data;
-- avoid allowing model-written memory to authorize future side effects;
-- add migration, retention, and redaction tests.
+The default task-context store remains disabled, preserving the existing privacy default until
+deployment policy enables durable Goal continuity. Logs, optional audio recordings, acceptance
+artifacts, and external service logs may still contain user text or voice data. Durable profile
+Memory continues to require its existing explicit consent/deletion policy. No memory record may
+authorize future side effects or substitute for fresh Runtime/Evidence grounding.

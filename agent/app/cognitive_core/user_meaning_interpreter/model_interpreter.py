@@ -92,6 +92,8 @@ _CONTEXT_OMIT_KEYS = {
     "active_task_contexts",
     "active_task_snapshots",
     "active_goal_snapshots",
+    "working_goal_memory",
+    "long_term_goal_memory",
     "active_pending_tasks",
     "goal_association_candidates",
     "recent_goal_snapshots",
