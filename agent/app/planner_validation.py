@@ -468,26 +468,24 @@ def validate_goal_responsibility_outcomes(
         )
 
 
-def qualify_capability_catalog_for_output_modes(
+def qualify_capability_catalog_for_output_mode_values(
     capabilities: list[dict[str, Any]],
     *,
-    authoritative_goals: list[dict[str, Any]],
+    output_modes: set[str],
 ) -> list[dict[str, Any]]:
-    """Remove capabilities whose typed lane cannot serve any current Goal.
+    """Remove capabilities whose typed lane cannot serve the supplied output modes.
 
-    Goal Association already owns each Goal's provider-neutral output mode. The
-    catalog owns executable typed semantic-scope and effect metadata. Intersecting
-    those declarations prevents an information tool from becoming decorative body work,
-    or a body action from standing in for an exact vocal/media provider, without
-    inferring intent from user phrases or capability names.
+    The caller must supply output modes authored by an existing semantic authority
+    (UMI Responsibilities before Goal Association, or canonical Goals afterwards).
+    This function intersects only those typed modes with Capability metadata; it does
+    not infer intent from wording or capability names.
     """
 
     output_modes = {
-        " ".join(str((goal.get("metadata") or {}).get("output_mode") or "").strip().split())
-        for goal in authoritative_goals
-        if isinstance(goal, dict) and isinstance(goal.get("metadata"), dict)
+        " ".join(str(value or "").strip().split())
+        for value in output_modes
+        if " ".join(str(value or "").strip().split())
     }
-    output_modes.discard("")
     if not output_modes or "other" in output_modes:
         return list(capabilities)
 
@@ -508,6 +506,9 @@ def qualify_capability_catalog_for_output_modes(
         }
         hints = capability.get("hints")
         hints = hints if isinstance(hints, dict) else {}
+        semantic_type = " ".join(
+            str(hints.get("semantic_type") or "").strip().split()
+        )
         scope = capability.get("semantic_scope")
         if not isinstance(scope, dict) or not scope:
             scope = hints.get("semantic_scope")
@@ -529,7 +530,7 @@ def qualify_capability_catalog_for_output_modes(
             responsibility_type == "acquire_and_deliver_resource"
             and "information" in resource_kinds
         )
-        is_body = bool(
+        is_body = semantic_type == "body_action" or bool(
             effects.intersection(
                 {
                     "physical_motion",
@@ -573,6 +574,30 @@ def qualify_capability_catalog_for_output_modes(
         # transport/provider shape. Providers must declare the semantic scope or
         # effect that makes the capability relevant to the Goal.
     return qualified
+
+
+def qualify_capability_catalog_for_output_modes(
+    capabilities: list[dict[str, Any]],
+    *,
+    authoritative_goals: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Remove capabilities whose typed lane cannot serve any current Goal.
+
+    Goal Association already owns each Goal's provider-neutral output mode. The
+    catalog owns executable typed semantic-scope and effect metadata. Intersecting
+    those declarations prevents an information tool from becoming decorative body work,
+    or a body action from standing in for an exact vocal/media provider, without
+    inferring intent from user phrases or capability names.
+    """
+
+    output_modes = {
+        " ".join(str((goal.get("metadata") or {}).get("output_mode") or "").strip().split())
+        for goal in authoritative_goals
+        if isinstance(goal, dict) and isinstance(goal.get("metadata"), dict)
+    }
+    return qualify_capability_catalog_for_output_mode_values(
+        capabilities, output_modes=output_modes
+    )
 
 
 def qualify_capability_catalog_for_information_domains(
@@ -3297,12 +3322,12 @@ def validate_planner_social_expression_authority(
         social_only = [
             step
             for step in steps
-            if domains_by_capability.get(step.capability_id) == {"social_attention"}
+            if "social_attention" in domains_by_capability.get(step.capability_id, set())
         ]
         non_social = [
             step
             for step in steps
-            if domains_by_capability.get(step.capability_id) != {"social_attention"}
+            if "social_attention" not in domains_by_capability.get(step.capability_id, set())
         ]
         if social_only and non_social:
             raise PlannerDTOContractError(

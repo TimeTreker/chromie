@@ -2512,10 +2512,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(
             any(activity.role == "capability" for activity in advance.activities)
         )
-        self.assertIn(
-            "cannot invent an unbound Capability input",
-            advance.metadata["error"],
-        )
+        # UMI typed this as body_action, so the streaming Planner must never
+        # receive the unrelated information provider in its executable schema.
+        self.assertEqual(advance.metadata["error_type"], "ValidationError")
 
 
 
@@ -2624,7 +2623,8 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
-        self.assertEqual(advance.metadata["error_type"], "ValidationError")
+        self.assertEqual(advance.metadata["error_type"], "PlannerDTOContractError")
+        self.assertIn("already-bound input: location", advance.metadata["error"])
 
     def test_first_activity_plan_preserves_profile_context_topology(self):
         ollama = FakeOllama(

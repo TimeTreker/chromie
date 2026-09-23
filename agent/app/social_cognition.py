@@ -171,6 +171,13 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "act merely because no additional playback is useful. Acknowledging "
     "a person's reported experience is context_grounded; pre_evidence and progress_kind "
     "describe prospective Chromie task Work, not every social acknowledgement. "
+    "When context.work_failure is supplied, treat its reason as trusted cause evidence, "
+    "not as wording to quote. Explain the most specific user-relevant cause that evidence "
+    "supports, while abstracting away module/class names, activity IDs, schemas, contracts, "
+    "and internal_stage/internal_failure_class. Distinguish failure before execution from "
+    "failure during execution and from true Capability unavailability; never claim a "
+    "Capability is unavailable unless supplied facts establish that. If the supplied reason "
+    "does not support a more specific explanation, a generic failure update is acceptable. "
     "Repair means correcting a previously delivered communicative act, never a failed "
     "task or provider operation. Keep reason_summary brief. "
     "Produce the complete decision once. For genuinely unresolved reasoning, request one "
@@ -285,6 +292,21 @@ def _fresh_addressed_turn_requires_acknowledgement(
     )
 
 
+def _terminal_work_failure_requires_result_update(
+    request: SocialCognitionRequest,
+) -> bool:
+    """A terminal requested-Work failure with a result Need is not optional chatter."""
+
+    failure = request.context.get("work_failure")
+    return bool(
+        request.trigger == "work_state"
+        and isinstance(failure, dict)
+        and failure.get("status") == "failed"
+        and any(need.kind == "result" for need in request.communication_needs)
+        and not user_turn_prohibits_speech(request.context.get("user_turn_envelope"))
+    )
+
+
 def _materialize_communicative_auxiliary_anchors(raw: Any) -> Any:
     """Bind nested social expression linkage mechanically to its parent act.
 
@@ -344,7 +366,10 @@ def social_cognition_response_schema(
         })
     if deep:
         schema["properties"]["disposition"]["enum"] = ["communicate", "silence"]
-    if _fresh_addressed_turn_requires_acknowledgement(request):
+    if (
+        _fresh_addressed_turn_requires_acknowledgement(request)
+        or _terminal_work_failure_requires_result_update(request)
+    ):
         schema["properties"]["disposition"]["enum"] = [
             value
             for value in schema["properties"]["disposition"]["enum"]
@@ -593,6 +618,10 @@ def validate_social_cognition_output(
     if _fresh_addressed_turn_requires_acknowledgement(request) and output.disposition == "silence":
         raise ValueError(
             "fresh addressed turn without pending or delivered reply requires acknowledgement"
+        )
+    if _terminal_work_failure_requires_result_update(request) and output.disposition == "silence":
+        raise ValueError(
+            "terminal requested-Work failure with a result need requires a user update"
         )
     allowed = {item["capability_id"]: item for item in candidates}
     scopes = {

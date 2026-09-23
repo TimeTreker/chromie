@@ -1072,9 +1072,9 @@
       "ordinal": 2,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Stop uncommitted Planner Work, join the same turn's admitted independent SC delivery, then give the typed terminal Work-failure fact to Social Cognition for a bounded user-facing update while preserving the original failed result and authorizing no unvalidated Work. Retain secondary SC failures as diagnostics; outer cancellation still cancels delivery and propagates. Cleanup failures propagate rather than claiming success.",
+      "contract": "Stop uncommitted Planner Work, join the same turn's admitted independent SC delivery, then expose the typed terminal Work-failure fact and bounded supported cause through a runtime-owned result Need to Social Cognition for a user-facing explanation while preserving the original failed result and authorizing no unvalidated Work. Retain secondary SC failures as diagnostics; outer cancellation still cancels delivery and propagates. Cleanup failures propagate rather than claiming success.",
       "review_status": "reviewed",
-      "body_sha256": "43ea401979ae2331c1fe225d07366c7c148ae46b18a194de35d7ca98509ff629",
+      "body_sha256": "ac95bcd9bedce72614a5166dd556f3e8bc436c17f56636df4cbbe4bf73400718",
       "failure_signals": [
         "return"
       ]

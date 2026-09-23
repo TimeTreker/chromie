@@ -51,6 +51,7 @@ from .planner_validation import (
     information_acquisition_goal_ids,
     normalize_common_planner_output,
     qualify_planner_capability_payload,
+    qualify_capability_catalog_for_output_mode_values,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
     validate_goal_binding_argument_grounding,
@@ -190,6 +191,10 @@ class FastPlannerResolver:
                 capabilities = [fast_capability_payload(item, include_side_effect_free=True)
                     for item in catalog if item.available and item.interaction_executable
                     and is_planner_step_capability(item.capability_id)]
+                capabilities = qualify_capability_catalog_for_output_mode_values(
+                    capabilities,
+                    output_modes={item.output_mode for item in responsibilities},
+                )
                 if len(capabilities) > self.max_capabilities + len(loaded_ids):
                     raise PlannerDTOContractError("Common capability contracts exceed the configured context budget")
                 schema = fast_streaming_advance_response_schema(

@@ -4436,14 +4436,18 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             [step.timing for step in result.terminal_plan.steps],
             ["parallel", "parallel"],
         )
-        # Independent SC may finish despite Work rejection. Its silent result
-        # cannot dispatch the invalid Work or conceal a Host replan.
+        # Invalid Work still cannot dispatch, but terminal failure is now an
+        # explicit runtime-owned result Need. Social Cognition communicates that
+        # result instead of leaving the user with a silent failed task.
         self.assertIsNotNone(result.interaction_response)
         self.assertEqual(result.interaction_response.capabilities, [])
-        self.assertEqual(result.interaction_response.speech, [])
+        self.assertTrue(result.interaction_response.speech)
+        self.assertTrue(
+            result.interaction_response.speech[0].metadata.get("addressed_need_ids")
+        )
         self.assertEqual(
             result.interaction_response.metadata["social_cognition_resolution"]["disposition"],
-            "silence",
+            "communicate",
         )
 
     def test_goal_state_is_visible_even_when_later_activity_validation_fails(self):

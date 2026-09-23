@@ -2592,6 +2592,7 @@ class GoalDrivenRuntimeCoordinator:
         trigger: str | None = None,
         source_refs: list[str] | None = None,
         goal_ids: list[str] | None = None,
+        communication_needs: list[SocialCommunicationNeed] | None = None,
     ) -> SocialCognitionRequest:
         sid = str(work_request.sid or "")
         social_context = dict(work_request.context)
@@ -2616,6 +2617,7 @@ class GoalDrivenRuntimeCoordinator:
             responsibilities=list(work_request.responsibilities),
             meaning_uncertainties=list(work_request.meaning_uncertainties),
             source_turn=work_request.source_turn_provenance,
+            communication_needs=list(communication_needs or []),
             context=ContextAssembly.project_context({
                 **social_context, "work_decision_pending": pending,
                 **({"canonical_plan_resolution": plan.prompt_projection()} if plan is not None else {}),
@@ -2631,6 +2633,7 @@ class GoalDrivenRuntimeCoordinator:
         source_refs: list[str] | None = None,
         goal_ids: list[str] | None = None,
         work_decision_pending: bool | None = None,
+        communication_needs: list[SocialCommunicationNeed] | None = None,
     ) -> asyncio.Task[Any] | None:
         """Let a new UMI or committed Plan state invite SC without holding Work."""
         if self.policy.mode != "apply" or user_turn_prohibits_speech(work_request.context.get("user_turn_envelope")):
@@ -2643,6 +2646,7 @@ class GoalDrivenRuntimeCoordinator:
             work_request=work_request, turn_id=turn_id, plan=primary_plan,
             trigger=trigger, source_refs=source_refs, goal_ids=goal_ids,
             work_decision_pending=work_decision_pending,
+            communication_needs=communication_needs,
         )
         execution_snapshot: dict[str, Any] | None = None
         def current() -> bool:
@@ -2674,6 +2678,7 @@ class GoalDrivenRuntimeCoordinator:
                 turn_id=turn_id, plan=primary_plan,
                 trigger=trigger, source_refs=source_refs, goal_ids=goal_ids,
                 work_decision_pending=work_decision_pending,
+                communication_needs=communication_needs,
             )
             resolved = await self.resolve_social_interaction(
                 session, request=current_request, session_id=sid, snapshot_is_current=current,
@@ -4532,6 +4537,7 @@ class GoalDrivenRuntimeCoordinator:
         planning_snapshot: dict[str, Any] | None = None
         planning_commit: dict[str, Any] | None = None
         state_social_task: asyncio.Task[Any] | None = None
+        planner_refs: list[str] = []
         initial_meaning_uncertainty_count = len(work_request.meaning_uncertainties)
         post_ga_meaning_uncertainty_count = initial_meaning_uncertainty_count
         planner_waited_for_goal_continuity = False
@@ -4732,34 +4738,67 @@ class GoalDrivenRuntimeCoordinator:
                 _social_result, interaction = result
 
         async def communicate_terminal_work_failure(
-            *, stage: str, failure_class: str, failure_domain: str,
+            *, stage: str, failure_class: str, failure_domain: str, failure_reason: str,
         ) -> None:
-            """Give terminal Work failure to SC without making Host a semantic speaker."""
+            """Give terminal Work failure and its known cause to Social Cognition.
+
+            Host/runtime preserves diagnostic identity, while SC owns the user-facing
+            abstraction. A typed result Need makes terminal failure an explicit
+            communication obligation instead of an optional social update.
+            """
             nonlocal interaction
             await finish_independent_social_interaction()
             if self.policy.mode != "apply":
                 return
+            failure_reference = f"work_failure:{turn_id}:{stage}"[:200]
+            bounded_reason = " ".join(str(failure_reason or "").strip().split())[:500]
+            failed_ref_set = set(planner_refs)
+            failure_work_request = (
+                self._subset_work_request(work_request, failed_ref_set)
+                if failed_ref_set
+                else work_request.model_copy(deep=True)
+            )
             failure_context = {
-                **work_request.context,
+                **failure_work_request.context,
                 "work_failure": {
                     "status": "failed",
                     "effect_execution": "not_authorized_or_not_completed",
                     "work_decision_pending": False,
                     "failure_domain": failure_domain or "cognitive_work",
-                    # Internal stage/class remain diagnostic identity only. SC is explicitly
-                    # forbidden from exposing them as user-facing wording.
+                    "reason": bounded_reason,
+                    # Internal stage/class remain diagnostic identity only. SC may use
+                    # them to understand provenance but must not expose them verbatim.
                     "internal_stage": stage,
                     "internal_failure_class": failure_class,
                 },
             }
-            failure_request = work_request.model_copy(
+            failure_request = failure_work_request.model_copy(
                 deep=True, update={"context": failure_context},
+            )
+            failure_need = SocialCommunicationNeed(
+                need_id=communication_need_id(
+                    "runtime:" + turn_id, failure_reference
+                ),
+                owner="runtime",
+                kind="result",
+                source_responsibility_refs=[
+                    item.local_ref for item in failure_request.responsibilities
+                ],
+                reference_id=failure_reference,
+                facts={
+                    "status": "failed",
+                    "effect_execution": "not_authorized_or_not_completed",
+                    "failure_domain": failure_domain or "cognitive_work",
+                    "reason": bounded_reason,
+                },
+                delivery_phase="immediate",
             )
             failure_task = self.start_state_interaction(
                 session, work_request=failure_request, turn_id=turn_id,
                 trigger="work_state",
-                source_refs=[f"work_failure:{turn_id}:{stage}"[:200]],
+                source_refs=[failure_reference],
                 work_decision_pending=False,
+                communication_needs=[failure_need],
             )
             if failure_task is None:
                 return
@@ -5753,6 +5792,11 @@ class GoalDrivenRuntimeCoordinator:
                 stage=exc.stage,
                 failure_class=str(exc.failure_metadata.get("failure_class") or type(exc).__name__),
                 failure_domain=str(exc.failure_metadata.get("failure_domain") or "cognitive_work"),
+                failure_reason=str(
+                    exc.failure_metadata.get("reason")
+                    or exc.failure_metadata.get("error")
+                    or str(exc)
+                ),
             )
             failure_metadata = {
                 **exc.failure_metadata,
@@ -5777,7 +5821,7 @@ class GoalDrivenRuntimeCoordinator:
             await cancel_uncommitted_fast_work(type(exc).__name__)
             await communicate_terminal_work_failure(
                 stage="runtime", failure_class=type(exc).__name__,
-                failure_domain="cognitive_runtime",
+                failure_domain="cognitive_runtime", failure_reason=str(exc),
             )
             return self._finish(
                 mode=self.policy.mode,

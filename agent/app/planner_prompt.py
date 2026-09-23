@@ -784,7 +784,7 @@ def fast_advance_layered_prompt(
         "that connection in reason_summary. A valid Responsibility ref alone does not justify an "
         "unrelated Activity. Once those outcomes have their required Work, end the Activities list. "
         "Produce one complete Work DTO. No presentation wording or decoration. A Capability whose "
-        "declared behavior_domains contain only social_attention is task Work only when it realizes "
+        "declared behavior_domains contain social_attention is task Work only when it realizes "
         "its own explicitly requested Responsibility; never append it to another Responsibility as "
         "acknowledgement, politeness, personality, or decoration. SC owns optional social expression. "
         "Use role=capability for direct executable task Work: activity_id, exact capability_id, "

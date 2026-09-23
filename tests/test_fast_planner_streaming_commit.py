@@ -307,7 +307,7 @@ async def test_nod_count_binding_evidence_wrapper_is_semantically_equal_to_scala
 
 
 def _blink_social_catalog_capability() -> CatalogCapability:
-    return CatalogCapability(capability_id='soridormi.blink_eyes', agent_id='capability_agent', description='Blink as an optional visual social expression.', input_schema={'type': 'object', 'properties': {'count': {'type': 'integer', 'minimum': 1, 'default': 2}}, 'additionalProperties': False}, effects=['visual_expression'], available=True, interaction_executable=True, prompt_tier='common', behavior_domains=['social_attention'], can_run_parallel=True, parallel_metadata_declared=True, exclusive_group='visual.eyes', resource_claims=['visual.eyes'])
+    return CatalogCapability(capability_id='soridormi.blink_eyes', agent_id='capability_agent', description='Blink as an optional visual social expression.', input_schema={'type': 'object', 'properties': {'count': {'type': 'integer', 'minimum': 1, 'default': 2}}, 'additionalProperties': False}, effects=['visual_expression'], available=True, interaction_executable=True, prompt_tier='common', behavior_domains=['social_attention', 'facial_expression'], can_run_parallel=True, parallel_metadata_declared=True, exclusive_group='visual.eyes', resource_claims=['visual.eyes'])
 
 def _look_request() -> CognitiveWorkRequest:
     return CognitiveWorkRequest(sid='turn-stream-look', text='看着我三秒', language='zh-CN', responsibilities=[CognitiveResponsibilityProposal(local_ref='look', outcome='look at the addressee', output_mode='body_action', bindings={'addressee': '我'}, confidence=1.0)], interpretation_confidence=1.0, context={'active_user_target': {'source': 'live_perception', 'target_ref': 'current_speaker', 'relative_direction': 'front', 'confidence': 1.0, 'evidence_refs': ['scenario:current-speaker']}})
@@ -319,11 +319,57 @@ def _structured_resource_catalog_capability() -> CatalogCapability:
     realization = {'physical_resource_entity': {'source_entity_type': 'entity', 'planner_owned': True, 'arguments': ['resource'], 'minimum_arguments': 1, 'contract': 'Conserve the exact entity inside resource.'}, 'physical_resource_location': {'source_entity_type': 'location', 'planner_owned': True, 'arguments': ['source'], 'minimum_arguments': 1, 'contract': 'Conserve the exact location inside source.'}, 'physical_resource_distance': {'source_entity_type': 'distance', 'planner_owned': True, 'arguments': ['source'], 'minimum_arguments': 1, 'contract': 'Conserve the exact distance inside source.'}, 'physical_resource_recipient': {'source_entity_type': 'recipient', 'planner_owned': True, 'arguments': ['recipient'], 'minimum_arguments': 1, 'contract': 'Conserve the exact recipient inside recipient.'}}
     return CatalogCapability(capability_id='soridormi.acquire_and_deliver_resource', agent_id='capability_agent', description='Acquire and deliver a physical resource.', input_schema={'type': 'object', 'properties': {'resource': {'type': 'object', 'properties': {'kind': {'type': 'string', 'enum': ['physical_object']}, 'description': {'type': 'string', 'minLength': 1}}, 'required': ['kind', 'description'], 'additionalProperties': False}, 'source': {'type': 'object', 'properties': {'status': {'type': 'string', 'enum': ['known']}, 'description': {'type': 'string'}, 'bindings': {'type': 'object'}}, 'required': ['status'], 'additionalProperties': False}, 'recipient': {'type': 'object', 'properties': {'description': {'type': 'string', 'minLength': 1}}, 'required': ['description'], 'additionalProperties': False}}, 'required': ['resource', 'source', 'recipient'], 'additionalProperties': False}, effects=['physical_motion', 'resource_delivery'], available=True, interaction_executable=True, prompt_tier='common', hints={'semantic_scope': {'responsibility_type': 'acquire_and_deliver_resource', 'resource_kinds': ['physical_object']}, 'argument_realization': realization})
 
+def _weather_information_catalog_capability() -> CatalogCapability:
+    return CatalogCapability(
+        capability_id='chromie.weather.lookup',
+        agent_id='capability_agent',
+        description='Look up weather information.',
+        input_schema={
+            'type': 'object',
+            'properties': {'location': {'type': 'string'}},
+            'required': ['location'],
+            'additionalProperties': False,
+        },
+        effects=['external_grounded_information'],
+        available=True,
+        interaction_executable=True,
+        prompt_tier='common',
+        hints={
+            'semantic_scope': {
+                'domain': 'weather_forecast',
+                'responsibility_type': 'acquire_and_deliver_resource',
+                'resource_kinds': ['information'],
+            }
+        },
+    )
+
+
 def _structured_resource_request() -> CognitiveWorkRequest:
     return CognitiveWorkRequest(sid='turn-stream-resource', text='there is a bottle of milk ahead of you about 50 meters, please bring it to me', language='en-US', responsibilities=[CognitiveResponsibilityProposal(local_ref='fetch', outcome='acquire and deliver the resource', output_mode='body_action', bindings={'entity': 'bottle of milk', 'location': 'ahead of you about 50 meters', 'distance': 50, 'recipient': 'me'}, confidence=1.0)], interpretation_confidence=1.0)
 
 def _structured_resource_output(*, recipient: str='me') -> dict[str, Any]:
     return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['fetch'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.acquire_and_deliver_resource', 'activity_id': 'fetch-milk', 'args': {'resource': {'kind': 'physical_object', 'description': 'bottle of milk'}, 'source': {'status': 'known', 'description': 'ahead of you about 50 meters', 'bindings': {'distance': 50}}, 'recipient': {'description': recipient}}, 'timing': 'sequential', 'source_responsibility_refs': ['fetch']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Acquire the resource and deliver it.'}
+
+@pytest.mark.asyncio
+async def test_fast_stream_filters_incompatible_information_capability_before_generation() -> None:
+    request = _structured_resource_request()
+    model = _StreamingModel([_wire_output(_structured_resource_output())])
+    frames = [
+        frame
+        async for frame in FastPlannerResolver(
+            model,
+            _Catalog([
+                _structured_resource_catalog_capability(),
+                _weather_information_catalog_capability(),
+            ]),
+        ).stream_advance(request)
+    ]
+
+    assert isinstance(frames[-1], FastPlannerStreamTerminal)
+    schema_text = json.dumps(model.last_kwargs['response_format'], ensure_ascii=False)
+    assert 'soridormi.acquire_and_deliver_resource' in schema_text
+    assert 'chromie.weather.lookup' not in schema_text
+
 
 @pytest.mark.asyncio
 async def test_fast_planner_rejects_social_only_decoration_mixed_into_task_responsibility() -> None:

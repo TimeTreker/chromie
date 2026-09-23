@@ -530,7 +530,7 @@ def validate_fast_advance_output(
             for value in (definition.get("behavior_domains") or [])
             if str(value).strip()
         }
-        return domains == {"social_attention"}
+        return "social_attention" in domains
 
     unresolved_meaning = {
         " ".join(item.description.strip().split())

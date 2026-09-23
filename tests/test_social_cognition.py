@@ -377,6 +377,30 @@ async def test_no_capability_catalog_cannot_produce_gesture():
         await SocialCognitionResolver(model, Catalog()).resolve(request())
 
 
+def test_terminal_work_failure_result_need_cannot_choose_silence():
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+
+    need = SocialCommunicationNeed(
+        need_id="need:failure", owner="runtime", kind="result",
+        source_goal_ids=["goal:1"], reference_id="work_failure:turn:planner",
+        facts={"status": "failed", "reason": "The proposed actions were inconsistent."},
+        delivery_phase="immediate",
+    )
+    current = request(
+        communication_needs=[need],
+        context={
+            "work": [{"id": "work:1", "status": "failed"}],
+            "active_goal_snapshots": [{"goal_id": "goal:1", "status": "active"}],
+            "work_failure": {
+                "status": "failed",
+                "reason": "The proposed actions were inconsistent.",
+            },
+        },
+    )
+    schema = social_cognition_response_schema(current, [])
+    assert "silence" not in schema["properties"]["disposition"]["enum"]
+
+
 @pytest.mark.asyncio
 async def test_silence_keeps_upstream_obligations_intact():
     current = request()
@@ -1639,12 +1663,26 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
             if failure == "social":
                 raise OSError("SC service failed")
             if request.context.get("work_failure"):
+                failure_context = request.context["work_failure"]
+                expected_reason = (
+                    "planner transport failed"
+                    if failure == "planner_exception"
+                    else "Direction source missing."
+                )
+                assert failure_context["reason"] == expected_reason
+                assert len(request.communication_needs) == 1
+                need = request.communication_needs[0]
+                assert need.owner == "runtime" and need.kind == "result"
+                assert need.facts["reason"] == expected_reason
                 return SocialCognitionResolution(
                     request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
                     disposition="communicate", reason_summary="The requested Work failed before completion.",
-                    activities=[{"activity_id": "work-failed", "text": "I couldn't complete that turn.",
+                    activities=[{"activity_id": "work-failed", "text": f"I couldn't complete that turn because {expected_reason}",
                                  "function": "inform", "truth_stage": "context_grounded",
-                                 "source_responsibility_refs": ["turn"]}],
+                                 "source_responsibility_refs": ["turn"],
+                                 "addressed_need_ids": [need.need_id],
+                                 "delivery_phase": "immediate"}],
+                    need_outcomes={need.need_id: "covered"},
                 )
             return SocialCognitionResolution(
                 request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
@@ -1719,7 +1757,12 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
         else:
             assert len(submitted) == 2
             assert submitted[0].speech[0].text == "Hello!"
-            assert result.interaction_response.speech[0].text == "I couldn't complete that turn."
+            expected_reason = (
+                "planner transport failed"
+                if failure == "planner_exception"
+                else "Direction source missing."
+            )
+            assert expected_reason in result.interaction_response.speech[0].text
             assert result.interaction_response.metadata["presentation_already_dispatched"] is True
     finally:
         release_social.set()

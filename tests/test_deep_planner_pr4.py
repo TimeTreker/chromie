@@ -71,7 +71,7 @@ class PlannerSocialAuthorityValidationTests(unittest.TestCase):
             {"capability_id": "soridormi.acquire_and_deliver_resource",
              "behavior_domains": ["manipulation"]},
             {"capability_id": "soridormi.wave_hand",
-             "behavior_domains": ["social_attention"]},
+             "behavior_domains": ["social_attention", "greeting"]},
         ]
         with self.assertRaisesRegex(
             Exception, "optional social expression belongs to Social Cognition"
