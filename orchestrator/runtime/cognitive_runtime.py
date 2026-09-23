@@ -3234,21 +3234,31 @@ class GoalDrivenRuntimeCoordinator:
         UMI still authors semantic cognitive readiness. Runtime may close only hard
         architectural prerequisites of an authority UMI explicitly requested. Initial
         Planner therefore mechanically implies turn-wide Goal Association so later Work
-        can obtain canonical Goal binding. This never infers Planner, SC, or GA readiness
-        from output_mode, continuity_scope, bindings, keywords, or task classes.
+        can obtain canonical Goal binding. Runtime never creates Planner readiness from
+        output_mode, continuity_scope, bindings, keywords, or task classes; it may only
+        narrow a model-requested Planner scope by removing turn-local Responsibilities
+        that structurally cannot belong to Planner Work authority.
         """
 
         known = [item.local_ref for item in request.responsibilities]
         known_set = set(known)
+        goal_scoped = {
+            item.local_ref
+            for item in request.responsibilities
+            if item.continuity_scope == "goal"
+        }
         activation = next(
             (item for item in request.cognitive_requests if item.authority == authority),
             None,
         )
         if activation is None:
-            if authority == "goal_association" and any(
-                item.authority == "planner" for item in request.cognitive_requests
-            ):
-                return known
+            if authority == "goal_association":
+                planner = next(
+                    (item for item in request.cognitive_requests if item.authority == "planner"),
+                    None,
+                )
+                if planner is not None and set(planner.responsibility_refs).intersection(goal_scoped):
+                    return known
             return []
         unknown = set(activation.responsibility_refs) - known_set
         if unknown:
@@ -3257,6 +3267,20 @@ class GoalDrivenRuntimeCoordinator:
                 + ",".join(sorted(unknown))
             )
         selected = set(activation.responsibility_refs)
+        if authority == "planner":
+            # Planner owns Goal-bound HOW only. UMI may accidentally request it
+            # for ordinary turn-local speech, but Runtime must never widen that
+            # speech into Goal/Work authority. Narrowing an explicitly requested
+            # activation to its structurally legal scope is containment, not a
+            # new readiness decision. Standing SC still owns the turn-local reply.
+            omitted = selected - goal_scoped
+            if omitted:
+                logger.info(
+                    "cognitive_activation_scope_narrowed authority=planner "
+                    "omitted_turn_local_refs=%s",
+                    ",".join(sorted(omitted)),
+                )
+            selected.intersection_update(goal_scoped)
         return [ref for ref in known if ref in selected]
 
     @staticmethod

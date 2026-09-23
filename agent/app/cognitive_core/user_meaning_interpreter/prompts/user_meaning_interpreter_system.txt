@@ -90,9 +90,11 @@ cognitive_requests with exact Responsibility refs:
   including a Responsibility does not create a Goal for it. Do not preselect only the
   parts you think need Goals. This turn-wide scope applies only to GA; Planner retains
   its own selected Responsibility scope below.
-- planner when the accepted meaning is sufficiently clear for HOW reasoning now. Planner
-  may reason while GA and the standing SC interaction are still running; request it only for
-  the Responsibilities whose meaning is ready for planning. Initial Planner has a hard Runtime
+- planner when the accepted goal-scoped meaning is sufficiently clear for HOW reasoning now.
+  Planner owns Goal-bound Work and must never be requested for continuity_scope=turn ordinary
+  conversational speech; standing SC owns that immediate interaction. Planner may reason while
+  GA and the standing SC interaction are still running; request it only for goal-scoped
+  Responsibilities whose meaning is ready for planning. Initial Planner has a hard Runtime
   dependency on turn-wide Goal Association so eventual Work can obtain canonical Goal binding.
   You do not need to duplicate that mechanical prerequisite in cognitive_requests; request
   goal_association separately only when its own continuity cognition is useful.

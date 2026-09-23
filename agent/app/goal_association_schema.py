@@ -95,6 +95,7 @@ def goal_association_response_schema(
     responsibility_count: int | None = None,
     responsibility_refs: list[str] | None = None,
     responsibility_output_modes: dict[str, str] | None = None,
+    responsibility_continuity_scopes: dict[str, str] | None = None,
     responsibility_information_refs: set[str] | None = None,
     responsibility_bindings: dict[str, dict[str, Any]] | None = None,
     meaning_uncertainty_refs: list[str] | None = None,
@@ -125,6 +126,7 @@ def goal_association_response_schema(
     ]
     responsibility_refs = list(responsibility_refs or [])
     responsibility_output_modes = dict(responsibility_output_modes or {})
+    responsibility_continuity_scopes = dict(responsibility_continuity_scopes or {})
     responsibility_information_refs = set(
         responsibility_information_refs or set()
     )
@@ -145,12 +147,28 @@ def goal_association_response_schema(
                 for value in values
                 if str(value or "").strip() in responsibility_refs
             )
-    non_goal_eligible_refs = [
-        ref
-        for ref in responsibility_refs
-        if responsibility_output_modes.get(ref) == "speech"
-        and ref not in relation_coupled_refs
-    ]
+    # ``continuity_scope=turn`` is UMI's explicit semantic claim that the
+    # Responsibility is complete in the current interaction and leaves no
+    # canonical Goal obligation.  When live scope metadata is available, GA may
+    # inspect context but cannot attach that Responsibility to retained/new Goal
+    # identity.  Older direct schema callers that do not provide scopes keep the
+    # previous speech-based eligibility surface for compatibility with fixtures.
+    if responsibility_continuity_scopes:
+        non_goal_eligible_refs = [
+            ref
+            for ref in responsibility_refs
+            if responsibility_continuity_scopes.get(ref) == "turn"
+            and ref not in relation_coupled_refs
+        ]
+        forced_non_goal_refs = set(non_goal_eligible_refs)
+    else:
+        non_goal_eligible_refs = [
+            ref
+            for ref in responsibility_refs
+            if responsibility_output_modes.get(ref) == "speech"
+            and ref not in relation_coupled_refs
+        ]
+        forced_non_goal_refs: set[str] = set()
     meaning_uncertainty_refs = [
         " ".join(str(item or "").strip().split())
         for item in (meaning_uncertainty_refs or [])
@@ -928,8 +946,13 @@ def goal_association_response_schema(
         def non_goal_excludes(source_ref: str) -> dict[str, Any]:
             return {"not": {"contains": {"const": source_ref}}}
 
+        excluded_from_required_goals = (
+            forced_non_goal_refs
+            if responsibility_continuity_scopes
+            else set(non_goal_eligible_refs)
+        )
         required_goal_refs = [
-            ref for ref in responsibility_refs if ref not in non_goal_eligible_refs
+            ref for ref in responsibility_refs if ref not in excluded_from_required_goals
         ]
         if output_type is GoalSegmentationModelOutput:
             # Keep the old compact array contract for every Responsibility that
@@ -943,27 +966,34 @@ def goal_association_response_schema(
                     for source_ref in required_goal_refs
                 ]
             if non_goal_eligible_refs:
-                schema.setdefault("allOf", []).extend(
-                    {
-                        "oneOf": [
-                            {
-                                "properties": {
-                                    "new_goals": contains_source_ref(source_ref),
-                                    "non_goal_responsibility_refs": non_goal_excludes(source_ref),
-                                },
-                                "required": ["new_goals"],
+                for source_ref in non_goal_eligible_refs:
+                    if source_ref in forced_non_goal_refs:
+                        schema.setdefault("allOf", []).append({
+                            "properties": {
+                                "new_goals": excludes_source_ref(source_ref),
+                                "non_goal_responsibility_refs": non_goal_contains(source_ref),
                             },
-                            {
-                                "properties": {
-                                    "new_goals": excludes_source_ref(source_ref),
-                                    "non_goal_responsibility_refs": non_goal_contains(source_ref),
+                            "required": ["new_goals", "non_goal_responsibility_refs"],
+                        })
+                    else:
+                        schema.setdefault("allOf", []).append({
+                            "oneOf": [
+                                {
+                                    "properties": {
+                                        "new_goals": contains_source_ref(source_ref),
+                                        "non_goal_responsibility_refs": non_goal_excludes(source_ref),
+                                    },
+                                    "required": ["new_goals"],
                                 },
-                                "required": ["new_goals", "non_goal_responsibility_refs"],
-                            },
-                        ]
-                    }
-                    for source_ref in non_goal_eligible_refs
-                )
+                                {
+                                    "properties": {
+                                        "new_goals": excludes_source_ref(source_ref),
+                                        "non_goal_responsibility_refs": non_goal_contains(source_ref),
+                                    },
+                                    "required": ["new_goals", "non_goal_responsibility_refs"],
+                                },
+                            ]
+                        })
                 # ``decision`` is legacy wire compatibility only. The
                 # ownership collections above are the complete semantic result.
                 # Do not add a second cross-field authority here.
@@ -972,6 +1002,19 @@ def goal_association_response_schema(
             # two-way conservation for substantive refs. Eligible ordinary speech
             # gets a third explicit non_goal alternative.
             for source_ref in responsibility_refs:
+                if source_ref in forced_non_goal_refs:
+                    schema.setdefault("allOf", []).append({
+                        "properties": {
+                            "associations": excludes_source_ref(source_ref),
+                            "new_goals": excludes_source_ref(source_ref),
+                            "non_goal_responsibility_refs": non_goal_contains(source_ref),
+                        },
+                        "required": [
+                            "associations", "new_goals",
+                            "non_goal_responsibility_refs",
+                        ],
+                    })
+                    continue
                 alternatives = [
                     {
                         "properties": {

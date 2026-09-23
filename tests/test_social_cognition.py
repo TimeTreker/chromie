@@ -1410,11 +1410,15 @@ def test_terminal_fast_limitation_establishes_exact_result_need(disposition):
     assert need.facts["disposition"] == disposition
 
 
-@pytest.mark.parametrize('stage,kind,valid', [
-    ('pre_evidence', None, False), ('pre_evidence', 'acknowledge_work', True),
-    ('context_grounded', None, True), ('context_grounded', 'acknowledge_work', False),
+@pytest.mark.parametrize('stage,kind,schema_valid,dto_valid', [
+    ('pre_evidence', None, False, False),
+    ('pre_evidence', 'acknowledge_work', True, True),
+    # Generic DTO permits a context-grounded acknowledgement, but the dynamic
+    # interpretation-ingress schema now rejects it for non-speech task Work.
+    ('context_grounded', None, False, True),
+    ('context_grounded', 'acknowledge_work', False, False),
 ])
-def test_decoder_enforces_the_existing_progress_kind_contract(stage, kind, valid):
+def test_decoder_enforces_the_existing_progress_kind_contract(stage, kind, schema_valid, dto_valid):
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
     current = request(trigger='interpretation', source_turn={'original_text': 'Please check the forecast.'},
                       responsibilities=[CognitiveResponsibilityProposal(local_ref='r1', outcome='check forecast',
@@ -1423,8 +1427,8 @@ def test_decoder_enforces_the_existing_progress_kind_contract(stage, kind, valid
     if kind is not None:
         raw['activities'][0]['progress_kind'] = kind
     schema = social_cognition_response_schema(current, [])
-    assert Draft202012Validator(schema).is_valid(raw) is valid
-    if valid:
+    assert Draft202012Validator(schema).is_valid(raw) is schema_valid
+    if dto_valid:
         SocialCommunicativeAct.model_validate(raw['activities'][0])
     else:
         with pytest.raises(ValueError):
@@ -2152,3 +2156,137 @@ def test_social_model_context_compacts_redundant_mind_without_losing_social_self
     assert len(json.dumps(projected, ensure_ascii=False)) < len(
         json.dumps(mind, ensure_ascii=False)
     ) * 0.75
+
+
+def test_interpretation_prompt_keeps_current_turn_foreground_and_hides_unbound_goal_memory():
+    from agent.app.social_cognition import social_cognition_prompt
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    current = request(
+        trigger="interpretation",
+        source_refs=["turn:joke"],
+        goal_ids=[],
+        source_turn={"turn_id": "turn:joke", "original_text": "Tell me a joke."},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="tell a joke", output_mode="speech",
+            continuity_scope="turn", confidence=1.0,
+        )],
+        context={
+            "active_goal_snapshots": [{
+                "goal_id": "goal-weather",
+                "description": "Determine tomorrow's weather in Chongqing.",
+            }],
+            "working_goal_memory": [{
+                "goal_id": "goal-weather",
+                "description": "Determine tomorrow's weather in Chongqing.",
+            }],
+            "long_term_goal_memory": [{
+                "goal_id": "goal-weather",
+                "summary": "Tomorrow weather in Chongqing.",
+            }],
+            "work_decision_pending": False,
+            "interaction_context": {
+                "events": [], "already_spoken": [], "pending_speech": [],
+                "prior_delivered_speech": [{
+                    "turn_id": "old-weather-turn",
+                    "text": "I said I would check the weather.",
+                    "metadata": {"communicative_activity_ids": ["old-act"]},
+                }],
+            },
+        },
+    )
+    prompt = social_cognition_prompt(current, [], num_ctx=8192)
+    assert "tell a joke" in prompt
+    assert "I said I would check the weather" in prompt
+    assert "goal-weather" not in prompt
+    assert "Determine tomorrow's weather in Chongqing" not in prompt
+    assert "working_goal_memory" not in prompt
+    assert "long_term_goal_memory" not in prompt
+
+
+def test_interpretation_non_speech_task_cannot_inform_result_before_planner_or_evidence():
+    from agent.app.social_cognition import validate_social_cognition_output
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    current = request(
+        trigger="interpretation",
+        source_refs=["turn:weather"],
+        goal_ids=[],
+        source_turn={"turn_id": "turn:weather", "original_text": "Will it rain tomorrow?"},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="determine whether it will rain tomorrow",
+            output_mode="information", continuity_scope="goal", confidence=1.0,
+        )],
+        context={"work_decision_pending": True, "interaction_context": {
+            "events": [], "already_spoken": [], "pending_speech": [], "prior_delivered_speech": [],
+        }},
+    )
+    wrong = SocialCognitionOutput.model_validate({
+        "disposition": "communicate",
+        "activities": [{
+            "activity_id": "weather-result",
+            "text": "According to the latest forecast, it will rain.",
+            "function": "inform",
+            "truth_stage": "context_grounded",
+            "source_responsibility_refs": ["r1"],
+        }],
+        "reason_summary": "Premature result.",
+        "need_outcomes": {},
+    })
+    with pytest.raises(ValueError, match="task result cannot be communicated"):
+        validate_social_cognition_output(wrong, current, [])
+
+    acknowledgement = SocialCognitionOutput.model_validate({
+        "disposition": "communicate",
+        "activities": [{
+            "activity_id": "weather-ack",
+            "text": "I'll check that.",
+            "function": "acknowledge",
+            "truth_stage": "pre_evidence",
+            "progress_kind": "check_information",
+            "source_responsibility_refs": ["r1"],
+        }],
+        "reason_summary": "Acknowledge the request without claiming a result.",
+        "need_outcomes": {},
+    })
+    validate_social_cognition_output(acknowledgement, current, [])
+
+
+def test_interpretation_schema_rejects_non_speech_context_grounded_inform():
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    current = request(
+        trigger="interpretation",
+        source_refs=["turn:weather"],
+        goal_ids=[],
+        source_turn={"turn_id": "turn:weather", "original_text": "Will it rain tomorrow?"},
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="determine whether it will rain tomorrow",
+            output_mode="information", continuity_scope="goal", confidence=1.0,
+        )],
+        context={"work_decision_pending": True, "interaction_context": {
+            "events": [], "already_spoken": [], "pending_speech": [], "prior_delivered_speech": [],
+        }},
+    )
+    schema = social_cognition_response_schema(current, [])
+    wrong = {
+        "disposition": "communicate",
+        "activities": [{
+            "activity_id": "weather-result",
+            "text": "According to the latest forecast, it will rain.",
+            "function": "inform",
+            "truth_stage": "context_grounded",
+            "source_responsibility_refs": ["r1"],
+            "source_goal_ids": [],
+            "evidence_refs": [],
+            "addressed_need_ids": [],
+            "repair_of_activity_ids": [],
+            "auxiliary_activities": [],
+        }],
+        "reason_summary": "Premature result.",
+        "need_outcomes": {},
+        "memory_candidates": [],
+        "self_memory_candidates": [],
+    }
+    assert list(Draft202012Validator(schema).iter_errors(wrong))

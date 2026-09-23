@@ -364,3 +364,56 @@ async def test_goal_scoped_meaning_does_not_wake_planner_without_model_request()
     assert agent.planner_calls == 0
     assert result.metadata["planner_not_requested_by_umi"] is True
     assert len(agent.social_requests) == 1
+
+
+def test_runtime_drops_turn_local_refs_from_model_requested_planner_scope() -> None:
+    request = CognitiveWorkRequest(
+        sid="turn-local-planner-scope",
+        text="Tell me a joke.",
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1",
+            outcome="tell a joke",
+            output_mode="speech",
+            continuity_scope="turn",
+            confidence=1.0,
+        )],
+        cognitive_requests=[{
+            "authority": "planner",
+            "responsibility_refs": ["r1"],
+            "reason_summary": "The small model incorrectly requested Planner.",
+        }],
+    )
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
+        request, "planner"
+    ) == []
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
+        request, "goal_association"
+    ) == []
+
+
+def test_runtime_preserves_goal_scoped_refs_when_narrowing_planner_scope() -> None:
+    request = CognitiveWorkRequest(
+        sid="mixed-planner-scope",
+        text="Tell me a joke, then bring the cup.",
+        responsibilities=[
+            CognitiveResponsibilityProposal(
+                local_ref="r1", outcome="tell a joke", output_mode="speech",
+                continuity_scope="turn", confidence=1.0,
+            ),
+            CognitiveResponsibilityProposal(
+                local_ref="r2", outcome="bring the cup", output_mode="body_action",
+                body_effect_family="task_physical_effect", continuity_scope="goal", confidence=1.0,
+            ),
+        ],
+        cognitive_requests=[{
+            "authority": "planner",
+            "responsibility_refs": ["r1", "r2"],
+            "reason_summary": "Plan only the Goal-owned work.",
+        }],
+    )
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
+        request, "planner"
+    ) == ["r2"]
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
+        request, "goal_association"
+    ) == ["r1", "r2"]

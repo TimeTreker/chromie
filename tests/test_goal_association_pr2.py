@@ -9,6 +9,8 @@ import copy
 import json
 import unittest
 
+import pytest
+
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
@@ -3011,3 +3013,81 @@ class GoalAssociationRepairPreservationTests(unittest.TestCase):
                 self.assertEqual(result.new_goals, [])
                 self.assertEqual(len(model.prompts), 1)
                 self.assertEqual(raw, before)
+
+
+def test_turn_local_speech_is_forced_non_goal_even_with_active_weather_goal():
+    retained = active_goal(
+        "goal-weather",
+        "Determine tomorrow's weather in Chongqing.",
+    )
+    schema = ga_schema.goal_association_response_schema(
+        GoalAssociationModelOutput,
+        [retained],
+        [],
+        responsibility_count=1,
+        responsibility_refs=["r1"],
+        responsibility_output_modes={"r1": "speech"},
+        responsibility_continuity_scopes={"r1": "turn"},
+    )
+    validator = Draft202012Validator(schema)
+    wrong = {
+        "associations": [{
+            "relationship": "continue",
+            "source_responsibility_refs": ["r1"],
+            "target_goal_ids": ["goal-weather"],
+            "confidence": 1.0,
+        }],
+        "new_goals": [],
+        "non_goal_responsibility_refs": [],
+        "referent_updates": [],
+        "resolved_references": [],
+        "cognitive_requests": [],
+        "confidence": 1.0,
+        "reason_summary": "The active weather Goal is unrelated to the current joke request.",
+    }
+    assert not validator.is_valid(wrong)
+
+    correct = {
+        **wrong,
+        "associations": [],
+        "non_goal_responsibility_refs": ["r1"],
+        "reason_summary": "The current conversational Responsibility is independent.",
+    }
+    assert validator.is_valid(correct)
+
+
+def test_ga_materialization_rejects_turn_local_goal_ownership():
+    retained = active_goal(
+        "goal-weather",
+        "Determine tomorrow's weather in Chongqing.",
+    )
+    req = CognitiveWorkRequest(
+        sid="sid-turn-local-weather",
+        text="Tell me a joke.",
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1",
+            outcome="tell a joke",
+            output_mode="speech",
+            continuity_scope="turn",
+            confidence=1.0,
+        )],
+        context={"active_goal_snapshots": [retained], "history": []},
+    )
+    wrong = GoalAssociationModelOutput.model_validate({
+        "associations": [{
+            "relationship": "continue",
+            "source_responsibility_refs": ["r1"],
+            "target_goal_ids": ["goal-weather"],
+            "confidence": 1.0,
+        }],
+        "new_goals": [],
+        "non_goal_responsibility_refs": [],
+        "referent_updates": [],
+        "resolved_references": [],
+        "cognitive_requests": [],
+        "confidence": 1.0,
+        "reason_summary": "Incorrectly attach the new joke request to weather.",
+    })
+    resolver = GoalAssociationResolver(FakeOllama({}))
+    with pytest.raises(ValueError, match="turn-local Responsibility cannot acquire canonical Goal identity"):
+        asyncio.run(resolver._materialize_primary_output(wrong, request=req, turn_id="turn"))

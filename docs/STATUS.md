@@ -1,5 +1,32 @@
 # Chromie Current Status
 
+## Foreground-turn continuity containment — 2026-09-24
+
+RTX4090/Qwen3.5-4B debug bundle `chromie_debug_bundle_20260924_003802.tar.gz`
+reproduced a cross-turn topic-capture defect that predates the working-conversation and
+tiered-memory patches. UMI correctly understood independent current turns such as
+`can you speak chinese?` and `can me tell me a joke?`, but standing SC consumed the
+unbound active weather Goal as if it were current-turn authority, while GA still allowed
+ordinary turn-local speech to attach to that Goal. The first weather turn also showed an
+earlier truth-stage defect: interpretation-time SC announced a forecast before trusted
+weather Evidence existed.
+
+Source repair makes accepted current-turn Responsibilities foreground: initial SC omits
+broad unbound Goal/Work memory while retaining prior delivered speech; non-speech task
+interaction is pre-Evidence acknowledgement-only; `continuity_scope=turn` is forced
+`non_goal` by the live GA schema and deterministic materialization; and Runtime may narrow
+an explicitly model-requested Planner scope by removing turn-local Responsibilities that
+cannot own Work. Goal-scoped continuation/refinement still reaches GA normally, so this
+does not disable multi-turn task continuity.
+
+Focused GA/turn-local/SC regressions pass **277 tests / 107 subtests**. Expanded
+UMI/GA/SC/Runtime/Fast/Deep/conversation-state regressions pass **727 tests / 564
+subtests**, with two existing FastAPI deprecation warnings. This is source-level
+containment only; the exact live weather→doubt→language-switch→joke sequence still needs
+current-revision target qualification. A separate remaining question is whether UMI/GA
+requests Planner often enough for an information Goal to actually perform the weather
+lookup; this patch intentionally does not infer Planner readiness from task type.
+
 ## Standing initial Social Cognition scheduling — 2026-09-23
 
 A live RTX4090/Qwen3.5-4B weather turn twice preserved understandable WHAT but omitted

@@ -1,6 +1,26 @@
 # Chromie Development Checkpoint
 
-Updated 2026-09-23. Audience: the owner and the next development session.
+## Foreground-turn containment patch pending application — 2026-09-24
+
+Current base is owner-applied `main` revision `1e10bc825cee8d72a1f139b25a82e3492edc75b8`
+(after working conversational context and tiered Memory/Goal residency). The retained
+RTX4090 bundle `chromie_debug_bundle_20260924_003802.tar.gz` proves the reported
+weather-topic fixation predates those two Memory patches. UMI preserved the new utterance
+meaning; the earliest wrong boundaries were interpretation-time SC treating unbound active
+Goal state as current-turn authority and GA permitting turn-local conversational speech to
+acquire old Goal identity. The initial weather turn additionally exposed premature
+SC task-result speech before trusted Evidence.
+
+The pending source patch makes current accepted Responsibilities foreground, hides broad
+unbound Goal/Work state from initial SC, restricts initial non-speech task communication to
+pre-Evidence acknowledgement, forces `continuity_scope=turn` to GA `non_goal`, and narrows
+illegal turn-local Planner activation without inventing Planner readiness. Focused
+validation is 277/277 tests plus 107 subtests; expanded cognition/runtime validation is
+727/727 tests plus 564 subtests. Resume by running repository policy/full/docs gates, then
+live-test weather → doubt → Chinese/language question → joke and verify the old weather Goal
+remains background rather than capturing independent turns.
+
+Updated 2026-09-24. Audience: the owner and the next development session.
 This is the current resume point; [Status](docs/STATUS.md) owns implementation/evidence
 claims, [Roadmap](ROADMAP.md) owns delivery order, and [Handoff](HANDOFF.md) owns volatile
 identities, retained artifacts and commands. Earlier snapshots remain in Git history.

@@ -1,6 +1,30 @@
 # Chromie Handoff
 
-Updated 2026-09-23. Audience: the owner and next development session. This file owns
+## Foreground-turn continuity containment — pending application 2026-09-24
+
+Base revision: `1e10bc825cee8d72a1f139b25a82e3492edc75b8` on `main`, including the
+owner-applied working-conversation and tiered-memory patches. Reproducer:
+`chromie_debug_bundle_20260924_003802.tar.gz` / `Pasted text.txt`. The episode starts
+with a weather Goal, then independent turns (`can you speak chinese?`, `can me tell me a
+joke?`) are correctly understood by UMI but are overridden downstream by retained weather
+state. The initial weather SC also speaks an unverified forecast before any weather
+Capability/Evidence transaction.
+
+Pending patch repairs four boundaries: current UMI meaning is foreground; initial SC does
+not receive broad unbound Goal/Work memory; turn-local speech is mechanically GA `non_goal`;
+and Runtime drops turn-local refs from an accidentally requested Planner activation. Initial
+non-speech task SC is pre-Evidence acknowledgement-only. Do not weaken these guards to make
+the old episode pass. Goal-scoped refinements such as `add ice to it` remain eligible for
+normal GA continuity against working/long-term Goal candidates.
+
+Retained local source validation: focused **277 tests + 107 subtests**; expanded
+**727 tests + 564 subtests**; two existing FastAPI warnings. After applying, run the
+canonical repository gate where the full benchmark fixture archive is available, then rerun
+the exact weather sequence. Do not claim the weather lookup itself is fixed unless Planner
+actually schedules the weather Capability and trusted Evidence returns; this patch fixes
+topic capture and premature result speech, not model-driven Planner activation policy.
+
+Updated 2026-09-24. Audience: the owner and next development session. This file owns
 volatile identities, evidence paths and resume commands. [Checkpoint](DEVELOPMENT_CHECKPOINT.md)
 owns priorities; [Status](docs/STATUS.md) owns claim limits. This is the owner-requested
 delivery handoff; resume from the latest `main` commit containing this file.

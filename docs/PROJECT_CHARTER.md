@@ -104,14 +104,22 @@ architecture/terminology freeze; it does not close #24/#32 or authorize a releas
 | Host / Runtime / Providers | Admission, privacy, authorization, safety, compute/execution scheduling, exact lifecycle and Evidence | Deciding which semantic cognition is needed, ordinary semantic communication, or action selection |
 
 Social Cognition consumes one bounded, versioned view of existing truth: complete
-accepted UMI meaning and read-only source provenance; the current Goal overview
-and relevant Goal detail; queued/running/blocked/terminal Work; qualified Evidence
+accepted UMI meaning and read-only source provenance; Goal/Work state only when it is already
+bound to the current cognitive opportunity; queued/running/blocked/terminal Work; qualified Evidence
 and applicable capability/confirmation facts; recent admitted dialogue; generated,
 queued, started, completed, interrupted and failed delivery records; Stable Mind;
 and relevant disclosure-safe Memory and Situation. A broad read-only Goal overview
 does not grant authority over unrelated Goals. Required facts must not be silently
 truncated to meet a fast budget. Memory, Goal, Work and Interaction stores retain
 their existing owners; two inference sessions do not create two conversations.
+
+A fresh interpretation-triggered SC invocation treats the accepted current UMI Responsibility as
+foreground. Before GA has bound that Responsibility, broad active/working/long-term Goal memory is
+not model-facing social authority and is omitted from that invocation; prior delivered speech remains
+available for conversational repair. For non-speech task Responsibilities, interpretation-ingress SC
+may acknowledge only pre-evidence receipt/progress and cannot state a task result before Planner or
+trusted Evidence establishes one. Later Goal/Work/Evidence-triggered SC receives the exact bound
+state it needs.
 
 One accepted UMI result carries explicit `cognitive_requests[]` only for non-standing
 cognition whose usefulness depends on the accepted meaning: Goal Association and Planner,
@@ -122,12 +130,17 @@ anything. Initial SC activation is therefore Runtime scheduling, not a UMI seman
 choice, and UMI omission of an SC request cannot invalidate otherwise accepted meaning. Fast
 Planner activation remains model-selected. Runtime may close only a hard architectural
 prerequisite of an explicitly requested authority; in particular, initial Planner mechanically
-schedules turn-wide GA so eventual Work can obtain canonical Goal binding. That dependency
-closure is scheduling, not another semantic cognitive-activation decision. Runtime does not
-recreate GA/Planner readiness from `continuity_scope`, `output_mode`, bindings, keywords, or
-task classes. `continuity_scope` remains semantic ownership evidence and is not a routing
-flag. Optional communication does not gate already-requested planning or safe dispatch, and
-Work completion does not gate an already-grounded conversational answer.
+schedules turn-wide GA so eventual Work can obtain canonical Goal binding. Runtime never creates
+Planner readiness from `continuity_scope`, `output_mode`, bindings, keywords, or task classes,
+but it does contain an explicitly requested Planner activation to structurally legal Goal-scoped
+Responsibilities; turn-local conversational speech cannot acquire Planner Work authority. That
+dependency/scope closure is scheduling and authority containment, not another semantic cognitive-
+activation decision. `continuity_scope=turn` is UMI's explicit claim that the current conversational
+Responsibility is complete in the interaction and leaves no canonical Goal obligation; GA therefore
+classifies it `non_goal` and cannot attach it to retained/new Goal identity. Expressions that truly
+continue, change, cancel, resume, refine, or otherwise require retained Goal continuity are
+`continuity_scope=goal`. Optional communication does not gate already-requested planning or safe
+dispatch, and Work completion does not gate an already-grounded conversational answer.
 Not every turn requires GA and Planner in addition to the standing initial SC call. Missing canonical Goal identity alone does not
 block a source-grounded Communicative Act. Understanding, cognitive activation, planning
 readiness, canonical continuity, commitment, execution and verified completion remain

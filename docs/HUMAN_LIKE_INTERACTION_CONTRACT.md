@@ -50,6 +50,30 @@ Delayed communication must be checked against newer task and delivery state so
 an outdated promise cannot follow a completed result. A communication failure
 cannot erase completed Work or invite a Host-authored task-result sentence.
 
+## Foreground turn versus retained Goal context
+
+The complete accepted UMI Responsibilities for the current admitted turn are the
+foreground semantic truth for that interaction. Recent dialogue, working Memory,
+long-term Memory, active/recoverable Goals, and prior delivery records are context for
+understanding and continuity; they are not permission to replace a clear new
+Responsibility with an older Goal merely because that Goal is active, recent, or the
+only candidate.
+
+`continuity_scope=turn` is the explicit UMI boundary for ordinary current-conversation
+speech that leaves no canonical Goal obligation. Goal Association must classify such a
+Responsibility as `non_goal`; it cannot attach it to, create, modify, cancel, resume, or
+supersede a canonical Goal. An utterance that truly continues, refines, corrects,
+cancels, resumes, or otherwise changes retained task meaning is instead goal-scoped at
+the UMI WHAT boundary before GA chooses canonical identity.
+
+Standing interpretation-time Social Cognition sees the current accepted Responsibilities
+and prior delivered interaction, but broad unbound Goal/Work memory is withheld until
+GA/Planner/Runtime supplies exact current-turn binding. For a non-speech task at this
+early stage, SC may acknowledge receipt or intended checking only as `pre_evidence`; it
+must not state or repeat a task result until Planner/Evidence establishes that result.
+This preserves human conversational continuity without letting background work capture a
+new topic.
+
 The [target lifecycle](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle)
 and [acceptance matrix](ACCEPTANCE.md#social-cognition-acceptance) own migration
 and proof. SC owns ordinary turn and result interaction in the implementation.

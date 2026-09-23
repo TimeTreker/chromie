@@ -123,12 +123,15 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "you actually have. Host protective controls suppress SC before inference when interaction "
     "must remain silent. Duplicate pending/delivered interaction may still suppress another "
     "acknowledgement. "
-    "At interpretation ingress ordinary output_mode=speech may be answered directly from "
-    "supplied conversational context while Goal Association independently checks whether the "
-    "same turn carries retained Goal continuity. That immediate reply does not create, erase, "
-    "or decide a Goal relationship. Non-speech task Responsibilities still have an independent "
-    "Work decision pending, so do not answer that task or invent an input question before that "
-    "decision. Silence remains valid when no useful interaction or supplied-need accounting "
+    "At interpretation ingress the accepted current UMI Responsibility is foreground. Retained "
+    "Goals and old Work are not authority to replace it with a previous topic. Ordinary "
+    "output_mode=speech may be answered directly from supplied conversational context while Goal "
+    "Association independently checks canonical continuity. That immediate reply does not create, "
+    "erase, or decide a Goal relationship. Non-speech task Responsibilities still have an "
+    "independent Work decision pending: before Planner/Evidence establishes task facts, any act "
+    "about that Responsibility is acknowledgement-only, truth_stage=pre_evidence, and may claim "
+    "only receipt/understanding or that checking/Work is pending. Never state or repeat a task "
+    "result at interpretation ingress. Silence remains valid when no useful interaction or supplied-need accounting "
     "is due. An already pending/delivered reply suppresses extra playback, not the exact-act "
     "accounting required for a supplied need. Never invent a task just to create "
     "an interaction need. "
@@ -555,13 +558,18 @@ def social_cognition_response_schema(
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": question_branches}
     if request.trigger == "interpretation" and not request.communication_needs:
         # Native decoding must see the same semantic boundary as Host validation.
-        # Ordinary speech can be answered directly while GA independently checks
-        # continuity. Non-speech task content remains acknowledgement-only until
-        # Planner establishes a communication need.
+        # Ordinary speech can be answered directly.  Non-speech task content has
+        # no established result yet, so it may only receive a pre-evidence
+        # acknowledgement/nonverbal act until Planner/Evidence establishes facts.
         direct_speech_refs = sorted(
             item.local_ref
             for item in request.responsibilities
             if item.output_mode == "speech"
+        )
+        task_refs = sorted(
+            item.local_ref
+            for item in request.responsibilities
+            if item.output_mode != "speech"
         )
         existing = schema["$defs"]["SocialCommunicativeAct"]
         continuity_branches = []
@@ -571,12 +579,16 @@ def social_cognition_response_schema(
                 value for value in function.get("enum", [function.get("const")])
                 if value is not None
             ]
-            direct = [value for value in functions if value in {"respond", "ask"}]
-            other = [value for value in functions if value not in {"respond", "ask"}]
-            if other:
-                variant = copy.deepcopy(branch)
-                variant["properties"]["function"] = {"type": "string", "enum": other}
-                continuity_branches.append(variant)
+            direct = [value for value in functions if value not in {"acknowledge", "nonverbal"}]
+            acknowledgement = [value for value in functions if value in {"acknowledge", "nonverbal"}]
+            if acknowledgement:
+                stage_contract = branch["properties"].get("truth_stage", {})
+                stage_values = stage_contract.get("enum", [stage_contract.get("const")])
+                if not task_refs or "pre_evidence" in stage_values:
+                    variant = copy.deepcopy(branch)
+                    properties = variant["properties"]
+                    properties["function"] = {"type": "string", "enum": acknowledgement}
+                    continuity_branches.append(variant)
             if direct and direct_speech_refs:
                 variant = copy.deepcopy(branch)
                 properties = variant["properties"]
@@ -660,19 +672,38 @@ def validate_social_cognition_output(
         "addressed_need_ids": {item.need_id for item in request.communication_needs},
     }
     for act in output.activities:
-        if request.trigger == "interpretation" and not request.communication_needs and act.function in {"respond", "ask"}:
+        if request.trigger == "interpretation" and not request.communication_needs:
             direct_speech_refs = {
                 item.local_ref
                 for item in request.responsibilities
                 if item.output_mode == "speech"
             }
+            task_refs = {
+                item.local_ref
+                for item in request.responsibilities
+                if item.output_mode != "speech"
+            }
             cited_refs = set(act.source_responsibility_refs)
-            if not cited_refs or not cited_refs.issubset(direct_speech_refs):
-                raise ValueError(
-                    "interpretation-triggered respond/ask cannot fulfill an unestablished "
-                    "Work communication need unless it cites only ordinary speech "
-                    "Responsibility provenance"
-                )
+            if act.function not in {"acknowledge", "nonverbal"}:
+                if not cited_refs or not cited_refs.issubset(direct_speech_refs):
+                    raise ValueError(
+                        "interpretation-triggered task result cannot be communicated before "
+                        "Planner/Evidence establishes it; only ordinary speech Responsibilities "
+                        "may receive a direct response"
+                    )
+            if cited_refs.intersection(task_refs):
+                if act.function not in {"acknowledge", "nonverbal"}:
+                    raise ValueError(
+                        "non-speech task Responsibility is acknowledgement-only at interpretation ingress"
+                    )
+                if act.truth_stage != "pre_evidence":
+                    raise ValueError(
+                        "non-speech task acknowledgement must remain pre_evidence at interpretation ingress"
+                    )
+                if act.function == "acknowledge" and act.progress_kind is None:
+                    raise ValueError(
+                        "pre-evidence task acknowledgement requires progress_kind"
+                    )
         for name, values in scopes.items():
             if not set(getattr(act, name)).issubset(values):
                 raise ValueError(f"Social Cognition widened {name}")
@@ -779,7 +810,7 @@ def _social_mind_projection(context: dict[str, Any]) -> dict[str, Any]:
 
 
 def _social_model_context(
-    context: dict[str, Any], *, source_turn_id: str = "",
+    context: dict[str, Any], *, source_turn_id: str = "", trigger: str = "",
 ) -> dict[str, Any]:
     projected = copy.deepcopy(context)
     if "mind" in projected:
@@ -810,6 +841,24 @@ def _social_model_context(
     # compete with the social decision. The trusted request still retains it.
     projected.pop("user_turn_envelope", None)
     projected.pop("user_turn_schema_version", None)
+    if trigger == "interpretation":
+        # Standing SC runs before GA has bound the current Responsibility to any
+        # canonical Goal.  Broad retained Goal/Work state is therefore background
+        # continuity evidence, not current-turn social authority.  UMI has already
+        # used that context to produce complete current meaning, and the interaction
+        # ledger still carries prior delivered speech for conversational repair.
+        # Remove unbound retained task state so a stale active Goal cannot replace
+        # the foreground accepted Responsibility (for example weather -> joke).
+        for key in (
+            "active_goal_snapshots", "recent_goal_snapshots",
+            "working_goal_memory", "long_term_goal_memory",
+            "user_meaning_goal_context", "goal_association_candidates",
+            "active_pending_tasks", "active_task_contexts",
+            "active_task_snapshots", "task_contexts", "current_task_context",
+            "goal_association_resolution", "planner_context",
+            "canonical_plan_resolution", "source_canonical_plan",
+        ):
+            projected.pop(key, None)
     for key in ("canonical_plan_resolution", "source_canonical_plan"):
         if key in projected:
             projected[key] = _social_plan_facts(projected[key])
@@ -858,7 +907,9 @@ def social_cognition_prompt(
 ) -> str:
     payload = request.model_dump(mode="json")
     payload["context"] = _social_model_context(
-        payload.get("context", {}), source_turn_id=str(request.source_turn.get("turn_id") or ""),
+        payload.get("context", {}),
+        source_turn_id=str(request.source_turn.get("turn_id") or ""),
+        trigger=request.trigger,
     )
     # Empty external Needs are not a social fact and previously became a false
     # silence cue in native inference. Non-empty Needs remain complete.

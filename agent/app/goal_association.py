@@ -188,6 +188,10 @@ class GoalAssociationResolver:
                 for item in request.responsibilities
                 if item.output_mode != "unspecified"
             },
+            responsibility_continuity_scopes={
+                item.local_ref: item.continuity_scope
+                for item in request.responsibilities
+            },
             responsibility_information_refs={
                 item.local_ref
                 for item in request.responsibilities
@@ -523,12 +527,38 @@ class GoalAssociationResolver:
         invalid_non_goal = sorted(
             ref
             for ref in non_goal_refs
-            if by_ref[ref].output_mode != "speech" or ref in relation_coupled_refs
+            if by_ref[ref].output_mode != "speech"
+            or by_ref[ref].continuity_scope != "turn"
+            or ref in relation_coupled_refs
         )
         if invalid_non_goal:
             raise ValueError(
-                "non_goal requires ordinary relation-free conversational speech: "
+                "non_goal requires ordinary turn-local relation-free conversational speech: "
                 + ",".join(invalid_non_goal)
+            )
+        turn_local_refs = {
+            ref for ref, item in by_ref.items() if item.continuity_scope == "turn"
+        }
+        goal_owned_refs = {
+            ref
+            for association in getattr(model_output, "associations", [])
+            for ref in association.source_responsibility_refs
+        } | {
+            ref
+            for goal in model_output.new_goals
+            for ref in goal.source_responsibility_refs
+        }
+        illegal_turn_goal_refs = sorted(turn_local_refs.intersection(goal_owned_refs))
+        if illegal_turn_goal_refs:
+            raise ValueError(
+                "turn-local Responsibility cannot acquire canonical Goal identity: "
+                + ",".join(illegal_turn_goal_refs)
+            )
+        missing_turn_non_goal = sorted(turn_local_refs - set(non_goal_refs))
+        if missing_turn_non_goal:
+            raise ValueError(
+                "turn-local Responsibility must remain non_goal after GA continuity inspection: "
+                + ",".join(missing_turn_non_goal)
             )
         model_output = model_output.model_copy(update={"new_goals": [
             item.model_copy(update={"output_mode": (
