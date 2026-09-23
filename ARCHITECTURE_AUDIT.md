@@ -285,8 +285,13 @@ output. Declared fixture resource metadata also reaches Runtime definitions. The
 original shallow passes and two unsuccessful refinements remain retained. This tests
 catalog-driven conflict containment, not concurrent physical execution.
 
-`benchmarks/integration/workflow_scenarios/` contains 6,000 separate case JSONs and
-898 SHA-addressed packet parts; 382,137,005 bytes including its manifest. Original
+`benchmarks/integration/workflow_scenarios/manifest.json` retains the 6,000-case
+freeze and a pinned source revision. The current 6,000 case JSONs and 76 shared
+packet parts (288,195,530 bytes) are ignored local replay inputs, restored from
+`ac4e56274ecac59cff51e84d734dee05d04f7da9` with every hash checked. The earlier
+382,137,005-byte/898-part snapshot is historical. Existing Git history is preserved;
+no current runtime or generator is allowed to reconstruct new expected answers.
+Original
 five prototype responses are unchanged; only their UMI packets were explicitly
 refrozen for the authorized Schema/prompt amendment. Current model replies are
 references or labeled faults; none is runtime-generated from a verdict. The runner

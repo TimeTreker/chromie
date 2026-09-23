@@ -2313,7 +2313,7 @@ def _live_integrity_stop(
         stop = _live_integrity_stop(turn, execute=execute)
         if stop is not None:
             return stop
-    if result.get("turns"):
+    if result.get("turns") and not result.get("harness_failure"):
         return None
     cognitive = result.get("cognitive_runtime") or {}
     metadata = cognitive.get("metadata") or {}
@@ -2358,6 +2358,74 @@ def _live_integrity_stop(
     }
 
 
+def _live_model_binding(identity_path: Path) -> dict[str, Any]:
+    if not identity_path.is_file():
+        return {}
+    identity = json.loads(identity_path.read_text())
+    binding = ((identity.get("deployment") or {}).get("service_images") or {}).get("chromie-llm") or {}
+    if binding and (not binding.get("container_id") or not binding.get("image_id")):
+        raise ValueError("Runtime identity has an incomplete model-service binding")
+    return binding
+
+
+async def _inspect_live_model(container_id: str) -> dict[str, Any]:
+    # Query only public identity/readiness fields, never container environment.
+    template = ('{"container_id":"{{.Id}}","image_id":"{{.Image}}",'
+                '"started_at":"{{.State.StartedAt}}","restart_count":{{.RestartCount}},'
+                '"status":"{{.State.Status}}","health":"{{if .State.Health}}'
+                '{{.State.Health.Status}}{{else}}missing{{end}}"}')
+    process = await asyncio.create_subprocess_exec(
+        "docker", "inspect", "--format", template, container_id,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=15.0)
+    except asyncio.TimeoutError:
+        process.kill()
+        await process.communicate()
+        raise
+    if process.returncode:
+        raise RuntimeError(stderr.decode(errors="replace").strip()[:500])
+    return json.loads(stdout)
+
+
+async def _wait_for_live_model(
+    binding: dict[str, Any], previous: dict[str, Any] | None, *, timeout_s: float,
+) -> dict[str, Any]:
+    """Wait for existing service recovery; never restart or retry model inference."""
+    loop = asyncio.get_running_loop()
+    start = loop.time()
+    observations: list[dict[str, Any]] = []
+    while True:
+        try:
+            current = await _inspect_live_model(binding["container_id"])
+        except (OSError, RuntimeError, asyncio.TimeoutError, ValueError) as exc:
+            current = {"error": f"{type(exc).__name__}: {exc}"}
+        if not observations or observations[-1] != current:
+            observations.append(current)
+        matches = all(current.get(key) == binding[key] for key in ("container_id", "image_id"))
+        ready = matches and current.get("status") == "running" and current.get("health") == "healthy"
+        changed = bool(previous) and matches and any(
+            current.get(key) != previous.get(key) for key in ("started_at", "restart_count")
+        )
+        elapsed = loop.time() - start
+        # A replacement runtime or unavailable identity needs a new bound run.
+        if ready or not matches or elapsed >= timeout_s:
+            return {
+                "ok": ready, "restarted": changed,
+                "instance": current if matches else previous,
+                "observations": observations, "elapsed_s": elapsed,
+                "error": None if ready else (
+                    "Bound model service identity is unavailable or changed" if not matches else
+                    "Bound model service did not become healthy before the recovery deadline"
+                ),
+            }
+        if len(observations) == 1 and elapsed < 1.0:
+            print("[general-ability] Waiting for the bound model service to recover before admitting another case.",
+                  file=sys.stderr, flush=True)
+        await asyncio.sleep(min(2.0, max(0.0, timeout_s - elapsed)))
+
+
 async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
     keep_going = bool(getattr(args, "keep_going", False))
     if keep_going and args.allow_non_sim:
@@ -2391,6 +2459,8 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
     stopped_after_stage: str | None = None
     integrity_stop: dict[str, Any] | None = None
     integrity_failures: list[dict[str, Any]] = []
+    model_binding = _live_model_binding(Path(args.runtime_identity))
+    model_instance: dict[str, Any] | None = None
     refs_by_stage: dict[str, list[tuple[AbilityClass, LiveCaseRef]]] = {}
     for ability, ref in selected_refs:
         refs_by_stage.setdefault(ref.stage, []).append((ability, ref))
@@ -2414,11 +2484,42 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
                 file=sys.stderr,
                 flush=True,
             )
+            readiness: dict[str, Any] | None = None
             try:
-                result = await asyncio.wait_for(
-                    _run_live_case(args, case, case_dir),
-                    timeout=args.case_timeout_s,
-                )
+                if model_binding:
+                    readiness = await _wait_for_live_model(
+                        model_binding, model_instance,
+                        timeout_s=min(args.case_timeout_s, 420.0) if keep_going else 0.0,
+                    )
+                    model_instance = readiness.get("instance") or model_instance
+                if readiness is not None and not readiness["ok"]:
+                    result = {"ok": False, "errors": [readiness["error"]],
+                              "harness_failure": {"failure_domain": "service",
+                                                  "failure_class": "model_readiness_failed"}}
+                else:
+                    result = await asyncio.wait_for(
+                        _run_live_case(args, case, case_dir),
+                        timeout=args.case_timeout_s,
+                    )
+                    if model_binding and executed_count == len(selected_refs):
+                        final_readiness = await _wait_for_live_model(
+                            model_binding, model_instance, timeout_s=0.0,
+                        )
+                        result["model_final_readiness"] = final_readiness
+                        if not final_readiness["ok"] or final_readiness["restarted"]:
+                            result["harness_failure"] = {"failure_domain": "service",
+                                                         "failure_class": "model_changed_or_unavailable_at_cohort_end"}
+                            result["ok"] = False
+                            result.setdefault("errors", []).append(
+                                "Model service changed or became unavailable at cohort end."
+                            )
+                if readiness is not None and readiness.get("restarted"):
+                    result["harness_failure"] = {"failure_domain": "service",
+                                                 "failure_class": "model_restarted_during_cohort"}
+                    result["ok"] = False
+                    result.setdefault("errors", []).append(
+                        "Model service restarted; subsequent output is diagnostic recovery evidence."
+                    )
             except Exception as exc:
                 error = f"{exc.__class__.__name__}: {str(exc) or exc.__class__.__name__}"
                 result = {
@@ -2444,6 +2545,10 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
                         "scoring_authority": "acceptance_only_not_runtime_policy",
                     },
                 }
+            if readiness is not None:
+                result["model_readiness"] = readiness
+                if not args.no_write:
+                    _write_json(case_dir / "model_readiness.json", readiness)
             result["ability_class"] = ability.ability_id
             result["general_rule"] = ability.general_rule
             result["case_id"] = case.case_id
@@ -2461,7 +2566,7 @@ async def run_live_text(args: argparse.Namespace) -> dict[str, Any]:
                 failure = {**stop, "case_id": case.case_id, "stage": ref.stage}
                 integrity_failures.append(failure)
                 result["integrity_failure"] = failure
-                if not keep_going:
+                if not keep_going or (readiness is not None and not readiness["ok"]):
                     integrity_stop = failure
                     result["integrity_stop"] = failure
                 result["ok"] = False
@@ -2779,8 +2884,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--keep-going", action="store_true",
         help=(
             "Attempt every selected live simulator case despite earlier case/stage failures. "
-            "Each case retains its independent preflight and execution guards; failures "
-            "still fail qualification and the exit status. Not supported with --allow-non-sim."
+            "Wait for a bound model service's automatic recovery before the next case; "
+            "unavailable/changed identity or recovery timeout stops admission. Independent "
+            "preflight, execution guards, failing qualification and exit status remain. "
+            "Not supported with --allow-non-sim."
         ),
     )
     parser.add_argument("--evidence-dir", help="Directory for retained evidence summary.")

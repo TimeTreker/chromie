@@ -60,6 +60,11 @@ an execution-lifetime check, not proof of physical onset or hardware synchroniza
 The simultaneous gaze/blink case requires this check in addition to both effects and
 arguments; a mechanical pass still does not replace its semantic review.
 
+The text runner's pre-dispatch argument checks and post-run observations share the
+same optional-default projection. Defaults require the retained request's exact
+Capability ID/version contract; explicit arguments win and required omissions stay
+unknown. This changes acceptance comparisons only, never the execution request.
+
 ## Layout
 
 ```text

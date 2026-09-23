@@ -134,13 +134,16 @@ class SGLangClient(OllamaClient):
                 self._log_budget_diagnostic(diagnostic.level, diagnostic.render())
         if blocking is not None:
             # A character estimate is a screening bound, not the model's token
-            # count. Verify the identical chat packet with the serving tokenizer
-            # before rejecting it. This performs no generation or semantic retry.
+            # count. Verify the same chat content with the serving tokenizer,
+            # whose counting endpoint does not stream. Leave generation unchanged;
+            # this performs no generation or semantic retry.
             try:
                 async with httpx.AsyncClient(
                     timeout=httpx.Timeout(self.timeout_ms / 1000.0), trust_env=False,
                 ) as client:
-                    response = await client.post(f"{self.base_url}/tokenize", json=payload)
+                    response = await client.post(
+                        f"{self.base_url}/tokenize", json={**payload, "stream": False},
+                    )
                 response.raise_for_status()
                 counted = response.json()
                 count, limit, tokens = counted.get("count"), counted.get("max_model_len"), counted.get("tokens")

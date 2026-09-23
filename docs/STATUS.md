@@ -1,6 +1,76 @@
 # Chromie Current Status
 
-## Full-case diagnostic and delivery pause — 2026-09-23
+## Benchmark storage cleanup — 2026-09-23
+
+Owner-authorized storage cleanup removes6,076 expanded replay files (about275 MiB)
+from the tracked tree. Benchmark code, authored datasets, prototype episodes and
+freeze manifest remain versioned. Ignored local inputs restore from the exact
+retained Git revision with all case/packet hashes checked; no reference answer,
+expected verdict, split or semantic coverage changed. Existing Git history remains.
+
+Cold-cache canonical gate passes: **153 benchmark,3823 main/1096 subtests,20 legacy
+ tests**, two existing warnings. Eight new storage regressions cover exact-byte
+restoration, modified/missing/undeclared input handling, archive integrity and
+explicit shallow-clone fetch without changing the checkout. All60 replay families
+still collect from the manifest. No new maintained document or environment variable.
+
+Four axes: **benchmark storage cleanup implemented; local automatic verification
+passed; native RTX5090 target still failing/incomplete as below; development only**.
+Included in the owner-requested development delivery. Tests/check suites were
+**not run for commit/push, at owner request**; counts above are the latest retained
+gate before delivery-documentation edits. No runtime rebuild, new live proof or
+release claim. Restoration instructions and evidence paths are in Handoff and the
+benchmark README.
+
+## RTX5090 qualification continuation — 2026-09-23
+
+Current **RTX5090/Gemma4-12B** compiler crash is repaired. XGrammar0.2.1 used128000
+as both a valid lookahead expression ID and an internal parser marker, leading to
+invalid rule-1 access. The pinned image builds exact0.2.1 with marker-2; native
+before/after tests prove the collision and repair. Package/API, schema dialect,
+model, prompts and semantic authorities remain unchanged. The original exact
+request now completes native inference and independent JSON Schema validation;
+its generated semantics are not thereby approved.
+
+Diagnostic recovery also now waits for the identity-bound model service to become
+healthy before admitting an independent case. Docker already restarted the old
+crash; the old runner raced startup. Restarts remain hard failures, with no failed
+inference retry. Identity replacement, missing health or timeout fails closed.
+Earlier exact-contract optional-default acceptance and non-streaming tokenizer
+count repairs remain preserved; generation stays streamed.
+
+Final image:81 retained schemas attempted,76 compile/five handled pre-existing
+minItems/prefixItems errors, zero crashes. Full native invocation: **75/75 attempted,
+12 mechanical passes/63 failures (16%)**, **zero model restarts/OOM**. Same source,
+container/image and start time throughout. All75 manually adjudicated; among12
+mechanical passes, five pass semantic review, three are partial and four fail.
+Eight dependent turns remain unrun; raw cohort_complete and qualification_complete
+remain false. Case43's new output fails argument provenance rather than crashing;
+cases44–75 now have independent diagnostic evidence. No overall semantic pass.
+
+Recovery suite89 passes. Canonical **145 benchmark,3823 main/1096 subtests,20 legacy**
+passes, two existing warnings; policy/ownership/static/config/docs included.
+Level A **45/45**,15 classes. Exactly one final bundle,300 native-call records and
+600 verified request/output references, zero parser gaps or digest mismatches.
+Focused nod completes twice with exact default contracts, but its legacy speech
+assertion fails. Required-answer failures remain distinct actual SC failures.
+
+Four axes: **compiler/recovery and earlier oracle/transport repairs implemented;
+local automatic verification passed; native target failing/incomplete; development
+only**. Two of six authorized repair/diagnostic loops complete. Remaining blockers
+include handled grammar400s, UMI/GA/Planner contracts, ungrounded movement, SC
+truthfulness/workflow/latency, speech prepared-start coordination, reflex contract
+retention and acceptance mismatches. No new semantic stage, runtime switch,
+environment variable or maintained document. No rejected prompt candidate promoted.
+
+Agent/source matches; Agent/LLM/TTS/ASR healthy. Owned simulator/MCP stopped after a
+fresh standing/safe-idle/empty-work probe. No physical microphone/speaker/robot,
+supervised voice, target closure or release claim. Repairs are included in this
+development delivery; the prior runtime evidence is not a fresh commit qualification.
+Actual workflow, cause, all-case review and claim limits are retained under
+`.chromie/acceptance/rtx5090-resume-20260923/REVIEW.md`; Checkpoint/Handoff own resume.
+
+## Historical laptop full-case diagnostic and delivery pause — 2026-09-23
 
 The owner-requested simulator diagnostic now uses `--keep-going`: it attempts every
 independent case and stage under unchanged preflight/dispatch guards, retaining all

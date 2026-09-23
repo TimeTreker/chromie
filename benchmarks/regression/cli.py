@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 
 from benchmarks.contracts import ContractError
+from benchmarks.regression.archive import restore_frozen_corpus
 from benchmarks.regression.compare import compare_qualification_runs
 from benchmarks.regression.replay import (
     load_replay_scenario,
@@ -25,6 +26,12 @@ def _write(path: Path, payload: dict) -> None:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Compare Chromie qualification archives")
     sub = parser.add_subparsers(dest="command", required=True)
+    restore = sub.add_parser("restore-fixtures", help="Restore checksum-pinned offline replay inputs")
+    restore.add_argument("--repo", type=Path, default=Path.cwd())
+    restore.add_argument("--corpus", type=Path,
+                         default=Path("benchmarks/integration/workflow_scenarios"))
+    restore.add_argument("--fetch", action="store_true",
+                         help="Fetch the pinned revision from origin if absent in a shallow checkout")
     compare = sub.add_parser("compare")
     compare.add_argument("--baseline", type=Path, required=True)
     compare.add_argument("--candidate", type=Path, required=True)
@@ -61,6 +68,11 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     try:
+        if args.command == "restore-fixtures":
+            print(json.dumps(restore_frozen_corpus(
+                args.corpus.resolve(), repo_root=args.repo.resolve(), fetch=args.fetch,
+            )))
+            return 0
         if args.command == "compare":
             payload = compare_qualification_runs(
                 args.baseline,

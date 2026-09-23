@@ -8,6 +8,8 @@ if [[ "${INSTALL_TEST_DEPS:-0}" == "1" ]]; then
   python -m pip install -r requirements-test.txt
 fi
 
+python -m benchmarks.regression restore-fixtures
+
 python scripts/check_repository_policies.py
 python scripts/check_test_ownership.py
 python scripts/run_ruff.py

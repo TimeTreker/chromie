@@ -17,6 +17,7 @@ sys.path.insert(0, str(ROOT))
 
 from tests.workflow_replay_support import run_case  # noqa: E402
 from benchmarks.integration.model_replay import ModelReplay, load_case  # noqa: E402
+from benchmarks.regression.archive import restore_frozen_corpus  # noqa: E402
 
 
 def source_identity():
@@ -26,6 +27,7 @@ def source_identity():
         'scripts/run_workflow_replay.py', 'benchmarks/integration/model_replay.py',
         'tests/workflow_replay_support.py', 'tests/capability_runtime_test_support.py',
         'tests/test_cognitive_runtime_pr7.py', 'benchmarks/datasets/fast_planner_daily_life/qualification.py',
+        'benchmarks/regression/archive.py',
     )]
     return {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}
 
@@ -77,11 +79,13 @@ def main() -> int:
         parser.error('candidate inference uses one worker to preserve provider concurrency')
     if sys.flags.optimize:
         parser.error('run without -O: executable assertions are required')
+    manifest_path = args.case_root/'manifest.json'
+    manifest = json.loads(manifest_path.read_text())
+    if 'storage' in manifest:
+        restore_frozen_corpus(args.case_root, repo_root=ROOT)
     paths = sorted(args.case_root.glob('workflow-*.json'))
     if not paths:
         parser.error('no workflow cases discovered')
-    manifest_path = args.case_root/'manifest.json'
-    manifest = json.loads(manifest_path.read_text())
     if {p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in paths} != manifest['case_sha256']:
         parser.error('frozen case identity mismatch; review and freeze explicitly')
     args.evidence_dir.mkdir(parents=True, exist_ok=False)

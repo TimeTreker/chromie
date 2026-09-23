@@ -1,12 +1,82 @@
 from __future__ import annotations
 
 import unittest
+import copy
+
+import pytest
 
 from scripts.outcome_observations import (
     collect_llm_integrity_violations,
     collect_observations,
     validate_expected_observations,
 )
+from scripts.interaction_text_mujoco_check import validate_contract
+from shared.chromie_contracts.interaction import InteractionResponse
+
+
+@pytest.mark.parametrize("case,expected_args", [
+    ("matching", {"count": 2}),
+    ("missing_contract", {}),
+    ("other_request", {}),
+    ("other_capability", {}),
+    ("other_version", {}),
+    ("missing_version", {}),
+    ("required", {}),
+    ("no_default", {}),
+    ("explicit", {"count": 1}),
+    ("explicit_null", {"count": None}),
+    ("explicit_false", {"count": False}),
+])
+def test_precheck_and_observations_share_only_request_bound_defaults(case, expected_args):
+    request = {"request_id": "blink", "capability_id": "soridormi.blink_eyes",
+               "capability_version": "1", "args": {}}
+    contract = {"capability_id": request["capability_id"], "capability_version": "1",
+                "input_schema": {"type": "object", "properties": {
+                    "count": {"type": "integer", "default": 2}}}}
+    contracts = {"blink": contract}
+    if case == "missing_contract":
+        contracts.clear()
+    elif case == "other_request":
+        contracts = {"other": contract}
+    elif case == "other_capability":
+        contract["capability_id"] = "soridormi.nod_yes"
+    elif case == "other_version":
+        contract["capability_version"] = "old"
+    elif case == "missing_version":
+        request["capability_version"] = None
+    elif case == "required":
+        contract["input_schema"]["required"] = ["count"]
+    elif case == "no_default":
+        del contract["input_schema"]["properties"]["count"]["default"]
+    elif case.startswith("explicit"):
+        request["args"] = dict(expected_args)
+    response = InteractionResponse(capabilities=[request])
+    summary = {"interaction_response": response.model_dump(mode="json"),
+               "capability_contracts": contracts}
+    original = copy.deepcopy(summary)
+    errors = validate_contract(
+        interpretation={}, response=response, expected_capabilities=[request["capability_id"]],
+        expect_no_capabilities=False, expected_args=[(0, "count", 2)], arg_tolerance=1e-6,
+        capability_contracts=contracts,
+    )
+    assert bool(errors) == (case != "matching")
+    assert collect_observations(summary)[0]["args"] == expected_args
+    assert summary == original
+
+
+@pytest.mark.parametrize("field", ["capability_id", "capability_version"])
+def test_mismatched_receipt_cannot_qualify_an_omitted_default(field):
+    request = {"request_id": "blink", "capability_id": "soridormi.blink_eyes",
+               "capability_version": "1", "args": {}}
+    summary = {
+        "interaction_response": {"capabilities": [request]},
+        "capability_contracts": {"blink": {
+            "capability_id": request["capability_id"], "capability_version": "1",
+            "input_schema": {"properties": {"count": {"default": 2}}},
+        }},
+        "execution": {"results": [{**request, field: "mismatch", "status": "completed"}]},
+    }
+    assert collect_observations(summary)[0]["args"] == {}
 
 
 class OutcomeObservationTests(unittest.TestCase):

@@ -42,6 +42,7 @@ from orchestrator.runtime.observability_recording import (
     record_cognitive_runtime_evidence,
 )
 from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
+from scripts.outcome_observations import observed_capability_args
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "text-mujoco"
 DEFAULT_TEXT = (
     "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, "
@@ -138,6 +139,7 @@ def validate_contract(
     expect_no_capabilities: bool,
     expected_args: list[tuple[int, str, Any]],
     arg_tolerance: float,
+    capability_contracts: dict[str, Any] | None = None,
 ) -> list[str]:
     del interpretation
     errors: list[str] = []
@@ -166,7 +168,9 @@ def validate_contract(
                 f"but only {len(capabilities)} Soridormi skill(s) were emitted"
             )
             continue
-        actual = capabilities[index].args.get(key)
+        actual = observed_capability_args(
+            capabilities[index].model_dump(mode="json"), capability_contracts or {},
+        ).get(key)
         if not _numbers_close(actual, expected, tolerance=arg_tolerance):
             errors.append(
                 f"arg mismatch for skill[{index}] {capabilities[index].capability_id} "
@@ -1324,6 +1328,7 @@ async def run_check(
                 expect_no_capabilities=args.expect_no_capabilities,
                 expected_args=args.expect_arg,
                 arg_tolerance=args.arg_tolerance,
+                capability_contracts=capability_contracts,
             )
         )
         reject_speech_patterns = list(getattr(args, "reject_speech_pattern", []) or [])

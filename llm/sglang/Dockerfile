@@ -1,6 +1,38 @@
-# Pinned GPU runtime. Remove this constructor repair when an upstream pinned
-# image initializes Gemma4Unified's inherited output-head contract itself.
+# Repair the pinned compiler rather than changing its schema dialect. In 0.2.1,
+# expression 128000 collides with Earley's unexpanded-rule sentinel: a lookahead
+# then dereferences rule -1. Real expression IDs are nonnegative; -1 is already
+# the invalid-state marker, so reserve -2 for unexpanded rules. Remove this
+# backport when adopting an upstream runtime containing mlc-ai/xgrammar#716.
+FROM lmsysorg/sglang@sha256:59e11312666e1c5c155210ea335589b91daa0d70848521b390b93b1b1e8fb0ef AS xgrammar-build
+RUN git init /tmp/xgrammar && \
+    git -C /tmp/xgrammar remote add origin https://github.com/mlc-ai/xgrammar.git && \
+    git -C /tmp/xgrammar fetch --depth 1 origin 5b4e9ce9e72524037ae24ecd831b9b6604d2eb48 && \
+    git -C /tmp/xgrammar checkout --detach FETCH_HEAD && \
+    git -C /tmp/xgrammar submodule update --init --depth 1 3rdparty/dlpack
+RUN python3 - <<'PY'
+from pathlib import Path
+
+path = Path('/tmp/xgrammar/cpp/earley_parser.h')
+source = path.read_text()
+before = 'kUnexpandedRuleStartSequenceId = 128000;'
+if source.count(before) != 1:
+    raise RuntimeError('Pinned Earley sentinel changed; review the compiler backport')
+path.write_text(source.replace(before, 'kUnexpandedRuleStartSequenceId = -2;'))
+PY
+COPY test_xgrammar_parser.cc /tmp/test_xgrammar_parser.cc
+RUN cmake -S /tmp/xgrammar -B /tmp/xgrammar/build -DCMAKE_BUILD_TYPE=Release && \
+    cmake --build /tmp/xgrammar/build -j 6 && \
+    g++ -std=c++17 -I/tmp/xgrammar/cpp -I/tmp/xgrammar/include \
+      -I/tmp/xgrammar/3rdparty/picojson -I/tmp/xgrammar/3rdparty/dlpack/include \
+      /tmp/test_xgrammar_parser.cc /tmp/xgrammar/build/libxgrammar.a -pthread \
+      -o /tmp/test_xgrammar_parser && /tmp/test_xgrammar_parser
+
+# Keep the original package/API and all other pinned dependencies. Only replace
+# its native library with the source-bound, parser-tested 0.2.1 backport.
 FROM lmsysorg/sglang@sha256:59e11312666e1c5c155210ea335589b91daa0d70848521b390b93b1b1e8fb0ef
+COPY --from=xgrammar-build /tmp/xgrammar/python/xgrammar/libxgrammar_bindings.so /opt/sglang/lib/python3.12/site-packages/xgrammar/libxgrammar_bindings.so
+LABEL org.chromie.xgrammar.source="5b4e9ce9e72524037ae24ecd831b9b6604d2eb48" \
+      org.chromie.xgrammar.patch="earley-unexpanded-sentinel-minus-two"
 
 # The unified constructor skips the parent constructor, but inherits forward(),
 # which reads lm_head_is_tied. Preserve the exact existing GPU branch predicate.

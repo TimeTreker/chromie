@@ -113,6 +113,43 @@ def observation_type_for_capability(
     return str(definition.get("type") or f"capability.{capability_id}")
 
 
+def observed_capability_args(
+    request: dict[str, Any],
+    contracts: dict[str, Any],
+    *,
+    receipt: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Read explicit args and optional defaults from the exact retained contract.
+
+    This is an acceptance projection, never an execution-argument mutation.
+    A receipt, when present, must belong to the same request and contract.
+    """
+    args = request.get("args")
+    args = dict(args) if isinstance(args, dict) else {}
+    request_id = request.get("request_id")
+    capability_id = request.get("capability_id")
+    version = request.get("capability_version")
+    contract = contracts.get(request_id) if request_id else None
+    if not capability_id or not version or not isinstance(contract, dict):
+        return args
+    if any(contract.get(key) != request.get(key)
+           for key in ("capability_id", "capability_version")):
+        return args
+    if receipt is not None and any(
+        receipt.get(key) != request.get(key)
+        for key in ("request_id", "capability_id", "capability_version")
+    ):
+        return args
+    schema = contract.get("input_schema") or {}
+    defaults = {
+        key: rule["default"]
+        for key, rule in schema.get("properties", {}).items()
+        if isinstance(rule, dict) and "default" in rule
+        and key not in schema.get("required", [])
+    }
+    return {**defaults, **args}
+
+
 def collect_observations(
     summary: dict[str, Any],
     *,
@@ -162,22 +199,11 @@ def collect_observations(
             continue
         definition = behavior_map.get(capability_id, {})
         metadata = skill.get("metadata") if isinstance(skill.get("metadata"), dict) else {}
-        args = skill.get("args") if isinstance(skill.get("args"), dict) else {}
         receipt = execution_by_request.get(str(skill.get("request_id") or ""))
-        contracts = summary.get("capability_contracts") or {}
-        contract = contracts.get(skill.get("request_id"), {})
+        args = observed_capability_args(
+            skill, summary.get("capability_contracts") or {}, receipt=receipt,
+        )
         version = skill.get("capability_version")
-        if (version and contract.get("capability_id") == capability_id
-                and contract.get("capability_version") == version
-                and (receipt is None or (receipt.get("capability_id") == capability_id
-                                        and receipt.get("capability_version") == version))):
-            # Omission has meaning only under the exact retained execution contract.
-            # Preserve explicit values and leave required or unqualified fields unknown.
-            schema = contract.get("input_schema") or {}
-            defaults = {key: rule["default"] for key, rule in schema.get("properties", {}).items()
-                        if isinstance(rule, dict) and "default" in rule
-                        and key not in schema.get("required", [])}
-            args = {**defaults, **args}
         arg_fields = definition.get("arg_fields")
         if not isinstance(arg_fields, list):
             arg_fields = list(args)

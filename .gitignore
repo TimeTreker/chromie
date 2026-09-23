@@ -37,3 +37,6 @@ htmlcov/
 /benchmarks/manifests/existing_scenarios.json
 /benchmarks/reports/*
 !/benchmarks/reports/.gitkeep
+# Expanded frozen replay inputs are restored from the manifest's pinned revision.
+/benchmarks/integration/workflow_scenarios/*
+!/benchmarks/integration/workflow_scenarios/manifest.json

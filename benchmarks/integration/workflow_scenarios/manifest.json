@@ -6157,5 +6157,10 @@
     "ffd1978d136a2c7c92253385305f0e8fde3e658130a85abd379f6851e915f5f0.json": "ffd1978d136a2c7c92253385305f0e8fde3e658130a85abd379f6851e915f5f0"
   },
   "frozen_on": "2026-09-21",
-  "freeze_note": "Current UMI/GA activation and compact Evidence re-entry wire migration; original inputs, split, fault intent, expected provider outcomes retained. 6000 explicit authoring captures passed; strict rerun not run because owner requested immediate delivery without further tests."
+  "freeze_note": "Current UMI/GA activation and compact Evidence re-entry wire migration; original inputs, split, fault intent, expected provider outcomes retained. 6000 explicit authoring captures passed; strict rerun not run because owner requested immediate delivery without further tests.",
+  "storage": {
+    "git_revision": "ac4e56274ecac59cff51e84d734dee05d04f7da9",
+    "git_path": "benchmarks/integration/workflow_scenarios",
+    "manifest_sha256": "d1ea729df9e35c1b1e6e8025406aba18dfe4448512c2abf810bcd94ad048a5fb"
+  }
 }

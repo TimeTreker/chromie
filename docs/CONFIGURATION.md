@@ -1097,6 +1097,16 @@ because of retained Schema/Host and semantic failures. See the current checkpoin
 raw evidence; provider timing is not physical voice or complete interaction evidence.
 
 Build the pinned image with `docker build -t chromie-sglang:gemma4-fp8 llm/sglang`.
+The image builds XGrammar 0.2.1's native library from exact source revision
+`5b4e9ce9e72524037ae24ecd831b9b6604d2eb48` with one parser repair: the
+unexpanded-rule marker is -2, outside the nonnegative expression-ID domain and
+distinct from the existing invalid-state marker -1. The original marker 128000
+collided with a real lookahead expression in the retained Fast schema and read
+rule -1, crashing the process. Package/API, schema conversion, model and decoding
+options stay pinned. The image build checks real parser acceptance/rejection and
+reset at expression IDs 127999/128000/128001. Image labels retain source/patch
+identity. Remove this backport when a reviewed upstream runtime contains
+[XGrammar's sentinel-removing refactor](https://github.com/mlc-ai/xgrammar/commit/db4b9557a3984841ccff930333e54bc2a319068e).
 The pinned image also bounds XGrammar's retained compiler cache to 512 MiB and
 removes the backend's second unbounded strong-reference cache. Dynamic per-turn schemas
 previously accumulated until the scheduler exhausted host RAM. In-flight requests retain

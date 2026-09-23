@@ -15,6 +15,9 @@ fixed input-to-action mappings.
   reserved homes for later benchmark phases; existing scenarios remain in place.
 - `reports/`: generated local reports. Generated JSON should not be committed
   unless a release process explicitly retains it as evidence.
+- `integration/workflow_scenarios/manifest.json`: tracked freeze and source revision.
+  Its expanded cases and shared packet files are ignored local inputs restored from
+  that immutable revision; they are not regenerated from current prompts or outputs.
 
 The maintained User Meaning Interpretation fixtures live in
 `scenarios/user_meaning_interpretation/`. The source manifest references that
@@ -183,10 +186,27 @@ authoritative source dataset.
 Run the frozen architecture cohort without a model server or hardware:
 
 ```bash
+python -m benchmarks.regression restore-fixtures
 python scripts/run_workflow_replay.py \
   --workers 4 --evidence-dir .chromie/acceptance/workflow-6000-new-run
 python -m pytest -q tests/test_workflow_replay.py
 ```
+
+The source gate and replay runner restore missing expanded inputs from the
+manifest's exact Git revision already in local history. For a shallow checkout,
+run `python -m benchmarks.regression restore-fixtures --fetch` once to fetch that
+revision from `origin`; CI includes this explicit preparation. Restoration verifies
+all 6,000 case hashes, 76 shared-packet hashes and the original archive manifest
+before publishing missing files. Changed existing inputs are rejected, never
+silently overwritten. Direct pytest collection uses the committed case list so an
+absent local cache cannot silently remove the 60 family regressions.
+
+Keep benchmark code, schemas, authored datasets, five prototype episodes and the
+freeze manifest in Git. Expanded replay files and generated reports stay ignored.
+The immutable source is currently retained in existing repository history; this
+cleanup does not rewrite history or reduce a full historical clone. Future corpus
+changes must retain their reviewed bytes at an immutable retrievable revision and
+update the source pin and hashes together. Updating a generator is not a new freeze.
 
 Use an unused evidence directory and run without Python `-O`. The runner discovers
 `integration/workflow_scenarios/workflow-*.json`: 6,000 cases from 60 authored
@@ -218,12 +238,13 @@ Goal IDs may bind fixture placeholders. Unknown, changed, reordered, extra and u
 calls fail; no semantic matching, implicit online fallback or automatic recording
 exists. A standalone service is available with `python -m
 benchmarks.integration.model_replay CASE.json --port 0 --bindings TRUSTED_BINDINGS.json`;
-the normal runner binds committed Goal identities automatically.
+the normal runner binds frozen Goal identities automatically.
 
 `integration/workflow_corpus.py` owns offline authoring/expansion only. GPT-6 Astra
 in this task authored the 60 contrasts and reference rules; deterministic expansion
 is not 6,000 independent model inferences. Review is non-independent. Persisted case
-JSONs and SHA256-addressed shared packet parts are authoritative during execution;
+JSONs and SHA256-addressed shared packet parts, restored and checked against the
+committed freeze manifest, are authoritative during execution;
 the runner never invokes the authoring module. Manifests bind case/part hashes.
 Updating a prompt/contract requires explicit request/reference review and a new
 freeze. Keep failed captures and preceding identities; never fit expected semantic

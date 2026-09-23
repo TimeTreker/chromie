@@ -768,6 +768,16 @@ success; missing dependent turns remain explicit. The score does not override
 hard failures, pending semantic review, qualification status or the failing exit
 code. Review all mechanically passing cases before presenting a behavioral score.
 Default fail-fast qualification remains available without `--keep-going`.
+When the supplied runtime identity binds a local `chromie-llm` container/image,
+the runner checks that exact service before admitting each case and again at cohort
+end. Diagnostic continuation waits for its existing automatic recovery, bounded by
+the smaller of the case timeout and the launcher's 420-second startup allowance.
+It records readiness transitions, start time and restart count; it never retries
+the failed inference or restarts/replaces the service itself. A restart remains a
+hard integrity failure even when later independent cases run. Missing/changed
+identity or recovery timeout stops admission and retains the remaining cases as
+blocked. Unbound runs retain their existing case preflight but cannot establish
+this service-continuity evidence.
 
 Warm interaction cases retain two non-overlapping intervals: the accepted SC
 stage start to its complete decision (`max_warm_sc_decision_ms`), then that

@@ -231,6 +231,63 @@ class SGLangProtocolTests(unittest.TestCase):
 
 
 class SGLangStreamEvidenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_stream_budget_count_uses_nonstream_tokenizer_without_changing_generation(self) -> None:
+        import httpx
+
+        for count, limit, fits in ((500, 1024, True), (972, 1024, True),
+                                   (973, 1024, False), (950, 1000, False)):
+            with self.subTest(count=count, limit=limit):
+                class StreamResponse:
+                    status_code = 200
+
+                    async def __aenter__(self):
+                        return self
+
+                    async def __aexit__(self, *args):
+                        return None
+
+                    async def aiter_lines(self):
+                        yield 'data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}'
+
+                async def tokenize(url, *, json):
+                    # Pinned SGLang's tokenize handler supports only non-streaming.
+                    return httpx.Response(
+                        501 if json.get("stream") else 200,
+                        json={"count": count, "tokens": [1] * count, "max_model_len": limit},
+                        request=httpx.Request("POST", url),
+                    )
+
+                transport = Mock()
+                transport.post = AsyncMock(side_effect=tokenize)
+                transport.stream.return_value = StreamResponse()
+                context = AsyncMock()
+                context.__aenter__.return_value = transport
+                client = SGLangClient("http://fast.invalid/v1", "fixed", timeout_ms=1000,
+                    purpose="fast_planner", service_settings=Settings(
+                        llm_prompt_chars_per_token_estimate=2, llm_context_safety_margin_tokens=20))
+                with patch("agent.app.clients.sglang_client.httpx.AsyncClient", return_value=context), patch(
+                    "agent.app.clients.sglang_client.log_llm_call_evidence"
+                ) as evidence:
+                    if fits:
+                        self.assertEqual([part async for part in client.generate_stream(
+                            "x" * 3000, options={"num_ctx": 1024, "num_predict": 32},
+                        )], ["ok"])
+                    else:
+                        with self.assertRaises(SGLangGenerationError) as caught:
+                            async for _ in client.generate_stream(
+                                "x" * 3000, options={"num_ctx": 1024, "num_predict": 32},
+                            ):
+                                self.fail("overflow emitted a model token")
+                        self.assertEqual(caught.exception.failure_class, "prompt_budget_exceeded")
+                        transport.stream.assert_not_called()
+                request = evidence.call_args.kwargs["request"]
+                self.assertIs(request["stream"], True)
+                transport.post.assert_awaited_once_with(
+                    "http://fast.invalid/v1/tokenize", json={**request, "stream": False},
+                )
+                if fits:
+                    self.assertEqual(transport.stream.call_args.kwargs["json"], request)
+
     async def test_exact_serving_tokens_resolve_estimate_overflow_without_prompt_loss(self) -> None:
         import httpx
 

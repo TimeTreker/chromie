@@ -33,12 +33,97 @@ from scripts.general_ability_acceptance import (
     library_summary,
     run_level_a,
     run_live_text,
+    _wait_for_live_model,
     _live_case_namespace,
     select_ability_classes,
     validate_live_text_result,
     validate_library,
 )
 from scripts.interaction_text_mujoco_check import build_parser as build_text_check_parser
+
+
+@pytest.fixture(autouse=True)
+def isolate_unit_tests_from_saved_deployment(monkeypatch):
+    monkeypatch.setattr("scripts.general_ability_acceptance._live_model_binding", lambda path: {})
+
+
+def _model_state(**changes):
+    return {"container_id": "bound-container", "image_id": "bound-image",
+            "started_at": "original-start", "restart_count": 0,
+            "status": "running", "health": "healthy", **changes}
+
+
+def test_diagnostic_waits_for_recovery_before_next_case_and_retains_crash():
+    args = build_parser().parse_args(["--mode", "live-text", "--keep-going", "--no-write"])
+    healthy = _model_state()
+    starting = _model_state(health="starting", started_at="recovered-start", restart_count=1)
+    recovered = {**starting, "health": "healthy"}
+    count = 0
+
+    async def run_case(*unused):
+        nonlocal count
+        count += 1
+        if count == 1:
+            return {"ok": False, "errors": ["compiler crashed"], "cognitive_runtime": {
+                "status": "error", "metadata": {"failure_domain": "service"}}}
+        # The second case must not run during the failed service's restart.
+        assert probe.await_count >= count + 1
+        return {"ok": True, "errors": []}
+
+    probe = AsyncMock(side_effect=[healthy, starting] + [recovered] * 100)
+    with patch("scripts.general_ability_acceptance._live_model_binding", return_value=healthy), \
+         patch("scripts.general_ability_acceptance._inspect_live_model", probe), \
+         patch("scripts.general_ability_acceptance.asyncio.sleep", AsyncMock()), \
+         patch("scripts.general_ability_acceptance._run_live_case", side_effect=run_case):
+        report = asyncio.run(run_live_text(args))
+    assert count == report["planned_case_count"]
+    assert report["cases"][0]["errors"][0] == "compiler crashed"
+    assert report["cases"][1]["model_readiness"]["observations"] == [starting, recovered]
+    assert report["cases"][1]["integrity_failure"]["failure_class"] == "model_restarted_during_cohort"
+    assert report["qualification_complete"] is False
+
+
+@pytest.mark.parametrize("state", [
+    _model_state(health="starting"), _model_state(health="missing"),
+    _model_state(image_id="substituted-image"), _model_state(container_id="replacement"),
+    RuntimeError("inspection unavailable"),
+])
+def test_model_readiness_fails_closed_without_admitting_cases(state):
+    args = build_parser().parse_args(["--mode", "live-text", "--keep-going", "--no-write"])
+    args.case_timeout_s = 0.0
+    probe = AsyncMock(side_effect=state) if isinstance(state, Exception) else AsyncMock(return_value=state)
+    with patch("scripts.general_ability_acceptance._live_model_binding", return_value=_model_state()), \
+         patch("scripts.general_ability_acceptance._inspect_live_model", probe), \
+         patch("scripts.general_ability_acceptance._run_live_case", AsyncMock()) as runner:
+        report = asyncio.run(run_live_text(args))
+    runner.assert_not_awaited()
+    assert report["case_count"] == 1
+    assert report["skipped_case_count"] == report["planned_case_count"] - 1
+    assert report["integrity_stop"]["failure_class"] == "model_readiness_failed"
+    assert not report["cohort_complete"]
+
+
+@pytest.mark.parametrize("changes", [{"restart_count": 1}, {"started_at": "new-start"}])
+def test_model_restart_is_visible_even_when_already_healthy(changes):
+    with patch("scripts.general_ability_acceptance._inspect_live_model",
+               AsyncMock(return_value=_model_state(**changes))):
+        result = asyncio.run(_wait_for_live_model(_model_state(), _model_state(), timeout_s=0))
+    assert result["ok"]
+    assert result["restarted"]
+
+
+def test_last_case_cannot_hide_model_restart():
+    args = build_parser().parse_args([
+        "--mode", "live-text", "--keep-going", "--no-write", "--only-case", "nod_head_twice",
+    ])
+    runner = AsyncMock(return_value={"ok": True, "errors": [], "turns": [{"ok": True}]})
+    with patch("scripts.general_ability_acceptance._live_model_binding", return_value=_model_state()), \
+         patch("scripts.general_ability_acceptance._inspect_live_model",
+               AsyncMock(side_effect=[_model_state(), _model_state(restart_count=1)])), \
+         patch("scripts.general_ability_acceptance._run_live_case", runner):
+        report = asyncio.run(run_live_text(args))
+    assert report["ok"] is False
+    assert report["integrity_failures"][0]["failure_class"] == "model_changed_or_unavailable_at_cohort_end"
 
 
 @pytest.mark.parametrize("blink_start,passes", [("03", True), ("05", False)])

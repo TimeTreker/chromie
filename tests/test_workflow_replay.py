@@ -191,7 +191,9 @@ def test_expanded_corpus_identity_coverage_and_split_integrity():
     assert manifest['training_eligible'] is False
 
 
-@pytest.mark.parametrize('path', sorted(CORPUS.glob('workflow-*-blink-0-0.json')), ids=lambda p:p.stem)
+@pytest.mark.parametrize('path', [CORPUS/name for name in sorted(
+    json.loads((CORPUS/'manifest.json').read_text())['case_sha256']
+) if name.endswith('-blink-0-0.json')], ids=lambda p:p.stem)
 def test_expanded_family_regression(path, tmp_path):
     from benchmarks.integration.model_replay import load_case
     case = load_case(path)

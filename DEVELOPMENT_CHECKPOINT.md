@@ -5,7 +5,94 @@ This is the current resume point; [Status](docs/STATUS.md) owns implementation/e
 claims, [Roadmap](ROADMAP.md) owns delivery order, and [Handoff](HANDOFF.md) owns volatile
 identities, retained artifacts and commands. Earlier snapshots remain in Git history.
 
-## Active scope
+## Owner-requested development delivery — 2026-09-23
+
+Owner requested commit and push **without tests**. Pre-delivery baseline is
+`ac4e56274ecac59cff51e84d734dee05d04f7da9` on `main`; the delivery fetch confirmed
+0 ahead/behind `origin/main`. Resume from the latest `main` commit containing this
+checkpoint and Handoff. Scope includes the RTX5090 compiler/recovery repairs,
+earlier acceptance-default/tokenizer repairs, and benchmark storage cleanup below.
+
+Tests and check suites: **not run for this delivery, at owner request**. The latest
+observed local gate is the storage-cleanup gate below; subsequent edits only update
+delivery documentation. Prior live evidence binds the evaluated runtime and source,
+not a fresh qualification of this commit. Active line #24/#32 and all live blockers
+remain open. Private ignored evidence must be transferred separately for another
+machine; it is not included in Git. Follow the ordered diagnosis and resume commands
+below and in Handoff; this delivery does not approve target qualification or release.
+
+## Benchmark storage cleanup — 2026-09-23
+
+Owner authorized removing unnecessary tracked benchmark bulk. Removed **6,076
+expanded replay files/288,195,530 bytes (about275 MiB)** from the index; tracked
+benchmark files fall from9,691 to3,615. Code, schemas, authored datasets, five
+prototype episodes and the checksum manifest remain tracked. Expanded inputs are
+ignored local cache, restored from pinned revision `ac4e56274ecac59cff51e84d734dee05d04f7da9`.
+Every original case/packet hash, answer, oracle and split is unchanged. Existing Git
+history is retained, so this reduces the current tree, not historical clone size.
+
+The canonical gate restores missing inputs offline from local history. Shallow
+checkouts/CI explicitly run `python -m benchmarks.regression restore-fixtures --fetch`.
+Changed local fixtures fail rather than being overwritten; absent cache cannot
+silently skip the60 family regressions. Cold-cache restoration verified all6,076
+files. Canonical **153 benchmark,3823 main/1096 subtests,20 legacy tests** pass;
+two existing warnings. No production behavior change or new native qualification
+claim; RTX5090 failure evidence below remains current for the evaluated runtime.
+Evidence: `.chromie/acceptance/benchmark-storage-20260923/`. This delivery includes
+the removals with the manifest, restoration code, ignore rules and CI setup.
+
+## RTX5090 continuation — 2026-09-23
+
+Owner selected maintained **RTX5090/Gemma4-12B** qualification. Pre-delivery baseline
+is `ac4e56274`; fetched `main`/origin were 0 ahead/behind before development. The
+repairs below are included in this delivery. Active delivery line remains #24/#32.
+**Two of six new repair/diagnostic loops are complete; qualification remains open.**
+
+The case43 XGrammar crash is now causally reproduced and repaired. Its valid
+lookahead expression128000 collided with XGrammar0.2.1's internal marker128000,
+causing an invalid rule-1 access. The pinned image now builds exact0.2.1 source
+with marker-2, outside the legal expression domain. No dependency-version, model,
+semantic prompt/schema or authority change. Actual native parser tests fail before
+and pass after at127999/128000/128001. The original exact request now completes
+native inference with valid JSON/Schema; that is not semantic approval of its output.
+
+The second defect was recovery admission: Docker already restarted the crashed
+service, but the runner immediately attempted the remaining cases during startup.
+Identity-bound diagnostic runs now wait for healthy recovery before independent
+cases, retaining the original failure and every restart. Missing/replaced identity
+or recovery timeout stops admission. No inference retry or semantic repair call.
+Earlier optional-default acceptance and tokenizer-transport repairs remain intact.
+
+Current-image corpus: **81 schemas attempted,76 compile, five handled pre-existing
+minItems/prefixItems errors, zero crashes**. Focused nod execution completes two
+nods and safe idle but still fails a legacy speech requirement. Current full run
+attempts **75/75:12 mechanical passes/63 failures**, zero model restarts/OOM, with
+unchanged source and service identity throughout. All75 manually reviewed: the12
+passes contain five semantic passes, three partials and four failures. Eight
+follow-up turns remain unrun; raw cohort/qualification completion remain false.
+Case43 now fails an unrelated Fast argument-provenance check, not compilation.
+The previously blocked cases44–75 now have independent diagnostic results.
+
+Validation: recovery suite **89 passed**; canonical **145 benchmark,3823 main/
+1096 subtests,20 legacy tests** passed, two existing warnings; policy/ownership/
+static/config/docs included. Level A **45/45**,15 classes. Exactly one final bundle;
+300 native-call records/600 references verified, zero gaps/mismatches. No maintained
+document, environment variable, runtime switch or semantic-owner growth.
+
+Evidence root `.chromie/acceptance/rtx5090-resume-20260923/`: `REVIEW.md` records
+actual module I/O and cause; `sentinel-case-review.json` judges every case. Handoff
+owns identities, artifacts and resume commands. Next bounded diagnosis: handled
+minItems/prefixItems grammar400s and acceptance mismatches, then retained UMI/GA/
+Planner/SC and prepared-start failures. Unresolved-destination motion and false
+capability/body/rumor claims remain hard semantic failures. Do not weaken provenance,
+force speech for body-only cases, or repeat rejected prompt candidates.
+
+Agent/source matches; Agent/LLM/TTS/ASR healthy. Task-owned simulator/MCP stopped
+after fresh standing/safe-idle/empty-work proof. No physical microphone, audible
+speaker, robot, supervised-voice, target-closure or release claim. Earlier delivered
+snapshots below are historical laptop evidence, not the current RTX5090 result.
+
+## Historical delivered scope
 
 Current focus: Goal-driven single-authority architecture and current-revision evidence closure.
 
@@ -119,7 +206,8 @@ prompt candidate promoted. Resume these bounded loops, beginning with:
    `validate_contract` reads absent `count` as unknown despite a retained matching
    Capability version declaring optional `count=2`. Reuse the exact request/ID/version
    default-realization rule already in `outcome_observations`; test missing/mismatched
-   contracts, required properties and explicit overrides. This fix is not implemented.
+   contracts, required properties and explicit overrides. The RTX5090 continuation
+   above implements this fix and records the focused and full native rerun results.
 4. For each accepted minimal fix, prove focused regression then rerun all75 on one
    unchanged deployed revision, with `--keep-going`, one final bundle and every case
    reviewed. Do not count unavailable services or blocked dependent turns as semantic

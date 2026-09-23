@@ -204,6 +204,79 @@ def test_admitted_runtime_rejection_retains_final_status_without_dispatch(tmp_pa
             assert any("safe_idle" in error for error in result["errors"])
 
 
+@pytest.mark.parametrize("version,required,emitted,expected_ok", [
+    ("1", [], {}, True),
+    ("stale", [], {}, False),
+    ("1", ["count"], {}, False),
+    ("1", [], {"count": 1}, False),
+    ("1", [], {"count": 2}, True),
+])
+def test_preview_checks_optional_defaults_from_retained_contract(
+    tmp_path, version, required, emitted, expected_ok,
+):
+    from orchestrator.runtime.cognitive_gateway import CognitiveGateway
+    from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
+    from shared.chromie_contracts.core_interpretation import CoreInterpretationResult, CognitiveResponsibilityProposal
+
+    args = build_parser().parse_args([
+        "blink twice", "--preview-only", "--expect-arg", "0:count=2",
+        "--evidence-dir", str(tmp_path),
+    ])
+    response = InteractionResponse(capabilities=[{
+        "request_id": "blink-request", "capability_id": "soridormi.blink_eyes",
+        "capability_version": "1", "args": dict(emitted),
+    }])
+    gateway = CognitiveGateway()
+    definition = SimpleNamespace(
+        capability_id="soridormi.blink_eyes", version=version,
+        input_schema={"type": "object", "required": required,
+                      "properties": {"count": {"type": "integer", "default": 2}}},
+    )
+    assistant = SimpleNamespace(
+        get_http_session=AsyncMock(return_value=object()), create_session=Mock(return_value="defaults"),
+        build_context=Mock(return_value={}),
+        agent_client=SimpleNamespace(
+            health=AsyncMock(return_value={"capability_sources": ["soridormi"]}),
+            review_attention=AsyncMock(side_effect=lambda _session, request: gateway.attention_fail_open(request, reason="controlled admission")),
+            interpret_turn=AsyncMock(return_value=CoreInterpretationResult(
+                turn_id="defaults", session_id="defaults", confidence=1.0,
+                responsibilities=[CognitiveResponsibilityProposal(local_ref="r-blink", outcome="Blink twice.", output_mode="body_action", confidence=1.0)],
+            )),
+        ),
+        interaction_runtime=SimpleNamespace(
+            soridormi_invoker=object(), confirmation_request_ids=AsyncMock(return_value=[]),
+            prepare_response=lambda response, **kwargs: response,
+            capability_definition=Mock(return_value=definition),
+        ),
+        _cognitive_gateway_adapter=Mock(return_value=gateway), session_log=Mock(),
+        _run_cognitive_runtime_pipeline=AsyncMock(return_value=CognitiveRuntimeResolution(
+            mode="apply", status="applied", interaction_response=response,
+            metadata={"goal_state_commit_stage": "goal_association"},
+        )),
+        _metadata_with_turn_envelope=lambda metadata, envelope: metadata,
+        _cognitive_resolution_summary=Mock(return_value={}),
+        conversation_state=SimpleNamespace(
+            record_user_turn=Mock(), record_interaction_response=Mock(),
+            active_goal_snapshots=Mock(return_value=[]), recent_goal_snapshots=Mock(return_value=[]),
+        ),
+        sessions=SimpleNamespace(state={"defaults": {}}), cognitive_evidence=None,
+        _dispatch_detached_interaction=AsyncMock(),
+    )
+    safe = {"mode": "sim", "safe_idle": True, "active_task": None, "fallen": False, "emergency_stop": False}
+    with (
+        patch("scripts.interaction_text_mujoco_check._invoke_soridormi_status", AsyncMock(return_value=safe)),
+        patch("scripts.interaction_text_mujoco_check.record_cognitive_runtime_evidence"),
+        patch("scripts.interaction_text_mujoco_check.collect_run_provenance", return_value={}),
+    ):
+        result = asyncio.run(run_check(args, assistant=assistant, configure_environment=False))
+    assert result["ok"] is expected_ok, result["errors"]
+    assert result["interaction_response"]["capabilities"][0]["args"] == emitted
+    assert result["capability_contracts"]["blink-request"]["input_schema"] == definition.input_schema
+    assert response.capabilities[0].args == emitted
+    assert json.loads((tmp_path / "summary.json").read_text()) == result
+    assistant._dispatch_detached_interaction.assert_not_awaited()
+
+
 class InteractionTextMujocoCheckTests(unittest.TestCase):
 
     def test_live_dispatch_preserves_prior_fast_planner_communication(self) -> None:

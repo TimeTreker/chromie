@@ -61,7 +61,9 @@ Planner required Work inputs are serialized losslessly. Their accumulated Goal,
 interaction, source, dialogue and terminal-evidence context shares the configured
 whole-request model budget instead of fixed per-section character quotas. The
 transport owns admission, including output reservation and safety margin; SGLang
-verifies estimate overflow with its serving tokenizer. True overflow retains
+verifies estimate overflow with its serving tokenizer using a non-streaming count
+request with the complete chat content; the generation payload stays unchanged.
+True overflow retains
 `prompt_budget_exceeded` in `llm_budget` and fails before generation. Independently
 bounded owners elsewhere still use `required_json` and retain
 `required_context_over_budget` in `prompt_projection`; they never shorten a required
