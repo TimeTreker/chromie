@@ -1,0 +1,4 @@
+interface:
+  display_name: "Chromie Patch Git Commands"
+  short_description: "Include complete Git commands with every patch"
+  default_prompt: "Use $chromie-patch-git-commands to include the complete Git command sequence with this Chromie patch."

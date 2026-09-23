@@ -56,6 +56,9 @@ authority, or failure semantics become clearer. See the size-review policy in
 
 ## Working rules
 
+- For every patch handoff, follow the
+  [patch Git commands skill](.agents/skills/chromie-patch-git-commands/SKILL.md)
+  and include the complete, copy-ready Git sequence, including add, commit and push.
 - Follow the active Issue in `DEVELOPMENT_CHECKPOINT.md`. Until the canonical
   local gate is reproducible and the current-revision live voice proof is
   retained and the default target-evidence profile closes, do not add product
