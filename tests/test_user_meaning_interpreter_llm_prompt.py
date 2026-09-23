@@ -396,6 +396,94 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
 
 
 
+
+    def test_working_conversational_memory_resolves_followup_without_leaking_goal_identity(self) -> None:
+        interpreter = self._interpreter()
+        request = UserMeaningInterpretationRequest(
+            text="Please add ice to it.",
+            context={
+                "history": [
+                    {"role": "user", "text": "Bring me a cup of coffee."},
+                    {"role": "assistant", "text": "Sure."},
+                ],
+                "user_meaning_goal_context": [{
+                    "goal_id": "goal-coffee-secret",
+                    "responsibility_status": "open",
+                    "goal": {
+                        "goal_id": "goal-coffee-secret",
+                        "description": "Bring a cup of coffee to the user.",
+                        "object": {"resource": "cup of coffee"},
+                        "constraints": {},
+                        "metadata": {"output_mode": "body_action"},
+                    },
+                    "source_task_id": "task-coffee-secret",
+                    "last_user_update": "Bring me a cup of coffee.",
+                }],
+                "discourse_referents": [{
+                    "referent_id": "ref-coffee-secret",
+                    "entity_type": "physical_object",
+                    "canonical_value": "cup of coffee",
+                    "aliases": ["coffee"],
+                    "scope_kind": "goal",
+                    "scope_ids": ["goal-coffee-secret"],
+                    "status": "foreground",
+                    "confidence": 1.0,
+                    "source_turn_id": "turn-coffee-secret",
+                    "source_goal_ids": ["goal-coffee-secret"],
+                }],
+                "discourse_focus": ["ref-coffee-secret"],
+            },
+        )
+
+        payload = interpreter.build_interpretation_payload(request)
+        _system, user_text, _all = _payload_message_texts(payload)
+
+        self.assertIn("Working Conversational Memory", user_text)
+        self.assertIn("Bring me a cup of coffee.", user_text)
+        self.assertIn("Bring a cup of coffee to the user.", user_text)
+        self.assertIn('"canonical_value":"cup of coffee"', user_text)
+        self.assertIn('"salience":"focus"', user_text)
+        self.assertNotIn("goal-coffee-secret", user_text)
+        self.assertNotIn("task-coffee-secret", user_text)
+        self.assertNotIn("ref-coffee-secret", user_text)
+
+    def test_working_conversational_memory_supports_elliptical_constraint_followup(self) -> None:
+        interpreter = self._interpreter()
+        request = UserMeaningInterpretationRequest(
+            text="No sugar.",
+            context={
+                "history": [{"role": "user", "text": "Bring me a cup of coffee."}],
+                "user_meaning_goal_context": [{
+                    "goal": {
+                        "description": "Bring a cup of coffee to the user.",
+                        "object": {"resource": "cup of coffee"},
+                        "constraints": {},
+                        "metadata": {"output_mode": "body_action"},
+                    },
+                    "responsibility_status": "open",
+                }],
+                "discourse_referents": [{
+                    "referent_id": "ref-coffee",
+                    "entity_type": "physical_object",
+                    "canonical_value": "cup of coffee",
+                    "aliases": ["coffee"],
+                    "scope_kind": "conversation",
+                    "scope_ids": [],
+                    "status": "foreground",
+                    "confidence": 1.0,
+                    "source_turn_id": "turn-coffee",
+                    "source_goal_ids": [],
+                }],
+                "discourse_focus": ["ref-coffee"],
+            },
+        )
+        _system, user_text, _all = _payload_message_texts(
+            interpreter.build_interpretation_payload(request)
+        )
+        self.assertIn("No sugar.", user_text)
+        self.assertIn("cup of coffee", user_text)
+        self.assertIn("omitted repeated subjects", user_text)
+
     def test_primary_prompt_does_not_expose_runtime_sid(self) -> None:
         payload = self._interpreter().build_interpretation_payload(
             UserMeaningInterpretationRequest(

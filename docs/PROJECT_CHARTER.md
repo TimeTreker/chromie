@@ -1136,8 +1136,16 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    within one conversation are serialized at that semantic-state boundary; the
    next association refreshes the bounded continuity snapshot before deciding `continue`, `reference`, `modify`,
    replacement, or new work. Continuity is causally bounded: a turn never reads
-   dialogue admitted after itself. This keeps conversational continuity responsive
-   without letting the Host infer semantics from recency or wording. Planner
+   dialogue admitted after itself. UMI consumes that bounded conversational state as
+   **working semantic context**: recent accepted dialogue, human-level active Goal meaning,
+   salient discourse entities/focus, relevant activated Memory, Situation and Interaction
+   Context. This context may resolve pronouns, ellipsis, omitted repeated subjects,
+   corrections and incremental constraints (for example, coffee -> "add ice to it" ->
+   "no sugar"). UMI may carry the resolved human-level object/constraint into WHAT, but it
+   must not see or author canonical Goal/task/referent identity merely to make the reference
+   resolvable. GA remains the only owner that associates the accepted current Responsibility
+   with retained canonical Goal identity. This keeps conversational continuity responsive
+   without letting the Host or UMI infer Goal semantics from recency or wording. Planner
    provenance remains downstream fail-closed: a value labelled `user_supplied`
    must be traceable to an exact owning intent excerpt or retained typed Goal
    binding; model memory or an invented contextual guess is not provenance.

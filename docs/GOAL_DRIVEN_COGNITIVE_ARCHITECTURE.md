@@ -310,9 +310,15 @@ User Meaning Interpretation answers the human semantic question:
 > What independently observable outcome is still owed to the person?
 
 A Goal is the persistent representation of that Responsibility when it must
-survive beyond immediate progress. The Planner does not get to redefine what the
-person asked for because one current Provider happens to expose a convenient
-capability granularity.
+survive beyond immediate progress. Before Goal identity is selected, UMI may use a bounded
+**working conversational context** containing recent accepted dialogue, active Goal human
+meaning without IDs, salient discourse entities/focus, relevant activated Memory and trusted
+Situation/Interaction context. This is semantic context for understanding phrases such as
+"add ice to it", "no sugar", "that one", or "do it after dinner". UMI resolves only the
+human-level WHAT; it does not bind the new utterance to a canonical Goal, task or referent ID.
+Goal Association performs that continuity/identity judgment after UMI has produced the accepted
+Responsibility. The Planner does not get to redefine what the person asked for because one
+current Provider happens to expose a convenient capability granularity.
 
 Goal Association determines how accepted Responsibilities relate to retained Goals.
 It selects identity, continuity and source-bound changes, rather than authoring another

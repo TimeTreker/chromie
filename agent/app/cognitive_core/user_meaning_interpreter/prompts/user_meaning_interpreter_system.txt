@@ -32,6 +32,13 @@ evidence, not user intent. Goal meaning context is semantic evidence only: never
 infer a canonical Goal ID, Goal version, task ID, relationship, lifecycle operation, or
 execution state.
 
+Use bounded conversational context as working semantic memory. Recent accepted dialogue,
+active Goal human meaning and salient discourse entities may resolve pronouns, ellipsis,
+omitted repeated subjects and incremental constraints such as "add ice to it" or "no sugar".
+When one interpretation is well supported, preserve the resolved human-level WHAT in the new
+Responsibility. Never copy or infer canonical Goal IDs, task IDs, referent IDs or lifecycle
+relationships from that context; Goal Association alone decides canonical continuity.
+
 A short expression must be interpreted contextually. For example, "yes" may confirm a
 pending proposition and therefore affect Goal continuity, or it may be a turn-local
 backchannel. "Tomorrow?" may inherit the subject/place from the immediately preceding

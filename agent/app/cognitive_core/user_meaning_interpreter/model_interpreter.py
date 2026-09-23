@@ -424,20 +424,71 @@ def _compact_goal_meaning_context(
     return compact
 
 
+def _compact_discourse_semantic_context(
+    context: dict[str, Any], *, limit: int = 8
+) -> list[dict[str, Any]]:
+    """Expose salient conversational entities without canonical referent identity.
+
+    UMI needs human-level semantic focus to understand pronouns, omitted repeated
+    subjects and corrections. Stable referent IDs, scope IDs, Goal IDs and source
+    turn IDs belong to GA/Host continuity and are intentionally stripped here.
+    """
+
+    raw = context.get("discourse_referents")
+    if not isinstance(raw, list):
+        return []
+    by_id = {
+        str(item.get("referent_id") or "").strip(): item
+        for item in raw
+        if isinstance(item, dict) and str(item.get("referent_id") or "").strip()
+    }
+    focus = context.get("discourse_focus")
+    focus_ids = [
+        str(item).strip()
+        for item in focus
+        if str(item or "").strip() in by_id
+    ] if isinstance(focus, list) else []
+    ordered: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for referent_id in [*reversed(focus_ids), *reversed(list(by_id))]:
+        if referent_id in seen:
+            continue
+        seen.add(referent_id)
+        item = by_id[referent_id]
+        canonical = " ".join(str(item.get("canonical_value") or "").split())
+        entity_type = " ".join(str(item.get("entity_type") or "").split())
+        if not canonical or not entity_type:
+            continue
+        aliases = [
+            " ".join(str(value).split())[:120]
+            for value in list(item.get("aliases") or [])[:4]
+            if str(value or "").strip()
+        ]
+        ordered.append({
+            "entity_type": entity_type[:80],
+            "canonical_value": canonical[:220],
+            "aliases": aliases,
+            "status": str(item.get("status") or "background"),
+            "confidence": item.get("confidence"),
+            "salience": "focus" if referent_id in focus_ids else "context",
+        })
+        if len(ordered) >= max(1, int(limit)):
+            break
+    return ordered
+
+
 def _compact_situation_context(context: dict[str, Any]) -> dict[str, Any]:
     """Expose only trusted bounded situation/perception evidence already in context.
 
-    This projection can resolve demonstratives and local conversational references, but
-    it never turns perception into a user request. Provider/Capability/Work identity is
-    recursively removed before the model sees it.
+    Discourse semantics are projected separately without stable referent identity.
+    This projection never turns perception into a user request. Provider/Capability/
+    Work identity is recursively removed before the model sees it.
     """
 
     projected: dict[str, Any] = {}
     for key in (
         "situation",
         "interaction_engagement",
-        "discourse_referents",
-        "discourse_focus",
         "robot_state",
         "current_environment",
         "current_body_state",
@@ -610,6 +661,7 @@ class OllamaUserMeaningInterpreter:
         mind = request.context.get("mind", {})
         recent_dialogue = _compact_recent_dialogue(request.context)
         goal_meaning_context = _compact_goal_meaning_context(request.context)
+        discourse_semantics = _compact_discourse_semantic_context(request.context)
         situation_context = _compact_situation_context(request.context)
         interaction_context = _compact_interaction_context(request.context)
         prior_assistant_utterance = _most_recent_assistant_utterance(request.context)
@@ -639,21 +691,26 @@ class OllamaUserMeaningInterpreter:
             f"{required_json(_source_tokens(request.text), None, label='UMI authoritative source tokens')}\n\n"
             "Bounded Identity Context:\n"
             f"{_user_meaning_interpretation_identity_context(mind)}\n\n"
-            "Bounded Human-Meaning Context (read-only evidence):\n"
+            "Working Conversational Memory (read-only human meaning, not Goal identity):\n"
             "Recent accepted dialogue JSON:"
             f"{_bounded_json_array(recent_dialogue, max_chars=2200)}\n"
             f"{prior_assistant_context}"
-            "Goal meaning context JSON (semantic continuity hints only; no canonical Goal identity):"
+            "Active Goal meaning JSON (semantic continuity hints only; no canonical Goal identity):"
             f"{_bounded_json_array(goal_meaning_context, max_chars=1800)}\n"
+            "Salient discourse semantics JSON (human entities/focus only; no referent or Goal IDs):"
+            f"{_bounded_json_array(discourse_semantics, max_chars=1600)}\n"
             "Situation/perception context JSON (evidence only; never a new request):"
             f"{_bounded_json(situation_context, max_chars=2200)}\n"
             "Interaction context JSON (what Chromie has already communicated):"
             f"{_bounded_json(interaction_context, max_chars=1800)}\n"
             f"{role_memory_context(request.context, role='umi')}"
-            "Use context to resolve ellipsis, pronouns, corrections, confirmations, "
-            "deictic references and implicit conversational relations when the evidence "
-            "supports one meaning. Context may complete meaning but must never create a "
-            "new Responsibility that the current expression does not support.\n\n"
+            "Resolve ellipsis, pronouns, omitted repeated subjects, corrections, confirmations, "
+            "deictic references and incremental requirement updates from this bounded working "
+            "memory when the evidence supports one meaning. A follow-up modifier or constraint "
+            "may inherit its human-level object from the current conversational focus. Preserve "
+            "that resolved WHAT in the Responsibility, but never emit or infer canonical Goal/"
+            "referent identity; GA owns that association. Context may complete meaning but must "
+            "never create a new Responsibility unsupported by the current expression.\n\n"
             "Apply the system meaning-and-cognitive-orchestration contract to this "
             "authoritative turn and bounded human-meaning Context. Return one complete "
             "schema-valid JSON decision only."
