@@ -4823,9 +4823,6 @@ class GoalDrivenRuntimeCoordinator:
             planner_refs = self._cognitive_request_responsibility_refs(
                 work_request, "planner"
             )
-            social_refs = self._cognitive_request_responsibility_refs(
-                work_request, "social_cognition"
-            )
             explicit_ga_requested = any(
                 item.authority == "goal_association"
                 for item in work_request.cognitive_requests
@@ -4841,21 +4838,15 @@ class GoalDrivenRuntimeCoordinator:
                 else None
             )
 
-            # UMI authors which existing cognitive authorities are useful now.
-            # Runtime validates their Responsibility scope and schedules those
-            # computations. It may close a hard dependency of an explicitly requested
-            # authority (Planner -> turn-wide GA), but never reconstructs semantic
-            # readiness from WHAT labels or fields.
-            state_social_task = (
-                self.start_state_interaction(
-                    session,
-                    work_request=self._subset_work_request(
-                        work_request, set(social_refs)
-                    ),
-                    turn_id=turn_id,
-                )
-                if social_refs
-                else None
+            # Initial Social Cognition is a standing interaction responsibility for every
+            # fresh admitted addressed turn, not a model-authored routing choice. Runtime
+            # therefore wakes SC mechanically with the complete accepted turn. UMI still
+            # selects only non-standing GA/Planner cognition; Runtime may close Planner's
+            # hard turn-wide GA dependency without inferring readiness from WHAT labels.
+            state_social_task = self.start_state_interaction(
+                session,
+                work_request=work_request,
+                turn_id=turn_id,
             )
             association_task = (
                 asyncio.create_task(

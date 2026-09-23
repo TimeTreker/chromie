@@ -596,7 +596,7 @@ class OllamaUserMeaningInterpreter:
             logger.warning("User Meaning Interpreter system prompt not found: %s", self.prompt_path)
             return (
                 "You are Chromie's User Meaning Interpretation model. Understand only WHAT the "
-                "human means, propose bounded next cognitive authorities, and return "
+                "human means, propose bounded non-standing cognitive authorities, and return "
                 "provider-neutral responsibilities, confidence, remaining semantic "
                 "uncertainties, and cognitive_requests as JSON."
             )
@@ -795,19 +795,19 @@ class OllamaUserMeaningInterpreter:
         ]
         activation["properties"]["authority"] = {
             "type": "string",
-            "enum": ["goal_association", "social_cognition", "planner"],
+            "enum": ["goal_association", "planner"],
         }
         activation["properties"]["responsibility_refs"]["items"] = {
             "type": "string", "enum": [f"r{i}" for i in range(1, 13)],
         }
         schema["properties"]["cognitive_requests"]["description"] = (
-            "Bounded cognitive activation requests. Every admitted addressed user turn must "
-            "include exactly one social_cognition request covering every Responsibility; "
-            "Social Cognition decides whether/how to interact. Goal Association and Planner "
-            "remain model-selected according to their own usefulness contracts."
+            "Bounded non-standing cognitive activation requests. Runtime mechanically wakes "
+            "Social Cognition once for every fresh admitted addressed turn, so UMI must not "
+            "encode that standing activation. Select Goal Association and/or Planner only "
+            "when their own cognition is useful for the accepted meaning."
         )
-        schema["properties"]["cognitive_requests"]["minItems"] = 1
-        schema["properties"]["cognitive_requests"]["maxItems"] = 3
+        schema["properties"]["cognitive_requests"]["minItems"] = 0
+        schema["properties"]["cognitive_requests"]["maxItems"] = 2
         token_refs = [token["ref"] for token in _source_tokens(admitted_turn)]
         if token_refs:
             schema["$defs"]["ResponsibilitySourceEvidence"] = user_turn_source_span_schema(token_refs)
@@ -914,19 +914,6 @@ class OllamaUserMeaningInterpreter:
             if isinstance(item["confidence"], bool) or not isinstance(item["confidence"], (int, float)):
                 raise ValueError("UMI requires numeric Responsibility confidence")
         decision = UserMeaningInterpretationDecision.model_validate(parsed)
-        known_refs = {item.local_ref for item in decision.responsibilities}
-        social_request = next(
-            (item for item in decision.cognitive_requests if item.authority == "social_cognition"),
-            None,
-        )
-        if social_request is None:
-            raise _UserMeaningInterpretationAuthorityViolation(
-                "every admitted addressed user turn must activate Social Cognition"
-            )
-        if set(social_request.responsibility_refs) != known_refs:
-            raise _UserMeaningInterpretationAuthorityViolation(
-                "initial Social Cognition cognition is turn-wide and must cover every Responsibility"
-            )
         _validate_primary_source_evidence(request, parsed)
         return decision
 

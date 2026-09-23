@@ -113,19 +113,21 @@ does not grant authority over unrelated Goals. Required facts must not be silent
 truncated to meet a fast budget. Memory, Goal, Work and Interaction stores retain
 their existing owners; two inference sessions do not create two conversations.
 
-One accepted UMI result carries explicit `cognitive_requests[]` naming which existing
-authorities should work next and the exact Responsibility refs motivating each request.
-Every fresh admitted turn addressed to Chromie must include one turn-wide Social Cognition
-request because interaction itself is a standing responsibility; SC still decides whether
-and how to express anything. Fast Planner activation remains model-selected. Runtime may
-close only a hard architectural prerequisite of an explicitly requested authority; in
-particular, initial Planner mechanically schedules turn-wide GA so eventual Work can obtain
-canonical Goal binding. That dependency closure is scheduling, not another semantic
-cognitive-activation decision. Runtime does not recreate readiness from `continuity_scope`,
-`output_mode`, bindings, keywords, or task classes. `continuity_scope` remains semantic
-ownership evidence and is not a routing flag. Optional communication does not gate
-already-requested planning or safe dispatch, and Work completion does not gate an
-already-grounded conversational answer.
+One accepted UMI result carries explicit `cognitive_requests[]` only for non-standing
+cognition whose usefulness depends on the accepted meaning: Goal Association and Planner,
+with exact Responsibility refs motivating each request. Every fresh admitted turn addressed
+to Chromie mechanically wakes one turn-wide Social Cognition interaction because interaction
+itself is a standing architectural responsibility; SC still decides whether and how to express
+anything. Initial SC activation is therefore Runtime scheduling, not a UMI semantic-routing
+choice, and UMI omission of an SC request cannot invalidate otherwise accepted meaning. Fast
+Planner activation remains model-selected. Runtime may close only a hard architectural
+prerequisite of an explicitly requested authority; in particular, initial Planner mechanically
+schedules turn-wide GA so eventual Work can obtain canonical Goal binding. That dependency
+closure is scheduling, not another semantic cognitive-activation decision. Runtime does not
+recreate GA/Planner readiness from `continuity_scope`, `output_mode`, bindings, keywords, or
+task classes. `continuity_scope` remains semantic ownership evidence and is not a routing
+flag. Optional communication does not gate already-requested planning or safe dispatch, and
+Work completion does not gate an already-grounded conversational answer.
 Not every turn requires GA and Planner in addition to the standing initial SC call. Missing canonical Goal identity alone does not
 block a source-grounded Communicative Act. Understanding, cognitive activation, planning
 readiness, canonical continuity, commitment, execution and verified completion remain

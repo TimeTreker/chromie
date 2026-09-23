@@ -32,11 +32,6 @@ def _cognitive_requests(*refs: str) -> list[dict[str, object]]:
             "reason_summary": "Check canonical continuity for the accepted meaning.",
         },
         {
-            "authority": "social_cognition",
-            "responsibility_refs": scope,
-            "reason_summary": "Consider the current interaction.",
-        },
-        {
             "authority": "planner",
             "responsibility_refs": scope,
             "reason_summary": "The accepted meaning is ready for HOW reasoning.",
@@ -132,14 +127,9 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         )
         self.assertEqual(decision.responsibilities[0].local_ref, "r1")
 
-    def test_primary_planner_activation_requires_standing_sc_but_not_redundant_ga(self) -> None:
+    def test_primary_planner_activation_does_not_require_model_authored_sc(self) -> None:
         parsed = _valid_output()
         parsed["cognitive_requests"] = [
-            {
-                "authority": "social_cognition",
-                "responsibility_refs": ["r1"],
-                "reason_summary": "The admitted turn requires an interaction decision.",
-            },
             {
                 "authority": "planner",
                 "responsibility_refs": ["r1"],
@@ -156,30 +146,21 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
 
         self.assertEqual(
             [item.authority for item in decision.cognitive_requests],
-            ["social_cognition", "planner"],
+            ["planner"],
         )
 
-    def test_primary_validation_requires_turn_wide_social_cognition(self) -> None:
+    def test_primary_validation_accepts_empty_non_standing_cognitive_requests(self) -> None:
         request = UserMeaningInterpretationRequest(
             text="What's the weather in Chongqing today?"
         )
         parsed = _valid_output()
-        parsed["cognitive_requests"] = [
-            item for item in parsed["cognitive_requests"]
-            if item["authority"] != "social_cognition"
-        ]
-        with self.assertRaisesRegex(ValueError, "activate Social Cognition"):
-            OllamaUserMeaningInterpreter._validate_interpretation_content(
-                request, json.dumps(parsed),
-            )
+        parsed["cognitive_requests"] = []
 
-        compound = _compound_output()
-        compound["cognitive_requests"][1]["responsibility_refs"] = ["r1"]
-        with self.assertRaisesRegex(ValueError, "Social Cognition cognition is turn-wide"):
-            OllamaUserMeaningInterpreter._validate_interpretation_content(
-                UserMeaningInterpretationRequest(text="nod and blink"),
-                json.dumps(compound),
-            )
+        decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+            request, json.dumps(parsed),
+        )
+
+        self.assertEqual(decision.cognitive_requests, [])
 
     def test_primary_source_evidence_rejects_unknown_refs(self) -> None:
         parsed = _valid_output()
@@ -192,7 +173,7 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
                 json.dumps(parsed),
             )
 
-    def test_mixed_greeting_and_work_requires_turn_wide_ga_and_sc_but_scoped_planner(self) -> None:
+    def test_mixed_greeting_and_work_requires_turn_wide_ga_and_scoped_planner(self) -> None:
         request = UserMeaningInterpretationRequest(text="Hi. Turn left.")
         parsed = _compound_output()
         parsed["responsibilities"][0].update(
@@ -203,8 +184,7 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
             outcome="Turn left", body_effect_family="task_physical_effect", continuity_scope="goal",
             source_evidence={"source_start_token_ref": "t2", "source_end_token_ref": "t4"},
         )
-        parsed["cognitive_requests"][1]["responsibility_refs"] = ["r1", "r2"]
-        parsed["cognitive_requests"][2]["responsibility_refs"] = ["r2"]
+        parsed["cognitive_requests"][1]["responsibility_refs"] = ["r2"]
         for omitted_scope in (["r1"], ["r2"]):
             with self.subTest(ga_refs=omitted_scope):
                 parsed["cognitive_requests"][0]["responsibility_refs"] = omitted_scope
@@ -218,7 +198,7 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         )
         self.assertEqual(
             {item.authority: item.responsibility_refs for item in decision.cognitive_requests},
-            {"goal_association": ["r1", "r2"], "social_cognition": ["r1", "r2"], "planner": ["r2"]},
+            {"goal_association": ["r1", "r2"], "planner": ["r2"]},
         )
 
     def test_primary_source_evidence_rejects_reversed_refs(self) -> None:

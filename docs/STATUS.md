@@ -1,5 +1,17 @@
 # Chromie Current Status
 
+## Standing initial Social Cognition scheduling — 2026-09-23
+
+A live RTX4090/Qwen3.5-4B weather turn twice preserved understandable WHAT but omitted
+the previously model-authored mandatory `social_cognition` activation, causing UMI to
+fail closed before Goal Association or Planner. The universal initial SC wake is now
+owned mechanically by Runtime: every fresh admitted addressed turn starts one turn-wide
+SC interaction from the complete accepted UMI result, while UMI `cognitive_requests[]`
+select only non-standing Goal Association and Planner cognition. The live UMI decoder
+therefore permits an empty activation array and no longer exposes `social_cognition` as
+a selectable initial authority. This changes scheduling ownership, not SC wording/silence
+authority and not GA/Planner semantic readiness.
+
 ## Benchmark storage cleanup — 2026-09-23
 
 Owner-authorized storage cleanup removes6,076 expanded replay files (about275 MiB)

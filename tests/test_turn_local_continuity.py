@@ -227,14 +227,15 @@ async def test_turn_local_interaction_returns_social_response_without_goal_or_pl
     assert agent.social_requests[0].context["work_decision_pending"] is True
 
 
-def test_umi_cognitive_requests_are_required_and_source_scoped() -> None:
+def test_umi_cognitive_requests_are_required_but_only_non_standing_authorities() -> None:
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(
         admitted_turn="Check the weather."
     )
     assert "cognitive_requests" in schema["required"]
+    assert schema["properties"]["cognitive_requests"]["minItems"] == 0
     activation = schema["$defs"]["CognitiveActivationRequest"]
     assert activation["properties"]["authority"]["enum"] == [
-        "goal_association", "social_cognition", "planner"
+        "goal_association", "planner"
     ]
 
 
@@ -293,6 +294,29 @@ async def test_goal_scoped_meaning_does_not_wake_planner_without_model_request()
             super().__init__()
             self.planner_calls = 0
 
+        async def resolve_social_cognition(self, session, *, request, timeout_ms):
+            del session, timeout_ms
+            self.social_requests.append(request)
+            return SocialCognitionResolution(
+                request_id=request.request_id,
+                snapshot_digest=request.snapshot_digest(),
+                disposition="communicate",
+                activities=[{
+                    "activity_id": "sc:goal-work:ack",
+                    "text": "Okay.",
+                    "function": "acknowledge",
+                    "truth_stage": "context_grounded",
+                    "delivery_phase": "immediate",
+                    "source_goal_ids": [],
+                    "source_responsibility_refs": ["r1"],
+                    "evidence_refs": [],
+                    "addressed_need_ids": [],
+                }],
+                reason_summary="Acknowledge the understood request without claiming completion.",
+                need_outcomes={},
+                model_call_count=1,
+            )
+
         async def resolve_goal_association(self, *args, **kwargs):
             self.goal_association_calls += 1
             return body_goal_association(source_ref="r1")
@@ -339,3 +363,4 @@ async def test_goal_scoped_meaning_does_not_wake_planner_without_model_request()
     assert result.terminal_plan is None
     assert agent.planner_calls == 0
     assert result.metadata["planner_not_requested_by_umi"] is True
+    assert len(agent.social_requests) == 1

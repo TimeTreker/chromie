@@ -62,8 +62,6 @@ def intent_result(text, output_mode="body_action"):
         "cognitive_requests": [
             {"authority": "goal_association", "responsibility_refs": ["r1"],
              "reason_summary": "Check canonical continuity."},
-            {"authority": "social_cognition", "responsibility_refs": ["r1"],
-             "reason_summary": "Consider interaction."},
             {"authority": "planner", "responsibility_refs": ["r1"],
              "reason_summary": "Meaning is ready for HOW."},
         ],
