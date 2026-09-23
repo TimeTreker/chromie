@@ -87,6 +87,7 @@ def _compound_output() -> dict[str, object]:
             "local_ref": ref,
             "outcome": outcome,
             "output_mode": "body_action",
+            "body_effect_family": "social_expression",
             "continuity_scope": "goal",
             "confidence": 1.0,
             "source_evidence": {
@@ -195,11 +196,11 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         request = UserMeaningInterpretationRequest(text="Hi. Turn left.")
         parsed = _compound_output()
         parsed["responsibilities"][0].update(
-            outcome="Respond to the greeting", output_mode="speech", continuity_scope="turn",
+            outcome="Respond to the greeting", output_mode="speech", body_effect_family=None, continuity_scope="turn",
             source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
         )
         parsed["responsibilities"][1].update(
-            outcome="Turn left", continuity_scope="goal",
+            outcome="Turn left", body_effect_family="task_physical_effect", continuity_scope="goal",
             source_evidence={"source_start_token_ref": "t2", "source_end_token_ref": "t4"},
         )
         parsed["cognitive_requests"][1]["responsibility_refs"] = ["r1", "r2"]

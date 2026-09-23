@@ -2576,6 +2576,26 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
                 forged["new_goals"][0]["bindings"] = []
                 self.assertFalse(Draft202012Validator(schema).is_valid(forged))
 
+    def test_body_effect_family_is_preserved_into_goal_metadata(self):
+        req = request("bring the milk to me", language="en-US").model_copy(
+            update={
+                "responsibilities": typed_responsibilities({
+                    "local_ref": "r1",
+                    "outcome": "bring the milk to me",
+                    "bindings": {"entity": "milk", "recipient": "me"},
+                    "output_mode": "body_action",
+                    "body_effect_family": "task_physical_effect",
+                    "confidence": 1.0,
+                })
+            }
+        )
+        raw = create_goals(intent_goal("unused", "body_action"))
+        result = asyncio.run(GoalAssociationResolver(ScriptedOllama([raw])).resolve(req))
+        self.assertEqual(
+            result.new_goals[0].metadata["body_effect_families"],
+            ["task_physical_effect"],
+        )
+
     def test_minimal_ga_new_goal_preserves_structured_umi_binding_losslessly(self):
         structured = {"room": "desk", "offset": [1, 2]}
         req = request("Arrange them in this region.", language="en-US").model_copy(

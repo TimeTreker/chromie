@@ -171,8 +171,11 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "act merely because no additional playback is useful. Acknowledging "
     "a person's reported experience is context_grounded; pre_evidence and progress_kind "
     "describe prospective Chromie task Work, not every social acknowledgement. "
-    "When context.work_failure is supplied, treat its reason as trusted cause evidence, "
-    "not as wording to quote. Explain the most specific user-relevant cause that evidence "
+    "When context.work_failure is supplied, treat its known_cause as trusted cause evidence, "
+    "not as wording to quote. A runtime-owned result need with required_result_update=true is "
+    "authoritative terminal Work state: address that result now, even if older Goal/Work context "
+    "still says planning or a previous acknowledgement was already delivered. Explain the most "
+    "specific user-relevant cause that evidence "
     "supports, while abstracting away module/class names, activity IDs, schemas, contracts, "
     "and internal_stage/internal_failure_class. Distinguish failure before execution from "
     "failure during execution and from true Capability unavailability; never claim a "
@@ -302,7 +305,13 @@ def _terminal_work_failure_requires_result_update(
         request.trigger == "work_state"
         and isinstance(failure, dict)
         and failure.get("status") == "failed"
-        and any(need.kind == "result" for need in request.communication_needs)
+        and any(
+            need.owner == "runtime"
+            and need.kind == "result"
+            and need.facts.get("status") == "failed"
+            and need.facts.get("required_result_update") is True
+            for need in request.communication_needs
+        )
         and not user_turn_prohibits_speech(request.context.get("user_turn_envelope"))
     )
 
@@ -349,6 +358,12 @@ def social_cognition_response_schema(
         for name in ("memory_candidates", "self_memory_candidates"):
             schema["properties"][name]["maxItems"] = 0
     need_ids = [item.need_id for item in request.communication_needs]
+    required_failure_need_ids = [
+        need.need_id for need in request.communication_needs
+        if need.owner == "runtime" and need.kind == "result"
+        and need.facts.get("status") == "failed"
+        and need.facts.get("required_result_update") is True
+    ]
     schema["properties"]["need_outcomes"] = {
         "type": "object", "additionalProperties": False,
         "properties": {key: {"type": "string", "enum": ["covered", "pending"]} for key in need_ids},
@@ -364,6 +379,10 @@ def social_cognition_response_schema(
             "if": {"properties": {"disposition": {"enum": ["communicate", "silence"]}}},
             "then": {"properties": {"need_outcomes": {"required": need_ids}}},
         })
+    for need_id in required_failure_need_ids:
+        schema["properties"]["need_outcomes"]["properties"][need_id] = {
+            "type": "string", "const": "covered",
+        }
     if deep:
         schema["properties"]["disposition"]["enum"] = ["communicate", "silence"]
     if (
@@ -619,10 +638,20 @@ def validate_social_cognition_output(
         raise ValueError(
             "fresh addressed turn without pending or delivered reply requires acknowledgement"
         )
-    if _terminal_work_failure_requires_result_update(request) and output.disposition == "silence":
-        raise ValueError(
-            "terminal requested-Work failure with a result need requires a user update"
-        )
+    if _terminal_work_failure_requires_result_update(request):
+        required_failure_need_ids = {
+            need.need_id for need in request.communication_needs
+            if need.owner == "runtime" and need.kind == "result"
+            and need.facts.get("status") == "failed"
+            and need.facts.get("required_result_update") is True
+        }
+        if output.disposition != "communicate" or any(
+            output.need_outcomes.get(need_id) != "covered"
+            for need_id in required_failure_need_ids
+        ):
+            raise ValueError(
+                "terminal requested-Work failure result need must be communicated and covered"
+            )
     allowed = {item["capability_id"]: item for item in candidates}
     scopes = {
         "source_responsibility_refs": {item.local_ref for item in request.responsibilities},
@@ -793,12 +822,25 @@ def _social_interaction_opportunity(
     """Compact deterministic cue for SC; never a second social authority."""
     already = interaction.get("already_spoken") or []
     pending = interaction.get("pending_speech") or []
+    failure = request.context.get("work_failure")
+    terminal_failure = isinstance(failure, dict) and failure.get("status") == "failed"
     opportunity: dict[str, Any] = {
-        "kind": "fresh_addressed_turn" if request.trigger == "interpretation" else "trusted_state_change",
+        "kind": (
+            "terminal_work_failure" if terminal_failure
+            else "fresh_addressed_turn" if request.trigger == "interpretation"
+            else "trusted_state_change"
+        ),
         "fresh_addressed_turn": request.trigger == "interpretation",
         "reply_already_pending_or_delivered": bool(already or pending),
         "work_decision_pending": bool(request.context.get("work_decision_pending")),
     }
+    if terminal_failure:
+        opportunity["terminal_work_failure"] = {
+            "status": "failed",
+            "effect_execution": failure.get("effect_execution"),
+            "known_cause": failure.get("known_cause"),
+            "required_result_update": True,
+        }
     if request.communication_needs:
         turn_id = request.source_turn.get("turn_id")
         opportunity["need_accounting"] = {

@@ -91,7 +91,12 @@ it must not automatically block unrelated grounded cognition. Do not request Dee
 Planner owns its own reasoning depth.
 
 output_mode describes the requested observable result, never a Capability or plan. Use
-body_action for physical movement/posture/gaze/gesture/manipulation; information for a
+body_action for physical movement/posture/gaze/gesture/manipulation; for every body_action also
+author body_effect_family as provider-neutral WHAT: task_physical_effect for locomotion, posture,
+manipulation, acquisition/carrying/handover; social_expression for an explicitly requested gesture
+or facial expression; gaze_or_orientation for explicitly requested looking/attention orientation.
+This refinement never names a Capability/provider/Activity and must not be inferred from what tools
+are available. Use information for a
 requested fact or judgment; speech for an ordinary communicative obligation; preserve
 specific authored vocal modes; media_playback is existing media; stateful_effect is an
 external durable/future state change outside embodiment. When a person asks Chromie to

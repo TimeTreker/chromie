@@ -201,6 +201,20 @@ class CognitiveResponsibilityProposal(BaseModel):
             "local_ref values."
         ),
     )
+    body_effect_family: Literal[
+        "task_physical_effect",
+        "social_expression",
+        "gaze_or_orientation",
+    ] | None = Field(
+        default=None,
+        description=(
+            "Provider-neutral WHAT refinement for body_action only. "
+            "task_physical_effect covers locomotion, posture, manipulation, carrying and handover; "
+            "social_expression covers explicitly requested gesture/facial expression; "
+            "gaze_or_orientation covers explicitly requested looking/attention orientation. "
+            "This never names a Capability, provider, Activity or executable method."
+        ),
+    )
     output_mode: Literal[
         "unspecified",
         "speech",
@@ -279,6 +293,8 @@ class CognitiveResponsibilityProposal(BaseModel):
 
     @model_validator(mode="after")
     def validate_continuity_scope(self) -> "CognitiveResponsibilityProposal":
+        if self.output_mode != "body_action" and self.body_effect_family is not None:
+            raise ValueError("body_effect_family is valid only for body_action Responsibility")
         if self.continuity_scope == "turn" and self.output_mode != "speech":
             raise ValueError(
                 "turn-local Responsibility must be ordinary conversational speech"

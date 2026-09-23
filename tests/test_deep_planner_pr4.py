@@ -143,6 +143,69 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
             ["soridormi.walk_forward"],
         )
 
+    def test_body_effect_family_hides_optional_social_expression_from_task_work(self):
+        capabilities = [
+            {
+                "capability_id": "soridormi.acquire_and_deliver_resource",
+                "effects": ["physical_motion", "resource_delivery"],
+                "semantic_scope": {
+                    "responsibility_type": "acquire_and_deliver_resource",
+                    "resource_kinds": ["physical_object"],
+                },
+            },
+            {
+                "capability_id": "soridormi.blink_eyes",
+                "effects": ["visual_expression"],
+                "behavior_domains": ["social_attention", "facial_expression"],
+            },
+            {
+                "capability_id": "soridormi.look_at_person",
+                "effects": ["physical_motion"],
+                "behavior_domains": ["social_attention", "orientation"],
+            },
+        ]
+        goals = [{
+            "goal_id": "milk",
+            "metadata": {
+                "output_mode": "body_action",
+                "body_effect_families": ["task_physical_effect"],
+            },
+        }]
+        qualified = qualify_capability_catalog_for_output_modes(
+            capabilities, authoritative_goals=goals,
+        )
+        self.assertEqual(
+            [item["capability_id"] for item in qualified],
+            ["soridormi.acquire_and_deliver_resource"],
+        )
+
+    def test_explicit_social_expression_keeps_social_body_capabilities(self):
+        capabilities = [
+            {
+                "capability_id": "soridormi.walk_forward",
+                "effects": ["physical_motion"],
+            },
+            {
+                "capability_id": "soridormi.blink_eyes",
+                "effects": ["visual_expression"],
+                "behavior_domains": ["social_attention", "facial_expression"],
+            },
+        ]
+        goals = [{
+            "goal_id": "blink",
+            "metadata": {
+                "output_mode": "body_action",
+                "body_effect_families": ["social_expression"],
+            },
+        }]
+        qualified = qualify_capability_catalog_for_output_modes(
+            capabilities, authoritative_goals=goals,
+        )
+        self.assertEqual(
+            [item["capability_id"] for item in qualified],
+            ["soridormi.blink_eyes"],
+        )
+
 
 class FullCatalog:
     def __init__(self):

@@ -52,6 +52,7 @@ def intent_result(text, output_mode="body_action"):
         "confidence": 1.0,
         "responsibilities": [{
             "local_ref": "r1", "outcome": text, "confidence": 1.0, "output_mode": output_mode,
+            **({"body_effect_family": "task_physical_effect"} if output_mode == "body_action" else {}),
             "continuity_scope": "goal",
             "source_evidence": {
                 "source_start_token_ref": tokens[0]["ref"],

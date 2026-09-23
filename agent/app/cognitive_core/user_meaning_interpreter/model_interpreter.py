@@ -677,6 +677,7 @@ class OllamaUserMeaningInterpreter:
         fields = (
             "local_ref",
             "output_mode",
+            "body_effect_family",
             "continuity_scope",
             "outcome",
             "bindings",
@@ -687,7 +688,7 @@ class OllamaUserMeaningInterpreter:
         # Semantic bindings are optional because complete meaning remains in outcome,
         # but when UMI can ground a material semantic fact (place/time/count/relation)
         # it may expose that typed fact for GA/Planner without choosing HOW.
-        item["required"] = [name for name in fields if name != "bindings"]
+        item["required"] = [name for name in fields if name not in {"bindings", "body_effect_family"}]
         item["properties"]["outcome"]["description"] = (
             "Complete natural-language user request with every material detail, in the source language. "
             "Never a category name, code or underscore-separated identifier."
@@ -699,6 +700,12 @@ class OllamaUserMeaningInterpreter:
         )
         item["properties"]["output_mode"]["enum"].remove("unspecified")
         item["properties"]["output_mode"].pop("default", None)
+        item["properties"]["body_effect_family"]["description"] = (
+            "Required exactly when output_mode=body_action. Classify the requested observable WHAT, "
+            "not HOW: task_physical_effect for locomotion/posture/manipulation/carrying/handover; "
+            "social_expression for an explicitly requested gesture/facial expression; "
+            "gaze_or_orientation for explicitly requested looking/attention orientation."
+        )
         item["properties"]["continuity_scope"]["description"] = (
             "Ownership after UMI handoff, not duration. Use goal for every non-speech "
             "result and whenever information/evidence, embodied/media/stateful work, or "
@@ -733,13 +740,24 @@ class OllamaUserMeaningInterpreter:
             "enum": ["turn", "goal"],
             "description": item["properties"]["continuity_scope"]["description"],
         }
+        speech_item["properties"]["body_effect_family"] = {"type": "null"}
+        body_item = copy.deepcopy(base_item)
+        body_item["properties"]["output_mode"] = {
+            "type": "string", "const": "body_action",
+            "description": item["properties"]["output_mode"]["description"],
+        }
+        body_item["properties"]["continuity_scope"] = {
+            "type": "string", "const": "goal",
+            "description": item["properties"]["continuity_scope"]["description"],
+        }
+        body_item["required"] = [*body_item.get("required", []), "body_effect_family"]
         work_item = copy.deepcopy(base_item)
         work_item["properties"]["output_mode"] = {
             "type": "string",
             "enum": [
                 value
                 for value in item["properties"]["output_mode"]["enum"]
-                if value != "speech"
+                if value not in {"speech", "body_action"}
             ],
             "description": item["properties"]["output_mode"]["description"],
         }
@@ -748,8 +766,9 @@ class OllamaUserMeaningInterpreter:
             "const": "goal",
             "description": item["properties"]["continuity_scope"]["description"],
         }
+        work_item["properties"]["body_effect_family"] = {"type": "null"}
         item.clear()
-        item["oneOf"] = [speech_item, work_item]
+        item["oneOf"] = [speech_item, body_item, work_item]
         schema["properties"]["responsibilities"]["maxItems"] = 12
         uncertainty = schema["$defs"]["UserMeaningUncertainty"]
         uncertainty["properties"] = {
@@ -864,10 +883,10 @@ class OllamaUserMeaningInterpreter:
             )
         proposals = parsed.get("responsibilities")
         fields = {
-            "local_ref", "outcome", "bindings", "output_mode", "continuity_scope",
+            "local_ref", "outcome", "bindings", "output_mode", "body_effect_family", "continuity_scope",
             "confidence", "source_evidence",
         }
-        required_fields = fields - {"bindings"}
+        required_fields = fields - {"bindings", "body_effect_family"}
         for item in proposals if isinstance(proposals, list) else []:
             if not isinstance(item, dict):
                 continue  # Closed DTO handles malformed objects.
@@ -882,6 +901,11 @@ class OllamaUserMeaningInterpreter:
                 raise ValueError("UMI requires authored meaning, confidence and source evidence")
             if item["output_mode"] == "unspecified":
                 raise ValueError("UMI must state the requested result type")
+            if response_schema is not None:
+                if item["output_mode"] == "body_action" and not item.get("body_effect_family"):
+                    raise ValueError("UMI body_action Responsibility requires body_effect_family")
+                if item["output_mode"] != "body_action" and item.get("body_effect_family") is not None:
+                    raise ValueError("UMI body_effect_family is valid only for body_action")
             for name in ("local_ref", "outcome", "output_mode"):
                 if not isinstance(item[name], str) or not item[name].strip():
                     raise ValueError(f"User Meaning Interpretation requires authored {name}")

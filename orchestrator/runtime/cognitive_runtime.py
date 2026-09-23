@@ -4751,7 +4751,7 @@ class GoalDrivenRuntimeCoordinator:
             if self.policy.mode != "apply":
                 return
             failure_reference = f"work_failure:{turn_id}:{stage}"[:200]
-            bounded_reason = " ".join(str(failure_reason or "").strip().split())[:500]
+            known_cause = " ".join(str(failure_reason or "").strip().split())[:500]
             failed_ref_set = set(planner_refs)
             failure_work_request = (
                 self._subset_work_request(work_request, failed_ref_set)
@@ -4765,7 +4765,7 @@ class GoalDrivenRuntimeCoordinator:
                     "effect_execution": "not_authorized_or_not_completed",
                     "work_decision_pending": False,
                     "failure_domain": failure_domain or "cognitive_work",
-                    "reason": bounded_reason,
+                    "known_cause": known_cause,
                     # Internal stage/class remain diagnostic identity only. SC may use
                     # them to understand provenance but must not expose them verbatim.
                     "internal_stage": stage,
@@ -4789,7 +4789,8 @@ class GoalDrivenRuntimeCoordinator:
                     "status": "failed",
                     "effect_execution": "not_authorized_or_not_completed",
                     "failure_domain": failure_domain or "cognitive_work",
-                    "reason": bounded_reason,
+                    "known_cause": known_cause,
+                    "required_result_update": True,
                 },
                 delivery_phase="immediate",
             )

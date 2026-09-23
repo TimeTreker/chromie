@@ -631,6 +631,7 @@ def fast_evidence_reentry_goal_projection(
             "constraints": goal.get("constraints"),
             "resource_responsibility": goal.get("resource_responsibility"),
             "output_mode": metadata.get("output_mode"),
+            "body_effect_families": metadata.get("body_effect_families"),
         }
         projected.append({
             key: value for key, value in item.items()
@@ -726,6 +727,7 @@ def fast_evidence_reentry_prompt(
                 "local_ref": item.local_ref,
                 "outcome": item.outcome,
                 "output_mode": item.output_mode,
+                "body_effect_family": item.body_effect_family,
                 "bindings": copy.deepcopy(item.bindings),
             }
             for item in request.responsibilities
@@ -890,8 +892,19 @@ def fast_responsibility_decision_projection(
 ) -> list[dict[str, Any]]:
     """Pass complete owned intent without imposing an Activity count or lane."""
     return [
-        {"ref": item.local_ref, "outcome": item.outcome, "output_mode": item.output_mode,
-         "source_evidence": item.source_evidence.model_dump() if item.source_evidence else None}
+        {
+            **{
+                "ref": item.local_ref,
+                "outcome": item.outcome,
+                "output_mode": item.output_mode,
+                "source_evidence": item.source_evidence.model_dump() if item.source_evidence else None,
+            },
+            **(
+                {"body_effect_family": item.body_effect_family}
+                if item.body_effect_family is not None
+                else {}
+            ),
+        }
         for item in responsibilities
     ]
 

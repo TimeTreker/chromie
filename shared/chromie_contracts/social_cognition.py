@@ -226,6 +226,17 @@ class SocialCognitionResolution(SocialCognitionOutput):
         needs = {need.need_id: need for need in request.communication_needs}
         if set(self.need_outcomes) != set(needs):
             raise ValueError("Social Cognition must account for every supplied communication need")
+        required_failure_need_ids = {
+            need.need_id for need in request.communication_needs
+            if need.owner == "runtime" and need.kind == "result"
+            and need.facts.get("status") == "failed"
+            and need.facts.get("required_result_update") is True
+        }
+        if required_failure_need_ids and (
+            self.disposition != "communicate"
+            or any(self.need_outcomes.get(need_id) != "covered" for need_id in required_failure_need_ids)
+        ):
+            raise ValueError("terminal Work failure result update must be communicated and covered")
         for need_id, outcome in self.need_outcomes.items():
             if outcome == "covered" and not any(
                 need_id in act.addressed_need_ids and act.text.strip() for act in self.activities

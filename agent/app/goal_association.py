@@ -1104,6 +1104,11 @@ class GoalAssociationResolver:
                             for ref in item.source_responsibility_refs
                         ],
                         "output_mode": item.output_mode,
+                        "body_effect_families": sorted({
+                            responsibility_by_ref[ref].body_effect_family
+                            for ref in item.source_responsibility_refs
+                            if responsibility_by_ref[ref].body_effect_family is not None
+                        }),
                         "media_operation": item.media_operation,
                         "resolved_references": [
                             reference.model_dump(mode="json", exclude_none=True)

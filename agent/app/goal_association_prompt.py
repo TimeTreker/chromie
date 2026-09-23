@@ -182,6 +182,7 @@ def association_goal_projection(
             "source_text": goal.get("source_text"),
             "object": goal.get("object"),
             "output_mode": metadata.get("output_mode"),
+            "body_effect_families": metadata.get("body_effect_families"),
             "open_information_gaps": snapshot.get(
                 "open_information_gaps", []
             ),

@@ -472,6 +472,7 @@ def qualify_capability_catalog_for_output_mode_values(
     capabilities: list[dict[str, Any]],
     *,
     output_modes: set[str],
+    body_effect_families: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Remove capabilities whose typed lane cannot serve the supplied output modes.
 
@@ -488,6 +489,12 @@ def qualify_capability_catalog_for_output_mode_values(
     }
     if not output_modes or "other" in output_modes:
         return list(capabilities)
+
+    required_body_effect_families = {
+        " ".join(str(value or "").strip().split())
+        for value in (body_effect_families or set())
+        if " ".join(str(value or "").strip().split())
+    }
 
     has_body = "body_action" in output_modes
     has_information = "information" in output_modes
@@ -530,21 +537,31 @@ def qualify_capability_catalog_for_output_mode_values(
             responsibility_type == "acquire_and_deliver_resource"
             and "information" in resource_kinds
         )
-        is_body = semantic_type == "body_action" or bool(
-            effects.intersection(
-                {
-                    "physical_motion",
-                    "visual_expression",
-                    "object_manipulation",
-                    "resource_delivery",
-                    "body_activity_execution",
-                    "embodied_task_request",
-                }
-            )
-        ) or (
+        behavior_domains = {
+            " ".join(str(item or "").strip().split()).casefold()
+            for item in capability.get("behavior_domains") or []
+            if str(item or "").strip()
+        }
+        body_effects: set[str] = set()
+        if (
             responsibility_type == "acquire_and_deliver_resource"
             and "physical_object" in resource_kinds
-        )
+        ) or effects.intersection(
+            {
+                "object_manipulation",
+                "resource_delivery",
+                "body_activity_execution",
+                "embodied_task_request",
+            }
+        ):
+            body_effects.add("task_physical_effect")
+        if "orientation" in behavior_domains:
+            body_effects.add("gaze_or_orientation")
+        elif "social_attention" in behavior_domains or "visual_expression" in effects:
+            body_effects.add("social_expression")
+        if not body_effects and ("physical_motion" in effects or semantic_type == "body_action"):
+            body_effects.add("task_physical_effect")
+        is_body = bool(body_effects)
         is_stateful = "stateful_effect" in declared_output_modes
         is_vocal = capability_id == VOCAL_PERFORMANCE_CAPABILITY_ID
         is_media = capability_id in set(MEDIA_CAPABILITY_IDS.values())
@@ -567,7 +584,10 @@ def qualify_capability_catalog_for_output_mode_values(
                 qualified.append(capability)
             continue
         if is_body:
-            if has_body:
+            if has_body and (
+                not required_body_effect_families
+                or body_effects.intersection(required_body_effect_families)
+            ):
                 qualified.append(capability)
             continue
         # Untyped capabilities are not made semantically applicable by their
@@ -595,8 +615,17 @@ def qualify_capability_catalog_for_output_modes(
         for goal in authoritative_goals
         if isinstance(goal, dict) and isinstance(goal.get("metadata"), dict)
     }
+    body_effect_families = {
+        " ".join(str(item or "").strip().split())
+        for goal in authoritative_goals
+        if isinstance(goal, dict) and isinstance(goal.get("metadata"), dict)
+        for item in (goal.get("metadata") or {}).get("body_effect_families", [])
+        if " ".join(str(item or "").strip().split())
+    }
     return qualify_capability_catalog_for_output_mode_values(
-        capabilities, output_modes=output_modes
+        capabilities,
+        output_modes=output_modes,
+        body_effect_families=body_effect_families,
     )
 
 

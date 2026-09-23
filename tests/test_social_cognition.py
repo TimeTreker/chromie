@@ -383,7 +383,7 @@ def test_terminal_work_failure_result_need_cannot_choose_silence():
     need = SocialCommunicationNeed(
         need_id="need:failure", owner="runtime", kind="result",
         source_goal_ids=["goal:1"], reference_id="work_failure:turn:planner",
-        facts={"status": "failed", "reason": "The proposed actions were inconsistent."},
+        facts={"status": "failed", "known_cause": "The proposed actions were inconsistent.", "required_result_update": True},
         delivery_phase="immediate",
     )
     current = request(
@@ -393,12 +393,13 @@ def test_terminal_work_failure_result_need_cannot_choose_silence():
             "active_goal_snapshots": [{"goal_id": "goal:1", "status": "active"}],
             "work_failure": {
                 "status": "failed",
-                "reason": "The proposed actions were inconsistent.",
+                "known_cause": "The proposed actions were inconsistent.",
             },
         },
     )
     schema = social_cognition_response_schema(current, [])
     assert "silence" not in schema["properties"]["disposition"]["enum"]
+    assert schema["properties"]["need_outcomes"]["properties"][need.need_id]["const"] == "covered"
 
 
 @pytest.mark.asyncio
@@ -1669,11 +1670,12 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
                     if failure == "planner_exception"
                     else "Direction source missing."
                 )
-                assert failure_context["reason"] == expected_reason
+                assert failure_context["known_cause"] == expected_reason
                 assert len(request.communication_needs) == 1
                 need = request.communication_needs[0]
                 assert need.owner == "runtime" and need.kind == "result"
-                assert need.facts["reason"] == expected_reason
+                assert need.facts["known_cause"] == expected_reason
+                assert need.facts["required_result_update"] is True
                 return SocialCognitionResolution(
                     request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
                     disposition="communicate", reason_summary="The requested Work failed before completion.",

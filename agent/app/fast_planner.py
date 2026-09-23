@@ -194,6 +194,11 @@ class FastPlannerResolver:
                 capabilities = qualify_capability_catalog_for_output_mode_values(
                     capabilities,
                     output_modes={item.output_mode for item in responsibilities},
+                    body_effect_families={
+                        item.body_effect_family
+                        for item in responsibilities
+                        if item.body_effect_family is not None
+                    },
                 )
                 if len(capabilities) > self.max_capabilities + len(loaded_ids):
                     raise PlannerDTOContractError("Common capability contracts exceed the configured context budget")

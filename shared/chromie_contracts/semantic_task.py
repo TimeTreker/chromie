@@ -174,6 +174,11 @@ def apply_goal_meaning_update(goal: "SemanticGoal", update: dict[str, Any]) -> "
                   version=goal.version + 1,
                   source_responsibility_refs=list(dict.fromkeys([*goal.source_responsibility_refs, *by_ref])))
     values["metadata"]["requirement_sources"] = provenance
+    body_effect_families = sorted({
+        item.body_effect_family for item in sources if item.body_effect_family is not None
+    })
+    if body_effect_families:
+        values["metadata"]["body_effect_families"] = body_effect_families
     resource = values.get("resource_responsibility") or {}
     named_surfaces = [values["object"].get("bindings", {}), values["constraints"],
                       resource.get("resource", {}).get("attributes", {}),
