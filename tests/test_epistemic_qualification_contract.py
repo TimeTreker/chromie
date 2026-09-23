@@ -5,7 +5,10 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from pydantic import ValidationError
 
-from orchestrator.runtime.capability_runtime import CapabilityDefinition
+from orchestrator.runtime.capability_runtime import (
+    CapabilityDefinition,
+    embodied_completion_evidence_policy,
+)
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler
 from shared.chromie_contracts.execution_outcome import (
     ClaimQualification,
@@ -40,6 +43,20 @@ def completion_policy() -> ClaimQualificationPolicy:
             }
         ],
     )
+
+
+def test_embodied_completion_policy_requires_reported_safety_health() -> None:
+    policy = embodied_completion_evidence_policy()
+    requirements = policy.requirement_groups[0].requirements
+    postcondition = next(
+        item for item in requirements if item.source == "provider_postcondition"
+    )
+    assert postcondition.field_assertions == {
+        "safe_idle": True,
+        "active_task_present": False,
+        "emergency_stop": False,
+        "fallen": False,
+    }
 
 
 def test_claim_policy_digest_is_stable_and_request_commit_is_typed() -> None:

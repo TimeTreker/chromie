@@ -310,9 +310,10 @@ python scripts/run_target_evidence_closure.py attach-social \
 
 Benchmark remains an evaluator. It does not choose Social Attention behavior for
 the Runtime. The Social Attention track is a logical behavior-domain track over
-Planner-authored `auxiliary_activities[]`; it is not a separate endpoint or model
-identity. Its retained run must name the Fast/Deep Planner models that could author
-the containing Plan.
+Social Cognition-authored `SocialCommunicativeAct.auxiliary_activities[]`; it is not
+a separate endpoint or model identity. Its retained run must name the Social Cognition
+model that authored the communicative act and preserve the exact target/capability
+evidence used to validate the optional expression.
 
 ## Deployed loopback and LAN evidence
 

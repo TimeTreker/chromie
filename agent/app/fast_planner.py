@@ -40,8 +40,7 @@ from .planner_schema import (
 from .planner_context import (
     completed_acquisition_goal_ids,
     completed_work_step_evidence,
-    auxiliary_social_capability_payloads,
-    auxiliary_social_prompt_context,
+    trusted_target_prompt_context,
     cancellation_capability_facts,
     fast_capability_payload,
     fast_capability_context,
@@ -59,6 +58,7 @@ from .planner_validation import (
     validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
+    validate_planner_social_expression_authority,
 )
 from .planner_fast_validation import (
     AuthoritativeGroundingValidationError,
@@ -186,7 +186,7 @@ class FastPlannerResolver:
             loaded_ids: tuple[str, ...] = ()
             for invocation in range(2):
                 current, catalog, entries = await fast_capability_context(self.catalog, request, loaded_ids)
-                current.context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(current.context, [])
+                current.context["planner_target_evidence_context"] = trusted_target_prompt_context(current.context)
                 capabilities = [fast_capability_payload(item, include_side_effect_free=True)
                     for item in catalog if item.available and item.interaction_executable
                     and is_planner_step_capability(item.capability_id)]
@@ -325,13 +325,7 @@ class FastPlannerResolver:
             cancellation_capability_facts(auxiliary_catalog)
             if cancellation_reentry_goal_ids else []
         )
-        auxiliary_social_capabilities = auxiliary_social_capability_payloads(
-            auxiliary_catalog
-        )
-        context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(
-            context,
-            auxiliary_social_capabilities,
-        )
+        context["planner_target_evidence_context"] = trusted_target_prompt_context(context)
         executable = [
             item
             for item in capabilities
@@ -403,7 +397,6 @@ class FastPlannerResolver:
                         item["capability_id"]: item["input_schema"]
                         for item in capability_payload
                     },
-                    auxiliary_social_capabilities=auxiliary_social_capabilities,
                     response_only=response_only,
                     requires_execution=requires_execution,
                     response_goal_ids=response_goal_ids,
@@ -426,7 +419,6 @@ class FastPlannerResolver:
                         item["capability_id"]: item["input_schema"]
                         for item in capability_payload
                     },
-                    auxiliary_social_capabilities=auxiliary_social_capabilities,
                     response_only=response_only,
                     requires_execution=requires_execution,
                     response_goal_ids=response_goal_ids,
@@ -587,6 +579,9 @@ class FastPlannerResolver:
                         raw,
                         planner_tier="fast",
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                    )
+                    validate_planner_social_expression_authority(
+                        validated_model_output, capabilities=capability_payload,
                     )
                     normalized = materialize_planner_output(
                         validated_model_output,

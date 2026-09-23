@@ -5,6 +5,24 @@ volatile identities, evidence paths and resume commands. [Checkpoint](DEVELOPMEN
 owns priorities; [Status](docs/STATUS.md) owns claim limits. This is the owner-requested
 delivery handoff; resume from the latest `main` commit containing this file.
 
+## Local archive repair pending application — 2026-09-23
+
+Source basis: owner-supplied `chromie_20260923_archive.zip`; paired debug source identity
+`af5e11eb4e86a0bde18dfdc0d0b2f48494b01066`. This environment has no archive `.git` metadata
+and has not pushed anything. The generated patch closes the active Chromie-side boundaries for
+standing SC activation, Planner social-expression isolation, concurrent timing realization,
+SC-owned terminal failure communication, sanitized fallback speech, and reported embodied safety
+postconditions. Fast/Deep Planner now receive target-only realization evidence rather than the
+old `planner_auxiliary_social_context`; optional expression candidates remain exclusively on the
+Social Cognition path.
+
+Do not mark the milk-delivery reset case closed until Soridormi exposes a per-execution reset,
+recovery, interruption, or equivalent terminal safety fact. In the supplied run MuJoCo reset at
+tilt 1.298 rad while Chromie's provider-facing result later said `completed`; no reset counter or
+epoch crosses the interface, so a Chromie-only patch cannot recover that truth without guessing.
+After applying to a full checkout, run the canonical repository gate and current prompt/model
+qualification, then repeat the exact weather, milk delivery, and concurrent walk+wave sequence.
+
 ## Delivery revision and validation boundary — 2026-09-23
 
 Owner requested commit and push **without tests**. Repository:

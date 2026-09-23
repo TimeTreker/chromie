@@ -39,8 +39,7 @@ from .planner_schema import (
 )
 from .planner_context import (
     completed_work_step_evidence,
-    auxiliary_social_capability_payloads,
-    auxiliary_social_prompt_context,
+    trusted_target_prompt_context,
     cancellation_capability_facts,
     deep_capability_payload,
     planner_goal_context,
@@ -62,6 +61,7 @@ from .planner_validation import (
     validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
+    validate_planner_social_expression_authority,
 )
 from .planner_deep_validation import deep_plan_validation_errors
 from .planner_fast_validation import validate_work_reuse_selection
@@ -159,11 +159,7 @@ class DeepPlannerResolver:
             cancellation_capability_facts(capabilities)
             if goal_context.cancellation_reentry_goal_ids else []
         )
-        auxiliary_social_capabilities = auxiliary_social_capability_payloads(capabilities)
-        context["planner_auxiliary_social_context"] = auxiliary_social_prompt_context(
-            context,
-            auxiliary_social_capabilities,
-        )
+        context["planner_target_evidence_context"] = trusted_target_prompt_context(context)
         executable = [
             item
             for item in capabilities
@@ -212,7 +208,6 @@ class DeepPlannerResolver:
             capability_input_schemas={
                 item["capability_id"]: item["input_schema"] for item in payload
             },
-            auxiliary_social_capabilities=auxiliary_social_capabilities,
             response_only=response_only,
             requires_execution=requires_execution,
             response_goal_ids=list(goal_context.response_goal_ids),
@@ -314,6 +309,9 @@ class DeepPlannerResolver:
                     raw,
                     planner_tier="deep",
                     expected_goal_ids_for_turn=expected_goal_ids_for_turn,
+                )
+                validate_planner_social_expression_authority(
+                    validated_model_output, capabilities=payload,
                 )
                 validate_work_reuse_selection(validated_model_output, context=context)
                 plan = CanonicalPlan.model_validate(

@@ -261,9 +261,13 @@ an additional request. UMI preserves complete natural-language intent and cites 
 source and requested result type; it does not extract parameter bindings or Goal
 relationships. The result type keeps ordinary communication distinct from requested
 physical effects without selecting any Capability.
-A compound request may remain one Responsibility. GA relates that intent to retained
-Goals; Planner decomposes Activities and resolves their parameters against full
-Capability contracts. Missing execution details are Planner gaps, not UMI uncertainty.
+A compound request may remain one Responsibility only when it is one independently
+satisfiable human outcome. Independently requested observable effects remain separate
+Responsibilities even when the person asks for them concurrently; UMI preserves the
+coordination with `parallel_with`/ordering relations and Planner realizes Activities. GA
+relates those outcomes to retained Goals; Planner decomposes implementation steps and
+resolves their parameters against full Capability contracts. Missing execution details
+are Planner gaps, not UMI uncertainty.
 SC communicates the actual state reported by these owners through speech and eligible
 Social Attention. Runtime admission and execution safety remain independent.
 

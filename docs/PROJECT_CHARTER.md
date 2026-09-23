@@ -115,7 +115,9 @@ their existing owners; two inference sessions do not create two conversations.
 
 One accepted UMI result carries explicit `cognitive_requests[]` naming which existing
 authorities should work next and the exact Responsibility refs motivating each request.
-Initial SC and Fast Planner activation follows those model-authored requests. Runtime may
+Every fresh admitted turn addressed to Chromie must include one turn-wide Social Cognition
+request because interaction itself is a standing responsibility; SC still decides whether
+and how to express anything. Fast Planner activation remains model-selected. Runtime may
 close only a hard architectural prerequisite of an explicitly requested authority; in
 particular, initial Planner mechanically schedules turn-wide GA so eventual Work can obtain
 canonical Goal binding. That dependency closure is scheduling, not another semantic
@@ -124,7 +126,7 @@ cognitive-activation decision. Runtime does not recreate readiness from `continu
 ownership evidence and is not a routing flag. Optional communication does not gate
 already-requested planning or safe dispatch, and Work completion does not gate an
 already-grounded conversational answer.
-Not every turn requires all three calls. Missing canonical Goal identity alone does not
+Not every turn requires GA and Planner in addition to the standing initial SC call. Missing canonical Goal identity alone does not
 block a source-grounded Communicative Act. Understanding, cognitive activation, planning
 readiness, canonical continuity, commitment, execution and verified completion remain
 distinct facts. Post-GA/Evidence/Situation re-entry is being migrated separately and may

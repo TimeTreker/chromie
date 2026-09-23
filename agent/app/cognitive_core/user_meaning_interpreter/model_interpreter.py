@@ -102,6 +102,7 @@ _CONTEXT_OMIT_KEYS = {
     # an opaque target_ref or scene geometry into provider-neutral WHAT.
     "active_user_target",
     "planner_auxiliary_social_context",
+    "planner_target_evidence_context",
     # The exact source wording is projected once in its dedicated provenance
     # block.  Do not duplicate the full Gateway envelope as ambient context.
     "user_turn_envelope",
@@ -780,6 +781,12 @@ class OllamaUserMeaningInterpreter:
         activation["properties"]["responsibility_refs"]["items"] = {
             "type": "string", "enum": [f"r{i}" for i in range(1, 13)],
         }
+        schema["properties"]["cognitive_requests"]["description"] = (
+            "Bounded cognitive activation requests. Every admitted addressed user turn must "
+            "include exactly one social_cognition request covering every Responsibility; "
+            "Social Cognition decides whether/how to interact. Goal Association and Planner "
+            "remain model-selected according to their own usefulness contracts."
+        )
         schema["properties"]["cognitive_requests"]["minItems"] = 1
         schema["properties"]["cognitive_requests"]["maxItems"] = 3
         token_refs = [token["ref"] for token in _source_tokens(admitted_turn)]
@@ -883,6 +890,19 @@ class OllamaUserMeaningInterpreter:
             if isinstance(item["confidence"], bool) or not isinstance(item["confidence"], (int, float)):
                 raise ValueError("UMI requires numeric Responsibility confidence")
         decision = UserMeaningInterpretationDecision.model_validate(parsed)
+        known_refs = {item.local_ref for item in decision.responsibilities}
+        social_request = next(
+            (item for item in decision.cognitive_requests if item.authority == "social_cognition"),
+            None,
+        )
+        if social_request is None:
+            raise _UserMeaningInterpretationAuthorityViolation(
+                "every admitted addressed user turn must activate Social Cognition"
+            )
+        if set(social_request.responsibility_refs) != known_refs:
+            raise _UserMeaningInterpretationAuthorityViolation(
+                "initial Social Cognition cognition is turn-wide and must cover every Responsibility"
+            )
         _validate_primary_source_evidence(request, parsed)
         return decision
 

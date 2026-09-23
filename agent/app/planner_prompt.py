@@ -157,13 +157,12 @@ def immutable_source_turn_prompt(
 def trusted_target_evidence_prompt_section(context: dict[str, Any]) -> str:
     """Expose one already-owned target reference for primary targeted Work.
 
-    The same evidence may also qualify optional decoration, but target
-    Evidence is not auxiliary-only. Planner may copy an exact trusted reference
+    Target Evidence is not a social-expression affordance. Planner may copy an exact trusted reference
     into a provider-declared target argument; it may never infer a direction or
     synthesize a target when this projection is unavailable.
     """
 
-    payload = context.get("planner_auxiliary_social_context")
+    payload = context.get("planner_target_evidence_context")
     target_evidence = payload.get("target_evidence") if isinstance(payload, dict) else None
     if not isinstance(target_evidence, dict) or not target_evidence.get("available"):
         return "No trusted semantic target evidence is available.\n"
@@ -784,7 +783,10 @@ def fast_advance_layered_prompt(
         "identify the listed outcome it realizes or the necessary prerequisite it supplies; explain "
         "that connection in reason_summary. A valid Responsibility ref alone does not justify an "
         "unrelated Activity. Once those outcomes have their required Work, end the Activities list. "
-        "Produce one complete Work DTO. No presentation wording or decoration. "
+        "Produce one complete Work DTO. No presentation wording or decoration. A Capability whose "
+        "declared behavior_domains contain only social_attention is task Work only when it realizes "
+        "its own explicitly requested Responsibility; never append it to another Responsibility as "
+        "acknowledgement, politeness, personality, or decoration. SC owns optional social expression. "
         "Use role=capability for direct executable task Work: activity_id, exact capability_id, "
         "args, source_responsibility_refs and timing. Use role=complete_response only for a "
         "language response. Use role=clarification only when a required input is actually missing; "
@@ -833,7 +835,10 @@ def fast_advance_layered_prompt(
         "Cover every source ref exactly and give each terminal Responsibility one outcome. "
         "Preserve before/after/precedes/follows/parallel_with in Activity order and timing. "
         "Ordered Activities, including communication Needs, use timing=sequential. Physical Work "
-        "stays sequential; parallel Work requires a compatible group. Preserve requested speech "
+        "stays sequential unless the accepted Responsibilities explicitly require concurrency. Every "
+        "Capability Activity in one requested concurrent group must use timing=parallel; never mark "
+        "only one member parallel or emit a singleton parallel marker. Parallel Work still requires "
+        "a compatible Capability/resource group. Preserve requested speech "
         "order even though SC realizes it later. Execute only direct, fully grounded Work within "
         "Fast budget; unsupported capability or unresolved composition delegates once to Deep "
         "with escalate, deep_planner continuation and no Activities. No same-decision reviewer. "

@@ -376,7 +376,7 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
 
 
 class AuxiliaryActivityTarget(BaseModel):
-    """Bounded semantic target cited by a Planner-owned auxiliary Activity.
+    """Bounded semantic target cited by a communication-owned auxiliary Activity.
 
     Live perception is authority-owned state and therefore need not be relabelled
     as retained Evidence. ``evidence_refs`` carries exact retained references when
@@ -418,7 +418,7 @@ class AuxiliaryActivityTarget(BaseModel):
 
 
 class AuxiliaryPlanActivity(CapabilityIdentityModel):
-    """Optional Planner-authored social decoration around one primary Activity.
+    """Optional Social Cognition-authored expression around one primary Activity.
 
     Membership in ``auxiliary_activities`` is the non-Goal contract: there are no
     Goal IDs, outcome links, completion flags, or model-authored optionality

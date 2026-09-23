@@ -98,6 +98,8 @@ def embodied_completion_evidence_policy() -> ClaimQualificationPolicy:
                         "field_assertions": {
                             "safe_idle": True,
                             "active_task_present": False,
+                            "emergency_stop": False,
+                            "fallen": False,
                         },
                     },
                 ],

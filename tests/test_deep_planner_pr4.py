@@ -21,6 +21,7 @@ from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.planner_validation import (
     qualify_capability_catalog_for_output_modes,
     validate_planner_model_output,
+    validate_planner_social_expression_authority,
 )
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from tests.cognitive_work_test_support import cognitive_work_request
@@ -39,6 +40,66 @@ class SequencedOllama:
         if isinstance(value, Exception):
             raise value
         return value
+
+
+class PlannerSocialAuthorityValidationTests(unittest.TestCase):
+    def test_shared_fast_deep_contract_rejects_task_plus_social_decoration_same_goal(self):
+        output = PlannerModelOutput.model_validate({
+            "disposition": "execute",
+            "coverage": "complete",
+            "confidence": 1.0,
+            "goal_summary": "deliver milk",
+            "steps": [
+                {"step_id": "fetch", "capability_id": "soridormi.acquire_and_deliver_resource",
+                 "args": {}, "timing": "sequential", "source_goal_ids": ["goal-milk"]},
+                {"step_id": "wave", "capability_id": "soridormi.wave_hand",
+                 "args": {}, "timing": "sequential", "source_goal_ids": ["goal-milk"]},
+            ],
+            "escalation_reason": "", "unresolved": [], "parameter_resolutions": [],
+            "time_conditions": [],
+            "goal_outcomes": {
+                "goal-milk": {"disposition": "execute", "coverage": "complete",
+                              "step_ids": ["fetch", "wave"], "unresolved": [],
+                              "rationale": "work"}
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "exact",
+                                  "satisfied_goal_ids": ["goal-milk"], "unmet_goal_ids": [],
+                                  "unmet_requirements": [], "rationale": "planned"},
+            "plan_relation": "exact", "user_confirmation_required": False,
+        })
+        capabilities = [
+            {"capability_id": "soridormi.acquire_and_deliver_resource",
+             "behavior_domains": ["manipulation"]},
+            {"capability_id": "soridormi.wave_hand",
+             "behavior_domains": ["social_attention"]},
+        ]
+        with self.assertRaisesRegex(
+            Exception, "optional social expression belongs to Social Cognition"
+        ):
+            validate_planner_social_expression_authority(output, capabilities=capabilities)
+
+    def test_explicit_social_goal_remains_valid_planner_work(self):
+        output = PlannerModelOutput.model_validate({
+            "disposition": "execute", "coverage": "complete", "confidence": 1.0,
+            "goal_summary": "wave",
+            "steps": [{"step_id": "wave", "capability_id": "soridormi.wave_hand",
+                       "args": {}, "timing": "sequential", "source_goal_ids": ["goal-wave"]}],
+            "escalation_reason": "", "unresolved": [], "parameter_resolutions": [],
+            "time_conditions": [],
+            "goal_outcomes": {
+                "goal-wave": {"disposition": "execute", "coverage": "complete",
+                              "step_ids": ["wave"], "unresolved": [],
+                              "rationale": "requested"}
+            },
+            "goal_satisfaction": {"score": 1.0, "status": "exact",
+                                  "satisfied_goal_ids": ["goal-wave"], "unmet_goal_ids": [],
+                                  "unmet_requirements": [], "rationale": "planned"},
+            "plan_relation": "exact", "user_confirmation_required": False,
+        })
+        validate_planner_social_expression_authority(
+            output, capabilities=[{"capability_id": "soridormi.wave_hand",
+                                   "behavior_domains": ["social_attention"]}],
+        )
 
 
 class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):

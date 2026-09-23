@@ -3266,6 +3266,55 @@ def planner_contract_diagnostics(
     return unique
 
 
+
+def validate_planner_social_expression_authority(
+    output: PlannerModelOutput,
+    *,
+    capabilities: list[dict[str, Any]],
+) -> None:
+    """Reject optional social decoration from the shared Fast/Deep Work contract.
+
+    Social-domain Capabilities remain valid Planner Work when they are the requested
+    effect. What is forbidden is attaching a social-expression-only step to the same
+    Goal as unrelated non-social task Work. Independent requested effects must already
+    have distinct UMI Responsibilities/Goals; optional expression belongs to SC.
+    """
+
+    domains_by_capability = {
+        str(item.get("capability_id") or "").strip(): {
+            str(value).strip().lower()
+            for value in (item.get("behavior_domains") or [])
+            if str(value).strip()
+        }
+        for item in capabilities
+        if isinstance(item, dict) and str(item.get("capability_id") or "").strip()
+    }
+    steps_by_goal: dict[str, list[Any]] = {}
+    for step in output.steps:
+        for goal_id in step.source_goal_ids:
+            steps_by_goal.setdefault(goal_id, []).append(step)
+    for goal_id, steps in steps_by_goal.items():
+        social_only = [
+            step
+            for step in steps
+            if domains_by_capability.get(step.capability_id) == {"social_attention"}
+        ]
+        non_social = [
+            step
+            for step in steps
+            if domains_by_capability.get(step.capability_id) != {"social_attention"}
+        ]
+        if social_only and non_social:
+            raise PlannerDTOContractError(
+                "Planner cannot attach social-expression-only Capability Work to a "
+                "different task under the same Goal; optional social expression belongs "
+                "to Social Cognition. Independently requested observable effects must "
+                "remain separate UMI Responsibilities/Goals; goal_id="
+                + goal_id
+                + " social_capabilities="
+                + ",".join(step.capability_id for step in social_only)
+            )
+
 def validate_planner_model_output(
     raw: dict[str, Any],
     *,

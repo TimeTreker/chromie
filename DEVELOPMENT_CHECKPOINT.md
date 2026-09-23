@@ -5,6 +5,29 @@ This is the current resume point; [Status](docs/STATUS.md) owns implementation/e
 claims, [Roadmap](ROADMAP.md) owns delivery order, and [Handoff](HANDOFF.md) owns volatile
 identities, retained artifacts and commands. Earlier snapshots remain in Git history.
 
+## Local archive defect-repair patch — 2026-09-23
+
+The owner supplied `chromie_20260923_archive.zip` after a debug run that exposed Planner/SC
+authority, concurrency, failure-presentation, and execution-evidence defects. The paired debug
+bundle reports source revision `af5e11eb4e86a0bde18dfdc0d0b2f48494b01066`; the archive
+itself contains no `.git` metadata, so this patch is source-relative and has not been committed,
+pushed, or live-qualified here.
+
+Implemented repair: every fresh admitted addressed UMI result must request turn-wide Social
+Cognition; independent concurrent effects remain separate Responsibilities; Fast/Deep Planner
+receive no optional social-expression candidates/style/history; Fast validation rejects
+social-only decoration mixed into unrelated task Work; explicit parallel groups must be encoded
+as parallel members; terminal Work failures re-enter SC; raw internal failure labels no longer
+reach ordinary TTS; and reported embodied safety faults (`emergency_stop`/`fallen`) now block
+success evidence. The hidden MuJoCo auto-reset remains an external contract blocker because
+Soridormi reports no per-execution reset/recovery fact to Chromie.
+
+Archive-local focused/runtime validation passed after these changes. The canonical wrapper and
+docs gate cannot be fully reproduced from this zip because its benchmark fixture tree is absent;
+Ruff is also not installed in this execution environment. Re-run the complete maintained gate on
+a full checkout before commit/push, then live-qualify the concurrent walk+wave, milk-delivery, and
+weather conversation on the target runtime.
+
 ## Owner-requested development delivery — 2026-09-23
 
 Owner requested commit and push **without tests**. Pre-delivery baseline is

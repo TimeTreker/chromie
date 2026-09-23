@@ -1638,6 +1638,14 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
                 raise
             if failure == "social":
                 raise OSError("SC service failed")
+            if request.context.get("work_failure"):
+                return SocialCognitionResolution(
+                    request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
+                    disposition="communicate", reason_summary="The requested Work failed before completion.",
+                    activities=[{"activity_id": "work-failed", "text": "I couldn't complete that turn.",
+                                 "function": "inform", "truth_stage": "context_grounded",
+                                 "source_responsibility_refs": ["turn"]}],
+                )
             return SocialCognitionResolution(
                 request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
                 disposition="communicate", reason_summary="The greeting is independent of the turn action.",
@@ -1678,7 +1686,7 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
         {"local_ref": "hello", "outcome": "Respond to the greeting", "output_mode": "speech", "continuity_scope": "turn", "confidence": 1},
         {"local_ref": "turn", "outcome": "Turn left", "output_mode": "body_action", "continuity_scope": "goal", "confidence": 1},
     ], cognitive_requests=[
-        {"authority": "social_cognition", "responsibility_refs": ["hello"], "reason_summary": "Respond to the greeting."},
+        {"authority": "social_cognition", "responsibility_refs": ["hello", "turn"], "reason_summary": "Own interaction for the complete admitted turn."},
         {"authority": "planner", "responsibility_refs": ["turn"], "reason_summary": "Plan the requested turn."},
     ])
     task = asyncio.create_task(coordinator.resolve(
@@ -1709,8 +1717,9 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
             assert result.interaction_response is None
             assert any(item.get("stage") == "social_cognition" for item in result.metadata["stage_diagnostics"])
         else:
-            assert len(submitted) == 1
-            assert result.interaction_response.speech[0].text == "Hello!"
+            assert len(submitted) == 2
+            assert submitted[0].speech[0].text == "Hello!"
+            assert result.interaction_response.speech[0].text == "I couldn't complete that turn."
             assert result.interaction_response.metadata["presentation_already_dispatched"] is True
     finally:
         release_social.set()

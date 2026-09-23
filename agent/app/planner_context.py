@@ -1117,12 +1117,13 @@ def cancellation_capability_facts(entries: list[Any]) -> list[dict[str, Any]]:
 
 
 def auxiliary_social_capability_payloads(entries: list[Any]) -> list[dict[str, Any]]:
-    """Project only catalog-qualified optional social-decoration Capabilities.
+    """Project catalog-qualified social-expression candidates for Social Cognition.
 
-    This is a read-only catalog filter. It does not decide that an expression is
-    useful; the same primary Planner result makes that semantic choice. Requiring
-    explicit behavior-domain and parallel-safety declarations keeps the model from
-    borrowing an arbitrary body Capability for decoration.
+    This is a read-only catalog filter. It never grants Planner authority over an
+    optional expression. Social Cognition alone decides whether a candidate belongs
+    in a communicative act; Runtime still validates and executes the exact proposal.
+    Explicit behavior-domain and parallel-safety declarations prevent Social
+    Cognition from borrowing an arbitrary body Capability for expression.
     """
 
     projected: list[dict[str, Any]] = []
@@ -1163,23 +1164,15 @@ def auxiliary_social_capability_payloads(entries: list[Any]) -> list[dict[str, A
     return projected
 
 
-def auxiliary_social_prompt_context(
-    context: dict[str, Any],
-    candidates: list[dict[str, Any]],
-) -> dict[str, Any]:
-    """Return the bounded scene/style/history input for Planner decoration."""
+def trusted_target_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
+    """Project only trusted target-realization evidence for Planner HOW.
 
-    mind = context.get("mind")
-    raw_style = mind.get("social_interaction_style") if isinstance(mind, dict) else None
-    style = (
-        {
-            key: raw_style[key]
-            for key in ("expressiveness", "repetition_guidance", "restraint")
-            if key in raw_style
-        }
-        if isinstance(raw_style, dict) and raw_style.get("owner_approved") is True
-        else {}
-    )
+    Person/addressee meaning remains UMI-owned WHAT. Planner may receive only the
+    opaque current target reference needed to realize a provider-declared target
+    argument; social style, recent expressions, and optional-expression candidates
+    are intentionally absent from this projection.
+    """
+
     target_evidence: dict[str, Any] = {"available": False}
     for key in (
         "auxiliary_social_target",
@@ -1215,6 +1208,27 @@ def auxiliary_social_prompt_context(
             },
         }
         break
+    return {"target_evidence": target_evidence}
+
+
+def auxiliary_social_prompt_context(
+    context: dict[str, Any],
+    candidates: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Return bounded scene/style/history input owned by Social Cognition."""
+
+    mind = context.get("mind")
+    raw_style = mind.get("social_interaction_style") if isinstance(mind, dict) else None
+    style = (
+        {
+            key: raw_style[key]
+            for key in ("expressiveness", "repetition_guidance", "restraint")
+            if key in raw_style
+        }
+        if isinstance(raw_style, dict) and raw_style.get("owner_approved") is True
+        else {}
+    )
+    target_evidence = trusted_target_prompt_context(context)["target_evidence"]
     recent = [
         {
             key: item[key]

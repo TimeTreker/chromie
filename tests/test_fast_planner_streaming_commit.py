@@ -325,6 +325,30 @@ def _structured_resource_request() -> CognitiveWorkRequest:
 def _structured_resource_output(*, recipient: str='me') -> dict[str, Any]:
     return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['fetch'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.acquire_and_deliver_resource', 'activity_id': 'fetch-milk', 'args': {'resource': {'kind': 'physical_object', 'description': 'bottle of milk'}, 'source': {'status': 'known', 'description': 'ahead of you about 50 meters', 'bindings': {'distance': 50}}, 'recipient': {'description': recipient}}, 'timing': 'sequential', 'source_responsibility_refs': ['fetch']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Acquire the resource and deliver it.'}
 
+@pytest.mark.asyncio
+async def test_fast_planner_rejects_social_only_decoration_mixed_into_task_responsibility() -> None:
+    request = _structured_resource_request()
+    raw = _structured_resource_output()
+    raw["activities"].append({
+        "role": "capability",
+        "capability_id": "soridormi.blink_eyes",
+        "activity_id": "social-ack",
+        "args": {"count": 1},
+        "timing": "sequential",
+        "source_responsibility_refs": ["fetch"],
+    })
+    model = _StreamingModel([_wire_output(raw)])
+    frames = [
+        frame
+        async for frame in FastPlannerResolver(
+            model, _Catalog([_structured_resource_catalog_capability(), _blink_social_catalog_capability()])
+        ).stream_advance(request)
+    ]
+    assert isinstance(frames[-1], FastPlannerStreamFailure)
+    assert frames[-1].failure_class == "fast_stream_contract_invalid"
+    assert "optional social expression belongs to Social Cognition" in frames[-1].reason
+
+
 def test_fast_decision_projection_localizes_coverage_bindings_and_relations() -> None:
     look = CognitiveResponsibilityProposal(local_ref='r1', outcome='look at the person', output_mode='body_action', bindings={'entity': 'me', 'parallel_with': ['r2']}, confidence=1.0)
     blink = CognitiveResponsibilityProposal(local_ref='r2', outcome='blink twice', output_mode='body_action', bindings={'count': 2, 'parallel_with': 'r1'}, confidence=1.0)

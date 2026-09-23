@@ -3990,24 +3990,20 @@ class VoiceAssistant:
         failure_class: str | None,
         failure_error: str | None,
     ) -> str:
-        """Project bounded operational failure identity into debug speech.
+        """Return a human-safe operational notice; diagnostics stay in metadata/logs."""
 
-        Detailed provider, protocol, validation, and HTTP text remains available in
-        logs/evidence and response metadata. It must not be serialized into TTS merely
-        because a qualification console enables diagnostic speech.
-        """
-
-        stage = " ".join(str(failure_stage or "cognition").split())
-        failure_kind = " ".join(
-            str(failure_class or "semantic_failure").split()
+        stage = str(failure_stage or "").strip().casefold()
+        if "user_meaning" in stage or "interpret" in stage:
+            return (
+                "刚才那句我没理解清楚，你能再说一次吗？"
+                if zh
+                else "I didn't understand that clearly. Could you say it again?"
+            )
+        return (
+            "我这边刚才出了点问题，没能把这件事完成。"
+            if zh
+            else "I ran into a problem and couldn't complete that."
         )
-
-        stage_label = stage.replace("_", " ").strip()
-        failure_label = failure_kind.replace("_", " ").strip()
-        if zh:
-            return f"{stage_label} 失败（{failure_label}）。"
-
-        return f"{stage_label.capitalize()} failed ({failure_label})."
 
     def _cognitive_core_exception_safe_response(
         self,
@@ -4025,29 +4021,16 @@ class VoiceAssistant:
         validated Canonical Plan and Trusted Capability Runtime execution.
         """
 
-        # Cognition is unavailable at this boundary. Friendly mode keeps the
-        # emergency fail-closed utterance tiny and natural. Explicit diagnostic
-        # mode may project only already-recorded operational failure evidence;
-        # it does not reinterpret user meaning or authorize any effect.
+        # Cognition is unavailable at this boundary. Keep the emergency
+        # fail-closed utterance tiny and natural; detailed operational identity
+        # remains in response metadata/logs rather than becoming robot speech.
         envelope = (context or {}).get("user_turn_envelope")
         zh = self._looks_zh(user_text)
-        diagnostic = (
-            getattr(self, "failure_speech_mode", "friendly") == "diagnostic"
-            and bool(failure_stage or failure_class or failure_error)
-        )
-        text = (
-            self._operational_failure_notice(
-                zh=zh,
-                failure_stage=failure_stage,
-                failure_class=failure_class,
-                failure_error=failure_error,
-            )
-            if diagnostic
-            else (
-                "咦，刚才没接上。你再跟我说一遍嘛。"
-                if zh
-                else "Huh, that didn't go through. Can you tell me again?"
-            )
+        text = self._operational_failure_notice(
+            zh=zh,
+            failure_stage=failure_stage,
+            failure_class=failure_class,
+            failure_error=failure_error,
         )
         response = self._host_speech_response(
             text,

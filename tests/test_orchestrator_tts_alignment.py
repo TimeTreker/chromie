@@ -1045,7 +1045,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assert response is not None
         self.assertEqual(
             response.speech[0].text,
-            "Huh, that didn't go through. Can you tell me again?",
+            "I ran into a problem and couldn't complete that.",
         )
         self.assertEqual(
             response.metadata["source"],
@@ -1062,7 +1062,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "Huh, that didn't go through. Can you tell me again?",
+            "I ran into a problem and couldn't complete that.",
         )
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertFalse(response.metadata["semantic_fallback"])
@@ -1086,7 +1086,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "Fast planner stream failed (stream transport invalid).",
+            "I ran into a problem and couldn't complete that.",
         )
         self.assertEqual(
             response.metadata["semantic_failure_stage"],
@@ -1101,6 +1101,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "fast_planner_stream:stream_transport_invalid:"
             "SGLang stream ended without a finish_reason",
         )
+        self.assertNotIn("Fast planner", response.speech[0].text)
+        self.assertNotIn("stream transport invalid", response.speech[0].text)
         self.assertNotIn("SGLang", response.speech[0].text)
         self.assertNotIn("finish_reason", response.speech[0].text)
         self.assertNotIn("{", response.speech[0].text)
@@ -1163,7 +1165,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             response.speech[0].text,
-            "咦，刚才没接上。你再跟我说一遍嘛。",
+            "我这边刚才出了点问题，没能把这件事完成。",
         )
         self.assertNotIn("执行任何操作", response.speech[0].text)
         self.assertNotIn("处理好你的请求", response.speech[0].text)

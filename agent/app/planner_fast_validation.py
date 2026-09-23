@@ -522,6 +522,16 @@ def validate_fast_advance_output(
         )
     by_ref = {item.local_ref: item for item in responsibilities}
     allowed = {item["capability_id"]: item for item in capabilities}
+
+    def social_expression_only(capability_id: str) -> bool:
+        definition = allowed.get(capability_id) or {}
+        domains = {
+            str(value).strip().casefold()
+            for value in (definition.get("behavior_domains") or [])
+            if str(value).strip()
+        }
+        return domains == {"social_attention"}
+
     unresolved_meaning = {
         " ".join(item.description.strip().split())
         for item in request.meaning_uncertainties
@@ -532,6 +542,28 @@ def validate_fast_advance_output(
     terminal_activities = [
         item for item in output.activities if item.role in {"capability", "complete_response"}
     ]
+    capabilities_by_ref: dict[str, list[Any]] = {ref: [] for ref in responsibility_refs}
+    for activity in capability_activities:
+        for source_ref in activity.source_responsibility_refs:
+            if source_ref in capabilities_by_ref:
+                capabilities_by_ref[source_ref].append(activity)
+    for source_ref, activities in capabilities_by_ref.items():
+        social_only = [
+            item for item in activities if social_expression_only(item.capability_id)
+        ]
+        non_social = [
+            item for item in activities if not social_expression_only(item.capability_id)
+        ]
+        if social_only and non_social:
+            raise PlannerDTOContractError(
+                "Planner cannot attach social-expression-only Capability Work to a "
+                "different requested task under the same Responsibility; optional social "
+                "expression belongs to Social Cognition. Split independently requested "
+                "observable effects into separate UMI Responsibilities; source_ref="
+                + source_ref
+                + " social_capabilities="
+                + ",".join(item.capability_id for item in social_only)
+            )
     parallel_batch: list[Any] = []
     for activity in capability_activities:
         if activity.timing == "parallel":
@@ -919,7 +951,7 @@ def validate_fast_advance_output(
             # argument_realization metadata so a valid live target does not look
             # like an invented required input.
             if parameter == "target_ref":
-                target_context = request.context.get("planner_auxiliary_social_context")
+                target_context = request.context.get("planner_target_evidence_context")
                 target_evidence = (
                     target_context.get("target_evidence")
                     if isinstance(target_context, dict)

@@ -8,6 +8,7 @@ from agent.app.capabilities.catalog import CapabilityMatch
 from agent.app.planner_context import (
     auxiliary_social_capability_payloads,
     auxiliary_social_prompt_context,
+    trusted_target_prompt_context,
 )
 from agent.app.planner_schema import (
     canonical_plan_response_schema,
@@ -165,7 +166,7 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
                 jsonschema.validate({**proposal, **change}, definition)
 
 
-    def test_catalog_filter_is_mechanical_and_prompt_names_planner_owner(self) -> None:
+    def test_catalog_filter_is_mechanical_and_social_context_names_sc_owner(self) -> None:
         eligible = CapabilityMatch(
             capability_id="soridormi.blink_eyes",
             agent_id="soridormi.skill",
@@ -194,6 +195,21 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
         self.assertEqual(context["eligible_capabilities"][0]["capability_id"], "soridormi.blink_eyes")
         self.assertNotIn("max_activities", context)
         self.assertNotIn("max_auxiliary_expressions", context)
+
+        target_context = trusted_target_prompt_context({
+            "active_user_target": {
+                "target_ref": "opaque-current-speaker",
+                "relative_direction": "front",
+            }
+        })
+        self.assertEqual(set(target_context), {"target_evidence"})
+        self.assertEqual(
+            target_context["target_evidence"]["target"]["target_ref"],
+            "opaque-current-speaker",
+        )
+        self.assertNotIn("eligible_capabilities", target_context)
+        self.assertNotIn("social_interaction_style", target_context)
+        self.assertNotIn("recent_auxiliary_behavior_evidence", target_context)
 
     def test_runtime_executes_exact_proposal_without_goal_authority(self) -> None:
         runtime = _Runtime([_definition()])

@@ -405,9 +405,9 @@ class CoreInterpretationResult(BaseModel):
         min_length=1,
         description=(
             "Complete set of independently satisfiable human outcomes. Emit one item "
-            "per requested observable effect, including separate concurrent embodied "
-            "and authored-vocal effects; coordination is a relation, not permission "
-            "to collapse two effects into one item."
+            "per requested observable effect, including separate concurrent effects "
+            "even inside one result domain; coordination is a relation, not permission "
+            "to collapse two independently requested effects into one item."
         ),
     )
     meaning_uncertainties: list[UserMeaningUncertainty] = Field(

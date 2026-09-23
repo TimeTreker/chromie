@@ -131,13 +131,20 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         )
         self.assertEqual(decision.responsibilities[0].local_ref, "r1")
 
-    def test_primary_planner_activation_does_not_require_redundant_ga_request(self) -> None:
+    def test_primary_planner_activation_requires_standing_sc_but_not_redundant_ga(self) -> None:
         parsed = _valid_output()
-        parsed["cognitive_requests"] = [{
-            "authority": "planner",
-            "responsibility_refs": ["r1"],
-            "reason_summary": "The accepted meaning is ready for HOW reasoning.",
-        }]
+        parsed["cognitive_requests"] = [
+            {
+                "authority": "social_cognition",
+                "responsibility_refs": ["r1"],
+                "reason_summary": "The admitted turn requires an interaction decision.",
+            },
+            {
+                "authority": "planner",
+                "responsibility_refs": ["r1"],
+                "reason_summary": "The accepted meaning is ready for HOW reasoning.",
+            },
+        ]
 
         decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
             UserMeaningInterpretationRequest(
@@ -147,8 +154,31 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         )
 
         self.assertEqual(
-            [item.authority for item in decision.cognitive_requests], ["planner"]
+            [item.authority for item in decision.cognitive_requests],
+            ["social_cognition", "planner"],
         )
+
+    def test_primary_validation_requires_turn_wide_social_cognition(self) -> None:
+        request = UserMeaningInterpretationRequest(
+            text="What's the weather in Chongqing today?"
+        )
+        parsed = _valid_output()
+        parsed["cognitive_requests"] = [
+            item for item in parsed["cognitive_requests"]
+            if item["authority"] != "social_cognition"
+        ]
+        with self.assertRaisesRegex(ValueError, "activate Social Cognition"):
+            OllamaUserMeaningInterpreter._validate_interpretation_content(
+                request, json.dumps(parsed),
+            )
+
+        compound = _compound_output()
+        compound["cognitive_requests"][1]["responsibility_refs"] = ["r1"]
+        with self.assertRaisesRegex(ValueError, "Social Cognition cognition is turn-wide"):
+            OllamaUserMeaningInterpreter._validate_interpretation_content(
+                UserMeaningInterpretationRequest(text="nod and blink"),
+                json.dumps(compound),
+            )
 
     def test_primary_source_evidence_rejects_unknown_refs(self) -> None:
         parsed = _valid_output()
@@ -161,7 +191,7 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
                 json.dumps(parsed),
             )
 
-    def test_mixed_greeting_and_work_requires_turn_wide_ga_but_scoped_sc_and_planner(self) -> None:
+    def test_mixed_greeting_and_work_requires_turn_wide_ga_and_sc_but_scoped_planner(self) -> None:
         request = UserMeaningInterpretationRequest(text="Hi. Turn left.")
         parsed = _compound_output()
         parsed["responsibilities"][0].update(
@@ -172,7 +202,7 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
             outcome="Turn left", continuity_scope="goal",
             source_evidence={"source_start_token_ref": "t2", "source_end_token_ref": "t4"},
         )
-        parsed["cognitive_requests"][1]["responsibility_refs"] = ["r1"]
+        parsed["cognitive_requests"][1]["responsibility_refs"] = ["r1", "r2"]
         parsed["cognitive_requests"][2]["responsibility_refs"] = ["r2"]
         for omitted_scope in (["r1"], ["r2"]):
             with self.subTest(ga_refs=omitted_scope):
@@ -187,7 +217,7 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         )
         self.assertEqual(
             {item.authority: item.responsibility_refs for item in decision.cognitive_requests},
-            {"goal_association": ["r1", "r2"], "social_cognition": ["r1"], "planner": ["r2"]},
+            {"goal_association": ["r1", "r2"], "social_cognition": ["r1", "r2"], "planner": ["r2"]},
         )
 
     def test_primary_source_evidence_rejects_reversed_refs(self) -> None:
@@ -405,11 +435,14 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
                         "target_ref": "opaque-current-speaker",
                         "relative_direction": "front",
                     },
-                    "planner_auxiliary_social_context": {
+                    "planner_target_evidence_context": {
                         "target_evidence": {
                             "available": True,
                             "target": {"target_ref": "opaque-current-speaker"},
                         }
+                    },
+                    "planner_auxiliary_social_context": {
+                        "eligible_capabilities": [{"capability_id": "legacy-social"}],
                     },
                 },
             )
@@ -420,6 +453,7 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
         self.assertNotIn("opaque-current-speaker", all_text)
         self.assertNotIn("active_user_target", all_text)
         self.assertNotIn("planner_auxiliary_social_context", all_text)
+        self.assertNotIn("planner_target_evidence_context", all_text)
 
     def test_primary_prompt_exposes_semantic_identity_not_presentation_profile(self) -> None:
         payload = self._interpreter().build_interpretation_payload(

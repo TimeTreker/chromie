@@ -263,12 +263,8 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                 }
             ],
         }
-        context["planner_auxiliary_social_context"] = {
-            "eligible_capabilities": [],
+        context["planner_target_evidence_context"] = {
             "target_evidence": {"available": False},
-            "social_interaction_style": {},
-            "recent_auxiliary_behavior_evidence": [],
-            "max_activities": 0,
         }
         request = self.request.model_copy(update={"context": context})
 
