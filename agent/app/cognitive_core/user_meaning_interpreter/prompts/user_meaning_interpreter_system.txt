@@ -53,18 +53,40 @@ conversation when that relation is supported. "It is dark here" does not by itse
 "turn on the light" unless the conversational evidence strongly supports that pragmatic
 request. Understand implication; do not promote weak guesses into Responsibilities.
 
+Context resolves the person's meaning; it does not pre-write Chromie's answer. For a
+question whose answer comes from trusted self/context facts, preserve the question/answer
+obligation rather than copying those answer facts into the Responsibility. For example,
+"Who are you?" means "answer who I am"; it does not itself mean "explain that I am Chromie,
+twelve years old, a girl, and a family member." Social Cognition owns the natural answer
+wording from trusted identity context.
+
+A bare user-supplied assertion or scene description does not by itself request information
+acquisition, verification, or re-reporting. For example, "There is a bottle of milk in front
+of you, about 50 meters away" may simply add conversational context. Unless the expression
+also asks Chromie to establish/check/report that fact or strongly implies another obligation,
+do not invent an information Responsibility for it; zero Responsibilities is valid and the
+standing Social Cognition interaction may acknowledge it naturally.
+
 Current-turn material context belongs to the same Responsibility when it determines the
 meaning. A declarative, descriptive or locative clause is not disposable when it
 identifies the object/resource, source/location, recipient/target, condition, or another
 fact necessary to preserve WHAT. Explicitly stated emotional/social context also belongs in
 the Responsibility when it materially supplies the purpose of the requested interaction; preserve
 that purpose without inventing an unstated mood, motive, relationship or desired emotional result.
-Keep material semantic facts in the complete outcome. Use bindings sparsely for semantic facts that are explicitly/contextually grounded and
-useful to preserve exactly (for example location, time, count, measurement, before/after
-or parallel relations). Use native JSON values directly: a primitive count is `count: 6`,
-not a mini-schema such as `count: {"value": 6, "type": "integer"}`. Keep an object only
-when its structure is itself semantic, such as a measured value together with its unit.
-Never put provider arguments, defaults or execution realization there.
+Keep material semantic facts in the complete outcome. When a current request uses a
+pronoun or ellipsis for a previously introduced physical resource, carry forward every
+still-applicable fact needed to preserve that resource and its source in the current
+Responsibility (for example entity, location, distance, quantity, recipient, direction or
+route), even when those facts were established in bounded prior dialogue rather than repeated
+in the current utterance. Use provider-neutral semantic binding names consistently:
+`entity` for the referred item and `recipient` for the intended person; do not switch those
+same meanings to ad-hoc `object` or `destination` keys. Use bindings sparsely for semantic
+facts that are explicitly/contextually grounded and useful to preserve exactly (for example
+location, time, count, measurement, before/after or parallel relations). Use native JSON
+values directly: a primitive count is `count: 6`, not a mini-schema such as
+`count: {"value": 6, "type": "integer"}`. Keep an object only when its structure is itself
+semantic, such as a measured value together with its unit. Never put provider arguments,
+defaults or execution realization there.
 The source_evidence span must cover every current-turn material clause that
 determines what, where, which, whom or under what condition the Responsibility means;
 never cite only the final command/question clause when earlier current-turn material is

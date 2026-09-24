@@ -7,7 +7,7 @@ from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_model_contract import PlannerDTOContractError
 from agent.app.planner_fast_validation import AuthoritativeGroundingValidationError, validate_fast_advance_output
-from agent.app.planner_prompt import fast_advance_capability_prompt_projection, fast_advance_layered_prompt, fast_advance_semantic_capability_projection, fast_advance_streaming_capability_prompt_projection, fast_responsibility_decision_projection, fast_streaming_advance_system_prompt
+from agent.app.planner_prompt import fast_advance_capability_prompt_projection, fast_advance_layered_prompt, fast_advance_semantic_capability_projection, fast_advance_streaming_capability_prompt_projection, fast_responsibility_decision_projection, fast_streaming_advance_system_prompt, planner_interaction_context_projection
 from agent.app.planner_schema import fast_streaming_advance_response_schema
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveStageFailure, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
@@ -349,6 +349,34 @@ def _structured_resource_request() -> CognitiveWorkRequest:
 
 def _structured_resource_output(*, recipient: str='me') -> dict[str, Any]:
     return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['fetch'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.acquire_and_deliver_resource', 'activity_id': 'fetch-milk', 'args': {'resource': {'kind': 'physical_object', 'description': 'bottle of milk'}, 'source': {'status': 'known', 'description': 'ahead of you about 50 meters', 'bindings': {'distance': 50}}, 'recipient': {'description': recipient}}, 'timing': 'sequential', 'source_responsibility_refs': ['fetch']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Acquire the resource and deliver it.'}
+
+
+
+def test_planner_interaction_context_drops_prior_turn_delivery_as_completion_evidence() -> None:
+    context = {
+        "already_spoken": [{"text": "current-turn answer", "turn_id": "turn-current"}],
+        "pending_speech": [],
+        "prior_delivered_speech": [{"text": "older answer must not satisfy this turn", "turn_id": "turn-old"}],
+    }
+    projected = planner_interaction_context_projection(context)
+    assert projected["already_spoken"] == context["already_spoken"]
+    assert projected["pending_speech"] == []
+    assert "prior_delivered_speech" not in projected
+    assert "prior_delivered_speech" in context
+
+
+def test_fast_stream_prompt_hides_prior_turn_delivered_words_but_keeps_current_delivery_state() -> None:
+    current = _structured_resource_request()
+    current.context["interaction_context"] = {
+        "already_spoken": [{"text": "CURRENT DELIVERY MARKER", "turn_id": current.sid}],
+        "prior_delivered_speech": [{"text": "OLD DELIVERY MARKER", "turn_id": "older-turn"}],
+    }
+    prompt = str(fast_advance_layered_prompt(
+        current, responsibilities=current.responsibilities, capabilities=[]
+    ))
+    assert "CURRENT DELIVERY MARKER" in prompt
+    assert "OLD DELIVERY MARKER" not in prompt
+    assert "prior-turn delivered speech are context only" in prompt
 
 @pytest.mark.asyncio
 async def test_fast_stream_filters_incompatible_information_capability_before_generation() -> None:

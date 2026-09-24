@@ -273,6 +273,28 @@ def test_umi_system_prompt_preserves_information_delivery_as_terminal_what() -> 
     assert "Acquiring or checking the source alone is not" in prompt
     assert "the complete WHAT" in prompt
 
+def test_umi_system_prompt_keeps_answer_facts_and_bare_assertions_out_of_what() -> None:
+    prompt = (
+        Path(__file__).parents[1]
+        / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
+    ).read_text(encoding="utf-8")
+    assert '"Who are you?" means "answer who I am"' in prompt
+    assert "does not pre-write Chromie's answer" in prompt
+    assert "bare user-supplied assertion or scene description" in prompt
+    assert "do not invent an information Responsibility" in prompt
+
+
+def test_umi_system_prompt_carries_contextual_resource_facts_with_canonical_bindings() -> None:
+    prompt = (
+        Path(__file__).parents[1]
+        / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
+    ).read_text(encoding="utf-8")
+    assert "previously introduced physical resource" in prompt
+    assert "entity, location, distance, quantity, recipient" in prompt
+    assert "`entity` for the referred item and `recipient` for the intended person" in prompt
+    assert "`object` or `destination` keys" in prompt
+
+
 class UserMeaningInterpreterPromptTests(unittest.TestCase):
     def _interpreter(self) -> OllamaUserMeaningInterpreter:
         return OllamaUserMeaningInterpreter(

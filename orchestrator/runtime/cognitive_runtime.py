@@ -5803,47 +5803,47 @@ class GoalDrivenRuntimeCoordinator:
         except CognitiveStageFailure as exc:
             await cancel_uncommitted_fast_work(exc.stage)
 
-            # A late continuity/association failure cannot retroactively turn an
-            # already delivered conversational Responsibility into a user-visible
-            # task failure. The words were actually delivered; GA is only history
-            # association. Preserve the diagnostic, but do not apologize, retry, or
-            # tell a second joke merely because that parallel cognition failed.
-            if exc.stage == "goal_association":
-                await finish_independent_social_interaction()
-                delivered_current_interaction = bool(
-                    interaction is not None
-                    and interaction.metadata.get("presentation_already_dispatched") is True
-                    and any(speech.text.strip() for speech in interaction.speech)
-                )
-                conversational_only = all(
-                    item.output_mode == "speech"
-                    for item in work_request.responsibilities
-                )
-                if delivered_current_interaction and conversational_only:
-                    return self._finish(
-                        mode=self.policy.mode,
-                        status=(
-                            "applied" if self.policy.mode == "apply"
-                            else "report_only" if self.policy.mode == "report_only"
-                            else "skipped"
+            # Parallel cognition cannot retroactively turn an already delivered
+            # conversational Responsibility into a user-visible task failure. Once
+            # Social Cognition actually delivered the fresh speech-only turn, GA and
+            # Planner are optional bookkeeping/HOW cognition for that completed social
+            # act. Preserve their diagnostic failure, but do not apologize, retry, or
+            # re-deliver the same answer. Non-speech Work never enters this containment.
+            await finish_independent_social_interaction()
+            delivered_current_interaction = bool(
+                interaction is not None
+                and interaction.metadata.get("presentation_already_dispatched") is True
+                and any(speech.text.strip() for speech in interaction.speech)
+            )
+            conversational_only = bool(work_request.responsibilities) and all(
+                item.output_mode == "speech"
+                for item in work_request.responsibilities
+            )
+            if delivered_current_interaction and conversational_only:
+                return self._finish(
+                    mode=self.policy.mode,
+                    status=(
+                        "applied" if self.policy.mode == "apply"
+                        else "report_only" if self.policy.mode == "report_only"
+                        else "skipped"
+                    ),
+                    association=association,
+                    fast_plan=fast_plan,
+                    terminal_plan=terminal_plan,
+                    interaction=interaction if self.policy.mode == "apply" else None,
+                    goal_state_results=goal_state_results,
+                    timings=timings,
+                    started=started,
+                    metadata={
+                        "optional_cognition_failure_after_delivered_interaction": True,
+                        "suppressed_failure_stage": exc.stage,
+                        "suppressed_failure_class": str(
+                            exc.failure_metadata.get("failure_class") or type(exc).__name__
                         ),
-                        association=association,
-                        fast_plan=fast_plan,
-                        terminal_plan=terminal_plan,
-                        interaction=interaction if self.policy.mode == "apply" else None,
-                        goal_state_results=goal_state_results,
-                        timings=timings,
-                        started=started,
-                        metadata={
-                            "optional_cognition_failure_after_delivered_interaction": True,
-                            "suppressed_failure_stage": exc.stage,
-                            "suppressed_failure_class": str(
-                                exc.failure_metadata.get("failure_class") or type(exc).__name__
-                            ),
-                            "stage_diagnostics": stage_diagnostics,
-                            **path_metadata(),
-                        },
-                    )
+                        "stage_diagnostics": stage_diagnostics,
+                        **path_metadata(),
+                    },
+                )
 
             await communicate_terminal_work_failure(
                 stage=exc.stage,

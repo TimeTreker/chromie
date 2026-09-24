@@ -2371,3 +2371,35 @@ def test_goal_less_terminal_failure_hides_unrelated_retained_goal_context():
         "current_task_context",
     ):
         assert key not in projected
+
+def test_current_turn_output_guard_keeps_task_acknowledgement_precommitment() -> None:
+    from agent.app.social_cognition import _social_current_turn_output_guard
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    current = request(
+        trigger="interpretation",
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="bring the milk to the user",
+            output_mode="body_action", body_effect_family="task_physical_effect",
+            continuity_scope="goal", confidence=1.0,
+        )],
+    )
+    guard = _social_current_turn_output_guard(current)
+    assert "acknowledge receipt or understanding only" in guard
+    assert "Do not promise, accept, announce an intention to execute" in guard
+
+
+def test_current_turn_output_guard_keeps_direct_chat_compact() -> None:
+    from agent.app.social_cognition import _social_current_turn_output_guard
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    current = request(
+        trigger="interpretation",
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="answer who I am",
+            output_mode="speech", continuity_scope="turn", confidence=1.0,
+        )],
+    )
+    guard = _social_current_turn_output_guard(current)
+    assert "default to one compact sentence" in guard
+    assert "not a checklist of facts to volunteer" in guard

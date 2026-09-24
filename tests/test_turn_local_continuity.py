@@ -13,8 +13,9 @@ from shared.chromie_contracts.core_interpretation import (
     CoreInterpretationResult,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.plan import FastPlannerStreamFailure
 from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-from tests.test_cognitive_runtime_pr7 import FakeRuntime, RecordingPlannerAdapter, admitted_core, body_goal_association
+from tests.test_cognitive_runtime_pr7 import FakeRuntime, RecordingPlannerAdapter, admitted_core, body_goal_association, new_goal_association
 
 
 def test_turn_local_scope_is_semantic_and_speech_only() -> None:
@@ -501,3 +502,91 @@ async def test_late_ga_failure_cannot_turn_delivered_joke_into_user_visible_fail
     assert result.metadata["optional_cognition_failure_after_delivered_interaction"] is True
     assert result.metadata["suppressed_failure_stage"] == "goal_association"
     assert agent.social_calls == 1, "late GA failure must not trigger apology/retry speech"
+
+@pytest.mark.asyncio
+async def test_late_fast_planner_failure_cannot_invalidate_delivered_conversation() -> None:
+    class Agent:
+        def __init__(self) -> None:
+            self.social_calls = 0
+
+        async def resolve_social_cognition(self, session, *, request, timeout_ms):
+            del session, timeout_ms
+            self.social_calls += 1
+            return SocialCognitionResolution(
+                request_id=request.request_id,
+                snapshot_digest=request.snapshot_digest(),
+                disposition="communicate",
+                activities=[{
+                    "activity_id": "sc:identity:delivered",
+                    "text": "I'm Chromie.",
+                    "function": "respond",
+                    "truth_stage": "context_grounded",
+                    "delivery_phase": "immediate",
+                    "source_goal_ids": [],
+                    "source_responsibility_refs": ["r1"],
+                    "evidence_refs": [],
+                    "addressed_need_ids": [],
+                }],
+                reason_summary="Answer the current identity question.",
+                need_outcomes={},
+                model_call_count=1,
+            )
+
+        async def resolve_goal_association(self, *args, **kwargs):
+            del args, kwargs
+            return new_goal_association("goal-identity")
+
+        async def stream_fast_advance(self, session, *, request, timeout_ms):
+            del session, timeout_ms
+            yield FastPlannerStreamFailure(
+                turn_id=request.sid,
+                failure_stage="before_commit",
+                failure_class="fast_stream_contract_invalid",
+                failure_domain="model_contract",
+                architecture_attribution="fast_planner",
+                retryable=False,
+                reason="Invalid redundant Planner result.",
+            )
+
+    agent = Agent()
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=agent,
+        adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
+    core, envelope = admitted_core(
+        "who are you?",
+        sid="identity-late-fast",
+        language="en-US",
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": "answer who I am",
+            "bindings": {},
+            "output_mode": "speech",
+            "continuity_scope": "turn",
+            "confidence": 1.0,
+        }],
+        cognitive_requests=[
+            {
+                "authority": "goal_association",
+                "responsibility_refs": ["r1"],
+                "reason_summary": "Check continuity.",
+            },
+            {
+                "authority": "planner",
+                "responsibility_refs": ["r1"],
+                "reason_summary": "Plan the response HOW.",
+            },
+        ],
+    )
+    result = await coordinator.resolve(
+        object(), text="who are you?", sid="identity-late-fast",
+        core_interpretation=core, turn_envelope=envelope,
+        context={"history": []}, history=[], language="en-US",
+    )
+    assert result.status == "applied", result.fallback_reason
+    assert result.interaction_response is not None
+    assert result.interaction_response.speech[0].text == "I'm Chromie."
+    assert result.metadata["optional_cognition_failure_after_delivered_interaction"] is True
+    assert result.metadata["suppressed_failure_stage"] == "fast_planner_stream"
+    assert agent.social_calls == 1, "late Fast failure must not trigger a second failure response"

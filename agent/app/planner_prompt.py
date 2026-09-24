@@ -47,6 +47,21 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.memory import role_memory_context
 
 
+def planner_interaction_context_projection(value: Any) -> Any:
+    """Expose current-turn delivery state without treating old speech as Work evidence.
+
+    Prior-turn delivered speech remains Social Cognition/UMI conversational context.
+    Planner owns HOW for the newly admitted Responsibilities, so an older answer can
+    never prove that a fresh current-turn Responsibility is already fulfilled.
+    """
+
+    if not isinstance(value, dict):
+        return copy.deepcopy(value)
+    projected = copy.deepcopy(value)
+    projected.pop("prior_delivered_speech", None)
+    return projected
+
+
 try:
     from chromie_contracts.core_interpretation import (
         CognitiveResponsibilityProposal,
@@ -467,6 +482,8 @@ def _canonical_work_prompt(
                 value = planner_reentry_execution_truth_projection(
                     value, goal_ids=set(request.planner_reentry_scope.goal_ids),
                 )
+            elif key == "interaction_context":
+                value = planner_interaction_context_projection(value)
             sections.append("\n" + label + ":\n" + required_json(
                 value, None, label=label,
             ) + "\n")
@@ -781,7 +798,12 @@ def fast_advance_layered_prompt(
         "GA independently binds canonical Goals. The responsibilities array below is the complete "
         "task scope of THIS invocation; it may contain only part of the original turn. Use the "
         "immutable source, history and identity to ground HOW, not to add tasks absent from that "
-        "array. SC independently handles interaction outside this task scope. For each Activity, "
+        "array. SC independently handles interaction outside this task scope. Historical dialogue "
+        "and prior-turn delivered speech are context only: they can never satisfy a newly admitted "
+        "current-turn Responsibility. A repeated current request is a fresh obligation unless the "
+        "current canonical state itself proves otherwise; for ordinary speech, plan the current "
+        "complete_response again rather than treating similar words from an older turn as completion. "
+        "Only current-turn delivery state may suppress duplicate current-turn Work. For each Activity, "
         "identify the listed outcome it realizes or the necessary prerequisite it supplies; explain "
         "that connection in reason_summary. A valid Responsibility ref alone does not justify an "
         "unrelated Activity. Once those outcomes have their required Work, end the Activities list. "
@@ -853,11 +875,20 @@ def fast_advance_layered_prompt(
             item.model_dump(mode="json") for item in request.meaning_uncertainties
         ],
         "goal_continuity": fast_goal_continuity_projection(context),
-        "context": {key: context.get(key) for key in (
-            "interaction_context", "existing_work_activities", "active_task_snapshots",
-            "verified_tool_memory_index", "trusted_terminal_evidence", "result_evidence_reentry",
-            "trusted_execution_outcome", "planner_reentry_expectations", "trusted_goal_cancellation_evidence",
-        ) if key in context},
+        "context": {
+            key: (
+                planner_interaction_context_projection(context.get(key))
+                if key == "interaction_context"
+                else context.get(key)
+            )
+            for key in (
+                "interaction_context", "existing_work_activities", "active_task_snapshots",
+                "verified_tool_memory_index", "trusted_terminal_evidence", "result_evidence_reentry",
+                "trusted_execution_outcome", "planner_reentry_expectations",
+                "trusted_goal_cancellation_evidence",
+            )
+            if key in context
+        },
         "history": recent_dialogue_prompt_projection(request.history),
         "language": request.language,
         "situation": situation_prompt_projection(context),

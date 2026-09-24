@@ -964,6 +964,27 @@ def _social_interaction_opportunity(
     return opportunity
 
 
+def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
+    """Place the current ingress truth boundary next to the output contract."""
+
+    if request.trigger != "interpretation" or not request.responsibilities:
+        return ""
+    if any(item.output_mode != "speech" for item in request.responsibilities):
+        return (
+            "\nCurrent-turn output guard: this is interpretation ingress for task Work "
+            "that Planner/Runtime has not established yet. If you speak now, acknowledge "
+            "receipt or understanding only. Do not promise, accept, announce an intention "
+            "to execute, or say the Work will happen; later supplied Work facts own that "
+            "commitment.\n"
+        )
+    return (
+        "\nCurrent-turn output guard: this is direct conversational speech. Answer only "
+        "the current Responsibility and default to one compact sentence. Trusted profile "
+        "facts that the person did not ask for are background context, not a checklist of "
+        "facts to volunteer.\n"
+    )
+
+
 def social_cognition_prompt(
     request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, num_ctx: int,
 ) -> str:
@@ -1046,7 +1067,8 @@ class SocialCognitionResolver:
         raw = await model.generate(
             prompt + "\nRequired output contract JSON:\n" + required_json(
                 schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
-            ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT, system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
+            ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT
+            + _social_current_turn_output_guard(request), system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
                 "This is the sole deeper pass; decide communicate or silence now." if deep else ""
             ),
             options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx,
