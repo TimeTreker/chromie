@@ -1,5 +1,32 @@
 # Chromie Development Checkpoint
 
+## Simulation milk-scene observation slice — 2026-09-24
+
+Current base is `08e40d2eebbc03d962895d5bb32cfa832adf69bf` on `main`, paired with
+Soridormi `013f46d19ec5101c4392532ab848e0b0819c2a50` on `codex/turn-count`.
+The paired Soridormi source commit is
+`f9cf6ac14e63e2c69caca7665b7ed9d16e4861df`; Chromie's expected resume
+revision is the latest `main` commit containing this checkpoint and Handoff.
+This delivery adds a Soridormi-owned optional MuJoCo milk-bottle scene marker,
+read-only simulation-only observation tool, and Chromie source-specific adapter into
+Goal-free Situation. The adapter preserves the Soridormi observation reference and
+cannot turn a user's text into perception. It is explicit; ordinary text turns do
+not invoke it. The first-turn ungrounded “I see” response and Fast Planner's false
+current-turn citation for inherited location remain open. `stand_idle` necessity
+and latency remain unqualified; do not treat the mock as real camera or hardware
+evidence.
+
+Focused Chromie adapter tests pass (2); policy, test-ownership and docs gates pass.
+The broader Chromie gate remains failing on semantic/workflow fixtures (benchmark:
+6 failed/147 passed; main: 120 failed/3708 passed). Soridormi's dependency-complete
+container suite passed 803 tests/5 skipped before final visual cap and output-field
+tidying; focused post-tidying checks passed 70 tests and body concurrency passed
+164 tests/4 skipped. No live scene-to-speech or physical test was run. Resume by
+wiring an explicitly admitted fresh observation to the relevant cognition path,
+then qualifying grounded first-turn speech and separately repairing Planner
+location provenance with a frozen contrast cohort. Run the canonical gates and
+highest safe live profile before claiming the two-turn episode fixed.
+
 ## Responsibility association + natural interaction patch pending — 2026-09-24
 
 Current base is `cc4276625ffde7d3dd786b99cf48729e0edc49b4` on `main` after the owner-applied

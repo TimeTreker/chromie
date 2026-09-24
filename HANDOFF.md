@@ -1,5 +1,52 @@
 # Chromie Handoff
 
+## Simulation milk-scene observation delivery — 2026-09-24
+
+Checkouts: `/home/chromie/github/chromie` at `main` base
+`08e40d2eebbc03d962895d5bb32cfa832adf69bf`, and
+`/home/chromie/github/soridormi` at `codex/turn-count` base
+`013f46d19ec5101c4392532ab848e0b0819c2a50`. Both matched their fetched
+`origin` branches before editing. Preserve Soridormi's pre-existing untracked
+`workspace/Open_Duck_Playground` submodule directory; it is outside this patch.
+Paired Soridormi source commit:
+`f9cf6ac14e63e2c69caca7665b7ed9d16e4861df`.
+
+Soridormi's `./scripts/run_sim_server.sh --backend mujoco --profile open_duck_forward
+--no-viewer --milk-bottle` generates a non-contact scene marker 50 m ahead.
+`soridormi.robot.observe_scene` reads current MuJoCo geometry and pose and returns
+simulation-marked, source-identified observations or an empty list. Chromie's
+`observe_soridormi_sim_scene` validates that output and constructs a Goal-free
+Situation observation. No ordinary-turn call site exists yet, and neither the
+first-turn “I see” wording nor the inherited-location Planner citation is fixed.
+
+Observed checks: Chromie focused adapter 2 passed; policy, test ownership and docs
+passed; full benchmark 6 failed/147 passed and main tests 120 failed/3708 passed.
+Soridormi container full suite 803 passed/5 skipped before the final cap/output
+tidying; post-tidying focused 70 passed, body concurrency 164 passed/4 skipped,
+governance and compile passed. Generated XML compiled in MuJoCo and direct backend
+observation returned 50.0 m. Host-only body test could not import `zmq`; the
+dependency-complete container passed. No retained live run, service restart,
+microphone/speaker, physical robot, or real-camera evidence is claimed.
+
+Local commands used for the relevant source checks: Chromie
+`python -m pytest -q tests/test_soridormi_scene_perception.py`,
+`python scripts/check_repository_policies.py`,
+`python scripts/check_test_ownership.py`, and `python scripts/check_docs.py`.
+Soridormi `python scripts/validate_repository_governance.py` and
+`python -m compileall -q src tests` passed. Its full `pytest -q`, focused pytest,
+and `./scripts/validate_body_concurrency.sh` ran inside the dependency-complete
+container as recorded above; no live scenario command was run.
+
+Resume: fetch both upstream branches; preserve dirty work; run the focused tests,
+then wire fresh scene observation into an explicitly source-attributed cognition
+opportunity and exercise the milk dialogue in a safe live simulation. Qualify and
+repair first-turn speech and Planner inherited-location provenance separately;
+inspect whether Soridormi's completion posture requires an explicit `stand_idle`.
+Run `python scripts/check_repository_policies.py`, `./scripts/run_tests.sh`, and
+`python scripts/check_docs.py` in Chromie before a revision-level claim. Expected
+resume revision after delivery is the latest commit containing this Handoff and
+Checkpoint pair, not either pre-delivery base above.
+
 ## Responsibility association + natural interaction patch — pending application 2026-09-24
 
 Base revision: `cc4276625ffde7d3dd786b99cf48729e0edc49b4` on `main`. The owner clarified the
