@@ -845,7 +845,19 @@ def test_user_meaning_interpreter_scope_prompt_distinguishes_work_from_duration(
         Path("agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
         .read_text(encoding="utf-8")
     )
-    assert "goal does\nNOT mean long-term, cross-session" in prompt
+    assert "lifetime distinction" in prompt
     assert "Every non-speech output_mode therefore\nuses goal" in prompt
     assert "Use turn for ordinary current-conversation\nspeech" in prompt
-    assert "GA owns that continuity judgment" in prompt
+    assert 'does NOT mean "no Goal"' in prompt
+    assert "does not block Planner" in prompt
+
+
+def test_umi_preserves_explicit_social_purpose_without_inventing_emotion() -> None:
+    prompt = (
+        Path("agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
+        .read_text(encoding="utf-8")
+    )
+    assert "Explicitly stated emotional/social context" in prompt
+    assert "materially supplies the purpose" in prompt
+    assert "without inventing an unstated mood, motive" in prompt
+    assert "GA owns association with retained Goal history" in prompt

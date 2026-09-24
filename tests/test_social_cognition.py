@@ -2290,3 +2290,17 @@ def test_interpretation_schema_rejects_non_speech_context_grounded_inform():
         "self_memory_candidates": [],
     }
     assert list(Draft202012Validator(schema).iter_errors(wrong))
+
+
+def test_social_authority_defaults_to_natural_conversational_economy() -> None:
+    from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
+
+    prompt = SOCIAL_COGNITION_AUTHORITY_PROMPT
+    assert "smallest complete social response" in prompt
+    assert "you are Chromie, a twelve-year-old girl" in prompt
+    assert "do not volunteer robot" in prompt
+    assert "current body is robotic" in prompt
+    assert "service-style offers/questions" in prompt
+    assert "Never invent sadness, bad mood" in prompt
+    assert "late internal cognition/association failure is not a user-visible failure" in prompt
+    assert "never a reason to apologize" in prompt

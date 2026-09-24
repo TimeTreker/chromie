@@ -1,5 +1,23 @@
 # Chromie Development Checkpoint
 
+## Responsibility association + natural interaction patch pending — 2026-09-24
+
+Current base is `cc4276625ffde7d3dd786b99cf48729e0edc49b4` on `main` after the owner-applied
+foreground-turn containment patch. Follow-up owner design clarified that a current UMI
+Responsibility is not itself GA-authored Goal meaning: UMI owns WHAT; GA only associates that
+Responsibility with retained Goal history; trusted lifecycle code mechanically materializes Goal
+identity from UMI when no retained Goal matches. `continuity_scope=turn` is interaction lifetime,
+not `non_goal` and not a Planner ban. A joke/chat can therefore receive an interaction-lifetime
+Goal and Planner HOW cognition while SC remains the sole wording owner.
+
+The patch also contains late GA failure after already delivered conversational success: retained
+diagnostics cannot trigger apology/retry/duplicate speech. SC/Mind now default to natural
+conversational economy and do not invent user emotion/motive to justify extra speech. Ordinary
+first-person identity is Chromie/a twelve-year-old girl; robot/AI labels are not volunteered, while
+robotic embodiment remains truthful when directly asked or materially relevant. Expanded focused
+validation: 807 tests / 561 subtests before final documentation edits; repository ownership/policy
+gates passed. Soridormi hidden reset/recovery evidence remains a separate provider boundary.
+
 ## Foreground-turn containment patch pending application — 2026-09-24
 
 Current base is owner-applied `main` revision `1e10bc825cee8d72a1f139b25a82e3492edc75b8`

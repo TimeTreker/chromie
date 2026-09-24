@@ -761,28 +761,31 @@ class GoalAssociationModelGoal(BaseModel):
 
 
 class GoalSegmentationModelOutput(BaseModel):
-    """Semantic goal segmentation used when no association target exists.
+    """Association-only result used when no retained Goal target exists.
 
-    ``new_goals`` and ``non_goal_responsibility_refs`` own the semantic
-    segmentation result. ``decision`` remains only as a legacy model-wire
-    compatibility field and must not become a second cross-field authority.
+    The model may only declare that current Responsibilities are unassociated
+    with retained Goal history. Trusted code materializes any new canonical Goal
+    mechanically from the accepted UMI Responsibility; GA never authors new WHAT.
+    ``decision`` remains representational only and carries no semantic authority.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     decision: GoalSegmentationDecision = "create_goals"
-    non_goal_responsibility_refs: list[str] = Field(
+    unassociated_responsibility_refs: list[str] = Field(
         default_factory=list,
         max_length=8,
         description=(
-            "Ordinary conversational speech Responsibilities that need no canonical "
-            "Goal after bounded continuity inspection. This is a Goal Association "
-            "continuity result, not a Social Cognition or Planner decision."
+            "Current UMI Responsibilities that do not associate with any retained Goal. "
+            "This is an association result only. Trusted code may materialize a new Goal "
+            "from the accepted Responsibility after GA returns."
         ),
     )
     new_goals: list[GoalAssociationModelGoal] = Field(
         default_factory=list,
         max_length=8,
+        exclude=True,
+        description="Trusted-code-only materialization surface; never model-authored.",
     )
     referent_updates: list[GoalAssociationModelReferentUpdate] = Field(
         default_factory=list,
@@ -831,18 +834,18 @@ class GoalSegmentationModelOutput(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalSegmentationModelOutput":
-        if not self.new_goals and not self.non_goal_responsibility_refs:
+        if not self.unassociated_responsibility_refs:
             raise ValueError(
-                "segmentation requires new_goals or non_goal_responsibility_refs"
+                "association-only segmentation requires unassociated_responsibility_refs"
             )
         return self
 
 class GoalAssociationModelOutput(BaseModel):
-    """One complete candidate-aware semantic result from Goal Association.
+    """One complete candidate-aware association result from Goal Association.
 
-    Associations, new Goals and explicit non_goal conversation are independent
-    per-Responsibility outcomes. The dynamic decoder and trusted Host conserve every
-    accepted UMI Responsibility across exactly one of those continuity results.
+    GA may associate a current Responsibility with retained Goal history or mark it
+    unassociated. It never creates a new Goal or rewrites current WHAT. Trusted code
+    materializes a new Goal mechanically from accepted UMI meaning when needed.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -854,13 +857,16 @@ class GoalAssociationModelOutput(BaseModel):
     new_goals: list[GoalAssociationModelGoal] = Field(
         default_factory=list,
         max_length=8,
+        exclude=True,
+        description="Trusted-code-only materialization surface; never model-authored.",
     )
-    non_goal_responsibility_refs: list[str] = Field(
+    unassociated_responsibility_refs: list[str] = Field(
         default_factory=list,
         max_length=8,
         description=(
-            "Ordinary conversational speech Responsibilities that are complete as "
-            "interaction and do not belong to retained or new canonical Goal state."
+            "Current UMI Responsibilities that do not associate with any retained Goal. "
+            "This does not mean unimportant or non-goal; trusted code may materialize "
+            "an independent interaction/task Goal from the accepted Responsibility."
         ),
     )
     referent_updates: list[GoalAssociationModelReferentUpdate] = Field(
@@ -886,7 +892,7 @@ class GoalAssociationModelOutput(BaseModel):
         max_length=320,
         description=(
             "Non-authoritative compact rationale for the emitted result; associations "
-            "and new_goals own each Responsibility's continuity decision."
+            "and unassociated_responsibility_refs own each Responsibility's association decision."
         ),
     )
 

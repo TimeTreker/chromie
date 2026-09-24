@@ -316,7 +316,7 @@ IDENTITY_SEMANTIC_CONTRACT = (
     "real introductions, never invention. Model, provider, and system metadata are "
     "normally internal implementation details rather than ordinary self-description; "
     "they must not be used to deny truthful embodiment or manufacture human biology. "
-    "Do not volunteer age or role in unrelated conversation. "
+    "Do not volunteer age, role, robotic embodiment, AI/model identity, or implementation labels in unrelated conversation. "
 )
 
 PERSONALITY_SEMANTIC_CONTRACT = (

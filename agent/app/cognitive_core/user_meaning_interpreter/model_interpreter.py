@@ -766,12 +766,11 @@ class OllamaUserMeaningInterpreter:
             "gaze_or_orientation for explicitly requested looking/attention orientation."
         )
         item["properties"]["continuity_scope"]["description"] = (
-            "Ownership after UMI handoff, not duration. Use goal for every non-speech "
-            "result and whenever information/evidence, embodied/media/stateful work, or "
-            "pending-Goal change remains; goal may complete before the next user turn. "
-            "Use turn only for ordinary current-conversation speech completed directly "
-            "by Social Cognition with no separate user/world objective. This does not suppress "
-            "GA's continuity check and is not an explicit Planner routing flag."
+            "Expected Responsibility lifetime, not routing. Use turn for ordinary conversational "
+            "speech expected to complete within this interaction; this may still materialize a "
+            "short-lived interaction Goal and may still use Planner. Use goal for every non-speech "
+            "result and for speech that must remain open beyond the immediate interaction or changes "
+            "retained Goal meaning. GA independently decides association with retained Goal history."
         )
         item["properties"]["continuity_scope"].pop("default", None)
         item["properties"]["local_ref"] = {

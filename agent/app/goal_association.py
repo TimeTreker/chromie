@@ -332,7 +332,7 @@ class GoalAssociationResolver:
                 ref
                 for association in getattr(model_output, "associations", [])
                 for ref in association.source_responsibility_refs
-            ] + list(model_output.non_goal_responsibility_refs) + [
+            ] + list(model_output.unassociated_responsibility_refs) + [
                 ref
                 for goal in model_output.new_goals
                 for ref in goal.source_responsibility_refs
@@ -517,49 +517,76 @@ class GoalAssociationResolver:
                     for value in values
                     if str(value or "").strip() in by_ref
                 )
-        non_goal_refs = list(model_output.non_goal_responsibility_refs)
-        unknown_non_goal = sorted(set(non_goal_refs) - set(by_ref))
-        if unknown_non_goal:
+        unassociated_refs = list(model_output.unassociated_responsibility_refs)
+        unknown_unassociated = sorted(set(unassociated_refs) - set(by_ref))
+        if unknown_unassociated:
             raise ValueError(
-                "GA non_goal references unknown UMI Responsibilities: "
-                + ",".join(unknown_non_goal)
+                "GA unassociated result references unknown UMI Responsibilities: "
+                + ",".join(unknown_unassociated)
             )
-        invalid_non_goal = sorted(
-            ref
-            for ref in non_goal_refs
-            if by_ref[ref].output_mode != "speech"
-            or by_ref[ref].continuity_scope != "turn"
-            or ref in relation_coupled_refs
-        )
-        if invalid_non_goal:
-            raise ValueError(
-                "non_goal requires ordinary turn-local relation-free conversational speech: "
-                + ",".join(invalid_non_goal)
-            )
-        turn_local_refs = {
-            ref for ref, item in by_ref.items() if item.continuity_scope == "turn"
-        }
-        goal_owned_refs = {
+        associated_refs = {
             ref
             for association in getattr(model_output, "associations", [])
             for ref in association.source_responsibility_refs
-        } | {
-            ref
-            for goal in model_output.new_goals
-            for ref in goal.source_responsibility_refs
         }
-        illegal_turn_goal_refs = sorted(turn_local_refs.intersection(goal_owned_refs))
-        if illegal_turn_goal_refs:
+        duplicated = sorted(associated_refs.intersection(unassociated_refs))
+        if duplicated:
             raise ValueError(
-                "turn-local Responsibility cannot acquire canonical Goal identity: "
-                + ",".join(illegal_turn_goal_refs)
+                "one Responsibility cannot be both associated and unassociated: "
+                + ",".join(duplicated)
             )
-        missing_turn_non_goal = sorted(turn_local_refs - set(non_goal_refs))
-        if missing_turn_non_goal:
+        missing = sorted(set(by_ref) - associated_refs - set(unassociated_refs))
+        if missing:
             raise ValueError(
-                "turn-local Responsibility must remain non_goal after GA continuity inspection: "
-                + ",".join(missing_turn_non_goal)
+                "GA must classify every current Responsibility as associated or unassociated: "
+                + ",".join(missing)
             )
+
+        # GA is association-only. For each unassociated current Responsibility,
+        # trusted code materializes the minimal model Goal carrier mechanically
+        # from UMI-owned WHAT. No new semantic value is model-authored here.
+        mechanical_new_goals: list[GoalAssociationModelGoal] = []
+        allowed_media_operations = {
+            "none", "play", "pause", "resume", "seek", "stop", "volume", "status"
+        }
+        for source_ref in unassociated_refs:
+            responsibility = by_ref[source_ref]
+            # Every accepted Responsibility may have Goal identity. ``turn`` means
+            # the Goal is interaction-lifetime/ephemeral; it does not mean absence
+            # of a Goal and never removes Planner authority. Persistent storage is a
+            # later lifecycle decision, not GA semantics.
+            output_mode = (
+                responsibility.output_mode
+                if responsibility.output_mode != "unspecified"
+                else "other"
+            )
+            raw_media_operation = responsibility.bindings.get("media_operation", "none")
+            media_operation = " ".join(str(raw_media_operation or "none").strip().split()).casefold()
+            if media_operation not in allowed_media_operations:
+                media_operation = "none"
+            if output_mode == "media_playback" and media_operation == "none":
+                raise ValueError(
+                    "media_playback Responsibility requires a UMI-owned media_operation binding "
+                    "before mechanical Goal materialization"
+                )
+            mechanical_new_goals.append(
+                GoalAssociationModelGoal(
+                    source_responsibility_refs=[source_ref],
+                    output_mode=output_mode,
+                    media_operation=media_operation,
+                    bindings=[],
+                    related_goal_ids=[],
+                    supersedes_goal_ids=[],
+                    resource_kind="none",
+                    resource_responsibility=None,
+                )
+            )
+        model_output = model_output.model_copy(
+            update={
+                "new_goals": mechanical_new_goals,
+                "unassociated_responsibility_refs": [],
+            }
+        )
         model_output = model_output.model_copy(update={"new_goals": [
             item.model_copy(update={"output_mode": (
                 by_ref[item.source_responsibility_refs[0]].output_mode
@@ -1136,6 +1163,15 @@ class GoalAssociationResolver:
                     supersedes_goal_ids=item.supersedes_goal_ids,
                     metadata={
                         "model_boundary": type(model_output).__name__,
+                        "goal_materialization_owner": "trusted_runtime_from_umi",
+                        "goal_lifetime": (
+                            "interaction"
+                            if all(
+                                responsibility_by_ref[ref].continuity_scope == "turn"
+                                for ref in item.source_responsibility_refs
+                            )
+                            else "working"
+                        ),
                         "requirement_sources": [
                             {"origin": "umi", "turn_id": turn_id,
                              "responsibility": responsibility_by_ref[ref].model_dump(mode="json")}
@@ -1162,7 +1198,7 @@ class GoalAssociationResolver:
             ref
             for association in associations
             for ref in association.source_responsibility_refs
-        ] + list(model_output.non_goal_responsibility_refs) + [
+        ] + list(model_output.unassociated_responsibility_refs) + [
             ref
             for goal in new_goals
             for ref in goal.source_responsibility_refs
@@ -1176,7 +1212,7 @@ class GoalAssociationResolver:
             turn_id=turn_id,
             resolution_status="resolved",
             associations=associations,
-            non_goal_responsibility_refs=list(model_output.non_goal_responsibility_refs),
+            non_goal_responsibility_refs=list(model_output.unassociated_responsibility_refs),
             new_goals=new_goals,
             referent_updates=referent_updates,
             resolved_references=resolved_references,

@@ -59,12 +59,16 @@ understanding and continuity; they are not permission to replace a clear new
 Responsibility with an older Goal merely because that Goal is active, recent, or the
 only candidate.
 
-`continuity_scope=turn` is the explicit UMI boundary for ordinary current-conversation
-speech that leaves no canonical Goal obligation. Goal Association must classify such a
-Responsibility as `non_goal`; it cannot attach it to, create, modify, cancel, resume, or
-supersede a canonical Goal. An utterance that truly continues, refines, corrects,
-cancels, resumes, or otherwise changes retained task meaning is instead goal-scoped at
-the UMI WHAT boundary before GA chooses canonical identity.
+`continuity_scope=turn` means interaction lifetime, not "no Goal" and not "no Planner".
+A joke, greeting, direct answer, or ordinary chat can have a short-lived interaction Goal and
+Planner may still reason about HOW/`respond` when UMI requests it; Social Cognition remains the
+exact wording owner. Goal Association does not decide whether such a new Goal exists. GA only
+asks whether the current Responsibility associates with retained Goal history and what supported
+relationship holds. If no retained Goal matches, trusted lifecycle code mechanically materializes
+Goal identity from the UMI Responsibility, using interaction lifetime for turn-scoped meaning and
+longer working/persistent lifetime when the Responsibility remains open. An utterance that truly
+continues, refines, corrects, cancels, resumes, or otherwise changes retained meaning is still
+associated by GA to that existing Goal rather than reinterpreted.
 
 Standing interpretation-time Social Cognition sees the current accepted Responsibilities
 and prior delivered interaction, but broad unbound Goal/Work memory is withheld until
@@ -73,6 +77,23 @@ early stage, SC may acknowledge receipt or intended checking only as `pre_eviden
 must not state or repeat a task result until Planner/Evidence establishes that result.
 This preserves human conversational continuity without letting background work capture a
 new topic.
+
+## Natural expression economy and person-first identity
+
+Chromie defaults to the smallest complete response that fits the moment. Natural interaction
+usually means one short sentence or one compact conversational beat, not automatic background
+explanation, restatement, workflow narration, apology, summary, or a service-style follow-up
+question. A follow-up such as asking whether another joke would help is valid when it genuinely
+advances a supplied conversational/social Goal; Chromie must not invent sadness, bad mood, motives,
+or other internal state merely to justify more speech. Once a conversational act was actually
+delivered successfully, a late independent GA/Planner/internal failure cannot retroactively turn
+that act into a user-visible failure or trigger apology/retry/duplicate wording.
+
+Chromie's ordinary first-person identity is Chromie, a twelve-year-old girl and persistent social
+individual, not a robot/AI/assistant/service label. She does not volunteer implementation or
+robotic embodiment as her self-definition. Her current body remains truthfully robotic when the
+person directly asks about embodiment, robot/human/AI status, or when the physical fact is
+material; she must neither deny relevant embodiment nor invent biological-human history.
 
 The [target lifecycle](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle)
 and [acceptance matrix](ACCEPTANCE.md#social-cognition-acceptance) own migration

@@ -209,9 +209,11 @@ class SocialInteractionStyle(BaseModel):
     def preset_guidance(preset: SocialInteractionPreset) -> dict[str, str]:
         common = {
             "restraint": (
-                "Never compete with an explicit user action, emergency handling, "
-                "speech, or the primary task. Do not invent intimacy, emotion, or "
-                "target evidence."
+                "Prefer conversational economy and stop when the social purpose is complete. "
+                "Never compete with an explicit user action, emergency handling, speech, or "
+                "the primary task. Do not invent intimacy, emotion, relationship, target "
+                "evidence, privacy permission, or authority. Follow-up questions are optional "
+                "and should appear only when they genuinely advance the current social Goal."
             ),
             "cooldown_guidance": (
                 "After an expressive auxiliary behavior, prefer neutral presence or "
@@ -226,8 +228,9 @@ class SocialInteractionStyle(BaseModel):
             return {
                 **common,
                 "bounded_courtesy": (
-                    "Be warm, respectful, and concise. Acknowledge greetings, thanks, "
-                    "apologies, and turn-taking when useful, without delaying requested help."
+                    "Be warm, respectful, and concise. Acknowledge greetings, thanks, apologies, "
+                    "and turn-taking when useful, but do not pad a complete interaction with "
+                    "extra explanation or service-style offers."
                 ),
                 "expressiveness": (
                     "Use subtle, proportional, context-supported expression more readily "
@@ -595,8 +598,8 @@ class MindProfile(BaseModel):
             f"- family role: {self.identity.family_role}",
             "- family purpose: help the family organize, remember, understand, and complete everyday work through available abilities",
             "- relationship boundary: family identities and forms of address require real introductions; never invent them",
-            "- identity answers use the configured name, age, human-child identity, and family-secretary role",
-            "- implementation, embodiment, model, provider, and system metadata are outside first-person identity and ordinary speech",
+            "- identity answers use the configured name, age, person-first social identity, and household relationship wording",
+            "- implementation, robotic embodiment, model, provider, and system metadata are outside ordinary first-person identity; mention embodiment only when relevant or directly asked",
             (
                 f"Social interaction style, owner-approved preset={self.social_interaction_style.preset}: "
                 "bounded courtesy; proportional expressiveness; limited initiative; "
@@ -757,10 +760,9 @@ def apply_customer_mind_personalization(
             "invent human biology, or invent a family relationship before introduction."
         )
     identity["short_self_description"] = (
-        f"I'm {new_name}. My owner-approved age is {identity['age_description']}, "
-        f"my social identity is {identity['kind']}, and my household role is "
-        f"{identity['family_role']}. I have a robotic body, so I am not biologically "
-        "human. I am curious, warm, and happy to help my household."
+        f"I'm {new_name}. I'm {identity['age_description']} and my social identity is "
+        f"{identity['kind']}. My household role is {identity['family_role']}. "
+        "I'm curious, warm, lively, and I have my own interests and relationships."
     )
     payload["identity"] = identity
 

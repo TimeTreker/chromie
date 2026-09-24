@@ -56,8 +56,10 @@ request. Understand implication; do not promote weak guesses into Responsibiliti
 Current-turn material context belongs to the same Responsibility when it determines the
 meaning. A declarative, descriptive or locative clause is not disposable when it
 identifies the object/resource, source/location, recipient/target, condition, or another
-fact necessary to preserve WHAT. Keep material semantic facts in the complete outcome.
-Use bindings sparsely for semantic facts that are explicitly/contextually grounded and
+fact necessary to preserve WHAT. Explicitly stated emotional/social context also belongs in
+the Responsibility when it materially supplies the purpose of the requested interaction; preserve
+that purpose without inventing an unstated mood, motive, relationship or desired emotional result.
+Keep material semantic facts in the complete outcome. Use bindings sparsely for semantic facts that are explicitly/contextually grounded and
 useful to preserve exactly (for example location, time, count, measurement, before/after
 or parallel relations). Use native JSON values directly: a primitive count is `count: 6`,
 not a mini-schema such as `count: {"value": 6, "type": "integer"}`. Keep an object only
@@ -72,8 +74,9 @@ evidence is provenance, not an action decomposition.
 The Responsibility DTO is semantic only. Do not author Goal relationship fields, Goal
 IDs, task IDs, Capability/tool/provider choices, execution steps, Activity decomposition,
 argument realization, defaults, parameter conversions, response wording, or completion
-claims. Planner owns HOW. GA owns canonical Goal identity and continuity. SC owns social
-wording and interaction realization.
+claims. Planner owns HOW. GA owns association with retained Goal history; trusted lifecycle code
+mechanically materializes new Goal identity from accepted UMI WHAT when no retained Goal matches.
+SC owns social wording and interaction realization.
 
 Cognitive orchestration is part of this same primary interpretation. After preserving WHAT,
 request only the non-standing cognitive authorities that are useful to think next. Use
@@ -90,14 +93,14 @@ cognitive_requests with exact Responsibility refs:
   including a Responsibility does not create a Goal for it. Do not preselect only the
   parts you think need Goals. This turn-wide scope applies only to GA; Planner retains
   its own selected Responsibility scope below.
-- planner when the accepted goal-scoped meaning is sufficiently clear for HOW reasoning now.
-  Planner owns Goal-bound Work and must never be requested for continuity_scope=turn ordinary
-  conversational speech; standing SC owns that immediate interaction. Planner may reason while
-  GA and the standing SC interaction are still running; request it only for goal-scoped
-  Responsibilities whose meaning is ready for planning. Initial Planner has a hard Runtime
-  dependency on turn-wide Goal Association so eventual Work can obtain canonical Goal binding.
-  You do not need to duplicate that mechanical prerequisite in cognitive_requests; request
-  goal_association separately only when its own continuity cognition is useful.
+- planner when the accepted meaning is sufficiently clear and HOW reasoning would be useful now.
+  Planner may reason about physical/information Work or a conversational Responsibility whose HOW
+  is simply to respond; Social Cognition still owns the exact words. continuity_scope is a lifetime
+  hint, not a Planner-routing flag. Planner may reason while GA and standing SC are still running.
+  Initial Planner has a hard Runtime dependency on turn-wide Goal Association/materialization so
+  eventual Work or response can obtain canonical Goal identity. You do not need to duplicate that
+  mechanical prerequisite in cognitive_requests; request goal_association separately only when its
+  own historical-continuity cognition is useful.
 These are non-standing cognition requests, not route labels. An empty cognitive_requests array
 is valid when neither GA nor Planner cognition is useful now; Runtime still wakes the standing
 initial SC interaction. Do not derive GA/Planner activation from a fixed category, output_mode,
@@ -134,14 +137,12 @@ uses goal: information needs a truth/evidence owner; body_action, media_playback
 stateful_effect, styled/recited/sung/hummed/nonverbal vocal results need downstream work.
 Also use goal when the expression explicitly confirms, corrects, rejects, cancels, resumes,
 refines or otherwise changes pending Goal meaning. Use turn for ordinary current-conversation
-speech whose completion is Social Cognition's reply itself and that leaves no separate
-user/world objective. Do NOT choose goal merely because an open Goal exists, because the
-turn is addressed to Chromie, or because a short greeting/attention ping might indirectly
-refer to unfinished work; GA owns that continuity judgment from bounded Goal/dialogue
-evidence. speech may still be goal-scoped when the accepted speech itself has explicit
-non-conversational continuity or is semantically coupled to other Work. This is an
-architectural meaning distinction, not a phrase table. GA still decides WHICH canonical
-Goal, if any.
+speech whose expected lifetime is this interaction (for example greeting, joke, ordinary chat or
+a direct conversational answer). This does NOT mean "no Goal" and does not block Planner; trusted
+lifecycle code may materialize a short-lived interaction Goal. Use goal when the Responsibility
+must remain open beyond the immediate interaction or explicitly changes retained Goal meaning.
+Do NOT choose goal merely because an old Goal exists; GA alone decides whether current meaning
+associates with retained history. This is a lifetime distinction, not a routing or importance label.
 
 meaning_uncertainties contains only genuine semantic ambiguity remaining AFTER the
 bounded context above has been used. Each item has its own local_ref and names the

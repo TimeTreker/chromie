@@ -36,6 +36,8 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.version, "0.8.0")
         self.assertEqual(type(profile.identity).__name__, "ChromieIdentity")
         self.assertIn("live with my family", profile.identity.short_self_description)
+        self.assertNotIn("robot", profile.identity.short_self_description.casefold())
+        self.assertNotIn("ai", profile.identity.short_self_description.casefold())
         self.assertIn("twelve-year-old girl", profile.identity.model_identity_boundary)
         self.assertIn("robot", profile.identity.model_identity_boundary.casefold())
         self.assertIn("she", profile.identity.pronouns)
@@ -73,12 +75,15 @@ class MindProfileTests(unittest.TestCase):
         self.assertIn("twelve-year-old girl", context["personality_expression"]["self_concept"])
         self.assertIn("robotic", context["personality_expression"]["self_concept"])
         self.assertIn("biological human", context["personality_expression"]["self_concept"])
-        self.assertIn("question first", context["personality_expression"]["answer_style"])
+        self.assertIn("one compact sentence", context["personality_expression"]["answer_style"])
+        self.assertIn("Do not automatically summarize", context["personality_expression"]["answer_style"])
         self.assertIn("logs and memory", context["personality_expression"]["internal_language_boundary"])
         self.assertIn(
             "explicit user action",
             context["social_interaction_style"]["restraint"],
         )
+        self.assertIn("conversational economy", context["social_interaction_style"]["restraint"])
+        self.assertIn("Do not volunteer robot, AI", context["identity"]["identity_answer_guidance"])
         self.assertIn(
             "recent auxiliary-behavior evidence",
             context["social_interaction_style"]["repetition_guidance"],

@@ -1,5 +1,20 @@
 # Chromie Handoff
 
+## Responsibility association + natural interaction patch — pending application 2026-09-24
+
+Base revision: `cc4276625ffde7d3dd786b99cf48729e0edc49b4` on `main`. The owner clarified the
+intended semantic hierarchy after the foreground-turn patch: UMI emits current Responsibilities;
+GA only associates them with retained Goal history; trusted lifecycle code materializes new Goal
+identity mechanically from UMI when no retained match exists. `turn` is interaction lifetime, not
+absence of a Goal or Planner. Joke/chat Responsibilities may have short-lived interaction Goals and
+Planner HOW cognition; SC still owns exact words.
+
+The patch additionally prevents late independent GA failure from turning an already delivered joke
+into user-visible failure/apology/second joke, adds natural conversational economy to SC/Mind, and
+keeps ordinary identity person-first (`Chromie`, twelve-year-old girl) without volunteering robot/AI
+labels. Robotic embodiment remains a truthful direct-answer fact. Soridormi per-execution reset
+evidence is deliberately not folded into this patch and remains a separate provider-fidelity task.
+
 ## Foreground-turn continuity containment — pending application 2026-09-24
 
 Base revision: `1e10bc825cee8d72a1f139b25a82e3492edc75b8` on `main`, including the

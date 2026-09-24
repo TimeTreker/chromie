@@ -81,9 +81,10 @@ def test_live_user_meaning_interpreter_schema_requires_continuity_scope() -> Non
     assert work_branch["properties"]["continuity_scope"]["const"] == "goal"
     scope_help = speech_branch["properties"]["continuity_scope"]["description"]
     mode_help = speech_branch["properties"]["output_mode"]["description"]
-    assert "not duration" in scope_help
-    assert "GA's continuity check" in scope_help
-    assert "requires continuity_scope=goal" in mode_help
+    assert "lifetime" in scope_help
+    assert "not routing" in scope_help
+    assert "immediate interaction" in scope_help
+    assert "continuity_scope=goal" in mode_help
 
 
 def test_weather_and_body_work_cannot_be_turn_local() -> None:
@@ -102,7 +103,7 @@ def test_weather_and_body_work_cannot_be_turn_local() -> None:
 
 
 @pytest.mark.asyncio
-async def test_goal_association_can_complete_turn_local_speech_as_non_goal() -> None:
+async def test_goal_association_materializes_unassociated_turn_speech_as_interaction_goal() -> None:
     request = CognitiveWorkRequest(
         sid="turn-local-ga",
         text="Yeah.",
@@ -119,12 +120,8 @@ async def test_goal_association_can_complete_turn_local_speech_as_non_goal() -> 
     class Model:
         async def generate(self, *args, **kwargs):
             return {
-                # The dynamic Schema permits this legacy first-enum value while
-                # the ownership collections correctly classify the turn as
-                # interaction-only. It must not override the actual GA result.
-                "decision": "create_goals",
-                "new_goals": [],
-                "non_goal_responsibility_refs": ["r1"],
+                "decision": "no_goal",
+                "unassociated_responsibility_refs": ["r1"],
                 "referent_updates": [],
                 "resolved_references": [],
                 "confidence": 1.0,
@@ -133,8 +130,10 @@ async def test_goal_association_can_complete_turn_local_speech_as_non_goal() -> 
 
     result = await GoalAssociationResolver(Model()).resolve(request)
     assert result.resolution_status == "resolved"
-    assert result.non_goal_responsibility_refs == ["r1"]
-    assert result.new_goals == []
+    assert result.non_goal_responsibility_refs == []
+    assert len(result.new_goals) == 1
+    assert result.new_goals[0].source_responsibility_refs == ["r1"]
+    assert result.new_goals[0].metadata["goal_lifetime"] == "interaction"
     assert result.associations == []
 
 
@@ -366,7 +365,7 @@ async def test_goal_scoped_meaning_does_not_wake_planner_without_model_request()
     assert len(agent.social_requests) == 1
 
 
-def test_runtime_drops_turn_local_refs_from_model_requested_planner_scope() -> None:
+def test_runtime_preserves_turn_local_refs_when_planner_is_model_requested() -> None:
     request = CognitiveWorkRequest(
         sid="turn-local-planner-scope",
         text="Tell me a joke.",
@@ -385,13 +384,13 @@ def test_runtime_drops_turn_local_refs_from_model_requested_planner_scope() -> N
     )
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
         request, "planner"
-    ) == []
+    ) == ["r1"]
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
         request, "goal_association"
-    ) == []
+    ) == ["r1"]
 
 
-def test_runtime_preserves_goal_scoped_refs_when_narrowing_planner_scope() -> None:
+def test_runtime_preserves_all_model_requested_planner_refs_regardless_lifetime() -> None:
     request = CognitiveWorkRequest(
         sid="mixed-planner-scope",
         text="Tell me a joke, then bring the cup.",
@@ -413,7 +412,92 @@ def test_runtime_preserves_goal_scoped_refs_when_narrowing_planner_scope() -> No
     )
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
         request, "planner"
-    ) == ["r2"]
+    ) == ["r1", "r2"]
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(
         request, "goal_association"
     ) == ["r1", "r2"]
+
+@pytest.mark.asyncio
+async def test_late_ga_failure_cannot_turn_delivered_joke_into_user_visible_failure() -> None:
+    class Agent:
+        def __init__(self) -> None:
+            self.social_calls = 0
+
+        async def resolve_social_cognition(self, session, *, request, timeout_ms):
+            del session, timeout_ms
+            self.social_calls += 1
+            return SocialCognitionResolution(
+                request_id=request.request_id,
+                snapshot_digest=request.snapshot_digest(),
+                disposition="communicate",
+                activities=[{
+                    "activity_id": "sc:joke:delivered",
+                    "text": "Why did the chicken cross the road? To get to the other side!",
+                    "function": "respond",
+                    "truth_stage": "context_grounded",
+                    "delivery_phase": "immediate",
+                    "source_goal_ids": [],
+                    "source_responsibility_refs": ["r1"],
+                    "evidence_refs": [],
+                    "addressed_need_ids": [],
+                }],
+                reason_summary="Fulfill the requested conversational joke.",
+                need_outcomes={},
+                model_call_count=1,
+            )
+
+        async def resolve_goal_association(self, *args, **kwargs):
+            return GoalAssociationResolution(
+                turn_id="joke-late-ga",
+                resolution_status="fail_closed",
+                confidence=0.0,
+                reason_summary="Invalid late association output.",
+                metadata={
+                    "status": "model_contract_failed",
+                    "failure_class": "structured_output_validation",
+                    "failure_domain": "model_contract",
+                    "architecture_attribution": "goal_association",
+                    "retryable": False,
+                },
+            )
+
+        async def stream_fast_advance(self, *args, **kwargs):
+            raise AssertionError("Planner was not requested in this containment test")
+            yield  # pragma: no cover
+
+    agent = Agent()
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=agent,
+        adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
+    core, envelope = admitted_core(
+        "Tell me a joke.",
+        sid="joke-late-ga",
+        language="en-US",
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": "Tell the user a joke.",
+            "bindings": {},
+            "output_mode": "speech",
+            "continuity_scope": "turn",
+            "confidence": 1.0,
+        }],
+        cognitive_requests=[{
+            "authority": "goal_association",
+            "responsibility_refs": ["r1"],
+            "reason_summary": "Check whether this conversational responsibility continues retained social history.",
+        }],
+    )
+    result = await coordinator.resolve(
+        object(), text="Tell me a joke.", sid="joke-late-ga",
+        core_interpretation=core, turn_envelope=envelope,
+        context={"history": []}, history=[], language="en-US",
+    )
+    assert result.status == "applied", result.fallback_reason
+    assert result.interaction_response is not None
+    assert result.interaction_response.speech[0].text.startswith("Why did the chicken")
+    assert result.interaction_response.metadata["presentation_already_dispatched"] is True
+    assert result.metadata["optional_cognition_failure_after_delivered_interaction"] is True
+    assert result.metadata["suppressed_failure_stage"] == "goal_association"
+    assert agent.social_calls == 1, "late GA failure must not trigger apology/retry speech"

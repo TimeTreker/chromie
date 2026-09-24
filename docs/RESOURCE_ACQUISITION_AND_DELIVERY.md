@@ -164,25 +164,22 @@ Those belong downstream.
 
 ## Goal Association ownership
 
-Goal Association decides whether the current turn creates, continues, modifies,
-or supplies missing information for a resource responsibility.
+Goal Association decides only whether the current resource Responsibility associates with,
+continues, modifies, clarifies, or otherwise relates to a retained Goal. It does not create a new
+resource interpretation and its live model schema cannot author `new_goals` or a
+`resource_responsibility`. When no retained Goal matches, trusted lifecycle code materializes the
+new Goal mechanically from UMI-owned WHAT/bindings.
 
-`SemanticGoal.resource_responsibility` is the resource domain's sole persisted
-semantic authority. Resource identity, kind, quantity, source, recipient, and
-delivery mode are authored exactly once there. The Goal-Association model-facing
-schema also has one writable owner per fact: information requests put location,
-time, requested aspect, and similar query facts only in `query_scope`; the narrow
-information `source` carries source status/identity only. Physical requests put
-spatial/acquisition facts only in `source.acquisition_bindings`. The Host then
-materializes one canonical `resource_responsibility`; it does not persist a second
-flat `SemanticGoal.object.bindings` copy. Generic Planner checks may derive a
-transient flat view from the canonical object, but that view is never written back.
-A separately supplied distance and direction remain separate typed bindings. When
-User Meaning Interpretation instead owns one composite relative-location value that already
-contains an approximate distance, Goal Association preserves that complete value in
-one location binding; it must not split or normalize the authoritative semantic value.
-A Goal description is a
-human-readable summary: it may be checked for material contradiction but never
+`SemanticGoal.resource_responsibility`, when present from an authoritative upstream typed contract,
+remains the resource domain's sole persisted structured semantic authority. GA may preserve or
+source-bind changes to that retained structure, but it cannot synthesize resource identity, kind,
+quantity, source, recipient, delivery mode, query scope, or acquisition bindings merely from its
+own interpretation. New Goals produced from today's UMI contract therefore inherit UMI semantic
+bindings directly; Planner consumes those Goal bindings and advertised Capability semantics. A
+future richer UMI resource DTO may populate the same canonical resource structure without changing
+GA's association-only authority. Generic Planner checks may derive transient views but never write
+them back as a second truth. A Goal description is a human-readable summary: it may be checked for
+material contradiction but never
 supplies, overrides, or repairs a typed resource fact. Generic Goal bindings and
 Planner argument views must not be separately model-authored copies of resource
 facts. When an existing consumer needs a flat quantity, source, recipient, or

@@ -1,6 +1,35 @@
 # Chromie Current Status
 
-## Foreground-turn continuity containment — 2026-09-24
+## Responsibility association and natural interaction economy — 2026-09-24
+
+Owner discussion after the foreground-turn repair clarified the semantic split. UMI owns each
+accepted current-turn **Responsibility** (what Chromie owes now). GA is now strictly historical
+**association**: its live model wire may associate a current Responsibility with a retained open
+Goal or mark it unassociated, but may not model-author `new_goals`, resource structure, Goal WHAT,
+or a replacement interpretation. Trusted lifecycle code mechanically materializes canonical Goal
+identity and semantic fields from the accepted UMI Responsibility when no retained Goal matches.
+A `continuity_scope=turn` Responsibility is interaction-lifetime rather than `non_goal`: a joke,
+greeting or ordinary chat may receive a short-lived interaction Goal and may still receive Planner
+HOW cognition when UMI requests it. Longer obligations materialize as working Goals and retain the
+existing durable-memory policy. `continuity_scope` is lifetime evidence, never a Planner routing
+flag.
+
+The same repair contains late independent cognition failure after successful conversational
+delivery: once the requested joke/reply was actually delivered, a later GA contract failure is
+retained as diagnostic evidence but cannot turn the interaction into user-visible failure, apology,
+retry or duplicate speech. Social Cognition now carries an explicit natural-expression economy:
+default to the smallest complete response, avoid automatic explanation/repetition/service-style
+follow-up, and ask another question only when it genuinely advances the supplied social Goal. User
+emotion/motive is evidence only when actually supplied; Chromie must not invent sadness/bad mood to
+justify more speech. Owner-approved identity guidance is person-first: ordinary first-person identity
+is Chromie, a twelve-year-old girl and persistent social individual, not a robot/AI/assistant label;
+robotic embodiment remains truthful when directly asked or materially relevant.
+
+Focused UMI/GA/SC/Planner/Memory regressions pass in the development tree; exact current-revision
+live qualification remains pending. Soridormi execution-reset evidence fidelity is a separate
+provider boundary and is not claimed repaired by this cognitive/social patch.
+
+## Historical foreground-turn continuity containment — 2026-09-24
 
 RTX4090/Qwen3.5-4B debug bundle `chromie_debug_bundle_20260924_003802.tar.gz`
 reproduced a cross-turn topic-capture defect that predates the working-conversation and
@@ -11,12 +40,12 @@ ordinary turn-local speech to attach to that Goal. The first weather turn also s
 earlier truth-stage defect: interpretation-time SC announced a forecast before trusted
 weather Evidence existed.
 
-Source repair makes accepted current-turn Responsibilities foreground: initial SC omits
-broad unbound Goal/Work memory while retaining prior delivered speech; non-speech task
-interaction is pre-Evidence acknowledgement-only; `continuity_scope=turn` is forced
-`non_goal` by the live GA schema and deterministic materialization; and Runtime may narrow
-an explicitly model-requested Planner scope by removing turn-local Responsibilities that
-cannot own Work. Goal-scoped continuation/refinement still reaches GA normally, so this
+That historical patch made accepted current-turn Responsibilities foreground, hid broad unbound
+Goal/Work memory from initial SC, and made non-speech task interaction pre-Evidence
+acknowledgement-only. Its then-current `turn -> non_goal/no Planner` containment was subsequently
+superseded by the Responsibility-association design above: `turn` now means interaction lifetime,
+GA is association-only, trusted lifecycle code materializes interaction Goals, and model-requested
+Planner HOW remains legal for conversational Responsibilities. Goal-scoped continuation/refinement still reaches GA normally, so this
 does not disable multi-turn task continuity.
 
 Focused GA/turn-local/SC regressions pass **277 tests / 107 subtests**. Expanded

@@ -98,10 +98,10 @@ architecture/terminology freeze; it does not close #24/#32 or authorize a releas
 | Owner | Complete semantic responsibility | Authority it does not acquire |
 |---|---|---|
 | User Meaning Interpretation | Complete current-turn intent in natural language, source provenance, confidence, unresolved meaning, and bounded requests for which existing cognitive authorities should work next | Another role's semantic result, communication wording, Capability choice, Work planning |
-| Goal Association | Canonical Goal identity, continuity and source-preserving updates | Reinterpreting WHAT, communication, Work compatibility |
+| Goal Association | Association of current Responsibilities with retained canonical Goal history, including supported continuity relationships and source-preserving updates to an existing Goal | Reinterpreting WHAT, model-authoring a new Goal from scratch, communication, Work compatibility |
 | Social Cognition | Whether, when and how to interact with people; exact grounded communication and bounded eligible social-expression Capability proposals | Reinterpreting UMI, changing Goals or Work, planning requested tasks, authorizing effects |
 | Planner | Capability selection, execution-input resolution, complete Work plans, dependencies, reuse/revision and planning limitations | Ordinary reply wording or review of Social Cognition's decision |
-| Host / Runtime / Providers | Admission, privacy, authorization, safety, compute/execution scheduling, exact lifecycle and Evidence | Deciding which semantic cognition is needed, ordinary semantic communication, or action selection |
+| Host / Runtime / Providers | Admission, privacy, authorization, safety, compute/execution scheduling, exact lifecycle and Evidence; mechanically materializing Goal identity/fields from already accepted UMI WHAT when GA reports no retained association | Reinterpreting WHAT, deciding a Goal relationship, ordinary semantic communication, or action selection |
 
 Social Cognition consumes one bounded, versioned view of existing truth: complete
 accepted UMI meaning and read-only source provenance; Goal/Work state only when it is already
@@ -131,16 +131,18 @@ choice, and UMI omission of an SC request cannot invalidate otherwise accepted m
 Planner activation remains model-selected. Runtime may close only a hard architectural
 prerequisite of an explicitly requested authority; in particular, initial Planner mechanically
 schedules turn-wide GA so eventual Work can obtain canonical Goal binding. Runtime never creates
-Planner readiness from `continuity_scope`, `output_mode`, bindings, keywords, or task classes,
-but it does contain an explicitly requested Planner activation to structurally legal Goal-scoped
-Responsibilities; turn-local conversational speech cannot acquire Planner Work authority. That
-dependency/scope closure is scheduling and authority containment, not another semantic cognitive-
-activation decision. `continuity_scope=turn` is UMI's explicit claim that the current conversational
-Responsibility is complete in the interaction and leaves no canonical Goal obligation; GA therefore
-classifies it `non_goal` and cannot attach it to retained/new Goal identity. Expressions that truly
-continue, change, cancel, resume, refine, or otherwise require retained Goal continuity are
-`continuity_scope=goal`. Optional communication does not gate already-requested planning or safe
-dispatch, and Work completion does not gate an already-grounded conversational answer.
+Planner readiness from `continuity_scope`, `output_mode`, bindings, keywords, or task classes.
+An explicitly requested Planner scope is preserved even for conversational speech: Planner may
+reason about HOW/`respond`, while Social Cognition remains the sole exact wording owner.
+`continuity_scope` is a lifetime hint, not a routing or importance label. `turn` means the accepted
+Responsibility is expected to complete within the current interaction and any mechanically
+materialized Goal has interaction lifetime; it does not mean "no Goal" or "no Planner". `goal`
+means the Responsibility must remain open beyond the immediate interaction or explicitly changes
+retained Goal meaning. GA itself only associates the current Responsibility with retained Goal
+history. When GA reports no association, trusted lifecycle code may mechanically materialize a
+new canonical Goal from UMI-owned WHAT without another semantic interpretation. Optional
+communication does not gate already-requested planning or safe dispatch, and Work completion does
+not gate an already-grounded conversational answer.
 Not every turn requires GA and Planner in addition to the standing initial SC call. Missing canonical Goal identity alone does not
 block a source-grounded Communicative Act. Understanding, cognitive activation, planning
 readiness, canonical continuity, commitment, execution and verified completion remain
@@ -310,20 +312,18 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   maintained configuration and owns only addressedness/speech-act admission evidence.
   A disabled or unavailable review may fail open to cognition, but it is explicitly
   unreviewed/unknown evidence and must not fabricate high-confidence addressedness.
-- **TURN-GOAL-BOUNDARY-001** — An admitted Responsibility whose complete meaning can be
-  satisfied by the current ordinary conversation and leaves no separate user/world
-  objective is interaction-complete: Social Cognition may express it immediately, but
-  this does **not** suppress Goal Association. GA still performs bounded continuity
-  inspection because a terse greeting, acknowledgement or attention ping can carry deeper
-  meaning when retained Goal/dialogue evidence supports it. GA may classify relation-free
-  ordinary speech as `non_goal`, associate it with retained Goal state, or create a new
-  Goal when continuity truly exists. UMI now authors bounded `cognitive_requests[]`; an
-  explicit Planner request may begin Fast cognition in parallel with GA/SC for exactly the
-  cited Responsibilities. `continuity_scope` no longer wakes Planner by itself. GA now also
-  authors bounded downstream `cognitive_requests[]` after continuity resolution; Runtime may
-  schedule Planner or SC only when GA explicitly requests that existing authority. The
-  distinction comes from bounded meaning and context, never phrase
-  tables or hardware profiles. GA exclusively owns canonical Goal identity.
+- **TURN-GOAL-BOUNDARY-001** — `turn` is a conversational lifetime boundary, not a
+  declaration that no Goal or Planner exists. An admitted Responsibility expected to finish in
+  the current interaction may still have a short-lived interaction Goal and may still receive
+  Planner HOW cognition when UMI requests it. GA performs bounded historical association only:
+  it may associate the current Responsibility with a retained open Goal when accepted meaning
+  supports continuity, or report it unassociated. GA does **not** model-author a new Goal WHAT.
+  Trusted lifecycle code mechanically materializes Goal identity and semantic fields from the
+  accepted UMI Responsibility when no retained association exists, marking turn-scoped Goals as
+  interaction lifetime and longer obligations as working/persistent according to lifecycle
+  policy. Social Cognition may complete conversational Responsibilities immediately and remains
+  the sole wording owner. `continuity_scope` never wakes or suppresses Planner by itself. The
+  distinction comes from bounded meaning and context, never phrase tables or hardware profiles.
 - **SPEECH-OWNER-001** — Social Cognition is the sole ordinary semantic owner of whether and when to
   communicate, the Communicative Activity, its exact wording, truth stage, and source
   provenance. UMI, committed GA/Planner state, Runtime/Evidence or trusted Situation
@@ -591,9 +591,10 @@ RAM-resident, comparatively detailed context for the current conversation and ac
 more summarized/abstract projections. Storage lifetime does not create semantic authority:
 a long-term item is not more true merely because it is durable, and a working item is not
 less important merely because it is volatile. UMI primarily resolves the current utterance
-from working conversational context plus selectively activated relevant Memory. GA primarily
-establishes Goal continuity and may compare the accepted current Responsibility against both
-working Goal memory and abstract long-term Goal memory. Planner receives only the relevant
+from working conversational context plus selectively activated relevant Memory. GA is the historical association authority and may compare the accepted current Responsibility
+against both working Goal memory and abstract long-term Goal memory. If no retained Goal matches,
+it reports the Responsibility unassociated; trusted lifecycle code, not GA's model, materializes
+any new Goal identity from UMI-owned WHAT. Planner receives only the relevant
 Responsibilities/Goals plus current Work, Evidence, communication records and applicable
 remembered preferences.
 
@@ -629,7 +630,7 @@ same as having no turn**:
 |---|---|---|---|
 | Startup orientation | None | None | Host lifecycle may offer one quiet baseline Activity. It is not a user interaction or Social Attention. |
 | Protective Reflex | A received `NormalizedTurnCapture` | Not required | Gateway applies deterministic pre-semantic stop/cancel/emergency/silence/unusable-input policy to the turn before UMI exists, then retains the reflex evidence. |
-| Ordinary admitted interaction | An admitted `UserTurnEnvelope` | None for turn-local conversation; otherwise none until GA commits one | UMI interprets WHAT and its turn-vs-Goal continuity scope; SC may complete turn-local conversation directly. Goal-scoped Responsibilities fan out to Planner while GA independently owns canonical Goal continuity. |
+| Ordinary admitted interaction | An admitted `UserTurnEnvelope` | A short-lived interaction Goal may be mechanically materialized for turn-lifetime Responsibilities; longer Goals persist according to lifecycle policy | UMI interprets WHAT and lifetime. GA only associates that Responsibility with retained Goal history. Planner may reason about HOW for either conversational or task Responsibilities when model-requested; SC owns exact interaction wording. |
 | `CognitiveOpportunity` reactivation | No fabricated new user turn; exact source/interaction/request/Situation provenance remains retained | Existing Goal IDs are required when continuing an unfinished Responsibility; situation-only social/world readiness may be Goal-free | A meaningful trusted state transition may reactivate the same Core. The opportunity is ephemeral, owns neither Goal nor Evidence/Situation truth, may legitimately produce zero new Activities, and cannot create Work authority merely because a social event is salient. |
 | Provisional cognition continuation | The original admitted turn and delivered provisional Activity remain the source/common-ground evidence | The still-open Responsibility must be canonically Goal-bound before continuation is consumed | One explicitly authorized one-shot deliberative continuation may re-enter the same Core communication authority. It fabricates no Evidence, gains no Work authority, and cannot recur without another material event or explicit bounded continuation. |
 

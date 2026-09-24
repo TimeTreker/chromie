@@ -3229,36 +3229,27 @@ class GoalDrivenRuntimeCoordinator:
     def _cognitive_request_responsibility_refs(
         request: CognitiveWorkRequest, authority: str,
     ) -> list[str]:
-        """Return effective initial activation scope for one cognitive owner.
+        """Return the exact model-requested initial activation scope.
 
-        UMI still authors semantic cognitive readiness. Runtime may close only hard
-        architectural prerequisites of an authority UMI explicitly requested. Initial
-        Planner therefore mechanically implies turn-wide Goal Association so later Work
-        can obtain canonical Goal binding. Runtime never creates Planner readiness from
-        output_mode, continuity_scope, bindings, keywords, or task classes; it may only
-        narrow a model-requested Planner scope by removing turn-local Responsibilities
-        that structurally cannot belong to Planner Work authority.
+        Runtime closes only structural prerequisites. Planner may reason about any
+        accepted Responsibility, including conversational/interaction Goals whose
+        HOW is a response rather than Capability Work. Therefore an explicitly
+        requested Planner mechanically implies turn-wide Goal Association so the
+        eventual Plan can bind to canonical Goal identity. ``continuity_scope`` is
+        not a Planner-routing flag and never strips an explicitly requested scope.
         """
 
         known = [item.local_ref for item in request.responsibilities]
         known_set = set(known)
-        goal_scoped = {
-            item.local_ref
-            for item in request.responsibilities
-            if item.continuity_scope == "goal"
-        }
         activation = next(
             (item for item in request.cognitive_requests if item.authority == authority),
             None,
         )
         if activation is None:
-            if authority == "goal_association":
-                planner = next(
-                    (item for item in request.cognitive_requests if item.authority == "planner"),
-                    None,
-                )
-                if planner is not None and set(planner.responsibility_refs).intersection(goal_scoped):
-                    return known
+            if authority == "goal_association" and any(
+                item.authority == "planner" for item in request.cognitive_requests
+            ):
+                return known
             return []
         unknown = set(activation.responsibility_refs) - known_set
         if unknown:
@@ -3267,20 +3258,6 @@ class GoalDrivenRuntimeCoordinator:
                 + ",".join(sorted(unknown))
             )
         selected = set(activation.responsibility_refs)
-        if authority == "planner":
-            # Planner owns Goal-bound HOW only. UMI may accidentally request it
-            # for ordinary turn-local speech, but Runtime must never widen that
-            # speech into Goal/Work authority. Narrowing an explicitly requested
-            # activation to its structurally legal scope is containment, not a
-            # new readiness decision. Standing SC still owns the turn-local reply.
-            omitted = selected - goal_scoped
-            if omitted:
-                logger.info(
-                    "cognitive_activation_scope_narrowed authority=planner "
-                    "omitted_turn_local_refs=%s",
-                    ",".join(sorted(omitted)),
-                )
-            selected.intersection_update(goal_scoped)
         return [ref for ref in known if ref in selected]
 
     @staticmethod
@@ -5067,13 +5044,31 @@ class GoalDrivenRuntimeCoordinator:
                             ),
                         },
                     )
-                # GA has explicitly completed the continuity question without Goal-owned
-                # Work. SC may already have delivered the social response in parallel;
-                # return that exact interaction as the terminal turn result without ever
-                # waking Planner.
-                if umi_planning_task is not None and not umi_planning_task.done():
-                    umi_planning_task.cancel()
-                    await asyncio.gather(umi_planning_task, return_exceptions=True)
+                # GA has completed historical continuity without canonical Goal-owned
+                # Work. A model-requested Planner may still reason about conversational
+                # HOW (for example whether a joke/chat Responsibility is a direct response).
+                # Let that bounded cognition finish, but it owns neither wording nor Goal
+                # persistence and cannot turn a successful SC delivery into failure.
+                turn_local_planner_status = "not_requested"
+                if umi_planning_task is not None:
+                    planner_result, = await asyncio.gather(
+                        umi_planning_task, return_exceptions=True
+                    )
+                    if isinstance(planner_result, BaseException):
+                        turn_local_planner_status = "failed_nonblocking"
+                        stage_diagnostics.append(self._stage_failure_metadata(
+                            "fast_planner_stream",
+                            {
+                                "error_type": type(planner_result).__name__,
+                                "error": str(planner_result),
+                                "failure_domain": "conversational_how",
+                                "architecture_attribution": "planner",
+                                "retryable": False,
+                            },
+                            default_failure_class="turn_local_planner_failed",
+                        ))
+                    else:
+                        turn_local_planner_status = "considered"
                 if self.policy.mode != "apply":
                     return self._finish(
                         mode=self.policy.mode,
@@ -5087,6 +5082,7 @@ class GoalDrivenRuntimeCoordinator:
                             **path_metadata(),
                             "goal_continuity_checked": True,
                             "planner_avoided_no_goal": True,
+                            "turn_local_planner_status": turn_local_planner_status,
                             "non_goal_responsibility_refs": list(
                                 association.non_goal_responsibility_refs
                             ),
@@ -5105,6 +5101,7 @@ class GoalDrivenRuntimeCoordinator:
                             **path_metadata(),
                             "goal_continuity_checked": True,
                             "planner_avoided_no_goal": True,
+                            "turn_local_planner_status": turn_local_planner_status,
                             "model_driven_cognitive_orchestration": True,
                         },
                     )
@@ -5128,6 +5125,7 @@ class GoalDrivenRuntimeCoordinator:
                         **path_metadata(),
                         "goal_continuity_checked": True,
                         "planner_avoided_no_goal": True,
+                        "turn_local_planner_status": turn_local_planner_status,
                         "non_goal_responsibility_refs": list(
                             association.non_goal_responsibility_refs
                         ),
@@ -5804,6 +5802,49 @@ class GoalDrivenRuntimeCoordinator:
             raise
         except CognitiveStageFailure as exc:
             await cancel_uncommitted_fast_work(exc.stage)
+
+            # A late continuity/association failure cannot retroactively turn an
+            # already delivered conversational Responsibility into a user-visible
+            # task failure. The words were actually delivered; GA is only history
+            # association. Preserve the diagnostic, but do not apologize, retry, or
+            # tell a second joke merely because that parallel cognition failed.
+            if exc.stage == "goal_association":
+                await finish_independent_social_interaction()
+                delivered_current_interaction = bool(
+                    interaction is not None
+                    and interaction.metadata.get("presentation_already_dispatched") is True
+                    and any(speech.text.strip() for speech in interaction.speech)
+                )
+                conversational_only = all(
+                    item.output_mode == "speech"
+                    for item in work_request.responsibilities
+                )
+                if delivered_current_interaction and conversational_only:
+                    return self._finish(
+                        mode=self.policy.mode,
+                        status=(
+                            "applied" if self.policy.mode == "apply"
+                            else "report_only" if self.policy.mode == "report_only"
+                            else "skipped"
+                        ),
+                        association=association,
+                        fast_plan=fast_plan,
+                        terminal_plan=terminal_plan,
+                        interaction=interaction if self.policy.mode == "apply" else None,
+                        goal_state_results=goal_state_results,
+                        timings=timings,
+                        started=started,
+                        metadata={
+                            "optional_cognition_failure_after_delivered_interaction": True,
+                            "suppressed_failure_stage": exc.stage,
+                            "suppressed_failure_class": str(
+                                exc.failure_metadata.get("failure_class") or type(exc).__name__
+                            ),
+                            "stage_diagnostics": stage_diagnostics,
+                            **path_metadata(),
+                        },
+                    )
+
             await communicate_terminal_work_failure(
                 stage=exc.stage,
                 failure_class=str(exc.failure_metadata.get("failure_class") or type(exc).__name__),

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 
 from pydantic import ValidationError
@@ -934,42 +935,16 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
         )
         self.assertNotIn("resource_responsibility", goal.model_dump(mode="json"))
 
-    def test_goal_association_expands_provider_neutral_physical_resource(self) -> None:
+    def test_goal_association_does_not_reauthor_provider_neutral_physical_resource(self) -> None:
         model_output = GoalSegmentationModelOutput.model_validate(
             {
                 "decision": "create_goals",
-                "new_goals": [
-                    {
-                        "source_responsibility_refs": ["resource"],
-
-                        "output_mode": "body_action",
-                        "resource_kind": "physical_object",
-                        "bindings": [],
-                        "resource_responsibility": {
-                            "kind": "physical_object",
-                            "description": "a bottle of water",
-                            "quantity": "1",
-                            "source": {
-                                "status": "known",
-                                "description": "100 meters ahead",
-                                "acquisition_bindings": [
-                                    {
-                                        "name": "source_location",
-                                        "entity_type": "place",
-                                        "value": "100 meters ahead",
-                                        "confidence": 1.0,
-                                    }
-                                ],
-                            },
-                            "recipient": {"description": "requester"},
-                            "delivery_mode": "physical_handover",
-                        },
-                    }
-                ],
+                "unassociated_responsibility_refs": ["resource"],
                 "referent_updates": [],
                 "resolved_references": [],
+                "cognitive_requests": [],
                 "confidence": 1.0,
-                "reason_summary": "One complete resource responsibility.",
+                "reason_summary": "No retained Goal matches the current Responsibility.",
             }
         )
         request = CognitiveWorkRequest(
@@ -984,6 +959,9 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                         "resource": "a bottle of water",
                         "source": "100 meters ahead",
                     },
+                    "output_mode": "body_action",
+                    "body_effect_family": "task_physical_effect",
+                    "continuity_scope": "goal",
                     "confidence": 0.9,
                 }
             ],
@@ -991,31 +969,14 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
             context={},
         )
 
-        resolution = GoalAssociationResolver(_NoopOllama())._expand_model_output(
-            model_output,
-            request=request,
-            turn_id="turn-resource",
-        )
-        responsibility = resolution.new_goals[0].resource_responsibility
-        self.assertIsNotNone(responsibility)
-        assert responsibility is not None
-        self.assertEqual(responsibility.resource.kind, "physical_object")
-        self.assertNotIn(
-            "responsibility_variant",
-            responsibility.model_dump(mode="json"),
-        )
+        resolution = asyncio.run(GoalAssociationResolver(_NoopOllama())._materialize_primary_output(
+            model_output, request=request, turn_id="turn-resource"
+        ))
+        created = resolution.new_goals[0]
+        self.assertIsNone(created.resource_responsibility)
         self.assertEqual(
-            responsibility.source.bindings["source_location"]["value"],
-            "100 meters ahead",
+            {name: value["value"] for name, value in created.object["bindings"].items()},
+            request.responsibilities[0].bindings,
         )
-        self.assertEqual(
-            {name: binding["value"] for name, binding in resolution.new_goals[0].object["bindings"].items()},
-            {"resource": "a bottle of water", "source": "100 meters ahead"},
-        )
-        serialized = responsibility.model_dump(mode="json")
-        self.assertNotIn("provider_id", serialized)
-        self.assertNotIn("capability_id", serialized)
-
-
-if __name__ == "__main__":
-    unittest.main()
+        self.assertEqual(created.metadata["output_mode"], "body_action")
+        self.assertEqual(created.metadata["body_effect_families"], ["task_physical_effect"])

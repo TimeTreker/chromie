@@ -94,14 +94,18 @@ types, source evidence and bounded unresolved meaning. It emits neither paramete
 bindings nor Goal relationships. It does not author Work, Primary
 Activities, Plan structure, execution lanes, realization, Capability IDs, executable
 arguments, provider requests, planning InformationGaps, input-source/default policy,
-clarification selection, or `actions[]`; Goal Association owns canonical Goal state and
-Planner owns the first Work/Activity contract, execution-input completeness, and
+clarification selection, or `actions[]`; Goal Association owns association with retained canonical
+Goal history, while trusted lifecycle code materializes new Goal identity/fields mechanically from
+accepted UMI WHAT when no retained Goal matches. Planner owns the first Work/Activity contract,
+execution-input completeness, and
 source strategy. Fast/deep are cognition passes of that same Planner authority. That ownership cannot be used to reinterpret,
 widen, narrow, or invent Responsibility meaning. No maintained `RouteDecision` or
 legacy Agent semantic compatibility surface remains on the Core path.
 
-WorkDAG does not add another semantic owner. Goal Association may create/update canonical
-Goal truth but cannot edit graph topology. Planner alone may retain the current WorkDAG,
+WorkDAG does not add another semantic owner. Goal Association may associate/update retained
+canonical Goal truth but cannot model-author a fresh Goal interpretation or edit graph topology.
+Trusted lifecycle materialization of an unassociated Responsibility copies UMI-owned semantics
+without becoming another semantic owner. Planner alone may retain the current WorkDAG,
 author its exact next revision, merge coherent planned Work, or create a new WorkDAG.
 DAGEngine advances execution state and reports Evidence only; normal node completion may
 continue mechanically without a Planner turn, while material invalidation re-enters Planner.

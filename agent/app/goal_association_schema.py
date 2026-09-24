@@ -147,28 +147,12 @@ def goal_association_response_schema(
                 for value in values
                 if str(value or "").strip() in responsibility_refs
             )
-    # ``continuity_scope=turn`` is UMI's explicit semantic claim that the
-    # Responsibility is complete in the current interaction and leaves no
-    # canonical Goal obligation.  When live scope metadata is available, GA may
-    # inspect context but cannot attach that Responsibility to retained/new Goal
-    # identity.  Older direct schema callers that do not provide scopes keep the
-    # previous speech-based eligibility surface for compatibility with fixtures.
-    if responsibility_continuity_scopes:
-        non_goal_eligible_refs = [
-            ref
-            for ref in responsibility_refs
-            if responsibility_continuity_scopes.get(ref) == "turn"
-            and ref not in relation_coupled_refs
-        ]
-        forced_non_goal_refs = set(non_goal_eligible_refs)
-    else:
-        non_goal_eligible_refs = [
-            ref
-            for ref in responsibility_refs
-            if responsibility_output_modes.get(ref) == "speech"
-            and ref not in relation_coupled_refs
-        ]
-        forced_non_goal_refs: set[str] = set()
+    # GA is association-only. Every current Responsibility may either associate
+    # with one retained Goal or remain unassociated. ``continuity_scope`` is not
+    # a Goal-identity routing flag: a conversational Responsibility can still
+    # relate to retained social continuity, while an unrelated task remains new.
+    non_goal_eligible_refs = list(responsibility_refs)
+    forced_non_goal_refs: set[str] = set()
     meaning_uncertainty_refs = [
         " ".join(str(item or "").strip().split())
         for item in (meaning_uncertainty_refs or [])
@@ -186,20 +170,16 @@ def goal_association_response_schema(
             if isinstance(refs, dict):
                 refs["items"] = {"type": "string", "enum": responsibility_refs}
                 refs["uniqueItems"] = True
-    new_goals = properties.get("new_goals")
-    if isinstance(new_goals, dict):
-        new_goals["maxItems"] = (
-            8
-            if responsibility_count is None
-            else min(8, max(0, int(responsibility_count)))
-        )
+    # New Goals are materialized mechanically after association. The model wire
+    # never carries a new-goal semantic surface.
+    properties.pop("new_goals", None)
     associations = properties.get("associations")
     if isinstance(associations, dict) and not open_goal_ids:
         # Retained terminal Goals remain available below as related historical
         # context for a new Goal, but they cannot own a current Responsibility.
         # Make this structural for native decoders rather than relying on if/then.
         associations["maxItems"] = 0
-    non_goal = properties.get("non_goal_responsibility_refs")
+    non_goal = properties.get("unassociated_responsibility_refs")
     if isinstance(non_goal, dict):
         if non_goal_eligible_refs:
             non_goal["items"] = {
@@ -209,7 +189,7 @@ def goal_association_response_schema(
             non_goal["uniqueItems"] = True
             non_goal["maxItems"] = len(non_goal_eligible_refs)
         else:
-            properties.pop("non_goal_responsibility_refs", None)
+            properties.pop("unassociated_responsibility_refs", None)
     if not referent_ids:
         resolved_references = properties.get("resolved_references")
         if isinstance(resolved_references, dict):
@@ -869,48 +849,28 @@ def goal_association_response_schema(
                 )
     properties = schema.setdefault("properties", {})
     required = list(schema.get("required") or [])
-    if output_type is GoalSegmentationModelOutput:
-        properties["decision"] = {
-            "type": "string",
-            "enum": (
-                ["create_goals", "no_goal"]
-                if non_goal_eligible_refs
-                else ["create_goals"]
-            ),
-        }
-        ordered_required = [
-            "decision",
-            "new_goals",
-            "referent_updates",
-            "resolved_references",
-            "cognitive_requests",
-            "confidence",
-            "reason_summary",
-        ]
-    else:
-        ordered_required = [
-            "associations",
-            "new_goals",
-            "referent_updates",
-            "resolved_references",
-            "cognitive_requests",
-            "confidence",
-            "reason_summary",
-        ]
-    if non_goal_eligible_refs:
-        # SGLang/XGrammar reliably preserves the top-level required object
-        # surface, but a field whose necessity exists only inside the
-        # conservation allOf/oneOf below is not guaranteed to be emitted. GA
-        # ownership must therefore be explicit on the decoder-visible object:
-        # when interaction-only ownership is a legal outcome, the model must
-        # always author this collection, using [] when it selects Goal
-        # ownership and exact Responsibility refs when it selects non_goal.
-        # DTO/Host conservation below remains the semantic authority over the
-        # collection contents.
-        ordered_required.insert(
-            ordered_required.index("new_goals") + 1,
-            "non_goal_responsibility_refs",
-        )
+    # Trusted code owns new Goal materialization; the model owns only association.
+    properties.pop("new_goals", None)
+    properties.pop("decision", None)
+    unassociated = properties.get("unassociated_responsibility_refs")
+    if isinstance(unassociated, dict):
+        unassociated["items"] = {"type": "string", "enum": responsibility_refs}
+        unassociated["uniqueItems"] = True
+        unassociated["maxItems"] = len(responsibility_refs)
+    associations = properties.get("associations")
+    if isinstance(associations, dict) and not open_goal_ids:
+        associations["maxItems"] = 0
+
+    ordered_required = [
+        *( ["associations"] if "associations" in properties else [] ),
+        "unassociated_responsibility_refs",
+        "referent_updates",
+        "resolved_references",
+        "cognitive_requests",
+        "confidence",
+        "reason_summary",
+    ]
+
     if responsibility_refs:
         def source_ref_item(source_ref: str) -> dict[str, Any]:
             return {
@@ -926,130 +886,55 @@ def goal_association_response_schema(
                 "required": ["source_responsibility_refs"],
             }
 
-        def contains_source_ref(source_ref: str) -> dict[str, Any]:
+        def association_contains(source_ref: str) -> dict[str, Any]:
             return {
                 "contains": source_ref_item(source_ref),
                 "minContains": 1,
                 "maxContains": 1,
             }
 
-        def excludes_source_ref(source_ref: str) -> dict[str, Any]:
+        def association_excludes(source_ref: str) -> dict[str, Any]:
             return {"not": {"contains": source_ref_item(source_ref)}}
 
-        def non_goal_contains(source_ref: str) -> dict[str, Any]:
+        def unassociated_contains(source_ref: str) -> dict[str, Any]:
             return {
                 "contains": {"const": source_ref},
                 "minContains": 1,
                 "maxContains": 1,
             }
 
-        def non_goal_excludes(source_ref: str) -> dict[str, Any]:
+        def unassociated_excludes(source_ref: str) -> dict[str, Any]:
             return {"not": {"contains": {"const": source_ref}}}
 
-        excluded_from_required_goals = (
-            forced_non_goal_refs
-            if responsibility_continuity_scopes
-            else set(non_goal_eligible_refs)
-        )
-        required_goal_refs = [
-            ref for ref in responsibility_refs if ref not in excluded_from_required_goals
-        ]
-        if output_type is GoalSegmentationModelOutput:
-            # Keep the old compact array contract for every Responsibility that
-            # cannot be interaction-only. Eligible conversational speech may
-            # additionally choose new Goal ownership or explicit non_goal.
-            properties["new_goals"]["minItems"] = len(required_goal_refs)
-            properties["new_goals"]["maxItems"] = len(responsibility_refs)
-            if required_goal_refs:
-                properties["new_goals"]["allOf"] = [
-                    contains_source_ref(source_ref)
-                    for source_ref in required_goal_refs
-                ]
-            if non_goal_eligible_refs:
-                for source_ref in non_goal_eligible_refs:
-                    if source_ref in forced_non_goal_refs:
-                        schema.setdefault("allOf", []).append({
-                            "properties": {
-                                "new_goals": excludes_source_ref(source_ref),
-                                "non_goal_responsibility_refs": non_goal_contains(source_ref),
-                            },
-                            "required": ["new_goals", "non_goal_responsibility_refs"],
-                        })
-                    else:
-                        schema.setdefault("allOf", []).append({
-                            "oneOf": [
-                                {
-                                    "properties": {
-                                        "new_goals": contains_source_ref(source_ref),
-                                        "non_goal_responsibility_refs": non_goal_excludes(source_ref),
-                                    },
-                                    "required": ["new_goals"],
-                                },
-                                {
-                                    "properties": {
-                                        "new_goals": excludes_source_ref(source_ref),
-                                        "non_goal_responsibility_refs": non_goal_contains(source_ref),
-                                    },
-                                    "required": ["new_goals", "non_goal_responsibility_refs"],
-                                },
-                            ]
-                        })
-                # ``decision`` is legacy wire compatibility only. The
-                # ownership collections above are the complete semantic result.
-                # Do not add a second cross-field authority here.
-        else:
-            # Existing-Goal continuity and independent new work retain the old
-            # two-way conservation for substantive refs. Eligible ordinary speech
-            # gets a third explicit non_goal alternative.
-            for source_ref in responsibility_refs:
-                if source_ref in forced_non_goal_refs:
-                    schema.setdefault("allOf", []).append({
-                        "properties": {
-                            "associations": excludes_source_ref(source_ref),
-                            "new_goals": excludes_source_ref(source_ref),
-                            "non_goal_responsibility_refs": non_goal_contains(source_ref),
-                        },
-                        "required": [
-                            "associations", "new_goals",
-                            "non_goal_responsibility_refs",
-                        ],
-                    })
-                    continue
-                alternatives = [
+        for source_ref in responsibility_refs:
+            if "associations" not in properties or not open_goal_ids:
+                schema.setdefault("allOf", []).append({
+                    "properties": {
+                        "unassociated_responsibility_refs": unassociated_contains(source_ref),
+                    },
+                    "required": ["unassociated_responsibility_refs"],
+                })
+                continue
+            schema.setdefault("allOf", []).append({
+                "oneOf": [
                     {
                         "properties": {
-                            "associations": contains_source_ref(source_ref),
-                            "new_goals": excludes_source_ref(source_ref),
+                            "associations": association_contains(source_ref),
+                            "unassociated_responsibility_refs": unassociated_excludes(source_ref),
                         },
-                        "required": ["associations", "new_goals"],
+                        "required": ["associations", "unassociated_responsibility_refs"],
                     },
                     {
                         "properties": {
-                            "associations": excludes_source_ref(source_ref),
-                            "new_goals": contains_source_ref(source_ref),
+                            "associations": association_excludes(source_ref),
+                            "unassociated_responsibility_refs": unassociated_contains(source_ref),
                         },
-                        "required": ["associations", "new_goals"],
+                        "required": ["associations", "unassociated_responsibility_refs"],
                     },
                 ]
-                if source_ref in non_goal_eligible_refs:
-                    for alternative in alternatives:
-                        alternative["properties"][
-                            "non_goal_responsibility_refs"
-                        ] = non_goal_excludes(source_ref)
-                    alternatives.append({
-                        "properties": {
-                            "associations": excludes_source_ref(source_ref),
-                            "new_goals": excludes_source_ref(source_ref),
-                            "non_goal_responsibility_refs": non_goal_contains(source_ref),
-                        },
-                        "required": [
-                            "associations", "new_goals",
-                            "non_goal_responsibility_refs",
-                        ],
-                    })
-                schema.setdefault("allOf", []).append({"oneOf": alternatives})
+            })
 
-    schema["required"] = list(dict.fromkeys([*ordered_required, *required]))
+    schema["required"] = [name for name in dict.fromkeys([*ordered_required, *required]) if name in properties]
     schema.pop("oneOf", None)
     schema.pop("anyOf", None)
     schema = resource_semantic_contract_response_schema(schema)
