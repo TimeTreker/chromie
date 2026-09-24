@@ -2297,6 +2297,9 @@ def test_social_authority_defaults_to_natural_conversational_economy() -> None:
 
     prompt = SOCIAL_COGNITION_AUTHORITY_PROMPT
     assert "smallest complete social response" in prompt
+    assert "Simple identity or greeting questions" in prompt
+    assert "do not volunteer biography, family" in prompt
+    assert "future-Work commitment, not an acknowledgement" in prompt
     assert "you are Chromie, a twelve-year-old girl" in prompt
     assert "do not volunteer robot" in prompt
     assert "current body is robotic" in prompt
@@ -2304,3 +2307,67 @@ def test_social_authority_defaults_to_natural_conversational_economy() -> None:
     assert "Never invent sadness, bad mood" in prompt
     assert "late internal cognition/association failure is not a user-visible failure" in prompt
     assert "never a reason to apologize" in prompt
+
+@pytest.mark.asyncio
+async def test_unbacked_covered_need_is_downgraded_to_pending_before_host_validation():
+    from shared.chromie_contracts.social_cognition import SocialCommunicationNeed
+
+    needs = [
+        SocialCommunicationNeed(
+            need_id="need:empathy",
+            owner="planner",
+            kind="answer",
+            reference_id="plan:1",
+            source_goal_ids=["goal:1"],
+        ),
+        SocialCommunicationNeed(
+            need_id="need:joke",
+            owner="planner",
+            kind="answer",
+            reference_id="plan:1",
+            source_goal_ids=["goal:1"],
+        ),
+    ]
+    current = request(communication_needs=needs)
+    raw = response(addressed_need_ids=["need:empathy"])
+    raw["need_outcomes"] = {
+        "need:empathy": "covered",
+        "need:joke": "covered",
+    }
+
+    result = await SocialCognitionResolver(Model(raw), Catalog()).resolve(current)
+
+    assert result.need_outcomes == {
+        "need:empathy": "covered",
+        "need:joke": "pending",
+    }
+
+
+def test_goal_less_terminal_failure_hides_unrelated_retained_goal_context():
+    from agent.app.social_cognition import _social_model_context
+
+    context = {
+        "work_failure": {"status": "failed", "known_cause": "goal_association"},
+        "active_goal_snapshots": [{"goal_id": "goal-old-joke"}],
+        "working_goal_memory": [{"goal_id": "goal-old-joke"}],
+        "active_task_contexts": [{"goal_id": "goal-old-joke"}],
+        "current_task_context": {"goal_id": "goal-old-joke"},
+        "interaction_context": {"prior_delivered_speech": []},
+    }
+
+    projected = _social_model_context(
+        context,
+        source_turn_id="turn-milk",
+        trigger="work_state",
+        goal_ids=[],
+    )
+
+    assert projected["work_failure"]["status"] == "failed"
+    assert projected["interaction_context"] == {"prior_delivered_speech": []}
+    for key in (
+        "active_goal_snapshots",
+        "working_goal_memory",
+        "active_task_contexts",
+        "current_task_context",
+    ):
+        assert key not in projected

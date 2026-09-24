@@ -102,6 +102,9 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "owner while you choose speech, Social Attention or silence. "
     "An internal module finishing is not automatically news for a person. Never promise "
     "a specific action or method without its established planning/authorization facts. "
+    "At interpretation ingress, wording such as I'll do it, I'll go get it, or right now is "
+    "a future-Work commitment, not an acknowledgement; use receipt/understanding wording "
+    "until Planner/Runtime facts establish the commitment. "
     "For prospective pre_evidence communication, supply its exact progress_kind. "
     "Pending or started speech is not completed delivery. Repetition can be appropriate "
     "after interruption or an explicit request; keep Activity identities immutable. "
@@ -142,7 +145,9 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "body is robotic and you are not biologically human. Never deny relevant embodiment facts or invent "
     "human biology. "
     "Practice natural conversational economy. Default to the smallest complete social response "
-    "that fits the moment: often one short sentence or one compact conversational beat. Do not "
+    "that fits the moment: often one short sentence or one compact conversational beat. Simple identity "
+    "or greeting questions normally need only one short sentence; do not volunteer biography, family, "
+    "interests, life story, or relationship philosophy unless the person asks for that detail. Do not "
     "automatically explain background context, summarize what just happened, repeat facts the person "
     "already knows, or append service-style offers/questions after the interaction purpose is complete. "
     "A follow-up question is useful only when it genuinely advances the current conversational/social "
@@ -657,6 +662,38 @@ def social_cognition_response_schema(
     return schema
 
 
+def _downgrade_unsupported_need_coverage(
+    output: SocialCognitionOutput,
+) -> SocialCognitionOutput:
+    """Fail closed when claimed Need coverage has no returned verbal act.
+
+    ``covered`` is not an independent semantic fact: the Host contract defines
+    it as coverage by an explicit returned verbal act. Native constrained
+    decoding cannot reliably enforce that cross-array relation. This monotonic
+    normalization only removes unsupported coverage; it never upgrades pending
+    to covered, invents wording, or repairs missing Goal/Responsibility bindings.
+    """
+
+    verbally_addressed_need_ids = {
+        need_id
+        for act in output.activities
+        if act.text.strip()
+        for need_id in act.addressed_need_ids
+    }
+    reconciled = {
+        need_id: (
+            "pending"
+            if outcome == "covered"
+            and need_id not in verbally_addressed_need_ids
+            else outcome
+        )
+        for need_id, outcome in output.need_outcomes.items()
+    }
+    if reconciled == output.need_outcomes:
+        return output
+    return output.model_copy(update={"need_outcomes": reconciled})
+
+
 def validate_social_cognition_output(
     output: SocialCognitionOutput, request: SocialCognitionRequest,
     candidates: list[dict[str, Any]],
@@ -826,7 +863,11 @@ def _social_mind_projection(context: dict[str, Any]) -> dict[str, Any]:
 
 
 def _social_model_context(
-    context: dict[str, Any], *, source_turn_id: str = "", trigger: str = "",
+    context: dict[str, Any],
+    *,
+    source_turn_id: str = "",
+    trigger: str = "",
+    goal_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     projected = copy.deepcopy(context)
     if "mind" in projected:
@@ -857,14 +898,19 @@ def _social_model_context(
     # compete with the social decision. The trusted request still retains it.
     projected.pop("user_turn_envelope", None)
     projected.pop("user_turn_schema_version", None)
-    if trigger == "interpretation":
-        # Standing SC runs before GA has bound the current Responsibility to any
-        # canonical Goal.  Broad retained Goal/Work state is therefore background
-        # continuity evidence, not current-turn social authority.  UMI has already
-        # used that context to produce complete current meaning, and the interaction
-        # ledger still carries prior delivered speech for conversational repair.
-        # Remove unbound retained task state so a stale active Goal cannot replace
-        # the foreground accepted Responsibility (for example weather -> joke).
+    work_failure = projected.get("work_failure")
+    goal_less_terminal_failure = (
+        not goal_ids
+        and isinstance(work_failure, dict)
+        and work_failure.get("status") == "failed"
+    )
+    if trigger == "interpretation" or goal_less_terminal_failure:
+        # Standing SC before GA and a terminal failure with no canonical Goal
+        # both lack authority to make an unrelated retained Goal the foreground.
+        # UMI/current failure facts already carry the exact current meaning, and
+        # the interaction ledger still carries prior delivered speech for
+        # repetition/repair identity. Remove unbound retained task state so a
+        # stale active Goal cannot replace the foreground Responsibility.
         for key in (
             "active_goal_snapshots", "recent_goal_snapshots",
             "working_goal_memory", "long_term_goal_memory",
@@ -926,6 +972,7 @@ def social_cognition_prompt(
         payload.get("context", {}),
         source_turn_id=str(request.source_turn.get("turn_id") or ""),
         trigger=request.trigger,
+        goal_ids=list(request.goal_ids),
     )
     # Empty external Needs are not a social fact and previously became a false
     # silence cue in native inference. Non-empty Needs remain complete.
@@ -1012,6 +1059,7 @@ class SocialCognitionResolver:
         if schema_errors:
             raise ValueError(f"Social Cognition raw Schema rejected: {schema_errors}")
         output = SocialCognitionOutput.model_validate(raw)
+        output = _downgrade_unsupported_need_coverage(output)
         if deep and output.disposition == "deliberate":
             raise ValueError("Social Cognition deeper pass cannot recurse")
         validate_social_cognition_output(output, request, candidates)

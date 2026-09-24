@@ -99,8 +99,12 @@ def goal_association_response_schema(
     responsibility_information_refs: set[str] | None = None,
     responsibility_bindings: dict[str, dict[str, Any]] | None = None,
     meaning_uncertainty_refs: list[str] | None = None,
+    association_min_confidence: float = 0.0,
 ) -> dict[str, Any]:
     schema = copy.deepcopy(output_type.model_json_schema())
+    association_min_confidence = max(
+        0.0, min(1.0, float(association_min_confidence))
+    )
     active_ids = [
         " ".join(str(item.get("goal_id") or "").strip().split())
         for item in candidate_goals
@@ -216,11 +220,18 @@ def goal_association_response_schema(
                         # Association confidence is model evidence used by the
                         # fail-closed commit threshold. A DTO default of 0.0 is
                         # not evidence and must never silently discard an
-                        # otherwise correct continuity decision.
+                        # otherwise correct continuity decision. Expose the
+                        # configured admission threshold to the constrained
+                        # decoder so a semantic "no match" is represented as
+                        # unassociated rather than as a confidence-zero
+                        # association that later conflicts with unassociated.
                         required_fields = list(node.get("required") or [])
                         for field in ("target_goal_ids", "confidence"):
                             if field not in required_fields:
                                 required_fields.append(field)
+                        confidence = node_properties.get("confidence")
+                        if isinstance(confidence, dict):
+                            confidence["minimum"] = association_min_confidence
                         node["required"] = required_fields
                 related_field = node_properties.get("related_goal_ids")
                 if isinstance(related_field, dict):

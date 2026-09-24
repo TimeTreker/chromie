@@ -1606,3 +1606,58 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
     def test_emotion_is_context_evidence_not_an_invented_goal_fact(self):
         prompt = ga_prompt.system_prompt(GoalAssociationModelOutput)
         self.assertIn("do not invent motives or internal states", prompt)
+
+def test_below_threshold_nonmatch_is_removed_before_exact_one_classification():
+    req = request(
+        "Who are you?",
+        language="en-US",
+        active_goals=[
+            active_goal("goal-joke", "Tell the user a joke."),
+            active_goal("goal-empathy", "Acknowledge the user's feelings."),
+        ],
+    )
+    output = GoalAssociationModelOutput.model_validate({
+        "associations": [
+            {
+                "relationship": "reference",
+                "source_responsibility_refs": ["r1"],
+                "target_goal_ids": ["goal-joke", "goal-empathy"],
+                "confidence": 0.0,
+                "reason_summary": "The current identity question does not match.",
+            },
+            {
+                "relationship": "reference",
+                "source_responsibility_refs": ["r1"],
+                "target_goal_ids": ["goal-joke", "goal-empathy"],
+                "confidence": 0.0,
+                "reason_summary": "The current identity question does not match.",
+            },
+        ],
+        "unassociated_responsibility_refs": ["r1"],
+        "confidence": 1.0,
+        "reason_summary": "No retained Goal matches the current Responsibility.",
+    })
+    resolver = GoalAssociationResolver(FakeOllama({}), min_confidence=0.65)
+
+    result = asyncio.run(resolver._materialize_primary_output(
+        output, request=req, turn_id="turn-identity"
+    ))
+
+    assert result.resolution_status == "resolved"
+    assert result.associations == []
+    assert len(result.new_goals) == 1
+    assert result.new_goals[0].source_responsibility_refs == ["r1"]
+    assert len(result.metadata["rejected_below_confidence_associations"]) == 2
+
+
+def test_live_ga_schema_exposes_existing_goal_admission_threshold():
+    schema = ga_schema.goal_association_response_schema(
+        GoalAssociationModelOutput,
+        [active_goal("goal-joke", "Tell the user a joke.")],
+        [],
+        responsibility_refs=["r1"],
+        association_min_confidence=0.65,
+    )
+    association = schema["$defs"]["GoalAssociationModelAssociation"]
+
+    assert association["properties"]["confidence"]["minimum"] == 0.65

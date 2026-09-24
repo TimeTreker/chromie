@@ -207,6 +207,7 @@ class GoalAssociationResolver:
             meaning_uncertainty_refs=[
                 item.local_ref for item in request.meaning_uncertainties
             ],
+            association_min_confidence=self.min_confidence,
         )
         generation_options = {
             "temperature": 0,
@@ -445,6 +446,27 @@ class GoalAssociationResolver:
         request: CognitiveWorkRequest,
         turn_id: str,
     ) -> GoalAssociationResolution:
+        # Confidence admission is part of GA's canonical association boundary,
+        # not a post-materialization cleanup. A below-threshold candidate has
+        # not associated the Responsibility. Remove it before exact-one
+        # classification so an explicit unassociated decision cannot be turned
+        # into a contradictory duplicate mapping.
+        rejected_below_confidence = [
+            association
+            for association in getattr(model_output, "associations", [])
+            if association.confidence < self.min_confidence
+        ]
+        if rejected_below_confidence:
+            model_output = model_output.model_copy(
+                update={
+                    "associations": [
+                        association
+                        for association in model_output.associations
+                        if association.confidence >= self.min_confidence
+                    ]
+                }
+            )
+
         gaps_by_goal_id = {
             str(goal.get("goal_id") or "").strip(): {
                 str(gap.get("gap_id") or "").strip()
@@ -653,10 +675,28 @@ class GoalAssociationResolver:
         # Goal below instead of requiring the model to restate them.  Requiring
         # both was contradictory: the decoder forbade GA-authored bindings while
         # this boundary rejected their absence.
-        return self._expand_model_output(
+        resolution = self._expand_model_output(
             model_output,
             request=request,
             turn_id=turn_id,
+        )
+        return resolution.model_copy(
+            update={
+                "metadata": {
+                    **resolution.metadata,
+                    "min_confidence": self.min_confidence,
+                    "rejected_below_confidence_associations": [
+                        {
+                            "source_responsibility_refs": list(
+                                association.source_responsibility_refs
+                            ),
+                            "target_goal_ids": list(association.target_goal_ids),
+                            "confidence": association.confidence,
+                        }
+                        for association in rejected_below_confidence
+                    ],
+                }
+            }
         )
 
 
