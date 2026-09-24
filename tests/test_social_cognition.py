@@ -2387,6 +2387,8 @@ def test_current_turn_output_guard_keeps_task_acknowledgement_precommitment() ->
     guard = _social_current_turn_output_guard(current)
     assert "acknowledge receipt or understanding only" in guard
     assert "Do not promise, accept, announce an intention to execute" in guard
+    assert "Use neutral acknowledgement wording such as 'Okay' or 'Got it'" in guard
+    assert "'I'll do/get/bring it' is a future-Work commitment" in guard
 
 
 def test_current_turn_output_guard_keeps_direct_chat_compact() -> None:

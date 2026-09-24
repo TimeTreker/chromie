@@ -33,6 +33,12 @@ except ImportError:  # pragma: no cover - repository development path
 
 
 try:
+    from chromie_contracts.core_interpretation import responsibility_binding_material_value
+except ImportError:  # pragma: no cover - repository development path
+    from shared.chromie_contracts.core_interpretation import responsibility_binding_material_value
+
+
+try:
     from chromie_runtime.ollama_non_thinking import (
         OllamaNonThinkingViolation,
         enforce_non_thinking_ollama_response,
@@ -391,6 +397,17 @@ def _compact_goal_meaning_context(
         gaps = item.get("open_information_gaps")
         if not isinstance(gaps, list):
             gaps = []
+        goal_object = (
+            copy.deepcopy(goal.get("object"))
+            if isinstance(goal.get("object"), dict)
+            else {}
+        )
+        goal_bindings = goal_object.get("bindings")
+        if isinstance(goal_bindings, dict):
+            goal_object["bindings"] = {
+                str(name): responsibility_binding_material_value(value)
+                for name, value in goal_bindings.items()
+            }
         compact.append(
             {
                 "status": str(
@@ -399,11 +416,7 @@ def _compact_goal_meaning_context(
                     or "open"
                 ),
                 "description": description[:320],
-                "object": (
-                    goal.get("object")
-                    if isinstance(goal.get("object"), dict)
-                    else {}
-                ),
+                "object": goal_object,
                 "constraints": (
                     goal.get("constraints")
                     if isinstance(goal.get("constraints"), dict)
@@ -751,6 +764,17 @@ class OllamaUserMeaningInterpreter:
         item["properties"]["outcome"]["description"] = (
             "Complete natural-language user request with every material detail, in the source language. "
             "Never a category name, code or underscore-separated identifier."
+        )
+        item["properties"]["bindings"]["description"] = (
+            "Sparse provider-neutral semantic facts that are part of the accepted WHAT. "
+            "Use native JSON values, not semantic descriptor envelopes: entity/recipient/location "
+            "scalars are direct strings, while genuinely structured measurements may remain objects. "
+            "For a pronoun/ellipsis that resolves a previously introduced physical resource, carry "
+            "forward every still-applicable known source fact needed by the current requested effect "
+            "(for example entity, location, distance, quantity, recipient, direction or route). "
+            "Context-derived facts belong here even though source_evidence remains current-turn-only; "
+            "never hide those facts only in outcome/cognitive request prose or fabricate a current-turn "
+            "source span for them."
         )
         item["properties"]["output_mode"]["description"] = (
             "Expected human result type only; the complete request belongs in outcome. "

@@ -378,6 +378,122 @@ def test_fast_stream_prompt_hides_prior_turn_delivered_words_but_keeps_current_d
     assert "OLD DELIVERY MARKER" not in prompt
     assert "prior-turn delivered speech are context only" in prompt
 
+
+def _contextual_structured_resource_request() -> CognitiveWorkRequest:
+    return CognitiveWorkRequest(
+        sid="turn-context-resource",
+        text="I would appreciate it if you can bring it to me.",
+        language="en-US",
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="fetch",
+            outcome="bring the bottle of milk to the user",
+            output_mode="body_action",
+            body_effect_family="task_physical_effect",
+            continuity_scope="goal",
+            bindings={
+                "entity": {
+                    "confidence": 1.0, "entity_type": "object", "name": "entity",
+                    "value": {
+                        "confidence": 1.0, "entity_type": "object",
+                        "name": "milk_bottle", "value": "bottle of milk",
+                    },
+                },
+                "location": {
+                    "confidence": 1.0, "entity_type": "location", "name": "location",
+                    "value": "in front of you",
+                },
+                "distance": {
+                    "confidence": 1.0, "entity_type": "distance", "name": "distance",
+                    "value": {
+                        "confidence": 1.0, "entity_type": "measurement",
+                        "name": "distance", "value": 50, "unit": "meters",
+                    },
+                },
+                "recipient": {
+                    "confidence": 1.0, "entity_type": "person", "name": "recipient",
+                    "value": "user",
+                },
+            },
+            confidence=1.0,
+        )],
+        interpretation_confidence=1.0,
+    )
+
+
+def _contextual_structured_resource_output() -> dict[str, Any]:
+    return {
+        "disposition": "execute",
+        "coverage": "complete",
+        "covered_responsibility_refs": ["fetch"],
+        "activities": [{
+            "role": "capability",
+            "capability_id": "soridormi.acquire_and_deliver_resource",
+            "activity_id": "fetch-context-milk",
+            "args": {
+                "resource": {"kind": "physical_object", "description": "bottle of milk"},
+                "source": {
+                    "status": "known",
+                    "description": "in front of you",
+                    "bindings": {
+                        "location": "in front of you",
+                        "distance": {"value": 50, "unit": "meters"},
+                    },
+                },
+                "recipient": {"description": "user"},
+            },
+            "timing": "sequential",
+            "source_responsibility_refs": ["fetch"],
+        }],
+        "continuations": [],
+        "confidence": 1.0,
+        "unresolved": [],
+        "reason_summary": "Acquire the context-resolved resource and deliver it.",
+    }
+
+
+def test_fast_schema_forbids_current_turn_source_spans_for_binding_grounded_resource_args() -> None:
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
+
+    request = _contextual_structured_resource_request()
+    schema = fast_streaming_advance_response_schema(
+        ["fetch"],
+        responsibilities=request.responsibilities,
+        capabilities=[_structured_resource_catalog_capability().model_dump(mode="json")],
+        source_token_refs=[item["ref"] for item in _source_tokens(request.text)],
+        language=request.language,
+    )
+    activity = schema["properties"]["activities"]["items"]["oneOf"][0]
+    argument_sources = activity["properties"]["argument_sources"]
+    assert argument_sources["properties"] == {}
+    assert argument_sources["additionalProperties"] is False
+
+
+@pytest.mark.asyncio
+async def test_fast_stream_accepts_contextual_resource_bindings_without_fake_current_turn_spans() -> None:
+    request = _contextual_structured_resource_request()
+    assert request.responsibilities[0].bindings == {
+        "entity": "bottle of milk",
+        "location": "in front of you",
+        "distance": {"value": 50, "unit": "meters"},
+        "recipient": "user",
+    }
+    model = _StreamingModel([_wire_output(_contextual_structured_resource_output())])
+    frames = [
+        frame
+        async for frame in FastPlannerResolver(
+            model, _Catalog([_structured_resource_catalog_capability()])
+        ).stream_advance(request)
+    ]
+
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    activity = frames[-1].advance.activities[0]
+    assert activity.capability_id == "soridormi.acquire_and_deliver_resource"
+    assert activity.argument_sources == {}
+    assert activity.args["recipient"]["description"] == "user"
+    assert activity.args["source"]["bindings"]["distance"] == {
+        "value": 50, "unit": "meters"
+    }
+
 @pytest.mark.asyncio
 async def test_fast_stream_filters_incompatible_information_capability_before_generation() -> None:
     request = _structured_resource_request()

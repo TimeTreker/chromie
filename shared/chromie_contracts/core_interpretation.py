@@ -21,6 +21,10 @@ _UMI_BINDING_PROVENANCE_KEYS = frozenset({
     "source_end_token_ref",
     "confidence",
 })
+_UMI_BINDING_ENVELOPE_KEYS = _UMI_BINDING_PROVENANCE_KEYS | frozenset({
+    "name",
+    "entity_type",
+})
 
 
 def _matches_json_primitive_type(value: Any, declared_type: Any) -> bool:
@@ -48,17 +52,37 @@ def responsibility_binding_material_value(value: Any) -> Any:
     """Return the semantic value of one UMI binding.
 
     UMI bindings own WHAT, not a second provenance envelope. Some model outputs
-    wrap a scalar as ``{"value": ..., "source_evidence": ...}`` even though the
-    Responsibility already carries authoritative source evidence. Treat only that
-    narrow evidence-only wrapper as representation noise. Structured semantic
-    values (for example a region object or a measured value with ``unit``) remain
-    intact.
+    wrap a scalar as ``{"value": ..., "source_evidence": ...}`` or as a
+    constrained-model descriptor such as
+    ``{"name": "recipient", "entity_type": "person", "value": "user"}`` even
+    though the Responsibility already owns the binding name and authoritative
+    source evidence. Treat those descriptor/provenance wrappers as representation
+    noise. Structured semantic values (for example a region object or a measured
+    value with ``unit``) remain intact.
     """
 
     if isinstance(value, dict) and "value" in value:
         metadata_keys = set(value) - {"value"}
-        if metadata_keys.issubset(_UMI_BINDING_PROVENANCE_KEYS):
-            return value["value"]
+        descriptor_shape = {"name", "entity_type"}.issubset(value)
+        if descriptor_shape:
+            # Constrained UMI models sometimes emit their internal semantic
+            # binding descriptor (name/entity_type/confidence/value) instead
+            # of the requested native JSON value. Those fields describe the
+            # binding itself, not the user's WHAT. If the descriptor also
+            # carries genuine semantic structure (for example a measurement
+            # unit), keep only that structure around the recursively normalized
+            # material value.
+            semantic_fields = {
+                key: responsibility_binding_material_value(item)
+                for key, item in value.items()
+                if key != "value" and key not in _UMI_BINDING_ENVELOPE_KEYS
+            }
+            material = responsibility_binding_material_value(value["value"])
+            if semantic_fields:
+                return {"value": material, **semantic_fields}
+            return material
+        if metadata_keys.issubset(_UMI_BINDING_ENVELOPE_KEYS):
+            return responsibility_binding_material_value(value["value"])
         # Some constrained models redundantly emit a JSON-schema primitive type
         # beside a scalar, for example {"value": 6, "type": "integer"}. JSON
         # already carries that type, so this is representation noise rather than

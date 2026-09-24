@@ -975,7 +975,9 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
             "that Planner/Runtime has not established yet. If you speak now, acknowledge "
             "receipt or understanding only. Do not promise, accept, announce an intention "
             "to execute, or say the Work will happen; later supplied Work facts own that "
-            "commitment.\n"
+            "commitment. Use neutral acknowledgement wording such as 'Okay' or 'Got it'. "
+            "Wording like 'I'll do/get/bring it' is a future-Work commitment, not an "
+            "acknowledgement.\n"
         )
     return (
         "\nCurrent-turn output guard: this is direct conversational speech. Answer only "

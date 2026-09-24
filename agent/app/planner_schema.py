@@ -2929,6 +2929,7 @@ def fast_advance_response_schema(
                                     str(name): copy.deepcopy(span_contract)
                                     for name in sorted(input_properties)
                                     if name not in index_grounded_parameters
+                                    and name not in grounded_parameters
                                 },
                                 "required": required_source_inputs,
                                 "additionalProperties": False,

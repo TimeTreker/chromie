@@ -71,6 +71,68 @@ def test_user_meaning_interpreter_source_span_covers_material_clauses_not_only_c
     assert "semantic conservation, not a capability rule" in prompt
 
 
+
+def test_nested_umi_binding_descriptors_normalize_to_material_values() -> None:
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    proposal = CognitiveResponsibilityProposal(
+        local_ref="r1",
+        outcome="bring the bottle of milk to the user",
+        bindings={
+            "entity": {
+                "confidence": 1.0,
+                "entity_type": "object",
+                "name": "entity",
+                "value": {
+                    "confidence": 1.0,
+                    "entity_type": "object",
+                    "name": "milk_bottle",
+                    "value": "bottle of milk",
+                },
+            },
+            "recipient": {
+                "confidence": 1.0,
+                "entity_type": "person",
+                "name": "recipient",
+                "value": "user",
+            },
+            "distance": {
+                "confidence": 1.0,
+                "entity_type": "distance",
+                "name": "distance",
+                "value": {
+                    "confidence": 1.0,
+                    "entity_type": "measurement",
+                    "name": "distance",
+                    "value": 50,
+                    "unit": "meters",
+                },
+            },
+        },
+        output_mode="body_action",
+        body_effect_family="task_physical_effect",
+        continuity_scope="goal",
+        confidence=1.0,
+    )
+
+    assert proposal.bindings == {
+        "entity": "bottle of milk",
+        "recipient": "user",
+        "distance": {"value": 50, "unit": "meters"},
+    }
+
+
+def test_user_meaning_interpreter_requires_contextual_resource_source_bindings() -> None:
+    prompt = PROMPT.read_text(encoding="utf-8").casefold()
+
+    assert "those still-applicable source facts are part of the current what and must be" in prompt
+    assert "present in this responsibility's bindings" in prompt
+    assert "cognitive_requests" in prompt and "reason_summary" in prompt
+    assert "source_evidence still cites only the current" in prompt
+    assert "turn and must never be widened or fabricated" in prompt
+    assert 'recipient: "user"' in prompt
+    assert 'entity: "bottle of milk"' in prompt
+
 def test_user_meaning_interpreter_goal_context_is_semantic_without_canonical_identity() -> None:
     from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import (
         _compact_goal_meaning_context,
@@ -107,7 +169,7 @@ def test_user_meaning_interpreter_goal_context_is_semantic_without_canonical_ide
         {
             "status": "open",
             "description": "Check whether Chongqing will be hot tonight.",
-            "object": {"bindings": {"location": {"value": "重庆"}}},
+            "object": {"bindings": {"location": "重庆"}},
             "constraints": {"time_scope": "今晚"},
             "output_mode": "information",
             "pending_clarification": [],
