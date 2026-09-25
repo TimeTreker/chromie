@@ -1,5 +1,40 @@
 # Chromie Development Checkpoint
 
+## Simulation scene object-set adapter — 2026-09-25
+
+Pre-delivery Chromie base `6e51ad2a443e0bc7d6dcf47f8f109a8f6ad33e69` on
+`main`, matched `origin/main`; expected resume revision is the latest `main`
+commit containing this checkpoint and Handoff. Paired Soridormi commit
+`5d235b8aee35efd4788b0dd1de791753275618f9` on `main` adds a standing user to the default scene plus a
+return walk after milk pickup. Soridormi's direct MuJoCo run observed the milk
+10.006→0.844 m and recipient 9.412→0.892 m, mocked handover, and final
+standing/safe idle. That run used a dirty successor of `06d5d4f` with the
+service source revision still set to that older commit; it is simulator proof,
+not a paired committed-revision or Chromie conversation proof.
+Soridormi's full dependency-complete container suite passed 819 tests with 4
+skips; the focused body suite passed 177 tests. The committed MCP runtime
+reported its revision and both scene markers on the restarted default scenario.
+Its full public MCP call then walked to milk 10.008→0.834 m and back to the
+user 9.425→0.883 m, completed the mock handover, and ended standing/safe idle
+with no active task. The scene was reset to its starting pose afterward.
+
+Chromie's explicit Soridormi scene adapter now admits a bounded set of marked
+simulator objects under the original observation reference. This closes the
+immediate object-set rejection introduced by the simulated user and permits a
+future water marker without claiming one exists. Focused adapter tests: 3 passed;
+policy, test-ownership, and docs checks passed. The canonical `run_tests.sh`
+benchmark stage remains failing at 6 failed/147 passed on the pre-existing
+semantic corpora; later stages did not run in that invocation. Ordinary turns
+still do not request scene observations. The reported first-turn unsupported
+“I see” speech and inherited-location current-turn Planner citation remain open.
+
+Resume by wiring a fresh Soridormi scene read into an explicitly admitted
+information-acquisition Work path, then qualify scene-grounded speech and
+resource planning on the target model with the frozen contrast method. A water
+example additionally requires a real water fixture in a scenario and provider
+resource matching. Re-run the full canonical gate and highest safe live profile
+before any end-to-end Chromie claim. Camera and hardware perception are unrun.
+
 ## Simulation milk-scene observation slice — 2026-09-24
 
 Current base is `08e40d2eebbc03d962895d5bb32cfa832adf69bf` on `main`, paired with

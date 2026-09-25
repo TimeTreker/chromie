@@ -37,7 +37,15 @@ def scene(*, objects: list[dict[str, Any]] | None = None) -> dict[str, Any]:
 
 
 def test_simulator_observation_reaches_chromie_with_source_ref() -> None:
-    invoker = SceneInvoker(scene())
+    invoker = SceneInvoker(scene(objects=[
+        scene()["objects"][0],
+        {
+            "object_ref": "soridormi_mock_user_torso",
+            "description": "user",
+            "relative_direction": "to Chromie's right",
+            "distance_m": 1.5,
+        },
+    ]))
     observation = asyncio.run(observe_soridormi_sim_scene(
         invoker, context={}
     ))
@@ -48,6 +56,10 @@ def test_simulator_observation_reaches_chromie_with_source_ref() -> None:
     assert observation.projection.interpretations[0].value == (
         "bottle of milk, 50 meters in front of Chromie (simulated)"
     )
+    assert observation.projection.interpretations[1].value == (
+        "user, 1.5 meters to Chromie's right (simulated)"
+    )
+    assert observation.projection.interpretations[1].source_refs == ["soridormi-scene-7"]
 
 
 def test_user_report_cannot_substitute_for_scene_observation() -> None:
@@ -61,8 +73,25 @@ def test_user_report_cannot_substitute_for_scene_observation() -> None:
             SceneInvoker({**scene(), "source_kind": "user_report"}),
             context={},
         ))
-    with pytest.raises(ValueError, match="bottle contract"):
+    with pytest.raises(ValueError, match="scene marker contract"):
         asyncio.run(observe_soridormi_sim_scene(
             SceneInvoker(scene(objects=[{**scene()["objects"][0], "distance_m": 500.0}])),
             context={},
         ))
+
+
+def test_scene_object_can_describe_another_simulated_resource() -> None:
+    observation = asyncio.run(observe_soridormi_sim_scene(
+        SceneInvoker(scene(objects=[{
+            "object_ref": "soridormi_mock_water_bottle",
+            "description": "bottle of water",
+            "relative_direction": "to Chromie's left",
+            "distance_m": 3.0,
+        }])),
+        context={"recent_dialogue": ["I am thirsty"]},
+    ))
+    assert observation is not None
+    assert observation.projection.interpretations[0].value == (
+        "bottle of water, 3 meters to Chromie's left (simulated)"
+    )
+    assert observation.projection.interpretations[0].source_refs == ["soridormi-scene-7"]

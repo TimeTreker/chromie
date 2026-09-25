@@ -1,5 +1,62 @@
 # Chromie Handoff
 
+## Simulation object-set adapter delivery — 2026-09-25
+
+Chromie checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery
+base `6e51ad2a443e0bc7d6dcf47f8f109a8f6ad33e69`; fetched `origin/main`
+matched before editing. Paired Soridormi checkout `/home/chromie/github/soridormi`
+has source commit `5d235b8aee35efd4788b0dd1de791753275618f9` and proof
+record commit `531268c53c1029ab4875ddeb623046314e48ab4b` pushed on `main`;
+its standing-user/return-walk patch is separate.
+Resume from the latest commits containing these handoffs after fetching both
+repositories, rather than from the pre-delivery hashes.
+
+Soridormi's default MuJoCo scenario now adds a named non-contact user actor 1.5 m
+right of Chromie. A direct isolated simulator run on the dirty Soridormi source
+walked to the milk (10.006→0.844 m, 156.08 s), returned to the user
+(9.412→0.892 m, 159.17 s), reported mocked pickup/handover, and ended standing,
+safe idle, with no active task. The runtime's `source_revision` remained
+`06d5d4f` during that dirty-source probe, so do not use the revision field to
+claim this run as committed-revision proof. The isolated simulator was stopped.
+The default scenario and MCP service were restarted from committed `5d235b8`;
+MCP `get_status` reported that source revision, `safe_idle=true`, and no active
+task, while `observe_scene` reported milk at 10.006 m and the simulated user
+1.5 m to Chromie's right. Soridormi's dependency-complete container suite
+passed 819 tests/4 skipped and body concurrency passed 177 tests; host Python
+lacks `pyzmq` and cannot collect the full suite.
+The full public MCP call on code revision `5d235b8` then reported bottle
+10.008→0.834 m in 155.26 s, return to user 9.425→0.883 m in 158.45 s,
+mocked handover, standing/safe idle, and no active task. Direct simulator reset
+restored milk about 10 m ahead and user 1.5 m right; subsequent MCP status
+again reported safe idle and those scene markers. The public call output was
+observed in the terminal; no separate ignored bundle was retained.
+
+Chromie now validates multiple `soridormi_mock_*` scene markers in one
+`soridormi.robot.observe_scene` result and projects each into Goal-free
+Situation with `source_refs=[observation_id]` and `(simulated)` wording. It
+rejects wrong source provenance, duplicate/malformed markers, directions and
+distances outside the 60 m observation bound. It does not call the tool on
+ordinary turns or seed objects from user text. No actual water object, automatic
+perception-triggered planning, scene-to-speech, physical camera, or hardware
+proof is included.
+
+Commands/results on Chromie: `python -m pytest -q
+tests/test_soridormi_scene_perception.py` → 3 passed;
+`python scripts/check_repository_policies.py`,
+`python scripts/check_test_ownership.py`, and `python scripts/check_docs.py` →
+passed. `./scripts/run_tests.sh` → benchmark stage 6 failed/147 passed on the
+maintained semantic corpora; it stopped before main tests. No ignored live
+artifact was retained for the direct Soridormi probe; its measurements were
+observed in the run output. The committed-revision public MCP proof above
+qualifies Soridormi's simulated round trip, not Chromie's dialogue or hardware.
+
+Next: fetch both repos, start the current Soridormi scenario and MCP provider,
+admit an explicit fresh scene read into Chromie's information-acquisition
+Work path, and run focused tests plus frozen model-role and live simulation
+qualification. Keep first-turn perceptual speech and inherited Planner argument
+provenance as separate open repairs. Complete the canonical local gate before
+any release claim.
+
 ## Simulation milk-scene observation delivery — 2026-09-24
 
 Checkouts: `/home/chromie/github/chromie` at `main` base
