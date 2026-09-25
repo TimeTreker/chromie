@@ -7,7 +7,7 @@ from typing import Any
 
 try:
     from chromie_contracts.user_turn import user_turn_source_span_schema
-    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
+    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty, responsibility_binding_material_value
     from chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
         VOCAL_MODES,
@@ -19,7 +19,7 @@ try:
     )
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.user_turn import user_turn_source_span_schema
-    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty, responsibility_binding_material_value
     from shared.chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
         VOCAL_MODES,
@@ -41,6 +41,7 @@ from .planner_grounding import (
     _is_count_binding,
     _material_values_equal,
     _normalized_entity_type,
+    _resource_source_binding_type,
     literal_intent_argument,
     semantic_numeric_values,
 )
@@ -2627,6 +2628,7 @@ def fast_advance_response_schema(
         covered["maxItems"] = len(refs)
         covered["uniqueItems"] = True
     definitions = schema.get("$defs", {})
+    provider_owned_inputs_complete = False
     information_gap_contract = definitions.get("PlannerInformationGap")
     if isinstance(information_gap_contract, dict):
         gap_required = information_gap_contract.setdefault("required", [])
@@ -2656,6 +2658,37 @@ def fast_advance_response_schema(
             if isinstance(required_for, dict):
                 required_for["minItems"] = 1
             if meaning_uncertainties == []:
+                def binding_realizes_input(
+                    capability: dict[str, Any],
+                    item: CognitiveResponsibilityProposal,
+                    name: str,
+                ) -> bool:
+                    if name in item.bindings:
+                        return True
+                    return any(
+                        isinstance(contract := _argument_realization_contract(
+                            capability, binding_name
+                        ), dict)
+                        and name in (contract.get("arguments") or [])
+                        for binding_name in item.bindings
+                    )
+
+                def provider_owns_ready_inputs(capability: dict[str, Any]) -> bool:
+                    hints = capability.get("hints") or {}
+                    resource_contract = hints.get("resource_contract") or {}
+                    owned = set(resource_contract.get("provider_owns") or [])
+                    if not {"source_resolution", "navigation", "perception"} <= owned:
+                        return False
+                    input_schema = capability.get("input_schema") or {}
+                    required = input_schema.get("required") or []
+                    return bool(responsibility_items) and all(
+                        all(
+                            binding_realizes_input(capability, item, str(name))
+                            for name in required
+                        )
+                        for item in responsibility_items
+                    )
+
                 gap_properties["source_kind"] = {
                     "const": "execution_input",
                     "type": "string",
@@ -2663,8 +2696,11 @@ def fast_advance_response_schema(
                 applicable_capability_ids = [
                     str(item.get("capability_id") or "").strip()
                     for item in (capabilities or [])
-                    if isinstance(item, dict) and str(item.get("capability_id") or "").strip()
+                    if isinstance(item, dict)
+                    and str(item.get("capability_id") or "").strip()
+                    and not provider_owns_ready_inputs(item)
                 ]
+                provider_owned_inputs_complete = bool(capabilities) and not applicable_capability_ids
                 if applicable_capability_ids:
                     gap_properties["source_reference"] = {
                         "type": "string",
@@ -2675,6 +2711,8 @@ def fast_advance_response_schema(
                         if not isinstance(capability, dict):
                             continue
                         capability_id = str(capability.get("capability_id") or "").strip()
+                        if capability_id not in applicable_capability_ids:
+                            continue
                         input_schema = capability.get("input_schema")
                         if not capability_id or not isinstance(input_schema, dict):
                             continue
@@ -2684,11 +2722,12 @@ def fast_advance_response_schema(
                             for name in input_schema.get("required") or []
                             if isinstance(input_properties.get(str(name)), dict)
                             and "default" not in input_properties[str(name)]
-                            # This is the same direct-binding exclusion enforced
-                            # by Host. Across several Responsibilities, exclude
-                            # only names bound in every possible source owner.
+                            # A typed semantic binding may realize a structured
+                            # provider argument through argument_realization.
+                            # Neither form is a missing user input.
                             and not (responsibility_items and all(
-                                str(name) in item.bindings for item in responsibility_items
+                                binding_realizes_input(capability, item, str(name))
+                                for item in responsibility_items
                             ))
                         ]
                         if not required_inputs:
@@ -2791,8 +2830,13 @@ def fast_advance_response_schema(
     if isinstance(activity_items, dict) and responsibility_items:
         allowed_activity_contracts = [
             "FastPlannerCapabilityActivity",
-            "FastPlannerInputNeed",
         ]
+        if not provider_owned_inputs_complete:
+            allowed_activity_contracts.append("FastPlannerInputNeed")
+        elif isinstance(disposition, dict):
+            disposition["enum"] = [
+                value for value in disposition.get("enum", []) if value != "clarify"
+            ]
         if ordinary_speech_refs and not (committed_communicative or suppress_new_communicative):
             allowed_activity_contracts.insert(1, "FastPlannerResponseNeed")
         activity_items["oneOf"] = [
@@ -2893,6 +2937,28 @@ def fast_advance_response_schema(
                                     str(name)
                                     for name in realization.get("arguments") or []
                                 )
+                        source_schema = properties["args"].get("properties", {}).get("source")
+                        source_bindings_schema = (
+                            source_schema.get("properties", {}).get("bindings")
+                            if isinstance(source_schema, dict) else None
+                        )
+                        if isinstance(source_bindings_schema, dict):
+                            exact_source_bindings: dict[str, Any] = {}
+                            for item in responsibility_items:
+                                if item.local_ref not in compatible:
+                                    continue
+                                for binding_name, raw_value in item.bindings.items():
+                                    source_type = _resource_source_binding_type(capability, binding_name)
+                                    realization = _argument_realization_contract(capability, binding_name)
+                                    if source_type == "distance" and isinstance(realization, dict) and "source" in realization.get("arguments", []):
+                                        exact_source_bindings[source_type] = responsibility_binding_material_value(raw_value)
+                            if exact_source_bindings:
+                                source_bindings_schema["properties"] = {
+                                    name: {"const": value}
+                                    for name, value in sorted(exact_source_bindings.items())
+                                }
+                                source_bindings_schema["required"] = sorted(exact_source_bindings)
+                                source_schema["required"] = sorted(set(source_schema.get("required", [])) | {"bindings"})
                         grounded_parameters = trusted_grounded_parameters | bound_parameters | realized_parameters
                         input_properties = input_schema.get("properties")
                         if isinstance(input_properties, dict):

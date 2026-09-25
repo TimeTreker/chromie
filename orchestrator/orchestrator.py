@@ -6367,6 +6367,7 @@ class VoiceAssistant:
                 f"{receipt.dispatch_id if receipt is not None else 'immediate'}"
             ),
         )
+        self.sessions.track_capability_dispatch(session_id, result_task)
         result_tasks = getattr(self, "active_cognitive_runtime_tasks", None)
         if not isinstance(result_tasks, dict):
             result_tasks = {}

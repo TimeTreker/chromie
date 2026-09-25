@@ -149,7 +149,7 @@ class CapabilityDefinition(CapabilityIdentityModel):
     # Internal providers may need a bounded cleanup/ownership envelope beyond
     # the model-facing request ceiling. In particular, local speech must outlive
     # the configured playback-start barrier so Runtime cannot orphan synthesis.
-    timeout_ms: int = Field(default=30000, ge=1, le=300000)
+    timeout_ms: int = Field(default=30000, ge=1, le=900000)
     idempotent: bool = False
     requires_safety_monitor: bool = False
     cancellation_domains: tuple[CancellationDomain, ...] = ()

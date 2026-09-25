@@ -1,5 +1,42 @@
 # Chromie Current Status
 
+## Reported resource, Planner provenance, and long dispatch — 2026-09-25
+
+The two-turn user-reported milk episode has a focused current-revision
+live-text/MuJoCo pass. A text scene report receives a neutral `Got it.` rather
+than a first-person perception claim. UMI carries the milk, recipient, reported
+source place, and typed 50 m distance into the later pronoun request. Fast
+Planner produces one `soridormi.acquire_and_deliver_resource` Activity with
+`argument_sources={}` for the context-derived source, and no routine
+`stand_idle`. The provider reports completion and safe idle with no active
+task, and the Host session closes complete after 340.4 s. Soridormi's
+perception remains a simulation-only scene API, not camera evidence; ordinary
+turns do not automatically invoke that API. The first-turn neutral speech is
+truthful about the *user report*, not proof Chromie saw the bottle.
+
+The repair closes the observed false Planner source citation by recognizing
+provider argument realization from `source_location`/`source_distance` bindings
+in both Fast Schema and Host validation. It also removes an invented
+provider-owned coordinate clarification, aligns the named MCP/Host timeouts
+with the declared long skill, and prevents the Host idle sweeper from
+abandoning an accepted detached dispatch. Focused tests and the one-case live
+path passed. The semantic review harness remains pending; the focused verdict
+above includes manual inspection of UMI, Planner, Runtime, provider, and
+session evidence.
+
+The two relevant Level A classes passed 8/11; three legacy body-action
+references omit UMI's required `body_effect_family` and fail contract
+validation. The 76-case current-revision live cohort stopped at its first
+`compound_walk_nod_turn` after Fast Planner failed to cover two accepted
+Responsibilities; no physical Work ran in that case. The canonical local gate
+still fails at six pre-existing benchmark fixture cases (147 benchmark tests
+passed), before main tests. Four axes: **repair implemented; focused automatic
+and simulator verification passed; full target cohort and canonical gate
+failing/incomplete; development only**. No microphone, speaker, camera, or
+physical hardware qualification is claimed. Retained commands, identities,
+bundles, and next steps are in [Handoff](../HANDOFF.md) and the
+[Checkpoint](../DEVELOPMENT_CHECKPOINT.md).
+
 ## Responsibility association and natural interaction economy — 2026-09-24
 
 Owner discussion after the foreground-turn repair clarified the semantic split. UMI owns each

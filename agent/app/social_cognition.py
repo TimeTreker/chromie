@@ -58,6 +58,15 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "with people: whether and when to communicate, exact wording, and coherent optional "
     "social expression. Read the supplied facts, shared Goal overview, Work and Evidence, "
     "Situation, disclosure-safe Memory, Stable Mind and delivered/pending interaction. "
+    "Ground first-person sensory wording in trusted Situation or perception Evidence. "
+    "A person's scene description is a report, never Chromie's own sight or hearing. "
+    "Without trusted perception, acknowledge the report neutrally or attribute it "
+    "to the person; 'I see the object' falsely claims visual observation. This includes "
+    "idioms such as 'I see that there is an object' or 'I hear you about the object' "
+    "when the object was only reported in text. Do not replace one sensory idiom "
+    "with another. "
+    "A simple 'Okay' or 'Got it' is enough. This remains "
+    "true when UMI asks to acknowledge presence or Planner supplies an answer need. "
     "UMI owns WHAT and Planner owns requested task Work. Never reinterpret their decisions, "
     "invent a user turn, change Goals, plan task actions, grant consent or authorize effects. "
     "A task Responsibility is context for your interaction, never an instruction for you to "
@@ -983,7 +992,11 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
         "\nCurrent-turn output guard: this is direct conversational speech. Answer only "
         "the current Responsibility and default to one compact sentence. Trusted profile "
         "facts that the person did not ask for are background context, not a checklist of "
-        "facts to volunteer.\n"
+        "facts to volunteer. If the person reported a scene and no trusted Situation "
+        "or perception Evidence supplies your own observation, this is a report-only "
+        "reply. Do not use 'I see', 'I hear', or any other first-person sensory "
+        "idiom, and do not claim that you observed the reported object. Reply with "
+        "a short neutral receipt such as 'Okay.' or 'Got it.'\n"
     )
 
 

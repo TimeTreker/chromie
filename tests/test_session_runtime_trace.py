@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import tempfile
 import unittest
 from pathlib import Path
@@ -9,6 +10,36 @@ from orchestrator.runtime.session import SessionTracker
 
 
 class SessionRuntimeTraceTests(unittest.TestCase):
+    def test_idle_timeout_waits_for_accepted_capability_dispatch(self) -> None:
+        async def run() -> None:
+            tracker = SessionTracker(enabled=False)
+            sid = tracker.create()
+            release = asyncio.Event()
+            task = asyncio.create_task(release.wait())
+            tracker.track_capability_dispatch(sid, task)
+            state = tracker.state[sid]
+            state["last_activity_ms"] = 1000.0
+
+            self.assertEqual(
+                tracker.finalize_idle_sessions(
+                    idle_timeout_ms=500.0, now_ms_value=1600.0
+                ),
+                [],
+            )
+            self.assertFalse(state["interrupted"])
+            release.set()
+            await task
+            await asyncio.sleep(0)
+            self.assertEqual(state["pending_capability_dispatches"], 0)
+            self.assertEqual(
+                tracker.finalize_idle_sessions(
+                    idle_timeout_ms=500.0, now_ms_value=1600.0
+                ),
+                [sid],
+            )
+
+        asyncio.run(run())
+
     def test_session_trace_records_lifecycle_and_user_observable_milestone(self) -> None:
         with mock.patch.dict(
             "os.environ",

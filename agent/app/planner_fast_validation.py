@@ -895,6 +895,19 @@ def validate_fast_advance_output(
             for ref in activity.source_responsibility_refs
             for name, value in by_ref[ref].bindings.items()
         }
+        binding_grounded_parameters = set(authoritative_bindings)
+        for binding_name in authoritative_bindings:
+            realization = _argument_realization_contract(definition, binding_name)
+            if isinstance(realization, dict):
+                binding_grounded_parameters.update(
+                    str(name) for name in realization.get("arguments") or []
+                )
+        falsely_cited = binding_grounded_parameters.intersection(activity.argument_sources)
+        if falsely_cited:
+            raise AuthoritativeGroundingValidationError(
+                "Fast Planner binding-grounded argument cannot cite the current UserTurn: "
+                f"{activity.capability_id}; arguments={','.join(sorted(falsely_cited))}"
+            )
         memory_parameters: set[str] = set()
         if activity.capability_id == "chromie.memory.retrieve_verified_tool_result":
             # The opaque evidence/tool identities come from trusted context,

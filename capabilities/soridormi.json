@@ -978,7 +978,7 @@
           "execution": {
             "can_run_parallel": false,
             "exclusive_group": "soridormi.robot_motion",
-            "timeout_s": 30.0,
+            "timeout_s": 660.0,
             "idempotent": false,
             "side_effect_free": false
           },

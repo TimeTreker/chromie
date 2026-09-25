@@ -66,6 +66,27 @@ class _RecordingInvoker:
 
 
 class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
+    def test_imports_bounded_long_running_resource_skill_timeout(self) -> None:
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [{
+            "skill_id": "acquire_and_deliver_resource",
+            "available": True,
+            "timeout_s": 660.0,
+            "parameters_schema": {"type": "object", "properties": {}},
+            "effects": ["physical_motion", "resource_delivery"],
+        }])
+        self.assertEqual(
+            registry.get("soridormi.acquire_and_deliver_resource").timeout_ms,
+            660000,
+        )
+        self.assertEqual(
+            CapabilityRequest(
+                capability_id="soridormi.acquire_and_deliver_resource",
+                timeout_ms=660000,
+            ).timeout_ms,
+            660000,
+        )
+
     def _runtime(self, invoker: _RecordingInvoker) -> CapabilityRuntime:
         registry = CapabilityRegistry()
         import_soridormi_capability_catalog(registry,
@@ -126,7 +147,12 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(
             requirements[1].field_assertions,
-            {"safe_idle": True, "active_task_present": False},
+            {
+                "safe_idle": True,
+                "active_task_present": False,
+                "emergency_stop": False,
+                "fallen": False,
+            },
         )
 
     async def test_named_skill_uses_opaque_plan_execute_contract(self) -> None:

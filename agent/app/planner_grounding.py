@@ -185,6 +185,22 @@ def _goal_binding_map(goal: dict[str, Any]) -> dict[str, dict[str, Any]]:
         }
     return bindings
 
+def _resource_source_binding_type(
+    capability: dict[str, Any], binding_name: str,
+) -> str | None:
+    """Map only declared physical-resource source roles to provider binding types."""
+
+    hints = capability.get("hints")
+    scope = hints.get("semantic_scope") if isinstance(hints, dict) else None
+    if not isinstance(scope, dict) or scope.get("responsibility_type") != "acquire_and_deliver_resource":
+        return None
+    return {
+        "location": "location", "source_location": "location",
+        "distance": "distance", "source_distance": "distance",
+        "direction": "direction", "source_direction": "direction",
+    }.get(_normalized_entity_type(binding_name))
+
+
 def _argument_realization_contract(
     capability: dict[str, Any],
     entity_type: str,
@@ -203,7 +219,7 @@ def _argument_realization_contract(
     contracts = hints.get("argument_realization")
     if not isinstance(contracts, dict):
         return None
-    normalized = _normalized_entity_type(entity_type)
+    normalized = _resource_source_binding_type(capability, entity_type) or _normalized_entity_type(entity_type)
     for contract in contracts.values():
         if not isinstance(contract, dict):
             continue

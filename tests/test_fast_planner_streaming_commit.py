@@ -319,6 +319,18 @@ def _structured_resource_catalog_capability() -> CatalogCapability:
     realization = {'physical_resource_entity': {'source_entity_type': 'entity', 'planner_owned': True, 'arguments': ['resource'], 'minimum_arguments': 1, 'contract': 'Conserve the exact entity inside resource.'}, 'physical_resource_location': {'source_entity_type': 'location', 'planner_owned': True, 'arguments': ['source'], 'minimum_arguments': 1, 'contract': 'Conserve the exact location inside source.'}, 'physical_resource_distance': {'source_entity_type': 'distance', 'planner_owned': True, 'arguments': ['source'], 'minimum_arguments': 1, 'contract': 'Conserve the exact distance inside source.'}, 'physical_resource_recipient': {'source_entity_type': 'recipient', 'planner_owned': True, 'arguments': ['recipient'], 'minimum_arguments': 1, 'contract': 'Conserve the exact recipient inside recipient.'}}
     return CatalogCapability(capability_id='soridormi.acquire_and_deliver_resource', agent_id='capability_agent', description='Acquire and deliver a physical resource.', input_schema={'type': 'object', 'properties': {'resource': {'type': 'object', 'properties': {'kind': {'type': 'string', 'enum': ['physical_object']}, 'description': {'type': 'string', 'minLength': 1}}, 'required': ['kind', 'description'], 'additionalProperties': False}, 'source': {'type': 'object', 'properties': {'status': {'type': 'string', 'enum': ['known']}, 'description': {'type': 'string'}, 'bindings': {'type': 'object'}}, 'required': ['status'], 'additionalProperties': False}, 'recipient': {'type': 'object', 'properties': {'description': {'type': 'string', 'minLength': 1}}, 'required': ['description'], 'additionalProperties': False}}, 'required': ['resource', 'source', 'recipient'], 'additionalProperties': False}, effects=['physical_motion', 'resource_delivery'], available=True, interaction_executable=True, prompt_tier='common', hints={'semantic_scope': {'responsibility_type': 'acquire_and_deliver_resource', 'resource_kinds': ['physical_object']}, 'argument_realization': realization})
 
+
+def _provider_owned_structured_resource_capability() -> CatalogCapability:
+    capability = _structured_resource_catalog_capability()
+    return capability.model_copy(update={
+        "hints": {
+            **capability.hints,
+            "resource_contract": {
+                "provider_owns": ["source_resolution", "navigation", "perception"],
+            },
+        },
+    })
+
 def _weather_information_catalog_capability() -> CatalogCapability:
     return CatalogCapability(
         capability_id='chromie.weather.lookup',
@@ -451,6 +463,17 @@ def _contextual_structured_resource_output() -> dict[str, Any]:
     }
 
 
+def _contextual_resource_with_source_role_bindings() -> CognitiveWorkRequest:
+    request = _contextual_structured_resource_request()
+    responsibility = request.responsibilities[0]
+    bindings = dict(responsibility.bindings)
+    bindings["source_location"] = bindings.pop("location")
+    bindings["source_distance"] = bindings.pop("distance")
+    return request.model_copy(update={
+        "responsibilities": [responsibility.model_copy(update={"bindings": bindings})],
+    })
+
+
 def test_fast_schema_forbids_current_turn_source_spans_for_binding_grounded_resource_args() -> None:
     from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
 
@@ -466,6 +489,80 @@ def test_fast_schema_forbids_current_turn_source_spans_for_binding_grounded_reso
     argument_sources = activity["properties"]["argument_sources"]
     assert argument_sources["properties"] == {}
     assert argument_sources["additionalProperties"] is False
+
+
+def test_fast_schema_forbids_false_source_span_for_inherited_source_role_bindings() -> None:
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
+
+    request = _contextual_resource_with_source_role_bindings()
+    capability = _provider_owned_structured_resource_capability().model_dump(mode="json")
+    schema = fast_streaming_advance_response_schema(
+        ["fetch"], responsibilities=request.responsibilities,
+        capabilities=[capability],
+        meaning_uncertainties=[],
+        source_token_refs=[item["ref"] for item in _source_tokens(request.text)],
+        language=request.language,
+    )
+    activity = schema["properties"]["activities"]["items"]
+    assert activity["properties"]["role"]["enum"] == ["capability"]
+    assert "clarify" not in schema["properties"]["disposition"]["enum"]
+    assert activity["properties"]["argument_sources"]["properties"] == {}
+    source_bindings = activity["properties"]["args"]["properties"]["source"]["properties"]["bindings"]
+    assert source_bindings["properties"]["distance"] == {"enum": [{"value": 50, "unit": "meters"}]}
+    assert source_bindings["required"] == ["distance"]
+    valid = _contextual_structured_resource_output()
+    assert Draft202012Validator(schema).is_valid(valid)
+    wrong_shape = json.loads(json.dumps(valid))
+    wrong_shape["activities"][0]["args"]["source"]["bindings"]["distance"] = "50 meters"
+    assert not Draft202012Validator(schema).is_valid(wrong_shape)
+    invalid = json.loads(json.dumps(valid))
+    invalid["activities"][0]["argument_sources"] = {
+        "source": {"source_start_token_ref": "t4", "source_end_token_ref": "t10"},
+    }
+    assert not Draft202012Validator(schema).is_valid(invalid)
+
+
+def test_fast_schema_does_not_offer_provider_owned_resource_as_missing_input() -> None:
+    request = _contextual_resource_with_source_role_bindings()
+    schema = fast_streaming_advance_response_schema(
+        ["fetch"], responsibilities=request.responsibilities,
+        capabilities=[
+            _provider_owned_structured_resource_capability().model_dump(mode="json"),
+            _nod_catalog_capability().model_dump(mode="json"),
+        ],
+        meaning_uncertainties=[],
+        language=request.language,
+    )
+    clarification = schema["properties"]["activities"]["items"]["oneOf"][-1]
+    gap = clarification["properties"]["information_gaps"]["items"]
+    allowed = {
+        reference
+        for variant in gap.get("oneOf", [gap])
+        for reference in variant["properties"]["source_reference"].get("enum", [])
+    }
+    assert "soridormi.acquire_and_deliver_resource" not in allowed
+
+
+def test_fast_host_rejects_current_turn_citation_for_inherited_source_role_bindings() -> None:
+    from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import _source_tokens
+
+    request = _contextual_resource_with_source_role_bindings()
+    end_ref = _source_tokens(request.text)[-1]["ref"]
+    responsibility = CognitiveResponsibilityProposal.model_validate({
+        **request.responsibilities[0].model_dump(mode="json"),
+        "source_evidence": {"source_start_token_ref": "t0", "source_end_token_ref": end_ref},
+    })
+    request = request.model_copy(update={"responsibilities": [responsibility]})
+    invalid = _contextual_structured_resource_output()
+    invalid["activities"][0]["argument_sources"] = {
+        "source": {"source_start_token_ref": "t4", "source_end_token_ref": end_ref},
+    }
+    with pytest.raises(AuthoritativeGroundingValidationError, match="binding-grounded argument"):
+        validate_fast_advance_output(
+            FastPlannerAdvanceModelOutput.model_validate(invalid),
+            request=request, responsibilities=request.responsibilities,
+            capabilities=[_structured_resource_catalog_capability().model_dump(mode="json")],
+        )
 
 
 @pytest.mark.asyncio
@@ -493,6 +590,19 @@ async def test_fast_stream_accepts_contextual_resource_bindings_without_fake_cur
     assert activity.args["source"]["bindings"]["distance"] == {
         "value": 50, "unit": "meters"
     }
+
+
+@pytest.mark.asyncio
+async def test_fast_stream_accepts_inherited_source_role_bindings_without_span() -> None:
+    request = _contextual_resource_with_source_role_bindings()
+    model = _StreamingModel([_wire_output(_contextual_structured_resource_output())])
+    frames = [
+        frame async for frame in FastPlannerResolver(
+            model, _Catalog([_structured_resource_catalog_capability()])
+        ).stream_advance(request)
+    ]
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    assert frames[-1].advance.activities[0].argument_sources == {}
 
 @pytest.mark.asyncio
 async def test_fast_stream_filters_incompatible_information_capability_before_generation() -> None:

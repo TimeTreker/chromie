@@ -1,5 +1,58 @@
 # Chromie Development Checkpoint
 
+## Reported-resource dialogue and long dispatch repair — 2026-09-25
+
+Pre-delivery Chromie base `b0c2dfec004a082702f71d14148791aefd67a5bf`
+on `main` matched fetched `origin/main`. Resume from the latest `main` commit
+containing this checkpoint and Handoff. Soridormi checkout
+`531268c53c1029ab4875ddeb623046314e48ab4b` remains unchanged; the running
+MCP source identifies `5d235b8aee35efd4788b0dd1de791753275618f9`.
+
+The retained two-turn report → milk delivery exposed four boundaries. Social
+Cognition treated a user text report as first-person perception. Fast Planner's
+resource argument mapping failed to recognize `source_location` and
+`source_distance` bindings, allowing a false current-turn citation; its input-gap
+schema similarly offered provider-owned source/recipient coordinates as missing
+human input. The checked-in Soridormi execute-plan timeout and Host request
+ceilings were shorter than the combined skill's declared bound. Finally, the
+Host idle sweeper abandoned the session during a valid long detached dispatch.
+This patch strengthens report-only speech/UMI source-role guidance, projects and
+validates binding-grounded Planner arguments without current-turn provenance,
+constrains the typed source distance, excludes satisfied provider-owned input
+gaps, keeps the plan to its sufficient resource-delivery Activity, aligns bounded
+timeouts, and keeps sessions live until their accepted dispatch resolves.
+Soridormi owns its final safe posture; no extra `stand_idle` Work is needed.
+
+Current-revision focused live text + MuJoCo evidence in
+`.chromie/acceptance/reported-milk-fix9-20260925` passed mechanically and was
+manually reviewed: first reply `Got it.`, second-turn UMI preserved bottle,
+recipient, `source_location=in front of you`, and typed 50 m
+`source_distance`; Fast Planner emitted one acquire/deliver Activity with
+`argument_sources={}`; Soridormi completed, reported `safe_idle=true` and no
+active task; the Host session ended `complete` after 340.4 s. The harness's
+semantic reviewer remains pending, so this is a manually adjudicated focused
+simulator result, not cohort or physical voice qualification. Its bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260925_135912.tar.gz`.
+The full 76-case live cohort on the same candidate stopped at case 1/76:
+`compound_walk_nod_turn` failed Fast Planner Responsibility coverage before
+physical execution. Retained evidence:
+`.chromie/acceptance/aggregate-candidate9-20260925` and
+`/home/chromie/Downloads/chromie_debug_bundle_20260925_140141.tar.gz`.
+The cohort is incomplete and the default target-evidence profile remains open.
+
+Final focused UMI/Planner/Session/Provider regressions passed 364 tests/165
+subtests. Repository policy, test-ownership, docs and scenario-library checks
+passed. The two relevant Level A classes passed 8/11; three older reference
+cases fail the current UMI contract because body-action fixtures omit
+`body_effect_family`. The canonical
+`./scripts/run_tests.sh` still stopped at the pre-existing benchmark fixture
+drift (6 failed/147 passed); later stages did not run. Next: diagnose the
+compound case from the retained aggregate, rerun its focused general-ability
+class and the complete live cohort on one unchanged candidate, then close the
+canonical gate and target evidence. Ordinary turns still do not invoke the
+simulator observation adapter; this repair does not claim camera, microphone,
+speaker, physical robot, or automatic water-finding behavior.
+
 ## Simulation scene object-set adapter — 2026-09-25
 
 Pre-delivery Chromie base `6e51ad2a443e0bc7d6dcf47f8f109a8f6ad33e69` on

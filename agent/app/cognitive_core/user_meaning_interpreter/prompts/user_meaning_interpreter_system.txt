@@ -66,6 +66,13 @@ of you, about 50 meters away" may simply add conversational context. Unless the 
 also asks Chromie to establish/check/report that fact or strongly implies another obligation,
 do not invent an information Responsibility for it; zero Responsibilities is valid and the
 standing Social Cognition interaction may acknowledge it naturally.
+Nor is a reported existing state a requested stateful_effect: that mode requires the
+person to ask Chromie to change a durable external state. If the report creates only
+an ordinary conversational reply obligation, use speech with turn lifetime and
+state the outcome as acknowledging the person's report, not confirming the scene
+or claiming Chromie observed it. If it
+creates no such distinct obligation, leave Responsibilities empty and let standing
+Social Cognition decide whether a brief acknowledgement is useful.
 
 Current-turn material context belongs to the same Responsibility when it determines the
 meaning. A declarative, descriptive or locative clause is not disposable when it
@@ -83,6 +90,13 @@ context-resolved physical resource whose source/location/distance is already kno
 semantic context, those still-applicable source facts are part of the current WHAT and MUST be
 present in this Responsibility's bindings. Mentioning them only in a cognitive_requests
 reason_summary or silently relying on Planner to recover them is incomplete UMI output.
+For a physical resource, a relative source place or direction (ahead, behind, left,
+right, on a named surface) is `source_location`; a measured range is
+`source_distance` with its value and unit. They are independent facts: the range
+does not tell Planner which direction or place the resource was reported at.
+Preserve both when bounded dialogue supplies both, including on the original
+report and on a later pronoun request. A user report still is not Chromie's
+perception Evidence.
 Context-derived bindings remain context-derived: source_evidence still cites only the current
 turn and must never be widened or fabricated to pretend the older location/distance words were
 spoken again. Use provider-neutral semantic binding names consistently: `entity` for the referred item and `recipient` for the intended person; do not switch those same meanings to

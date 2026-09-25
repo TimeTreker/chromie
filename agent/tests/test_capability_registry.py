@@ -58,6 +58,7 @@ def test_checked_in_soridormi_manifest_preserves_safety_contract() -> None:
     named_list = registry.get_tool("soridormi.skill.list")
     named_plan = registry.get_tool("soridormi.skill.create_plan")
     named_execute = registry.get_tool("soridormi.skill.execute_plan")
+    assert named_execute.execution.timeout_s == 660.0
     task_capabilities = registry.get_tool("soridormi.task.get_capabilities")
     task_preview = registry.get_tool("soridormi.task.preview")
     task_submit = registry.get_tool("soridormi.task.submit")

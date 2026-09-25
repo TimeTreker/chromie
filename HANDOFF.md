@@ -1,5 +1,80 @@
 # Chromie Handoff
 
+## Reported milk and detached-dispatch delivery — 2026-09-25
+
+Chromie `/home/chromie/github/chromie` is on `main`, pre-delivery base
+`b0c2dfec004a082702f71d14148791aefd67a5bf`, fetched and equal to
+`origin/main` before editing. Resume from the latest commit containing this
+Handoff and Checkpoint, then fetch before further development. Paired Soridormi
+`/home/chromie/github/soridormi` is clean on `main` at
+`531268c53c1029ab4875ddeb623046314e48ab4b`; the MCP service reports
+source `5d235b8aee35efd4788b0dd1de791753275618f9`. This delivery changes
+Chromie only. The Soridormi default scenario was reset to its initial bottle
+10 m ahead/user 1.5 m right before each physical rerun and after the final
+delivery; no scene asset or Soridormi source was modified.
+
+Implementation: UMI now explicitly preserves reported relative source place
+and measured distance separately, including across a pronoun. SC receives a
+report-only truth guard for visual/auditory claims. Planner's resource-role
+mapping recognizes `source_location`/`source_distance`, its dynamic Schema
+requires the exact typed distance and withholds a provider-owned resource from
+the missing-user-input clarification choices, while Host validation rejects
+current-turn citation for binding-grounded arguments. The common Work contract
+omits routine idle cleanup because Soridormi already ends standing/safe idle.
+The execute-plan MCP manifest timeout is 660 s and Host capability definition
+and request bounds admit it up to 900 s. `SessionTracker` protects a session
+from the 120 s idle sweeper while its accepted detached capability result task
+is unresolved; normal idle finalization resumes when that task ends. New live
+general-ability case:
+`scenarios/general_ability/must_pass/truthful_embodied_speech/reported_milk_then_delivery.json`.
+
+Current candidate identity:
+`/tmp/chromie-live-candidate9-identity-20260925.json` verified equal Agent
+container/host source digest `ab35edfe8c3fa20251bf5a0d505dbe49d1db889689e127b9f82c55ecaef7dedb`.
+Focused live command used:
+`python scripts/general_ability_acceptance.py --mode live-text --only-case reported_milk_then_delivery --execute --capability-timeout-s 0 --timeout-s 420 --case-timeout-s 700 --soridormi-repo /home/chromie/github/soridormi --runtime-identity /tmp/chromie-live-candidate9-identity-20260925.json --evidence-dir .chromie/acceptance/reported-milk-fix9-20260925 --json`.
+Result: one case mechanically passed, semantic reviewer pending. Manual review
+found the first `Got it.`, the later UMI bindings
+`entity=bottle of milk`, `recipient=user`, `source_location=in front of you`,
+`source_distance={value:50,unit:meters}`, one Planner acquire/deliver Activity,
+empty `argument_sources`, Soridormi `completed`, post-status `safe_idle=true`
+and `active_task_present=false`, and `session_done: state=complete` at
+340,408.8 ms. No `stand_idle` Activity. Evidence and one post-run bundle:
+`.chromie/acceptance/reported-milk-fix9-20260925`,
+`/home/chromie/Downloads/chromie_debug_bundle_20260925_135912.tar.gz`.
+
+Same-candidate complete live invocation (without `--only-case`) stopped at
+case 1/76, `compound_walk_nod_turn`: Fast Planner omitted terminal Activities
+for `r4,r5`, so Host rejected the plan and no robot Work ran. The cohort is
+incomplete; retain `.chromie/acceptance/aggregate-candidate9-20260925` and
+`/home/chromie/Downloads/chromie_debug_bundle_20260925_140141.tar.gz`.
+The earlier unchanged baseline also stopped at case 1/75 on the 300 s Host
+capability-definition ceiling; the candidate closes that mechanical timeout
+for the milk skill but not this separate compound-planning defect.
+
+Observed local checks: `PYTHONPATH=agent:. python -m pytest -q
+tests/test_user_meaning_interpreter_material_context.py
+tests/test_user_meaning_interpreter_llm_prompt.py
+tests/test_fast_planner_streaming_commit.py tests/test_fast_planner_pr3.py
+tests/test_session_runtime_trace.py tests/test_soridormi_capability_provider.py
+agent/tests/test_capability_registry.py` → 364 passed/165 subtests; `python
+scripts/check_repository_policies.py`, `python scripts/check_test_ownership.py`,
+`python scripts/check_docs.py`, and
+`python scripts/general_ability_acceptance.py --mode check` passed.
+`python scripts/general_ability_acceptance.py --mode level-a --ability-class
+truthful_embodied_speech --ability-class composable_action_planning` passed
+8/11; three older body-action references omit the now-required UMI
+`body_effect_family` and fail before the intended ability assertion.
+`./scripts/run_tests.sh` failed at maintained benchmark dataset validation,
+6 failed/147 passed, before main tests. A physical voice run was not performed.
+Next resume:
+inspect the aggregate compound case's accepted UMI Responsibilities and raw
+Fast Planner result; fix its earliest owner, then rerun the focused ability,
+the full same-revision cohort, canonical gates, and current-revision target
+profile before a broader correctness claim. The simulator's
+`soridormi.robot.observe_scene` remains an explicit simulation-only adapter;
+ordinary conversation still does not automatically call it.
+
 ## Simulation object-set adapter delivery — 2026-09-25
 
 Chromie checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery

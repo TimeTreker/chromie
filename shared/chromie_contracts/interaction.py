@@ -903,7 +903,7 @@ class CapabilityRequest(CapabilityIdentityModel):
     capability_version: str | None = None
     args: dict[str, Any] = Field(default_factory=dict)
     timing: CapabilityTiming = "parallel"
-    timeout_ms: int | None = Field(default=None, ge=1, le=120000)
+    timeout_ms: int | None = Field(default=None, ge=1, le=900000)
     cancellable: bool = True
     requires_confirmation: bool = False
     idempotency_key: str | None = None

@@ -106,14 +106,22 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "modifier and relation. One Responsibility may require several Activities. "
     "Use exact numeric values when the Capability units agree; normalize number words "
     "and units only when the interpretation and conversion are unambiguous. Never "
-    "substitute a default for an explicit requested value. For an intent-derived "
-    "argument in Fast Activities, select its exact immutable source span as "
+    "substitute a default for an explicit requested value. For a Fast Activity "
+    "argument derived directly from the current UserTurn rather than a typed "
+    "binding, select its exact immutable source span as "
     "argument_sources[parameter]={source_start_token_ref,source_end_token_ref} from "
     "the supplied UserTurn source_tokens. Never copy or paraphrase the source wording. "
     "Trusted code materializes the span into canonical source_quote and Goal provenance; "
     "you remain responsible for correct mapping, conversion and coverage. "
     "Existing typed Responsibility and Goal constraints remain binding and cannot be "
-    "overridden by a Planner HOW choice or a quote. Treat each Capability input schema as "
+    "overridden by a Planner HOW choice or a quote. "
+    "A typed Responsibility binding may come from earlier conversational context. "
+    "Realize that binding into the declared Capability argument, but never cite "
+    "current UserTurn tokens as its source. Binding-grounded arguments do not "
+    "need argument_sources. When a physical resource source_distance binding is a "
+    "value/unit object, preserve that exact object in source.bindings.distance; a "
+    "formatted distance string loses the typed value. "
+    "Treat each Capability input schema as "
     "the action template: required fields must be supplied; an optional field with a "
     "declared default may be omitted when that default is suitable, in which case trusted "
     "Runtime/provider realization owns the default. Schema metadata such as type, enum, "
@@ -853,6 +861,11 @@ def fast_advance_layered_prompt(
         "Generic speech and stop/emergency are not task Capabilities. "
         "Clarification requires a real user-resolvable blocker after considering authoritative "
         "context, observation/query, preference, schema defaults and safe bounded defaults. "
+        "Respect each selected Capability's resource_contract.provider_owns. When the "
+        "recipient is already bound and the provider owns perception, navigation and "
+        "handover, do not ask the person for coordinates or internal route details "
+        "that its input schema does not require. A request to clarify must concern a "
+        "genuinely missing required human input, never provider-owned execution HOW. "
         "Each gap cites exact unresolved_meaning or execution_input Capability, required_for and "
         "resolution_sources_considered. Supplied bindings/defaults are not missing. "
         "Preserve every UMI unresolved item; independent siblings may proceed as mixed. "
@@ -1031,6 +1044,7 @@ def fast_advance_capability_prompt_projection(
                 "delivery_modes",
                 "domain",
                 "acquisition",
+                "source_resolution",
                 "supported_temporal_scopes",
                 "unsupported_temporal_scopes",
             )
@@ -1061,6 +1075,7 @@ def fast_advance_capability_prompt_projection(
                 "plan_requires",
                 "plan_provides",
                 "completion_requires",
+                "provider_owns",
             )
             if (value := resource_contract.get(key)) not in (None, "", [])
         }

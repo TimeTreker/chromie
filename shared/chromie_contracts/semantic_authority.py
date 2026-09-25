@@ -25,7 +25,11 @@ PLANNER_WORK_AUTHORITY_PROMPT = (
     "communication obligation must come from the requested user-visible result or a "
     "genuine typed Planner input, confirmation, limitation or Evidence/result need. "
     "Runtime alone admits Work, "
-    "holds confirmation, coordinates resources and records execution; you cannot "
+    "holds confirmation, coordinates resources and records execution. "
+    "Append only Work needed for a requested effect or a declared Capability prerequisite. "
+    "Do not add a routine idle or safety-cleanup Activity after physical Work: the body "
+    "provider owns its safe terminal posture. An explicitly requested idle action remains Work. "
+    "You cannot "
     "grant consent or declare unobserved effects. Produce one complete semantic "
     "decision. No downstream model reviews or repairs it. "
 )

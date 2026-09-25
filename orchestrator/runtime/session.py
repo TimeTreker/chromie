@@ -250,6 +250,7 @@ class SessionTracker:
             "skipped_tts": 0,
             "llm_done": False,
             "pending_social_tasks": 0,
+            "pending_capability_dispatches": 0,
             "social_task_failures": [],
             "done_logged": False,
             "flow_summary_logged": False,
@@ -678,6 +679,20 @@ class SessionTracker:
 
         task.add_done_callback(finished)
 
+    def track_capability_dispatch(self, sid: str | None, task: asyncio.Task[Any]) -> None:
+        """Keep a session live while its accepted provider dispatch is unresolved."""
+        state = self.state.get(sid or "")
+        if state is None:
+            return
+        state["pending_capability_dispatches"] = int(
+            state.get("pending_capability_dispatches", 0)
+        ) + 1
+
+        def finished(_completed: asyncio.Task[Any]) -> None:
+            state["pending_capability_dispatches"] -= 1
+
+        task.add_done_callback(finished)
+
     def maybe_done(self, sid: str | None) -> None:
         if not sid:
             return
@@ -769,6 +784,8 @@ class SessionTracker:
         finalized: list[str] = []
         for sid, session in list(self.state.items()):
             if session.get("done_logged") or session.get("runtime_trace_finalized"):
+                continue
+            if session.get("pending_capability_dispatches", 0):
                 continue
             last_activity = float(session.get("last_activity_ms", session.get("t0_ms", current)))
             if current - last_activity < float(idle_timeout_ms):
