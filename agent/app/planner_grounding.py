@@ -15,6 +15,39 @@ _NUMERIC_LITERAL_RE = re.compile(
 )
 _LIST_LITERAL_SEPARATOR_RE = re.compile(r"[,，;；、]")
 
+
+def provider_resolves_required_source(capability: dict[str, Any], parameter: str) -> bool:
+    """Recognize a source argument explicitly resolved by the provider."""
+
+    if parameter != "source":
+        return False
+    hints = capability.get("hints") or {}
+    if not isinstance(hints, dict):
+        return False
+    scope = capability.get("semantic_scope") or hints.get("semantic_scope") or {}
+    contract = capability.get("resource_contract") or hints.get("resource_contract") or {}
+    schema = capability.get("input_schema") or {}
+    if not isinstance(schema, dict):
+        return False
+    properties = schema.get("properties") or {}
+    if not isinstance(properties, dict):
+        return False
+    source_schema = properties.get("source") or {}
+    if not isinstance(source_schema, dict):
+        return False
+    source_properties = source_schema.get("properties") or {}
+    if not isinstance(source_properties, dict):
+        return False
+    status_schema = source_properties.get("status") or {}
+    return (
+        isinstance(scope, dict)
+        and scope.get("source_resolution") == "provider_owned"
+        and isinstance(contract, dict)
+        and {"source_resolution", "perception"}.issubset(set(contract.get("provider_owns") or []))
+        and isinstance(status_schema, dict)
+        and bool({"unknown", "provider_resolved"} & set(status_schema.get("enum") or []))
+    )
+
 def literal_intent_argument(value: Any, *, outcome: str, source_text: str) -> bool:
     """Check literal provenance, not the Planner's semantic argument mapping.
 

@@ -6811,5 +6811,95 @@ class FastPlannerResolverTests(unittest.TestCase):
         schema = FastPlannerAdvanceModelOutput.model_json_schema()
         self.assertNotIn("response_text", json.dumps(schema, sort_keys=True))
 
+    def test_provider_owned_resource_source_needs_no_user_span_or_location_gap(self):
+        capability = {
+            "capability_id": "soridormi.acquire_and_deliver_resource",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "resource": {"type": "object", "properties": {
+                        "kind": {"type": "string", "enum": ["physical_object"]},
+                        "description": {"type": "string"}},
+                        "required": ["kind", "description"], "additionalProperties": False},
+                    "source": {"type": "object", "properties": {
+                        "status": {"type": "string", "enum": ["known", "unknown", "provider_resolved"]},
+                        "description": {"type": "string"}},
+                        "required": ["status"], "additionalProperties": False},
+                    "recipient": {"type": "object", "properties": {
+                        "description": {"type": "string"}},
+                        "required": ["description"], "additionalProperties": False},
+                },
+                "required": ["resource", "source", "recipient"],
+                "additionalProperties": False,
+            },
+            "hints": {
+                "semantic_scope": {"source_resolution": "provider_owned"},
+                "resource_contract": {"provider_owns": ["source_resolution", "perception", "navigation"]},
+                "argument_realization": {
+                    "physical_resource_entity": {"source_entity_type": "entity", "planner_owned": True,
+                                                 "arguments": ["resource"], "minimum_arguments": 1},
+                    "physical_resource_recipient": {"source_entity_type": "recipient", "planner_owned": True,
+                                                    "arguments": ["recipient"], "minimum_arguments": 1},
+                },
+            },
+        }
+        work = _work_request(
+            sid="water-confirmation", text="Sure, water is perfect!", language="en-US",
+            responsibilities=[{"local_ref": "r1", "outcome": "bring water to the user",
+                               "output_mode": "body_action", "body_effect_family": "task_physical_effect",
+                               "bindings": {"entity": "water", "recipient": "user"}, "confidence": 1.0}],
+        )
+        schema = planner_schema.fast_streaming_advance_response_schema(
+            ["r1"], responsibilities=work.responsibilities, capabilities=[capability],
+            meaning_uncertainties=[], source_token_refs=[item["ref"] for item in user_turn_source_tokens(work.original_user_text)],
+        )
+        self.assertNotIn("clarify", schema["properties"]["disposition"]["enum"])
+        raw = {
+            "activities": [{"role": "capability", "capability_id": capability["capability_id"],
+                            "activity_id": "acquire-water", "args": {
+                                "resource": {"kind": "physical_object", "description": "water"},
+                                "source": {"status": "unknown"},
+                                "recipient": {"description": "user"}},
+                            "argument_sources": {}, "timing": "sequential",
+                            "source_responsibility_refs": ["r1"],
+                            "reason_summary": "Ask the provider to locate and bring water."}],
+            "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+            "continuations": [], "confidence": 1.0, "unresolved": [],
+            "reason_summary": "Provider resolves the source.",
+        }
+        self.assertEqual(list(Draft202012Validator(schema).iter_errors(raw)), [])
+        planner_fast_validation.validate_fast_advance_output(
+            FastPlannerAdvanceModelOutput.model_validate(raw), request=work,
+            responsibilities=work.responsibilities, capabilities=[capability],
+        )
+        cited = copy.deepcopy(raw)
+        cited["activities"][0]["argument_sources"] = {
+            "source": {"source_start_token_ref": "t2", "source_end_token_ref": "t2"}}
+        self.assertTrue(list(Draft202012Validator(schema).iter_errors(cited)))
+        invented = copy.deepcopy(raw)
+        invented["activities"][0]["args"]["source"] = {
+            "status": "known", "description": "on the left table"}
+        with self.assertRaisesRegex(planner_fast_validation.AuthoritativeGroundingValidationError, "unbound provider-resolved source"):
+            planner_fast_validation.validate_fast_advance_output(
+                FastPlannerAdvanceModelOutput.model_validate(invented), request=work,
+                responsibilities=work.responsibilities, capabilities=[capability],
+            )
+        gap = FastPlannerAdvanceModelOutput.model_validate({
+            **raw, "activities": [{"role": "clarification", "activity_id": "ask-location",
+                                  "source_responsibility_refs": ["r1"], "timing": "sequential",
+                                  "information_gaps": [{"gap_id": "gap-source", "description": "Where is it?",
+                                                        "required_for": ["source"],
+                                                        "preferred_resolution": "ask_user",
+                                                        "source_kind": "execution_input",
+                                                        "source_reference": capability["capability_id"],
+                                                        "resolution_sources_considered": ["authoritative_context", "capability_schema"]}]}],
+            "disposition": "clarify", "coverage": "partial", "unresolved": ["source"],
+        })
+        with self.assertRaisesRegex(PlannerDTOContractError, "provider-resolved source"):
+            planner_fast_validation.validate_fast_advance_output(
+                gap, request=work, responsibilities=work.responsibilities,
+                capabilities=[capability],
+            )
+
 if __name__ == "__main__":
     unittest.main()

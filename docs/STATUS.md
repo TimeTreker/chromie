@@ -1,5 +1,47 @@
 # Chromie Current Status
 
+## Thirst confirmation and provider-owned water source — 2026-09-25
+
+The retained two-turn text episode in
+`/home/chromie/Downloads/chromie_debug_bundle_20260925_160205.tar.gz`
+had a correct first-turn offer and a correct second-turn UMI body Responsibility
+with `entity=water`, `recipient=user`. Fast Planner's dynamic Schema treated
+Soridormi's required but provider-resolved `source` argument as a missing user
+location and required a current-turn token citation. The model therefore emitted
+an acquire/deliver Activity, a false `source` citation to the word `water`, and
+contradictory location clarifications. Host validation rejected the Plan before
+any Soridormi dispatch. The source Schema and Host now recognize the declared
+provider-owned source: an unbound source is only `status=unknown`, has no
+current-turn citation, and cannot become a user input gap. A focused production-
+shaped Gemma replay produced one valid resource Activity without clarification;
+DTO and Host validation accepted it. This is focused role evidence, not a new
+live Host result.
+
+The paired Soridormi default scene has three equivalent water markers 5 m left.
+Its simulation-only provider now selects the nearest equivalent resource and
+holds its object reference, while still requiring a unique recipient. The
+normal locomotion command could not finish that lateral route within 300 s;
+three isolated MuJoCo runs timed out safely. A bounded `fast_limited` probe
+completed approach 5.0→0.898 m and return 5.737→0.883 m with mock delivery
+and safe idle. The provider now defaults to normal pace and raises a non-slow
+command within the advertised presets only when observed progress predicts a
+route deadline miss. An isolated default-pace run completed approach
+5.0→0.899 m in 144.13 s and return 5.738→0.900 m in 198.85 s, recording
+pace recovery on both legs, mock delivery, `safe_idle=true`, and no active task.
+These are direct Soridormi MuJoCo results on dirty source, not camera,
+physical handling, or a Chromie conversation.
+
+Two new live-text scenarios retain the original thirst confirmation and a
+direct water request; scenario discovery passed. The existing text Host holds
+the exclusive qualification lock, so a full current-revision live cohort and
+the selected end-to-end cases were not run. Chromie's focused Planner tests
+passed; the canonical gate still fails at the previously recorded six
+benchmark fixture errors, and Level A robust-intent/composable planning fails
+four older UMI fixtures missing `body_effect_family`. Four axes: **source
+implementation updated; focused Schema/Host and isolated simulator evidence
+passed with broader local failures; current-revision deployed text/voice proof
+unrun; default target qualification open**.
+
 ## Text console input during active Work — 2026-09-25
 
 The maintained local text client now accepts another line while an earlier

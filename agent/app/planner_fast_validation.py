@@ -55,6 +55,7 @@ from .planner_grounding import (
     _material_values_equal,
     literal_intent_argument,
     missing_argument_realizations,
+    provider_resolves_required_source,
     semantic_numeric_values,
 )
 from .planner_model_contract import PlannerDTOContractError, PlannerTier
@@ -775,6 +776,11 @@ def validate_fast_advance_output(
                             "Planner cannot ask for an input with a Capability "
                             f"schema default: {gap.source_reference}.{parameter}"
                         )
+                    if provider_resolves_required_source(definition, parameter):
+                        raise PlannerDTOContractError(
+                            "Planner cannot ask the user for a provider-resolved "
+                            f"source: {gap.source_reference}.{parameter}"
+                        )
                     if parameter in bound_names:
                         raise PlannerDTOContractError(
                             f"Planner cannot ask for an already-bound input: {parameter}"
@@ -903,6 +909,10 @@ def validate_fast_advance_output(
                     str(name) for name in realization.get("arguments") or []
                 )
         falsely_cited = binding_grounded_parameters.intersection(activity.argument_sources)
+        falsely_cited.update(
+            parameter for parameter in activity.argument_sources
+            if provider_resolves_required_source(definition, parameter)
+        )
         if falsely_cited:
             raise AuthoritativeGroundingValidationError(
                 "Fast Planner binding-grounded argument cannot cite the current UserTurn: "
@@ -1019,6 +1029,14 @@ def validate_fast_advance_output(
                             f"{activity.capability_id}.{parameter}="
                             + ",".join(sorted(missing_sources))
                         )
+                continue
+            if provider_resolves_required_source(definition, parameter):
+                source_value = activity.args.get(parameter)
+                if source_value not in ({"status": "unknown"}, {"status": "provider_resolved"}):
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner unbound provider-resolved source must contain "
+                        f"only its unresolved status: {activity.capability_id}.{parameter}"
+                    )
                 continue
             derivation = _argument_derivation_contract(definition, parameter)
             if derivation is not None:

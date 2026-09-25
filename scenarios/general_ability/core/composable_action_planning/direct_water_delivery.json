@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "direct_water_delivery",
+  "stage": "core",
+  "difficulty": "medium",
+  "rationale": "A direct request for water should use the advertised complete physical delivery capability even when the user supplies no source location.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": ["typed_schema_and_runtime_contracts", "safety_authorization_capability_and_execution_evidence", "provenance_and_llm_integrity"],
+    "semantic_dimensions": ["intent_understanding", "plan_completeness"],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": ["intent_understanding", "plan_completeness"],
+    "primary_outcomes": ["Request physical water acquisition and delivery to the user using provider-owned source resolution."],
+    "acceptable_auxiliary": ["Brief speech may accompany the action."],
+    "forbidden_semantic_outcomes": ["Invent a user-specified source location.", "Ask the user where water is when the selected provider owns locating it.", "Claim physical handover without provider completion evidence."],
+    "verdicts": ["pass", "partial", "fail", "insufficient_evidence"]
+  },
+  "text": "Chromie, please bring me some water.",
+  "language": "en-US",
+  "expected_capabilities": ["soridormi.acquire_and_deliver_resource"],
+  "forbidden_capabilities": ["soridormi.stand_idle"],
+  "require_speech": true,
+  "description": "Direct physical water delivery with no user-given source location.",
+  "general_ability": {
+    "memberships": [{
+      "id": "composable_action_planning",
+      "title": "Composable High-Level Action Planning",
+      "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
+      "rationale": "The complete provider skill owns finding, walking, and terminal posture for physical water delivery.",
+      "root_cause_boundaries": ["Cognitive Core/user meaning interpretation", "Agent contract", "Trusted Capability Runtime/provider", "Test evidence"]
+    }]
+  }
+}

@@ -43,6 +43,7 @@ from .planner_grounding import (
     _normalized_entity_type,
     _resource_source_binding_type,
     literal_intent_argument,
+    provider_resolves_required_source,
     semantic_numeric_values,
 )
 from .planner_model_contract import (
@@ -2663,6 +2664,8 @@ def fast_advance_response_schema(
                     item: CognitiveResponsibilityProposal,
                     name: str,
                 ) -> bool:
+                    if provider_resolves_required_source(capability, name):
+                        return True
                     if name in item.bindings:
                         return True
                     return any(
@@ -2722,6 +2725,7 @@ def fast_advance_response_schema(
                             for name in input_schema.get("required") or []
                             if isinstance(input_properties.get(str(name)), dict)
                             and "default" not in input_properties[str(name)]
+                            and not provider_resolves_required_source(capability, str(name))
                             # A typed semantic binding may realize a structured
                             # provider argument through argument_realization.
                             # Neither form is a missing user input.
@@ -2983,6 +2987,7 @@ def fast_advance_response_schema(
                                 name
                                 for name in required_inputs
                                 if name not in grounded_parameters
+                                and not provider_resolves_required_source(capability, name)
                                 and isinstance(input_properties.get(name), dict)
                                 and (input_properties[name].get("type")
                                      in ("number", "integer", "boolean", "object", "array")
@@ -2996,6 +3001,7 @@ def fast_advance_response_schema(
                                     for name in sorted(input_properties)
                                     if name not in index_grounded_parameters
                                     and name not in grounded_parameters
+                                    and not provider_resolves_required_source(capability, name)
                                 },
                                 "required": required_source_inputs,
                                 "additionalProperties": False,

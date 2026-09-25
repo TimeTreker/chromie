@@ -1,5 +1,60 @@
 # Chromie Development Checkpoint
 
+## Thirst confirmation, provider source, and water route — 2026-09-25
+
+Pre-delivery Chromie base `c97aab36eb97217b15b7d9932157da55180caaeb`
+on `main` and paired Soridormi base `2d8296ee61ac1d4383310680db25109c84aba5e5`
+on `main` matched their fetched upstream before editing. Resume from the
+latest delivery commit containing this checkpoint and Handoff; fetch both
+remotes before further development. The active aggregate compound-planning
+Issue and default target-evidence gate remain open.
+The paired Soridormi delivery is `df74003230f0104784823d74cd066adb6fc84597`
+on pushed `origin/main`.
+
+The retained 16:02 thirst episode's first turn correctly offered water; the
+second UMI/GA/SC path produced a water body Responsibility and a neutral
+acknowledgment. Fast Planner's dynamic Schema then misclassified the
+provider-owned `source` as a missing user location and demanded a current-turn
+token citation. It emitted one acquire/deliver Activity plus contradictory
+source/recipient clarification and falsely cited `water` for the source. The
+Host rejected the Plan before Soridormi dispatch. The repair projects the
+existing Soridormi source-resolution/perception contract into Fast Schema and
+Host: unbound source can be only `status=unknown` or `provider_resolved`, with
+no current-turn citation or location clarification. A production-shaped
+Gemma replay emitted one schema/DTO/Host-valid acquire/deliver Activity with
+unknown source, no citation, and no clarification. Two new scenarios retain
+the two-turn confirmation and a direct water request.
+
+Paired Soridormi now resolves `water` against the three equivalent observed
+`bottle of water` markers, holds the selected object reference, and requires
+a unique recipient. Three 300-second normal-command MuJoCo attempts timed out
+without pickup or delivery; a fast bounded command completed the route.
+The provider defaults to normal and uses observed progress to recover a
+non-slow command within its advertised speed presets. Isolated default-scene
+MuJoCo proof: water 5.0→0.899 m in 144.13 s, user 5.738→0.900 m in 198.85 s,
+both legs recording bounded recovery, mock handover completed, final
+`safe_idle=true` and no active task. The scene mock is not camera or hardware
+proof.
+
+Chromie focused Planner tests passed 162 tests/82 subtests; scene discovery,
+repository policy, test ownership, and docs checks passed. The canonical
+`./scripts/run_tests.sh` still stops at the pre-existing benchmark drift,
+6 failed/147 passed. Level A robust-intent/composable planning passed 9/13;
+four older UMI body-action fixtures omit `body_effect_family`. The user's
+running text Host holds `/tmp/chromie-orchestrator.lock`, so the attempted
+aggregate live baseline could not start; no changed-revision end-to-end
+Chromie text/voice proof is claimed. Soridormi focused runtime/manifest tests
+passed 124; the full suite with the checkout mounted at `/app` and the
+isolated scene stopped passed 825 tests/8 skips. Governance and compile pass.
+Its body-concurrency gate passed 179 tests/4 skips.
+
+Next: after the operator text Host can be restarted, rebuild/verify the
+current Chromie Agent and Soridormi MCP source, run the retained thirst and
+direct-water live-text cases (five or fewer utterances with the milk contrast),
+inspect one debug bundle, then the complete cohort if the active gate allows.
+Keep the existing compound-planning blocker and canonical benchmark drift
+separate. Physical microphone, speaker, camera, and robot proof remain open.
+
 ## Live text console interruption path — 2026-09-25
 
 Pre-delivery Chromie base `618569ab430df7981ed08fb7b4ae4599cc36180b`

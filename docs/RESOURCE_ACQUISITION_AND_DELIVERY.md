@@ -265,6 +265,11 @@ When the source is unknown, Goal Association retains the clear Goal with
 `source.status=unknown`; the Planner may request the specific missing binding.
 A later location reply is associated semantically with that retained Goal. The
 Host does not attach turns by recency or a phrase rule.
+When the selected capability explicitly owns source resolution and perception,
+an unbound source is instead realized as `{"status":"unknown"}` in its required
+provider argument. That provider-owned input is not a missing user input and
+has no current-turn `argument_sources` citation. A source location supplied in
+the conversation is still retained with its actual contextual provenance.
 
 ## Continuous progress across resource responsibilities
 
