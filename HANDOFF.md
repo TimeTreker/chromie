@@ -1,5 +1,62 @@
 # Chromie Handoff
 
+## Text console continuous-input delivery — 2026-09-25
+
+Chromie checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery
+base `618569ab430df7981ed08fb7b4ae4599cc36180b`; fetched
+`origin/main` matched before editing. Resume from the latest commit containing
+this Handoff and Checkpoint. Soridormi checkout is on `main` at
+`2bf8d67fc6aa755a6359b32358e592e1afad0b71`; no Soridormi source was
+changed for this Chromie console repair.
+
+The client previously blocked keyboard reads until `{"done":true}`; the Host
+console also blocked socket reads until `_run_text_turn` and session closure.
+New text could not reach Gateway while a long task ran. The client now watches
+stdin and socket together; the Host starts each text turn in the existing
+InputSessionRuntime routed-turn lifecycle, reads the next line immediately,
+and emits per-turn completion. Protective stop still uses deterministic
+Gateway cancellation. Assistant-history forwarding filters by session ID to
+avoid duplicate/cross-client replies. Interactive `/quit` and Ctrl+C disconnect
+the client without canceling admitted robot Work. The owned contract and user
+instructions were updated in `docs/API_REFERENCE.md` and `docs/USER_MANUAL.md`.
+
+Observed commands/results: final-source focused `pytest -q
+tests/test_psm_live_text_console.py tests/test_cognitive_gateway_reflex.py
+tests/test_orchestrator_barge_in_queue.py tests/test_shutdown_lifecycle.py
+tests/test_social_identity_schema.py tests/test_input_session_runtime_extraction.py`
+→ 65 passed/42 subtests. Level A
+`deterministic_safety_controls` 3/3 and
+`evidence_bound_cognitive_turn_closure` 6/6. Level A
+`human_like_cognitive_continuity` 3/4, with the existing missing
+`body_effect_family` UMI fixture in `weather_then_repeated_walk_stays_grounded`.
+`python scripts/check_repository_policies.py`,
+`python scripts/check_test_ownership.py`, and `python scripts/check_docs.py`
+passed. Canonical `./scripts/run_tests.sh` stopped in benchmark validation:
+6 failed/147 passed, before its main-test stage. Separate `pytest -q tests`
+started before the final reply-filter edit and returned 125 failed/3713
+passed/1009 subtests, 2 warnings; the broad failures have not all been
+adjudicated for this patch. No new live evidence bundle or
+target qualification artifact was produced.
+
+At inspection, the user's old `./scripts/start_chromie.sh --text-console --build`
+launcher and `chromie_psm_live_text_console.py --serve --capabilities --speaker`
+Host were still running on loaded pre-patch Python code; do not treat this
+source patch as active there. Soridormi MCP reported `safe_idle=true`,
+`active_task=null`, `emergency_stop=false`. The Host was not restarted and no
+live long-task/stop, physical microphone/speaker, or robot proof was run.
+
+Resume on the same host: after any desired current work completes, press
+Ctrl+C in the old Host launcher terminal, then run
+`cd /home/chromie/github/chromie && ./scripts/start_chromie.sh --text-console`
+there. In another terminal run
+`cd /home/chromie/github/chromie && python scripts/chromie_psm_live_text_console.py`.
+Submit a bounded long task and type `stop` before it finishes; inspect Gateway
+cancellation, Runtime/provider receipt, session outcome, and Soridormi safe
+idle in one retained live case before asserting end-to-end interruption.
+Then resume the prior aggregate compound-planning failure and canonical/target
+gates. `/quit` exits only the client; for an emergency use the independent
+Soridormi emergency-stop path.
+
 ## Reported milk and detached-dispatch delivery — 2026-09-25
 
 Chromie `/home/chromie/github/chromie` is on `main`, pre-delivery base

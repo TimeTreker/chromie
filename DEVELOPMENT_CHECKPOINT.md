@@ -1,5 +1,46 @@
 # Chromie Development Checkpoint
 
+## Live text console interruption path — 2026-09-25
+
+Pre-delivery Chromie base `618569ab430df7981ed08fb7b4ae4599cc36180b`
+on `main` matched fetched `origin/main`; resume from the latest `main` commit
+containing this checkpoint and Handoff. Paired Soridormi is now on `main` at
+`2bf8d67` (scenario launcher restart), but this Chromie patch changes no
+Soridormi source or physical Skill. The active aggregate compound-planning
+Issue and target-evidence gate remain open.
+
+The user's running text client could not submit `stop` during a long task:
+client input waited for a `done` frame, and the Host console waited for complete
+turn/session closure before reading another socket line. The console now reads
+input and replies independently, runs each admitted text turn through Host's
+existing routed-turn lifecycle, keeps protective reflex priority and text
+channel provenance, and sends turn completion separately. Session-bound
+history forwarding prevents two overlapping turn workers from printing the
+same reply. Interactive `/quit` and Ctrl+C close the client; neither is a
+robot cancellation. Type `stop` for scoped work cancellation, then verify
+the resulting state; use the independent emergency-stop path in an emergency.
+
+Focused console, reflex, barge-in, shutdown, identity and input-runtime tests
+pass 65 tests/42 subtests on the final source, with explicit ordinary-follow-up
+and stop while prior input remains active. Level A safety and overlapping
+turn closure passed 3/3 and 6/6. Continuity passed 3/4 because one older UMI
+body-action fixture omits required `body_effect_family`. Policy, ownership
+and docs checks passed. `./scripts/run_tests.sh` still fails in the benchmark
+stage at 6 failed/147 passed; a separate main suite started before the final
+reply-filter edit had 125 failed/3713 passed, and its failures have not all
+been attributed. No rebuilt Host or
+current-revision live text/voice/robot proof exists: the user's running
+`--text-console` Host was intentionally left running on its old loaded code.
+Soridormi status was `safe_idle=true`, `active_task=null` at inspection.
+
+Next: stop the old Host in its launcher terminal when convenient, restart
+`./scripts/start_chromie.sh --text-console`, reconnect the text client, and
+run a supervised long-task → immediate `stop` → cancellation/safe-idle probe
+before claiming live interruption latency. Then return to the retained
+aggregate `compound_walk_nod_turn` failure in the prior checkpoint, complete
+the canonical gate and full target-evidence profile. This source result does
+not qualify microphone, speaker, camera or physical robot behavior.
+
 ## Reported-resource dialogue and long dispatch repair — 2026-09-25
 
 Pre-delivery Chromie base `b0c2dfec004a082702f71d14148791aefd67a5bf`

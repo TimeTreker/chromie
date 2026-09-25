@@ -556,18 +556,23 @@ class InputSessionRuntime:
             )
         return cancelled_session_ids
 
-    def _launch_routed_turn(self, user_text: str, session_id: str) -> None:
+    def _launch_routed_turn(
+        self, user_text: str, session_id: str, *, channel: str = "voice"
+    ) -> asyncio.Task | None:
         host = self.host
         reflex_candidate = DEFAULT_REFLEX_FILTER.evaluate(user_text)
+        def route() -> Any:
+            if channel == "voice":
+                return host.handle_routed_text(user_text, session_id)
+            return host.handle_routed_text(user_text, session_id, channel=channel)
+
         if self._has_active_protective_reflex():
             if reflex_candidate.action == "interrupt":
                 # A new deterministic protective input is independent of an
                 # older protective operation. It must not wait behind output
                 # cleanup or provider I/O, and an ordinary queued turn must
                 # never be able to replace it.
-                task = asyncio.create_task(
-                    host.handle_routed_text(user_text, session_id)
-                )
+                task = asyncio.create_task(route())
                 lifecycle = host._input_turn_state()
                 lifecycle.register_turn(
                     task,
@@ -589,19 +594,20 @@ class InputSessionRuntime:
                     "protective_reflex_launched_concurrently: scope=%s",
                     reflex_candidate.cancellation_scope,
                 )
-                return
+                return task
             queue_depth = host._input_turn_state().queue_turn_after_reflex(
                 user_text,
                 session_id,
+                channel=channel,
             )
             host.session_log(
                 session_id,
                 "turn_queued_behind_cognitive_gateway_reflex: queue_depth=%s",
                 queue_depth,
             )
-            return
+            return None
 
-        task = asyncio.create_task(host.handle_routed_text(user_text, session_id))
+        task = asyncio.create_task(route())
         is_reflex = reflex_candidate.action == "interrupt"
         host._input_turn_state().register_turn(
             task,
@@ -618,6 +624,7 @@ class InputSessionRuntime:
                 sid,
             )
         )
+        return task
 
     def _on_routed_turn_done(
         self,
@@ -675,14 +682,16 @@ class InputSessionRuntime:
         if not pending:
             return
         if not protective_failed:
-            for pending_text, pending_session_id in pending:
+            for pending_text, pending_session_id, pending_channel in pending:
                 host.session_log(
                     pending_session_id,
                     "turn_released_after_cognitive_gateway_reflex",
                 )
-                self._launch_routed_turn(pending_text, pending_session_id)
+                self._launch_routed_turn(
+                    pending_text, pending_session_id, channel=pending_channel
+                )
             return
-        for _, pending_session_id in pending:
+        for _, pending_session_id, _ in pending:
             host.session_log(
                 pending_session_id,
                 "turn_dropped_after_failed_cognitive_gateway_reflex",

@@ -320,9 +320,13 @@ The client shows only `you>` prompts and `Chromie>` replies. It sends your text 
 the running Host over a private local socket; it does not start another Host or
 configure robot access. Microphone, VAD, and ASR are bypassed; text startup does not
 wait for ASR readiness. Replies are forwarded
-from recorded Host dialogue while the turn runs; the next prompt appears after the
-turn finishes. `/quit` closes only the client; reconnecting keeps the Host and its
-conversation state. Stop the first terminal with Ctrl+C to shut down Chromie.
+from recorded Host dialogue while the turn runs; the next prompt is available
+immediately, including while Chromie is doing a longer task. Type `stop` to request
+the Gateway's current-interaction cancellation, or `Stop moving.` to cancel
+embodied motion, without waiting for the earlier task to finish.
+`/quit` and Ctrl+C in the client close only the client; they do not cancel robot
+work. Reconnecting keeps the Host and its conversation state. Stop the first
+terminal with Ctrl+C to shut down Chromie after robot work is safely stopped.
 
 The `--serve` entrypoint is used by the launcher, which enables `--capabilities
 --speaker` and retains its generated environment and existing Host lock. Other

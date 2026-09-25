@@ -1309,7 +1309,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(
             list(assistant._pending_turn_after_reflex),
-            [("What time is it?", "sid-ordinary")],
+            [("What time is it?", "sid-ordinary", "voice")],
         )
         self.assertFalse(controls["ordinary_started"].is_set())
         self.assertTrue(
@@ -1628,8 +1628,8 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             list(assistant._pending_turn_after_reflex),
             [
-                ("Hello after stop.", "sid-next"),
-                ("Keep the other request too.", "sid-another"),
+                ("Hello after stop.", "sid-next", "voice"),
+                ("Keep the other request too.", "sid-another", "voice"),
             ],
         )
 

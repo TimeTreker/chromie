@@ -1,5 +1,28 @@
 # Chromie Current Status
 
+## Text console input during active Work — 2026-09-25
+
+The maintained local text client now accepts another line while an earlier
+turn is running, and the Host reads that line while the turn continues. Text
+turns use the existing routed-turn lifecycle, so a deterministic `stop` can
+reach scoped cancellation without waiting for long Work. Replies are limited
+to their originating session to prevent duplicate output during overlap.
+`/quit` or client Ctrl+C disconnects only the client; it does not stop robot
+Work. An already-running Host must be restarted to load this source.
+
+Focused console and related reflex/turn tests pass 65 tests/42 subtests on the
+final source, including overlapping ordinary input and stop cancellation.
+Level A deterministic safety passed
+3/3 and overlapping-turn closure passed 6/6. Human-like continuity passed
+3/4; one existing body-action fixture lacks required UMI `body_effect_family`.
+Repository policy, test ownership, and docs checks passed. The canonical gate
+still stops at benchmark fixture drift (6 failed/147 passed); a separate broad
+main suite run begun before the final reply-filter edit had 125 failed/3713
+passed, with failures not fully adjudicated for this patch. The deployed text Host was not restarted or used for live proof;
+Soridormi was observed safe idle with no active task. Four axes: **console
+implementation updated; focused automatic verification passed but broad gates
+fail; current-revision live/physical proof unrun; development only**.
+
 ## Reported resource, Planner provenance, and long dispatch — 2026-09-25
 
 The two-turn user-reported milk episode has a focused current-revision

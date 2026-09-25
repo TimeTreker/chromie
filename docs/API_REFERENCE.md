@@ -61,14 +61,20 @@ IDs or semantic metadata are accepted. The Host creates the session and calls
 Goal/Planner authorities, confirmation and Soridormi safety.
 
 Each response is one newline-delimited JSON object: `{"reply":"..."}` carries
-exact newly recorded assistant dialogue; `{"done":true}` permits the next input.
+exact newly recorded assistant dialogue; `{"done":true}` closes that admitted
+turn. The client can send another line before the previous turn completes, and
+replies may arrive while the next line is being typed.
 The client renders only replies and its input prompt. Diagnostics, exceptions,
 timings and development-command output remain in the startup terminal. An error
 does not become an invented Chromie reply. The client displays a plain connection
 notice if transport is unavailable. A client disconnect does not cancel admitted
 Work or shut down the Host; reconnecting retains the same Host/conversation state.
-The Host retains the runner's sequential input and bounded completion wait.
-Only dialogue transport changed; this does not qualify native cognition or physical
+The Host tracks each text turn through its normal routed-turn lifecycle, including
+deterministic protective interruption. `/quit` disconnects the client but is not a
+robot stop command; send `stop` for current-interaction cancellation or
+`Stop moving.` for embodied-motion cancellation through the Gateway. Use the
+Soridormi emergency-stop path for an emergency. The bounded completion
+wait runs independently for each turn. This does not qualify native cognition or physical
 delivery. Evidence levels and deployment closure remain owned by Status/Acceptance.
 
 ## Cognitive Core turn-interpretation API — Agent port 8092

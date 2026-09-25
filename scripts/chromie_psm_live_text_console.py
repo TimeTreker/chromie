@@ -28,6 +28,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import select
 import shlex
 import socket
 import subprocess
@@ -98,7 +99,6 @@ class _DialogueConnection:
         self.connections: asyncio.Queue[tuple[asyncio.StreamReader, asyncio.StreamWriter]] = asyncio.Queue(maxsize=1)
         self.reader: asyncio.StreamReader | None = None
         self.writer: asyncio.StreamWriter | None = None
-        self.pending = False
         self.occupied = False
 
     def accept(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -109,23 +109,23 @@ class _DialogueConnection:
         self.occupied = True
         self.connections.put_nowait((reader, writer))
 
-    def _send(self, message: dict[str, Any]) -> None:
-        if self.writer is not None and not self.writer.is_closing():
-            self.writer.write((json.dumps(message, ensure_ascii=False) + "\n").encode("utf-8"))
+    def _send(self, writer: asyncio.StreamWriter, message: dict[str, Any]) -> None:
+        if not writer.is_closing():
+            writer.write((json.dumps(message, ensure_ascii=False) + "\n").encode("utf-8"))
 
-    def reply(self, text: str) -> None:
-        self._send({"reply": text})
+    def reply(self, text: str, *, writer: asyncio.StreamWriter | None = None) -> None:
+        target = writer or self.writer
+        if target is not None:
+            self._send(target, {"reply": text})
+
+    def turn_done(self, writer: asyncio.StreamWriter) -> None:
+        self._send(writer, {"done": True})
 
     async def read_text(self) -> str:
         while True:
             if self.reader is None:
                 self.reader, self.writer = await self.connections.get()
             try:
-                if self.pending:
-                    self._send({"done": True})
-                    self.pending = False
-                    if self.writer is not None:
-                        await self.writer.drain()
                 line = await self.reader.readline()
                 if not line:
                     await self.disconnect()
@@ -133,7 +133,6 @@ class _DialogueConnection:
                 text = json.loads(line)
                 if not isinstance(text, str) or len(line) > MAX_MESSAGE_BYTES:
                     raise ValueError("Text client must send one bounded JSON string")
-                self.pending = True
                 return text
             except (ConnectionError, ValueError, UnicodeError):
                 logging.getLogger(__name__).exception("Text client disconnected or sent invalid input")
@@ -149,7 +148,7 @@ class _DialogueConnection:
             except ConnectionError:
                 logging.getLogger(__name__).debug("Text client closed during disconnect")
         self.reader = self.writer = None
-        self.pending = self.occupied = False
+        self.occupied = False
 
 
 @contextmanager
@@ -178,33 +177,70 @@ def _listening_socket(path: Path) -> Iterator[socket.socket]:
 def _run_client(root: Path) -> None:
     with socket.socket(socket.AF_UNIX) as connection:
         connection.connect(str(_socket_path(root)))
-        with connection.makefile("rb") as replies:
-            while True:
-                try:
-                    text = input("you> ")
-                except EOFError:
-                    return
-                if text.strip() in {"/quit", "/exit"}:
-                    return
-                if not text.strip():
-                    continue
-                packet = (json.dumps(text, ensure_ascii=False) + "\n").encode("utf-8")
-                if len(packet) > MAX_MESSAGE_BYTES:
-                    raise ValueError("Message is too long")
-                connection.sendall(packet)
-                while True:
-                    line = replies.readline(MAX_MESSAGE_BYTES + 1)
-                    if not line:
-                        raise ConnectionError("Chromie disconnected")
+        input_buffer = bytearray()
+        response_buffer = bytearray()
+        accepting_input = True
+        pending_turns = 0
+        interactive = sys.stdin.isatty()
+        if interactive:
+            print("you> ", end="", flush=True)
+        while accepting_input or pending_turns:
+            sources: list[Any] = [connection]
+            if accepting_input:
+                sources.append(sys.stdin.fileno())
+            readable, _, _ = select.select(sources, [], [])
+            if sys.stdin.fileno() in readable:
+                chunk = os.read(sys.stdin.fileno(), 4096)
+                if not chunk:
+                    if interactive:
+                        return
+                    accepting_input = False
+                else:
+                    input_buffer.extend(chunk)
+                    while b"\n" in input_buffer:
+                        line, _, rest = input_buffer.partition(b"\n")
+                        input_buffer = bytearray(rest)
+                        text = line.removesuffix(b"\r").decode(sys.stdin.encoding or "utf-8")
+                        if text.strip() in {"/quit", "/exit"}:
+                            if interactive:
+                                return
+                            accepting_input = False
+                            break
+                        if text.strip():
+                            packet = (json.dumps(text, ensure_ascii=False) + "\n").encode("utf-8")
+                            if len(packet) > MAX_MESSAGE_BYTES:
+                                raise ValueError("Message is too long")
+                            connection.sendall(packet)
+                            if not text.lstrip().startswith("/"):
+                                pending_turns += 1
+                        if interactive:
+                            print("you> ", end="", flush=True)
+                    if len(input_buffer) > MAX_MESSAGE_BYTES:
+                        raise ValueError("Message is too long")
+            if connection in readable:
+                chunk = connection.recv(4096)
+                if not chunk:
+                    raise ConnectionError("Chromie disconnected")
+                response_buffer.extend(chunk)
+                while b"\n" in response_buffer:
+                    line, _, rest = response_buffer.partition(b"\n")
+                    response_buffer = bytearray(rest)
                     if len(line) > MAX_MESSAGE_BYTES:
                         raise ValueError("Invalid dialogue response")
                     response = json.loads(line)
                     if isinstance(response, dict) and set(response) == {"reply"} and isinstance(response["reply"], str):
-                        print(f"Chromie> {response['reply']}", flush=True)
+                        prefix = "\n" if interactive else ""
+                        print(f"{prefix}Chromie> {response['reply']}", flush=True)
+                        if interactive and accepting_input:
+                            print("you> ", end="", flush=True)
                     elif response == {"done": True}:
-                        break
+                        pending_turns -= 1
+                        if pending_turns < 0:
+                            raise ValueError("Unexpected dialogue completion")
                     else:
                         raise ValueError("Invalid dialogue response")
+                if len(response_buffer) > MAX_MESSAGE_BYTES:
+                    raise ValueError("Invalid dialogue response")
 
 
 def _csv(value: str | None) -> list[str]:
@@ -232,11 +268,13 @@ def _history_snapshot(assistant: Any) -> list[dict[str, Any]]:
 
 def _publish_history_delta(
     assistant: Any, before: list[dict[str, Any]], say: Callable[[str], None],
+    *, session_id: str | None = None,
 ) -> list[dict[str, Any]]:
     history = _history_snapshot(assistant)
     previous = {id(item) for item in before}
     for item in history:
-        if id(item) not in previous and item.get("role") == "assistant" and item.get("text"):
+        if (id(item) not in previous and item.get("role") == "assistant"
+                and item.get("text") and (session_id is None or item.get("sid") == session_id)):
             say(item["text"])
     return history
 
@@ -300,31 +338,41 @@ async def _wait_for_session_done(
     while time.monotonic() < deadline:
         publish()
         state = assistant.sessions.state.get(sid) or {}
-        if state.get("done_logged"):
+        if state.get("done_logged") or state.get("interrupted"):
             return
         await asyncio.sleep(0.05)
     raise TimeoutError(f"session {sid} did not finish within {timeout_s:.1f}s")
 
 
-async def _run_text_turn(assistant: Any, text: str, sid: str, timeout_s: float, dialogue: _DialogueConnection) -> None:
+async def _run_text_turn(
+    assistant: Any, text: str, sid: str, timeout_s: float, say: Callable[[str], None]
+) -> None:
+    from orchestrator.runtime.input_session_runtime import input_session_runtime_for  # noqa: PLC0415
+
     history = _history_snapshot(assistant)
 
     def publish() -> None:
         nonlocal history
-        history = _publish_history_delta(assistant, history, dialogue.reply)
+        history = _publish_history_delta(
+            assistant, history, say, session_id=sid
+        )
 
-    task = asyncio.create_task(assistant.handle_routed_text(text, sid, channel="text"))
+    task = input_session_runtime_for(assistant)._launch_routed_turn(
+        text, sid, channel="text"
+    )
     try:
-        while not task.done():
-            await asyncio.wait({task}, timeout=0.05)
-            publish()
-        await task
+        if task is not None:
+            while not task.done():
+                await asyncio.wait({task}, timeout=0.05)
+                publish()
+            try:
+                await task
+            except asyncio.CancelledError:
+                # The Host's protective reflex owns cancellation evidence.
+                pass
         await _wait_for_session_done(assistant, sid, timeout_s, publish)
     finally:
         publish()
-        if not task.done():
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
 
 
 def _configure_environment(root: Path, args: argparse.Namespace, output_dir: Path) -> None:
@@ -443,6 +491,26 @@ async def _run_console(root: Path, args: argparse.Namespace, listener: socket.so
     source_revision = 0
     last_social_sid: str | None = None
     last_social_digest = ""
+    active_turns: set[asyncio.Task[None]] = set()
+
+    async def complete_text_turn(
+        text: str, sid: str, writer: asyncio.StreamWriter
+    ) -> None:
+        started = time.perf_counter()
+        try:
+            await _run_text_turn(
+                assistant, text, sid, args.timeout_s,
+                lambda reply: dialogue.reply(reply, writer=writer),
+            )
+        except Exception as exc:
+            logging.getLogger(__name__).exception("Text turn failed: sid=%s", sid)
+            print(f"[text][error] {type(exc).__name__}: {exc}")
+        finally:
+            dialogue.turn_done(writer)
+            elapsed_ms = (time.perf_counter() - started) * 1000.0
+            logging.getLogger(__name__).info(
+                "Text turn completed in %.0f ms: sid=%s", elapsed_ms, sid
+            )
 
     print("[psm-console] microphone/ASR bypassed; terminal text uses channel='text'.")
     print(f"[psm-console] evidence: {output_dir}")
@@ -624,17 +692,17 @@ async def _run_console(root: Path, args: argparse.Namespace, listener: socket.so
 
             # Ordinary user text: maintained post-ASR text boundary.
             sid = assistant.create_session()
-            started = time.perf_counter()
-            try:
-                await _run_text_turn(assistant, raw, sid, args.timeout_s, dialogue)
-            except Exception as exc:
-                logging.getLogger(__name__).exception("Text turn failed: sid=%s", sid)
-                print(f"[text][error] {type(exc).__name__}: {exc}")
-                continue
-            elapsed_ms = (time.perf_counter() - started) * 1000.0
-            logging.getLogger(__name__).info("Text turn completed in %.0f ms: sid=%s", elapsed_ms, sid)
+            writer = dialogue.writer
+            if writer is None:
+                raise ConnectionError("Text client disconnected before turn admission")
+            task = asyncio.create_task(complete_text_turn(raw, sid, writer))
+            active_turns.add(task)
+            task.add_done_callback(active_turns.discard)
 
     finally:
+        for task in active_turns:
+            task.cancel()
+        await asyncio.gather(*active_turns, return_exceptions=True)
         server.close()
         await server.wait_closed()
         await dialogue.disconnect()

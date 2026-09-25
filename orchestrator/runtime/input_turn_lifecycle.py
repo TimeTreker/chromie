@@ -36,7 +36,7 @@ class InputTurnLifecycle:
     concurrent_protective_reflex_tasks: set[asyncio.Task] = field(
         default_factory=set
     )
-    pending_turn_after_reflex: deque[tuple[str, str]] = field(
+    pending_turn_after_reflex: deque[tuple[str, str, str]] = field(
         default_factory=deque
     )
     pending_vad_audio: PendingVadAudio | None = None
@@ -123,11 +123,13 @@ class InputTurnLifecycle:
             cancelled.append(session_id)
         return tuple(cancelled)
 
-    def queue_turn_after_reflex(self, user_text: str, session_id: str) -> int:
-        self.pending_turn_after_reflex.append((user_text, session_id))
+    def queue_turn_after_reflex(
+        self, user_text: str, session_id: str, *, channel: str = "voice"
+    ) -> int:
+        self.pending_turn_after_reflex.append((user_text, session_id, channel))
         return len(self.pending_turn_after_reflex)
 
-    def drain_turns_after_reflex(self) -> list[tuple[str, str]]:
+    def drain_turns_after_reflex(self) -> list[tuple[str, str, str]]:
         pending = list(self.pending_turn_after_reflex)
         self.pending_turn_after_reflex.clear()
         return pending
