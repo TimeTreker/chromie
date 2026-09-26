@@ -3967,6 +3967,14 @@ class ConversationStateManager:
             "verified_tool_memory_index": self.verified_tool_memory_index(),
             "discourse_referents": self.discourse_referents(),
             "discourse_focus": self.discourse_focus(),
+            # Active Memory is the bounded, relevance-activated cognitive projection
+            # over both retention tiers. It is deliberately not a third store.
+            "active_memory": {
+                "kind": "relevance_projection",
+                "entries": copy.deepcopy(combined_entries),
+                "selection_policy": "context_relevance_then_recency",
+                "activation_source_count": len(activation_texts),
+            },
             "extracted_memory": combined_entries,
             "memory_summary": (
                 "\n".join(combined_summary_lines) if combined_summary_lines else "None"

@@ -68,7 +68,16 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
     reconstruct missing facts from a summary at this model-facing boundary.
     """
     memory = context.get("session_memory")
-    entries = memory.get("extracted_memory", []) if isinstance(memory, dict) else []
+    entries = []
+    if isinstance(memory, dict):
+        active = memory.get("active_memory")
+        if isinstance(active, dict) and isinstance(active.get("entries"), list):
+            entries = active["entries"]
+        else:
+            # Compatibility for snapshots produced before Active Memory became an
+            # explicit cognitive projection. This is not a second semantic path:
+            # extracted_memory already contains the same relevance-ranked entries.
+            entries = memory.get("extracted_memory", [])
     selected: list[dict[str, Any]] = []
     budget = 2400 if role == "umi" else 4800
     fields = (
@@ -97,10 +106,11 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
         ),
     }[role]
     return (
-        "Activated Memory JSON (context only):\n"
+        "Active Memory JSON (activated context only):\n"
         + json.dumps(selected, ensure_ascii=False, separators=(",", ":"))
         + "\n" + purpose
-        + " memory_tier describes whether this activated context came from working RAM or "
+        + " Active Memory is a relevance projection, not a persistence tier or a new store. "
+        "memory_tier describes whether an activated item came from volatile working RAM or "
         "long-term durable storage; scope describes relevance and persistence_policy describes "
         "retention policy. A long-term item is intentionally more stable, not more authoritative. "
         "Neither memory nor its confidence replaces current meaning, Goal state, Runtime state, "

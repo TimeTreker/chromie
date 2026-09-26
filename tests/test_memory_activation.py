@@ -254,3 +254,43 @@ def test_role_memory_uses_only_activated_entries_and_keeps_whole_records() -> No
     prompt = role_memory_context(context, role="umi")
     assert json.loads(prompt.split("\n")[1]) == [{"text": "relevant filtered fact", "source_turn_ids": ["visible"]}]
     assert "raw store" not in prompt and "unfiltered aggregate" not in prompt
+
+
+def test_session_memory_exposes_active_memory_as_projection_not_third_store() -> None:
+    manager = ConversationStateManager(base_conversation_id="active-memory-projection")
+    manager.record_interaction_response(
+        "sid-old",
+        {"metadata": {"memory_updates": [{
+            "type": "extracted_memory",
+            "value": {
+                "scope": "session",
+                "kind": "note",
+                "key": "water_location",
+                "text": "Water is on the bedside table in the Chongqing hotel.",
+            },
+        }]}},
+    )
+    manager.record_user_turn("sid-current", "Please bring me the water.")
+
+    memory = manager.session_memory()
+
+    assert memory["active_memory"]["kind"] == "relevance_projection"
+    assert memory["active_memory"]["entries"] == memory["extracted_memory"]
+    assert memory["active_memory"]["selection_policy"] == "context_relevance_then_recency"
+
+
+def test_role_memory_prefers_explicit_active_memory_projection() -> None:
+    import json
+    from shared.chromie_contracts.memory import role_memory_context
+
+    prompt = role_memory_context(
+        {
+            "session_memory": {
+                "active_memory": {"entries": [{"text": "currently relevant"}]},
+                "extracted_memory": [{"text": "legacy projection must not win"}],
+            }
+        },
+        role="planner",
+    )
+    assert json.loads(prompt.split("\n")[1]) == [{"text": "currently relevant"}]
+    assert "Active Memory is a relevance projection" in prompt

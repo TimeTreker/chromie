@@ -585,18 +585,39 @@ planning task; reviewing an earlier model answer does not. Concurrent model comp
 order never establishes semantic priority. Conflicting submissions must validate their
 source state before changing Work, and obsolete results cannot overwrite newer state.
 
-Memory has two retention tiers under one semantic owner. **Working Memory** is volatile,
-RAM-resident, comparatively detailed context for the current conversation and active work.
-**Long-term Memory** is durable storage exposed back to cognition only through bounded,
-more summarized/abstract projections. Storage lifetime does not create semantic authority:
-a long-term item is not more true merely because it is durable, and a working item is not
-less important merely because it is volatile. UMI primarily resolves the current utterance
-from working conversational context plus selectively activated relevant Memory. GA is the historical association authority and may compare the accepted current Responsibility
-against both working Goal memory and abstract long-term Goal memory. If no retained Goal matches,
-it reports the Responsibility unassociated; trusted lifecycle code, not GA's model, materializes
-any new Goal identity from UMI-owned WHAT. Planner receives only the relevant
-Responsibilities/Goals plus current Work, Evidence, communication records and applicable
-remembered preferences.
+Memory has two **retention tiers** under one semantic owner, plus a separate cognitive
+activation projection. **Working Memory** is volatile, RAM-resident state for the current
+conversation, active Goals/Work and immediate reasoning. **Long-term Memory** is durable
+storage exposed back to cognition only through bounded, more summarized/abstract projections.
+**Active Memory** is not a third store or retention tier: it is the small relevance-activated
+projection of working and long-term Memory that is currently on Chromie's mind. A context
+change may therefore deactivate an otherwise newer memory without deleting it. For example,
+a Beijing hotel object-location memory can remain durable after Chromie is in a Chongqing
+hotel while no longer entering ordinary current planning; stable preferences may remain active
+when relevant across both contexts.
+
+Storage lifetime and activation do not create semantic authority: a long-term item is not more
+true merely because it is durable, an active item is not necessarily current physical fact, and
+a working item is not less important merely because it is volatile. Activation considers current
+Goal/task, conversation, Situation/place/people/objects, relevance, recency, confidence and
+validity/staleness using bounded trusted context; it is not an LRU cache and does not silently
+change remembered meaning. UMI primarily resolves the current utterance from working
+conversational context plus relevant Active Memory. GA is the historical association authority
+and may compare the accepted current Responsibility against both working Goal memory and
+abstract long-term Goal memory. If no retained Goal matches, it reports the Responsibility
+unassociated; trusted lifecycle code, not GA's model, materializes any new Goal identity from
+UMI-owned WHAT. Planner receives relevant Responsibilities/Goals, current Work and Evidence,
+Situation/Interaction state, and Active Memory.
+
+Planner treats Memory and Perception as evidence sources for HOW. When a material planning
+decision depends on unknown or stale world state, it first uses sufficient relevant Active Memory;
+otherwise it plans qualified information/perception acquisition, consumes the resulting trusted
+Evidence on re-entry, and continues planning. Remembered physical state is a prior rather than
+proof that the world is unchanged. Soridormi may and should perceive again during closed-loop
+execution to localize, verify, avoid obstacles and control the body, but execution-time perception
+does not replace Chromie's high-level grounding of what target/location/action to pursue. This is
+the same separation as route planning versus a self-driving controller that continuously verifies
+the road while following the selected route.
 
 Canonical Goals still have exactly one Goal owner. A Goal may have a detailed RAM projection
 and a durable disk-backed summary at the same time, but those are two memory representations
