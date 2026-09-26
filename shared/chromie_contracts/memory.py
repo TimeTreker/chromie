@@ -2,13 +2,83 @@ from __future__ import annotations
 
 import json
 
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 MemoryKind = Literal[
     "preference", "fact", "note", "instruction", "constraint", "relationship", "other"
 ]
+MemoryCognitiveRole = Literal["umi", "ga", "planner"]
+
+_UMI_DEFAULT_MEMORY_KINDS = frozenset({
+    "preference",
+    "instruction",
+    "constraint",
+    "relationship",
+    "correction",
+    "entity",
+    "ownership",
+    "person_identity",
+    "person_relationship",
+    "shared_experience",
+    "relationship_interpretation",
+    "interaction_boundary",
+})
+
+
+def resolve_memory_cognitive_roles(
+    *,
+    kind: str,
+    cognitive_roles: list[str] | tuple[str, ...] | None = None,
+) -> tuple[MemoryCognitiveRole, ...]:
+    """Resolve which cognitive roles may consume one already-activated entry.
+
+    Persistence and activation remain separate from role visibility.  Planner and GA
+    may consume the broad Active Memory projection; UMI is conservative by default
+    and receives only memory classes that can help resolve human meaning.  A trusted
+    producer can opt a semantically meaningful fact/note into UMI explicitly.
+    """
+
+    if cognitive_roles is not None:
+        normalized: list[MemoryCognitiveRole] = []
+        for raw in cognitive_roles:
+            role = str(raw or "").strip().casefold()
+            if role not in {"umi", "ga", "planner"}:
+                continue
+            if role not in normalized:
+                normalized.append(cast(MemoryCognitiveRole, role))
+        if normalized:
+            return tuple(normalized)
+    normalized_kind = str(kind or "note").strip().casefold()
+    roles: list[MemoryCognitiveRole] = ["ga", "planner"]
+    if normalized_kind in _UMI_DEFAULT_MEMORY_KINDS:
+        roles.insert(0, "umi")
+    return tuple(roles)
+
+
+def project_active_memory_for_role(
+    entries: list[dict[str, Any]],
+    *,
+    role: MemoryCognitiveRole,
+) -> list[dict[str, Any]]:
+    """Return whole Active Memory entries visible to one cognitive role."""
+
+    projected: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        roles = resolve_memory_cognitive_roles(
+            kind=str(entry.get("kind") or "note"),
+            cognitive_roles=(
+                list(entry.get("cognitive_roles") or [])
+                if isinstance(entry.get("cognitive_roles"), list)
+                else None
+            ),
+        )
+        if role in roles:
+            projected.append(entry)
+    return projected
 
 
 class MemoryUpdateProposal(BaseModel):
@@ -78,6 +148,10 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
             # explicit cognitive projection. This is not a second semantic path:
             # extracted_memory already contains the same relevance-ranked entries.
             entries = memory.get("extracted_memory", [])
+    entries = project_active_memory_for_role(
+        entries if isinstance(entries, list) else [],
+        role=role,
+    )
     selected: list[dict[str, Any]] = []
     budget = 2400 if role == "umi" else 4800
     fields = (
@@ -85,6 +159,7 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
         "subject_refs", "source_person_refs", "source_ref_ids", "source_turn_ids",
         "source_sids", "audience_refs", "disclosure_scope", "persistence_policy",
         "consent_basis", "expires_ms", "memory_tier", "memory_backing",
+        "cognitive_roles",
     )
     for entry in entries if isinstance(entries, list) else []:
         if not isinstance(entry, dict) or not entry.get("text"):
@@ -98,7 +173,13 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
     if not selected:
         return ""
     purpose = {
-        "umi": "Interpret the current user meaning using only activated relevant memory as context.",
+        "umi": (
+            "Interpret only what the current user expression means. Use this role-scoped Memory "
+            "for referent/entity identity, stable semantic preferences, corrections, discourse continuity, "
+            "and other human-meaning context. Do not promote remembered world state, object location, "
+            "task outcome, or old observation into current WHAT unless the current expression actually "
+            "refers to that remembered meaning."
+        ),
         "ga": "Relate authoritative UMI Responsibilities to current and lasting Goal continuity.",
         "planner": (
             "Plan from canonical meaning, current Runtime Work and Evidence, with relevant remembered context. "
@@ -111,7 +192,8 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
         + "\n" + purpose
         + " Active Memory is a relevance projection, not a persistence tier or a new store. "
         "memory_tier describes whether an activated item came from volatile working RAM or "
-        "long-term durable storage; scope describes relevance and persistence_policy describes "
+        "long-term durable storage; cognitive_roles describes which cognitive owners may consume "
+        "the entry after activation; scope describes relevance and persistence_policy describes "
         "retention policy. A long-term item is intentionally more stable, not more authoritative. "
         "Neither memory nor its confidence replaces current meaning, Goal state, Runtime state, "
         "execution Evidence, or authorization. Never turn remembered context into a new Responsibility or infer completion from it.\n\n"

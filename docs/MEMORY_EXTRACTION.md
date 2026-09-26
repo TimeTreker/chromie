@@ -79,15 +79,21 @@ semantic responsibility to UMI, GA or Planner.
 
 | Role | Core question | Supplied context and Memory |
 | --- | --- | --- |
-| UMI | What does the person mean in the current utterance? | Current authoritative wording; recent accepted context, referents and corrections; currently activated relevant historical Memory. |
-| GA | How does that accepted meaning relate to existing Goals? | Accepted UMI Responsibilities and any explicit unresolved material; relevant canonical Goals, bounded Goal/progress history and unfulfilled commitments; necessary, disclosure-permitted personal and relational Memory. |
-| Planner | Given the intent, Goals and actual state, what should happen now? | Relevant Responsibilities and available canonical Goals; prepared, queued, running and completed Work projections; trusted Evidence and delivered/pending communication records; applicable remembered preferences and constraints. |
+| UMI | What does the person mean in the current utterance? | Current authoritative wording; recent accepted context, referents and corrections; the UMI-scoped Active Memory projection (identity/reference, stable semantic preferences, corrections, discourse continuity, explicitly meaning-relevant entries). |
+| GA | How does that accepted meaning relate to existing Goals? | Accepted UMI Responsibilities and any explicit unresolved material; relevant canonical Goals, bounded Goal/progress history and unfulfilled commitments; disclosure-permitted activated Memory needed for association. |
+| Planner | Given the intent, Goals and actual state, what should happen now? | Relevant Responsibilities and available canonical Goals; prepared, queued, running and completed Work projections; trusted Evidence and delivered/pending communication records; the broader Planner-scoped Active Memory projection, including remembered world/task priors. |
 
-These are views of existing owners, not three Memory stores or exclusive retrieval
-partitions. UMI can use an old fact to resolve a current reference; GA also needs a recent
-correction; Planner can need both. Existing Goal snapshots and interaction history supply
-bounded continuity, not a promise of complete historical replay. The initial UMI-triggered
-Planner does not wait for canonical Goal state that GA has not yet committed.
+These are views of existing owners, not three Memory stores. Activation first chooses bounded,
+disclosure-safe entries from Working and Long-term Memory; `cognitive_roles` then controls which
+cognitive owner may consume each activated entry. UMI is conservative by default: identity,
+relationship, preference, correction, entity and constraint-like Memory may help semantic
+resolution, while generic facts/notes/outcomes remain GA/Planner context unless a trusted producer
+explicitly marks them UMI-relevant through a trusted Memory ingress. Ordinary model-authored
+Memory updates cannot widen their own cognitive-role projection. This prevents a remembered Beijing hotel object location from
+silently becoming current WHAT after the user is in Chongqing, while still allowing a remembered
+name, relationship, or "usual drink" meaning to resolve language. Existing Goal snapshots and
+interaction history supply bounded continuity, not a promise of complete historical replay. The
+initial UMI-triggered Planner does not wait for canonical Goal state that GA has not yet committed.
 
 UMI preserves a request for current information, a new observation, repeated action or a
 specific historical result as WHAT. Planner decides whether the available facts satisfy
@@ -97,8 +103,9 @@ fulfilled by substituting an older remembered result. Memory never grants execut
 authority, changes accepted meaning or substitutes remembered intent for completed Work.
 
 `role_memory_context` projects only the already activated, disclosure-filtered
-`session_memory.extracted_memory` entries. UMI receives at most four whole entries within
-2,400 characters; GA and both Planner depths receive at most eight within 4,800 characters.
+`session_memory.active_memory.entries`, then applies the entry's cognitive-role projection. UMI
+receives at most four whole meaning-scoped entries within 2,400 characters; GA and both Planner
+depths receive at most eight within 4,800 characters.
 Oversized entries are omitted whole, never cut into invalid JSON. Source IDs, confidence,
 scope, persistence policy, consent and expiry travel with the selected entry; raw stores,
 summary text and verified-tool indexes do not become a second source of facts.
@@ -122,6 +129,7 @@ Memory entries should be structured and small:
   "key": "optional stable key for replacing a prior entry",
   "text": "Compact natural-language memory statement.",
   "confidence": 0.0,
+  "cognitive_roles": ["umi", "ga", "planner"],
   "relation": "optional bounded relation token",
   "subject_refs": ["person:..."],
   "source_person_refs": ["person:..."],
@@ -136,6 +144,13 @@ Memory entries should be structured and small:
   "safety_note": "Memory guides interpretation only; it does not authorize side effects."
 }
 ```
+
+`cognitive_roles` is an activation-consumer hint, not authority and not persistence. If absent,
+Memory applies conservative kind-based defaults: Planner and GA can consume the broad activated
+projection, while UMI receives only semantic/reference-oriented kinds. A trusted producer may mark
+a generic fact/note as UMI-relevant through a trusted Memory ingress when it truly defines meaning
+(for example an established alias); ordinary model-authored Memory updates cannot self-promote, and
+stale world state must not be widened merely to make UMI convenient.
 
 The `text` field should be a refined statement, not a copied transcript. For
 example:

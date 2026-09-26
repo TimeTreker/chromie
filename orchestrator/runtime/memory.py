@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Deque, Iterable, Literal, cast
 
+from shared.chromie_contracts.memory import resolve_memory_cognitive_roles
+
 
 logger = logging.getLogger("chromie.orchestrator.memory")
 
@@ -240,6 +242,7 @@ class MemoryEntry:
     expires_ms: float | None = None
     persistence_policy: str = "ephemeral"
     consent_basis: str | None = None
+    cognitive_roles: list[str] | None = None
     safety_note: str = "Memory guides interpretation only; it does not authorize side effects."
     id: str | None = None
 
@@ -254,6 +257,12 @@ class MemoryEntry:
         self.source_person_refs = _normalized_refs(self.source_person_refs)
         self.source_ref_ids = _normalized_refs(self.source_ref_ids)
         self.audience_refs = _normalized_refs(self.audience_refs)
+        self.cognitive_roles = list(
+            resolve_memory_cognitive_roles(
+                kind=self.kind,
+                cognitive_roles=self.cognitive_roles,
+            )
+        )
         structured_social = bool(
             self.kind in _RELATIONAL_MEMORY_KINDS
             or self.relation
@@ -330,6 +339,7 @@ class MemoryEntry:
             "expires_ms": self.expires_ms,
             "persistence_policy": self.persistence_policy,
             "consent_basis": self.consent_basis,
+            "cognitive_roles": list(self.cognitive_roles or []),
             "safety_note": self.safety_note,
         }
 
@@ -346,6 +356,7 @@ class MemoryEntry:
             "key": self.key,
             "text": self.text,
             "confidence": self.confidence,
+            "cognitive_roles": list(self.cognitive_roles or []),
         }
         if self.relation:
             payload["relation"] = self.relation
@@ -525,6 +536,11 @@ class ProtectedDurableMemoryStore:
                     persistence_policy="durable_with_explicit_consent",
                     consent_basis=(
                         str(item.get("consent_basis") or "") or None
+                    ),
+                    cognitive_roles=(
+                        [str(v) for v in item.get("cognitive_roles") or []]
+                        if isinstance(item.get("cognitive_roles"), list)
+                        else None
                     ),
                     id=str(item.get("id") or "") or None,
                 )
@@ -851,6 +867,11 @@ class MemoryExtractor:
                     persistence_policy=str(item.get("persistence_policy") or "ephemeral"),
                     consent_basis=(
                         str(item.get("consent_basis") or "") or None
+                    ),
+                    cognitive_roles=(
+                        [str(v) for v in item.get("cognitive_roles") or []]
+                        if trusted_disclosure and isinstance(item.get("cognitive_roles"), list)
+                        else None
                     ),
                 )
             )

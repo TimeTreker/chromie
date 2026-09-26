@@ -230,7 +230,14 @@ def test_role_memory_preserves_scope_independent_of_storage_and_provenance() -> 
         MemoryEntry(scope="profile", kind="preference", text="长期偏好", source_turn_ids=["turn-old"],
                     persistence_policy="durable_with_explicit_consent", consent_basis="explicit_current_turn").to_prompt_dict(),
     ]
-    for role in ("umi", "ga", "planner"):
+    umi_prompt = role_memory_context({"session_memory": {"extracted_memory": entries}}, role="umi")
+    umi_projected = json.loads(umi_prompt.split("\n")[1])
+    assert [entry["text"] for entry in umi_projected] == ["长期偏好"]
+    assert umi_projected[0]["persistence_policy"] == "durable_with_explicit_consent"
+    assert umi_projected[0]["source_turn_ids"] == ["turn-old"]
+    assert "world state, object location" in umi_prompt
+
+    for role in ("ga", "planner"):
         prompt = role_memory_context({"session_memory": {"extracted_memory": entries}}, role=role)
         projected = json.loads(prompt.split("\n")[1])
         assert [entry["text"] for entry in projected] == ["当前约束", "长期偏好"]
@@ -248,11 +255,16 @@ def test_role_memory_uses_only_activated_entries_and_keeps_whole_records() -> No
         "extracted_memory": [{"text": "raw store must not be projected"}],
         "session_memory": {"memory_summary": "unfiltered aggregate must not be used", "extracted_memory": [
             {"text": "x" * 5000, "source_turn_ids": ["too-large"]},
-            {"text": "relevant filtered fact", "source_turn_ids": ["visible"]},
+            {"kind": "fact", "text": "relevant filtered fact", "source_turn_ids": ["visible"], "cognitive_roles": ["umi"]},
         ]},
     }
     prompt = role_memory_context(context, role="umi")
-    assert json.loads(prompt.split("\n")[1]) == [{"text": "relevant filtered fact", "source_turn_ids": ["visible"]}]
+    assert json.loads(prompt.split("\n")[1]) == [{
+        "kind": "fact",
+        "text": "relevant filtered fact",
+        "source_turn_ids": ["visible"],
+        "cognitive_roles": ["umi"],
+    }]
     assert "raw store" not in prompt and "unfiltered aggregate" not in prompt
 
 
@@ -277,6 +289,7 @@ def test_session_memory_exposes_active_memory_as_projection_not_third_store() ->
     assert memory["active_memory"]["kind"] == "relevance_projection"
     assert memory["active_memory"]["entries"] == memory["extracted_memory"]
     assert memory["active_memory"]["selection_policy"] == "context_relevance_then_recency"
+    assert memory["active_memory"]["role_projection_policy"] == "entry_cognitive_roles"
 
 
 def test_role_memory_prefers_explicit_active_memory_projection() -> None:
@@ -294,3 +307,83 @@ def test_role_memory_prefers_explicit_active_memory_projection() -> None:
     )
     assert json.loads(prompt.split("\n")[1]) == [{"text": "currently relevant"}]
     assert "Active Memory is a relevance projection" in prompt
+
+
+def test_role_scoped_active_memory_keeps_world_state_out_of_umi_by_default() -> None:
+    import json
+    from shared.chromie_contracts.memory import role_memory_context
+
+    entries = [
+        MemoryEntry(
+            scope="profile",
+            kind="preference",
+            key="usual_drink",
+            text="The user's usual drink means sparkling water.",
+        ).to_prompt_dict(),
+        MemoryEntry(
+            scope="session",
+            kind="fact",
+            key="water_location",
+            text="Water was on the desk in the Beijing hotel.",
+        ).to_prompt_dict(),
+    ]
+
+    umi = role_memory_context({"session_memory": {"active_memory": {"entries": entries}}}, role="umi")
+    planner = role_memory_context({"session_memory": {"active_memory": {"entries": entries}}}, role="planner")
+
+    assert [item["key"] for item in json.loads(umi.split("\n")[1])] == ["usual_drink"]
+    assert [item["key"] for item in json.loads(planner.split("\n")[1])] == [
+        "usual_drink",
+        "water_location",
+    ]
+
+
+def test_trusted_memory_can_explicitly_mark_generic_fact_as_umi_meaning_context() -> None:
+    import json
+    from shared.chromie_contracts.memory import role_memory_context
+
+    entry = MemoryEntry(
+        scope="profile",
+        kind="fact",
+        key="mom_alias",
+        text="When the user says Mom, they mean Alice.",
+        cognitive_roles=["umi", "ga", "planner"],
+    ).to_prompt_dict()
+
+    prompt = role_memory_context(
+        {"session_memory": {"active_memory": {"entries": [entry]}}},
+        role="umi",
+    )
+
+    assert json.loads(prompt.split("\n")[1])[0]["key"] == "mom_alias"
+    assert json.loads(prompt.split("\n")[1])[0]["cognitive_roles"] == ["umi", "ga", "planner"]
+
+
+def test_untrusted_memory_update_cannot_self_promote_into_umi_projection() -> None:
+    manager = ConversationStateManager(base_conversation_id="memory-role-trust")
+    manager.record_interaction_response(
+        "sid-untrusted",
+        {
+            "metadata": {
+                "memory_updates": [
+                    {
+                        "type": "extracted_memory",
+                        "value": {
+                            "scope": "session",
+                            "kind": "fact",
+                            "key": "old_location",
+                            "text": "Water was on the Beijing hotel desk.",
+                            "cognitive_roles": ["umi", "ga", "planner"],
+                        },
+                    }
+                ]
+            }
+        },
+    )
+
+    entry = next(
+        item
+        for item in manager.session_memory()["active_memory"]["entries"]
+        if item.get("key") == "old_location"
+    )
+    assert entry["cognitive_roles"] == ["ga", "planner"]

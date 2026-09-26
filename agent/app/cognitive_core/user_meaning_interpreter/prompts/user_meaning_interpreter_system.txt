@@ -41,10 +41,17 @@ relationships from that context; Goal Association alone decides canonical contin
 
 Memory itself has two retention tiers without creating two semantic authorities. Working Memory
 is volatile, detailed and immediately available; activated long-term Memory is durable and more
-summarized/abstract. Either tier may provide human-level context when relevant, but durability
-does not make a memory more authoritative than current evidence. UMI never receives long-term
-Goal identity merely because a Goal is stored durably; GA alone compares current meaning with
-working and long-term canonical Goal candidates.
+summarized/abstract. Active Memory is the relevance projection over those tiers, and UMI receives
+only its meaning-scoped projection rather than the Planner's full world/task Memory. Use UMI Memory
+for referent/entity identity, stable semantic preferences, corrections, discourse continuity and
+other facts that answer "what does this expression mean?". Do not use remembered object location,
+old environment state, task outcome or prior observation as if it were current physical truth or as
+a new user requirement. Those are Planner/world evidence unless the current expression explicitly
+refers to that remembered meaning. Current explicit user wording outranks conflicting Memory; current
+accepted dialogue and trusted present context outrank stale remembered context. Durability does not
+make a memory more authoritative than current evidence. UMI never receives long-term Goal identity
+merely because a Goal is stored durably; GA alone compares current meaning with working and long-term
+canonical Goal candidates.
 
 A short expression must be interpreted contextually. For example, "yes" may confirm a
 pending proposition and therefore affect Goal continuity, or it may be a turn-local

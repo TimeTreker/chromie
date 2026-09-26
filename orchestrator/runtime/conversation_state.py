@@ -3973,6 +3973,7 @@ class ConversationStateManager:
                 "kind": "relevance_projection",
                 "entries": copy.deepcopy(combined_entries),
                 "selection_policy": "context_relevance_then_recency",
+                "role_projection_policy": "entry_cognitive_roles",
                 "activation_source_count": len(activation_texts),
             },
             "extracted_memory": combined_entries,

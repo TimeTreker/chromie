@@ -602,12 +602,18 @@ a working item is not less important merely because it is volatile. Activation c
 Goal/task, conversation, Situation/place/people/objects, relevance, recency, confidence and
 validity/staleness using bounded trusted context; it is not an LRU cache and does not silently
 change remembered meaning. UMI primarily resolves the current utterance from working
-conversational context plus relevant Active Memory. GA is the historical association authority
-and may compare the accepted current Responsibility against both working Goal memory and
-abstract long-term Goal memory. If no retained Goal matches, it reports the Responsibility
-unassociated; trusted lifecycle code, not GA's model, materializes any new Goal identity from
-UMI-owned WHAT. Planner receives relevant Responsibilities/Goals, current Work and Evidence,
-Situation/Interaction state, and Active Memory.
+conversational context plus a **UMI-scoped Active Memory projection**: referent/entity identity,
+stable semantic preferences, corrections, discourse continuity, and other remembered context
+whose role is to answer what the current expression means. Dynamic world state, old object
+locations, observations and task outcomes do not enter UMI by default merely because they are
+remembered; they remain Planner/world evidence unless a trusted Memory producer explicitly marks
+them meaning-relevant. Current explicit user wording outranks conflicting Memory. GA is the
+historical association authority and may compare the accepted current Responsibility against both
+working Goal memory and abstract long-term Goal memory. If no retained Goal matches, it reports
+the Responsibility unassociated; trusted lifecycle code, not GA's model, materializes any new Goal
+identity from UMI-owned WHAT. Planner receives relevant Responsibilities/Goals, current Work and
+Evidence, Situation/Interaction state, and the broader Planner-scoped Active Memory projection.
+Role projections are views over the same activated entries, not separate stores or owners.
 
 Planner treats Memory and Perception as evidence sources for HOW. When a material planning
 decision depends on unknown or stale world state, it first uses sufficient relevant Active Memory;

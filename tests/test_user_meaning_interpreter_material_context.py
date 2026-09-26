@@ -180,3 +180,13 @@ def test_user_meaning_interpreter_goal_context_is_semantic_without_canonical_ide
     assert "goal-secret-id" not in serialized
     assert "task-secret-id" not in serialized
     assert "terminal-goal" not in serialized
+
+
+def test_user_meaning_interpreter_memory_is_meaning_scoped_not_world_state_authority() -> None:
+    prompt = PROMPT.read_text(encoding="utf-8").casefold()
+
+    assert "umi receives\nonly its meaning-scoped projection" in prompt
+    assert 'what does this expression mean?' in prompt
+    assert "remembered object location" in prompt
+    assert "planner/world evidence" in prompt
+    assert "current explicit user wording outranks conflicting memory" in prompt
