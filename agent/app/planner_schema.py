@@ -156,8 +156,18 @@ def canonical_resource_argument_response_schema(
         return base_schema
 
     constrained = False
+    retained_branches: list[dict[str, Any]] = []
     for branch in branches:
         properties = branch.get("properties") if isinstance(branch, dict) else None
+        capability_ids = (properties.get("capability_id") or {}).get("enum") if isinstance(properties, dict) else None
+        # A single resource-delivery Responsibility already ends in the provider's
+        # safe terminal posture.  Do not offer a routine stand-idle cleanup branch
+        # to the decoder.  An explicitly requested posture action is a separate
+        # Responsibility/Goal and therefore does not enter this single-resource path.
+        if isinstance(capability_ids, list) and capability_ids == ["soridormi.stand_idle"]:
+            constrained = True
+            continue
+        retained_branches.append(branch)
         args = properties.get("args") if isinstance(properties, dict) else None
         argument_properties = args.get("properties") if isinstance(args, dict) else None
         if not isinstance(argument_properties, dict):
@@ -170,6 +180,7 @@ def canonical_resource_argument_response_schema(
             if isinstance(required, list) and name not in required:
                 required.append(name)
             constrained = True
+    step_schema["oneOf"] = retained_branches
     if not constrained:
         return base_schema
 

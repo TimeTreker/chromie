@@ -6909,3 +6909,56 @@ class FastPlannerResolverTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_single_resource_goal_decoder_hides_routine_stand_idle_cleanup() -> None:
+    base_schema = {
+        "$defs": {
+            "PlannerModelStep": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "properties": {
+                            "capability_id": {"type": "string", "enum": ["soridormi.acquire_and_deliver_resource"]},
+                            "args": {
+                                "type": "object",
+                                "properties": {
+                                    "resource": {"type": "object"},
+                                    "source": {"type": "object"},
+                                    "recipient": {"type": "object"},
+                                },
+                                "required": ["resource", "source", "recipient"],
+                            },
+                        },
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "capability_id": {"type": "string", "enum": ["soridormi.stand_idle"]},
+                            "args": {"type": "object", "properties": {}},
+                        },
+                    },
+                ]
+            }
+        },
+        "properties": {"parameter_resolutions": {"type": "array"}},
+    }
+    goals = [{
+        "goal_id": "goal-water",
+        "resource_responsibility": {
+            "resource": {"kind": "physical_object", "description": "water"},
+            "source": {"status": "provider_resolved"},
+            "recipient": {"description": "user"},
+        },
+    }]
+
+    schema = planner_schema.canonical_resource_argument_response_schema(
+        base_schema,
+        authoritative_goals=goals,
+    )
+
+    capability_ids = [
+        branch["properties"]["capability_id"]["enum"][0]
+        for branch in schema["$defs"]["PlannerModelStep"]["oneOf"]
+    ]
+    assert capability_ids == ["soridormi.acquire_and_deliver_resource"]

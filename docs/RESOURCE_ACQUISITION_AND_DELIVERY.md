@@ -578,11 +578,24 @@ second semantic world model. The split is:
   needs a deliberate new observation. Ambient trusted perception may update Situation
   independently and be available before a user turn reaches Planner.
 
-The current MuJoCo integration performs a fresh trusted `soridormi.robot.observe_scene`
-read before planning a physical-resource Goal in `voice_mujoco` mode. The resulting
-source-identified scene projection is carried into Planner Situation. This is simulation
-provenance only; a physical camera requires its own qualified trusted adapter rather than
-reusing the MuJoCo source contract.
+The current MuJoCo integration maintains a trusted ambient scene projection mechanically
+through periodic `soridormi.robot.observe_scene` safe reads. Provider change identity
+suppresses unchanged polls; sensor polling itself does not invoke UMI, GA, Planner, Social
+Cognition, or Memory extraction. On an ordinary turn, Planner consumes the latest bounded
+Situation that Chromie already owns. If that Situation is missing, stale, or insufficient,
+Planner may author Active Perception Work. This is simulation provenance only; a physical
+camera requires its own qualified trusted adapter rather than reusing the MuJoCo source
+contract. Maintained Host entrypoints used for qualification must start the same ambient
+perception lifecycle as the normal Host so model-facing Planner context is not accidentally
+empty only in the test surface.
+
+A successful physical handover may also create an optional evidence-bound social completion
+opportunity. Runtime owns the completion fact and supplies exact terminal Evidence; Social
+Cognition alone decides whether a short natural close such as “Here you are” is useful or
+whether silence is more natural. Planner never authors this wording, and no completion speech
+may precede trusted handover completion. Provider-owned safe terminal posture is likewise not
+an extra Planner step: routine `stand_idle` cleanup is omitted unless the user independently
+requested a posture Goal.
 
 After the Soridormi adapter validates provider identity, canonical Chromie terminal
 evidence may include:

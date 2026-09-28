@@ -454,6 +454,32 @@ Notes:
     )
 
 
+
+
+async def _run_host_ambient_perception(assistant: Any) -> None:
+    """Load and run the production ambient perception loop inside its task."""
+    from orchestrator.runtime.soridormi_scene_perception import (  # noqa: PLC0415
+        run_soridormi_ambient_perception_loop,
+    )
+
+    await run_soridormi_ambient_perception_loop(assistant)
+
+
+def _start_ambient_perception_task(assistant: Any, runner: Callable[[Any], Any], *, enabled: bool) -> asyncio.Task[Any] | None:
+    """Start the same mechanical ambient perception loop used by the normal Host."""
+    if not enabled:
+        return None
+    task = asyncio.create_task(runner(assistant), name="soridormi-ambient-perception")
+    tasks = getattr(assistant, "active_cognitive_runtime_tasks", None)
+    if not isinstance(tasks, dict):
+        tasks = {}
+        assistant.active_cognitive_runtime_tasks = tasks
+    tasks[task] = "soridormi-ambient-perception"
+    callback = getattr(assistant, "_cognitive_runtime_task_done", None)
+    if callable(callback):
+        task.add_done_callback(callback)
+    return task
+
 async def _run_console(root: Path, args: argparse.Namespace, listener: socket.socket) -> None:
     output_dir = args.output_dir
     _configure_environment(root, args, output_dir)
@@ -485,6 +511,11 @@ async def _run_console(root: Path, args: argparse.Namespace, listener: socket.so
         ) from exc
 
     assistant = VoiceAssistant()
+    _start_ambient_perception_task(
+        assistant,
+        _run_host_ambient_perception,
+        enabled=args.capabilities,
+    )
     dialogue = _DialogueConnection()
     server = await asyncio.start_unix_server(dialogue.accept, sock=listener, limit=MAX_MESSAGE_BYTES)
     source_id = "manual_psm_console"

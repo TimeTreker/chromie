@@ -164,7 +164,13 @@ from shared.chromie_contracts.interaction import (
     CapabilityResult,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
-from shared.chromie_contracts.plan import CanonicalPlan, canonical_plan_fingerprint
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    SocialCommunicationNeed,
+    canonical_plan_fingerprint,
+    communication_need_id,
+)
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest
 from shared.chromie_contracts.reflection import ReflectionRequest
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
@@ -6046,6 +6052,127 @@ class VoiceAssistant:
         )
         return response
 
+    async def _optional_completed_resource_social_response(
+        self,
+        *,
+        source_response: InteractionResponse,
+        bundle: Any,
+        plan: CanonicalPlan,
+        session_id: str | None,
+        language: str,
+        user_request: str,
+        evidence_refs: list[str],
+        goal_ids: list[str],
+        selected_execution_evidence: list[ExecutionEvidence],
+    ) -> InteractionResponse | None:
+        """Give SC one optional, evidence-bound handover-completion opportunity.
+
+        Planner owns Work and Runtime owns completion truth.  A completed physical
+        resource handover may still have a natural social close (for example,
+        "Here you are").  Runtime exposes that trusted result as an optional
+        communication Need; Social Cognition alone decides speech or silence.
+        """
+
+        completed_resource = [
+            item
+            for item in selected_execution_evidence
+            if item.status == "completed"
+            and item.capability_id == "soridormi.acquire_and_deliver_resource"
+        ]
+        if bundle.aggregate_status != "completed" or not completed_resource:
+            return None
+        if not evidence_refs or not goal_ids:
+            return None
+
+        turn_envelope = (
+            source_response.metadata.get("user_turn_envelope")
+            if isinstance(source_response.metadata, dict)
+            else None
+        )
+        normalized_input = (
+            turn_envelope.get("normalized_input")
+            if isinstance(turn_envelope, dict)
+            else None
+        )
+        turn_id = str(
+            (turn_envelope or {}).get("turn_id")
+            or source_response.metadata.get("turn_id")
+            or session_id
+            or "terminal-resource-delivery"
+        )
+        source_turn = {
+            "turn_id": turn_id,
+            "original_text": (
+                str(normalized_input.get("text") or "").strip()
+                if isinstance(normalized_input, dict)
+                else user_request
+            ),
+        }
+        interaction_ledger = getattr(self.cognitive_runtime, "interaction_ledger", None)
+        interaction_context = (
+            interaction_ledger.context(
+                session_id, goal_ids=goal_ids, turn_id=turn_id
+            ).model_dump(mode="json")
+            if interaction_ledger is not None
+            else {
+                "events": [],
+                "already_spoken": [],
+                "pending_speech": [],
+                "prior_delivered_speech": [],
+            }
+        )
+        need = SocialCommunicationNeed(
+            need_id=communication_need_id(plan.plan_id, "resource_delivery_completed"),
+            owner="runtime",
+            kind="result",
+            source_goal_ids=goal_ids,
+            reference_id=plan.plan_id,
+            facts={
+                "status": "completed",
+                "result_kind": "resource_delivery_handover",
+                "optional_completion_update": True,
+            },
+            delivery_phase="final",
+            after_step_ids=[item.step_id for item in plan.steps],
+        )
+        request = SocialCognitionRequest(
+            request_id=(
+                "sc:terminal-resource:"
+                + hashlib.sha256(
+                    f"{plan.plan_id}:{','.join(evidence_refs)}".encode("utf-8")
+                ).hexdigest()[:96]
+            ),
+            trigger="evidence",
+            source_refs=list(evidence_refs),
+            language=language,
+            source_turn=source_turn,
+            goal_ids=list(goal_ids),
+            evidence_refs=list(evidence_refs),
+            communication_needs=[need],
+            context={
+                "interaction_context": interaction_context,
+                "work_result": {
+                    "status": "completed",
+                    "result_kind": "resource_delivery_handover",
+                    "evidence_refs": list(evidence_refs),
+                },
+            },
+        )
+        generation = int(getattr(self, "playback_generation", 0))
+        resolved = await self.cognitive_runtime.resolve_social_interaction(
+            await self.get_http_session(),
+            request=request,
+            session_id=str(session_id or "terminal-resource-delivery"),
+            snapshot_is_current=lambda: not self._outcome_response_is_stale(
+                generation=generation, session_id=session_id
+            ),
+            primary_plan=plan,
+        )
+        if resolved is None:
+            return None
+        _resolution, response = resolved
+        return response
+
     async def _plan_evidence_bound_capability_result_response(
         self,
         *,
@@ -6187,7 +6314,7 @@ class VoiceAssistant:
                     if item.goal_id in selected_goal_ids
                 ],
             }
-            return await self._planner_state_reentry_response(
+            planner_response = await self._planner_state_reentry_response(
                 source_response=source_response,
                 canonical_plan=plan,
                 user_request=user_request,
@@ -6215,6 +6342,19 @@ class VoiceAssistant:
                 response_source="fast_planner_evidence_reentry",
                 repeat_check_evidence=evidence,
                 repeat_check_context=extra_context,
+            )
+            if planner_response is not None:
+                return planner_response
+            return await self._optional_completed_resource_social_response(
+                source_response=source_response,
+                bundle=bundle,
+                plan=plan,
+                session_id=session_id,
+                language=language,
+                user_request=user_request,
+                evidence_refs=evidence_refs,
+                goal_ids=goal_ids,
+                selected_execution_evidence=selected_execution_evidence,
             )
         except Exception as exc:
             self.session_log(

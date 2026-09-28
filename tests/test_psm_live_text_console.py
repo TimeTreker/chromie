@@ -419,3 +419,35 @@ def test_text_launcher_rejects_skipping_its_host() -> None:
     )
     assert result.returncode == 2
     assert "--text-console requires the Host" in result.stderr
+
+
+def test_text_console_starts_ambient_perception_with_capabilities() -> None:
+    async def exercise() -> None:
+        started = asyncio.Event()
+        release = asyncio.Event()
+        done_callbacks = []
+
+        async def runner(host):
+            assert host is assistant
+            started.set()
+            await release.wait()
+
+        def done_callback(task):
+            done_callbacks.append(task)
+
+        assistant = SimpleNamespace(
+            active_cognitive_runtime_tasks={},
+            _cognitive_runtime_task_done=done_callback,
+        )
+        task = console._start_ambient_perception_task(
+            assistant, runner, enabled=True
+        )
+        assert task is not None
+        await asyncio.wait_for(started.wait(), timeout=1)
+        assert assistant.active_cognitive_runtime_tasks[task] == "soridormi-ambient-perception"
+        release.set()
+        await task
+        await asyncio.sleep(0)
+        assert done_callbacks == [task]
+
+    asyncio.run(exercise())

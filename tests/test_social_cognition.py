@@ -2307,6 +2307,9 @@ def test_social_authority_defaults_to_natural_conversational_economy() -> None:
     assert "Never invent sadness, bad mood" in prompt
     assert "late internal cognition/association failure is not a user-visible failure" in prompt
     assert "never a reason to apologize" in prompt
+    assert "newly completed in-person resource handover" in prompt
+    assert "completion speech is optional" in prompt
+    assert "must never be predicted before the handover actually completes" in prompt
 
 @pytest.mark.asyncio
 async def test_unbacked_covered_need_is_downgraded_to_pending_before_host_validation():
