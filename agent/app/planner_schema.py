@@ -2942,6 +2942,35 @@ def fast_advance_response_schema(
                                     for name in realization.get("arguments") or []
                                 )
                         source_schema = properties["args"].get("properties", {}).get("source")
+                        source_binding_names = {
+                            binding_name
+                            for binding_name in bound_parameters
+                            if _resource_source_binding_type(capability, binding_name)
+                        }
+                        if (
+                            isinstance(source_schema, dict)
+                            and provider_resolves_required_source(capability, "source")
+                            and not source_binding_names
+                        ):
+                            # Provider-owned source resolution is an execution
+                            # boundary, not a semantic choice for Fast Planner.
+                            # When UMI/Goal supplied no source fact, make the
+                            # unresolved provider handoff read-only in the decoder
+                            # instead of offering `known` and rejecting it after
+                            # inference. This preserves the Host validator while
+                            # eliminating a schema/semantic contradiction.
+                            properties["args"]["properties"]["source"] = {
+                                "type": "object",
+                                "properties": {
+                                    "status": {
+                                        "type": "string",
+                                        "const": "provider_resolved",
+                                    },
+                                },
+                                "required": ["status"],
+                                "additionalProperties": False,
+                            }
+                            source_schema = properties["args"]["properties"]["source"]
                         source_bindings_schema = (
                             source_schema.get("properties", {}).get("bindings")
                             if isinstance(source_schema, dict) else None

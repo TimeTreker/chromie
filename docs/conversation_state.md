@@ -78,8 +78,11 @@ returns data only when the already-resolved Goal bindings match exactly and the
 record is fresh enough. See
 [`DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 User Meaning Interpretation remains WHAT-only and never hands planning to a separate
-separate deep-thinking agent. Fast and Deep Planner passes consume the same bounded
-Goal/Situation/Memory authorities at different cognition depths. Raw turns remain
+deep-thinking agent. Fast and Deep Planner passes consume the same bounded
+Goal/Situation/Memory/Evidence/current-Work authorities at different cognition depths.
+Situation includes trusted current perception with exact source provenance; Active Memory
+is relevance-selected retained meaning. Neither raw sensor streams nor whole Memory stores
+are dumped into Planner prompts. Raw turns remain
 evidence/debug context; model-facing Memory is compact retained meaning selected
 by the existing Memory owner. Current prompt selection is context-conditioned so
 older relevant Memory can outrank unrelated recent entries without a retrieval

@@ -2158,3 +2158,8 @@ material cognition, model, provider, prompt, or timing change.
 
 Chromie remains a development project. No publication or release-readiness claim is made
 by this status page.
+
+
+### 2026-09-28 Planner perception/source-boundary repair
+
+Physical-resource planning in `voice_mujoco` now receives a fresh trusted Soridormi simulation scene projection before Fast Planner; stage-local Situation reconstruction preserves that projection instead of dropping it. Active Memory continues through its existing relevance/role projection. The streaming Fast decoder mechanically fixes an unbound provider-owned resource `source` to `{"status":"provider_resolved"}`, keeping the Host grounding validator strict while removing the schema/semantic contradiction that allowed `{"status":"known"}` and then failed with `fast_stream_contract_invalid`. This qualifies source wiring and focused tests only, not physical camera perception, ambient continuous perception, or live end-to-end resource delivery.

@@ -105,3 +105,42 @@ async def observe_soridormi_sim_scene(
         source=source,
         interpretations=interpretations,
     )
+
+def physical_resource_goals_need_scene_refresh(
+    authoritative_goals: list[dict[str, Any]],
+) -> bool:
+    """Return whether current Planner scope contains a physical resource Goal.
+
+    The predicate is semantic-shape only. It does not decide what object satisfies
+    the Goal and does not make scene observations authoritative by itself.
+    """
+
+    return any(
+        isinstance(goal, dict)
+        and isinstance((resource := goal.get("resource_responsibility")), dict)
+        and isinstance(resource.get("resource"), dict)
+        and resource["resource"].get("kind") == "physical_object"
+        for goal in authoritative_goals
+    )
+
+
+async def refresh_planner_soridormi_sim_scene(
+    invoker: AsyncToolInvoker | None,
+    *,
+    context: dict[str, Any],
+    authoritative_goals: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Return a fresh trusted scene projection for physical-resource planning.
+
+    This is intentionally narrow to the already-qualified MuJoCo observation
+    contract. Hardware/real-camera adapters must provide their own provenance
+    contract instead of being silently treated as simulation evidence.
+    """
+
+    if invoker is None or not physical_resource_goals_need_scene_refresh(authoritative_goals):
+        return None
+    observation = await observe_soridormi_sim_scene(invoker, context=context)
+    if observation is None:
+        return None
+    return observation.projection.prompt_projection()
+

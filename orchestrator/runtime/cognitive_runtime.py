@@ -2495,6 +2495,10 @@ class GoalDrivenRuntimeCoordinator:
         interaction_ledger: Any | None = None,
         workflow_stage_sink: Callable[..., None] | None = None,
         social_task_tracker: Callable[[str | None, asyncio.Task[Any]], None] | None = None,
+        planner_situation_refresh: (
+            Callable[[dict[str, Any], list[dict[str, Any]], str], Awaitable[dict[str, Any] | None]]
+            | None
+        ) = None,
     ) -> None:
         self.agent_client = agent_client
         self.adapter = adapter
@@ -2506,6 +2510,7 @@ class GoalDrivenRuntimeCoordinator:
         self.delivered_turn_speech_provider = delivered_turn_speech_provider
         self.workflow_stage_sink = workflow_stage_sink
         self.social_task_tracker = social_task_tracker
+        self.planner_situation_refresh = planner_situation_refresh
         self.interaction_ledger = interaction_ledger or getattr(
             getattr(adapter, "interaction_runtime", None),
             "interaction_ledger",
@@ -5352,6 +5357,15 @@ class GoalDrivenRuntimeCoordinator:
                     if goal_state_commit_stage
                     else "planner_information_gap"
                 )
+            if self.planner_situation_refresh is not None:
+                refreshed_situation = await self.planner_situation_refresh(
+                    context,
+                    list(authoritative_goals),
+                    turn_id,
+                )
+                if isinstance(refreshed_situation, dict):
+                    context["situation"] = refreshed_situation
+                    planning_context["situation"] = refreshed_situation
             planning_situation = build_situation_projection(
                 context=context,
                 turn_id=turn_id,

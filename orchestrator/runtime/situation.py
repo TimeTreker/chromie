@@ -254,6 +254,26 @@ def build_situation_projection(
     if not isinstance(discourse_focus, list):
         discourse_focus = []
 
+    selected_goals = (
+        _unique(focus_goal_ids, limit=8)
+        if focus_goal_ids is not None
+        else _unique(active_goal_ids, limit=8)
+    )
+
+    # A trusted perception/Situation projection may already have been attached by
+    # a source adapter before GA or Planner runs. Reconstructing Situation for a
+    # new cognitive stage must not erase those current observations. Situation is
+    # still volatile: only a schema-valid projection with exact source provenance
+    # is carried forward, and Goal-scoped interpretations remain bounded to the
+    # newly selected Goal set.
+    prior: SituationProjection | None = None
+    raw_prior = current.get("situation")
+    if isinstance(raw_prior, dict):
+        try:
+            prior = SituationProjection.model_validate(raw_prior)
+        except (ValidationError, ValueError, TypeError):
+            prior = None
+
     recent_evidence = current.get("recent_tool_evidence")
     if not isinstance(recent_evidence, list):
         recent_evidence = []
@@ -264,28 +284,42 @@ def build_situation_projection(
     ]
 
     explicit_sources = list(source_refs or [])
+    prior_sources = list(prior.source_refs) if prior is not None else []
     bounded_sources = _source_refs(
-        [*explicit_sources, *evidence_sources],
+        [*explicit_sources, *prior_sources, *evidence_sources],
         limit=16,
     )
     allowed_source_refs = {item.reference_id for item in bounded_sources}
-    bounded_interpretations = [
-        item
-        for item in list(interpretations or [])[:12]
-        if set(item.source_refs).issubset(allowed_source_refs)
+    candidate_interpretations = [
+        *(list(prior.interpretations) if prior is not None else []),
+        *list(interpretations or []),
     ]
+    bounded_interpretations: list[SituationInterpretation] = []
+    seen_interpretations: set[str] = set()
+    selected_goal_set = set(selected_goals)
+    for item in candidate_interpretations:
+        if len(bounded_interpretations) >= 12:
+            break
+        if item.interpretation_id in seen_interpretations:
+            continue
+        if not set(item.source_refs).issubset(allowed_source_refs):
+            continue
+        if not set(item.relevance_goal_ids).issubset(selected_goal_set):
+            continue
+        seen_interpretations.add(item.interpretation_id)
+        bounded_interpretations.append(item)
 
-    selected_goals = (
-        _unique(focus_goal_ids, limit=8)
-        if focus_goal_ids is not None
-        else _unique(active_goal_ids, limit=8)
+    retained_audience_refs = (
+        list(audience_refs)
+        if audience_refs is not None
+        else (list(prior.audience_refs) if prior is not None else [])
     )
     return SituationProjection.create(
         turn_id=_normalized(turn_id),
         revision=max(1, int(revision)),
         focus_goal_ids=selected_goals,
         discourse_focus_ids=_unique(discourse_focus[-8:], limit=8),
-        audience_refs=_unique(audience_refs or [], limit=16),
+        audience_refs=_unique(retained_audience_refs, limit=16),
         unresolved_conditions=conditions,
         source_refs=bounded_sources,
         interpretations=bounded_interpretations,

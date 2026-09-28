@@ -6858,7 +6858,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "activities": [{"role": "capability", "capability_id": capability["capability_id"],
                             "activity_id": "acquire-water", "args": {
                                 "resource": {"kind": "physical_object", "description": "water"},
-                                "source": {"status": "unknown"},
+                                "source": {"status": "provider_resolved"},
                                 "recipient": {"description": "user"}},
                             "argument_sources": {}, "timing": "sequential",
                             "source_responsibility_refs": ["r1"],
@@ -6868,6 +6868,12 @@ class FastPlannerResolverTests(unittest.TestCase):
             "reason_summary": "Provider resolves the source.",
         }
         self.assertEqual(list(Draft202012Validator(schema).iter_errors(raw)), [])
+        known = copy.deepcopy(raw)
+        known["activities"][0]["args"]["source"] = {"status": "known"}
+        self.assertTrue(list(Draft202012Validator(schema).iter_errors(known)))
+        unknown = copy.deepcopy(raw)
+        unknown["activities"][0]["args"]["source"] = {"status": "unknown"}
+        self.assertTrue(list(Draft202012Validator(schema).iter_errors(unknown)))
         planner_fast_validation.validate_fast_advance_output(
             FastPlannerAdvanceModelOutput.model_validate(raw), request=work,
             responsibilities=work.responsibilities, capabilities=[capability],

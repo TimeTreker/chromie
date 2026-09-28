@@ -86,6 +86,9 @@ from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.cognitive_gateway import (
     CognitiveGateway,
 )
+from orchestrator.runtime.soridormi_scene_perception import (
+    refresh_planner_soridormi_sim_scene,
+)
 from orchestrator.runtime.evidence_identity import (
     load_runtime_evidence_identity,
 )
@@ -505,12 +508,38 @@ class VoiceAssistant:
             delivered_turn_speech_provider=self._delivered_turn_speech_events,
             workflow_stage_sink=host_support.sessions.record_cognitive_stage,
             social_task_tracker=host_support.sessions.track_social_task,
+            planner_situation_refresh=(
+                self._refresh_planner_situation
+                if os.getenv("CHROMIE_OPERATOR_MODE", "").strip() == "voice_mujoco"
+                else None
+            ),
         )
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s confirmation_ttl_s=%.1f",
             self.enable_interaction_response,
             self.enable_soridormi_capabilities,
             self.confirmation_dialogue.ttl_s,
+        )
+
+    async def _refresh_planner_situation(
+        self,
+        context: dict[str, Any],
+        authoritative_goals: list[dict[str, Any]],
+        turn_id: str,
+    ) -> dict[str, Any] | None:
+        """Refresh current MuJoCo scene before physical-resource planning.
+
+        Soridormi owns the sensor/provider read. Chromie retains the resulting
+        typed observation as Situation and Planner decides what, if anything, it
+        means for the Goal. This hook is deliberately enabled only in
+        ``voice_mujoco`` until a real-camera provenance adapter is qualified.
+        """
+
+        del turn_id  # Source observation identity/revision comes from Soridormi.
+        return await refresh_planner_soridormi_sim_scene(
+            self.interaction_runtime.soridormi_invoker,
+            context=context,
+            authoritative_goals=authoritative_goals,
         )
 
     @property

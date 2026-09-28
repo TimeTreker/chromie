@@ -519,6 +519,36 @@ local planner, learned policies, deterministic controllers, or another hierarchy
 Those mechanisms do not become a second Chromie semantic planner because they are
 bounded by the already-selected capability contract.
 
+### Perception and source-resolution boundary
+
+`provider_owns` is an execution boundary, not permission for Soridormi to become a
+second semantic world model. The split is:
+
+- Soridormi owns sensor/device access and provider-local perception mechanics such as
+  camera/depth reads, detection, tracking, localization, navigation feedback, grasp
+  pose and trajectory control.
+- Chromie owns the cognitive Situation assembled from trusted typed observations,
+  relevance to current Goals, Memory activation, staleness/uncertainty, target choice
+  and Planner reasoning over those facts.
+- Fast/Deep Planner consume the same bounded `Goal + Situation + Active Memory +
+  Evidence + current Work` cognitive context. They do not receive raw image streams,
+  SLAM internals or unbounded detector output.
+- When current Situation already identifies a suitable physical resource, Planner may
+  bind that perceived entity/source and Soridormi resolves only execution-local detail.
+  When no suitable current source is known, `source.status=provider_resolved` means
+  only that the selected provider may perform bounded local search/perception required
+  by that capability. It must not reinterpret the human Goal or silently substitute a
+  semantically different resource.
+- Active Perception remains Planner-owned information-acquisition Work when cognition
+  needs a deliberate new observation. Ambient trusted perception may update Situation
+  independently and be available before a user turn reaches Planner.
+
+The current MuJoCo integration performs a fresh trusted `soridormi.robot.observe_scene`
+read before planning a physical-resource Goal in `voice_mujoco` mode. The resulting
+source-identified scene projection is carried into Planner Situation. This is simulation
+provenance only; a physical camera requires its own qualified trusted adapter rather than
+reusing the MuJoCo source contract.
+
 After the Soridormi adapter validates provider identity, canonical Chromie terminal
 evidence may include:
 
