@@ -1699,6 +1699,20 @@
       ]
     },
     {
+      "path": "orchestrator/runtime/soridormi_scene_perception.py",
+      "symbol": "run_soridormi_ambient_perception_loop",
+      "ordinal": 1,
+      "classification": "typed_failure_mapping",
+      "owner": "orchestrator.perception",
+      "contract": "Contain one ambient perception poll failure as observable provider-unavailable state; keep the last trusted Situation unchanged and never wake cognition or authorize Work from a failed read.",
+      "review_status": "reviewed",
+      "body_sha256": "d9e146e5bc262f301c9a7a73146b185f2c973b79cb468835471ef0166b54353a",
+      "failure_signals": [
+        "diagnostic",
+        "state_update"
+      ]
+    },
+    {
       "path": "orchestrator/vad.py",
       "symbol": "<module>",
       "ordinal": 1,

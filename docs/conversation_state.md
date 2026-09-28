@@ -81,8 +81,12 @@ User Meaning Interpretation remains WHAT-only and never hands planning to a sepa
 deep-thinking agent. Fast and Deep Planner passes consume the same bounded
 Goal/Situation/Memory/Evidence/current-Work authorities at different cognition depths.
 Situation includes trusted current perception with exact source provenance; Active Memory
-is relevance-selected retained meaning. Neither raw sensor streams nor whole Memory stores
-are dumped into Planner prompts. Raw turns remain
+is relevance-selected retained meaning. Current Goal-free perception may be maintained
+mechanically between conversational turns; unchanged sensor reads do not create turns, Goals,
+Memory, or model calls. Planner therefore begins from the best bounded world state Chromie
+already has and requests Active Perception only when that state is missing, stale, ambiguous,
+or insufficient. Neither raw sensor streams nor whole Memory stores are dumped into Planner
+prompts. Raw turns remain
 evidence/debug context; model-facing Memory is compact retained meaning selected
 by the existing Memory owner. Current prompt selection is context-conditioned so
 older relevant Memory can outrank unrelated recent entries without a retrieval

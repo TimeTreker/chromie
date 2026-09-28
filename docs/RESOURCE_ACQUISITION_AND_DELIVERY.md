@@ -162,6 +162,41 @@ The semantic contract forbids provider IDs, capability IDs, coordinates, grasp
 poses, websites, search engines, execution mode, and implementation plans.
 Those belong downstream.
 
+## Perception before and during planning
+
+Physical resource planning consumes Chromie's **current Situation**, not a blank world and
+not a hidden provider-owned second brain. Soridormi owns sensor/device reads, detection,
+tracking, localization and execution-local physical details; Chromie owns the revisable
+Situation interpretation, relevance to Goals, Memory activation, semantic target choice,
+and Planner HOW reasoning.
+
+The default sequence is:
+
+```text
+ambient Soridormi perception → Chromie Situation
+                              + activated Memory
+                              + Evidence / Goal / current Work
+                              → Fast Planner
+                                 ├─ enough context → execute
+                                 └─ information gap → Active Perception Work
+                                                        ↓
+                                                   new trusted observation
+                                                        ↓
+                                                   Planner re-entry
+```
+
+Ambient perception may run continuously or periodically without a Goal. It is mechanical
+and does not call an LLM merely because a new frame/read exists. Provider change identity
+lets Chromie replace Situation only on material scene revision. Active Perception is
+different: it is Planner-authored information-acquisition Work used when the current
+Situation is insufficient. Asking the user is appropriate only when perception cannot
+reasonably resolve the missing semantic information or when the user must disambiguate
+intent.
+
+`provider_resolved` remains an execution-bound source state, not permission for Soridormi
+to reinterpret the Goal. When no authoritative source binding exists, the provider may
+resolve execution-local source details, while semantic target choice remains Chromie's.
+
 ## Goal Association ownership
 
 Goal Association decides only whether the current resource Responsibility associates with,

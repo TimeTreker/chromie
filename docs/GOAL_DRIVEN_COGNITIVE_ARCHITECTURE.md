@@ -1868,9 +1868,11 @@ slices. `SituationProjection` v3 is implemented as bounded live current
 interpretation: working-set identity may be accompanied by small revisable
 interpretation tuples and exact authority-owned source references, while source
 payloads remain outside Situation. Meaningful provider Runtime-state transitions
-are the first production trusted ingress and are explicitly not promoted to
-Evidence; broader scene/body/environment adapters remain source-specific future
-work. The owner-approved #60 new-request contract separates requested temporal WHAT
+are production trusted ingress and are explicitly not promoted to Evidence. Soridormi's
+MuJoCo marker adapter is the first concrete ambient scene ingress: provider change identity
+allows mechanical maintenance of Goal-free current Situation without invoking cognition.
+Real camera/body/environment adapters remain source-specific future work. The owner-approved
+#60 new-request contract separates requested temporal WHAT
 from its planned HOW. UMI preserves the complete requested time wording in its
 outcome. Planner authors the normalized `due_at_ms` and exact `source_quote` in
 its time condition; GA does not normalize or bind a timestamp. The Gateway's

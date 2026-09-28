@@ -260,20 +260,6 @@ def build_situation_projection(
         else _unique(active_goal_ids, limit=8)
     )
 
-    # A trusted perception/Situation projection may already have been attached by
-    # a source adapter before GA or Planner runs. Reconstructing Situation for a
-    # new cognitive stage must not erase those current observations. Situation is
-    # still volatile: only a schema-valid projection with exact source provenance
-    # is carried forward, and Goal-scoped interpretations remain bounded to the
-    # newly selected Goal set.
-    prior: SituationProjection | None = None
-    raw_prior = current.get("situation")
-    if isinstance(raw_prior, dict):
-        try:
-            prior = SituationProjection.model_validate(raw_prior)
-        except (ValidationError, ValueError, TypeError):
-            prior = None
-
     recent_evidence = current.get("recent_tool_evidence")
     if not isinstance(recent_evidence, list):
         recent_evidence = []
@@ -283,15 +269,40 @@ def build_situation_projection(
         if isinstance(item, dict)
     ]
 
+    # Carry only trusted Goal-free perception forward between cognitive stages.
+    # Runtime/Evidence/Goal-bound interpretations are reconstructed by their own
+    # authorities and must not become a stale ambient world cache.
+    inherited_sources: list[SituationSourceRef] = []
+    inherited_interpretations: list[SituationInterpretation] = []
+    inherited_audience_refs: list[str] = []
+    raw_current_situation = current.get("situation")
+    if isinstance(raw_current_situation, dict):
+        try:
+            prior = SituationProjection.model_validate(raw_current_situation)
+        except (ValidationError, TypeError, ValueError):
+            prior = None
+        if prior is not None:
+            inherited_audience_refs = list(prior.audience_refs)
+            perception_refs = {
+                item.reference_id for item in prior.source_refs if item.kind == "perception"
+            }
+            inherited_sources = [
+                item for item in prior.source_refs if item.reference_id in perception_refs
+            ]
+            inherited_interpretations = [
+                item for item in prior.interpretations
+                if not item.relevance_goal_ids
+                and set(item.source_refs).issubset(perception_refs)
+            ]
+
     explicit_sources = list(source_refs or [])
-    prior_sources = list(prior.source_refs) if prior is not None else []
     bounded_sources = _source_refs(
-        [*explicit_sources, *prior_sources, *evidence_sources],
+        [*inherited_sources, *explicit_sources, *evidence_sources],
         limit=16,
     )
     allowed_source_refs = {item.reference_id for item in bounded_sources}
     candidate_interpretations = [
-        *(list(prior.interpretations) if prior is not None else []),
+        *inherited_interpretations,
         *list(interpretations or []),
     ]
     bounded_interpretations: list[SituationInterpretation] = []
@@ -310,9 +321,7 @@ def build_situation_projection(
         bounded_interpretations.append(item)
 
     retained_audience_refs = (
-        list(audience_refs)
-        if audience_refs is not None
-        else (list(prior.audience_refs) if prior is not None else [])
+        list(audience_refs) if audience_refs is not None else inherited_audience_refs
     )
     return SituationProjection.create(
         turn_id=_normalized(turn_id),

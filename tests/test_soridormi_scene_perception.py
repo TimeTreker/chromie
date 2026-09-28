@@ -8,8 +8,7 @@ import pytest
 from agent.app.tool_invocation import ToolCallOutcome
 from orchestrator.runtime.soridormi_scene_perception import (
     observe_soridormi_sim_scene,
-    physical_resource_goals_need_scene_refresh,
-    refresh_planner_soridormi_sim_scene,
+    refresh_soridormi_ambient_scene_once,
 )
 from orchestrator.runtime.situation import build_situation_projection
 
@@ -28,6 +27,8 @@ def scene(*, objects: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return {
         "observation_id": "soridormi-scene-7",
         "observation_sequence": 7,
+        "scene_revision": 3,
+        "scene_signature": "a" * 64,
         "mode": "sim",
         "source_kind": "mujoco_scene_marker",
         "mocked_simulation": True,
@@ -101,42 +102,61 @@ def test_scene_object_can_describe_another_simulated_resource() -> None:
     )
     assert observation.projection.interpretations[0].source_refs == ["soridormi-scene-7"]
 
-def test_physical_resource_planner_refresh_returns_trusted_scene_projection() -> None:
-    goals = [{
-        "goal_id": "goal-water",
-        "resource_responsibility": {
-            "resource": {"kind": "physical_object", "description": "a bottle of water"},
-        },
-    }]
-    assert physical_resource_goals_need_scene_refresh(goals)
-    invoker = SceneInvoker(scene(objects=[{
-        "object_ref": "soridormi_mock_water_bottle",
-        "description": "bottle of water",
-        "relative_direction": "to Chromie's left",
-        "distance_m": 3.0,
-    }]))
-    projection = asyncio.run(refresh_planner_soridormi_sim_scene(
-        invoker, context={}, authoritative_goals=goals,
-    ))
-    assert projection is not None
-    assert projection["source_refs"][0]["reference_id"] == "soridormi-scene-7"
-    assert projection["interpretations"][0]["subject_ref"] == (
-        "sim-object:soridormi_mock_water_bottle"
+
+class AmbientHost:
+    def __init__(self, invoker: SceneInvoker) -> None:
+        self.interaction_runtime = type("Runtime", (), {"soridormi_invoker": invoker})()
+        self.logs: list[tuple[Any, ...]] = []
+
+    def build_context(self, session_id):
+        current = getattr(self, "_ambient_situation_projection", None)
+        return {"situation": current.prompt_projection() if current is not None else None}
+
+    def session_log(self, *args):
+        self.logs.append(args)
+
+
+def test_ambient_scene_refresh_updates_only_on_semantic_revision() -> None:
+    invoker = SceneInvoker(scene())
+    host = AmbientHost(invoker)
+    assert asyncio.run(refresh_soridormi_ambient_scene_once(host)) == "updated"
+    projection = host._ambient_situation_projection
+    assert projection.interpretations[0].subject_ref == (
+        "sim-object:soridormi_mock_milk_bottle"
     )
+    assert host._ambient_scene_revision == 3
+
+    invoker.output = {
+        **scene(),
+        "observation_id": "soridormi-scene-8",
+        "observation_sequence": 8,
+    }
+    assert asyncio.run(refresh_soridormi_ambient_scene_once(host)) == "unchanged"
+    assert host._ambient_situation_projection is projection
+
+    invoker.output = {
+        **scene(objects=[]),
+        "observation_id": "soridormi-scene-9",
+        "observation_sequence": 9,
+        "scene_revision": 4,
+        "scene_signature": "b" * 64,
+    }
+    assert asyncio.run(refresh_soridormi_ambient_scene_once(host)) == "cleared"
+    assert host._ambient_situation_projection is None
 
 
-def test_rebuilt_planner_situation_preserves_fresh_trusted_perception() -> None:
-    observation = asyncio.run(observe_soridormi_sim_scene(
-        SceneInvoker(scene()), context={}
-    ))
+def test_planning_situation_carries_goal_free_perception_forward() -> None:
+    observation = asyncio.run(observe_soridormi_sim_scene(SceneInvoker(scene()), context={}))
     assert observation is not None
-    rebuilt = build_situation_projection(
+    planning = build_situation_projection(
         context={"situation": observation.projection.prompt_projection()},
         turn_id="turn-water",
         focus_goal_ids=["goal-water"],
-        revision=observation.projection.revision + 1,
+        revision=4,
     )
-    assert rebuilt.focus_goal_ids == ["goal-water"]
-    assert rebuilt.source_refs == observation.projection.source_refs
-    assert rebuilt.interpretations == observation.projection.interpretations
-
+    assert planning.focus_goal_ids == ["goal-water"]
+    assert planning.interpretations[0].subject_ref == (
+        "sim-object:soridormi_mock_milk_bottle"
+    )
+    assert planning.interpretations[0].relevance_goal_ids == []
+    assert planning.source_refs[0].kind == "perception"

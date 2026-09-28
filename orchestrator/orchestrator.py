@@ -87,7 +87,7 @@ from orchestrator.runtime.cognitive_gateway import (
     CognitiveGateway,
 )
 from orchestrator.runtime.soridormi_scene_perception import (
-    refresh_planner_soridormi_sim_scene,
+    run_soridormi_ambient_perception_loop,
 )
 from orchestrator.runtime.evidence_identity import (
     load_runtime_evidence_identity,
@@ -508,38 +508,12 @@ class VoiceAssistant:
             delivered_turn_speech_provider=self._delivered_turn_speech_events,
             workflow_stage_sink=host_support.sessions.record_cognitive_stage,
             social_task_tracker=host_support.sessions.track_social_task,
-            planner_situation_refresh=(
-                self._refresh_planner_situation
-                if os.getenv("CHROMIE_OPERATOR_MODE", "").strip() == "voice_mujoco"
-                else None
-            ),
         )
         logger.info(
             "Interaction runtime: endpoint=%s soridormi_skills=%s confirmation_ttl_s=%.1f",
             self.enable_interaction_response,
             self.enable_soridormi_capabilities,
             self.confirmation_dialogue.ttl_s,
-        )
-
-    async def _refresh_planner_situation(
-        self,
-        context: dict[str, Any],
-        authoritative_goals: list[dict[str, Any]],
-        turn_id: str,
-    ) -> dict[str, Any] | None:
-        """Refresh current MuJoCo scene before physical-resource planning.
-
-        Soridormi owns the sensor/provider read. Chromie retains the resulting
-        typed observation as Situation and Planner decides what, if anything, it
-        means for the Goal. This hook is deliberately enabled only in
-        ``voice_mujoco`` until a real-camera provenance adapter is qualified.
-        """
-
-        del turn_id  # Source observation identity/revision comes from Soridormi.
-        return await refresh_planner_soridormi_sim_scene(
-            self.interaction_runtime.soridormi_invoker,
-            context=context,
-            authoritative_goals=authoritative_goals,
         )
 
     @property
@@ -1841,6 +1815,11 @@ class VoiceAssistant:
                 "goal_association_candidates", []
             ),
             "recent_goal_snapshots": conversation.get("recent_goal_snapshots", []),
+            "situation": (
+                self._ambient_situation_projection.prompt_projection()
+                if getattr(self, "_ambient_situation_projection", None) is not None
+                else None
+            ),
             "current_task_context": conversation.get("current_task_context"),
             "discourse_referents": conversation.get("discourse_referents", []),
             "discourse_focus": conversation.get("discourse_focus", []),
@@ -7644,6 +7623,15 @@ class VoiceAssistant:
             "time-condition-cognition-wake"
         )
         time_condition_task.add_done_callback(self._cognitive_runtime_task_done)
+        if getattr(self, "enable_soridormi_capabilities", False):
+            ambient_perception_task = asyncio.create_task(
+                run_soridormi_ambient_perception_loop(self),
+                name="soridormi-ambient-perception",
+            )
+            self.active_cognitive_runtime_tasks[ambient_perception_task] = (
+                "soridormi-ambient-perception"
+            )
+            ambient_perception_task.add_done_callback(self._cognitive_runtime_task_done)
         if self.conversation_state.runtime_revalidation_candidates():
             task = asyncio.create_task(
                 self._revalidate_restored_goals_from_provider_state(),
