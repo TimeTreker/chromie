@@ -509,6 +509,9 @@ class VoiceAssistant:
             # continue.  Effectful execution still remains behind the trusted
             # canonical-plan/runtime boundary.
             goal_state_apply=self._commit_goal_association_state,
+            communicative_goal_completion_apply=(
+                self.conversation_state.reconcile_communicative_goal_completion
+            ),
             planner_gap_apply=self._commit_planner_information_gaps,
             context_refresh=self.build_context,
             delivered_turn_speech_provider=self._delivered_turn_speech_events,
@@ -1358,6 +1361,31 @@ class VoiceAssistant:
                 return ""
 
             status = current_status()
+            from orchestrator.runtime.scheduler import current_execution_start
+
+            execution_start = current_execution_start.get()
+            if execution_start is not None:
+                if status in {"playback_started", "playback_completed"}:
+                    await execution_start.group.ready_after_observed_start(
+                        execution_start.member
+                    )
+                elif status == "scheduled":
+                    key = self.playback_start_key(
+                        generation,
+                        orders[0],
+                        session_id,
+                    )
+                    self._playback_state().execution_starts[key] = execution_start
+                    status_after_binding = current_status()
+                    if status_after_binding in {
+                        "playback_started",
+                        "playback_completed",
+                    }:
+                        self._playback_state().execution_starts.pop(key, None)
+                        await execution_start.group.ready_after_observed_start(
+                            execution_start.member
+                        )
+                        status = status_after_binding
             playback_started = status in {
                 "playback_started",
                 "playback_completed",

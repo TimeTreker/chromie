@@ -1,5 +1,128 @@
 # Chromie Handoff
 
+## Non-model live workflow repairs and bound 80-case result — 2026-09-30
+
+Chromie checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery
+base `e1f4a446860852cfc7f95eae6ab3c6c84f16c496`; it matched fetched
+`origin/main` before editing. Paired Soridormi is pushed at
+`2af3034a91842ecb9964a45ce24e9bdc18fcde58`. Its unrelated dirty `README.md`,
+`scripts/run_scenario.sh`, `tests/test_run_scenario_restart.py`, and
+`workspace/Open_Duck_Playground` files were not touched or staged.
+
+Implemented scope:
+
+- `GoalDrivenRuntimeCoordinator` deterministically joins delivered direct SC
+  Responsibility refs to canonical speech-only Goal IDs that arrive later from
+  concurrent Goal Association, then delegates closure to the existing
+  Conversation State completion owner.
+- Reused required speech that already crossed playback start now releases its
+  prepared-start group from observed fact; late optional decoration is dropped.
+- Trusted Capability Runtime flushes one prepared-start coordination ID before
+  starting another, preserving separate speech/body expressions in order.
+- Terminal evidence retains the exact Host-owned optional social-decoration
+  tuple. The live judge ignores only failed results with that full tuple and no
+  Goal ownership; required body results still block.
+- Scenario inventory tests match the discovered 56/16/8 stage split and 80 total
+  live cases.
+
+Actual workflows through the repaired boundaries:
+
+| Boundary / owner | Authoritative input and observed pre-fix output | Expected output | Repair and downstream handoff |
+| --- | --- | --- | --- |
+| Direct speech Goal lifecycle / Cognitive Runtime + Conversation State | SC `respond` speech was played with turn-local Responsibility refs while concurrent GA had not yet supplied a Goal ID; the later speech-only Goal remained open. | A delivered direct response closes only the matching newly materialized interaction Goal. | After GA commit, Runtime joins refs to IDs and calls `reconcile_communicative_goal_completion`; unrelated, body, undelivered, or non-`respond` Goals are untouched. |
+| Reused playback coordination / Orchestrator + scheduler | The initial SC stream had already started or completed before final reused speech and optional blink formed a prepared group; reused speech never declared readiness, so the group failed. | Preserve observed speech delivery and avoid claiming simultaneous optional motion. | `ready_after_observed_start` records the required member, drops optional members, and releases the group. |
+| Multiple expression scheduling / Trusted Capability Runtime | Two independent SC speech/body pairs were accumulated into one parallel batch and rejected as two simultaneous `chromie.voice` owners. | Each coordination group runs internally in parallel; separate vocal groups run in order. | Submission batching flushes when a new nonempty prepared-start coordination ID appears. |
+| Optional-result evidence / Runtime + live judge | Runtime aggregate correctly treated the gesture as optional, but terminal result metadata lost its trust tuple; the judge counted `coordination_not_started` as required body failure. | A dropped optional decoration is retained as evidence without failing required Work. | Runtime rebinds `execution_role`, `source`, `auxiliary_plan_activity`, and `semantic_owner` from the validated request; judge recognizes only the complete tuple. |
+| Water acceptance / UMI → GA | On `sure`, UMI requested GA only and described the offered water as already provided; GA created/associated a Goal without Planner activation. | Preserve accepted offer as unfinished water-delivery work and request Planner. | Unchanged: earliest wrong boundary is model inference. Host must not invent Planner activation. |
+| Planner/provider / Cognitive Core → Host → Soridormi | No water-delivery Plan or CapabilityRequest existed. | One grounded acquire/deliver request, or one real clarification if evidence is insufficient. | Host correctly dispatched nothing; Soridormi was not invoked for delivery. |
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UMI as User Meaning Interpretation
+    participant SC as Social Cognition
+    participant GA as Goal Association
+    participant H as Host runtime
+    participant S as Soridormi
+    U->>UMI: turn input
+    par initial social response
+        UMI->>SC: Responsibility refs
+        SC->>H: direct respond act
+        H-->>U: playback starts
+    and Goal materialization
+        UMI->>GA: continuity request
+        GA->>H: canonical Goal IDs
+    end
+    H->>H: join delivered refs to speech-only Goal IDs
+    H->>H: close matching communicative Goal
+    Note over H: distinct prepared groups flush in order
+    H->>S: optional decoration when common start remains provable
+    S-->>H: terminal result with trusted optional tuple
+```
+
+Focused evidence:
+
+- `.chromie/acceptance/non-llm-system-fixes-20260930/focused-prepared-start-valid/`:
+  `daily_favorite_season_body_truth` passed 1/1 mechanically.
+- `.chromie/acceptance/non-llm-system-fixes-20260930/focused-identity-en-provenance-fixed/`:
+  two speech groups completed without duplicate voice-owner or optional gesture
+  errors; remaining failures were 4B SC latency and Planner Goal omission.
+- Focused unit suite: `565 passed, 5 skipped, 39 subtests passed`.
+
+The final bound aggregate is
+`.chromie/acceptance/non-llm-system-fixes-20260930/full-candidate-bound/`.
+Runtime identity `9e0e4d01530d3b1d32db8792463fafaebb0b4b1e94f9e7021528da3fcc365295`
+records base revision `e1f4a446860852cfc7f95eae6ab3c6c84f16c496`, dirty source-tree digest
+`7466a5f015fd409d2595094176c6076078bc00c8c7c7b1663716a854174f1014`,
+profile `rtx4090_laptop`, SGLang provider, and `chromie-qwen35-4b` for Agent,
+UMI, GA, Fast/Deep Planner, and attention. Agent packaged-source digest matched
+the checkout. The required checkpoint and Handoff were finalized after the run;
+those documentation-only edits are outside the retained source-tree digest and
+do not change tested behavior.
+
+Result: 80/80 cases attempted, 26 passed, 54 failed, 0 skipped, 32.5% pass
+rate. Stages were must-pass 14/56, core 9/16, challenge 3/8. There were 31 hard
+integrity failures: 18 Goal omissions, 5 invalid Fast streams, 5 model-contract
+UMI/SC failures surfaced through the harness, and 3 unavailable post-run status
+records after a hard turn failure. Error searches found zero duplicate voice-owner,
+optional `coordination_not_started`, or omitted prepared-start-boundary failures.
+Semantic review is pending for all 80. Some dependent turns were deliberately not
+run after hard first-turn failure, so `cohort_complete=false` and qualification
+remains failed despite 100% case-attempt coverage.
+
+The dominant open boundary is model output: UMI omits Planner and emits overlapping
+Responsibility spans; GA collapses Goals; Fast Planner invents provenance or invalid
+resource schedules; SC violates provenance or latency. These outputs are correctly
+rejected or contained. No further deterministic Host fix is justified without
+moving semantic authority into phrase rules or prose inference. The sole
+post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_123419.tar.gz`. Evidence is
+injected text, TTS, and MuJoCo simulation only.
+
+Validation observed:
+
+```text
+pytest -q tests/test_general_ability_acceptance.py \
+  tests/test_interaction_text_mujoco_check.py tests/test_execution_lanes.py \
+  tests/test_orchestrator_tts_alignment.py tests/test_capability_runtime.py \
+  tests/test_turn_local_continuity.py tests/test_conversation_state.py \
+  tests/test_social_cognition.py
+  565 passed, 5 skipped, 39 subtests passed
+python scripts/check_repository_policies.py
+  passed: 15 rule families, 0 exceptions
+python scripts/check_test_ownership.py
+  passed
+./scripts/run_tests.sh
+  passed policy, ownership, static analysis, configuration, docs, and scenario checks;
+  stopped at existing generated benchmark drift: 6 failed, 147 passed
+```
+
+Resume with model-profile/LoRA qualification or independent semantic review of the
+retained 80-case bundle. For another mechanical defect, reproduce the earliest
+boundary first and rerun the focused case plus the full cohort. Do not add phrase
+routing, infer semantic obligations from rationale prose, restore rejected prompt
+candidates, or treat this simulator run as physical proof.
+
 ## Full 80-case water-offer audit and retained operator repair — 2026-09-30
 
 Chromie checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery

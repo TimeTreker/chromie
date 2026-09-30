@@ -406,12 +406,12 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(
             [(stage.stage_id, len(stage.scenario_paths)) for stage in manifest.stages],
-            [("must_pass", 52), ("core", 15), ("challenge", 8)],
+            [("must_pass", 56), ("core", 16), ("challenge", 8)],
         )
-        self.assertEqual(len(live_ids), 75)
+        self.assertEqual(len(live_ids), 80)
         self.assertEqual(
             len({ref.source_path for ability in manifest.ability_classes for ref in ability.live_text_cases}),
-            75,
+            80,
         )
         generated = [
             ref

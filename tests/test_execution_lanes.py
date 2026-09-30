@@ -757,6 +757,65 @@ if __name__ == "__main__":
 
 
 class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
+    async def test_distinct_prepared_voice_groups_run_in_order(self):
+        starts = []
+
+        class Provider(MockCapabilityProvider):
+            supports_coordinated_start = True
+
+            async def execute(self, request, definition, context):
+                await context.start_gate.ready()
+                starts.append(request.request_id)
+                return CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    status="completed",
+                    provider_id=self.provider_id,
+                    output={"completed": True},
+                )
+
+        registry = CapabilityRegistry()
+        for name, lane in [
+            ("voice-a", "vocal"),
+            ("body-a", "activity"),
+            ("voice-b", "vocal"),
+            ("body-b", "activity"),
+        ]:
+            definition = _definition("test." + name, group=name, resources=[name])
+            definition.metadata["execution_lane"] = lane
+            registry.register(definition)
+        runtime = CapabilityRuntime(registry, max_concurrency=4)
+        runtime.register_provider(Provider("body"))
+        requests = []
+        for suffix in ("a", "b"):
+            for lane in ("voice", "body"):
+                requests.append(
+                    CapabilityRequest(
+                        request_id=f"{lane}-{suffix}",
+                        capability_id=f"test.{lane}-{suffix}",
+                        timing="parallel",
+                        metadata={
+                            "execution_lane": (
+                                "vocal" if lane == "voice" else "activity"
+                            ),
+                            "coordination_id": f"expression-{suffix}",
+                            "lane_start_policy": "prepared_start",
+                        },
+                    )
+                )
+
+        result = await submit_and_wait_terminal(
+            runtime,
+            InteractionResponse(
+                interaction_id="ordered-prepared-voice-groups",
+                capabilities=requests,
+            ),
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual({*starts[:2]}, {"voice-a", "body-a"})
+        self.assertEqual({*starts[2:]}, {"voice-b", "body-b"})
+
     async def test_prepared_group_waits_for_slowest_member_before_effect(self):
         starts = {}
         class Provider(MockCapabilityProvider):
@@ -823,6 +882,15 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                     result.status,
                     "completed" if mode.startswith("optional") else "failed",
                 )
+                if mode.startswith("optional"):
+                    body_result = next(row for row in result.results if row.request_id == "body")
+                    self.assertEqual(body_result.metadata["execution_role"], "social_decoration")
+                    self.assertEqual(
+                        body_result.metadata["source"],
+                        "social_cognition_auxiliary_activity",
+                    )
+                    self.assertIs(body_result.metadata["auxiliary_plan_activity"], True)
+                    self.assertEqual(body_result.metadata["semantic_owner"], "social_cognition")
 
     async def test_cancel_before_release_drains_both_lanes_without_effect(self):
         from shared.chromie_contracts.reflex import CancellationDirective

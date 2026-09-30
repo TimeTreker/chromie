@@ -24,6 +24,7 @@ from scripts.interaction_text_mujoco_check import (
     build_debug_summary,
     collect_run_provenance,
     dispatch_initial_reflex,
+    is_optional_social_decoration_result,
     parse_expected_arg,
     record_execution_bindings,
     print_result_summary,
@@ -36,8 +37,32 @@ from scripts.interaction_text_mujoco_check import (
     wait_for_provider_started,
     wait_for_session_done,
 )
-from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_contracts.interaction import CapabilityResult, InteractionResponse
 from shared.chromie_contracts.reflex import ReflexFilter
+
+
+def test_optional_social_decoration_result_requires_complete_trust_tuple() -> None:
+    result = CapabilityResult(
+        request_id="optional-blink",
+        capability_id="soridormi.blink_eyes",
+        status="refused",
+        provider_id="soridormi.mcp",
+        reason_code="coordination_not_started",
+        metadata={
+            "execution_role": "social_decoration",
+            "source": "social_cognition_auxiliary_activity",
+            "auxiliary_plan_activity": True,
+            "semantic_owner": "social_cognition",
+            "source_goal_ids": [],
+        },
+    )
+
+    assert is_optional_social_decoration_result(result) is True
+    assert is_optional_social_decoration_result(
+        result.model_copy(
+            update={"metadata": {**result.metadata, "source_goal_ids": ["goal-required"]}}
+        )
+    ) is False
 
 
 @pytest.mark.parametrize("preview", [True, False])

@@ -2489,6 +2489,9 @@ class GoalDrivenRuntimeCoordinator:
         adapter: CanonicalPlanRuntimeAdapter,
         policy: CognitiveRuntimePolicy,
         goal_state_apply: Callable[..., list[dict[str, Any]]] | None = None,
+        communicative_goal_completion_apply: (
+            Callable[..., list[dict[str, Any]]] | None
+        ) = None,
         planner_gap_apply: Callable[..., list[dict[str, Any]]] | None = None,
         context_refresh: Callable[[str | None], dict[str, Any]] | None = None,
         delivered_turn_speech_provider: (Callable[[str], list[dict[str, Any]]] | None) = None,
@@ -2504,6 +2507,9 @@ class GoalDrivenRuntimeCoordinator:
         self.adapter = adapter
         self.policy = policy
         self.goal_state_apply = goal_state_apply
+        self.communicative_goal_completion_apply = (
+            communicative_goal_completion_apply
+        )
         self.planner_gap_apply = planner_gap_apply
         self.context_refresh = context_refresh
         self._goal_association_locks: dict[str, asyncio.Lock] = {}
@@ -4062,6 +4068,65 @@ class GoalDrivenRuntimeCoordinator:
             )
         )
 
+    def _reconcile_delivered_direct_social_response(
+        self,
+        *,
+        association: GoalAssociationResolution,
+        interaction: InteractionResponse,
+        sid: str,
+    ) -> list[dict[str, Any]]:
+        """Close newly materialized speech Goals after their SC act was heard.
+
+        Initial Social Cognition may finish concurrently with Goal Association, so
+        its response carries Responsibility refs before canonical Goal IDs exist.
+        Once GA has committed those IDs, this is the deterministic join already
+        used by Planner.  SC's ``respond`` act remains the semantic completion
+        decision; delivered playback remains the factual completion evidence.
+        """
+
+        if (
+            self.communicative_goal_completion_apply is None
+            or interaction.metadata.get("presentation_already_dispatched") is not True
+            or not self._is_direct_spoken_association(association)
+        ):
+            return []
+        goal_ids_by_responsibility = self._goal_ids_by_responsibility(association)
+        results: list[dict[str, Any]] = []
+        for speech in interaction.speech:
+            metadata = speech.metadata if isinstance(speech.metadata, dict) else {}
+            if (
+                str(metadata.get("wording_owner") or "") != "social_cognition"
+                or str(metadata.get("speech_act") or "") != "respond"
+                or metadata.get("communication_completion_goal_ids")
+            ):
+                continue
+            goal_ids = list(
+                dict.fromkeys(
+                    goal_id
+                    for responsibility_ref in metadata.get(
+                        "source_responsibility_refs", []
+                    )
+                    for goal_id in goal_ids_by_responsibility.get(
+                        responsibility_ref, []
+                    )
+                )
+            )
+            if not goal_ids:
+                continue
+            results.extend(
+                self.communicative_goal_completion_apply(
+                    sid,
+                    goal_ids,
+                    metadata={
+                        "source": "social_cognition_communicative_completion",
+                        "delivery_role": "response",
+                        "speech_event_id": speech.id,
+                        "evidence_refs": list(metadata.get("evidence_refs") or []),
+                    },
+                )
+            )
+        return results
+
     @staticmethod
     def _fast_plan_path(plan: CanonicalPlan | None) -> str:
         if plan is None:
@@ -5200,6 +5265,13 @@ class GoalDrivenRuntimeCoordinator:
                         sid=sid,
                         reason="UMI requested Goal continuity without Planner or SC cognition",
                     )
+                direct_social_completion_results = (
+                    self._reconcile_delivered_direct_social_response(
+                        association=association,
+                        interaction=interaction,
+                        sid=sid,
+                    )
+                )
                 return self._finish(
                     mode="apply",
                     status="applied",
@@ -5214,6 +5286,9 @@ class GoalDrivenRuntimeCoordinator:
                         **path_metadata(),
                         "model_driven_cognitive_orchestration": True,
                         "planner_not_requested_by_umi": True,
+                        "direct_social_completion_results": (
+                            direct_social_completion_results
+                        ),
                     },
                 )
 

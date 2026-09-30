@@ -927,6 +927,63 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["playback_started"])
         self.assertEqual(result["order"], 5)
 
+    async def test_started_reused_speech_drops_late_optional_prepared_member(self) -> None:
+        from orchestrator.runtime.scheduler import (
+            CoordinatedStart,
+            CoordinatedStartError,
+            ExecutionStart,
+            current_execution_start,
+        )
+
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.playback_start_waiters = {}
+        assistant._turn_speech_events = {}
+        assistant._turn_speech_event_by_playback_key = {}
+        assistant.session_log = MethodType(
+            lambda self, sid, message, *args: None,
+            assistant,
+        )
+        event = assistant._register_turn_speech_event(
+            session_id="sid-prepared-reuse",
+            generation=3,
+            orders=[7],
+            text="Summer is lovely.",
+            stage="social_stream",
+            purpose="respond",
+        )
+        assert event is not None
+        event["status"] = "playback_started"
+
+        group = CoordinatedStart({"voice", "body"}, {"body"})
+        body_wait = asyncio.create_task(group.ready("body"))
+        await asyncio.sleep(0)
+        token = current_execution_start.set(ExecutionStart(group, "voice"))
+        try:
+            result = await assistant._schedule_interaction_speech(
+                {
+                    "text": "Summer is lovely.",
+                    "metadata": {
+                        "session_id": "sid-prepared-reuse",
+                        "reuse_current_turn_speech": True,
+                        "reused_speech_event_id": event["event_id"],
+                        "reused_speech_generation": 3,
+                        "reused_speech_orders": [7],
+                        "wait_for_playback_start": True,
+                    },
+                }
+            )
+        finally:
+            current_execution_start.reset(token)
+
+        self.assertTrue(result["playback_started"])
+        self.assertIn("voice", group.ready_members)
+        self.assertIn("body", group.dropped)
+        with self.assertRaisesRegex(
+            CoordinatedStartError,
+            "optional_member_not_ready_at_start",
+        ):
+            await body_wait
+
     async def test_same_communicative_activity_auto_reuses_audio_without_transport_identity(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.playback_start_waiters = {}

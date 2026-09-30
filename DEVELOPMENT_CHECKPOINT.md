@@ -1,5 +1,74 @@
 # Chromie Development Checkpoint
 
+## Non-model live workflow repair — 2026-09-30
+
+Pre-delivery Chromie base `e1f4a446860852cfc7f95eae6ab3c6c84f16c496`
+on `main` matched fetched `origin/main`. Paired Soridormi remains at pushed
+`2af3034a91842ecb9964a45ce24e9bdc18fcde58`; preserve its unrelated dirty
+`README.md`, `scripts/run_scenario.sh`, `tests/test_run_scenario_restart.py`, and
+`workspace/Open_Duck_Playground` work. Resume from the newest Chromie revision
+containing this checkpoint and Handoff, fetch both remotes, and keep the default
+target-evidence qualification line open.
+
+The retained patch fixes four non-semantic boundaries exposed by the water-offer
+and complete-cohort traces:
+
+- reconcile actually delivered direct SC speech to a newly materialized
+  speech-only Goal after concurrent Goal Association supplies canonical IDs;
+- treat already observed playback of reused required speech as the prepared-start
+  boundary and drop optional body decoration whose common onset is no longer
+  provable;
+- split independent prepared-start coordination IDs into ordered runtime batches
+  instead of rejecting them as simultaneous voice owners; and
+- preserve the exact Host-owned optional-decoration tuple on terminal results so
+  the live scorer does not turn a dropped optional gesture into required-work
+  failure. Required body failures remain hard failures.
+
+The live scenario inventory regression now expects 56 must-pass, 16 core, 8
+challenge, and 80 total cases. No prompt, model, semantic Schema, Goal/Planner
+authority, capability contract, or deterministic phrase rule changed.
+
+Focused current-source evidence: the prepared-start body-truth case passed 1/1;
+the two-expression English identity case no longer reports multiple voice owners
+or optional gesture failure, while still failing for model latency and missing
+Planner Goal outcome. The focused unit set passed 565 tests with 5 environment
+skips and 39 subtests.
+
+The final unchanged-source aggregate at
+`.chromie/acceptance/non-llm-system-fixes-20260930/full-candidate-bound/` attempted
+all 80 cases and scored 26/80 (32.5%): must-pass 14/56, core 9/16, challenge 3/8.
+Runtime identity is
+`9e0e4d01530d3b1d32db8792463fafaebb0b4b1e94f9e7021528da3fcc365295`;
+it binds dirty source-tree digest
+`7466a5f015fd409d2595094176c6076078bc00c8c7c7b1663716a854174f1014`
+to base revision `e1f4a446860852cfc7f95eae6ab3c6c84f16c496` and the deployed
+`chromie-qwen35-4b` profile. The post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_123419.tar.gz`. This is
+injected-text, TTS, and MuJoCo evidence, not physical audio, camera, grasp, or
+robot proof. This checkpoint and Handoff were finalized after the run; those
+documentation-only edits are not part of the retained source-tree digest.
+
+All repaired signatures are absent from the full result. The 31 hard failures are
+18 model Goal omissions, 5 invalid Fast streams, 5 UMI/SC contract failures
+reported as harness exceptions, and 3 post-run status gaps after hard turn failure.
+The dominant remaining failures are model-produced meaning, activation, Goal
+segmentation, planning, provenance, and latency errors. Do not add Host inference,
+phrase routing, or a second semantic writer to conceal them. Qualify a later LoRA
+or model profile against this frozen cohort.
+
+Repository policy and test ownership pass. The focused suite passes as above. The
+canonical `./scripts/run_tests.sh` passes policy, ownership, static analysis,
+configuration, documentation, and scenario stages, then stops at the already
+recorded generated benchmark drift (`6 failed, 147 passed`). Semantic review is
+pending for all 80 live cases, `cohort_complete=false` because dependent turns are
+not run after hard first-turn failures, and default qualification remains open.
+
+Next work is model-profile/LoRA qualification or independent semantic review of
+the retained bundle. If another non-model symptom appears, reproduce its earliest
+boundary on the unchanged cohort before editing; do not tune against a single
+utterance. Re-run the canonical gates after the existing benchmark fixtures are
+reconciled by their owning delivery line.
+
 ## Full water-offer diagnosis and console-noise repair — 2026-09-30
 
 Pre-delivery Chromie base `1ed1e1f0eade2f620e0ccafa1323790ae88ff477`

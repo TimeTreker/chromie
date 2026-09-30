@@ -7,6 +7,7 @@ from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CognitiveWorkRequest,
@@ -225,6 +226,58 @@ async def test_turn_local_interaction_returns_social_response_without_goal_or_pl
     assert len(agent.social_requests) == 1
     assert agent.goal_association_calls == 1
     assert agent.social_requests[0].context["work_decision_pending"] is True
+
+
+@pytest.mark.asyncio
+async def test_delivered_direct_social_response_closes_materialized_interaction_goal() -> None:
+    class Agent(TurnLocalAgent):
+        async def resolve_goal_association(self, *args, **kwargs):
+            del args, kwargs
+            return new_goal_association("goal-direct-social")
+
+    state = ConversationStateManager(base_conversation_id="direct-social")
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(),
+        adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+        goal_state_apply=state.apply_goal_association_resolution,
+        communicative_goal_completion_apply=(
+            state.reconcile_communicative_goal_completion
+        ),
+    )
+    core, envelope = admitted_core(
+        "Hello.",
+        sid="direct-social-turn",
+        language="en-US",
+        responsibilities=[{
+            "local_ref": "r1",
+            "outcome": "Acknowledge the greeting.",
+            "bindings": {},
+            "output_mode": "speech",
+            "continuity_scope": "turn",
+            "confidence": 1.0,
+        }],
+    )
+
+    result = await coordinator.resolve(
+        object(),
+        text="Hello.",
+        sid="direct-social-turn",
+        core_interpretation=core,
+        turn_envelope=envelope,
+        context={"history": []},
+        history=[],
+        language="en-US",
+    )
+
+    assert result.status == "applied", result.fallback_reason
+    assert result.interaction_response is not None
+    assert result.interaction_response.speech[0].text == "Got it."
+    assert state.active_goal_snapshots() == []
+    recent = state.recent_goal_snapshots()
+    assert [item["goal_id"] for item in recent] == ["goal-direct-social"]
+    assert recent[0]["responsibility_status"] == "satisfied"
+    assert result.metadata["direct_social_completion_results"][0]["changed"] is True
 
 
 def test_umi_cognitive_requests_are_required_but_only_non_standing_authorities() -> None:

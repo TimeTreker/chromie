@@ -1,5 +1,77 @@
 # Chromie Current Status
 
+## Non-model live workflow repairs and 80-case audit — 2026-09-30
+
+The owner-reported greeting → thirst/help → accepted-water episode is retained as
+`accepted_water_offer_executes`. Its live failure remains upstream semantic
+inference: on the acceptance turn User Meaning Interpretation requested Goal
+Association but omitted Planner, described the accepted offer as already complete,
+and therefore produced no `soridormi.acquire_and_deliver_resource` request.
+Planner and Soridormi were not invoked for water delivery. This is a
+`chromie-qwen35-4b` meaning/activation failure; Host code must not invent the
+omitted decision or add phrase routing for `sure`.
+
+Four independent non-model defects found while tracing the complete workflow are
+repaired. First, initial Social Cognition and Goal Association run concurrently;
+a directly delivered response could finish before its speech-only Goal had a
+canonical ID, leaving the completed greeting Goal open. Runtime now joins the
+already delivered SC Responsibility refs to the newly materialized Goal and calls
+the existing communicative completion owner. Second, reused SC speech could have
+already crossed playback start before its final prepared-start group was assembled;
+the coordinator now accepts that observed required start and drops optional body
+decoration whose common onset can no longer be proved. Third, the capability
+runtime previously placed multiple independent prepared speech/body groups in one
+parallel batch, causing a false multiple-voice-owner rejection; it now flushes at
+each coordination-ID boundary. Fourth, terminal results discarded the trusted
+optional-decoration tuple and the live scorer consequently counted a dropped blink
+or wave as required-work failure. The runtime now retains those Host-owned fields,
+and the scorer ignores only that exact optional tuple. Required body failures
+remain blocking. The stale 75-case inventory assertions were also updated to the
+current 56 must-pass, 16 core, 8 challenge, 80 total library.
+
+Focused live proof removed all three coordination/scoring signatures. The identity
+case executed two speech groups in order; optional decoration refusal no longer
+failed it. Its remaining errors were Social Cognition latency and Planner Goal
+outcome omission. The prepared-start body-truth case passed 1/1 mechanically. A
+565-test focused suite passed with 5 environment skips and 39 subtests.
+
+The final revision-bound aggregate attempted all 80 directory-discovered cases in
+one unchanged run with `--keep-going`: 26 passed and 54 failed (32.5% mechanical
+pass rate; must-pass 14/56, core 9/16, challenge 3/8). Case-attempt coverage was
+100%; dependent later turns remained unrun after three hard first-turn failures,
+so `cohort_complete=false` and qualification is open. The run retained 31 hard
+integrity failures: 18 missing Planner Goal outcomes, 5 invalid Fast Planner
+streams, 5 model-contract HTTP failures surfaced through the harness, and 3
+post-run status gaps following hard turn failure. No multiple-voice-owner,
+`coordination_not_started`, or missing prepared-start-provider error appeared.
+Semantic review remains pending for all 80 cases.
+
+The remaining clusters begin in model-produced transactions: UMI omits Planner for
+clear physical or fresh-information work and sometimes emits overlapping spans;
+Goal Association collapses independent Responsibilities; Fast Planner invents
+argument provenance, chooses the wrong capability, or requests impossible
+parallel body resources; Social Cognition violates provenance guards or exceeds
+the latency target. Validators fail these outputs closed. The date/time failures
+also originate in a Planner result that mentions the clock in natural-language
+rationale while declaring no capability/evidence step; a deterministic validator
+cannot infer a fresh-data obligation from prose without becoming another semantic
+authority. No additional non-model behavior patch is justified from this cohort.
+
+Retained evidence is
+`.chromie/acceptance/non-llm-system-fixes-20260930/full-candidate-bound/` with
+runtime identity `9e0e4d01530d3b1d32db8792463fafaebb0b4b1e94f9e7021528da3fcc365295`;
+the single post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_123419.tar.gz`. Agent and
+all cognitive roles used SGLang `chromie-qwen35-4b` under profile
+`rtx4090_laptop`. Repository policy and test ownership pass. The canonical gate
+still stops at the existing generated benchmark drift (6 failed, 147 passed)
+after policy, static-analysis, configuration, documentation, and scenario checks
+pass. Four axes: **Host lifecycle, scheduler, provenance, scorer, and inventory
+implementation updated; focused regression and revision-bound full live aggregate
+retained; deployed injected-text/TTS/MuJoCo evidence only; default semantic target,
+independent review, and physical microphone/speaker/robot qualification remain
+open**.
+
 ## Owner nine-turn conversation audit — 2026-09-30
 
 The owner-supplied bundle

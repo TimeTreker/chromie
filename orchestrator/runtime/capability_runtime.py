@@ -129,6 +129,14 @@ _RESULT_AUTHORITY_METADATA_KEYS = (
     "lane_start_policy",
     "lane_failure_policy",
     "parallel_with_activity",
+    # These four fields form the Runtime's exact trust tuple for optional
+    # Social Cognition decoration.  Retain the Host-validated request values on
+    # terminal evidence so downstream audit and acceptance code can distinguish
+    # a dropped decoration from failed required embodied work.
+    "execution_role",
+    "source",
+    "auxiliary_plan_activity",
+    "semantic_owner",
 )
 
 
@@ -1186,42 +1194,79 @@ class CapabilityRuntime:
             await start_gate.wait()
             try:
                 pending_parallel: list[tuple[CapabilityRequest, CapabilityDefinition]] = []
+
+                async def flush_parallel() -> CapabilityRuntimeResult | None:
+                    nonlocal pending_parallel, blocked_by
+                    if not pending_parallel:
+                        return None
+                    parallel_items = list(pending_parallel)
+                    pending_parallel = []
+                    batch_results, batch_traces = await self._run_parallel(
+                        interaction_id,
+                        parallel_items,
+                        authorization,
+                    )
+                    results.extend(batch_results)
+                    traces.extend(batch_traces)
+                    if any(
+                        self._is_runtime_cancellation(result)
+                        for result in batch_results
+                    ):
+                        return CapabilityRuntimeResult(
+                            interaction_id=interaction_id,
+                            status="cancelled",
+                            results=results,
+                            traces=traces,
+                        )
+                    blocking_batch_results = [
+                        result
+                        for (item, item_definition), result in zip(
+                            parallel_items,
+                            batch_results,
+                            strict=True,
+                        )
+                        if self._failure_blocks_following_requests(
+                            interaction_id,
+                            item,
+                            item_definition,
+                            result,
+                        )
+                    ]
+                    if blocking_batch_results:
+                        blocked_by = blocking_batch_results[0]
+                    return None
+
                 for request, definition in validated:
                     if request.timing == "parallel" and definition.can_run_parallel:
+                        coordination_id = (
+                            str(request.metadata.get("coordination_id") or "").strip()
+                            if request.metadata.get("lane_start_policy")
+                            == "prepared_start"
+                            else ""
+                        )
+                        pending_coordination_ids = {
+                            str(item.metadata.get("coordination_id") or "").strip()
+                            for item, _item_definition in pending_parallel
+                            if item.metadata.get("lane_start_policy")
+                            == "prepared_start"
+                        }
+                        if (
+                            coordination_id
+                            and pending_coordination_ids
+                            and coordination_id not in pending_coordination_ids
+                        ):
+                            terminal = await flush_parallel()
+                            if terminal is not None:
+                                return terminal
+                            if blocked_by is not None:
+                                break
                         pending_parallel.append((request, definition))
                         continue
-                    if pending_parallel:
-                        parallel_items = list(pending_parallel)
-                        batch_results, batch_traces = await self._run_parallel(
-                            interaction_id,
-                            parallel_items,
-                            authorization,
-                        )
-                        results.extend(batch_results)
-                        traces.extend(batch_traces)
-                        pending_parallel = []
-                        if any(self._is_runtime_cancellation(result) for result in batch_results):
-                            return CapabilityRuntimeResult(
-                                interaction_id=interaction_id,
-                                status="cancelled",
-                                results=results,
-                                traces=traces,
-                            )
-                        blocking_batch_results = [
-                            result
-                            for (item, item_definition), result in zip(
-                                parallel_items, batch_results, strict=True
-                            )
-                            if self._failure_blocks_following_requests(
-                                interaction_id,
-                                item,
-                                item_definition,
-                                result,
-                            )
-                        ]
-                        if blocking_batch_results:
-                            blocked_by = blocking_batch_results[0]
-                            break
+                    terminal = await flush_parallel()
+                    if terminal is not None:
+                        return terminal
+                    if blocked_by is not None:
+                        break
                     result, trace = await self._run_one(
                         interaction_id,
                         request,
@@ -1246,20 +1291,9 @@ class CapabilityRuntime:
                         blocked_by = result
                         break
                 if pending_parallel:
-                    batch_results, batch_traces = await self._run_parallel(
-                        interaction_id,
-                        pending_parallel,
-                        authorization,
-                    )
-                    results.extend(batch_results)
-                    traces.extend(batch_traces)
-                    if any(self._is_runtime_cancellation(result) for result in batch_results):
-                        return CapabilityRuntimeResult(
-                            interaction_id=interaction_id,
-                            status="cancelled",
-                            results=results,
-                            traces=traces,
-                        )
+                    terminal = await flush_parallel()
+                    if terminal is not None:
+                        return terminal
                 if blocked_by is not None:
                     completed_request_ids = {item.request_id for item in results}
                     for request, definition in validated:

@@ -61,6 +61,33 @@ class CoordinatedStart:
         if self.error is not None or member in self.dropped:
             raise CoordinatedStartError(self.error or "optional_member_not_ready_at_start")
 
+    async def ready_after_observed_start(self, member: str) -> None:
+        """Release required work after its effect already crossed the start boundary.
+
+        A reused output can begin before the final cross-lane group is assembled.
+        That observed start satisfies the required member, but optional members can
+        no longer prove a common onset and must be dropped even when they reached
+        the preparation barrier first.
+        """
+
+        if member not in self.members:
+            raise CoordinatedStartError("unknown coordination member")
+        if member in self.optional:
+            raise CoordinatedStartError(
+                "optional coordination member cannot own an observed prior start"
+            )
+        if self.released_at is None and self.error is None:
+            self.ready_members.add(member)
+            self.ready_at[member] = asyncio.get_running_loop().time()
+            self.dropped.update(self.optional)
+            self.ready_members.difference_update(self.optional)
+            if self.members - self.optional <= self.ready_members:
+                self.released_at = asyncio.get_running_loop().time()
+                self._released.set()
+        await self._released.wait()
+        if self.error is not None:
+            raise CoordinatedStartError(self.error)
+
     def finished(self, member: str) -> None:
         if self.released_at is not None or self.error is not None:
             return

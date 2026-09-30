@@ -219,6 +219,19 @@ def should_require_tts_speech(*, require_speech: bool) -> bool:
     return bool(require_speech)
 
 
+def is_optional_social_decoration_result(result: Any) -> bool:
+    """Recognize the Runtime's exact optional Social Cognition trust tuple."""
+
+    metadata = result.metadata if isinstance(result.metadata, dict) else {}
+    return bool(
+        metadata.get("execution_role") == "social_decoration"
+        and metadata.get("source") == "social_cognition_auxiliary_activity"
+        and metadata.get("auxiliary_plan_activity") is True
+        and metadata.get("semantic_owner") == "social_cognition"
+        and not metadata.get("source_goal_ids")
+    )
+
+
 def _workflow_field(message: str, key: str) -> str:
     match = re.search(rf"(?:^|\s){re.escape(key)}=([^\s]+)", message)
     if not match:
@@ -1469,7 +1482,10 @@ async def run_check(
                 if execution.status != "completed":
                     errors.append(f"Trusted Capability Runtime status was {execution.status!r}")
                 for result in body_results:
-                    if result.status != "completed":
+                    if (
+                        result.status != "completed"
+                        and not is_optional_social_decoration_result(result)
+                    ):
                         errors.append(
                             f"{result.capability_id} ended with status {result.status!r}: "
                             f"{result.reason_code or result.message}"
