@@ -579,7 +579,10 @@ second semantic world model. The split is:
   independently and be available before a user turn reaches Planner.
 
 The current MuJoCo integration maintains a trusted ambient scene projection mechanically
-through periodic `soridormi.robot.observe_scene` safe reads. Provider change identity
+through periodic `soridormi.robot.observe_scene` safe reads. The tool is admitted
+through the checked-in `capabilities/soridormi.json` registry entry;
+advertising the tool at the MCP endpoint alone does not register it with the Host.
+The entry preserves Soridormi's simulation-only, read-only contract. Provider change identity
 suppresses unchanged polls; sensor polling itself does not invoke UMI, GA, Planner, Social
 Cognition, or Memory extraction. On an ordinary turn, Planner consumes the latest bounded
 Situation that Chromie already owns. If that Situation is missing, stale, or insufficient,

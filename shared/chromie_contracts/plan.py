@@ -60,6 +60,7 @@ def validate_communicative_activity_identity(
     All Planner scopes share this mechanical contract. Equal words under distinct
     identities remain valid; transport decides whether an existing act needs delivery.
     ``already_spoken`` is the delivery owner's completed-speech projection.
+    Earlier turns may be referenced for repair, but cannot answer a new turn.
     """
     context = interaction_context if isinstance(interaction_context, dict) else {}
 
@@ -73,6 +74,8 @@ def validate_communicative_activity_identity(
         values = metadata.get("communicative_activity_ids") or row.get("communicative_activity_ids") or []
         return {str(value).strip() for value in values} if isinstance(values, list) else set()
 
+    if any(activity_id in ids(row) for row in rows("prior_delivered_speech")):
+        raise ValueError("Communicative Activity from a prior turn cannot be rebound to this turn")
     for row in [
         *rows("events"),
         *rows("already_spoken"),

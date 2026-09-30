@@ -595,6 +595,35 @@ def test_native_identity_choices_preserve_reuse_and_explicit_repetition(ledger_k
         assert validator.is_valid(repeated)
 
 
+def test_prior_turn_identity_cannot_be_rebound_to_a_new_reply():
+    from shared.chromie_contracts.plan import validate_communicative_activity_identity
+
+    interaction = {"prior_delivered_speech": [{
+        "turn_id": "old-turn", "text": "Old words.",
+        "metadata": {"communicative_activity_ids": ["act_001"]},
+    }]}
+    current = request(source_turn={"turn_id": "new-turn"},
+                      context={"interaction_context": interaction})
+    schema = social_cognition_response_schema(current, [])
+    assert not Draft202012Validator(schema).is_valid(
+        response(activity_id="act_001", text="Old words."),
+    )
+    with pytest.raises(ValueError, match="prior turn"):
+        validate_communicative_activity_identity(
+            activity_id="act_001", text="Old words.", interaction_context=interaction,
+        )
+    # Intentional repetition and correction are new acts; past evidence remains
+    # available for repair references without becoming a new delivery identity.
+    for words in ("Old words.", "新的回答。"):
+        assert Draft202012Validator(schema).is_valid(
+            response(activity_id="fresh", text=words),
+        )
+        validate_communicative_activity_identity(
+            activity_id="fresh", text=words, interaction_context=interaction,
+            repair_of_activity_ids=["act_001"],
+        )
+
+
 @pytest.mark.asyncio
 async def test_raw_schema_rejects_nested_identity_violation_before_dto_or_retry():
     current = request(context={"interaction_context": {"already_spoken": [{
@@ -630,6 +659,25 @@ def test_native_fresh_identity_pattern_enforces_length_without_decoder_length_ke
     assert Draft202012Validator(schema).is_valid(response(
         activity_id=retained[-1], text="Old words.",
     ))
+
+
+@pytest.mark.parametrize("retained", ["act_001", "existing", "face", "beef", "001"])
+def test_xgrammar_preserves_fresh_ids_after_hexadecimal_prefixes(retained):
+    # Run with the serving image's pinned XGrammar. Python's re accepts the
+    # faulty escape too, so it cannot establish native decoder compatibility.
+    xgrammar = pytest.importorskip("xgrammar")
+    current = request(context={"interaction_context": {"prior_delivered_speech": [{
+        "text": "Old words.", "metadata": {"communicative_activity_ids": [retained]},
+    }]}})
+    schema = social_cognition_response_schema(current, [])
+    fresh = schema["$defs"]["SocialCommunicativeAct"]["oneOf"][0]["properties"]["activity_id"]
+    tokenizer = xgrammar.TokenizerInfo(
+        [bytes([i]) for i in range(256)] + [b"STOP"], stop_token_ids=[256],
+    )
+    compiled = xgrammar.GrammarCompiler(tokenizer).compile_json_schema(json.dumps(fresh))
+    for identity, accepted in [("fresh_zh", True), ("z", True), (retained, False), ("", False)]:
+        matcher = xgrammar.GrammarMatcher(compiled)
+        assert matcher.accept_string(json.dumps(identity)) is accepted
 
 
 def test_sglang_preserves_social_need_contract_through_decoder_intersections():
@@ -2087,6 +2135,37 @@ def test_social_model_context_does_not_reinterpret_generic_dialogue_history() ->
     assert "core_interpretation" not in projected
     assert projected["interaction_context"] == interaction
     assert projected["other_evidence"] == {"status": "retain"}
+
+
+@pytest.mark.parametrize("trigger,goal_ids,failure,retain", [
+    ("interpretation", [], {}, False),
+    ("work_state", [], {"status": "failed"}, False),
+    ("work_state", ["current-goal"], {}, True),
+])
+def test_social_context_filters_nested_unbound_tasks_without_losing_memory(
+    trigger, goal_ids, failure, retain,
+):
+    from agent.app.social_cognition import _social_model_context
+
+    memory = {
+        "active_task_contexts": [{"goal": "Old unrelated identity question"}],
+        "active_task_snapshots": [{"last_user_update": "Old water request"}],
+        "current_task": {"goal_id": "old-goal"},
+        "current_task_context": {"goal": "Old unrelated identity question"},
+        "active_memory": {"entries": [{"content": "Prefers Chinese"}]},
+        "recent_user_request": "Speak Chinese now",
+        "recent_tool_evidence": [{"source_ref": "observed-scene"}],
+    }
+    context = {"session_memory": memory, "current_task": memory["current_task"],
+               "work_failure": failure}
+    projected = _social_model_context(context, trigger=trigger, goal_ids=goal_ids)
+    for key in ("active_task_contexts", "active_task_snapshots", "current_task", "current_task_context"):
+        assert (key in projected["session_memory"]) is retain
+    assert ("current_task" in projected) is retain
+    for key in ("active_memory", "recent_user_request", "recent_tool_evidence"):
+        assert projected["session_memory"][key] == memory[key]
+    assert context["session_memory"] is memory
+    assert "current_task" in memory
 
 
 @pytest.mark.parametrize("core_turn", ["current", "older", ""])

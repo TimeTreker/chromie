@@ -1,5 +1,39 @@
 # Chromie Development Checkpoint
 
+## Nine-turn owner conversation repair — 2026-09-30
+
+Pre-delivery Chromie base `6b83a8496d5b3dd9b2a7f78824250eb117f6fb19`
+on `main` matched fetched `origin/main`; paired Soridormi remained at
+`fc8c6f61013640e09bb5de978c59e9ce04423f6d` with its pre-existing dirty work
+untouched. Resume from the latest revision containing this checkpoint and Handoff,
+fetch both remotes, and preserve the active aggregate qualification line.
+
+The owner-supplied nine-turn episode is now a maintained live scenario. Retained
+source repairs scene-tool registration, native fresh communication-ID decoding,
+cross-turn activity-ID rebinding, and nested stale-task projection into Social
+Cognition. Six whole-conversation iterations completed all nine turns. The retained
+revision scored 2/9; a raw-history candidate scored 0/9 and a final current-scope
+prompt candidate remained 2/9 with semantic regressions, so both were rejected.
+
+Open earliest boundaries are UMI speaker perspective and overlap, missing useful
+Planner activation for the water request, GA association to a stale identity Goal,
+and SC session-language enactment. Do not claim the conversation fixed or broaden
+the retained mechanical repairs into phrase routing, a second semantic call, or a
+model change. Resume by qualifying those boundaries independently against the frozen
+nine-turn contrast before another aggregate edit.
+
+Retained live evidence is under
+`.chromie/acceptance/conversation-repair-20260930/nested-fixed/`; its bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_085555.tar.gz`.
+This is silent text plus MuJoCo simulation evidence, not physical audio/camera/robot
+proof. The final simulator status was safe idle with no active task.
+Focused Social Cognition/scene/manifest validation passed 183 tests with 5
+environmental XGrammar skips; the equivalent 20 native checks passed in the serving
+image. Scenario discovery and test ownership passed. Selected Level A evidence was
+16/19; four assertions in three scenarios retain the known missing
+`body_effect_family` fixture drift. The canonical gate again stopped at the same six
+benchmark dataset/fixture failures after 147 passes; later test stages did not run.
+
 ## Thirst confirmation, provider source, and water route — 2026-09-25
 
 Pre-delivery Chromie base `c97aab36eb97217b15b7d9932157da55180caaeb`

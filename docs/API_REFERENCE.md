@@ -17,6 +17,12 @@ owner. Triggers are interpretation, Goal state, Work state, Evidence or Situatio
 UMI is optional for non-turn triggers. Input includes exact source references,
 read-only Goal/Responsibility/Evidence scope, communication needs, trusted
 Situation and disclosure-safe shared context. An optional typed `CognitiveOpportunity` preserves existing source, subject, Situation and depth readiness; local mechanical readiness never calls the model. No synthetic user turn is required.
+For an interpretation-triggered call, the projection removes unbound retained
+task state from both the outer context and its `session_memory` mirror. This keeps
+historical Goals and delivery evidence available for their owned uses without
+letting them replace the current reply. A Communicative Activity ID from
+`prior_delivered_speech` may be cited by a new repair act, but cannot be rebound as
+the new turn's act; same-turn delivery accounting may still reuse an unchanged ID.
 
 `SocialCognitionResolution` contains request identity and snapshot digest, a
 complete communication/silence decision, exact acts and bounded eligible social

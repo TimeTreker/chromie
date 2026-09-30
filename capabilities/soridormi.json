@@ -130,6 +130,138 @@
           }
         },
         {
+          "name": "soridormi.robot.observe_scene",
+          "agent_id": "soridormi.robot",
+          "display_name": "Observe simulated scene",
+          "description": "Read the current MuJoCo scene-marker mock observation. It is simulation evidence, not camera or hardware perception.",
+          "version": "0.1.0",
+          "llm_visible": true,
+          "input_schema": {
+            "type": "object",
+            "properties": {}
+          },
+          "output_schema": {
+            "type": "object",
+            "properties": {
+              "observation_id": {
+                "type": "string"
+              },
+              "observation_sequence": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "scene_revision": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "scene_signature": {
+                "type": "string",
+                "minLength": 64,
+                "maxLength": 64
+              },
+              "mode": {
+                "type": "string",
+                "enum": [
+                  "sim"
+                ]
+              },
+              "source_kind": {
+                "type": "string"
+              },
+              "mocked_simulation": {
+                "type": "boolean",
+                "const": true
+              },
+              "robot_time_s": {
+                "type": "number"
+              },
+              "objects": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "object_ref": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "relative_direction": {
+                      "type": "string"
+                    },
+                    "distance_m": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "object_ref",
+                    "description",
+                    "relative_direction",
+                    "distance_m"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "source_revision": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "observation_id",
+              "observation_sequence",
+              "mode",
+              "source_kind",
+              "mocked_simulation",
+              "robot_time_s",
+              "objects"
+            ]
+          },
+          "effects": [
+            "read_only",
+            "perception"
+          ],
+          "safety_class": "safe_read",
+          "availability": {
+            "available": true,
+            "modes": [
+              "sim"
+            ],
+            "requires": [],
+            "reason": null
+          },
+          "execution": {
+            "can_run_parallel": true,
+            "exclusive_group": null,
+            "timeout_s": 2.0,
+            "idempotent": true,
+            "side_effect_free": true
+          },
+          "confirmation": {
+            "required": false,
+            "reason": null,
+            "required_in_modes": [],
+            "skippable_in_modes": []
+          },
+          "monitoring": {
+            "requires_safety_monitor": false,
+            "recommended_monitor_tools": [],
+            "hard_interrupt_events": []
+          },
+          "failure_modes": [],
+          "default_failure_policy": {
+            "strategy": "abort_task",
+            "target": null,
+            "message": null,
+            "default_output": null,
+            "max_attempts": null,
+            "backoff_s": null,
+            "then": null
+          },
+          "llm_hints": {
+            "when_to_use": "Use only for an explicit simulation scene observation. An empty objects list provides no visual grounding."
+          }
+        },
+        {
           "name": "soridormi.robot.get_mode",
           "agent_id": "soridormi.robot",
           "display_name": null,
@@ -4289,6 +4421,9 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "fa8080d2a4a5e1c47a1c77a1748aa65e6dec4d83"
+    "upstream_commit": "fa8080d2a4a5e1c47a1c77a1748aa65e6dec4d83",
+    "upstream_tool_commits": {
+      "soridormi.robot.observe_scene": "fc8c6f61013640e09bb5de978c59e9ce04423f6d"
+    }
   }
 }

@@ -1,5 +1,41 @@
 # Chromie Current Status
 
+## Owner nine-turn conversation audit — 2026-09-30
+
+The owner-supplied bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_081719.tar.gz`
+was replayed as one frozen nine-turn conversation through the deployed text Host,
+Agent, fixed `chromie-qwen35-4b` model, TTS scheduling, and Soridormi simulator.
+Every aggregate run attempted all nine turns; ordinary semantic failures did not
+stop the cohort. Six aggregate iterations scored 1/9, 2/9, 0/9 (rejected), 2/9,
+2/9, and 2/9 (rejected). The retained final source is the fifth iteration at
+2/9 (22.22%): Chromie's identity answer and the Chinese greeting passed.
+
+Four reproduced boundary defects are repaired. The checked-in Soridormi manifest
+now registers the provider's simulation-only `soridormi.robot.observe_scene` safe
+read. Social Cognition's native XGrammar fresh-activity pattern no longer lets a
+following hexadecimal ID prefix widen `\x1f` and block ordinary letters. A prior-
+turn Communicative Activity ID cannot be rebound as the answer to a new turn, while
+remaining available as a repair reference. Interpretation projection now removes
+unbound retained task mirrors from nested `session_memory` as well as the outer
+context. The exact episode is retained as a directory-discovered live scenario.
+
+The overall behavior is not qualified. UMI still confuses speaker perspective for
+“who am I?”, splits the noisy hunger/help turn into an invalid overlap, and does
+not reliably request Planner cognition for the physical water outcome. GA then
+associates unrelated turns with the stale identity Goal, and Social Cognition does
+not reliably enact the requested session language. Prompt/context candidates that
+regressed or failed to improve the complete cohort were rejected.
+
+Four axes: **source implementation updated; focused mechanical tests pass with
+broader known fixture/benchmark failures; current-revision silent live text and
+MuJoCo evidence is 2/9; default target qualification, physical microphone/speaker,
+camera, and robot evidence remain open**.
+Focused SC/scene/manifest tests passed 183 with 5 host-environment XGrammar skips;
+20 equivalent native checks passed in the serving image. Selected Level A was
+16/19. The canonical gate stopped at the retained benchmark drift, 6 failed and
+147 passed, after its policy/static/configuration/documentation stages passed.
+
 ## Thirst confirmation and provider-owned water source — 2026-09-25
 
 The retained two-turn text episode in

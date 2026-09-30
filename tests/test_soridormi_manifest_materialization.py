@@ -122,6 +122,7 @@ class SoridormiManifestMaterializationTests(unittest.TestCase):
             tool_names,
             {
                 "soridormi.robot.get_status",
+                "soridormi.robot.observe_scene",
                 "soridormi.robot.get_mode",
                 "soridormi.robot.get_battery",
                 "soridormi.motion.create_plan",

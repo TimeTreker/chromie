@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from typing import Any
 
 import pytest
 
-from agent.app.tool_invocation import ToolCallOutcome
+from agent.app.capabilities.loader import build_configured_registry
+from agent.app.tool_invocation import McpStreamableHttpInvoker, ToolCallOutcome
 from orchestrator.runtime.soridormi_scene_perception import (
     observe_soridormi_sim_scene,
     refresh_soridormi_ambient_scene_once,
@@ -66,6 +68,30 @@ def test_simulator_observation_reaches_chromie_with_source_ref() -> None:
         "user, 1.5 meters to Chromie's right (simulated)"
     )
     assert observation.projection.interpretations[1].source_refs == ["soridormi-scene-7"]
+
+
+def test_scene_observation_uses_checked_in_registry_and_transport(monkeypatch) -> None:
+    monkeypatch.setenv("SORIDORMI_MCP_URL", "http://scene-provider:8000/mcp")
+    calls = []
+
+    async def transport(url, tool, args, timeout_s):
+        calls.append((url, tool, args, timeout_s))
+        return {"structuredContent": scene()}
+
+    manifest = Path(__file__).resolve().parents[1] / "capabilities" / "soridormi.json"
+    configured = build_configured_registry([str(manifest)])
+    invoker = McpStreamableHttpInvoker(configured.registry, call=transport)
+    observation = asyncio.run(observe_soridormi_sim_scene(invoker, context={}))
+
+    assert observation is not None
+    assert observation.source_refs == ["soridormi-scene-7"]
+    assert calls == [(
+        "http://scene-provider:8000/mcp", "soridormi.robot.observe_scene", {}, 2.0,
+    )]
+    tool = configured.registry.get_tool("soridormi.robot.observe_scene")
+    assert tool.safety_class == "safe_read"
+    assert tool.availability.modes == ["sim"]
+    assert tool.execution.side_effect_free
 
 
 def test_user_report_cannot_substitute_for_scene_observation() -> None:

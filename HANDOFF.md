@@ -1,5 +1,53 @@
 # Chromie Handoff
 
+## Owner nine-turn conversation audit — 2026-09-30
+
+Chromie checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery base
+`6b83a8496d5b3dd9b2a7f78824250eb117f6fb19`; that base matched fetched
+`origin/main` before editing. Soridormi checkout `/home/chromie/github/soridormi`
+remained at `fc8c6f61013640e09bb5de978c59e9ce04423f6d`; preserve its unrelated dirty
+files. Input evidence is
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_081719.tar.gz` plus the
+owner transcript attached to the originating task.
+
+The retained patch registers `soridormi.robot.observe_scene` from that exact
+Soridormi revision, fixes the native fresh communication-ID regex, forbids reuse of
+a prior-turn activity ID as a new answer, filters mirrored unbound task state from
+SC `session_memory`, and retains the exact nine-turn episode as a live scenario.
+The Agent was rebuilt from the dirty source and its source digest matched the Host.
+
+Aggregate scores, in order, were 1/9 baseline, 2/9 scene registration, 0/9 rejected
+raw dialogue history, 2/9 activity identity, 2/9 retained nested-context repair,
+and 2/9 rejected current-scope prompt. The retained replay is
+`.chromie/acceptance/conversation-repair-20260930/nested-fixed/score.json`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_085555.tar.gz`. It passed
+turn 2 (Chromie identity) and turn 8 (Chinese greeting). All other turns failed the
+semantic oracle. The simulator ended `safe_idle=true`, `active_task=null`,
+`fallen=false`, `emergency_stop=false`.
+
+Remaining failures: UMI rejects the noisy hunger/help meaning as overlapping,
+answers “who am I?” with Chromie's identity, and does not reliably activate useful
+Planner work for water; GA carries unrelated turns into the stale identity Goal; SC
+does not consistently enact Chinese. The attempted generic perspective, raw-history,
+language, current-scope, and cache-isolation candidates did not qualify and are not
+in source. Physical microphone, speaker, camera, and robot evidence was not run.
+
+Validation on retained source: focused SC/scene/manifest `183 passed, 5 skipped`;
+native serving-image fresh-ID checks `20 passed`; scenario discovery and test
+ownership passed. Selected Level A was `16/19`, with the known missing
+`body_effect_family` fixture drift. `./scripts/run_tests.sh` passed policy, ownership,
+static analysis, configuration and documentation stages, then stopped at the same
+benchmark drift (`6 failed, 147 passed`); the full unit stage did not run.
+
+Resume with:
+
+```bash
+cd /home/chromie/github/chromie
+git fetch origin
+git status --short
+/home/chromie/miniconda3/envs/Chromie/bin/python scripts/general_ability_acceptance.py --mode check --only-case owner_identity_language_water_continuity --no-write
+```
+
 ## Thirsty water scene and provider-owned source — 2026-09-25
 
 Chromie checkout `/home/chromie/github/chromie`, `main`, pre-delivery base

@@ -228,10 +228,11 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
     """Keep fresh IDs compact while preserving immutable reuse of delivered wording.
 
     Activity identity is transport bookkeeping, not a social-expression quota.  Fresh
-    acts may use any short ID that is not a retained delivered identity; retained IDs
-    remain reusable only with their exact delivered wording.
+    acts may use any short ID that is not a retained delivered identity. Current-turn
+    IDs remain reusable with their exact wording; prior-turn IDs are repair refs only.
     """
     known: dict[str, set[str]] = {}
+    prior_ids: set[str] = set()
     context = request.context.get("interaction_context", {})
     for key in (
         "events", "already_spoken", "pending_speech", "prior_delivered_speech"
@@ -240,7 +241,10 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
             ids = row.get("metadata", {}).get("communicative_activity_ids") or row.get("communicative_activity_ids") or []
             if isinstance(ids, list):
                 for identity in ids:
-                    known.setdefault(str(identity).strip(), set()).add(normalize_whitespace(row.get("text") or ""))
+                    identity = str(identity).strip()
+                    known.setdefault(identity, set()).add(normalize_whitespace(row.get("text") or ""))
+                    if key == "prior_delivered_speech":
+                        prior_ids.add(identity)
 
     def fresh_identity_suffix(excluded: list[str], remaining: int) -> str | None:
         # The serving decoder ignores `not: {enum: ...}` and does not support
@@ -255,7 +259,10 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
         if not heads:
             minimum = 1 if "" in excluded else 0
             return safe_character + f"{{{minimum},{remaining}}}"
-        alternatives = [r'[^"\\\x00-\x1f' + re.escape(''.join(heads)) + "]" + safe_character + f"{{0,{remaining - 1}}}"]
+        # Keep the hexadecimal escape last: XGrammar consumes a following
+        # hexadecimal head (for example 'a' in act_001) as part of \x1f,
+        # widening the excluded control range to \x1fa and blocking fresh IDs.
+        alternatives = [r'[^"\\' + re.escape(''.join(heads)) + r'\x00-\x1f]' + safe_character + f"{{0,{remaining - 1}}}"]
         for head in heads:
             suffix = fresh_identity_suffix([
                 value[1:] for value in excluded if value.startswith(head)
@@ -290,8 +297,8 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
             }
         variants = [fresh]
         for identity, messages in known.items():
-            if len(messages) != 1:
-                continue  # Conflicting historical wording cannot be reused.
+            if identity in prior_ids or len(messages) != 1:
+                continue  # Earlier turns and conflicting wording cannot be reused.
             text = next(iter(messages))
             text_contract = branch["properties"]["text"]
             if ("const" in text_contract and text_contract["const"] != text) or not (
@@ -923,16 +930,22 @@ def _social_model_context(
         # the interaction ledger still carries prior delivered speech for
         # repetition/repair identity. Remove unbound retained task state so a
         # stale active Goal cannot replace the foreground Responsibility.
-        for key in (
+        unbound_task_keys = (
             "active_goal_snapshots", "recent_goal_snapshots",
             "working_goal_memory", "long_term_goal_memory",
             "user_meaning_goal_context", "goal_association_candidates",
             "active_pending_tasks", "active_task_contexts",
-            "active_task_snapshots", "task_contexts", "current_task_context",
+            "active_task_snapshots", "task_contexts", "current_task_context", "current_task",
             "goal_association_resolution", "planner_context",
             "canonical_plan_resolution", "source_canonical_plan",
-        ):
+        )
+        memory = projected.get("session_memory")
+        for key in unbound_task_keys:
             projected.pop(key, None)
+            # Session Memory mirrors the same task state. Filtering only the
+            # outer context leaves an unrelated retained Goal in SC's foreground.
+            if isinstance(memory, dict):
+                memory.pop(key, None)
     for key in ("canonical_plan_resolution", "source_canonical_plan"):
         if key in projected:
             projected[key] = _social_plan_facts(projected[key])
