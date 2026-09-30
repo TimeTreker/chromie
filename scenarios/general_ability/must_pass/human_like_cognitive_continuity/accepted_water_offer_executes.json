@@ -1,0 +1,91 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "accepted_water_offer_executes",
+  "stage": "must_pass",
+  "difficulty": "medium",
+  "rationale": "A short acceptance of Chromie's concrete physical offer must preserve the offered terminal effect and reach planning instead of collapsing into an acknowledgement.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "dialogue_continuity",
+      "intent_understanding",
+      "plan_completeness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "dialogue_continuity",
+      "intent_understanding",
+      "plan_completeness"
+    ],
+    "primary_outcomes": [
+      "Respond naturally to the greeting.",
+      "Understand the user's thirst and request for help without claiming completed work.",
+      "Resolve the user's acceptance against Chromie's immediately preceding water offer and request physical water acquisition and delivery to the user."
+    ],
+    "acceptable_auxiliary": [
+      "Chromie may ask whether the user wants water before the acceptance.",
+      "Brief truthful speech may accompany accepted physical work."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Treat the acceptance as only an acknowledgement or readiness statement.",
+      "Associate the thirst or water-delivery outcome with the earlier greeting Goal.",
+      "Claim water delivery without matching provider completion evidence."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "description": "Three-turn retained owner regression for accepting Chromie's offer to get water.",
+  "turns": [
+    {
+      "id": "turn-01",
+      "text": "hi, how are you?",
+      "language": "en-US",
+      "require_speech": true
+    },
+    {
+      "id": "turn-02",
+      "text": "I am a little thirsty, can you help me?",
+      "language": "en-US",
+      "require_speech": true
+    },
+    {
+      "id": "turn-03",
+      "text": "sure",
+      "language": "en-US",
+      "require_speech": true,
+      "expected_capabilities": [
+        "soridormi.acquire_and_deliver_resource"
+      ]
+    }
+  ],
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "human_like_cognitive_continuity",
+        "title": "Human-like Cognitive Continuity",
+        "general_rule": "Chromie should remain one continuous interlocutor while work progresses: preserve recent meaning, avoid duplicate acknowledgements, keep conversation available, and let follow-up turns revise only the relevant unfinished responsibility.",
+        "rationale": "A confirmation must inherit the concrete proposal it accepts while unrelated earlier conversation remains separate.",
+        "root_cause_boundaries": [
+          "Cognitive Gateway",
+          "User Meaning Interpretation/Goal Association",
+          "Planner",
+          "Host interaction state",
+          "Test evidence"
+        ]
+      }
+    ]
+  }
+}

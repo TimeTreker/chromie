@@ -1,5 +1,74 @@
 # Chromie Development Checkpoint
 
+## Full water-offer diagnosis and console-noise repair — 2026-09-30
+
+Pre-delivery Chromie base `1ed1e1f0eade2f620e0ccafa1323790ae88ff477`
+on `main` matched fetched `origin/main`. Paired Soridormi scenario revision
+`2af3034a91842ecb9964a45ce24e9bdc18fcde58` is pushed on `origin/main`;
+its unrelated dirty checkout files were not included. Resume from the latest
+Chromie revision containing this checkpoint and Handoff, fetch both remotes,
+and preserve the active default target-evidence qualification line.
+
+The reported three-turn water-offer episode is now a maintained must-pass live
+scenario. The matching simulator scene supplies a person 1.5 m to Chromie's
+right, one water bottle 3 m to its left, and a milk-bottle contrast 10 m ahead.
+The live text console keeps semantic/runtime records at their configured level
+while suppressing repetitive `httpx`, `httpcore`, and `mcp` transport polling
+lines. This delivery does not change a semantic prompt, model, Schema, DTO, or
+runtime decision authority.
+
+One frozen, revision-bound `--keep-going --assertion-scope full --execute`
+aggregate attempted all 80 discovered cases: 19 passed, 61 failed, 0 skipped
+(23.75% automated pass rate). Must-pass was 9/56, core 7/16, and challenge
+3/8. Thirty-six hard integrity failures comprised 20 model-contract failures
+(17 Goal omissions and 3 invalid Fast streams), 9 harness/runtime exceptions,
+6 unavailable per-case post-run status records, and 1 cognitive-runtime
+exception. Diagnostic earliest-boundary clustering across all failures was:
+31 response/user-outcome, 15 Planner contract, 5 live harness, 5 cognitive
+runtime, 3 Fast stream, and 2 Goal Association. A same-session, non-independent
+semantic review judged 7/80 pass and 73/80 fail (8.75%); it is diagnostic only,
+not independent semantic closure. The cohort is complete for case attempts but
+qualification remains failed because hard failures cannot be averaged away.
+
+For the exact water episode, turn 2 preserved some thirst/help meaning but Social
+Cognition answered as if Chromie were thirsty; turn 3 failed to bind `sure` to
+Chromie's water offer, Goal Association returned to the greeting, and no
+`soridormi.acquire_and_deliver_resource` request was committed. Six bounded
+prompt candidates were screened. The furthest candidate reached Planner, which
+invented two duplicate clarification actions with the same InformationGap ID
+instead of executing the accepted offer. Every candidate regressed a frozen
+contrast or failed end to end, so all semantic candidates were rejected and
+reverted. Current evidence therefore supports model-inference weakness under
+the deployed 4B profile as the dominant semantic limitation, with separate
+harness/status evidence defects; it does not prove the model is the only cause.
+
+Retained aggregate evidence is
+`.chromie/acceptance/full-water-diagnosis-20260930-0956/`; runtime identity hash
+`6027768ce3fbe1c03b4e52719817c1751c543d05e652039836faf3b5e2c878cf`
+records SGLang `chromie-qwen35-4b` for Agent and all cognitive roles. The one
+post-cohort bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_100809.tar.gz`.
+This is live text plus MuJoCo evidence, not microphone, speaker, camera, or
+physical-robot proof. After the aggregate, the simulator was reset and observed
+standing and safe idle with no active task or execution lanes.
+
+Focused console tests passed 18. Scenario discovery/check passed 15 ability
+classes, 45 Level A cases, and 80 live-text cases. Repository policy, test
+ownership, and docs checks passed. The canonical `./scripts/run_tests.sh` still
+failed at the known benchmark-contract drift (`6 failed, 147 passed`), so the
+canonical gate remains open. Soridormi scenario validation and focused runtime
+tests passed; its host-wide gates remain limited by missing host `zmq`, while the
+runtime-container full suite had 15 checkout-mount/path failures after 818 passes
+and 7 skips.
+
+Next work is to separate model-profile qualification from the five harness and
+status evidence boundaries, repair the earliest reproducible non-semantic
+boundary without phrase routing or a second semantic authority, then rerun a
+focused case and the complete cohort on one unchanged revision. Do not promote
+any of the six rejected prompt candidates. A larger/different model may be
+qualified later as an explicit profile change; no such model change is retained
+or claimed here.
+
 ## Nine-turn owner conversation repair — 2026-09-30
 
 Pre-delivery Chromie base `6b83a8496d5b3dd9b2a7f78824250eb117f6fb19`

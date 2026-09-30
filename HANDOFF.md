@@ -1,5 +1,132 @@
 # Chromie Handoff
 
+## Full 80-case water-offer audit and retained operator repair — 2026-09-30
+
+Chromie checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery
+base `1ed1e1f0eade2f620e0ccafa1323790ae88ff477`; it matched fetched
+`origin/main` before delivery. Paired Soridormi commit
+`2af3034a91842ecb9964a45ce24e9bdc18fcde58` adds
+`configs/simulation_scenarios/thirst_water_delivery.json` and is pushed to
+`origin/main`. Soridormi's pre-existing `README.md`, `scripts/run_scenario.sh`,
+`tests/test_run_scenario_restart.py`, and `workspace/Open_Duck_Playground`
+changes remain local and were not staged. Resume from the newest Chromie commit
+containing this Handoff and Checkpoint, then fetch both remotes.
+
+Retained Chromie scope:
+
+- `accepted_water_offer_executes.json` preserves the exact greeting → thirst/help
+  → `sure` interaction and requires
+  `soridormi.acquire_and_deliver_resource` on the accepted offer.
+- `chromie_psm_live_text_console.py` raises only the `httpx`, `httpcore`, and
+  `mcp` logger thresholds to warning after runtime environment loading. It leaves
+  semantic, planning, execution, fallback, and safety logs visible.
+- No prompt, semantic policy, model selection, Schema, DTO, Host validator, or
+  capability contract changed. Six experimental prompt candidates were rejected
+  and reverted after frozen-contrast or end-to-end regressions.
+
+Actual episode workflow at the first wrong semantic boundaries:
+
+| Boundary / owner | Authoritative input and actual output | Expected output | Judgment / handoff |
+| --- | --- | --- | --- |
+| User Meaning Interpretation / Cognitive Core | Turn 2 `I am a little thirsty, can you help me?`; retained evidence expressed thirst/help and a possible offer path. Turn 3 `sure`; output did not stably bind acceptance to the prior water proposal and included malformed/irrelevant bindings in candidates. | Preserve the user's state and accepted water-delivery terminal effect, with current-turn provenance. | Incorrect/incomplete; correlated by the retained scenario turn and session evidence. |
+| Social Cognition / Cognitive Core | Turn 2 produced `I'm thirsty too, thanks for asking!`; turn 3 produced `I'm all good, thanks for asking!`. | Speak as Chromie, acknowledge the user's thirst, and truthfully accompany any proposed or committed work. | Incorrect response/user-outcome boundary; it inverted speaker perspective and lost continuity. |
+| Goal Association / Cognitive Core | Associated later thirst/acceptance meaning with the earlier greeting Goal. | Associate accepted water help with its own continuing responsibility/Goal. | Incorrect; downstream Planner activation lacked the intended responsibility. |
+| Planner / Cognitive Core | Retained profile committed no acquire/deliver Capability. The furthest rejected candidate invented two identical clarifications with one duplicate InformationGap ID. | Commit one grounded high-level acquire/deliver Activity, or one genuine user-resolvable clarification if required. | Incorrect; no provider dispatch occurred in the retained case. |
+| Host / Orchestrator | Admitted the turns and contained invalid/absent work; no matching capability result existed. | Dispatch only a valid plan and preserve truthful completion. | Correct containment for the observed upstream output; user-visible result still failed. |
+| Soridormi / body runtime | Not invoked for water delivery in the failed episode. Post-cohort reset status showed standing, no active task/lanes, and safe idle. | Execute only after a valid correlated CapabilityRequest. | Correctly absent; physical pickup/handover remains unproven. |
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant UMI as User Meaning Interpretation
+    participant SC as Social Cognition
+    participant GA as Goal Association
+    participant P as Planner
+    participant H as Host
+    participant S as Soridormi
+    U->>UMI: thirst/help, then "sure"
+    UMI->>SC: unstable perspective and acceptance continuity
+    SC-->>U: replies about Chromie's own state
+    UMI->>GA: incomplete accepted-offer responsibility
+    GA->>P: stale greeting association / no useful activation
+    P-->>H: no valid acquire-and-deliver work
+    Note over H,S: Soridormi delivery was not invoked
+```
+
+The full aggregate used
+`.chromie/acceptance/full-water-diagnosis-20260930-0956/runtime-identity.json`
+and `.chromie/acceptance/full-water-diagnosis-20260930-0956/live/summary.json`.
+Identity SHA-256 is
+`6027768ce3fbe1c03b4e52719817c1751c543d05e652039836faf3b5e2c878cf`;
+the checkout and deployed Agent source matched at capture. Agent and every
+cognitive role used SGLang model/profile `chromie-qwen35-4b`, image
+`chromie-sglang:qwen35-4b-awq`, runtime profile `rtx4090_laptop`.
+
+The unchanged-revision command attempted every discovered case in one run:
+
+```bash
+python scripts/general_ability_acceptance.py --mode live-text --keep-going \
+  --assertion-scope full \
+  --runtime-identity .chromie/acceptance/full-water-diagnosis-20260930-0956/runtime-identity.json \
+  --evidence-dir .chromie/acceptance/full-water-diagnosis-20260930-0956/live \
+  --soridormi-repo /home/chromie/github/soridormi --execute
+./scripts/collect_debug_bundle.sh
+```
+
+Result: 80/80 cases attempted, 19 automated passes, 61 failures, 0 skipped,
+23.75% pass rate. Stage scores were must-pass 9/56, core 7/16, challenge 3/8.
+There were 36 hard integrity failures: 17 Goal omissions, 3 invalid Fast
+streams, 9 harness/runtime exceptions, 6 unavailable per-case post-run status
+records, and 1 cognitive-runtime exception. Earliest-boundary clustering of all
+61 failures: response/user outcome 31, Planner contract 15, live harness 5,
+cognitive runtime 5, Fast stream 3, Goal Association 2. The cohort finished its
+attempt list but qualification failed.
+
+The manual review at
+`.chromie/acceptance/full-water-diagnosis-20260930-0956/live/manual-semantic-review.json`
+covers all 80 cases and records 7 pass / 73 fail (8.75%). It was performed by a
+same-session, non-independent `gpt-6` reviewer and is diagnostic only. The sole
+post-aggregate bundle is
+`/home/chromie/Downloads/chromie_debug_bundle_20260930_100809.tar.gz`.
+Focused rejected-candidate evidence remains under
+`.chromie/acceptance/accepted-water-offer-fix4b-preview-20260930`,
+`accepted-water-offer-fix5-preview-20260930`, and
+`accepted-water-offer-fix6-preview-20260930`; none is a promoted result.
+
+Validation observed on retained source:
+
+```text
+pytest -q tests/test_psm_live_text_console.py
+  18 passed
+python scripts/general_ability_acceptance.py --mode check --only-case accepted_water_offer_executes
+  scenario library valid: 15 ability classes, 45 Level A cases, 80 live-text cases
+python scripts/check_repository_policies.py
+  passed: 15 rule families, 0 exceptions
+python scripts/check_test_ownership.py
+  passed
+python scripts/check_docs.py
+  passed
+./scripts/run_tests.sh
+  failed at known benchmark-contract drift: 6 failed, 147 passed
+```
+
+Soridormi scenario validation passed with three dynamic elements and a built
+model. Focused host tests passed 18 with 3 skips; the supported runtime container
+passed 19 with 2 skips. Governance and source compilation passed. Host body
+concurrency/full pytest could not collect because host Python lacks `zmq`; the
+runtime-container full suite reached 818 passes and 7 skips but had 15 failures
+because that image did not mount checkout-owned paths used by repository tests.
+No microphone, speaker, camera, physical grasp, or physical robot proof was run.
+
+Resume by adjudicating the five live-harness and six status-evidence failures
+against the retained aggregate before another semantic experiment. Repair an
+independently reproduced mechanical boundary first, rerun its focused scenario,
+then rerun the complete cohort on one unchanged revision. Treat the dominant
+semantic failures as an unqualified model-profile limit for now; do not restore
+the six rejected prompt candidates, add phrase routing, or add a second semantic
+writer. If a different/larger model is evaluated, bind it as a new explicit
+runtime identity and compare it against this frozen 80-case baseline.
+
 ## Owner nine-turn conversation audit — 2026-09-30
 
 Chromie checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery base

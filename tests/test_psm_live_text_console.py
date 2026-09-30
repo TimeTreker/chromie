@@ -53,6 +53,22 @@ def test_console_accepts_explicit_chromie_repo_root() -> None:
     assert console._discover_repo_root(ROOT) == ROOT
 
 
+def test_console_keeps_transport_polling_below_operator_info_logs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        "orchestrator.orchestrator.load_runtime_environment", lambda: None
+    )
+    args = console.build_parser().parse_args([])
+    args.output_dir = tmp_path
+
+    console._configure_environment(ROOT, args, tmp_path)
+
+    assert logging.getLogger("httpx").level == logging.WARNING
+    assert logging.getLogger("httpcore").level == logging.WARNING
+    assert logging.getLogger("mcp").level == logging.WARNING
+
+
 def test_superseded_text_turn_does_not_wait_for_done_logged() -> None:
     assistant = SimpleNamespace(
         sessions=SimpleNamespace(state={"old": {"interrupted": True, "done_logged": False}})

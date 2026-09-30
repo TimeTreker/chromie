@@ -384,6 +384,11 @@ def _configure_environment(root: Path, args: argparse.Namespace, output_dir: Pat
     # Load the same generated model/budget profile as normal deployment first.
     load_runtime_environment()
     logging.getLogger().setLevel(os.getenv("LOG_LEVEL", "INFO"))
+    # The ambient scene adapter polls frequently. Keep its semantic revision and
+    # availability records while suppressing one SDK/HTTP request line per MCP
+    # handshake step in the operator console.
+    for logger_name in ("httpx", "httpcore", "mcp"):
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
 
     os.environ["AGENT_URL"] = args.agent_url
     os.environ["ORCH_ENABLE_AGENT"] = "1"
