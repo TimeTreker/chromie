@@ -15,6 +15,7 @@ from orchestrator.runtime.capability_runtime import (
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.session import SessionTracker
 from shared.chromie_contracts.execution_outcome import claim_qualification_policy_sha256
 from shared.chromie_contracts.interaction import (
     CapabilityRequest,
@@ -156,6 +157,8 @@ class _AgentClient:
 
 
 class _Sessions:
+    track_capability_dispatch = SessionTracker.track_capability_dispatch
+
     def __init__(self) -> None:
         self.current_sid = "sid-detached"
         self.state = {"sid-detached": {}}
@@ -386,6 +389,7 @@ async def test_multi_capability_success_results_wait_for_batch_closure():
     assert len(assistant.active_cognitive_runtime_tasks) == 1
     result_task = next(iter(assistant.active_cognitive_runtime_tasks))
     assert not result_task.done()
+    assert assistant.sessions.state["sid-detached"]["pending_capability_dispatches"] == 1
 
     provider.release_first.set()
     await asyncio.sleep(0.05)
@@ -400,6 +404,7 @@ async def test_multi_capability_success_results_wait_for_batch_closure():
     provider.release_second.set()
     await asyncio.wait_for(asyncio.shield(result_task), timeout=1.0)
     assert result_task.done()
+    assert assistant.sessions.state["sid-detached"]["pending_capability_dispatches"] == 0
     # This fixture replaces the normal closure owner with a no-op stub, so the
     # only assertion here is that neither individual success bypassed batching.
     assert spoken == []

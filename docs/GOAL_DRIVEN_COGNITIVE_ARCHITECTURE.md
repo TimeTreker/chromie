@@ -14,11 +14,11 @@ The target architecture separates **cognitive orchestration** from **execution/c
 scheduling**. The model-facing cognitive owner decides which existing cognitive authorities
 are useful next from the accepted state; Runtime does not derive that decision from
 `output_mode`, task category, keywords, confidence thresholds, or another deterministic
-semantic router. A complete UMI result may therefore request GA, SC, and Planner in
-parallel when its current understanding is sufficient for each requested branch, while a
-different UMI result may request only a subset. Requesting an authority grants none of its
-semantic power to UMI: GA still authors Goal continuity, Planner still authors HOW, and SC
-still authors interaction.
+semantic router. A complete UMI result may request GA and Planner when its understanding warrants
+those non-standing branches. Every fresh admitted addressed turn mechanically starts
+SC as a standing interaction responsibility; SC activation is not a UMI request.
+Requesting an authority grants none of its semantic power to UMI: GA still authors
+Goal continuity, Planner still authors HOW, and SC still authors interaction.
 
 Trusted Runtime owns the mechanical half: source/version integrity, task lifetime,
 dependency waits, stale-result rejection, compute admission, priority/pre-emption,
@@ -3354,7 +3354,7 @@ does not claim that Goal state was updated.
 
 `Interaction Context` is the deterministic, model-facing projection of that
 journal, not another store. Runtime selects a bounded chronology for the
-relevant Goal IDs and includes same-turn unbound Fast Planner Communicative Activities without inventing
+relevant Goal IDs and includes same-turn unbound SC Communicative Activities without inventing
 Goal ownership. It exposes already audible speech, pending speech, Activity and
 provider-backed Vocal work, Social Attention decorations, Goal/Plan history, and
 unresolved waits. Ledger `domain=social_attention` is an observation domain, not

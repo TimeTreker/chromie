@@ -39,12 +39,8 @@ from agent.app.fast_planner import (  # noqa: E402
     parse_fast_work_document,
 )
 from agent.app.planner_context import (  # noqa: E402
-    auxiliary_social_capability_payloads,
     expected_goal_ids,
-    fast_capability_payload,
 )
-from agent.app.planner_model_contract import is_planner_step_capability  # noqa: E402
-from agent.app.planner_schema import fast_streaming_advance_response_schema  # noqa: E402
 from shared.chromie_contracts.core_interpretation import (  # noqa: E402
     CognitiveWorkRequest,
 )
@@ -273,34 +269,6 @@ class ReplayModel:
         yield self.raw
 
 
-def _stream_schema(
-    request: CognitiveWorkRequest,
-    catalog: StaticCatalog,
-) -> dict[str, Any]:
-    responsibilities = list(request.responsibilities)
-    responsibility_refs = [item.local_ref for item in responsibilities]
-    available = [
-        item
-        for item in catalog.items
-        if item.available
-        and item.interaction_executable
-        and is_planner_step_capability(item.capability_id)
-    ]
-    capability_payload = [
-        fast_capability_payload(item, include_side_effect_free=True) for item in available[:24]
-    ]
-    auxiliary = auxiliary_social_capability_payloads(catalog.items)
-    schema = fast_streaming_advance_response_schema(
-        responsibility_refs,
-        responsibilities=responsibilities,
-        capabilities=capability_payload,
-        auxiliary_social_capabilities=auxiliary,
-        meaning_uncertainties=list(request.meaning_uncertainties),
-        language=str(request.language or ""),
-    )
-    return schema
-
-
 async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
     request = CognitiveWorkRequest.model_validate(case["input"]["request"])
     catalog = StaticCatalog(materialize_catalog(case["input"]))
@@ -324,14 +292,7 @@ async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
             f"{case['id']}: prompt capture expected one primary call, got {len(capture.calls)}"
         )
     call = capture.calls[0]
-    response_schema = (
-        _stream_schema(
-            CognitiveWorkRequest.model_validate(case["input"]["request"]),
-            catalog,
-        )
-        if runtime_variant == "streaming_advance"
-        else call["response_format"]
-    )
+    response_schema = call["response_format"]
     if not isinstance(response_schema, dict):
         raise ValueError(f"{case['id']}: missing dynamic response Schema")
     Draft202012Validator.check_schema(response_schema)

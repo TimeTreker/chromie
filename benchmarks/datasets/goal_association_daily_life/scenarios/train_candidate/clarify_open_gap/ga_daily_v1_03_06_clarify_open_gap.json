@@ -155,6 +155,25 @@
   "split": "train_candidate",
   "target": {
     "contract_gap": "Retained typed Goal update has no current GI binding provenance. Reject this transition without mutating the old Goal; a complete source-backed replacement Goal is required. Source input and original intended continuity reference retained.",
+    "schema_expectation": "accept_host_reject",
+    "semantic_expectations": {
+      "candidate_goal_ids": [
+        "goal_03_06_a"
+      ],
+      "must_map_every_responsibility_exactly_once": true,
+      "must_preserve_gi_output_mode": true,
+      "responsibility_count": 1,
+      "responsibility_map": [
+        {
+          "operation": "association",
+          "relationship": "clarify",
+          "source_ref": "r1",
+          "target_goal_ids": [
+            "goal_03_06_a"
+          ]
+        }
+      ]
+    },
     "reference_model_output": {
       "associations": [
         {
@@ -183,7 +202,6 @@
         }
       ],
       "confidence": 1.0,
-      "new_goals": [],
       "reason_summary": "Map every accepted GI Responsibility exactly once.",
       "referent_updates": [],
       "resolved_references": [],
@@ -202,26 +220,8 @@
           ],
           "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
         }
-      ]
-    },
-    "schema_expectation": "accept_host_reject",
-    "semantic_expectations": {
-      "candidate_goal_ids": [
-        "goal_03_06_a"
       ],
-      "must_map_every_responsibility_exactly_once": true,
-      "must_preserve_gi_output_mode": true,
-      "responsibility_count": 1,
-      "responsibility_map": [
-        {
-          "operation": "association",
-          "relationship": "clarify",
-          "source_ref": "r1",
-          "target_goal_ids": [
-            "goal_03_06_a"
-          ]
-        }
-      ]
+      "new_goals": []
     }
   }
 }

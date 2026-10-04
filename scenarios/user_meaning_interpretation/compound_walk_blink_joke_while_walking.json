@@ -34,7 +34,8 @@
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t5"
               },
-              "continuity_scope": "goal"
+              "continuity_scope": "goal",
+              "body_effect_family": "task_physical_effect"
             },
             {
               "local_ref": "r2",
@@ -45,7 +46,8 @@
                 "source_start_token_ref": "t10",
                 "source_end_token_ref": "t15"
               },
-              "continuity_scope": "goal"
+              "continuity_scope": "goal",
+              "body_effect_family": "social_expression"
             },
             {
               "local_ref": "r3",
@@ -93,13 +95,15 @@
         "local_ref": "r1",
         "outcome": "Please walk forward for 20 seconds",
         "output_mode": "body_action",
-        "confidence": 0.91
+        "confidence": 0.91,
+        "body_effect_family": "task_physical_effect"
       },
       {
         "local_ref": "r2",
         "outcome": "after that blink your little eyes 6 times",
         "output_mode": "body_action",
-        "confidence": 0.86
+        "confidence": 0.86,
+        "body_effect_family": "social_expression"
       },
       {
         "local_ref": "r3",

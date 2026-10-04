@@ -32,7 +32,8 @@
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t11"
               },
-              "continuity_scope": "goal"
+              "continuity_scope": "goal",
+              "body_effect_family": "task_physical_effect"
             }
           ],
           "meaning_uncertainties": [],
@@ -61,7 +62,8 @@
         "local_ref": "r1",
         "outcome": "往前跑个十来秒，速度点。",
         "confidence": 0.97,
-        "output_mode": "body_action"
+        "output_mode": "body_action",
+        "body_effect_family": "task_physical_effect"
       }
     ]
   },

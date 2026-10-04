@@ -596,6 +596,14 @@ coverage is incomplete; `qualification_complete` additionally requires all hard
 gates and semantic review. Neither an early stop nor an unreviewed passing subset
 qualifies the revision.
 
+The text simulator checker publishes admitted user dialogue through
+`record_accepted_user_turn` before Core entry and concurrent SC delivery, matching
+production admission. Later semantic recording enriches that same user turn;
+it must not append another copy or move the user after the delivered assistant
+reply. Positive scripted UMI fixtures must carry the current required
+`body_effect_family` for body actions; fixture compatibility is Level A evidence,
+not native inference qualification.
+
 A passing `--mode level-a` run is still Level A deterministic evidence only. It
 does not prove live services, microphone/speaker behavior, simulator execution,
 or physical robot behavior. When it fails, the retained summary marks

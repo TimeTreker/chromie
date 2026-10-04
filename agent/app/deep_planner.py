@@ -61,7 +61,6 @@ from .planner_validation import (
     validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
-    validate_planner_social_expression_authority,
 )
 from .planner_deep_validation import deep_plan_validation_errors
 from .planner_fast_validation import validate_work_reuse_selection
@@ -309,9 +308,6 @@ class DeepPlannerResolver:
                     raw,
                     planner_tier="deep",
                     expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                )
-                validate_planner_social_expression_authority(
-                    validated_model_output, capabilities=payload,
                 )
                 validate_work_reuse_selection(validated_model_output, context=context)
                 plan = CanonicalPlan.model_validate(

@@ -123,7 +123,7 @@ async def test_goal_association_materializes_unassociated_turn_speech_as_interac
         async def generate(self, *args, **kwargs):
             return {
                 "decision": "no_goal",
-                "unassociated_responsibility_refs": ["r1"],
+                "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
                 "referent_updates": [],
                 "resolved_references": [],
                 "confidence": 1.0,

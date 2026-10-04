@@ -85,6 +85,7 @@ from .goal_association_contract import (
     GoalAssociationModelGoal,
     GoalAssociationModelOutput,
     GoalSegmentationModelOutput,
+    validate_primary_goal_relationships,
 )
 from .goal_association_schema import goal_association_response_schema
 from .goal_association_validation import (
@@ -259,11 +260,7 @@ class GoalAssociationResolver:
                     architecture_attribution="not_evaluated",
                     retryable=False,
                 )
-            for goal in value.get("new_goals", []):
-                if isinstance(goal, dict) and set(goal) - {
-                    "source_responsibility_refs", "related_goal_ids", "supersedes_goal_ids",
-                }:
-                    raise ValueError("GA new Goals contain identity/continuity only; intent is inherited")
+            validate_primary_goal_relationships(value)
             normalized, recovered = normalize_resource_binding_branches(value)
             redundant_resource_binding_recovery.extend(
                 {"stage": stage, **entry} for entry in recovered
@@ -333,7 +330,7 @@ class GoalAssociationResolver:
                 ref
                 for association in getattr(model_output, "associations", [])
                 for ref in association.source_responsibility_refs
-            ] + list(model_output.unassociated_responsibility_refs) + [
+            ] + [
                 ref
                 for goal in model_output.new_goals
                 for ref in goal.source_responsibility_refs
@@ -526,20 +523,11 @@ class GoalAssociationResolver:
 
         # Preserve UMI's human-level result type without letting GA re-author it.
         by_ref = {item.local_ref: item for item in request.responsibilities}
-        relation_keys = {"before", "after", "parallel_with"}
-        relation_coupled_refs: set[str] = set()
-        for source_ref, responsibility in by_ref.items():
-            for key, raw in responsibility.bindings.items():
-                if str(key).strip().casefold() not in relation_keys:
-                    continue
-                relation_coupled_refs.add(source_ref)
-                values = raw if isinstance(raw, list) else [raw]
-                relation_coupled_refs.update(
-                    str(value).strip()
-                    for value in values
-                    if str(value or "").strip() in by_ref
-                )
-        unassociated_refs = list(model_output.unassociated_responsibility_refs)
+        unassociated_refs = [
+            ref for goal in model_output.new_goals for ref in goal.source_responsibility_refs
+        ]
+        if len(unassociated_refs) != len(set(unassociated_refs)):
+            raise ValueError("GA must not map a current Responsibility to multiple new Goals")
         unknown_unassociated = sorted(set(unassociated_refs) - set(by_ref))
         if unknown_unassociated:
             raise ValueError(
@@ -566,12 +554,10 @@ class GoalAssociationResolver:
 
         # GA is association-only. For each unassociated current Responsibility,
         # trusted code materializes the minimal model Goal carrier mechanically
-        # from UMI-owned WHAT. No new semantic value is model-authored here.
+        # from UMI-owned WHAT. No new WHAT is model-authored here.
         mechanical_new_goals: list[GoalAssociationModelGoal] = []
-        allowed_media_operations = {
-            "none", "play", "pause", "resume", "seek", "stop", "volume", "status"
-        }
-        for source_ref in unassociated_refs:
+        for relation in model_output.new_goals:
+            source_ref = relation.source_responsibility_refs[0]
             responsibility = by_ref[source_ref]
             # Every accepted Responsibility may have Goal identity. ``turn`` means
             # the Goal is interaction-lifetime/ephemeral; it does not mean absence
@@ -582,23 +568,15 @@ class GoalAssociationResolver:
                 if responsibility.output_mode != "unspecified"
                 else "other"
             )
-            raw_media_operation = responsibility.bindings.get("media_operation", "none")
-            media_operation = " ".join(str(raw_media_operation or "none").strip().split()).casefold()
-            if media_operation not in allowed_media_operations:
-                media_operation = "none"
-            if output_mode == "media_playback" and media_operation == "none":
-                raise ValueError(
-                    "media_playback Responsibility requires a UMI-owned media_operation binding "
-                    "before mechanical Goal materialization"
-                )
+            # Complete media intent is sufficient here. Planner owns operation
+            # extraction and Capability arguments; GA must not require them from UMI.
             mechanical_new_goals.append(
                 GoalAssociationModelGoal(
                     source_responsibility_refs=[source_ref],
                     output_mode=output_mode,
-                    media_operation=media_operation,
                     bindings=[],
-                    related_goal_ids=[],
-                    supersedes_goal_ids=[],
+                    related_goal_ids=list(relation.related_goal_ids),
+                    supersedes_goal_ids=list(relation.supersedes_goal_ids),
                     resource_kind="none",
                     resource_responsibility=None,
                 )
@@ -606,17 +584,8 @@ class GoalAssociationResolver:
         model_output = model_output.model_copy(
             update={
                 "new_goals": mechanical_new_goals,
-                "unassociated_responsibility_refs": [],
             }
         )
-        model_output = model_output.model_copy(update={"new_goals": [
-            item.model_copy(update={"output_mode": (
-                by_ref[item.source_responsibility_refs[0]].output_mode
-                if item.source_responsibility_refs[0] in by_ref
-                and by_ref[item.source_responsibility_refs[0]].output_mode != "unspecified"
-                else "other"
-            )}) for item in model_output.new_goals
-        ]})
         collection_bindings = action_collection_bindings(model_output)
         if collection_bindings:
             raise ValueError(
@@ -1238,7 +1207,7 @@ class GoalAssociationResolver:
             ref
             for association in associations
             for ref in association.source_responsibility_refs
-        ] + list(model_output.unassociated_responsibility_refs) + [
+        ] + [
             ref
             for goal in new_goals
             for ref in goal.source_responsibility_refs
@@ -1252,7 +1221,7 @@ class GoalAssociationResolver:
             turn_id=turn_id,
             resolution_status="resolved",
             associations=associations,
-            non_goal_responsibility_refs=list(model_output.unassociated_responsibility_refs),
+            non_goal_responsibility_refs=[],
             new_goals=new_goals,
             referent_updates=referent_updates,
             resolved_references=resolved_references,

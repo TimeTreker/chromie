@@ -38,12 +38,12 @@ from agent.app.clients.ollama_client import (  # noqa: E402
 from shared.chromie_contracts.core_interpretation import (  # noqa: E402
     CognitiveWorkRequest,
 )
-from shared.chromie_contracts.goal import GoalAssociationResolution  # noqa: E402
 
 from benchmarks.datasets.goal_association_daily_life.validate import (  # noqa: E402
     DATASET_ID,
     DATASET_ROOT,
     MANIFEST_PATH,
+    _resolution_map,
     load_cases,
     scenario_paths,
     scenario_tree_digest,
@@ -184,7 +184,9 @@ async def build_transaction(
         num_ctx=num_ctx,
         num_predict=num_predict,
     ).resolve(request)
-    if resolution.resolution_status != "resolved" or len(capture.calls) != 1:
+    # A retained-state negative reference may correctly fail closed after the
+    # primary call. Its Host verdict must not prevent capture of that call.
+    if len(capture.calls) != 1:
         raise ValueError(
             f"{case['id']}: production prompt capture failed: "
             f"status={resolution.resolution_status} calls={len(capture.calls)}"
@@ -929,33 +931,6 @@ async def run_batch(
     if not stability["stable"]:
         raise ValueError("production source or harness changed during immutable batch")
     return stability
-
-
-def _resolution_map(resolution: GoalAssociationResolution) -> list[dict[str, Any]]:
-    mapped: list[dict[str, Any]] = []
-    for association in resolution.associations:
-        for source_ref in association.source_responsibility_refs:
-            mapped.append(
-                {
-                    "source_ref": source_ref,
-                    "operation": "association",
-                    "relationship": association.relationship,
-                    "target_goal_ids": association.target_goal_ids,
-                }
-            )
-    for goal in resolution.new_goals:
-        for source_ref in goal.source_responsibility_refs:
-            mapped.append(
-                {
-                    "source_ref": source_ref,
-                    "operation": "new_goal",
-                    "relationship": "new",
-                    "target_goal_ids": [],
-                    "output_mode": goal.metadata.get("output_mode", "unspecified"),
-                    "supersedes_goal_ids": goal.supersedes_goal_ids,
-                }
-            )
-    return sorted(mapped, key=lambda item: item["source_ref"])
 
 
 async def _adjudicate_one(

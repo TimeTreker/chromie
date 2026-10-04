@@ -40,57 +40,28 @@ def _speech(ref: str = "r1") -> CognitiveResponsibilityProposal:
     )
 
 
-def test_ga_no_goal_is_available_only_for_relation_free_ordinary_speech() -> None:
+def test_ga_maps_turn_speech_without_authorship_or_implicit_planner_request() -> None:
     schema = goal_association_response_schema(
-        GoalSegmentationModelOutput,
-        [],
-        [],
-        responsibility_count=1,
-        responsibility_refs=["r1"],
-        responsibility_output_modes={"r1": "speech"},
+        GoalSegmentationModelOutput, [], [], responsibility_count=1,
+        responsibility_refs=["r1"], responsibility_output_modes={"r1": "speech"},
         responsibility_bindings={"r1": {}},
     )
     valid = {
-        "decision": "no_goal",
-        "new_goals": [],
-        "non_goal_responsibility_refs": ["r1"],
-        "referent_updates": [],
-        "resolved_references": [],
-        "cognitive_requests": [],
-        "confidence": 1.0,
-        "reason_summary": "The current interaction is socially complete.",
+        "new_goals": [{"source_responsibility_refs": ["r1"],
+                       "related_goal_ids": [], "supersedes_goal_ids": []}],
+        "referent_updates": [], "resolved_references": [], "cognitive_requests": [],
+        "confidence": 1.0, "reason_summary": "The current interaction is socially complete.",
     }
     validator = Draft202012Validator(schema)
-    # The deployed guided decoder must see the ownership collection on the
-    # top-level required surface. Cross-field allOf/oneOf validation alone is
-    # insufficient to make SGLang/XGrammar emit an otherwise optional field.
-    assert "non_goal_responsibility_refs" in schema["required"]
     validator.validate(valid)
-
-    # The legacy discriminant is not semantic authority. The ownership
-    # collections already encode the complete result, so a decoder choosing
-    # the first enum value must not produce a Schema-valid / DTO-invalid object.
-    first_enum_compat = {**valid, "decision": "create_goals"}
-    validator.validate(first_enum_compat)
-    parsed = GoalSegmentationModelOutput.model_validate(first_enum_compat)
-    assert parsed.new_goals == []
-    assert parsed.non_goal_responsibility_refs == ["r1"]
-
-    related = goal_association_response_schema(
-        GoalSegmentationModelOutput,
-        [],
-        [],
-        responsibility_count=2,
-        responsibility_refs=["move", "say"],
-        responsibility_output_modes={"move": "body_action", "say": "speech"},
-        responsibility_bindings={"move": {}, "say": {"after": ["move"]}},
-    )
-    assert "non_goal_responsibility_refs" not in related["required"]
-    assert "say" not in (
-        related["properties"].get("non_goal_responsibility_refs", {})
-        .get("items", {})
-        .get("enum", [])
-    )
+    parsed = GoalSegmentationModelOutput.model_validate(valid)
+    assert parsed.new_goals[0].source_responsibility_refs == ["r1"]
+    assert parsed.cognitive_requests == []
+    assert not validator.is_valid({**valid, "new_goals": []})
+    assert not validator.is_valid({**valid, "non_goal_responsibility_refs": ["r1"]})
+    assert not validator.is_valid({**valid, "new_goals": [
+        {**valid["new_goals"][0], "description": "Invented new meaning."}
+    ]})
 
 
 @pytest.mark.asyncio

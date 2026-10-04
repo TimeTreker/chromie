@@ -13,7 +13,7 @@ import copy
 import json
 import unittest
 
-from jsonschema import Draft202012Validator
+from jsonschema import Draft202012Validator, ValidationError as SchemaValidationError
 
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.clients.ollama_client import OllamaGenerationError
@@ -21,7 +21,6 @@ from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.planner_validation import (
     qualify_capability_catalog_for_output_modes,
     validate_planner_model_output,
-    validate_planner_social_expression_authority,
 )
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from tests.cognitive_work_test_support import cognitive_work_request
@@ -42,64 +41,23 @@ class SequencedOllama:
         return value
 
 
-class PlannerSocialAuthorityValidationTests(unittest.TestCase):
-    def test_shared_fast_deep_contract_rejects_task_plus_social_decoration_same_goal(self):
-        output = PlannerModelOutput.model_validate({
-            "disposition": "execute",
-            "coverage": "complete",
-            "confidence": 1.0,
-            "goal_summary": "deliver milk",
-            "steps": [
-                {"step_id": "fetch", "capability_id": "soridormi.acquire_and_deliver_resource",
-                 "args": {}, "timing": "sequential", "source_goal_ids": ["goal-milk"]},
-                {"step_id": "wave", "capability_id": "soridormi.wave_hand",
-                 "args": {}, "timing": "sequential", "source_goal_ids": ["goal-milk"]},
-            ],
-            "escalation_reason": "", "unresolved": [], "parameter_resolutions": [],
-            "time_conditions": [],
-            "goal_outcomes": {
-                "goal-milk": {"disposition": "execute", "coverage": "complete",
-                              "step_ids": ["fetch", "wave"], "unresolved": [],
-                              "rationale": "work"}
-            },
-            "goal_satisfaction": {"score": 1.0, "status": "exact",
-                                  "satisfied_goal_ids": ["goal-milk"], "unmet_goal_ids": [],
-                                  "unmet_requirements": [], "rationale": "planned"},
-            "plan_relation": "exact", "user_confirmation_required": False,
-        })
-        capabilities = [
-            {"capability_id": "soridormi.acquire_and_deliver_resource",
-             "behavior_domains": ["manipulation"]},
-            {"capability_id": "soridormi.wave_hand",
-             "behavior_domains": ["social_attention", "greeting"]},
-        ]
-        with self.assertRaisesRegex(
-            Exception, "optional social expression belongs to Social Cognition"
-        ):
-            validate_planner_social_expression_authority(output, capabilities=capabilities)
+class PlannerWorkScopeValidationTests(unittest.TestCase):
+    def test_planner_model_cannot_author_auxiliary_social_activities(self):
+        from pydantic import ValidationError
+        _, raw = _canonical_compound_body_case()
+        raw["auxiliary_activities"] = [{"capability_id": "soridormi.blink_eyes"}]
+        with self.assertRaises(ValidationError) as failure:
+            PlannerModelOutput.model_validate(raw)
+        self.assertIn(("auxiliary_activities",), [e["loc"] for e in failure.exception.errors()])
 
-    def test_explicit_social_goal_remains_valid_planner_work(self):
-        output = PlannerModelOutput.model_validate({
-            "disposition": "execute", "coverage": "complete", "confidence": 1.0,
-            "goal_summary": "wave",
-            "steps": [{"step_id": "wave", "capability_id": "soridormi.wave_hand",
-                       "args": {}, "timing": "sequential", "source_goal_ids": ["goal-wave"]}],
-            "escalation_reason": "", "unresolved": [], "parameter_resolutions": [],
-            "time_conditions": [],
-            "goal_outcomes": {
-                "goal-wave": {"disposition": "execute", "coverage": "complete",
-                              "step_ids": ["wave"], "unresolved": [],
-                              "rationale": "requested"}
-            },
-            "goal_satisfaction": {"score": 1.0, "status": "exact",
-                                  "satisfied_goal_ids": ["goal-wave"], "unmet_goal_ids": [],
-                                  "unmet_requirements": [], "rationale": "planned"},
-            "plan_relation": "exact", "user_confirmation_required": False,
-        })
-        validate_planner_social_expression_authority(
-            output, capabilities=[{"capability_id": "soridormi.wave_hand",
-                                   "behavior_domains": ["social_attention"]}],
-        )
+    def test_planner_step_cannot_claim_an_unknown_goal(self):
+        request, raw = _canonical_compound_body_case()
+        model = SequencedOllama([raw])
+        asyncio.run(DeepPlannerResolver(model, _compound_catalog()).resolve(request))
+        raw["steps"][1]["source_goal_ids"] = ["foreign-goal"]
+        with self.assertRaises(SchemaValidationError):
+            Draft202012Validator(model.prompts[0][1]["response_format"]).validate(raw)
+
 
 
 class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
@@ -143,7 +101,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
             ["soridormi.walk_forward"],
         )
 
-    def test_body_effect_family_hides_optional_social_expression_from_task_work(self):
+    def test_body_effect_family_does_not_hide_compound_body_capabilities(self):
         capabilities = [
             {
                 "capability_id": "soridormi.acquire_and_deliver_resource",
@@ -176,10 +134,10 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["capability_id"] for item in qualified],
-            ["soridormi.acquire_and_deliver_resource"],
+            ["soridormi.acquire_and_deliver_resource", "soridormi.blink_eyes", "soridormi.look_at_person"],
         )
 
-    def test_explicit_social_expression_keeps_social_body_capabilities(self):
+    def test_social_expression_family_does_not_hide_physical_body_capabilities(self):
         capabilities = [
             {
                 "capability_id": "soridormi.walk_forward",
@@ -203,7 +161,7 @@ class DeepPlannerMixedAccountingNormalizationTests(unittest.TestCase):
         )
         self.assertEqual(
             [item["capability_id"] for item in qualified],
-            ["soridormi.blink_eyes"],
+            ["soridormi.walk_forward", "soridormi.blink_eyes"],
         )
 
 
@@ -3394,3 +3352,103 @@ class DeepPlannerResolverTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def _canonical_compound_body_case():
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    text = 'Walk forward one second, then blink twice.'
+    goal_id = 'goal-compound'
+    request = CognitiveWorkRequest(
+        sid='canonical-compound', text=text, language='en-US', interpretation_confidence=1,
+        responsibilities=[CognitiveResponsibilityProposal(local_ref='r1', outcome=text,
+            output_mode='body_action', body_effect_family='task_physical_effect', confidence=1)],
+        context={'goal_association_resolution': {'associations': [], 'new_goals': [{
+            'goal_id': goal_id, 'description': text, 'source_responsibility_refs': ['r1'],
+            'metadata': {'output_mode': 'body_action', 'body_effect_families': ['task_physical_effect']},
+        }]}},
+    )
+    satisfaction = {'score': 1, 'status': 'exact', 'satisfied_goal_ids': [goal_id],
+        'unmet_goal_ids': [], 'unmet_requirements': [], 'rationale': 'Both requested effects are planned.'}
+    raw = {'disposition': 'execute', 'coverage': 'complete', 'confidence': 1, 'goal_summary': text,
+        'steps': [
+            {'step_id': 'walk', 'capability_id': 'soridormi.walk_forward', 'args': {'duration_s': 1},
+             'timing': 'sequential', 'source_goal_ids': [goal_id],
+             'reason_summary': 'Walk for the requested duration.'},
+            {'step_id': 'blink', 'capability_id': 'soridormi.blink_eyes', 'args': {'count': 2},
+             'timing': 'sequential', 'source_goal_ids': [goal_id],
+             'reason_summary': 'Blink the requested number of times.'},
+        ], 'cancel_activity_ids': [], 'escalation_reason': '', 'unresolved': [], 'parameter_resolutions': [],
+        'time_conditions': [], 'goal_outcomes': {goal_id: {'disposition': 'execute', 'coverage': 'complete',
+            'step_ids': ['walk', 'blink'], 'unresolved': [], 'satisfaction': satisfaction,
+            'rationale': 'One complete source requests both effects.'}}, 'goal_satisfaction': satisfaction,
+        'plan_relation': 'exact', 'user_confirmation_required': False,
+    }
+    return request, raw
+
+
+def _compound_catalog():
+    catalog = FullCatalog()
+    catalog.items = [item.model_copy(update={"behavior_domains": ["social_attention", "facial_expression"]})
+                     if item.capability_id == "soridormi.blink_eyes" else item
+                     for item in catalog.items]
+    return catalog
+
+
+class PlannerCompoundResolverRegressionTests(unittest.TestCase):
+    def test_compound_sibling_keeps_its_independent_count_default(self):
+        from agent.app.fast_planner import FastPlannerResolver
+        for resolver_type in [FastPlannerResolver, DeepPlannerResolver]:
+            with self.subTest(resolver=resolver_type.__name__):
+                request, raw = _canonical_compound_body_case()
+                goal = request.context['goal_association_resolution']['new_goals'][0]
+                goal['description'] += ' Then turn left.'
+                goal['object'] = {'bindings': {'count': {'entity_type': 'count', 'value': 2}}}
+                catalog = _compound_catalog()
+                catalog.items.append(CatalogCapability(capability_id='soridormi.turn_in_place',
+                    agent_id='capability_agent', description='Turn in place.', effects=['physical_motion'],
+                    available=True, interaction_executable=True, prompt_tier='common',
+                    can_run_parallel=False, parallel_metadata_declared=True,
+                    exclusive_group='base_motion', resource_claims=['base_motion'],
+                    input_schema={'type': 'object', 'properties': {
+                        'count': {'type': 'integer', 'enum': [1], 'default': 1},
+                        'direction': {'type': 'string', 'enum': ['left', 'right']}},
+                        'required': ['direction'], 'additionalProperties': False}))
+                raw['steps'].append({'step_id': 'turn', 'capability_id': 'soridormi.turn_in_place',
+                    'args': {'direction': 'left', 'count': 1}, 'timing': 'sequential',
+                    'source_goal_ids': ['goal-compound'], 'reason_summary': 'Realize the requested left turn.'})
+                raw['goal_outcomes']['goal-compound']['step_ids'].append('turn')
+                model = SequencedOllama([raw])
+                plan = asyncio.run(resolver_type(model, catalog).resolve(request))
+                self.assertEqual(plan.disposition, 'execute', plan)
+                self.assertEqual(plan.steps[-1].args, {'direction': 'left', 'count': 1})
+                self.assertEqual(len(model.prompts), 1)
+                Draft202012Validator(model.prompts[0][1]['response_format']).validate(raw)
+
+    def test_canonical_passes_preserve_count_without_requiring_it_on_walk(self):
+        from agent.app.fast_planner import FastPlannerResolver
+        for resolver_type in [FastPlannerResolver, DeepPlannerResolver]:
+            with self.subTest(resolver=resolver_type.__name__):
+                request, raw = _canonical_compound_body_case()
+                goal = request.context['goal_association_resolution']['new_goals'][0]
+                goal['object'] = {'bindings': {'count': {'entity_type': 'count', 'value': 2}}}
+                model = SequencedOllama([raw])
+                plan = asyncio.run(resolver_type(model, _compound_catalog()).resolve(request))
+                self.assertEqual(plan.disposition, 'execute', plan)
+                self.assertEqual([s.args for s in plan.steps], [{'duration_s': 1}, {'count': 2}])
+                self.assertEqual(len(model.prompts), 1)
+                Draft202012Validator(model.prompts[0][1]['response_format']).validate(raw)
+
+    def test_canonical_fast_and_deep_keep_compound_work_on_one_goal(self):
+        from agent.app.fast_planner import FastPlannerResolver
+        for resolver_type in [FastPlannerResolver, DeepPlannerResolver]:
+            with self.subTest(resolver=resolver_type.__name__):
+                request, raw = _canonical_compound_body_case()
+                model = SequencedOllama([raw])
+                plan = asyncio.run(resolver_type(model, _compound_catalog()).resolve(request))
+                self.assertEqual(plan.disposition, 'execute', plan)
+                self.assertEqual([s.capability_id for s in plan.steps],
+                                 ['soridormi.walk_forward', 'soridormi.blink_eyes'])
+                self.assertTrue(all(s.source_goal_ids == ['goal-compound'] for s in plan.steps))
+                self.assertEqual([s.args for s in plan.steps], [{'duration_s': 1}, {'count': 2}])
+                self.assertEqual(len(model.prompts), 1)
+                Draft202012Validator(model.prompts[0][1]['response_format']).validate(raw)

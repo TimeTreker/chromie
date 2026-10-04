@@ -196,7 +196,7 @@ def test_admitted_runtime_rejection_retains_final_status_without_dispatch(tmp_pa
             mode="apply", status="error", fallback_reason="controlled contract rejection")),
         _host_speech_response=Mock(return_value=InteractionResponse(interaction_id="rejected", status="ok")),
         conversation_state=SimpleNamespace(
-            record_user_turn=Mock(), record_interaction_response=Mock(),
+            record_accepted_user_turn=Mock(), record_user_turn=Mock(), record_interaction_response=Mock(),
             active_goal_snapshots=Mock(return_value=[{"goal": {"goal_id": "goal:open", "responsibility_status": "open"}}]),
             recent_goal_snapshots=Mock(return_value=[{"goal": {"goal_id": "goal:done", "responsibility_status": "satisfied"}}]),
         ),
@@ -216,6 +216,7 @@ def test_admitted_runtime_rejection_retains_final_status_without_dispatch(tmp_pa
         {"goal": {"goal_id": "goal:done", "responsibility_status": "satisfied"}},
     ]
     assistant._dispatch_detached_interaction.assert_not_awaited()
+    assistant.conversation_state.record_accepted_user_turn.assert_called_once()
     assistant.conversation_state.record_user_turn.assert_called_once()
     assert probe.await_count == (1 if preview else 2)
     assert result["status_after"] == (None if preview or post_state == "unavailable" else final)
@@ -281,7 +282,7 @@ def test_preview_checks_optional_defaults_from_retained_contract(
         _metadata_with_turn_envelope=lambda metadata, envelope: metadata,
         _cognitive_resolution_summary=Mock(return_value={}),
         conversation_state=SimpleNamespace(
-            record_user_turn=Mock(), record_interaction_response=Mock(),
+            record_accepted_user_turn=Mock(), record_user_turn=Mock(), record_interaction_response=Mock(),
             active_goal_snapshots=Mock(return_value=[]), recent_goal_snapshots=Mock(return_value=[]),
         ),
         sessions=SimpleNamespace(state={"defaults": {}}), cognitive_evidence=None,
@@ -300,6 +301,189 @@ def test_preview_checks_optional_defaults_from_retained_contract(
     assert response.capabilities[0].args == emitted
     assert json.loads((tmp_path / "summary.json").read_text()) == result
     assistant._dispatch_detached_interaction.assert_not_awaited()
+
+
+@pytest.mark.parametrize("already_delivered", [True, False])
+@pytest.mark.asyncio
+async def test_live_check_consumes_social_delivery_without_replaying_it(
+    tmp_path, already_delivered,
+):
+    from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+    from orchestrator.runtime.cognitive_gateway import CognitiveGateway
+    from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
+    from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+    from orchestrator.runtime.interaction_ledger import InteractionLedger
+    from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+    from tests.test_planner_auxiliary_activity_contract import _definition
+
+    ledger = InteractionLedger()
+    speak = AsyncMock(return_value={"scheduled": True})
+    runtime = InteractionRuntimeCoordinator(speak, interaction_ledger=ledger)
+    provider = MockCapabilityProvider("test.social")
+    runtime.registry.register(_definition("test.social.wave").model_copy(update={
+        "provider_id": provider.provider_id, "output_schema": {"type": "object"},
+    }))
+    runtime.runtime.register_provider(provider)
+    packet = InteractionResponse(
+        interaction_id="social-greeting",
+        speech=[{"id": "greeting", "text": "Hello."}],
+        capabilities=[{
+            "request_id": "wave", "capability_id": "test.social.wave", "args": {"count": 1},
+            "idempotency_key": "greeting-wave", "timing": "parallel",
+            "metadata": {"source": "social_cognition_auxiliary_activity",
+                "semantic_owner": "social_cognition", "execution_role": "social_decoration",
+                "auxiliary_plan_activity": True, "source_goal_ids": []},
+        }],
+        metadata={"social_expression_materialized": True, "session_id": "sid", "turn_id": "sid"},
+    )
+    gateway = CognitiveGateway()
+    assistant = SimpleNamespace(
+        get_http_session=AsyncMock(return_value=object()), create_session=Mock(return_value="sid"),
+        build_context=Mock(return_value={}),
+        agent_client=SimpleNamespace(
+            health=AsyncMock(return_value={"capability_sources": ["soridormi"]}),
+            review_attention=AsyncMock(side_effect=lambda _session, request: gateway.attention_fail_open(request, reason="controlled admission")),
+            interpret_turn=AsyncMock(return_value=CoreInterpretationResult(
+                turn_id="sid", session_id="sid", confidence=1.0,
+                responsibilities=[{"local_ref": "r1", "outcome": "Return a greeting.", "output_mode": "speech", "confidence": 1.0}],
+            )),
+        ),
+        interaction_runtime=runtime, _cognitive_gateway_adapter=Mock(return_value=gateway),
+        session_log=Mock(), _metadata_with_turn_envelope=lambda metadata, envelope: metadata,
+        _cognitive_resolution_summary=Mock(return_value={}), cognitive_evidence=None,
+        conversation_state=SimpleNamespace(record_accepted_user_turn=Mock(), record_user_turn=Mock(), record_interaction_response=Mock(),
+            active_goal_snapshots=Mock(return_value=[]), recent_goal_snapshots=Mock(return_value=[])),
+        sessions=SimpleNamespace(state={"sid": {}}), active_cognitive_runtime_tasks={},
+        _finish_delivered_social_session=Mock(),
+    )
+
+    async def resolve(*args, **kwargs):
+        if already_delivered:
+            dispatch = await runtime.submit_response(packet, session_id="sid")
+            await runtime.wait_dispatch(dispatch)
+            packet.metadata["presentation_already_dispatched"] = True
+        return CognitiveRuntimeResolution(mode="apply", status="applied", interaction_response=packet,
+            metadata={"goal_state_commit_stage": "goal_association"})
+
+    async def dispatch(response, sid, **kwargs):
+        submitted = await runtime.submit_response(response, session_id=sid)
+        task = asyncio.create_task(runtime.wait_dispatch(submitted))
+        assistant.active_cognitive_runtime_tasks[task] = response.interaction_id
+
+    assistant._run_cognitive_runtime_pipeline = resolve
+    assistant._dispatch_detached_interaction = AsyncMock(side_effect=dispatch)
+    runtime.soridormi_invoker = object()
+    status = {"mode": "sim", "safe_idle": True, "active_task": None, "fallen": False, "emergency_stop": False}
+    args = build_parser().parse_args(["hello", "--no-require-speech", "--evidence-dir", str(tmp_path)])
+    with (
+        patch("scripts.interaction_text_mujoco_check._invoke_soridormi_status", AsyncMock(return_value=status)),
+        patch("scripts.interaction_text_mujoco_check.record_cognitive_runtime_evidence"),
+        patch("scripts.interaction_text_mujoco_check.collect_run_provenance", return_value={}),
+        patch("scripts.interaction_text_mujoco_check.wait_for_session_done", AsyncMock()),
+        patch("scripts.interaction_text_mujoco_check.record_execution_bindings"),
+    ):
+        result = await run_check(args, assistant=assistant, configure_environment=False)
+    assert result["ok"], result["errors"]
+    assert assistant._dispatch_detached_interaction.await_count == int(not already_delivered)
+    assert speak.await_count == 1
+    assert len(provider.calls) == 1
+    assert sum(event.event_type == "social_decoration_completed" for event in ledger.events("sid")) == 1
+    assert result["execution"] is None if already_delivered else result["execution"]["status"] == "completed"
+
+
+@pytest.mark.parametrize("already_delivered", [True, False])
+@pytest.mark.asyncio
+async def test_admitted_user_precedes_social_delivery_without_duplication(
+    tmp_path, already_delivered,
+):
+    from orchestrator.runtime.cognitive_gateway import CognitiveGateway
+    from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
+    from orchestrator.runtime.conversation_state import ConversationStateManager
+    from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
+    from orchestrator.runtime.interaction_ledger import InteractionLedger
+    from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
+
+    state = ConversationStateManager()
+    history_at_core_entry = []
+    packet = InteractionResponse(
+        interaction_id="social-greeting",
+        speech=[{"id": "greeting", "text": "Hello.",
+                 "metadata": {"wording_owner": "social_cognition"}}],
+        metadata={"session_id": "sid", "turn_id": "sid"},
+    )
+
+    async def speak(*args, **kwargs):
+        state.record_assistant_turn(
+            "sid", "Hello.", metadata={"source": "social_cognition"},
+        )
+        return {"scheduled": True}
+
+    runtime = InteractionRuntimeCoordinator(speak, interaction_ledger=InteractionLedger())
+    runtime.soridormi_invoker = object()
+    gateway = CognitiveGateway()
+
+    async def interpret(*args, **kwargs):
+        history_at_core_entry.extend(state.get_history())
+        assert state.active_goal_snapshots() == []
+        assert state.active_task_snapshots() == []
+        return CoreInterpretationResult(
+            turn_id="sid", session_id="sid", confidence=1.0,
+            responsibilities=[{"local_ref": "r1", "outcome": "Return a greeting.",
+                               "output_mode": "speech", "confidence": 1.0}],
+        )
+
+    async def resolve(*args, **kwargs):
+        if already_delivered:
+            dispatch_id = await runtime.submit_response(packet, session_id="sid")
+            await runtime.wait_dispatch(dispatch_id)
+            packet.metadata["presentation_already_dispatched"] = True
+        return CognitiveRuntimeResolution(
+            mode="apply", status="applied", interaction_response=packet,
+            metadata={"goal_state_commit_stage": "goal_association"},
+        )
+
+    assistant = SimpleNamespace(
+        get_http_session=AsyncMock(return_value=object()), create_session=Mock(return_value="sid"),
+        build_context=Mock(return_value={}),
+        agent_client=SimpleNamespace(
+            health=AsyncMock(return_value={"capability_sources": ["soridormi"]}),
+            review_attention=AsyncMock(side_effect=lambda _session, request: gateway.attention_fail_open(request, reason="controlled admission")),
+            interpret_turn=AsyncMock(side_effect=interpret),
+        ),
+        interaction_runtime=runtime, conversation_state=state,
+        _cognitive_gateway_adapter=Mock(return_value=gateway), session_log=Mock(),
+        _metadata_with_turn_envelope=lambda metadata, envelope: metadata,
+        _cognitive_resolution_summary=Mock(return_value={}), cognitive_evidence=None,
+        _run_cognitive_runtime_pipeline=resolve,
+        sessions=SimpleNamespace(state={"sid": {}}), active_cognitive_runtime_tasks={},
+        _finish_delivered_social_session=Mock(),
+    )
+
+    async def dispatch(response, sid, **kwargs):
+        dispatch_id = await runtime.submit_response(response, session_id=sid)
+        task = asyncio.create_task(runtime.wait_dispatch(dispatch_id))
+        assistant.active_cognitive_runtime_tasks[task] = response.interaction_id
+
+    assistant._dispatch_detached_interaction = AsyncMock(side_effect=dispatch)
+    safe = {"mode": "sim", "safe_idle": True, "active_task": None,
+            "fallen": False, "emergency_stop": False}
+    args = build_parser().parse_args(["hello", "--no-require-speech", "--evidence-dir", str(tmp_path)])
+    with (
+        patch("scripts.interaction_text_mujoco_check._invoke_soridormi_status", AsyncMock(return_value=safe)),
+        patch("scripts.interaction_text_mujoco_check.record_cognitive_runtime_evidence"),
+        patch("scripts.interaction_text_mujoco_check.collect_run_provenance", return_value={}),
+        patch("scripts.interaction_text_mujoco_check.wait_for_session_done", AsyncMock()),
+    ):
+        result = await run_check(args, assistant=assistant, configure_environment=False)
+
+    assert result["ok"], result["errors"]
+    assert [(row["role"], row["text"]) for row in state.get_history()] == [
+        ("user", "hello"), ("assistant", "Hello."),
+    ]
+    assert [row["role"] for row in history_at_core_entry] == ["user"]
+    assert history_at_core_entry[0]["metadata"]["accepted_dialogue_evidence"] is True
+    assert state.get_history()[0]["metadata"]["semantic_task_resolution_authoritative"] is True
+    assert assistant._dispatch_detached_interaction.await_count == int(not already_delivered)
 
 
 class InteractionTextMujocoCheckTests(unittest.TestCase):

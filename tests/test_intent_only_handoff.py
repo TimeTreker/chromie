@@ -210,9 +210,12 @@ async def test_compound_intent_becomes_three_grounded_activities_and_one_goal():
     ]
     frames = [frame async for frame in FastPlannerResolver(Model([work(activities)]), Catalog(entries)).stream_advance(request)]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
-    ga = Model([{"new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
-                 "referent_updates": [], "resolved_references": [], "confidence": 1.0, "reason_summary": "New intent."}])
+    ga_reply = {"new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}], "cognitive_requests": [],
+                "referent_updates": [], "resolved_references": [], "confidence": 1.0,
+                "reason_summary": "New intent."}
+    ga = Model([ga_reply])
     association = await GoalAssociationResolver(ga).resolve(request)
+    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(ga_reply)
     assert len(association.new_goals) == 1
     assert association.new_goals[0].description == EPISODES[0]
     assert association.new_goals[0].metadata["output_mode"] == "body_action"
@@ -359,10 +362,13 @@ async def test_planner_owns_new_future_readiness_without_gi_time_fields(fault):
     due = "2099-09-04T19:00:00+08:00"
     text = "Nod twice at " + due
     request = request_for(text)
-    ga = Model([{"decision": "create_goals", "new_goals": [{"source_responsibility_refs": ["r1"],
-                "related_goal_ids": [], "supersedes_goal_ids": []}],
-                "confidence": 1.0, "referent_updates": [], "resolved_references": [], "reason_summary": "New intent."}])
+    ga_reply = {"new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}], "cognitive_requests": [],
+                "confidence": 1.0, "referent_updates": [], "resolved_references": [],
+                "reason_summary": "New intent."}
+    ga = Model([ga_reply])
     association = await GoalAssociationResolver(ga).resolve(request)
+    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(ga_reply)
+    assert association.resolution_status == "resolved", association.metadata
     goal_id = association.new_goals[0].goal_id
     assert not association.new_goals[0].object.get("bindings")
     request.context["goal_association_resolution"] = association.model_dump(mode="json")
@@ -408,11 +414,13 @@ async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp
     request.responsibilities.append(request_for("Blink three times now").responsibilities[0].model_copy(
         update={"local_ref": "r2"}))
     request.text += "; blink three times now"
-    ga = Model([{"decision": "create_goals", "new_goals": [
-        {"source_responsibility_refs": [ref], "related_goal_ids": [], "supersedes_goal_ids": []}
-        for ref in ("r1", "r2")], "confidence": 1.0, "referent_updates": [],
-        "resolved_references": [], "reason_summary": "Two independent intentions."}])
+    ga_reply = {"new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}, {"source_responsibility_refs": ["r2"], "related_goal_ids": [], "supersedes_goal_ids": []}], "cognitive_requests": [],
+                "confidence": 1.0, "referent_updates": [], "resolved_references": [],
+                "reason_summary": "Two independent intentions."}
+    ga = Model([ga_reply])
     association = await GoalAssociationResolver(ga).resolve(request)
+    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(ga_reply)
+    assert association.resolution_status == "resolved", association.metadata
     request.context["goal_association_resolution"] = association.model_dump(mode="json")
     future, ready = [goal.goal_id for goal in association.new_goals]
     raw = json.loads(Path("benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]

@@ -48,7 +48,8 @@ def test_candidate_aware_contract_has_no_exclusive_branch_discriminant() -> None
                 {
                     "source_responsibility_refs": ["r2"],
 
-                    "output_mode": "speech",
+                    "related_goal_ids": [],
+                    "supersedes_goal_ids": [],
                 }
             ],
             "confidence": 1.0,

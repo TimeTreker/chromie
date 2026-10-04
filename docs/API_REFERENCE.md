@@ -103,11 +103,12 @@ inputs. Without a provider observation, the base context omits that state claim;
 execution authorization and provider safety checks remain independently enforced.
 
 `POST /cognitive-gateway/attention-review` accepts only normalized turn identity,
-text, language, and bounded host engagement evidence. Suppression is limited to
-high-confidence inactive ambient speech. An internally contradictory
-`addressed=false` result with a directed or unclear speech act receives one
-schema-constrained model repair; direct, unresolved unclear, malformed,
-unavailable, or failed review admits the turn.
+text, language, and bounded host engagement evidence. Suppression is limited to high-confidence inactive ambient speech. Direct,
+unresolved unclear, malformed, unavailable or failed review admits the turn.
+Charter principles 30–31 prohibit a second same-authority semantic classification.
+Current implementation nevertheless uses surface cues and one model repair on
+some contradictions; this is an open conformance defect documented in the
+[project audit](../ARCHITECTURE_AUDIT.md), not an allowed API repair contract.
 
 `POST /cognitive-core/interpret` accepts only a schema-valid admitted
 `CoreTurnRequest`. Bare text, a suppressed envelope, mismatched context identity,
@@ -167,6 +168,14 @@ scope. Host projection removes non-owned envelope fields, but never slices scope
 lifecycle rows or discards the caller's disclosure-safe Memory and Interaction
 context. Oversized contracts and model-context budgets fail before inference;
 they do not authorize a partial-scope wake.
+
+For Fast/Deep planning, an accepted `media_playback` Goal does not require UMI or
+GA to pre-extract `media_operation`. Missing/`none` leaves this HOW choice to the
+Planner primary result. A retained explicit operation constrains the exact media
+Capability; unsupported retained values reject. Availability is checked against
+the disclosed media catalog, with no speech/vocal substitution or implicit
+provider enablement. Goal coverage, argument provenance and provider safety
+validation continue to apply.
 
 `GET /agent-skills` reports the passive read-only cognitive-content registry.
 The maintained repository root is mounted read-only and contains the approved
@@ -488,15 +497,15 @@ provider data.
 
 `POST /goal-association` is available only when
 `AGENT_GOAL_ASSOCIATION_ENABLED=1` and Agent LLM use is enabled. It applies
-continuity before creation: each semantic responsibility may associate with
-existing active goals, become an independent new goal, or produce one natural
-clarification when the reference is ambiguous. Existing goal IDs must be copied
+continuity before creation: each accepted UMI Responsibility is represented exactly
+once by an existing-Goal association or a new-Goal identity/relationship row. GA
+does not author clarification wording or revise accepted UMI meaning. Existing goal IDs must be copied
 from the supplied active-goal snapshots; unknown or below-threshold associations
 are rejected. Every validated new Goal retains provider-neutral WHAT semantics. `output_mode`
 distinguishes ordinary speech, expressive speech, recitation, singing, humming,
 nonverbal vocalization, body action, media playback, information, stateful effect,
-or other; `media_operation` is one exact persistent playback operation only for
-`media_playback`. The live model-facing and canonical Goal contracts do not contain
+or other. A complete media intention does not require a pre-extracted operation:
+Planner derives the operation and Capability arguments from the accepted intention. The live model-facing and canonical Goal contracts do not contain
 `responsibility_kind`, `execution_lane`, `provider_required`, or `capability_work`.
 Those concepts are not reconstructed by the Host. Planner decides HOW from the
 canonical Goal, current trusted state/Evidence, and the available Capability catalog;
@@ -505,7 +514,14 @@ keeps Goal identity stable across provider changes and prevents Goal Association
 quietly taking back planning authority.
 The live GA new-Goal schema contains only source Responsibility refs, related Goal
 IDs and superseded Goal IDs. Description, criteria and result type are inherited
-mechanically from UMI. Resource details remain in that complete intention for Planner.
+mechanically from UMI. Every identity row explicitly supplies all three arrays;
+`related_goal_ids` can reference retained terminal history, while `supersedes_goal_ids`
+can reference only supplied open Goals. Unknown, duplicate or overlapping IDs reject;
+Host copies these GA choices unchanged and never infers a missing relationship.
+The primary collections are `associations` and `new_goals`; the incomplete
+`unassociated_responsibility_refs` field is retired with no compatibility path.
+Resource details remain in that complete intention for Planner. UMI owns initial
+Planner activation; Host does not invent it from the new-Goal result.
 
 Existing typed resource Goals retain one nested authority:
 `resource_responsibility.resource`, `.source`, `.recipient`, and `.delivery_mode`.

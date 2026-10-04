@@ -639,7 +639,7 @@ The harness records pause/continue latency, Deep delta counts across the held le
 resume-to-next-delta latency, TTS baseline and lease timing, and final Deep completion. It does
 **not** invent a new TTS slowdown threshold: the result is retained as evidence and must later be
 judged with Chromie's existing interaction-latency contract and real
-UMI -> Planner -> typed `PresentationCommit` -> TTS -> playback evidence.
+UMI -> validated SC commitment -> TTS -> playback evidence, with independent Work.
 
 Run the bounded probe only after the ordinary foreground-under-Deep SGLang canary has passed and
 TTS is warm/resident:
@@ -742,7 +742,7 @@ This source integration is **not** model/role promotion evidence. The provider c
 Qwen3.5-9B served model to isolate scheduler behavior, while the maintained RTX 5090 Ollama profile
 still uses its declared Gemma/Qwen role topology. Candidate Agent runs must explicitly select the
 served model for each role and then pass the real UMI/Planner semantic gates plus
-UMI -> Planner -> typed PresentationCommit -> TTS -> playback/interruption end-to-end evidence.
+UMI -> validated SC commitment -> TTS -> playback/interruption evidence alongside Work.
 
 Run only after the full presentation-lease series is stable:
 
@@ -900,13 +900,15 @@ example; this document does not redefine the project's latency acceptance policy
 particular sample count is statistically sufficient for release. Use the same count and frozen
 workload for each provider comparison.
 
-### RTX 5090 deployed-topology boundary
+### Historical RTX 5090 topology control
 
-The maintained `rtx5090` production profile is not a one-model scheduler experiment. It currently
-uses `gemma4:12b` for User Meaning Interpretation, Goal Association, and Deep Planner, while
-`qwen3.5:9b` owns Fast Planner and other latency-sensitive roles. Both models are intended to stay
-resident beside TTS. The deployed Ollama control must therefore preserve at least the transaction
-route relevant to the foreground-under-Deep experiment:
+The retained Ollama topology diagnostic used `gemma4:12b` for UMI, GA and Deep,
+with `qwen3.5:9b` for Fast and other foreground roles. That is historical provider
+comparison context, not the current maintained deployment. Both maintained
+[RTX 5090](../env/profiles/rtx5090.env) and
+[laptop](../env/profiles/rtx4090_laptop.env) profiles now select SGLang. Capture
+generated configuration, actual model artifact/revision and runtime identity for
+every new run. The historical control route was:
 
 ```text
 Deep deliberative load    -> gemma4:12b
@@ -915,22 +917,23 @@ Fast Planner canary       -> qwen3.5:9b
 TTS                       -> live shared-GPU service
 ```
 
-This deployed-topology control measures the actual current outcome. It is not scheduler-isolated
+A reproduced topology control measures the exact bound deployment outcome. It is not scheduler-isolated
 because model artifacts, model sizes, and cross-runner GPU contention are part of the result.
 Separately run SGLang and vLLM on the exact same HF model revision/artifact when the goal is to
 isolate serving/runtime scheduling behavior. Only after those two evidence layers exist should a
 production topology change be proposed.
 
-### RTX 4090 Laptop comparison boundary
+### Artifact and provider comparison boundary
 
-The maintained `rtx4090_laptop` profile uses Ollama `qwen3.5:4b`, which is a Q4_K_M GGUF
-artifact, while the straightforward SGLang/vLLM candidate path uses the upstream
-`Qwen/Qwen3.5-4B` safetensors checkpoint. Therefore use the laptop in two distinct layers:
+The historical laptop comparison paired Ollama `qwen3.5:4b` Q4_K_M GGUF with
+upstream `Qwen/Qwen3.5-4B` safetensors for candidate runtimes. Those artifact
+identities do not describe today's selected SGLang profile. Keep two evidence layers
+when comparing providers or replacing a bound deployment:
 
 1. **Scheduler/runtime candidate comparison:** SGLang versus vLLM on the exact same HF model
    revision, weight format, dtype, context, workload, TTS state, and sample count. Differences
    here can reasonably be attributed to the serving/runtime stack and its scheduling controls.
-2. **Deployed outcome comparison:** compare the winning candidate with production Ollama under
+2. **Deployed outcome comparison:** compare a qualified candidate with the captured current deployment under
    the same user-visible workload. Because the model artifact/quantization differs, this measures
    the whole deployed topology outcome and MUST NOT be reported as scheduler-only causality.
 
@@ -943,10 +946,10 @@ This phase is provider-level scheduling evidence. The Fast-UMI/Fast-Planner stri
 canaries, not production semantic transactions, and
 `chromie-presentation-commit-ready` is not a real `PresentationCommit`. A provider pass does
 not prove Chromie interaction latency, semantic correctness, audible playback, simulator
-behavior, or physical robot behavior. Production Ollama remains unchanged until same-revision
-comparison and the actual Agent UMI -> Fast Planner -> typed `PresentationCommit` -> TTS ->
-playback path satisfy `INTERACTION-LATENCY-001`. The same saturated-deliberation control must
-also be retained for Ollama before a cross-provider promotion claim is made.
+behavior, or physical robot behavior. Provider-level canaries do not authorize production promotion. Same-revision
+comparison and the actual Agent UMI -> SC commitment -> TTS -> playback path, with independent
+Planner Work, must satisfy `INTERACTION-LATENCY-001`. The same saturated-deliberation control must
+also be retained for each compared deployment before a cross-provider promotion claim.
 
 ## Evidence-based latency gate
 

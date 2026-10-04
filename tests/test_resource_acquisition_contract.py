@@ -939,7 +939,7 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
         model_output = GoalSegmentationModelOutput.model_validate(
             {
                 "decision": "create_goals",
-                "unassociated_responsibility_refs": ["resource"],
+                "new_goals": [{"source_responsibility_refs": ["resource"], "related_goal_ids": [], "supersedes_goal_ids": []}],
                 "referent_updates": [],
                 "resolved_references": [],
                 "cognitive_requests": [],

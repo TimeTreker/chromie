@@ -86,7 +86,8 @@
                     "source_start_token_ref": "t0",
                     "source_end_token_ref": "t3"
                   },
-                  "continuity_scope": "goal"
+                  "continuity_scope": "goal",
+                  "body_effect_family": "social_expression"
                 },
                 {
                   "local_ref": "r2",
@@ -97,7 +98,8 @@
                     "source_start_token_ref": "t5",
                     "source_end_token_ref": "t9"
                   },
-                  "continuity_scope": "goal"
+                  "continuity_scope": "goal",
+                  "body_effect_family": "social_expression"
                 }
               ],
               "meaning_uncertainties": [],
@@ -125,13 +127,15 @@
             "local_ref": "r1",
             "outcome": "你点点头",
             "confidence": 0.98,
-            "output_mode": "body_action"
+            "output_mode": "body_action",
+            "body_effect_family": "social_expression"
           },
           {
             "local_ref": "r2",
             "outcome": "再 眨两下眼睛",
             "confidence": 0.98,
-            "output_mode": "body_action"
+            "output_mode": "body_action",
+            "body_effect_family": "social_expression"
           }
         ],
         "history_contains": [

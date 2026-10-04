@@ -405,10 +405,27 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
         branch = schema["$defs"]["PlannerModelStep"]["oneOf"][0]
-        self.assertEqual(
-            branch["properties"]["args"]["properties"]["count"]["const"],
-            4,
-        )
+        from jsonschema import Draft202012Validator
+        # The provider requires a numeric argument. Count preservation belongs to
+        # the owned Plan, so a decoder must not force the same count on siblings.
+        argument_schema = branch["properties"]["args"]
+        validator = Draft202012Validator(argument_schema)
+        validator.validate({"count": 4})
+        self.assertFalse(validator.is_valid({"count": "4"}))
+        goal = {"goal_id": "goal-blink", "object": {
+            "bindings": {"count": {"entity_type": "count", "value": "4"}}}}
+        output = PlannerModelOutput(disposition="execute", coverage="complete", confidence=1,
+            goal_satisfaction={"score": 1, "status": "exact", "satisfied_goal_ids": ["goal-blink"],
+                               "rationale": "Requested count is represented in the owned blink."},
+            steps=[{"step_id": "blink", "capability_id": "soridormi.blink_eyes", "args": {"count": 4},
+                    "timing": "sequential", "source_goal_ids": ["goal-blink"]}])
+        capabilities = [{"capability_id": "soridormi.blink_eyes", "input_schema": argument_schema}]
+        planner_validation.validate_goal_binding_argument_grounding(
+            output, authoritative_goals=[goal], capabilities=capabilities)
+        output.steps[0].args["count"] = 3
+        with self.assertRaisesRegex(ValueError, "count realization"):
+            planner_validation.validate_goal_binding_argument_grounding(
+                output, authoritative_goals=[goal], capabilities=capabilities)
 
     def test_fast_escalation_outcome_schema_forbids_response_text(self) -> None:
         schema = fast_multi_goal_response_schema(
@@ -728,15 +745,10 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         ollama = _SequenceOllama(
             [
                 {
-                    "decision": "create_goals",
-                    "new_goals": [
-                        {
-                            "source_responsibility_refs": ["test_responsibility"],
-
-                            "related_goal_ids": [],
-                            "supersedes_goal_ids": [],
-                        }
-                    ],
+                    "new_goals": [{"source_responsibility_refs": ["test_responsibility"], "related_goal_ids": [], "supersedes_goal_ids": []}],
+                    "referent_updates": [],
+                    "resolved_references": [],
+                    "cognitive_requests": [],
                     "confidence": 1.0,
                     "reason_summary": "Treat the fragment as conversation.",
                 }
@@ -754,10 +766,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             _clarify_request().responsibilities[0].outcome,
         )
         self.assertEqual(len(ollama.schemas), 1)
-        self.assertEqual(
-            ollama.schemas[0]["properties"]["decision"]["enum"],
-            ["create_goals"],
-        )
+        self.assertNotIn("decision", ollama.schemas[0]["properties"])
+        self.assertEqual(set(ollama.schemas[0]["$defs"]["GoalAssociationModelGoal"]["properties"]),
+                         {"source_responsibility_refs", "related_goal_ids", "supersedes_goal_ids"})
         self.assertGreater(
             ollama.schemas[0]["properties"]["new_goals"]["maxItems"],
             0,

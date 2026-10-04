@@ -53,7 +53,7 @@
   "max_warm_sc_to_playback_start_ms": 3000,
   "expect_no_fast_contract_failure": true,
   "min_new_goal_count": 1,
-  "min_goal_outcome_count": 1,
+  "expect_created_goals_satisfied": true,
   "description": "Chinese identity response must preserve Chromie identity without backend self-description and meet the same warm interactive latency budget used by effectful progress speech.",
   "general_ability": {
     "memberships": [

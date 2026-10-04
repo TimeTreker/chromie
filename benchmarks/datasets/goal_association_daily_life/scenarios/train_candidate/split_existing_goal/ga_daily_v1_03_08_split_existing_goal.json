@@ -148,46 +148,6 @@
   "split": "train_candidate",
   "target": {
     "contract_gap": null,
-    "reference_model_output": {
-      "associations": [
-        {
-          "confidence": 1.0,
-          "reason_summary": "The source-grounded continuity relationship is split.",
-          "relationship": "split",
-          "resolved_gap_ids": [],
-          "source_responsibility_refs": [
-            "r1",
-            "r2"
-          ],
-          "target_goal_ids": [
-            "goal_03_08_a"
-          ]
-        }
-      ],
-      "confidence": 1.0,
-      "new_goals": [],
-      "reason_summary": "Map every accepted GI Responsibility exactly once.",
-      "referent_updates": [],
-      "resolved_references": [],
-      "cognitive_requests": [
-        {
-          "authority": "social_cognition",
-          "responsibility_refs": [
-            "r1",
-            "r2"
-          ],
-          "reason_summary": "Decide interaction using the established canonical continuity facts."
-        },
-        {
-          "authority": "planner",
-          "responsibility_refs": [
-            "r1",
-            "r2"
-          ],
-          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
-        }
-      ]
-    },
     "schema_expectation": "accept",
     "semantic_expectations": {
       "candidate_goal_ids": [
@@ -214,6 +174,46 @@
           ]
         }
       ]
+    },
+    "reference_model_output": {
+      "associations": [
+        {
+          "confidence": 1.0,
+          "reason_summary": "The source-grounded continuity relationship is split.",
+          "relationship": "split",
+          "resolved_gap_ids": [],
+          "source_responsibility_refs": [
+            "r1",
+            "r2"
+          ],
+          "target_goal_ids": [
+            "goal_03_08_a"
+          ]
+        }
+      ],
+      "confidence": 1.0,
+      "reason_summary": "Map every accepted GI Responsibility exactly once.",
+      "referent_updates": [],
+      "resolved_references": [],
+      "cognitive_requests": [
+        {
+          "authority": "social_cognition",
+          "responsibility_refs": [
+            "r1",
+            "r2"
+          ],
+          "reason_summary": "Decide interaction using the established canonical continuity facts."
+        },
+        {
+          "authority": "planner",
+          "responsibility_refs": [
+            "r1",
+            "r2"
+          ],
+          "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
+        }
+      ],
+      "new_goals": []
     }
   }
 }

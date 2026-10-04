@@ -154,18 +154,18 @@ def intent_goal(description: str, output_mode: str, **extra) -> dict:
 
 
 def create_goals(*goals: dict) -> dict:
-    refs = [
-        ref
-        for goal_payload in goals
-        for ref in goal_payload.get("source_responsibility_refs", [])
-    ]
     return {
-        "decision": "create_goals",
-        "unassociated_responsibility_refs": list(dict.fromkeys(refs)),
+        "new_goals": [
+            {"source_responsibility_refs": [ref],
+             "related_goal_ids": item.get("related_goal_ids", []),
+             "supersedes_goal_ids": item.get("supersedes_goal_ids", [])}
+            for item in goals for ref in item.get("source_responsibility_refs", [])
+        ],
         "cognitive_requests": [],
         "confidence": 1.0,
         "reason_summary": "No retained Goal matches the current Responsibility.",
     }
+
 
 
 def typed_responsibilities(*items: dict) -> list[CognitiveResponsibilityProposal]:
@@ -579,18 +579,17 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             }
         )
-        output = GoalSegmentationModelOutput.model_validate(
-            create_goals(
-                goal(
+        # This helper validates trusted typed carriers, after UMI inheritance.
+        output = [
+            GoalAssociationModelGoal.model_validate(goal(
                     "bring the bottle of milk to me",
                     "body_action",
                     resource=resource_responsibility(
                         description="bottle of milk",
                         recipient="me",
                     ),
-                )
-            )
-        )
+                )),
+        ]
 
         self.assertEqual(
             ga_validation.source_grounded_binding_conservation_conflicts(
@@ -622,9 +621,9 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             }
         )
-        output = GoalSegmentationModelOutput.model_validate(
-            create_goals(
-                goal(
+        # This helper validates trusted typed carriers, after UMI inheritance.
+        output = [
+            GoalAssociationModelGoal.model_validate(goal(
                     "bring a bottle of milk to me",
                     "body_action",
                     resource=resource_responsibility(
@@ -635,9 +634,8 @@ class GoalExecutionContractTests(unittest.TestCase):
                             binding("location", "relative_location", location),
                         ],
                     ),
-                )
-            )
-        )
+                )),
+        ]
 
         self.assertEqual(
             ga_validation.source_grounded_binding_conservation_conflicts(
@@ -671,10 +669,10 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             }
         )
-        output = GoalSegmentationModelOutput.model_validate(
-            create_goals(
-                goal("singing", "singing"),
-                goal(
+        # This helper validates trusted typed carriers, after UMI inheritance.
+        output = [
+            GoalAssociationModelGoal.model_validate(goal("singing", "singing")),
+            GoalAssociationModelGoal.model_validate(goal(
                     "blinking eyes simultaneously",
                     "body_action",
                     bindings=[
@@ -685,9 +683,8 @@ class GoalExecutionContractTests(unittest.TestCase):
                         )
                     ],
                     source_responsibility_refs=["r2"],
-                ),
-            )
-        )
+                )),
+        ]
 
         self.assertEqual(
             ga_validation.source_grounded_binding_conservation_conflicts(
@@ -719,9 +716,9 @@ class GoalExecutionContractTests(unittest.TestCase):
                 )
             }
         )
-        output = GoalSegmentationModelOutput.model_validate(
-            create_goals(
-                goal(
+        # This helper validates trusted typed carriers, after UMI inheritance.
+        output = [
+            GoalAssociationModelGoal.model_validate(goal(
                     "walk ahead for 15 seconds quickly",
                     "body_action",
                     bindings=[
@@ -729,9 +726,8 @@ class GoalExecutionContractTests(unittest.TestCase):
                         binding("duration", "duration", "15 seconds"),
                         binding("speed", "speed", "quick"),
                     ],
-                )
-            )
-        )
+                )),
+        ]
 
         self.assertEqual(
             ga_validation.source_grounded_binding_conservation_conflicts(
@@ -1457,21 +1453,22 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
 
     def test_live_model_schema_has_no_new_goal_authorship(self):
         for schema in (self._schema(), self._schema(candidates=[{"goal_id": "goal-old", "responsibility_status": "open"}])):
-            self.assertNotIn("new_goals", schema["properties"])
-            self.assertIn("unassociated_responsibility_refs", schema["properties"])
-            self.assertNotIn("GoalAssociationModelGoal", schema.get("$defs", {}))
+            self.assertIn("new_goals", schema["properties"])
+            self.assertNotIn("unassociated_responsibility_refs", schema["properties"])
+            self.assertEqual(set(schema["$defs"]["GoalAssociationModelGoal"]["properties"]),
+                             {"source_responsibility_refs", "related_goal_ids", "supersedes_goal_ids"})
 
     def test_no_candidate_schema_requires_every_ref_unassociated(self):
         schema = self._schema(("r1", "r2"))
         validator = Draft202012Validator(schema)
         valid = {
-            "unassociated_responsibility_refs": ["r1", "r2"],
+            "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}, {"source_responsibility_refs": ["r2"], "related_goal_ids": [], "supersedes_goal_ids": []}],
             "referent_updates": [], "resolved_references": [],
             "cognitive_requests": [], "confidence": 1.0,
             "reason_summary": "No retained Goal matches.",
         }
         self.assertTrue(validator.is_valid(valid))
-        self.assertFalse(validator.is_valid({**valid, "unassociated_responsibility_refs": ["r1"]}))
+        self.assertFalse(validator.is_valid({**valid, "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}]}))
         self.assertFalse(validator.is_valid({**valid, "new_goals": []}))
 
     def test_candidate_schema_partitions_current_refs_between_associated_and_unassociated(self):
@@ -1485,14 +1482,14 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
                 "target_goal_ids": ["goal-old"],
                 "confidence": 1.0,
             }],
-            "unassociated_responsibility_refs": ["r2"],
+            "new_goals": [{"source_responsibility_refs": ["r2"], "related_goal_ids": [], "supersedes_goal_ids": []}],
             "referent_updates": [], "resolved_references": [],
             "cognitive_requests": [], "confidence": 1.0,
             "reason_summary": "Only r1 continues retained work.",
         }
         self.assertTrue(validator.is_valid(valid))
-        self.assertFalse(validator.is_valid({**valid, "unassociated_responsibility_refs": ["r1", "r2"]}))
-        self.assertFalse(validator.is_valid({**valid, "unassociated_responsibility_refs": []}))
+        self.assertFalse(validator.is_valid({**valid, "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}, {"source_responsibility_refs": ["r2"], "related_goal_ids": [], "supersedes_goal_ids": []}]}))
+        self.assertFalse(validator.is_valid({**valid, "new_goals": []}))
 
     def test_terminal_goal_is_history_not_mutable_association_target(self):
         terminal = active_goal("goal-done", "Finished task")
@@ -1502,7 +1499,7 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
         rendered = json.dumps(schema, ensure_ascii=False)
         self.assertNotIn('"goal-done"', json.dumps(schema.get("$defs", {}).get("GoalAssociationModelAssociation", {})))
         valid = {
-            "associations": [], "unassociated_responsibility_refs": ["r1"],
+            "associations": [], "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
             "referent_updates": [], "resolved_references": [],
             "cognitive_requests": [], "confidence": 1.0,
             "reason_summary": "Terminal history cannot absorb fresh responsibility.",
@@ -1524,7 +1521,6 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
     def test_live_schema_rejects_model_authored_new_goal_payload(self):
         schema = self._schema(("r1",))
         forged = {
-            "unassociated_responsibility_refs": ["r1"],
             "new_goals": [goal("forged", "speech")],
             "referent_updates": [], "resolved_references": [],
             "cognitive_requests": [], "confidence": 1.0,
@@ -1541,7 +1537,7 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
             "output_mode": "information", "continuity_scope": "goal", "confidence": 1.0,
         })})
         output = GoalSegmentationModelOutput.model_validate({
-            "decision": "create_goals", "unassociated_responsibility_refs": ["r1"],
+            "decision": "create_goals", "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
             "referent_updates": [], "resolved_references": [], "cognitive_requests": [],
             "confidence": 1.0, "reason_summary": "No retained Goal matches.",
         })
@@ -1566,7 +1562,7 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
             "bindings": {}, "output_mode": "speech", "continuity_scope": "turn", "confidence": 1.0,
         })})
         output = GoalSegmentationModelOutput.model_validate({
-            "decision": "no_goal", "unassociated_responsibility_refs": ["r1"],
+            "decision": "no_goal", "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
             "referent_updates": [], "resolved_references": [], "cognitive_requests": [],
             "confidence": 1.0, "reason_summary": "No retained Goal matches.",
         })
@@ -1593,7 +1589,7 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
                 "requirement_changes": [{"target_goal_id": "goal-coffee", "replace_requirement_indices": [0], "source_responsibility_refs": ["r1"]}],
                 "confidence": 1.0,
             }],
-            "unassociated_responsibility_refs": [], "referent_updates": [],
+            "new_goals": [], "referent_updates": [],
             "resolved_references": [], "cognitive_requests": [], "confidence": 1.0,
             "reason_summary": "The new responsibility modifies retained coffee work.",
         })
@@ -1633,7 +1629,7 @@ def test_below_threshold_nonmatch_is_removed_before_exact_one_classification():
                 "reason_summary": "The current identity question does not match.",
             },
         ],
-        "unassociated_responsibility_refs": ["r1"],
+        "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
         "confidence": 1.0,
         "reason_summary": "No retained Goal matches the current Responsibility.",
     })
@@ -1648,6 +1644,94 @@ def test_below_threshold_nonmatch_is_removed_before_exact_one_classification():
     assert len(result.new_goals) == 1
     assert result.new_goals[0].source_responsibility_refs == ["r1"]
     assert len(result.metadata["rejected_below_confidence_associations"]) == 2
+
+
+@pytest.mark.parametrize("relationship", ["replace", "historical_reference", "independent"])
+def test_ga_primary_relationships_survive_without_downstream_inference(relationship):
+    retained = active_goal("goal-old", "Walk forward.")
+    if relationship == "historical_reference":
+        retained["responsibility_status"] = "satisfied"
+        retained["goal"]["responsibility_status"] = "satisfied"
+    text = {
+        "replace": "Stop the earlier task and blink twice instead.",
+        "historical_reference": "Tell me again what the completed task was.",
+        "independent": "Also tell me a joke.",
+    }[relationship]
+    req = request(text, active_goals=[retained])
+    related = ["goal-old"] if relationship == "historical_reference" else []
+    supersedes = ["goal-old"] if relationship == "replace" else []
+    raw = {
+        "associations": [],
+        "new_goals": [{"source_responsibility_refs": ["r1"],
+                       "related_goal_ids": related, "supersedes_goal_ids": supersedes}],
+        "referent_updates": [], "resolved_references": [], "cognitive_requests": [],
+        "confidence": 1.0, "reason_summary": "The accepted meaning determines this relation.",
+    }
+    model = FakeOllama(raw)
+    result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+    assert result.resolution_status == "resolved", result.metadata
+    assert len(model.prompts) == 1
+    Draft202012Validator(model.prompts[0][1]["response_format"]).validate(raw)
+    assert len(result.new_goals) == 1
+    actual = result.new_goals[0]
+    assert actual.description == req.responsibilities[0].outcome
+    assert actual.source_responsibility_refs == ["r1"]
+    assert actual.related_goal_ids == related
+    assert actual.supersedes_goal_ids == supersedes
+    assert result.cognitive_requests == []
+
+
+@pytest.mark.parametrize("with_candidate", [False, True])
+def test_ga_preserves_complete_media_intent_without_planner_arguments(with_candidate):
+    req = request("Play some music.", active_goals=[active_goal("goal-old", "Walk forward.")] if with_candidate else [])
+    req = req.model_copy(update={"responsibilities": typed_responsibilities({
+        "local_ref": "r1", "outcome": "Play some music.", "output_mode": "media_playback",
+        "continuity_scope": "goal", "bindings": {}, "confidence": 1.0,
+    })})
+    raw = {"new_goals": [{"source_responsibility_refs": ["r1"],
+                         "related_goal_ids": [], "supersedes_goal_ids": []}],
+           "referent_updates": [], "resolved_references": [], "cognitive_requests": [],
+           "confidence": 1.0, "reason_summary": "No retained Goal matches this media request."}
+    if with_candidate:
+        raw["associations"] = []
+    model = FakeOllama(raw)
+    result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+    Draft202012Validator(model.prompts[0][1]["response_format"]).validate(raw)
+    assert result.resolution_status == "resolved", result.metadata
+    assert len(model.prompts) == 1
+    assert result.new_goals[0].description == "Play some music."
+    assert result.new_goals[0].metadata["output_mode"] == "media_playback"
+    assert result.new_goals[0].object == {}
+    assert result.cognitive_requests == []
+
+
+@pytest.mark.parametrize("fault", ["unknown_related", "terminal_replacement", "overlap", "missing_links", "reauthored_what"])
+def test_ga_primary_relationship_contract_rejects_invalid_links_without_repair(fault):
+    retained = active_goal("goal-old", "Walk forward.")
+    if fault == "terminal_replacement":
+        retained["responsibility_status"] = "satisfied"
+        retained["goal"]["responsibility_status"] = "satisfied"
+    req = request("Blink twice instead.", active_goals=[retained])
+    item = {"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}
+    if fault == "unknown_related":
+        item["related_goal_ids"] = ["goal-unknown"]
+    elif fault == "terminal_replacement":
+        item["supersedes_goal_ids"] = ["goal-old"]
+    elif fault == "overlap":
+        item["related_goal_ids"] = item["supersedes_goal_ids"] = ["goal-old"]
+    elif fault == "missing_links":
+        item.pop("supersedes_goal_ids")
+    else:
+        item["description"] = "Only say hello."
+    raw = {"associations": [], "new_goals": [item], "referent_updates": [],
+           "resolved_references": [], "cognitive_requests": [], "confidence": 1.0,
+           "reason_summary": "Invalid primary relation must reject."}
+    model = FakeOllama(raw)
+    result = asyncio.run(GoalAssociationResolver(model).resolve(req))
+    assert result.resolution_status == "fail_closed"
+    assert not result.new_goals
+    assert len(model.prompts) == 1
+    assert not Draft202012Validator(model.prompts[0][1]["response_format"]).is_valid(raw)
 
 
 def test_live_ga_schema_exposes_existing_goal_admission_threshold():

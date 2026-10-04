@@ -31,7 +31,8 @@
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t5"
               },
-              "continuity_scope": "goal"
+              "continuity_scope": "goal",
+              "body_effect_family": "task_physical_effect"
             },
             {
               "local_ref": "r2",
@@ -42,7 +43,8 @@
                 "source_start_token_ref": "t7",
                 "source_end_token_ref": "t9"
               },
-              "continuity_scope": "goal"
+              "continuity_scope": "goal",
+              "body_effect_family": "social_expression"
             },
             {
               "local_ref": "r3",
@@ -94,7 +96,8 @@
         "source_evidence": {
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t5"
-        }
+        },
+        "body_effect_family": "task_physical_effect"
       },
       {
         "local_ref": "r2",
@@ -104,7 +107,8 @@
         "source_evidence": {
           "source_start_token_ref": "t7",
           "source_end_token_ref": "t9"
-        }
+        },
+        "body_effect_family": "social_expression"
       },
       {
         "local_ref": "r3",

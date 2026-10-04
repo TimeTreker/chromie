@@ -31,7 +31,8 @@
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t6"
               },
-              "continuity_scope": "goal"
+              "continuity_scope": "goal",
+              "body_effect_family": "task_physical_effect"
             }
           ],
           "meaning_uncertainties": [],
@@ -60,7 +61,8 @@
         "local_ref": "r1",
         "outcome": "往前走十五秒。",
         "confidence": 0.96,
-        "output_mode": "body_action"
+        "output_mode": "body_action",
+        "body_effect_family": "task_physical_effect"
       }
     ]
   },

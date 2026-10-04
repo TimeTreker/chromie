@@ -1,77 +1,50 @@
 # User Meaning Interpretation Daily-Life Dataset
 
-Audience: Chromie maintainers evaluating or reviewing the isolated User Meaning
-Interpretation (UMI) authority. The checked-in scenario JSON files are the
-authoritative dataset assets; this directory does not ship a scenario generator.
+Audience: UMI reference authors and qualification reviewers. Checked-in JSON,
+source inputs, contrast membership and manifest remain the dataset assets.
 
-This dataset is separate from `daily_conversation` because it tests the current
-primary GI model contract directly: complete natural-language intentions,
-requested result types, genuine unresolved meaning, and exact
-current-turn source evidence. It does not judge Planner behavior, Capability
-selection, response wording, execution, voice, simulation, or robot behavior.
+## Inventory and current compatibility
 
-## Layout and scope
+The retained inventory contains 1,496 scenarios: 374 four-case contrast sets,
+17 ordinary-life categories, 748 cases per language. Splits are 896
+`train_candidate`, 220 `validation`, 380 `frozen_test`; a contrast set stays within
+one split. Every case remains `training_eligible=false` pending independent review.
 
-Every JSON file under `scenarios/` contains exactly one scenario. The 1,496
-scenarios form 374 four-case contrast sets across 17 ordinary-life categories:
-family and home, meals, routines, school, work, travel, shopping, wellbeing,
-weather, friends, entertainment, household objects, movement, social support,
-multi-turn continuity, uncertainty/correction, and pets/gardening.
+This is a frozen reference inventory, not a qualified production-model corpus.
+The 2026-10-04 current-contract reconciliation removes retired initial
+`social_cognition` requests: Runtime already owns that standing invocation. It adds
+the existing body-effect family to 850 body-action references and their semantic
+expectations (730 task physical effects, 120 social expressions). All 1,496
+references now pass the current dynamic Schema and Host validator.
 
-The dataset is balanced between `zh-CN` and `en-US` (748 each) and divided by
-whole contrast set:
+The retained admitted text, complete meaning, context, source ranges, actors,
+referents, quantities, order, contrast membership and splits are unchanged. Original
+files and per-file before/after digests are retained under
+`.chromie/acceptance/contract-fixture-repair-20261004T084054Z/`; the manifest binds the
+new scenario-tree digest. This is a mechanical reference migration, not candidate
+inference or independent semantic review.
 
-- `train_candidate`: 896 scenarios
-- `validation`: 220 scenarios
-- `frozen_test`: 380 scenarios
+UMI preserves complete contextual WHAT, requested result type, uncertainty and
+exact current-turn source evidence. Planner owns parameter extraction, Capability
+selection and Work; SC owns wording. The live `bindings` surface conflicts with
+Charter principle 30 and is an open design/source finding in the
+[project audit](../../../ARCHITECTURE_AUDIT.md), not an approved dataset extension.
 
-A contrast set never crosses a split. The train-candidate label is only a data
-partition name: every scenario has `training_eligible=false` until independent
-semantic review promotes it. Frozen-test changes require owner review.
-
-Each scenario contains:
-
-- the immutable current turn and minimum bounded semantic context;
-- one acceptable current-schema `reference_wire_output`;
-- flexible semantic expectations for evaluating non-identical valid wording;
-- machine-checkable invariants and named adversarial failure hypotheses;
-- explicit review and evidence limitations.
-
-The retained semantic review dimensions cover quantities, units, actors, referents,
-place/time scope, requested result types, compound relations and continuity meaning.
-These are **review targets**, not GI output fields. The owner-approved migration
-keeps all source turns, context and contrast splits; full outcome text now carries
-material details and relations. GA owns canonical relationships and Planner owns
-parameter extraction, conversions and scheduling. The historical measurement
-coverage labels in the manifest describe reviewed source details, not a typed GI
-binding table. Native inference and independent semantic review remain separate.
-
-## Validation
-
-Run the complete static audit with:
+## Validation and migration
 
 ```bash
 python benchmarks/datasets/goal_interpretation_daily_life/validate.py
 ```
 
-The audit discovers every file, checks declared coverage and split isolation,
-rejects exact input duplication, and validates each reference against the
-dynamic current GI response schema. All 1,496 references must also pass the
-production Host validator. Host checks closed intent fields, exact source-token
-references, order and non-overlap. It does not infer missing details, enforce a
-fixed count of action fragments, or recover intent using phrase rules. Elliptical
-replies must be understood from their supplied context in the primary GI result.
+Validation must expose incompatibilities; it must not rewrite targets or routing
+choices to obtain a pass. Preserve admitted text, bounded context, 374 contrast
+sets and split isolation while reviewing migration. Frozen-test target changes
+require owner review and new bound digests; compare Schema, DTO and Host separately.
 
-These checks prove mechanical compatibility and internal consistency, not
-independent semantic correctness or live-model performance.
-
-The September 22 reference migration preserves all admitted text, context,
-outcomes, source spans, semantic detail expectations and contrast splits. References
-now explicitly carry `continuity_scope`, typed `meaning_uncertainties` and
-`cognitive_requests`. The 68 ambiguous-object/recipient cases retain their original
-uncertainty descriptions and cite their sole Responsibility. Draft-only conversation
-and repetition of already admitted speech use turn scope; separate recipient,
-information, performance and effect outcomes retain Goal scope. Activation choices
-are authored fixture data, never a Runtime routing rule or an inference-time repair.
-The frozen-test changes remain subject to owner review; no independent semantic,
-native-model or training promotion follows from current-Schema compatibility.
+Counts, actors, referents, units, place/time scope and relations remain semantic
+review targets. Neither a reference label nor deterministic compatibility proves
+native inference, independent semantic correctness, training readiness, service
+behavior, voice, simulator or robot performance. Follow the
+[qualification method](../../../docs/LLM_PROMPT_QUALIFICATION_METHOD.md) before
+candidate optimization or promotion. The migration does not authorize changing UMI's
+production prompt or `bindings` ownership.

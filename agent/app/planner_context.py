@@ -523,7 +523,7 @@ def planner_provider_vocal_goal_ids(
 def planner_provider_media_goal_operations(
     authoritative_goals: list[dict[str, Any]],
 ) -> dict[str, str]:
-    """Return exact media lifecycle operations requested by canonical WHAT."""
+    """Preserve retained media operations; new intent leaves selection to Planner."""
 
     result: dict[str, str] = {}
     for goal in authoritative_goals:
@@ -535,9 +535,9 @@ def planner_provider_media_goal_operations(
             str(metadata.get("media_operation") or "").strip() if isinstance(metadata, dict) else ""
         )
         if goal_id and _goal_output_mode(goal) == "media_playback":
-            if operation not in MEDIA_CAPABILITY_IDS:
-                raise ValueError(f"media_playback Goal requires exact media_operation: {goal_id}")
-            result[goal_id] = operation
+            if operation and operation != "none" and operation not in MEDIA_CAPABILITY_IDS:
+                raise ValueError(f"unsupported retained media_operation: {goal_id}")
+            result[goal_id] = operation or "none"
     return result
 
 

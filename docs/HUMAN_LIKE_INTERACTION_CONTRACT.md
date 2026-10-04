@@ -399,8 +399,8 @@ parallel-safety declaration, Trusted Runtime may start the lookup under Responsi
 provenance while continuity cognition remains in flight.
 
 The same principle does **not** authorize speculative physical effects. For a request such
-as “walk fifty meters, get a cup of water and bring it back,” UMI may request SC, GA, and
-Planner concurrently. SC may decide whether an acknowledgement is useful. Planner may
+as “walk fifty meters, get a cup of water and bring it back,” UMI may request GA and Planner concurrently, while Runtime starts the standing
+SC interaction. SC decides whether an acknowledgement is useful. Planner may
 immediately reason about mobility, manipulation, acquisition, return, delivery, current
 body/provider state, and the complete end-to-end user objective. GA may independently
 establish whether this is a fresh obligation or continuity with an existing concern.
@@ -783,8 +783,8 @@ claims, and completion restriction. Generated or queued speech is not delivery
 evidence. Only playback-started or playback-completed state satisfies the
 audible act. A later response stage may reference a queued event without
 resynthesizing it; if that exact event becomes `not_delivered`, Runtime may
-fulfill the same act once. A Fast Planner Communicative Activity scheduled before GA finishes retains only
-UMI Responsibility refs until GA binds it; Goal-bound speech cannot be reassigned
+fulfill the same act once. An SC Communicative Activity scheduled before GA finishes retains only
+UMI Responsibility refs until canonical Goal binding; Goal-bound speech cannot be reassigned
 to unrelated work. Literal text
 equality is only a payload-integrity check and never decides whether two
 conversational responsibilities are the same. Distinct result, failure,

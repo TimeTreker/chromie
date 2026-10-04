@@ -224,6 +224,11 @@ def worker_target(connection: Connection, *, cancellation_event: Any = None) -> 
                 raise RuntimeError(
                     f"CosyVoice could not prepare voice: {profile.speaker_id}"
                 )
+        # Every admitted speaker now has complete native conditioning. This
+        # ONNX encoder is used only to prepare reference audio, not synthesis
+        # with a cached speaker ID; retaining its CUDA arena competes with
+        # cognition and acoustic generation on the shared GPU.
+        model.frontend.speech_tokenizer_session = None
         connection.send(
             {
                 "type": "ready",

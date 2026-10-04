@@ -1183,6 +1183,20 @@ async def run_check(
                 "text-to-MuJoCo acceptance input was suppressed before Core entry"
             )
 
+        # Match production admission before concurrent SC can publish its reply.
+        # The later semantic record enriches this same turn without appending it.
+        assistant.conversation_state.record_accepted_user_turn(
+            sid,
+            args.text,
+            metadata={
+                "source": "cognitive_gateway_admitted_dialogue",
+                "admission": turn_envelope.admission,
+                "turn_envelope": turn_envelope.model_dump(
+                    mode="json", exclude_none=True,
+                ),
+            },
+        )
+
         interpretation_start = time.perf_counter()
         core_interpretation = await assistant.agent_client.interpret_turn(
             session,
@@ -1366,7 +1380,8 @@ async def run_check(
                 ),
             },
         )
-        if args.preview_only or errors:
+        presentation_delivered = response.metadata.get("presentation_already_dispatched") is True
+        if args.preview_only or errors or presentation_delivered:
             assistant.conversation_state.record_interaction_response(
                 sid,
                 response,
@@ -1378,7 +1393,10 @@ async def run_check(
                 "check was not given an explicit confirmation grant."
             )
 
-        if not errors and not args.preview_only:
+        # Independent SC delivery has already joined Runtime and recorded its
+        # terminal evidence. Preserve its response/history, as the production
+        # Host does, without dispatching the same speech and decoration again.
+        if not errors and not args.preview_only and not presentation_delivered:
             execution_start = time.perf_counter()
             confirmed = confirmation_request_ids if args.grant_confirmation else None
             record_execution_bindings(

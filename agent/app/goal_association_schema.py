@@ -6,12 +6,9 @@ This module has no model client, Goal state, or continuity decision lifecycle.
 from __future__ import annotations
 
 import copy
-import re
-from typing import Any, Literal
+from typing import Any
 
 from .goal_association_contract import (
-    CANONICAL_LOCATION_ENTITY_TYPES,
-    GoalAssociationModelGoal,
     GoalAssociationModelOutput,
     GoalSegmentationModelOutput,
 )
@@ -21,27 +18,6 @@ try:
     from chromie_contracts.json_schema import expose_intersection_shapes as _expose_intersection_shapes
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.json_schema import expose_intersection_shapes as _expose_intersection_shapes
-
-
-def _decoder_binding_value(name: Any, value: Any) -> str:
-    """Project an already-typed UMI value into the Goal binding vocabulary."""
-
-    normalized_name = "_".join(
-        str(name).strip().casefold().replace("-", "_").split()
-    )
-    normalized_value = " ".join(str(value).strip().casefold().split())
-    if normalized_name == "speed":
-        canonical_speed = {
-            "slowly": "slow",
-            "quickly": "quick",
-        }.get(normalized_value)
-        if canonical_speed is not None:
-            return canonical_speed
-    if value is True:
-        return "true"
-    if value is False:
-        return "false"
-    return str(value)
 
 
 def _prune_unreferenced_definitions(schema: dict[str, Any]) -> dict[str, Any]:
@@ -138,25 +114,6 @@ def goal_association_response_schema(
         str(source_ref): dict(bindings)
         for source_ref, bindings in (responsibility_bindings or {}).items()
     }
-    relation_keys = {"before", "after", "parallel_with"}
-    relation_coupled_refs: set[str] = set()
-    for source_ref, bindings in responsibility_bindings.items():
-        for key, raw in bindings.items():
-            if str(key).strip().casefold() not in relation_keys:
-                continue
-            relation_coupled_refs.add(source_ref)
-            values = raw if isinstance(raw, list) else [raw]
-            relation_coupled_refs.update(
-                str(value).strip()
-                for value in values
-                if str(value or "").strip() in responsibility_refs
-            )
-    # GA is association-only. Every current Responsibility may either associate
-    # with one retained Goal or remain unassociated. ``continuity_scope`` is not
-    # a Goal-identity routing flag: a conversational Responsibility can still
-    # relate to retained social continuity, while an unrelated task remains new.
-    non_goal_eligible_refs = list(responsibility_refs)
-    forced_non_goal_refs: set[str] = set()
     meaning_uncertainty_refs = [
         " ".join(str(item or "").strip().split())
         for item in (meaning_uncertainty_refs or [])
@@ -174,26 +131,13 @@ def goal_association_response_schema(
             if isinstance(refs, dict):
                 refs["items"] = {"type": "string", "enum": responsibility_refs}
                 refs["uniqueItems"] = True
-    # New Goals are materialized mechanically after association. The model wire
-    # never carries a new-goal semantic surface.
-    properties.pop("new_goals", None)
+    # GA supplies Goal identity/relationships only; Host inherits all WHAT from UMI.
     associations = properties.get("associations")
     if isinstance(associations, dict) and not open_goal_ids:
         # Retained terminal Goals remain available below as related historical
         # context for a new Goal, but they cannot own a current Responsibility.
         # Make this structural for native decoders rather than relying on if/then.
         associations["maxItems"] = 0
-    non_goal = properties.get("unassociated_responsibility_refs")
-    if isinstance(non_goal, dict):
-        if non_goal_eligible_refs:
-            non_goal["items"] = {
-                "type": "string",
-                "enum": non_goal_eligible_refs,
-            }
-            non_goal["uniqueItems"] = True
-            non_goal["maxItems"] = len(non_goal_eligible_refs)
-        else:
-            properties.pop("unassociated_responsibility_refs", None)
     if not referent_ids:
         resolved_references = properties.get("resolved_references")
         if isinstance(resolved_references, dict):
@@ -367,514 +311,17 @@ def goal_association_response_schema(
                 },
             }
         )
-    recipient_schema = schema.get("$defs", {}).get(
-        "GoalAssociationModelResourceRecipient"
-    )
-    if isinstance(recipient_schema, dict):
-        recipient_properties = recipient_schema.setdefault("properties", {})
-        recipient_properties["referent_id"] = (
-            {
-                "anyOf": [
-                    {"type": "string", "enum": referent_ids},
-                    {"type": "null"},
-                ]
-            }
-            if referent_ids
-            else {"type": "null"}
-        )
-        recipient_properties["description"] = {
-            "type": "string",
-            "minLength": 1,
-            "description": (
-                "Human-facing recipient meaning. Copy an explicit current-turn "
-                "recipient surface exactly; use requester only when no explicit "
-                "recipient or supplied discourse referent exists."
-            ),
-        }
-    # Apply the canonical binding clauses before copying the binding schema into
-    # Responsibility-specific oneOf branches.  Applying them only to ``$defs``
-    # after those copies are built leaves the active constrained-decoder branch
-    # without the same name/type invariant enforced by runtime validation.
-    schema = binding_semantic_contract_response_schema(schema)
-    goal_schema = schema.get("$defs", {}).get("GoalAssociationModelGoal")
-    if isinstance(goal_schema, dict) and active_ids:
-        # Host already rejects a Goal ID that is simultaneously retained as
-        # related context and retired by the replacement Goal. Expose that
-        # mechanical contradiction to the primary constrained decoder and DTO
-        # repair boundary instead of allowing it to reach terminal Host
-        # materialization.
-        goal_schema.setdefault("allOf", []).extend(
-            {
-                "not": {
-                    "properties": {
-                        "related_goal_ids": {
-                            "contains": {"const": goal_id},
-                        },
-                        "supersedes_goal_ids": {
-                            "contains": {"const": goal_id},
-                        },
-                    },
-                    "required": [
-                        "related_goal_ids",
-                        "supersedes_goal_ids",
-                    ],
-                }
-            }
-            for goal_id in active_ids
-        )
-    if isinstance(goal_schema, dict) and responsibility_refs:
-        # Every writable Goal-semantic surface must be explicit in the
-        # constrained model output. Defaults on these fields are Python DTO
-        # conveniences, not permission for the model to drop UMI-grounded
-        # bindings or silently avoid deciding the resource branch.
-        goal_required = list(
-            dict.fromkeys(
-                [
-                    "source_responsibility_refs",
-                    "output_mode",
-                    "resource_kind",
-                    "bindings",
-                    "resource_responsibility",
-                    *(goal_schema.get("required") or []),
-                ]
-            )
-        )
-        goal_schema["required"] = goal_required
-        source_refs_schema = goal_schema.get("properties", {}).get(
-            "source_responsibility_refs"
-        )
-        if isinstance(source_refs_schema, dict):
-            source_refs_schema["minItems"] = 1
-            source_refs_schema["maxItems"] = 1
-        goal_properties = goal_schema.get("properties")
-        branch_goal_properties = (
-            copy.deepcopy(goal_properties)
-            if isinstance(goal_properties, dict)
-            else {}
-        )
-
-        def expected_source_bindings(source_ref: str) -> list[tuple[str, str]]:
-            return [
-                (
-                    " ".join(str(name).strip().split()),
-                    _decoder_binding_value(name, value),
-                )
-                for name, value in responsibility_bindings.get(
-                    source_ref, {}
-                ).items()
-                if isinstance(value, (str, int, float, bool))
-                and " ".join(str(name).strip().split())
-                and "_".join(
-                    str(name).strip().casefold().replace("-", "_").split()
-                )
-                not in {"action", "activity", "effect", "outcome"}
-            ]
-
-        def exact_binding_array_schema(
-            base: dict[str, Any],
-            expected_bindings: list[tuple[str, str]],
-            *,
-            entity_type_by_name: dict[str, str] | None = None,
-        ) -> dict[str, Any]:
-            constrained = copy.deepcopy(base)
-            constrained["minItems"] = len(expected_bindings)
-            constrained["maxItems"] = len(expected_bindings)
-            binding_item_template = copy.deepcopy(
-                schema.get("$defs", {}).get("GoalAssociationModelBinding") or {}
-            )
-            binding_branches: list[dict[str, Any]] = []
-            for name, value in expected_bindings:
-                binding_branch = copy.deepcopy(binding_item_template)
-                binding_properties = binding_branch.setdefault("properties", {})
-                binding_properties["name"] = {"const": name}
-                binding_properties["value"] = {"const": value}
-                normalized_name = "_".join(
-                    name.strip().casefold().replace("-", "_").split()
-                )
-                canonical_entity_type = {
-                    "after": "sequence_ref",
-                    "before": "sequence_ref",
-                    "count": "count",
-                    "direction": "direction",
-                    "distance": "distance",
-                    "duration": "duration",
-                    "parallel_with": "sequence_ref",
-                    "quantity": "quantity",
-                    "speed": "speed",
-                    **(entity_type_by_name or {}),
-                }.get(normalized_name)
-                if canonical_entity_type is not None:
-                    binding_properties["entity_type"] = {
-                        "const": canonical_entity_type
-                    }
-                    # The fixed name/type already satisfy the canonical binding
-                    # conditionals. A speed additionally needs its fixed value
-                    # to satisfy the existing speed vocabulary. Keep the clauses
-                    # for unresolved types or an invalid supplied speed.
-                    if canonical_entity_type != "speed" or (
-                        value in {"slow", "normal", "quick"}
-                        or re.search(r"[0-9]", value) is not None
-                    ):
-                        binding_branch.pop("allOf", None)
-                if normalized_name == "location" and canonical_entity_type is None:
-                    # This UMI-fixed name must use the existing location type
-                    # vocabulary directly; decoder conditionals are insufficient.
-                    binding_properties["entity_type"] = {"enum": list(CANONICAL_LOCATION_ENTITY_TYPES)}
-                    binding_branch.pop("allOf", None)
-                binding_branch["required"] = list(
-                    dict.fromkeys(
-                        [
-                            *(binding_branch.get("required") or []),
-                            "name",
-                            "value",
-                            "entity_type",
-                            "confidence",
-                        ]
-                    )
-                )
-                binding_branches.append(binding_branch)
-            # Each expected source binding is already ordered by the accepted
-            # Responsibility DTO.  A free oneOf item grammar plus ``contains``
-            # allowed the deployed structured decoder to repeat one legal row
-            # and omit another (for example two ``name`` rows and no ``value``
-            # row).  Positional branches make the complete closed projection
-            # visible at the decoder boundary; no semantic value or type is
-            # invented here.  Keep ``items`` schema-valued even though
-            # ``maxItems`` prevents a suffix: Ollama 0.32's guided parser does
-            # not accept the JSON Schema boolean form ``items: false``.
-            constrained["prefixItems"] = binding_branches
-            constrained["items"] = (
-                {"oneOf": copy.deepcopy(binding_branches)}
-                if binding_branches
-                else copy.deepcopy(binding_item_template)
-            )
-            constrained["uniqueItems"] = True
-            # Exact length and required positional name/value constants already
-            # imply every contains clause. Repeating them as allOf makes some
-            # decoders discard the array's structural constraints altogether.
-            return constrained
-
-        def branch_properties(
-            source_ref: str,
-            *,
-            resource_variant: Literal[
-                "ordinary", "physical_object", "information", "unbounded"
-            ],
-        ) -> dict[str, Any]:
-            """Return the complete, output-mode-compatible Goal surface.
-
-            ``resource_responsibility`` is required so the decoder must make
-            the resource decision explicitly, but Pydantic's default schema
-            lists the object union before ``null``.  Ollama's constrained
-            decoder consequently biased ordinary effects toward fabricated
-            resources.  Keep semantic selection model-owned while removing
-            impossible resource kinds and putting the ordinary ``null`` branch
-            first.  ``body_action`` remains free to select a real physical
-            acquisition, and ``information`` remains free to select a real
-            information responsibility.
-            """
-
-            properties = copy.deepcopy(branch_goal_properties)
-            output_mode = responsibility_output_modes.get(source_ref)
-            properties["resource_kind"] = {
-                "const": (
-                    "none" if resource_variant == "ordinary" else resource_variant
-                ),
-                "description": (
-                    "Choose the semantic resource shape before authoring its payload. "
-                    "none means the outcome is not resource acquisition or delivery."
-                ),
-            }
-            if resource_variant == "ordinary":
-                properties["resource_responsibility"] = {
-                    "type": "null",
-                    "description": (
-                        "The requested outcome is not acquisition-and-delivery of a "
-                        "resource. Select this null branch for Chromie's own locomotion, "
-                        "posture, gaze, gesture, turning, or other body motion."
-                    ),
-                }
-                expected_bindings = expected_source_bindings(source_ref)
-                if expected_bindings:
-                    properties["bindings"] = exact_binding_array_schema(
-                        properties.get("bindings") or {},
-                        expected_bindings,
-                        entity_type_by_name={"location": "location"},
-                    )
-            elif resource_variant == "physical_object":
-                physical_schema = copy.deepcopy(
-                    schema.get("$defs", {}).get(
-                        "GoalAssociationModelPhysicalResourceResponsibility"
-                    )
-                    or {}
-                )
-                physical_schema["description"] = (
-                    "Select only when acquiring a distinct concrete object independent "
-                    "of Chromie's body and physically handing it to a recipient is the "
-                    "requested outcome. Never select for Chromie's own locomotion, "
-                    "posture, gaze, gesture, turning, or body motion."
-                )
-                spatial_names = {
-                    "location",
-                    "relative_location",
-                    "distance",
-                    "direction",
-                    "route",
-                }
-                expected_spatial_bindings = [
-                    (name, value)
-                    for name, value in expected_source_bindings(source_ref)
-                    if "_".join(
-                        name.strip().casefold().replace("-", "_").split()
-                    )
-                    in spatial_names
-                ]
-                physical_properties = physical_schema.get("properties")
-                if isinstance(physical_properties, dict):
-                    expected_bindings = expected_source_bindings(source_ref)
-                    identity_names = {
-                        "desired_item",
-                        "entity",
-                        "item",
-                        "object",
-                        "resource",
-                        "resource_identity",
-                        "target_item",
-                    }
-                    recipient_names = {"delivery_recipient", "recipient"}
-                    identity_values = [
-                        value
-                        for name, value in expected_bindings
-                        if "_".join(
-                            name.strip().casefold().replace("-", "_").split()
-                        )
-                        in identity_names
-                    ]
-                    recipient_values = [
-                        value
-                        for name, value in expected_bindings
-                        if "_".join(
-                            name.strip().casefold().replace("-", "_").split()
-                        )
-                        in recipient_names
-                    ]
-                    if len(set(identity_values)) == 1:
-                        physical_properties["description"] = {
-                            "const": identity_values[0]
-                        }
-                    if len(set(recipient_values)) == 1:
-                        resource_recipient = copy.deepcopy(
-                            schema.get("$defs", {}).get(
-                                "GoalAssociationModelResourceRecipient"
-                            )
-                            or {}
-                        )
-                        resource_recipient_properties = (
-                            resource_recipient.setdefault("properties", {})
-                        )
-                        resource_recipient_properties["description"] = {
-                            "const": recipient_values[0]
-                        }
-                        resource_recipient["required"] = list(
-                            dict.fromkeys(
-                                [
-                                    *(resource_recipient.get("required") or []),
-                                    "description",
-                                ]
-                            )
-                        )
-                        physical_properties["recipient"] = resource_recipient
-                if expected_spatial_bindings and isinstance(
-                    physical_properties, dict
-                ):
-                    source_schema = copy.deepcopy(
-                        schema.get("$defs", {}).get(
-                            "GoalAssociationModelPhysicalSource"
-                        )
-                        or {}
-                    )
-                    source_properties = source_schema.get("properties")
-                    if isinstance(source_properties, dict):
-                        source_properties["status"] = {"const": "known"}
-                        source_properties["acquisition_bindings"] = (
-                            exact_binding_array_schema(
-                                source_properties.get("acquisition_bindings") or {},
-                                expected_spatial_bindings,
-                                entity_type_by_name={
-                                    "location": "relative_location",
-                                    "relative_location": "relative_location",
-                                    "distance": "distance",
-                                    "direction": "direction",
-                                    "route": "route",
-                                },
-                            )
-                        )
-                        source_schema["required"] = list(
-                            dict.fromkeys(
-                                [
-                                    *(source_schema.get("required") or []),
-                                    "status",
-                                    "acquisition_bindings",
-                                ]
-                            )
-                        )
-                        physical_properties["source"] = source_schema
-                properties["resource_responsibility"] = physical_schema
-                properties["bindings"] = {
-                    **copy.deepcopy(properties.get("bindings") or {}),
-                    "maxItems": 0,
-                }
-            elif resource_variant == "information":
-                information_schema = copy.deepcopy(
-                    schema.get("$defs", {}).get(
-                        "GoalAssociationModelInformationResourceResponsibility"
-                    )
-                    or {}
-                )
-                expected_bindings = expected_source_bindings(source_ref)
-                information_properties = information_schema.get("properties")
-                if expected_bindings and isinstance(information_properties, dict):
-                    information_properties["query_scope"] = (
-                        exact_binding_array_schema(
-                            information_properties.get("query_scope") or {},
-                            expected_bindings,
-                        )
-                    )
-                properties["resource_responsibility"] = information_schema
-                properties["bindings"] = {
-                    **copy.deepcopy(properties.get("bindings") or {}),
-                    "maxItems": 0,
-                }
-
-            if resource_variant == "unbounded":
-                properties["resource_kind"] = copy.deepcopy(
-                    branch_goal_properties.get("resource_kind") or {}
-                )
-
-            properties["source_responsibility_refs"] = {
-                "const": [source_ref]
-            }
-            if output_mode is not None:
-                properties["output_mode"] = {"const": output_mode}
-                if output_mode == "media_playback":
-                    properties["media_operation"] = {
-                        **copy.deepcopy(
-                            branch_goal_properties.get("media_operation") or {}
-                        ),
-                        "enum": [
-                            "play",
-                            "pause",
-                            "resume",
-                            "seek",
-                            "stop",
-                            "volume",
-                            "status",
-                        ],
-                    }
-                else:
-                    properties["media_operation"] = {"const": "none"}
-            # JSON property order is observable to the constrained decoder. Put
-            # the source identity and semantic discriminators before either
-            # payload branch so the model chooses the owned result shape before
-            # filling its descriptive fields.
-            discriminator_first = (
-                "source_responsibility_refs",
-                "output_mode",
-                "resource_kind",
-                "bindings",
-                "resource_responsibility",
-                "media_operation",
-            )
-            return {
-                **{
-                    name: properties[name]
-                    for name in discriminator_first
-                    if name in properties
-                },
-                **{
-                    name: value
-                    for name, value in properties.items()
-                    if name not in discriminator_first
-                },
-            }
-
-        def resource_variants(source_ref: str) -> list[str]:
-            output_mode = responsibility_output_modes.get(source_ref)
-            if source_ref in responsibility_information_refs:
-                # UMI authored only the human-level information WHAT. At the
-                # canonical Goal boundary that category projects to the existing
-                # provider-neutral information-resource representation. This is
-                # a deterministic representation projection, not UMI choosing a
-                # Capability, provider, or executable work item.
-                return ["information"]
-            if output_mode == "body_action":
-                return ["ordinary", "physical_object"]
-            if output_mode == "information":
-                return ["information"]
-            if output_mode == "stateful_effect":
-                return ["ordinary"]
-            if output_mode is not None:
-                return ["ordinary"]
-            return ["unbounded"]
-
-        goal_schema["oneOf"] = []
-        for source_ref in responsibility_refs:
-            for resource_variant in resource_variants(source_ref):
-                goal_schema["oneOf"].append(
-                    {
-                        # Ollama's constrained decoder treats the selected
-                        # oneOf object branch as the active production surface.
-                        # Repeat the complete writable Goal surface here, not
-                        # only the discriminants, so branch-local required
-                        # fields can actually be generated. Resource-capable
-                        # modes use complete cross-product branches so an
-                        # ordinary Goal cannot also populate a resource object.
-                        "properties": branch_properties(
-                            source_ref,
-                            resource_variant=resource_variant,
-                        ),
-                        # Some constrained decoders treat a nested oneOf branch
-                        # as the active object production surface rather than
-                        # combining its required list with the parent object.
-                        "required": list(
-                            dict.fromkeys(
-                                [
-                                    *goal_required,
-                                    "source_responsibility_refs",
-                                    *(
-                                        ["output_mode"]
-                                        if source_ref
-                                        in responsibility_output_modes
-                                        else []
-                                    ),
-                                    *(
-                                        ["media_operation"]
-                                        if responsibility_output_modes.get(source_ref)
-                                        == "media_playback"
-                                        else []
-                                    ),
-                                ]
-                            )
-                        ),
-                    }
-                )
     properties = schema.setdefault("properties", {})
     required = list(schema.get("required") or [])
-    # Trusted code owns new Goal materialization; the model owns only association.
-    properties.pop("new_goals", None)
+    # Host materializes WHAT; GA owns the primary identity/relationship choice.
     properties.pop("decision", None)
-    unassociated = properties.get("unassociated_responsibility_refs")
-    if isinstance(unassociated, dict):
-        unassociated["items"] = {"type": "string", "enum": responsibility_refs}
-        unassociated["uniqueItems"] = True
-        unassociated["maxItems"] = len(responsibility_refs)
     associations = properties.get("associations")
     if isinstance(associations, dict) and not open_goal_ids:
         associations["maxItems"] = 0
 
     ordered_required = [
         *( ["associations"] if "associations" in properties else [] ),
-        "unassociated_responsibility_refs",
+        "new_goals",
         "referent_updates",
         "resolved_references",
         "cognitive_requests",
@@ -907,23 +354,13 @@ def goal_association_response_schema(
         def association_excludes(source_ref: str) -> dict[str, Any]:
             return {"not": {"contains": source_ref_item(source_ref)}}
 
-        def unassociated_contains(source_ref: str) -> dict[str, Any]:
-            return {
-                "contains": {"const": source_ref},
-                "minContains": 1,
-                "maxContains": 1,
-            }
-
-        def unassociated_excludes(source_ref: str) -> dict[str, Any]:
-            return {"not": {"contains": {"const": source_ref}}}
-
         for source_ref in responsibility_refs:
             if "associations" not in properties or not open_goal_ids:
                 schema.setdefault("allOf", []).append({
                     "properties": {
-                        "unassociated_responsibility_refs": unassociated_contains(source_ref),
+                        "new_goals": association_contains(source_ref),
                     },
-                    "required": ["unassociated_responsibility_refs"],
+                    "required": ["new_goals"],
                 })
                 continue
             schema.setdefault("allOf", []).append({
@@ -931,16 +368,16 @@ def goal_association_response_schema(
                     {
                         "properties": {
                             "associations": association_contains(source_ref),
-                            "unassociated_responsibility_refs": unassociated_excludes(source_ref),
+                            "new_goals": association_excludes(source_ref),
                         },
-                        "required": ["associations", "unassociated_responsibility_refs"],
+                        "required": ["associations", "new_goals"],
                     },
                     {
                         "properties": {
                             "associations": association_excludes(source_ref),
-                            "unassociated_responsibility_refs": unassociated_contains(source_ref),
+                            "new_goals": association_contains(source_ref),
                         },
-                        "required": ["associations", "unassociated_responsibility_refs"],
+                        "required": ["associations", "new_goals"],
                     },
                 ]
             })
@@ -949,22 +386,6 @@ def goal_association_response_schema(
     schema.pop("oneOf", None)
     schema.pop("anyOf", None)
     schema = resource_semantic_contract_response_schema(schema)
-    # The complete oneOf branches above duplicate the Pydantic parent Goal
-    # surface so constrained decoders can generate branch-local required fields.
-    # Keeping the same properties on the parent makes the decoder compile two
-    # equivalent object surfaces and keeps definitions for impossible resource
-    # variants alive.  Retain exactly one complete surface per branch.
-    compact_goal_schema = schema.get("$defs", {}).get(
-        "GoalAssociationModelGoal"
-    )
-    if isinstance(compact_goal_schema, dict) and compact_goal_schema.get("oneOf"):
-        compact_goal_schema.pop("properties", None)
-        compact_goal_schema.pop("required", None)
-        compact_goal_schema.pop("additionalProperties", None)
-        for branch in compact_goal_schema["oneOf"]:
-            if isinstance(branch, dict):
-                branch["type"] = "object"
-                branch["additionalProperties"] = False
     # GA owns identity and continuity. Complete intent is inherited by Host;
     # no classification, resource decomposition or parameter extraction is needed.
     schema["$defs"]["GoalAssociationModelGoal"] = {
@@ -992,29 +413,10 @@ def goal_association_response_schema(
             }, "required": ["related_goal_ids", "supersedes_goal_ids"]}}
             for goal_id in open_goal_ids
         ]
-    # When there is no live Goal that can own a Responsibility and no
-    # interaction-only speech alternative, ownership is not a semantic branch:
-    # every Responsibility must become a new Goal.  Do not leave that mandatory
-    # mapping only inside cross-field allOf/oneOf/contains clauses.  XGrammar can
-    # preserve the array shape while failing to force those intersections during
-    # generation, which lets a terminal historical candidate turn an otherwise
-    # ordinary new body-action request into a later conservation/DTO failure.
-    #
-    # Canonicalize the wire order to the accepted UMI Responsibility order and
-    # expose each exact source ref through prefixItems.  Ordering is transport
-    # mechanism only: GA still owns continuity, the Host still validates
-    # conservation, and retained terminal Goals remain available solely through
-    # related_goal_ids.
-    new_goal_only = (
-        output_type is GoalAssociationModelOutput
-        and bool(active_ids)
-        and not open_goal_ids
-    )
-    if (
-        new_goal_only
-        and responsibility_refs
-        and not non_goal_eligible_refs
-    ):
+    # Without an open target, every accepted Responsibility needs its own
+    # identity row. Fix transport order and exact refs for constrained decoders;
+    # retained terminal Goals remain historical context through related_goal_ids.
+    if not open_goal_ids and responsibility_refs:
         compact_goal = schema["$defs"]["GoalAssociationModelGoal"]
         fixed_items: list[dict[str, Any]] = []
         for source_ref in responsibility_refs:

@@ -5,6 +5,7 @@ import json
 
 import pytest
 
+from benchmarks.datasets.fast_planner_daily_life import qualification
 from benchmarks.datasets.fast_planner_daily_life.qualification import (
     DATASET_ROOT,
     PRODUCTION_TRANSACTION_FILES,
@@ -16,6 +17,30 @@ from benchmarks.datasets.fast_planner_daily_life.qualification import (
     validate_dataset,
 )
 from shared.chromie_contracts.plan import CanonicalPlan
+
+
+@pytest.mark.parametrize(
+    "runtime_variant", ["streaming_advance", "canonical_primary", "canonical_reentry"]
+)
+def test_candidate_packet_retains_the_exact_production_transaction(
+    monkeypatch, runtime_variant
+) -> None:
+    case = next(
+        item for item in load_cases()
+        if item["input"]["runtime_variant"] == runtime_variant
+    )
+    capture = qualification.CaptureModel()
+    monkeypatch.setattr(qualification, "CaptureModel", lambda: capture)
+
+    transaction = asyncio.run(qualification.build_transaction(case))
+
+    assert len(capture.calls) == 1
+    call = capture.calls[0]
+    assert transaction["response_schema"] == call["response_format"]
+    assert transaction["system_prompt"] == call["system"]
+    assert transaction["user_prompt"] == call["prompt"]
+    assert transaction["options"] == call["options"]
+    assert transaction["production_prompt_family"] == call["prompt_family"]
 
 
 def test_fast_planner_daily_life_corpus_is_current_production_shaped() -> None:

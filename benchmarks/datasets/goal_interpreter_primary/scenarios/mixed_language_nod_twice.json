@@ -45,7 +45,8 @@
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t4"
         },
-        "continuity_scope": "goal"
+        "continuity_scope": "goal",
+        "body_effect_family": "social_expression"
       }
     ],
     "meaning_uncertainties": [],

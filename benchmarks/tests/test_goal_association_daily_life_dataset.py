@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import logging
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Any
 import pytest
 
 from benchmarks.datasets.goal_association_daily_life.qualification import (
+    CaptureModel,
     _adjudicate_one,
     _capture_repair_call,
     _ollama_call,
@@ -19,10 +21,14 @@ from benchmarks.datasets.goal_association_daily_life.qualification import (
 from benchmarks.datasets.goal_association_daily_life.validate import (
     DATASET_ROOT,
     FAMILIES,
+    _ReferenceModel,
+    _request_schema,
     load_cases,
     scenario_paths,
+    scenario_tree_digest,
     validate_dataset,
 )
+from agent.app.goal_association import GoalAssociationResolver
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_runtime.llm_diagnostics import log_llm_call_evidence
 
@@ -72,6 +78,7 @@ def test_goal_association_daily_life_manifest_matches_file_tree() -> None:
     )
     assert manifest["asset_contract"]["contrast_set_size"] == len(FAMILIES)
     assert manifest["coverage_contract"]["training_eligible"] is False
+    assert manifest["asset_contract"]["scenario_tree_sha256"] == scenario_tree_digest()
 
 
 def test_clarify_oracles_do_not_claim_an_unproven_gap_resolution() -> None:
@@ -146,6 +153,64 @@ def test_goal_association_qualification_freezes_declared_generation_options() ->
         "num_ctx": 32768,
         "num_predict": 2048,
     }
+
+
+def test_goal_association_reference_validation_uses_the_production_primary_schema() -> None:
+    case = next(item for item in load_cases() if item["category"] == "clarify_open_gap")
+    request = CognitiveWorkRequest.model_validate(case["input"]["request"])
+    reference = case["target"]["reference_model_output"]
+    capture = CaptureModel(reference)
+    asyncio.run(GoalAssociationResolver(capture).resolve(request))
+
+    _, schema, _, _ = asyncio.run(_request_schema(request, _ReferenceModel(reference)))
+
+    assert len(capture.calls) == 1
+    assert json.dumps(schema) == json.dumps(capture.calls[0]["response_format"])
+
+
+def test_goal_association_can_capture_a_fail_closed_reference_transaction() -> None:
+    case = next(item for item in load_cases() if item["category"] == "clarify_open_gap")
+    capture = CaptureModel(case["target"]["reference_model_output"])
+    resolution = asyncio.run(
+        GoalAssociationResolver(capture).resolve(
+            CognitiveWorkRequest.model_validate(case["input"]["request"])
+        )
+    )
+    assert resolution.resolution_status == "fail_closed"
+    assert len(capture.calls) == 1
+
+    transaction = asyncio.run(build_transaction(case))
+
+    assert transaction["production_prompt_family"] == "goal_association.primary"
+    assert transaction["response_schema"] == capture.calls[0]["response_format"]
+    assert set(transaction) == {
+        "system_prompt", "user_prompt", "response_schema", "options",
+        "production_prompt_family", "prompt_identity",
+    }
+
+
+def test_goal_association_qualification_rejects_lost_historical_goal_identity() -> None:
+    case = next(
+        item for item in load_cases()
+        if item["category"] == "reference_terminal"
+        and item["input"]["request"]["responsibilities"][0]["output_mode"] == "speech"
+    )
+    raw = copy.deepcopy(case["target"]["reference_model_output"])
+    for goal in raw["new_goals"]:
+        goal["related_goal_ids"] = []
+    transaction = asyncio.run(build_transaction(case))
+
+    result = asyncio.run(
+        _adjudicate_one(case, json.dumps(raw), None, transaction["response_schema"])
+    )
+
+    assert result["schema"][0]["accepted"] is True
+    assert result["host"]["resolution_status"] == "resolved"
+    assert result["observed_responsibility_map"][0]["related_goal_ids"] == []
+    assert case["target"]["semantic_expectations"]["responsibility_map"][0]["related_goal_ids"]
+    assert result["hard_pass"] is False
+    assert result["strict_pass"] is False
+    assert "responsibility map drift" in result["target_region"]["hard_errors"][0]
 
 
 def test_goal_association_qualification_preserves_schema_property_order(

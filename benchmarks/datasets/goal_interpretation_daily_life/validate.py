@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter, defaultdict
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -73,6 +74,16 @@ DIGIT_MEASUREMENT_DIMENSIONS = {
 
 def scenario_paths(dataset_root: Path = DATASET_ROOT) -> list[Path]:
     return sorted((dataset_root / "scenarios").glob("*/*/*.json"))
+
+
+def scenario_tree_digest(dataset_root: Path = DATASET_ROOT) -> str:
+    digest = hashlib.sha256()
+    for path in scenario_paths(dataset_root):
+        digest.update(path.relative_to(dataset_root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
 
 
 def _walk_keys(value: Any) -> set[str]:
@@ -157,6 +168,8 @@ def _validate_case_shape(path: Path, case: dict[str, Any]) -> None:
             raise ValueError(f"{case_id}: local_ref expectation drift")
         if expectation["output_mode"] != reference["output_mode"]:
             raise ValueError(f"{case_id}: output_mode expectation drift")
+        if expectation.get("body_effect_family") != reference.get("body_effect_family"):
+            raise ValueError(f"{case_id}: body_effect_family expectation drift")
         if not expectation["outcome_contains_any"]:
             raise ValueError(f"{case_id}: missing flexible outcome oracle")
 
@@ -186,6 +199,8 @@ def _validate_case_shape(path: Path, case: dict[str, Any]) -> None:
 def validate_dataset(dataset_root: Path = DATASET_ROOT) -> dict[str, Any]:
     manifest = json.loads((dataset_root / "dataset.json").read_text(encoding="utf-8"))
     paths = scenario_paths(dataset_root)
+    if scenario_tree_digest(dataset_root) != manifest["asset_contract"]["scenario_tree_sha256"]:
+        raise ValueError("scenario tree digest mismatch")
     cases: list[dict[str, Any]] = []
     errors: list[str] = []
     interpreter = OllamaUserMeaningInterpreter(

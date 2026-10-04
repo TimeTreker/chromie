@@ -62,6 +62,13 @@ profile's conditioning without changing its transcript or reference audio.
 Preparation failure prevents readiness; a restarted worker prepares its own
 cache again. Nothing is written into the model artifact or voice catalog.
 
+After all committed voices have complete cached conditioning, the worker releases
+the reference-audio ONNX speech tokenizer and its CUDA arena before readiness.
+Synthesis uses the already validated speaker IDs and cached conditioning; it does
+not extract reference audio again. This keeps preparation-only GPU memory out of
+the shared cognition and synthesis budget. Unknown speakers still fail before
+native synthesis, and reference preparation failures still prevent readiness.
+
 The worker restores the native model's initial token chunk size before each
 serialized synthesis request. CosyVoice may still grow chunks within that
 request, but a previous utterance cannot make the next request start with an

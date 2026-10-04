@@ -135,18 +135,19 @@ the Core. It is an interaction policy, not an intent classifier. It may suppress
 only bounded, high-confidence ambient speech when engagement is inactive and
 policy permits suppression.
 
-A direct question, request, greeting, Chromie's name, active-goal continuation,
-unresolved unclear review, malformed model output, or contradiction between
-direct-address surface evidence and an ambient label fails open to Core review.
-Bare greetings, terminal question form, and an exact wake-name call are bounded
-contradiction evidence only; they do not infer intent, Goal, Capability, or plan.
-The classifier must use an explicit ambient speech act with `addressed=false`; a
-directed or unclear act paired with `addressed=false`, or an output contradicted
-by that bounded surface evidence, receives one schema-constrained model repair
-and still fails open if the repair remains inconsistent. Gateway-suppressed room
-speech remains bounded input evidence but is excluded from the recent-dialogue
-projection because Chromie did not accept it as part of the conversation.
+The primary Attention model owns addressedness and speech act using the admitted
+transcript and bounded engagement/context. Direct or unresolved usable input,
+malformed output, unavailability and failed review retain the fail-open admission
+contract. Suppression requires a qualified high-confidence inactive ambient result;
 Attention Review cannot authorize an effect.
+
+Current implementation uses greeting/question/wake-name surface cues to detect
+contradictions and calls the same model again to reclassify. That path violates
+Charter principles 30–31 and must not be treated as an allowed semantic repair.
+The [project audit](../ARCHITECTURE_AUDIT.md) retains the two-call reproduction;
+implementation qualification remains open. Ordinary phrase cues cannot become a
+second semantic authority. Gateway-suppressed room speech stays bounded input
+evidence and is excluded from accepted recent dialogue.
 
 ### 4.4 Context Assembly / 上下文组装
 

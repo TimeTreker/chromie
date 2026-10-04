@@ -2,17 +2,17 @@
 
 ## Status
 
-**Implementation:** present in the repository.
+**Implementation:** ownership migration exists; known contract conflicts remain in the audit.
 
-**Automated verification:** dependency-light unit tests and retained cognitive
-runtime scenarios cover report-only operation, lane-gated apply, Fast-to-Deep
+**Automatic verification:** the canonical local gate currently fails; existing source
+tests and retained scenarios cover diagnostic operation, validated apply, Fast-to-Deep
 escalation, trusted terminal host validation, atomic Goal-state application,
-Planner response projection, fail-closed disablement, and evidence classification.
+SC communication projection, fail-closed disablement, and evidence classification.
 
-**Target validation:** open. No live model-stack or MuJoCo evidence created by
-this implementation patch is claimed here.
+**Target validation:** open. This documentation reconciliation adds no live model-stack,
+MuJoCo or physical evidence; retained revision-bound proof belongs in Status/Handoff.
 
-**Deployment readiness:** not established. This rollout does not widen
+**Deployment state:** not established. This rollout does not widen
 simulator, microphone, speaker, or physical-robot support claims.
 
 This document is the operational companion to
@@ -20,120 +20,49 @@ This document is the operational companion to
 The architecture document owns cognitive principles. This document owns the
 staged runtime migration, rollback, diagnostics, and evidence procedure.
 
-## 1. Purpose
+## 1. Current runtime ownership
 
-PR1 through PR6 introduced the Goal-driven pipeline as advisory stages:
-
-```text
-Goal Association
-→ Fast Planner
-→ Deep Planner when Fast coverage is incomplete
-```
-
-PR7 connects those stages to the existing trusted host boundary without making
-any model an execution authority:
+The accepted SC migration supersedes the historical Planner-presentation rollout.
+Current source conformance and evidence limits are owned by [Status](STATUS.md),
+not by old PR stage descriptions or provider diagnostic canaries.
 
 ```text
-User Turn
-→ deterministic emergency and interruption controls
-→ User Meaning Interpretation (contextual WHAT only)
-→ concurrent Fast Planner / Goal Association fan-out
-→ Fast Planner
-   ├─ complete terminal CanonicalPlan
-   └─ escalate
-       → Deep Planner
-→ trusted host CanonicalPlan validation
-   ├─ valid
-   └─ structured rejection → fail closed
-→ mechanical validation/materialization of Planner-owned Communicative Activities
-→ trusted runtime adapter
-→ atomic Goal-state application
-→ existing request-bound confirmation
-→ existing Trusted Capability Runtime
-→ provider execution and retained evidence
+Admitted immutable UserTurn
+  -> UMI: complete WHAT and source evidence
+  -> Runtime standing SC interaction + requested GA/Planner
+       SC -> exact grounded communication or silence -> qualified delivery
+       GA -> retained Goal association / unassociated Responsibility refs
+       Host -> canonical new Goals preserving exact accepted WHAT
+       Planner -> complete Work / required communication needs / genuine Deep-HOW
+  -> trusted source/version/confirmation/resource/safety validation
+  -> Trusted Capability Runtime
+  -> provider lifecycle and exact terminal Evidence
+  -> scoped Planner Work and SC communication re-entry
 ```
 
-The main planning direction is acyclic. Deep planning never returns semantic
-work to Fast planning. Deep Planner may make one one mechanical DTO regeneration
-inside its own transaction. Trusted Host validation is terminal and does not
-invoke another semantic planner after rejecting the terminal plan.
-
-Goal Association uses Ollama schema-constrained generation with state-specific
-small model-facing DTOs. When active Goal IDs exist,
-`GoalAssociationModelOutput` permits semantic relationships, independent
-new-goal descriptions, or a natural clarification. When no association target
-exists, `GoalSegmentationModelOutput` omits the association field and its schema
-definition entirely, so the model decides only independent new-goal
-descriptions or a clarification. This avoids relying on decoder enforcement of
-composed `maxItems`/`oneOf` constraints to represent the host-known fact that an
-association is impossible.
-The host generates turn IDs, association IDs, goal IDs, versions, source text,
-default containers, canonical `SemanticGoal` objects, and the final
-`GoalAssociationResolution`. If model DTO validation still fails, the same
-model receives the original JSON, exact validation errors, and the same compact
-state-specific schema for one bounded revision. A second invalid result fails closed. No
-lexical alias table, phrase mapping, or local semantic rewrite changes the
-model-authored goal descriptions or relationships.
-
-Deep Planning and single-goal Fast Planning use the flat model-facing
-`PlannerModelOutput` schema rather than asking the structured decoder to emit
-the shared `CanonicalPlan` union directly. Multi-goal Fast Planning uses the
-decoder-tight `FastPlannerMultiGoalPlanOutput`. The model authors aggregate
-disposition, steps, step IDs, arguments, ordering, ownership, goal outcomes,
-responses, escalation judgments, and satisfaction. The host adds only canonical
-identity fields and validates the shared CanonicalPlan contract.
-
-Deep Planner complete multi-goal output still uses an exact `goal_outcomes`
-object keyed by Goal Association IDs. Satisfaction fields mean how adequately
-the proposed plan would satisfy each goal if its response and steps succeed;
-pending execution alone is not an unmet planning requirement.
-
-User-facing response transport is outside task planning. `chromie.speak` is
-excluded from both planner capability schemas and rejected if a planner emits
-it as a step. A direct conversational part of a mixed goal is represented by a
-goal-scoped `respond` outcome and exact Planner-owned Communicative Activity.
-Executable outcomes may also carry a still-needed prospective communicative
-delta. The Host mechanically validates truth stage, evidence provenance,
-confirmation, and delivery coordination from the immutable Plan and Interaction
-Context; wording never becomes execution evidence.
+SC and Work are independent until a required confirmation or explicit before/after
+dependency joins. Only validated, contract-declared side-effect-free safe reads may
+execute before canonical Goal binding; effectful Work remains prepared until all
+prerequisites hold. No partial JSON, speculative speech or failed Plan authorizes an effect.
 
 ## 2. Authority boundaries
 
-### Models may
+UMI owns contextual WHAT. GA only associates accepted Responsibilities with retained
+Goals or leaves them unassociated; Host materializes new Goal meaning exactly from
+UMI. Planner selects Capabilities, resolves execution inputs and produces complete
+Work. SC alone authors ordinary exact communication and eligible social expression.
 
-- associate the current turn with active Goals;
-- segment independent new Goals;
-- estimate complete, partial, or uncertain Goal coverage;
-- propose a CanonicalPlan;
-- resolve low-consequence parameters or request material information;
-- propose exact, adjusted, alternative, clarification, unavailable, or refused
-  outcomes;
-- compose goal-scoped speech and optional non-Goal `auxiliary_activities[]` in the
-  same primary Planner result.
+Every semantic authority produces its complete result in its primary invocation.
+One designated deeper cognition may resolve genuine upstream uncertainty under its
+own contract; it does not repair a rejected candidate. A same-stage retry can only
+regenerate a mechanically malformed DTO at most once, never reconsider semantics.
+No Host keyword routing, reviewer or retired response owner is a fallback.
 
-### Models may not
-
-- authorize their own side effects;
-- bypass confirmation;
-- commit Goal-state mutations directly;
-- execute a skill;
-- declare provider success without evidence;
-- turn an invalid partial plan into partial execution;
-- route Deep planning back to Fast planning.
-
-### Trusted host code owns
-
-- deterministic stop, cancellation, interruption, and stale-turn suppression;
-- CanonicalPlan contract validation;
-- capability identity and availability;
-- argument-schema validation;
-- provider and version checks;
-- exclusive resource and parallel-conflict checks;
-- request-bound confirmation;
-- Goal and plan version application;
-- atomic state commit or rollback;
-- Trusted Capability Runtime submission;
-- execution evidence and terminal state.
+Host/Runtime owns identity, state/version integrity, confirmation, authorization,
+capability/argument schemas, provider availability, resource conflicts, atomic
+commit, dispatch, cancellation and Evidence. Soridormi owns embodied feasibility,
+physical safety and safe idle. The audit records remaining UMI binding and Attention
+Review conformance defects; this rollout does not grant exceptions for them.
 
 ## 3. Runtime modes
 
@@ -149,7 +78,7 @@ Use this mode only to disable the Goal-driven Runtime for diagnostics or fault i
 ### `report_only`
 
 The unified pipeline runs as an observer and records Goal associations, Fast/Deep
-planning, the terminal `CanonicalPlan`, Planner response projection, failures, and stage
+planning, the terminal `CanonicalPlan`, SC communication projection, failures, and stage
 latency. It has no authority to commit user-visible speech, Goal state, confirmation,
 or effects. This mode is diagnostic only.
 
@@ -261,7 +190,7 @@ Goal Association remains advisory until the entire cognitive turn has passed:
 
 1. terminal planning;
 2. trusted CanonicalPlan validation;
-3. Planner response projection validation;
+3. SC communication projection validation;
 4. trusted `InteractionResponse` preparation.
 
 Only then does the host apply Goal changes.
@@ -292,27 +221,25 @@ contract exists.
 Goal-state success does not imply effect execution success. Execution evidence
 is retained separately.
 
-## 10. Planner communication and social attention
+## 10. Social Cognition communication and expression
 
-Fast/Deep Planner receives the versioned Goal snapshot and owns the exact
-goal-scoped Communicative Activities in its immutable Canonical Plan. There is
-no later model-backed wording owner. The Host may create an internal transport
-projection with the Plan fingerprint, but that projection cannot add, omit,
-rewrite, or reinterpret an Activity.
+SC receives the exact accepted intent and bounded current Goal/Work/Evidence/Interaction
+truth. It authors complete Communicative Activities, source scope, timing and optional
+eligible social-expression proposals. Planner authors Work and typed communication
+needs, including confirmation, input and result obligations; it never supplies competing
+ordinary words. Host validates and delivers the exact accepted SC act.
 
-Trusted checks ensure:
+Pre-execution speech cannot claim completion. Required confirmation and explicit
+before/after Work dependencies remain blocking. Queued/generated speech is not heard
+speech; delivered speech is not effect Evidence. Goal binding and request identity
+must stay exact across independent SC and GA/Work branches.
 
-- all known Goals are covered by the appropriate terminal response;
-- pre-execution speech does not claim completion; and
-- clarification enters `waiting_for_user` semantics.
-
-Social Attention is a Planner-owned behavior domain, not separate background
-cognition. `PresentationCommit`, terminal Fast output, and canonical Fast/Deep planning
-may emit bounded `auxiliary_activities[]`. Empty or invalid output,
-target/resource validation, and optional execution never delay or rewrite the
-attached Main Activity. Runtime may suppress an invalid or stale exact proposal but
-cannot reselect or retarget it. An auxiliary-only change or result cannot create a
-Goal-scoped `CognitiveOpportunity`.
+Optional SC expression cannot complete a Goal or delay independent Work. Runtime may
+suppress an invalid/stale proposal but cannot reselect it. An explicitly requested
+gesture is Planner Work rather than optional decoration. The retired Planner
+`PresentationCommit` and optional Planner `auxiliary_activities` are not current
+communication surfaces. Qualify UMI -> SC commit -> TTS/playback alongside independent
+Work, not the old streamed Planner presentation topology.
 
 ## 11. Evidence records
 
@@ -576,7 +503,7 @@ PR7 implementation is automatically verified when:
 - Deep performs no same-tier semantic replan; at most one mechanical DTO regeneration is allowed, and trusted runtime rejection fails closed;
 - invalid or partial plans commit no effectful skill;
 - Goal-state application is atomic;
-- the Planner response projection is fingerprint-bound to the terminal Plan;
+- the SC communication projection is fingerprint-bound to the terminal Plan;
 - evidence distinguishes applied, report-only, skipped, and error outcomes;
 - dependency-light cognitive scenarios and the full test suite pass.
 

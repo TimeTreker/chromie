@@ -696,14 +696,26 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
                     events = []
                     initial_hops = []
                     native_model = SimpleNamespace(token_hop_len=25)
+                    released = []
+
+                    class ReferenceEncoder:
+                        def __del__(self):
+                            released.append(True)
+
+                    frontend = SimpleNamespace(
+                        speech_tokenizer_session=ReferenceEncoder()
+                    )
 
                     def prepare(prompt, wav, speaker):
+                        self.assertIsNotNone(frontend.speech_tokenizer_session)
                         prepared[speaker] = (prompt, wav)
                         events.append(("prepare", speaker))
                         return True
 
                     def infer(text, prompt, wav, *, zero_shot_spk_id, stream):
                         self.assertTrue(stream)
+                        self.assertIsNone(frontend.speech_tokenizer_session)
+                        self.assertEqual(released, [True])
                         self.assertEqual(prepared[zero_shot_spk_id], (prompt, wav))
                         initial_hops.append(native_model.token_hop_len)
                         native_model.token_hop_len = 100
@@ -713,6 +725,7 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
 
                     model = SimpleNamespace(
                         model=native_model,
+                        frontend=frontend,
                         sample_rate=24000,
                         add_zero_shot_spk=prepare,
                         inference_zero_shot=infer,
@@ -742,6 +755,7 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
                         cosy.worker_target(connection)
 
                     self.assertEqual(set(prepared), set(voices.profiles))
+                    self.assertEqual(released, [True])
                     self.assertEqual(initial_hops, [25] * len(requests))
                     profile_count = len(voices.profiles)
                     self.assertEqual(events[profile_count][0], "send")

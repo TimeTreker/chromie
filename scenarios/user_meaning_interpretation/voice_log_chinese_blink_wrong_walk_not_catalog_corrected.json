@@ -32,7 +32,8 @@
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t5"
               },
-              "continuity_scope": "goal"
+              "continuity_scope": "goal",
+              "body_effect_family": "social_expression"
             }
           ],
           "meaning_uncertainties": [],
@@ -61,7 +62,8 @@
         "local_ref": "r1",
         "outcome": "眨两小眼睛。",
         "confidence": 0.93,
-        "output_mode": "body_action"
+        "output_mode": "body_action",
+        "body_effect_family": "social_expression"
       }
     ]
   }

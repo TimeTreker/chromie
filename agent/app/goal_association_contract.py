@@ -600,7 +600,11 @@ GoalAssociationModelResourceResponsibility = Annotated[
 
 
 class GoalAssociationModelGoal(BaseModel):
-    """Minimal model-facing semantic Goal preserving provider-neutral WHAT."""
+    """Primary identity/relationship row and trusted inherited WHAT carrier.
+
+    The production Schema and output validator expose only source refs and Goal
+    relationships. Other fields belong to trusted typed materialization helpers.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -621,8 +625,8 @@ class GoalAssociationModelGoal(BaseModel):
     media_operation: GoalMediaOperation = Field(
         default="none",
         description=(
-            "Exact persistent media lifecycle operation for media_playback; "
-            "none for every other output mode."
+            "Optional trusted retained operation for media_playback. New intent-only "
+            "Goals use none; Planner owns operation extraction and execution arguments."
         ),
     )
     bindings: list[GoalAssociationModelBinding] = Field(
@@ -726,8 +730,6 @@ class GoalAssociationModelGoal(BaseModel):
                 "a superseded Goal cannot also be retained as related context: "
                 + ", ".join(sorted(overlapping_goal_ids))
             )
-        if self.output_mode == "media_playback" and self.media_operation == "none":
-            raise ValueError("media_playback requires one exact media_operation")
         if self.output_mode != "media_playback" and self.media_operation != "none":
             raise ValueError("media_operation is valid only for output_mode=media_playback")
         actual_resource_kind = (
@@ -760,6 +762,32 @@ class GoalAssociationModelGoal(BaseModel):
         return self
 
 
+def validate_primary_goal_relationships(value: Any) -> Any:
+    """Require GA's complete relation choice without authoring UMI meaning."""
+    if not isinstance(value, dict):
+        return value
+    goals = value.get("new_goals", [])
+    items = goals if isinstance(goals, list) else [goals]
+    fields = {"source_responsibility_refs", "related_goal_ids", "supersedes_goal_ids"}
+    for item in items:
+        if not isinstance(item, dict):
+            continue  # The DTO owns mechanically malformed container shapes.
+        if set(item) != fields:
+            raise ValueError("GA must supply complete source/Goal relationships only; UMI owns WHAT")
+        for name in fields:
+            identifiers = item[name]
+            if not isinstance(identifiers, list) or any(
+                not isinstance(identifier, str)
+                or not identifier
+                or identifier != normalize_whitespace(identifier)
+                for identifier in identifiers
+            ):
+                raise ValueError("GA relationship references require explicit unchanged ID arrays")
+            if len(identifiers) != len(set(identifiers)):
+                raise ValueError("GA relationship references must not contain duplicate IDs")
+    return value
+
+
 class GoalSegmentationModelOutput(BaseModel):
     """Association-only result used when no retained Goal target exists.
 
@@ -772,20 +800,10 @@ class GoalSegmentationModelOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     decision: GoalSegmentationDecision = "create_goals"
-    unassociated_responsibility_refs: list[str] = Field(
-        default_factory=list,
-        max_length=8,
-        description=(
-            "Current UMI Responsibilities that do not associate with any retained Goal. "
-            "This is an association result only. Trusted code may materialize a new Goal "
-            "from the accepted Responsibility after GA returns."
-        ),
-    )
     new_goals: list[GoalAssociationModelGoal] = Field(
         default_factory=list,
         max_length=8,
-        exclude=True,
-        description="Trusted-code-only materialization surface; never model-authored.",
+        description="Unassociated UMI source references and GA-owned Goal relationships; no new WHAT.",
     )
     referent_updates: list[GoalAssociationModelReferentUpdate] = Field(
         default_factory=list,
@@ -814,6 +832,11 @@ class GoalSegmentationModelOutput(BaseModel):
         ),
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def validate_primary_relationships(cls, value: Any) -> Any:
+        return validate_primary_goal_relationships(value)
+
     @field_validator("reason_summary", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
@@ -834,9 +857,9 @@ class GoalSegmentationModelOutput(BaseModel):
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalSegmentationModelOutput":
-        if not self.unassociated_responsibility_refs:
+        if not self.new_goals:
             raise ValueError(
-                "association-only segmentation requires unassociated_responsibility_refs"
+                "association-only segmentation requires current UMI source references in new_goals"
             )
         return self
 
@@ -857,16 +880,9 @@ class GoalAssociationModelOutput(BaseModel):
     new_goals: list[GoalAssociationModelGoal] = Field(
         default_factory=list,
         max_length=8,
-        exclude=True,
-        description="Trusted-code-only materialization surface; never model-authored.",
-    )
-    unassociated_responsibility_refs: list[str] = Field(
-        default_factory=list,
-        max_length=8,
         description=(
-            "Current UMI Responsibilities that do not associate with any retained Goal. "
-            "This does not mean unimportant or non-goal; trusted code may materialize "
-            "an independent interaction/task Goal from the accepted Responsibility."
+            "Unassociated current UMI source references, related historical Goal IDs and "
+            "superseded open Goal IDs. Trusted code inherits WHAT from UMI; GA never authors it."
         ),
     )
     referent_updates: list[GoalAssociationModelReferentUpdate] = Field(
@@ -892,9 +908,14 @@ class GoalAssociationModelOutput(BaseModel):
         max_length=320,
         description=(
             "Non-authoritative compact rationale for the emitted result; associations "
-            "and unassociated_responsibility_refs own each Responsibility's association decision."
+            "and new_goals own each Responsibility's association decision."
         ),
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def validate_primary_relationships(cls, value: Any) -> Any:
+        return validate_primary_goal_relationships(value)
 
     @field_validator("reason_summary", mode="before")
     @classmethod

@@ -137,18 +137,29 @@
   "split": "validation",
   "target": {
     "contract_gap": null,
+    "schema_expectation": "accept",
+    "semantic_expectations": {
+      "candidate_goal_ids": [
+        "goal_05_08_a"
+      ],
+      "must_map_every_responsibility_exactly_once": true,
+      "must_preserve_gi_output_mode": true,
+      "responsibility_count": 1,
+      "responsibility_map": [
+        {
+          "operation": "new_goal",
+          "output_mode": "body_action",
+          "relationship": "new",
+          "source_ref": "r1",
+          "supersedes_goal_ids": [],
+          "target_goal_ids": [],
+          "related_goal_ids": []
+        }
+      ]
+    },
     "reference_model_output": {
       "associations": [],
       "confidence": 1.0,
-      "new_goals": [
-        {
-          "related_goal_ids": [],
-          "source_responsibility_refs": [
-            "r1"
-          ],
-          "supersedes_goal_ids": []
-        }
-      ],
       "reason_summary": "Map every accepted GI Responsibility exactly once.",
       "referent_updates": [],
       "resolved_references": [],
@@ -167,24 +178,14 @@
           ],
           "reason_summary": "Determine the remaining Work or control delta from the accepted Goal continuity."
         }
-      ]
-    },
-    "schema_expectation": "accept",
-    "semantic_expectations": {
-      "candidate_goal_ids": [
-        "goal_05_08_a"
       ],
-      "must_map_every_responsibility_exactly_once": true,
-      "must_preserve_gi_output_mode": true,
-      "responsibility_count": 1,
-      "responsibility_map": [
+      "new_goals": [
         {
-          "operation": "new_goal",
-          "output_mode": "body_action",
-          "relationship": "new",
-          "source_ref": "r1",
-          "supersedes_goal_ids": [],
-          "target_goal_ids": []
+          "source_responsibility_refs": [
+            "r1"
+          ],
+          "related_goal_ids": [],
+          "supersedes_goal_ids": []
         }
       ]
     }

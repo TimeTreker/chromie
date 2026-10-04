@@ -1230,7 +1230,10 @@ def _evaluate_complete_intent(
     tokens = {token["ref"]: token for token in _source_tokens(case["text"])}
     previous_end = -1
     for item in wire.get("responsibilities", []):
-        if set(item) - {"local_ref", "outcome", "output_mode", "continuity_scope", "confidence", "source_evidence"}:
+        if set(item) - {
+            "local_ref", "outcome", "output_mode", "body_effect_family",
+            "continuity_scope", "confidence", "source_evidence",
+        }:
             errors["intent_details"].append("UMI authored a downstream contract field")
         evidence = item.get("source_evidence") or {}
         first = tokens.get(evidence.get("source_start_token_ref"))

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 
 import pytest
+from jsonschema import Draft202012Validator
 
 from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter, _source_tokens
 from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
@@ -87,16 +88,23 @@ async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
     request = CognitiveWorkRequest(sid="weather-contract", text=text,
         responsibilities=interpreted.responsibilities, interpretation_confidence=1.0)
     assert not request.responsibilities[0].bindings
-    ga_wire = intent_goal(text, "information")
+    ga_wire = {
+        "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}], "cognitive_requests": [],
+        "referent_updates": [], "resolved_references": [], "confidence": 1.0,
+        "reason_summary": "No retained Goal matches the current Responsibility.",
+    }
     if mode_override:
         ga_wire["output_mode"] = mode_override
-    association_model = FakeOllama(create_goals(ga_wire))
+    association_model = FakeOllama(ga_wire)
     resolution = await GoalAssociationResolver(association_model).resolve(request)
     assert len(association_model.prompts) == 1
+    validator = Draft202012Validator(association_model.prompts[0][1]["response_format"])
     if mode_override:
+        assert not validator.is_valid(ga_wire)
         assert resolution.resolution_status == "fail_closed"
         assert not resolution.new_goals
         return
+    validator.validate(ga_wire)
     assert resolution.resolution_status == "resolved"
     canonical = resolution.new_goals[0]
     assert canonical.metadata["output_mode"] == "information"
@@ -190,7 +198,9 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
         expected_goal_ids=["goal-weather"],
     )
 
-    assert "Host supplies descriptions and IDs" in goal_prompt
+    assert "Compare annual weather." in goal_prompt
+    assert "UMI Responsibilities own" in goal_prompt
+    assert "GA is association-only" in goal_prompt
     for prompt in (fast_prompt, deep_prompt):
         assert "Compare annual weather." in prompt
         assert "Preserve exact advertised semantic scope" in prompt

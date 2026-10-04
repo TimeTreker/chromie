@@ -1295,3 +1295,53 @@ def test_communication_order_preserves_gi_relation_after_exact_ga_join():
         with pytest.raises(ValueError, match="omits or reverses"):
             validate_goal_responsibility_outcomes(bad, authoritative_goals=[], context=context,
                                                  responsibilities=responsibilities)
+
+
+
+def test_compound_repetition_uses_its_own_step_and_provider_format():
+    from tests.test_fast_planner_streaming_commit import _compound_count_case
+    from shared.chromie_contracts.user_turn import UserTurnSourceSpan, resolve_user_turn_source_span
+    for variant in ['compound_defaults', 'omitted_turn_default', 'matching_turn_count', 'distinct_explicit_count',
+                    'missing_count', 'wrong_nod_count', 'nondefault_turn_count', 'duration_masks_count', 'single_wrong_count']:
+        request, caps, raw, expected = _compound_count_case(variant)
+        goal = {'goal_id': 'goal-weather', 'description': request.text,
+                'metadata': {'output_mode': 'body_action'},
+                'object': {'bindings': {'count': {'entity_type': 'count', 'value': 2}}}}
+        output = _weather_output()
+        output.steps = []
+        output.parameter_resolutions = []
+        for activity in raw['activities']:
+            from agent.app.planner_model_contract import PlannerModelStep
+            from shared.chromie_contracts.plan import PlanParameterResolution
+            output.steps.append(PlannerModelStep(step_id=activity['activity_id'],
+                capability_id=activity['capability_id'], args=activity['args'], timing='sequential',
+                source_goal_ids=[goal['goal_id']], reason_summary=activity['reason_summary']))
+            for parameter, span in activity['argument_sources'].items():
+                quote = resolve_user_turn_source_span(request.text, UserTurnSourceSpan.model_validate(span))
+                output.parameter_resolutions.append(PlanParameterResolution(step_id=activity['activity_id'],
+                    parameter=parameter, value=activity['args'][parameter], strategy='semantic_realization',
+                    source_quote=quote, source_goal_ids=[goal['goal_id']], confidence=1,
+                    rationale='The primary Planner maps the exact owned source.', blocking=False))
+        capabilities = [c.model_dump(mode='json') for c in caps]
+        try:
+            validate_goal_binding_argument_grounding(output, authoritative_goals=[goal], capabilities=capabilities)
+            actual = True
+        except ValueError:
+            actual = False
+        assert actual == expected, variant
+        if expected:
+            validate_user_supplied_parameter_provenance(output, authoritative_goals=[goal])
+            base = canonical_plan_response_schema(planner_tier='fast', expected_goal_ids=[goal['goal_id']],
+                allowed_capability_ids=[c['capability_id'] for c in capabilities],
+                capability_input_schemas={c['capability_id']: c['input_schema'] for c in capabilities})
+            schema = canonical_goal_binding_argument_response_schema(base, authoritative_goals=[goal], capabilities=capabilities)
+            step_validator = Draft202012Validator({
+                '$defs': schema['$defs'], **schema['$defs']['PlannerModelStep']})
+            for step in output.steps:
+                step_validator.validate(step.model_dump(mode='json'))
+        if variant == 'compound_defaults':
+            # The same numeric value in another Goal's count slot proves nothing.
+            output.steps[1].source_goal_ids = ['other-goal']
+            import pytest
+            with pytest.raises(ValueError, match='count realization'):
+                validate_goal_binding_argument_grounding(output, authoritative_goals=[goal], capabilities=capabilities)

@@ -132,6 +132,20 @@ second decoration model call.
 
 Goal Association keeps one semantic authority while separating implementation concerns: `app/goal_association_contract.py` owns only the model-facing typed DTO/schema and local normalization rules, while `app/goal_association.py` owns the resolver/inference transaction that decides canonical Goal continuity. The contract module has no model client, runtime state, Goal commit, or tracing authority.
 
+The primary GA result contains `associations` and `new_goals`. A new-Goal row
+contains only `source_responsibility_refs`, `related_goal_ids`, and
+`supersedes_goal_ids`; Host copies UMI WHAT and GA relationship choices unchanged.
+Only open supplied Goals can be superseded. Terminal Goals remain historical
+context. The former unassociated-ref-only collection is retired. GA does not
+require UMI to pre-extract media operations; Planner owns those arguments.
+UMI still owns initial Planner activation, with no Host inference or repair.
+
+A new media Goal may have no retained `media_operation` (`none`). Planner selects
+the operation and arguments from the complete accepted meaning. An existing
+explicit operation remains binding; invalid operations fail closed. Executable
+media work still requires a declared, available media Capability; speech or vocal
+synthesis cannot substitute for playback.
+
 GA may regenerate one unambiguously malformed object/array container only after
 the complete original claims pass deterministic preflight. Acceptance compares
 every authored field/value with that lossless projection. Unknown fields, invalid

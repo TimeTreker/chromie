@@ -315,6 +315,25 @@ def _count_argument_names(
     return names
 
 
+def count_binding_is_realized(
+    name: str, binding: dict[str, Any],
+    work: list[tuple[dict[str, Any], dict[str, Any]]],
+) -> bool:
+    """Conserve a count in declared repetition slots of work owned by its source.
+
+    Planner selects which Activity realizes the requirement. Host checks the
+    declared parameter identity and exact value across that owned work; neither
+    a duration nor a sibling Goal's argument can witness repetition. Defaults
+    alone are not evidence that an explicit count was planned.
+    """
+    return any(
+        parameter in arguments
+        and _material_values_equal(arguments[parameter], binding["value"])
+        for capability, arguments in work
+        for parameter in _count_argument_names(capability, name)
+    )
+
+
 def _count_provenance_compatible(
     capability: dict[str, Any], parameter: str, name: str, binding: dict[str, Any]
 ) -> bool:

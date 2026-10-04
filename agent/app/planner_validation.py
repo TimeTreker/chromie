@@ -62,6 +62,7 @@ from .planner_grounding import (
     _is_count_binding,
     _material_values_equal,
     _normalized_entity_type,
+    count_binding_is_realized,
     literal_intent_argument,
     intent_source_quote,
     planner_readiness_times,
@@ -390,17 +391,20 @@ def validate_goal_responsibility_outcomes(
             )
         owned_steps = [step for step in output.steps if goal_id in step.source_goal_ids]
         if outcome.disposition == "execute":
-            expected_capability = MEDIA_CAPABILITY_IDS[operation]
+            expected_capabilities = (
+                set(MEDIA_CAPABILITY_IDS.values())
+                if operation == "none" else {MEDIA_CAPABILITY_IDS[operation]}
+            )
             if len(owned_steps) != 1:
                 raise ValueError(
                     "provider-required media execute outcome requires exactly one "
-                    f"owned {expected_capability} step: {goal_id}"
+                    f"owned media Capability step: {goal_id}"
                 )
             step = owned_steps[0]
-            if step.capability_id != expected_capability:
+            if step.capability_id not in expected_capabilities:
                 raise ValueError(
                     "provider-required media Goal requires exact capability_id "
-                    f"{expected_capability}: {goal_id}"
+                    f"from {sorted(expected_capabilities)}: {goal_id}"
                 )
             valid_media_step_ids.add(step.step_id)
         elif owned_steps:
@@ -472,14 +476,15 @@ def qualify_capability_catalog_for_output_mode_values(
     capabilities: list[dict[str, Any]],
     *,
     output_modes: set[str],
-    body_effect_families: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Remove capabilities whose typed lane cannot serve the supplied output modes.
 
     The caller must supply output modes authored by an existing semantic authority
     (UMI Responsibilities before Goal Association, or canonical Goals afterwards).
     This function intersects only those typed modes with Capability metadata; it does
-    not infer intent from wording or capability names.
+    not infer intent from wording or capability names. Body-domain labels do not
+    narrow body_action: one accepted compound Responsibility can require several
+    domains. Planner selects only effects or prerequisites in that complete WHAT.
     """
 
     output_modes = {
@@ -489,12 +494,6 @@ def qualify_capability_catalog_for_output_mode_values(
     }
     if not output_modes or "other" in output_modes:
         return list(capabilities)
-
-    required_body_effect_families = {
-        " ".join(str(value or "").strip().split())
-        for value in (body_effect_families or set())
-        if " ".join(str(value or "").strip().split())
-    }
 
     has_body = "body_action" in output_modes
     has_information = "information" in output_modes
@@ -584,10 +583,7 @@ def qualify_capability_catalog_for_output_mode_values(
                 qualified.append(capability)
             continue
         if is_body:
-            if has_body and (
-                not required_body_effect_families
-                or body_effects.intersection(required_body_effect_families)
-            ):
+            if has_body:
                 qualified.append(capability)
             continue
         # Untyped capabilities are not made semantically applicable by their
@@ -603,7 +599,7 @@ def qualify_capability_catalog_for_output_modes(
 ) -> list[dict[str, Any]]:
     """Remove capabilities whose typed lane cannot serve any current Goal.
 
-    Goal Association already owns each Goal's provider-neutral output mode. The
+    Each canonical Goal inherits UMI's provider-neutral output mode. The
     catalog owns executable typed semantic-scope and effect metadata. Intersecting
     those declarations prevents an information tool from becoming decorative body work,
     or a body action from standing in for an exact vocal/media provider, without
@@ -615,17 +611,9 @@ def qualify_capability_catalog_for_output_modes(
         for goal in authoritative_goals
         if isinstance(goal, dict) and isinstance(goal.get("metadata"), dict)
     }
-    body_effect_families = {
-        " ".join(str(item or "").strip().split())
-        for goal in authoritative_goals
-        if isinstance(goal, dict) and isinstance(goal.get("metadata"), dict)
-        for item in (goal.get("metadata") or {}).get("body_effect_families", [])
-        if " ".join(str(item or "").strip().split())
-    }
     return qualify_capability_catalog_for_output_mode_values(
         capabilities,
         output_modes=output_modes,
-        body_effect_families=body_effect_families,
     )
 
 
@@ -744,6 +732,11 @@ def qualify_capability_catalog_for_typed_binding_values(
             if not isinstance(argument_schema, dict):
                 continue
             entity_type = _normalized_entity_type(argument_schema.get("x-chromie-entity-type"))
+            if argument_name in _count_argument_names(capability):
+                # Repetition belongs to the selected counted effect, which may
+                # be one of several steps in the complete Goal. Keep sibling
+                # providers visible even when their independent default differs.
+                continue
             values = (
                 required_by_type.get(entity_type, [])
                 if entity_type
@@ -1420,13 +1413,13 @@ def validate_goal_binding_argument_grounding(
     capabilities: list[dict[str, Any]] | None = None,
     acquisition_goal_ids: set[str] | None = None,
 ) -> None:
-    """Keep executable arguments aligned with Goal Association bindings.
+    """Keep executable arguments aligned with immutable canonical Goal WHAT.
 
-    Goal Association remains the LLM semantic authority that resolves references
-    and binds entities.  This validator does not infer what ``那边`` means and it
-    contains no location, weather, or phrase rules.  It only rejects a Planner
-    step when an argument with the same semantic binding name contradicts the
-    immutable Goal value that the step claims to satisfy.
+    Goal Association owns identity and relationships, not new WHAT or execution
+    arguments. This validator does not infer semantic mappings from phrases.
+    Planner selects the corresponding steps and parameters in its primary result;
+    Host checks declared parameter identities and exact values. A compound Goal's
+    repetition is conserved across its owned work instead of imposed on every step.
 
     Verified-memory retrieval is additionally required to carry every material
     binding in ``material_args``.  This prevents a generic "latest result" lookup
@@ -1471,6 +1464,31 @@ def validate_goal_binding_argument_grounding(
             return [item for child in value for item in nested_values(child)]
         return [value]
 
+    owned_steps_by_goal = {
+        goal_id: [step for step in output.steps if goal_id in step.source_goal_ids]
+        for goal_id in bindings_by_goal
+    }
+    if capabilities is not None:
+        for goal_id, bindings in bindings_by_goal.items():
+            if goal_id in resource_goal_ids or goal_id in (acquisition_goal_ids or set()):
+                continue
+            owned_work = [(capabilities_by_id.get(step.capability_id) or {}, step.args)
+                          for step in owned_steps_by_goal[goal_id]]
+            for name, binding in bindings.items():
+                if not _is_count_binding(name, binding) or not owned_work:
+                    continue
+                if count_binding_is_realized(name, binding, owned_work):
+                    continue
+                if not any(_count_argument_names(capability, name) for capability, _ in owned_work):
+                    raise ValueError(
+                        "selected Capability has no declared count input for authoritative repetition: "
+                        f"goal_id={goal_id!r}, binding={name!r}"
+                    )
+                raise PlannerDTOContractError(
+                    "owned planner work omitted or contradicts authoritative count realization: "
+                    f"goal_id={goal_id!r}, binding={name!r}, value={binding['value']!r}"
+                )
+
     for step in output.steps:
         claimed_goal_ids = [
             goal_id for goal_id in step.source_goal_ids if goal_id in bindings_by_goal
@@ -1478,9 +1496,39 @@ def validate_goal_binding_argument_grounding(
         if not claimed_goal_ids:
             continue
 
+        capability = capabilities_by_id.get(step.capability_id) or {}
+        scoped_count_parameters: set[str] = set()
         required: dict[str, dict[str, Any]] = {}
         for goal_id in claimed_goal_ids:
             for name, binding in bindings_by_goal[goal_id].items():
+                if (capabilities is not None and _is_count_binding(name, binding)
+                        and goal_id not in resource_goal_ids
+                        and goal_id not in (acquisition_goal_ids or set())
+                        and len(owned_steps_by_goal[goal_id]) > 1
+                        and not count_binding_is_realized(name, binding, [(capability, step.args)])):
+                    # This count was conserved above in a sibling's declared slot.
+                    # Planner owns its assignment; do not impose it on every step.
+                    for parameter in _count_argument_names(capability, name):
+                        scoped_count_parameters.add(parameter)
+                        if parameter not in step.args:
+                            continue
+                        contract = (capability.get('input_schema') or {}).get('properties', {}).get(parameter) or {}
+                        resolution = resolutions_by_step_parameter.get((step.step_id, parameter))
+                        if ("default" in contract and _material_values_equal(step.args[parameter], contract["default"])) or (
+                            resolution is not None
+                            and resolution.strategy in {"user_supplied", "semantic_realization"}
+                            and goal_id in resolution.source_goal_ids
+                            and _material_values_equal(resolution.value, step.args[parameter])
+                            and any(goal.get('goal_id') == goal_id and intent_source_quote(
+                                resolution.source_quote, outcome=str(goal.get('description') or ''),
+                            ) for goal in authoritative_goals)
+                        ):
+                            continue
+                        raise ValueError(
+                            "sibling repetition requires its own source or Capability default: "
+                            f"{step.step_id}.{parameter}"
+                        )
+                    continue
                 if name in required and not _material_values_equal(
                     required[name]["value"],
                     binding["value"],
@@ -1496,34 +1544,6 @@ def validate_goal_binding_argument_grounding(
                 required[name] = binding
 
         capability = capabilities_by_id.get(step.capability_id) or {}
-        if capabilities is not None:
-            # Structured resource arguments retain their own nested grounding;
-            # an item quantity in that DTO is not an execution repetition.
-            # Complete prerequisite acquisition may defer an effect's repetition.
-            # Callers derive this scope from the validated whole Plan and catalog,
-            # never from the model's step_purpose label alone.
-            count_bindings = [
-                (name, binding)
-                for goal_id in claimed_goal_ids
-                if goal_id not in resource_goal_ids
-                and goal_id not in (acquisition_goal_ids or set())
-                for name, binding in bindings_by_goal[goal_id].items()
-            ]
-            for name, binding in count_bindings:
-                if not _is_count_binding(name, binding):
-                    continue
-                count_arguments = _count_argument_names(capability, name)
-                if not count_arguments:
-                    raise ValueError(
-                        "selected Capability has no declared count input for "
-                        f"authoritative repetition: {step.step_id}.{name}"
-                    )
-                if not count_arguments.intersection(step.args):
-                    raise PlannerDTOContractError(
-                        "planner step omitted authoritative count realization: "
-                        f"{step.step_id}.{name}"
-                    )
-
         for resolution in output.parameter_resolutions:
             if (resolution.step_id != step.step_id or resolution.blocking
                     or resolution.strategy != "user_supplied"):
@@ -1610,6 +1630,8 @@ def validate_goal_binding_argument_grounding(
                     values_by_entity_type[entity_type].append(value)
             for argument_name, argument_schema in argument_properties.items():
                 if not isinstance(argument_schema, dict):
+                    continue
+                if argument_name in scoped_count_parameters:
                     continue
                 entity_type = _normalized_entity_type(argument_schema.get("x-chromie-entity-type"))
                 if not entity_type:
@@ -3320,54 +3342,6 @@ def planner_contract_diagnostics(
     return unique
 
 
-
-def validate_planner_social_expression_authority(
-    output: PlannerModelOutput,
-    *,
-    capabilities: list[dict[str, Any]],
-) -> None:
-    """Reject optional social decoration from the shared Fast/Deep Work contract.
-
-    Social-domain Capabilities remain valid Planner Work when they are the requested
-    effect. What is forbidden is attaching a social-expression-only step to the same
-    Goal as unrelated non-social task Work. Independent requested effects must already
-    have distinct UMI Responsibilities/Goals; optional expression belongs to SC.
-    """
-
-    domains_by_capability = {
-        str(item.get("capability_id") or "").strip(): {
-            str(value).strip().lower()
-            for value in (item.get("behavior_domains") or [])
-            if str(value).strip()
-        }
-        for item in capabilities
-        if isinstance(item, dict) and str(item.get("capability_id") or "").strip()
-    }
-    steps_by_goal: dict[str, list[Any]] = {}
-    for step in output.steps:
-        for goal_id in step.source_goal_ids:
-            steps_by_goal.setdefault(goal_id, []).append(step)
-    for goal_id, steps in steps_by_goal.items():
-        social_only = [
-            step
-            for step in steps
-            if "social_attention" in domains_by_capability.get(step.capability_id, set())
-        ]
-        non_social = [
-            step
-            for step in steps
-            if "social_attention" not in domains_by_capability.get(step.capability_id, set())
-        ]
-        if social_only and non_social:
-            raise PlannerDTOContractError(
-                "Planner cannot attach social-expression-only Capability Work to a "
-                "different task under the same Goal; optional social expression belongs "
-                "to Social Cognition. Independently requested observable effects must "
-                "remain separate UMI Responsibilities/Goals; goal_id="
-                + goal_id
-                + " social_capabilities="
-                + ",".join(step.capability_id for step in social_only)
-            )
 
 def validate_planner_model_output(
     raw: dict[str, Any],

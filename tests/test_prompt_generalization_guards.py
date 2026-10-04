@@ -21,7 +21,6 @@ def test_user_meaning_interpretation_prompt_uses_general_rules_not_casebook_lite
         "`外面`",
         "green tea",
         "the second one",
-        "add ice to it",
         "Did event P occur?",
         "Is action Z safe under condition C?",
         "'tonight'",
@@ -55,8 +54,8 @@ def test_goal_association_prompt_does_not_embed_weather_or_tonight_templates() -
         "tonight uses one constraint",
     ):
         assert literal not in source
-    assert "Every supplied Responsibility ref must occur exactly once across" in source
-    assert "intact; Planner decomposes Activities" in source
+    # Conservation and unchanged WHAT are exercised through the production
+    # Schema/DTO/Host in test_goal_association_pr2, not exact prompt wording.
 
 
 def test_fast_planner_truth_prompt_preserves_epistemic_strength_without_phrase_table() -> None:

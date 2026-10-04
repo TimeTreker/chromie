@@ -28,7 +28,8 @@
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t8"
           },
-          "continuity_scope": "goal"
+          "continuity_scope": "goal",
+          "body_effect_family": "task_physical_effect"
         }
       ],
       "meaning_uncertainties": [],
@@ -39,13 +40,6 @@
             "r1"
           ],
           "reason_summary": "Preserve canonical continuity for the requested independent outcome."
-        },
-        {
-          "authority": "social_cognition",
-          "responsibility_refs": [
-            "r1"
-          ],
-          "reason_summary": "Decide grounded interaction for this addressed request without changing its meaning."
         },
         {
           "authority": "planner",
@@ -70,7 +64,8 @@
             "direction": "向左",
             "distance": "一米",
             "intensity": "轻轻地"
-          }
+          },
+          "body_effect_family": "task_physical_effect"
         }
       ],
       "unresolved": false,

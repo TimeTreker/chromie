@@ -411,14 +411,14 @@ Interpretation itself stops at Responsibility evidence; once that WHAT is suffic
 Fast Planner is the first HOW owner. It must not be implemented as a greeting/weather
 phrase rule, route shortcut, or second semantic authority.
 
-The **choice of which cognition to start is itself cognitive**, not a semantic decision
-owned by Runtime. A complete UMI result may propose a bounded set of next cognitive
-authorities from its accepted understanding. Later GA, Planner, SC, Evidence-driven or
-Situation-driven cognition may propose another bounded re-entry when new state makes more
-thought useful. These proposals are not route labels and do not let one role author another
-role's result. Trusted Runtime validates the allowed authority edge and schedules the
-requested work; it does not infer that Planner, GA, SC, Deep cognition, clarification, or
-replanning is required from field values or task classes.
+The choice to request non-standing cognition belongs to the current cognitive
+owner, not Runtime semantic routing. UMI may request GA and Planner with exact
+Responsibility scope. Runtime mechanically starts one turn-wide SC interaction for
+every fresh admitted addressed turn, and closes hard prerequisites such as GA for
+requested Planner Work; these are standing architectural obligations. Later owners
+may request bounded re-entry from new state. Runtime validates the edge and schedules
+it without inferring Planner readiness, clarification or replanning from keywords,
+output modes or task classes. Each owner still produces only its own result.
 
 For a sufficiently understood task, UMI may therefore fan out immediately:
 
@@ -445,8 +445,10 @@ validated UMI result
                        Runtime
 ```
 
-Not every turn requests all three branches. The model may decide that one branch lacks
-enough meaning to begin while another is already useful. Waiting is scoped to the true
+SC starts on each fresh addressed turn and decides whether to express anything.
+Not every turn requests Planner or GA independently; Runtime may schedule GA as a
+hard prerequisite of requested Planner Work. The model may determine that a
+non-standing branch lacks enough meaning while another is useful. Waiting is scoped to the true
 dependency: unresolved Goal motive does not block an otherwise grounded lookup; unresolved
 execution input does not block an independent social response; optional speech does not
 block Work. Conversely, side-effectful Work cannot cross its execution boundary merely
@@ -1201,7 +1203,7 @@ later association refreshes continuity after the association already occupying t
 boundary commits. Refreshed dialogue is causally cut at the current admitted turn,
 so later speech can inform a follow-up but can never flow backward into an earlier turn.
 After canonical Goal IDs exist, Runtime projects only Interaction Ledger events
-bound to those Goals plus explicitly unbound Fast Planner Communicative Activities from the same turn. Fast
+bound to those Goals plus explicitly unbound SC Communicative Activities from the same turn. Fast
 Planner, Deep Planner, and other later cognitive stages receive the bounded
 Goal-scoped projection to decide the
 still-needed delta. Scheduled speech remains distinct from audible speech,

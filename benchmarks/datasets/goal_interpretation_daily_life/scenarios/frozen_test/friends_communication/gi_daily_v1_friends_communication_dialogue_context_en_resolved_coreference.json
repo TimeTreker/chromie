@@ -41,7 +41,8 @@
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t7"
           },
-          "continuity_scope": "goal"
+          "continuity_scope": "goal",
+          "body_effect_family": "task_physical_effect"
         }
       ],
       "meaning_uncertainties": [],
@@ -52,13 +53,6 @@
             "r1"
           ],
           "reason_summary": "Preserve canonical continuity for the requested independent outcome."
-        },
-        {
-          "authority": "social_cognition",
-          "responsibility_refs": [
-            "r1"
-          ],
-          "reason_summary": "Decide grounded interaction for this addressed request without changing its meaning."
         },
         {
           "authority": "planner",
@@ -84,7 +78,8 @@
             "entity": "photo album",
             "location": "the arm of the sofa",
             "recipient": "Lee"
-          }
+          },
+          "body_effect_family": "task_physical_effect"
         }
       ],
       "unresolved": false,

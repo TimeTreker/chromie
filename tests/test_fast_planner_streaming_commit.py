@@ -624,11 +624,11 @@ async def test_fast_stream_filters_incompatible_information_capability_before_ge
     schema_text = json.dumps(model.last_kwargs['response_format'], ensure_ascii=False)
     assert 'soridormi.acquire_and_deliver_resource' in schema_text
     assert 'chromie.weather.lookup' not in schema_text
-    assert 'soridormi.blink_eyes' not in schema_text
+    assert 'soridormi.blink_eyes' in schema_text
 
 
 @pytest.mark.asyncio
-async def test_fast_stream_keeps_explicit_social_expression_and_hides_task_physical_work() -> None:
+async def test_fast_stream_keeps_body_capabilities_across_social_domain_labels() -> None:
     request = CognitiveWorkRequest(
         sid="turn-stream-blink",
         text="blink twice",
@@ -674,31 +674,23 @@ async def test_fast_stream_keeps_explicit_social_expression_and_hides_task_physi
     assert isinstance(frames[-1], FastPlannerStreamTerminal)
     schema_text = json.dumps(model.last_kwargs["response_format"], ensure_ascii=False)
     assert "soridormi.blink_eyes" in schema_text
-    assert "soridormi.acquire_and_deliver_resource" not in schema_text
+    assert "soridormi.acquire_and_deliver_resource" in schema_text
 
 
 @pytest.mark.asyncio
-async def test_fast_planner_rejects_social_only_decoration_mixed_into_task_responsibility() -> None:
-    request = _structured_resource_request()
-    raw = _structured_resource_output()
-    raw["activities"].append({
-        "role": "capability",
-        "capability_id": "soridormi.blink_eyes",
-        "activity_id": "social-ack",
-        "args": {"count": 1},
-        "timing": "sequential",
-        "source_responsibility_refs": ["fetch"],
-    })
+async def test_fast_planner_rejects_invalid_argument_source_in_compound_work() -> None:
+    request, capabilities, raw, _ = _compound_body_case("walk_nod_turn")
+    raw["activities"][1]["argument_sources"]["count"]["source_end_token_ref"] = "t999"
     model = _StreamingModel([_wire_output(raw)])
     frames = [
         frame
-        async for frame in FastPlannerResolver(
-            model, _Catalog([_structured_resource_catalog_capability(), _blink_social_catalog_capability()])
-        ).stream_advance(request)
+        async for frame in FastPlannerResolver(model, _Catalog(capabilities)).stream_advance(request)
     ]
     assert isinstance(frames[-1], FastPlannerStreamFailure)
     assert frames[-1].failure_class == "fast_stream_contract_invalid"
+    assert frames[-1].failure_stage == "before_commit"
     assert "not valid under any of the given schemas" in frames[-1].reason
+
 
 
 def test_fast_decision_projection_localizes_coverage_bindings_and_relations() -> None:
@@ -1048,3 +1040,248 @@ def test_fast_decoder_source_span_matches_immutable_token_order(start, end):
         expected = False
     contract = user_turn_source_span_schema([token["ref"] for token in tokens])
     assert Draft202012Validator(contract).is_valid(span.model_dump()) == expected
+
+
+def _compound_body_case(variant: str) -> tuple[CognitiveWorkRequest, list[CatalogCapability], dict[str, Any], bool]:
+    """Requested compound effects and independent mechanical rejection contrasts."""
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    def capability(capability_id, description, properties, domains, effects):
+        return CatalogCapability(
+            capability_id=capability_id, agent_id='capability_agent', description=description,
+            input_schema={'type': 'object', 'properties': properties, 'additionalProperties': False},
+            effects=effects, behavior_domains=domains, available=True, interaction_executable=True,
+            prompt_tier='common', can_run_parallel=True, parallel_metadata_declared=True,
+            exclusive_group='body.primary_motion', resource_claims=['body.primary_motion'],
+        )
+
+    caps = [
+        capability('soridormi.walk_velocity', 'Walk at requested speed for requested duration',
+                   {'duration_s': {'type': 'number', 'minimum': .1, 'default': 1},
+                    'vx_mps': {'type': 'number', 'default': .15}}, ['locomotion'], ['physical_motion']),
+        capability('soridormi.walk_forward', 'Walk forward',
+                   {'duration_s': {'type': 'number', 'minimum': .1, 'default': 1}}, ['locomotion'], ['physical_motion']),
+        capability('soridormi.nod_yes', 'Nod the head',
+                   {'count': {'type': 'integer', 'minimum': 1, 'maximum': 8, 'default': 2}},
+                   ['social_attention'], ['physical_motion']),
+        capability('soridormi.blink_eyes', 'Blink the eyes',
+                   {'count': {'type': 'integer', 'minimum': 1, 'maximum': 8, 'default': 2}},
+                   ['social_attention', 'facial_expression'], ['visual_expression']),
+        capability('soridormi.turn_in_place', 'Turn in place',
+                   {'direction': {'type': 'string', 'enum': ['left', 'right'], 'default': 'left'}},
+                   ['locomotion'], ['physical_motion']),
+        capability('soridormi.look_direction', 'Look in the requested direction',
+                   {'direction': {'type': 'string', 'enum': ['front', 'left', 'right'], 'default': 'front'}},
+                   ['orientation', 'social_attention'], ['physical_motion']),
+    ]
+    text = 'Walk forward one second, then blink twice.'
+    family = 'task_physical_effect'
+    mode = 'body_action'
+    specs = [('walk', 'soridormi.walk_forward', {'duration_s': 1}, {'duration_s': 'one'}),
+             ('blink', 'soridormi.blink_eyes', {'count': 2}, {'count': 'twice'})]
+    expected = variant in {'walk_nod_turn', 'walk_blink', 'look_walk', 'nod_only'}
+    if variant in {'walk_nod_turn', 'unavailable_nod'}:
+        text = 'walk ahead at 0.2 speed for 10 seconds then nod head twice then turn left'
+        specs = [('walk', 'soridormi.walk_velocity', {'vx_mps': .2, 'duration_s': 10},
+                  {'vx_mps': '0.2', 'duration_s': '10'}),
+                 ('nod', 'soridormi.nod_yes', {'count': 2}, {'count': 'twice'}),
+                 ('turn', 'soridormi.turn_in_place', {'direction': 'left'}, {'direction': 'left'})]
+    elif variant == 'look_walk':
+        text = 'look front then walk forward'; family = 'gaze_or_orientation'
+        specs = [('look', 'soridormi.look_direction', {'direction': 'front'}, {'direction': 'front'}),
+                 ('walk', 'soridormi.walk_forward', {}, {})]
+    elif variant == 'nod_only':
+        text = 'nod twice'; family = 'social_expression'
+        specs = [('nod', 'soridormi.nod_yes', {'count': 2}, {'count': 'twice'})]
+    elif variant in {'speech_gesture', 'information_gesture'}:
+        mode = 'speech' if variant == 'speech_gesture' else 'information'
+        text = 'answer who you are' if mode == 'speech' else 'report the current time'
+        specs = [('nod', 'soridormi.nod_yes', {}, {})]
+    elif variant == 'foreign_span':
+        text = 'walk forward then nod twice'
+        specs = [('walk', 'soridormi.walk_forward', {}, {}),
+                 ('nod', 'soridormi.nod_yes', {'count': 2}, {'count': 'twice'})]
+    tokens = user_turn_source_tokens(text)
+
+    def span(surface):
+        start = text.index(surface); end = start + len(surface)
+        contained = [t for t in tokens if t['start'] >= start and t['end'] <= end]
+        return {'source_start_token_ref': contained[0]['ref'], 'source_end_token_ref': contained[-1]['ref']}
+
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref='r1', outcome=text, output_mode=mode,
+        body_effect_family=family if mode == 'body_action' else None,
+        source_evidence={'source_start_token_ref': tokens[0]['ref'], 'source_end_token_ref': tokens[-1]['ref']},
+        confidence=1.0,
+    )
+    responsibilities = [responsibility]
+    if variant == 'foreign_span':
+        responsibility = CognitiveResponsibilityProposal.model_validate({
+            **responsibility.model_dump(), 'outcome': 'walk forward',
+            'source_evidence': span('walk forward'),
+        })
+        responsibilities = [responsibility]
+        responsibilities.append(CognitiveResponsibilityProposal(
+            local_ref='r2', outcome='nod twice', output_mode='body_action', body_effect_family='social_expression',
+            source_evidence=span('nod twice'), confidence=1,
+        ))
+    request = CognitiveWorkRequest(sid='compound-body-contrast', text=text, language='en-US',
+        responsibilities=responsibilities, interpretation_confidence=1)
+    raw = {'disposition': 'execute', 'coverage': 'complete',
+        'covered_responsibility_refs': [r.local_ref for r in responsibilities],
+        'activities': [{'role': 'capability', 'activity_id': aid, 'capability_id': cid,
+                        'args': args, 'argument_sources': {k: span(v) for k, v in sources.items()},
+                        'source_responsibility_refs': ['r1'], 'timing': 'sequential',
+                        'reason_summary': 'Realize the effect in the accepted source responsibility.'}
+                       for aid, cid, args, sources in specs],
+        'continuations': [], 'confidence': 1, 'unresolved': [], 'reason_summary': 'Complete requested work.'}
+    if variant == 'unknown_ref':
+        raw['activities'][1]['source_responsibility_refs'] = ['unknown']
+    elif variant == 'parallel_resource_conflict':
+        for item in raw['activities']: item['timing'] = 'parallel'
+    elif variant == 'unavailable_nod':
+        caps = [c.model_copy(update={'available': False}) if c.capability_id == 'soridormi.nod_yes' else c for c in caps]
+    elif variant == 'auxiliary_field':
+        raw['auxiliary_activities'] = [{'capability_id': 'soridormi.nod_yes', 'execution_role': 'social_decoration'}]
+    elif variant == 'invalid_count':
+        raw['activities'][1]['args']['count'] = 0
+    return request, caps, raw, expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('variant', [
+    'walk_nod_turn', 'walk_blink', 'look_walk', 'nod_only', 'speech_gesture', 'information_gesture',
+    'unknown_ref', 'foreign_span', 'parallel_resource_conflict', 'unavailable_nod', 'auxiliary_field', 'invalid_count',
+])
+async def test_compound_body_work_keeps_one_responsibility_and_mechanical_guards(variant):
+    request, caps, raw, expected = _compound_body_case(variant)
+    model = _StreamingModel([_wire_output(raw)])
+    frames = [f async for f in FastPlannerResolver(model, _Catalog(caps)).stream_advance(request)]
+    assert model.calls == 1
+    assert len(frames) == 1
+    assert isinstance(frames[0], FastPlannerStreamTerminal) is expected, frames[0]
+    if expected:
+        activities = frames[0].advance.activities
+        assert [a.capability_id for a in activities] == [a['capability_id'] for a in raw['activities']]
+        assert [a.args for a in activities] == [a['args'] for a in raw['activities']]
+        assert all(a.source_responsibility_refs == ['r1'] for a in activities)
+    else:
+        assert isinstance(frames[0], FastPlannerStreamFailure)
+        assert frames[0].failure_stage == 'before_commit'
+
+
+def _compound_count_case(variant: str):
+    request, caps, raw, _ = _compound_body_case('walk_nod_turn')
+    request = request.model_copy(update={'responsibilities': [request.responsibilities[0].model_copy(update={'bindings': {'count': 2}})]})
+    raw['activities'][1]['argument_sources'] = {}
+    raw['activities'][2]['args']['count'] = 1
+    caps[4] = caps[4].model_copy(update={'input_schema': {'type': 'object', 'properties': {
+        **caps[4].input_schema['properties'], 'count': {'type': 'integer', 'minimum': 1, 'maximum': 8, 'default': 1}},
+        'additionalProperties': False}})
+    expected = variant in {'compound_defaults', 'omitted_turn_default', 'matching_turn_count', 'distinct_explicit_count'}
+    if variant in {'matching_turn_count', 'distinct_explicit_count'}:
+        from shared.chromie_contracts.user_turn import user_turn_source_tokens
+        text = request.text + (' twice' if variant == 'matching_turn_count' else ' 3 times')
+        tokens = user_turn_source_tokens(text)
+        source = type(request.responsibilities[0]).model_validate({
+            **request.responsibilities[0].model_dump(), 'outcome': text,
+            'source_evidence': {'source_start_token_ref': tokens[0]['ref'], 'source_end_token_ref': tokens[-1]['ref']}})
+        request = request.model_copy(update={'text': text, 'responsibilities': [source]})
+    if variant == 'omitted_turn_default':
+        raw['activities'][2]['args'].pop('count')
+    elif variant == 'matching_turn_count':
+        raw['activities'][2]['args']['count'] = 2
+    elif variant == 'distinct_explicit_count':
+        raw['activities'][2]['args']['count'] = 3
+        count_token = next(t['ref'] for t in tokens if t['surface'] == '3')
+        raw['activities'][2]['argument_sources']['count'] = {'source_start_token_ref': count_token, 'source_end_token_ref': count_token}
+    elif variant == 'missing_count':
+        raw['activities'][1]['args'].pop('count')
+    elif variant == 'wrong_nod_count':
+        raw['activities'][1]['args']['count'] = 3
+    elif variant == 'nondefault_turn_count':
+        raw['activities'][2]['args']['count'] = 3
+    elif variant == 'duration_masks_count':
+        raw['activities'] = [raw['activities'][0]]
+        raw['activities'][0]['args'] = {'duration_s': 2}
+        raw['activities'][0]['argument_sources'] = {}
+    elif variant == 'single_wrong_count':
+        raw['activities'] = [raw['activities'][1]]
+        raw['activities'][0]['args']['count'] = 1
+    elif variant == 'foreign_argument_source':
+        raw['activities'][0]['argument_sources']['duration_s']['source_end_token_ref'] = 't999'
+    return request, caps, raw, expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('variant', ['compound_defaults', 'omitted_turn_default', 'matching_turn_count', 'distinct_explicit_count',
+    'missing_count', 'wrong_nod_count', 'nondefault_turn_count', 'duration_masks_count',
+    'single_wrong_count', 'foreign_argument_source'])
+async def test_compound_count_stays_in_declared_parameters(variant):
+    request, caps, raw, expected = _compound_count_case(variant)
+    model = _StreamingModel([_wire_output(raw)])
+    frames = [f async for f in FastPlannerResolver(model, _Catalog(caps)).stream_advance(request)]
+    assert model.calls == 1
+    assert isinstance(frames[-1], FastPlannerStreamTerminal) == expected
+    if expected:
+        assert [a.capability_id for a in frames[-1].advance.activities] == [a['capability_id'] for a in raw['activities']]
+    else:
+        assert frames[-1].failure_stage == 'before_commit'
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('variant', ['translated_missing', 'translated_cited', 'literal', 'case_only',
+    'selected_value_missing', 'selected_literal', 'bound_value', 'foreign_source', 'invalid_enum'])
+async def test_required_enum_source_matches_selected_value_and_original_turn(variant):
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text, outcome, value = '向右转。', 'turn right', 'right'
+    cited, bindings, owned = None, {}, None
+    expected = variant in {'translated_cited', 'literal', 'case_only', 'selected_literal', 'bound_value'}
+    if variant == 'translated_cited':
+        cited = '右'
+    elif variant == 'literal':
+        text = outcome = 'turn right'
+    elif variant == 'case_only':
+        text = 'Turn Right'
+    elif variant in {'selected_value_missing', 'selected_literal'}:
+        text, outcome = 'right was the old direction; now turn left', 'turn left'
+        value = 'left' if variant == 'selected_literal' else 'right'
+    elif variant == 'bound_value':
+        bindings = {'direction': 'right'}
+    elif variant == 'foreign_source':
+        text, outcome, owned, cited = '向左转。另一个要求向右转。', 'turn left', '向左转。', '右'
+    elif variant == 'invalid_enum':
+        text = outcome = 'turn up'
+        value = 'up'
+    tokens = user_turn_source_tokens(text)
+
+    def span(surface):
+        start = text.index(surface)
+        found = [t for t in tokens if start <= t['start'] and t['end'] <= start + len(surface)]
+        return {'source_start_token_ref': found[0]['ref'], 'source_end_token_ref': found[-1]['ref']}
+
+    responsibility = CognitiveResponsibilityProposal(local_ref='r1', outcome=outcome,
+        output_mode='body_action', body_effect_family='task_physical_effect', confidence=1,
+        source_evidence=span(owned or text), bindings=bindings)
+    request = CognitiveWorkRequest(sid='enum-source-contract', text=text, responsibilities=[responsibility],
+        interpretation_confidence=1)
+    capability = CatalogCapability(capability_id='soridormi.turn_in_place', agent_id='capability_agent',
+        description='Turn in place', input_schema={'type': 'object',
+            'properties': {'direction': {'type': 'string', 'enum': ['left', 'right']}},
+            'required': ['direction'], 'additionalProperties': False}, behavior_domains=['locomotion'],
+        effects=['physical_motion'], available=True, interaction_executable=True, prompt_tier='common')
+    raw = {'activities': [{'role': 'capability', 'activity_id': 'turn',
+        'capability_id': capability.capability_id, 'args': {'direction': value},
+        'argument_sources': {'direction': span(cited)} if cited else {},
+        'source_responsibility_refs': ['r1'], 'timing': 'sequential'}],
+        'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'],
+        'continuations': [], 'confidence': 1, 'unresolved': [], 'reason_summary': 'Realize owned turn.'}
+    model = _StreamingModel([_wire_output(raw)])
+    frames = [f async for f in FastPlannerResolver(model, _Catalog([capability])).stream_advance(request)]
+    assert model.calls == 1
+    assert Draft202012Validator(model.last_kwargs['response_format']).is_valid(raw) == (
+        expected or variant == 'foreign_source')
+    assert isinstance(frames[-1], FastPlannerStreamTerminal) == expected
+    if not expected:
+        assert frames[-1].failure_stage == 'before_commit'

@@ -24,9 +24,8 @@ from agent.app.goal_association_contract import (  # noqa: E402
     GoalAssociationModelOutput,
     GoalSegmentationModelOutput,
 )
-from agent.app.goal_association_prompt import discourse_referents  # noqa: E402
-from agent.app.goal_association_schema import goal_association_response_schema  # noqa: E402
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest  # noqa: E402
+from shared.chromie_contracts.goal import GoalAssociationResolution  # noqa: E402
 
 
 DATASET_ROOT = ROOT / "benchmarks" / "datasets" / "goal_association_daily_life"
@@ -85,9 +84,12 @@ class _ReferenceModel:
     def __init__(self, payload: dict[str, Any]) -> None:
         self.payload = payload
         self.calls = 0
+        self.primary_call: dict[str, Any] | None = None
 
     async def generate(self, prompt: Any, **kwargs: Any) -> dict[str, Any]:
         self.calls += 1
+        if self.primary_call is None:
+            self.primary_call = {"prompt": str(prompt), **kwargs}
         return self.payload
 
 
@@ -130,35 +132,20 @@ def _walk_keys(value: Any) -> set[str]:
     return set()
 
 
-def _request_schema(request: CognitiveWorkRequest) -> tuple[type[Any], dict[str, Any], list[dict[str, Any]]]:
-    resolver = GoalAssociationResolver(_ReferenceModel({}))
+async def _request_schema(
+    request: CognitiveWorkRequest,
+    model: _ReferenceModel,
+) -> tuple[type[Any], dict[str, Any], list[dict[str, Any]], GoalAssociationResolution]:
+    resolver = GoalAssociationResolver(model)
     candidates = resolver._candidate_goals(request)
     output_type: type[Any] = GoalAssociationModelOutput if candidates else GoalSegmentationModelOutput
-    schema = goal_association_response_schema(
-        output_type,
-        candidates,
-        discourse_referents(request),
-        responsibility_count=len(request.responsibilities),
-        responsibility_refs=[item.local_ref for item in request.responsibilities],
-        responsibility_output_modes={
-            item.local_ref: item.output_mode
-            for item in request.responsibilities
-            if item.output_mode != "unspecified"
-        },
-        responsibility_information_refs={
-            item.local_ref
-            for item in request.responsibilities
-            if item.output_mode == "information"
-        },
-        responsibility_bindings={
-            item.local_ref: {
-                str(name): value
-                for name, value in item.bindings.items()
-            }
-            for item in request.responsibilities
-        },
-    )
-    return output_type, schema, candidates
+    resolution = await resolver.resolve(request)
+    call = model.primary_call or {}
+    schema = call.get("response_format")
+    if call.get("prompt_family") != "goal_association.primary" or not isinstance(schema, dict):
+        raise ValueError("production primary call did not supply its dynamic Schema")
+    Draft202012Validator.check_schema(schema)
+    return output_type, schema, candidates, resolution
 
 
 def _responsibility_map(reference: dict[str, Any], request: CognitiveWorkRequest) -> list[dict[str, Any]]:
@@ -179,7 +166,32 @@ def _responsibility_map(reference: dict[str, Any], request: CognitiveWorkRequest
                 "relationship": "new",
                 "target_goal_ids": [],
                 "output_mode": next(item.output_mode for item in request.responsibilities if item.local_ref == source_ref),
+                "related_goal_ids": goal["related_goal_ids"],
                 "supersedes_goal_ids": goal["supersedes_goal_ids"],
+            })
+    return sorted(mapped, key=lambda item: item["source_ref"])
+
+
+def _resolution_map(resolution: GoalAssociationResolution) -> list[dict[str, Any]]:
+    mapped: list[dict[str, Any]] = []
+    for association in resolution.associations:
+        for source_ref in association.source_responsibility_refs:
+            mapped.append({
+                "source_ref": source_ref,
+                "operation": "association",
+                "relationship": association.relationship,
+                "target_goal_ids": association.target_goal_ids,
+            })
+    for goal in resolution.new_goals:
+        for source_ref in goal.source_responsibility_refs:
+            mapped.append({
+                "source_ref": source_ref,
+                "operation": "new_goal",
+                "relationship": "new",
+                "target_goal_ids": [],
+                "output_mode": goal.metadata.get("output_mode", "unspecified"),
+                "related_goal_ids": goal.related_goal_ids,
+                "supersedes_goal_ids": goal.supersedes_goal_ids,
             })
     return sorted(mapped, key=lambda item: item["source_ref"])
 
@@ -233,7 +245,8 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
             if source_refs != mapped_refs:
                 raise ValueError(f"Responsibility conservation drift: {source_refs} != {mapped_refs}")
 
-            output_type, schema, candidates = _request_schema(request)
+            model = _ReferenceModel(reference)
+            output_type, schema, candidates, resolution = await _request_schema(request, model)
             declared_candidates = target["semantic_expectations"]["candidate_goal_ids"]
             if [item["goal_id"] for item in candidates] != declared_candidates:
                 raise ValueError("candidate Goal projection drift")
@@ -247,8 +260,6 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
                 if schema_errors:
                     raise ValueError(f"reference schema failure: {schema_errors[0].message}")
                 output_type.model_validate(reference)
-                model = _ReferenceModel(reference)
-                resolution = await GoalAssociationResolver(model).resolve(request)
                 required_status = "fail_closed" if expectation == "accept_host_reject" else "resolved"
                 if resolution.resolution_status != required_status or model.calls != 1:
                     raise ValueError(
@@ -259,6 +270,8 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
                         raise ValueError("rejected legacy update leaked a state transition")
                     counts["known_contract_gaps"] += 1
                 else:
+                    if _resolution_map(resolution) != expected_map:
+                        raise ValueError("Host materialization changed the semantic responsibility map")
                     counts["host_accepted"] += 1
             else:
                 raise ValueError(f"unknown schema expectation {expectation!r}")

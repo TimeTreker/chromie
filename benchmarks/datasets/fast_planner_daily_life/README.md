@@ -1,155 +1,65 @@
 # Planner Daily-Life Qualification Corpus
 
-Audience: reviewers and operators qualifying Chromie's Fast/Deep Planner
-transaction under [Issue #35](https://github.com/TimeTreker/chromie/issues/35).
-This is offline evaluation input, not production behavior policy or approved SFT
-data.
+Audience: Planner reference authors and qualification operators. This is retained
+offline reference input, not production behavior policy or approved SFT data.
 
-The September 22 input refresh explicitly materializes the current GA projection's
-empty `non_goal_responsibility_refs` and `cognitive_requests` defaults in the 152
-canonical cases. All source inputs, target Plans, expectations and splits are preserved;
-the scenario-tree digest is refrozen after this offline authoring step. Validation
-still requires exact production projection equality and never refreshes fixtures.
+## Retained inventory and authority
 
-## What the corpus covers
+The Fast inventory has 204 cases: 17 historical capacity classes, three family
+contrasts per class, supported/boundary variants and bilingual realization.
+There are 51 contrast sets, 102 cases per language, 52 streaming-advance,
+72 canonical-primary and 80 canonical-reentry inputs. Splits are 120
+`train_candidate`, 44 `validation`, 40 `frozen_test`. All remain
+`training_eligible=false` and `independent_semantic_review=false`.
 
-The Fast corpus contains 204 current-production-shaped scenarios. Its count is
-derived from the design, not chosen as a scale target:
+The separate Deep inventory contains 40 cases over ten historical capacities,
+24 primary and 16 re-entry inputs. Its current full compatibility was not established
+in the 2026-10-04 audit; it cannot inherit a qualification claim from Fast.
 
-- 17 Planner capacities derived from the Charter, interaction contract, DTOs,
-  Host validation, and Capability contracts;
-- three materially different daily-life families per capacity;
-- one supported and one boundary condition per family;
-- an English and Chinese realization of every semantic cell.
+Planner owns Capability selection, parameter resolution/provenance, complete Work,
+dependencies, resource coordination, evidence interpretation, readiness and genuine
+Deep-HOW delegation. SC owns ordinary exact speech and eligible optional expression;
+UMI owns WHAT; GA owns retained Goal association. Runtime owns confirmation grants,
+authorization, delivery, cancellation, safety and Evidence production.
 
-That produces 51 one-axis contrast sets and `17 * 3 * 2 * 2 = 204` cases. The
-matrix covers all 15 maintained daily-life families: greetings/presence,
-feelings support, meals/wellbeing, identity/body truth, play/creativity,
-preferences/boundaries, shared-space etiquette, uncertainty repair, casual
-chat/curiosity, family/home, friends/social life, multi-turn continuity,
-practical information/tools, routines/plans, and school/learning.
+## Current compatibility is open
 
-The 17 capacity classes describe what Planner must do according to Chromie's
-design:
+The old 204-case coverage includes ordinary Communicative Activity authorship and
+optional social decoration as Planner duties. Those duties have retired. The old
+streaming presentation target is not the current Work-only `/fast-advance` contract.
+Input GA projections and targets also retain earlier fields. The historical
+“current-production-shaped” claim is withdrawn.
 
-1. authoritative scope coverage and prospective satisfaction;
-2. direct Communicative Activity authorship;
-3. Capability grounding without semantic substitution;
-4. parameter resolution and provenance;
-5. Work topology and sequential/parallel coordination;
-6. per-Goal disposition and mixed outcomes;
-7. user-resolvable uncertainty and honest limit outcomes;
-8. Plan relation and confirmation proposals;
-9. truthful response staging and deduplication;
-10. retained-Work revision without replay;
-11. Evidence re-entry interpretation;
-12. temporal-readiness planning;
-13. resource-contract composition;
-14. output-mode fidelity;
-15. optional subordinate social decoration;
-16. atomic Plan integrity and safe alternatives;
-17. Fast completion versus genuine Deep-HOW escalation.
+The audit reproduced a qualification-adapter TypeError from the removed
+`auxiliary_social_capabilities` argument before candidate inference. The adapter
+now retains the exact dynamic Schema from the captured production invocation for
+all three variants, including streaming capability filtering, source constraints
+and bounded lookup. Its duplicate Schema reconstruction has been removed. All
+204 references pass the current mechanical checker and all nine adapter tests
+pass; retired semantic coverage remains unqualified. Existing JSON,
+source turns, contexts, target Plans, expectations, splits and digests were preserved.
 
-The matrix also varies the real transaction boundaries: 52
-`streaming_advance`, 72 `canonical_primary`, and 80 `canonical_reentry` cases;
-102 cases per language; 102 supported and 102 boundary cases. Splits are 120
-`train_candidate`, 44 `validation`, and 40 `frozen_test`. A split name is only
-a partition: every case remains `training_eligible=false` and
-`independent_semantic_review=false`.
-
-The separate Deep corpus contains 40 cases across ten Deep/shared capacities,
-with 24 primary and 16 re-entry transactions, equal English/Chinese coverage,
-and supported/boundary contrasts. Deep is qualified separately because it sees
-the authoritative source/context for deeper HOW cognition; it never receives or
-repairs a Fast candidate Plan.
-
-## What the corpus deliberately does not claim
-
-Daily-life situations are test contexts, not proxy abilities. The actual
-coverage claim is limited to the declared capacity/state-space cells and their
-one-axis contrasts. The corpus does not prove exhaustive human life, emergent
-world knowledge, target-provider compatibility, voice quality, simulator or
-hardware behavior, safety certification, release readiness, or independent
-semantic validity.
-
-The authority map excludes provider-neutral WHAT (Goal Interpretation),
-canonical Goal identity/continuity (Goal Association), GA/Fast scheduling,
-confirmation grants, authorization, atomic commit, execution, Evidence
-manufacture, emergency controls, TTS realization, and provider-internal motion
-planning. A difficult case belonging to one of those owners must not be counted
-as Planner coverage.
-
-`streaming_advance` owns one ordered JSON HOW result over GI Responsibility refs
-before GA joins. It cannot invent Goal IDs, satisfaction, Plan relation, or time
-conditions. `canonical_primary` owns the complete semantic Plan over GA-owned
-Goals. `canonical_reentry` sees only the admitted still-open Goal/Evidence scope
-and must not replay completed Work or narrate excluded siblings.
-
-The 204-case tree replaced a historical 1,500-case cross-product. That older
-inventory was invalid qualification input: 720/1,000 canonical/re-entry
-contexts failed the current GA DTO, the remaining 280 did not equal the current
-projection, material bindings were absent, only five Capabilities were exposed,
-and reminder/weather dominated the targets. Its count was never evidence of
-daily-life or Planner-logic coverage.
-
-## Validation and immutable qualification
-
-Validate the checked-in corpus and focused dataset contracts:
+## Validation and reviewed migration
 
 ```bash
 python -m benchmarks.datasets.fast_planner_daily_life.qualification validate
 python -m pytest -q benchmarks/tests/test_fast_planner_daily_life_dataset.py
 ```
 
-Run a new target-blind Fast cohort without editing source or the harness between
-steps:
+These establish mechanical compatibility only. Do not disable assertions, refresh captures from
+candidate answers, or restore Planner wording to pass. Review current Work-only
+transactions and references together, preserve frozen input contrasts, move retired
+communication coverage to its actual SC owner only through reviewed target authorship,
+and bind new manifest/case identities before a new cohort.
 
-```bash
-RUN_DIR=.chromie/benchmarks/fast-planner/NEW_RUN_ID
-python -m benchmarks.datasets.fast_planner_daily_life.qualification prepare \
-  --label fast-qualified-full --output-dir "$RUN_DIR"
-python -m benchmarks.datasets.fast_planner_daily_life.qualification run \
-  --output-dir "$RUN_DIR" --concurrency 4 --timeout-s 180
-python -m benchmarks.datasets.fast_planner_daily_life.qualification adjudicate \
-  --output-dir "$RUN_DIR"
-```
+Follow the [qualification method](../../../docs/LLM_PROMPT_QUALIFICATION_METHOD.md):
+freeze full inputs, prompt, Schema, projection and model identity; infer once without
+targets; adjudicate Schema/DTO/Host and semantics separately; repair the earliest
+responsible boundary; rerun focused proof and the complete cohort. Deep never repairs
+a Fast candidate Plan. Missing/timeout/truncated results remain failures.
 
-Run Deep through the sibling `deep_qualification` command after Fast closes.
-Every scenario gets exactly one target-blind candidate call, no hidden retry,
-and real Schema/DTO/Host adjudication. A non-zero process, timeout, missing
-output, or source/harness change makes the batch incomplete; successful cases
-from different batches are never spliced together.
-
-All inference and optimization follows `qualify-chromie-semantic-transaction`: freeze
-the coverage-designed corpus and transaction, infer without targets, adjudicate
-the earliest boundary, make only an authorized minimal repair, rerun focused
-proof, then rerun the complete frozen cohort. A prompt changes only when the
-evidence identifies it as the earliest defective owner. Host rewriting,
-same-tier semantic repair/review, validator weakening, and example-answer
-libraries are forbidden.
-
-The `issue51-staged-acquisition-20260912` oracle revision changes only the target
-regions of four Fast conditional cases and two Deep component/composite cases.
-The source turns, Goal bindings and catalogs are unchanged. Delivered #51 allows
-complete prerequisite acquisition with honest unmet downstream obligations; the
-older escalate-only/composite-only targets excluded that legitimate behavior.
-The revised checks require an explicitly allowed Capability set and acquisition
-purpose, with the original effect unmet at both satisfaction levels. Historical
-failures and their original oracle identities remain retained in the audit
-artifacts and Git history; they are not relabeled as new passes. New inference
-must freeze the updated manifest and case digests before execution.
-
-Codex CLI qualification is an offline same-model surrogate, not the deployed
-Ollama/vLLM transport and not an independent semantic reviewer. Local artifacts
-under `.chromie/benchmarks/` do not transfer with Git. No scenario may enter
-QLoRA/SFT until an independent reviewer accepts its semantic target and the
-owner explicitly changes `training_eligible`.
-
-The `issue51-stage-and-issue58-readiness-20260912` Fast oracle additionally corrects
-the six bilingual future-readiness targets. Exact Runtime replay showed that the
-previous required lookup dispatched immediately despite a future time condition.
-The corrected region requires `respond`, an exact Goal/time condition, no current
-Work or confirmation, and honest unmet Goal satisfaction. Inputs remain unchanged;
-the old mechanical passes remain failed temporal behavior in the retained review.
-The existing Deep corpus is supplemented by the same six immutable future inputs
-under its own production transaction during Issue #58 qualification.
+Historical staged-acquisition and future-readiness target revisions remain in Git
+and evidence; they are not current-pipeline passes. Offline surrogate inference is
+not deployed SGLang, audible voice, real acquisition, simulator or robot qualification,
+and same-model review is not independent review. See the
+[project audit](../../../ARCHITECTURE_AUDIT.md) for reproduced boundaries.

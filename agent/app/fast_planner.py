@@ -59,7 +59,6 @@ from .planner_validation import (
     validate_resource_responsibility_capability_grounding,
     validate_goal_responsibility_outcomes,
     validate_planner_model_output,
-    validate_planner_social_expression_authority,
 )
 from .planner_fast_validation import (
     AuthoritativeGroundingValidationError,
@@ -194,11 +193,6 @@ class FastPlannerResolver:
                 capabilities = qualify_capability_catalog_for_output_mode_values(
                     capabilities,
                     output_modes={item.output_mode for item in responsibilities},
-                    body_effect_families={
-                        item.body_effect_family
-                        for item in responsibilities
-                        if item.body_effect_family is not None
-                    },
                 )
                 if len(capabilities) > self.max_capabilities + len(loaded_ids):
                     raise PlannerDTOContractError("Common capability contracts exceed the configured context budget")
@@ -207,6 +201,7 @@ class FastPlannerResolver:
                     capabilities=capabilities, meaning_uncertainties=list(request.meaning_uncertainties),
                     language=str(request.language or ""),
                     source_token_refs=[item["ref"] for item in user_turn_source_tokens(current.original_user_text)],
+                    original_user_text=current.original_user_text,
                 )
                 if not loaded_ids:
                     schema = capability_lookup_response_schema(schema, [
@@ -589,9 +584,6 @@ class FastPlannerResolver:
                         raw,
                         planner_tier="fast",
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-                    )
-                    validate_planner_social_expression_authority(
-                        validated_model_output, capabilities=capability_payload,
                     )
                     normalized = materialize_planner_output(
                         validated_model_output,

@@ -169,6 +169,43 @@ def test_spoken_answer_does_not_hide_unfinished_created_goal(status):
         assert any("Goal" in error for error in errors)
 
 
+@pytest.mark.parametrize("case_id", [
+    "qualification_identity_en_warm_latency", "qualification_identity_zh_warm_latency",
+])
+@pytest.mark.parametrize("status", [None, "open", "satisfied"])
+@pytest.mark.parametrize("decision_ms", [1000, 2500])
+def test_identity_delivery_requires_goal_completion_without_planner_work(
+    case_id, status, decision_ms,
+):
+    library = load_scenario_library()
+    case = next(ref.case for ability in library.ability_classes
+                for ref in ability.live_text_cases if ref.case.case_id == case_id)
+    social = {"semantic_owner": "social_cognition", "disposition": "communicate",
+              "activities": [{"activity_id": "identity", "function": "respond",
+                              "text": "I'm Chromie."}]}
+    summary = {
+        "interaction_response": {"speech": [{"text": "I'm Chromie."}],
+                                 "capabilities": [],
+                                 "metadata": {"social_cognition_resolution": social}},
+        "preview_only": False,
+        "cognitive_runtime": {"goal_association": {"new_goals": [{"goal_id": "identity"}]}},
+        "session_state": {"cognitive_workflow_stages": [{
+            "stage": "social_cognition", "status": "accepted", "output": social,
+            "started_elapsed_ms": 0, "finished_elapsed_ms": decision_ms,
+            "duration_ms": decision_ms,
+        }], "workflow_events": [{"event": "playback_start", "elapsed_ms": decision_ms + 100}]},
+    }
+    if status is not None:
+        summary["final_goal_snapshots"] = [{
+            "goal": {"goal_id": "identity", "responsibility_status": status},
+        }]
+    errors = validate_live_text_result(case, summary, assertion_scope="full")
+    assert not any("terminal Plan omitted" in error for error in errors), errors
+    assert any("Goal" in error for error in errors) is (status != "satisfied"), errors
+    assert any("decision exceeded target" in error for error in errors) is (decision_ms > 2000), errors
+    assert (errors == []) == (status == "satisfied" and decision_ms <= 2000), errors
+
+
 @pytest.mark.parametrize("stage", ["must_pass", "core"])
 @pytest.mark.parametrize("failure", [
     {"turn_id": "scenario-turn", "sid": "cbe8a87b", "cognitive_runtime": {"status": "error", "metadata": {

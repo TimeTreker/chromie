@@ -6,10 +6,13 @@ import asyncio
 import json
 import unittest
 
+import pytest
+
 from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
 from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
 from agent.app.goal_association_contract import GoalAssociationModelGoal
+from agent.app.planner_context import planner_provider_media_goal_operations
 from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import canonical_plan_response_schema
 from agent.app.planner_validation import validate_goal_responsibility_outcomes
@@ -215,10 +218,14 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
         self.assertEqual(playback.output_mode, "media_playback")
         self.assertEqual(singing.output_mode, "singing")
         self.assertFalse(hasattr(playback, "execution_lane"))
-        with self.assertRaisesRegex(ValueError, "exact media_operation"):
+        intent_only = GoalAssociationModelGoal(
+            source_responsibility_refs=["playback"], output_mode="media_playback",
+        )
+        self.assertEqual(intent_only.media_operation, "none")
+        self.assertEqual(intent_only.output_mode, "media_playback")
+        with self.assertRaisesRegex(ValueError, "valid only for"):
             GoalAssociationModelGoal(
-                source_responsibility_refs=["playback"],
-                    output_mode="media_playback",
+                source_responsibility_refs=["singing"], output_mode="singing", media_operation="play",
             )
 
     def test_goal_projection_retains_exact_media_operation_for_planners(self) -> None:
@@ -686,3 +693,32 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.parametrize("operation", ["play", "pause"])
+def test_planner_selects_media_operation_from_complete_intent(operation):
+    goal = media_goal(operation)
+    goal["metadata"].pop("media_operation")
+    goal["description"] = "Play Morning Piano." if operation == "play" else "Pause the current recording."
+    assert planner_provider_media_goal_operations([goal]) == {"goal-media": "none"}
+    validate_goal_responsibility_outcomes(media_plan(operation=operation), authoritative_goals=[goal])
+    with pytest.raises(ValueError, match="exact capability_id"):
+        validate_goal_responsibility_outcomes(
+            media_plan(capability_id="chromie.vocal.perform"), authoritative_goals=[goal],
+        )
+
+
+@pytest.mark.parametrize("available", [[MEDIA_CAPABILITY_IDS["pause"]], ["chromie.vocal.perform"], []])
+def test_unknown_media_operation_still_requires_available_media_provider(available):
+    schema = canonical_plan_response_schema(
+        planner_tier="deep", expected_goal_ids=["goal-media"],
+        allowed_capability_ids=available, provider_media_goal_operations={"goal-media": "none"},
+    )
+    dispositions = schema["properties"]["goal_outcomes"]["properties"]["goal-media"]["properties"]["disposition"]["enum"]
+    assert "respond" not in dispositions
+    assert ("execute" in dispositions) == (MEDIA_CAPABILITY_IDS["pause"] in available)
+
+
+def test_invalid_retained_media_operation_does_not_become_a_planner_default():
+    with pytest.raises(ValueError, match="unsupported retained media_operation"):
+        planner_provider_media_goal_operations([media_goal("warp")])

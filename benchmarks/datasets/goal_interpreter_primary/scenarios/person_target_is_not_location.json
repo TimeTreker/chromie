@@ -46,7 +46,8 @@
           "source_start_token_ref": "t0",
           "source_end_token_ref": "t5"
         },
-        "continuity_scope": "goal"
+        "continuity_scope": "goal",
+        "body_effect_family": "gaze_or_orientation"
       }
     ],
     "meaning_uncertainties": [],

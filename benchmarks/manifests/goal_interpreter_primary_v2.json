@@ -5,10 +5,10 @@
   "claim_boundary": "Primary GI regression screen plus explicit complete-transaction runner evidence when declared; not full role, Planner, Agent, voice or release qualification.",
   "training_eligible": false,
   "coverage": {
-    "design": "16 retained primary failures plus 8 minimal surface/language/modality contrasts, keeping whole contrast sets in frozen_test",
-    "cases": 24,
+    "design": "15 retained primary failures plus 8 minimal surface/language/modality contrasts, keeping whole contrast sets in frozen_test; owner-withdrawn Tianxin typo episode removed from all active inventories",
+    "cases": 23,
     "languages": {
-      "zh-CN": 15,
+      "zh-CN": 14,
       "en-US": 9
     },
     "gaps": [
@@ -25,7 +25,6 @@
     "review": "assistant authored and reviewed; not independent"
   },
   "case_files": [
-    "benchmarks/datasets/goal_interpreter_primary/scenarios/ambiguous_bare_referent.json",
     "benchmarks/datasets/goal_interpreter_primary/scenarios/ambiguous_deictic_object.json",
     "benchmarks/datasets/goal_interpreter_primary/scenarios/approximate_walk_duration.json",
     "benchmarks/datasets/goal_interpreter_primary/scenarios/blink_twice_plain.json",

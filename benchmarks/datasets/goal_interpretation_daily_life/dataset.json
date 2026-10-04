@@ -107,5 +107,9 @@
     "cross_split_contrast_sets_allowed": false,
     "frozen_test_mutation": "owner_review_required",
     "train_candidate_note": "Training remains prohibited until independent review promotes individual cases."
+  },
+  "asset_contract": {
+    "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
+    "scenario_tree_sha256": "d0c0cf766d23ecfb5c2fe317ca889a9bcbe5dd3586f707411c9fd34d693503e7"
   }
 }

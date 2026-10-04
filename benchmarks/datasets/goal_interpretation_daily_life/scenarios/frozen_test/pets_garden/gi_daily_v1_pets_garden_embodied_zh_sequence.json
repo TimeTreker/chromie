@@ -28,7 +28,8 @@
             "source_start_token_ref": "t1",
             "source_end_token_ref": "t5"
           },
-          "continuity_scope": "goal"
+          "continuity_scope": "goal",
+          "body_effect_family": "task_physical_effect"
         },
         {
           "local_ref": "r2",
@@ -39,7 +40,8 @@
             "source_start_token_ref": "t8",
             "source_end_token_ref": "t11"
           },
-          "continuity_scope": "goal"
+          "continuity_scope": "goal",
+          "body_effect_family": "task_physical_effect"
         }
       ],
       "meaning_uncertainties": [],
@@ -51,14 +53,6 @@
             "r2"
           ],
           "reason_summary": "Preserve canonical continuity for the requested independent outcome."
-        },
-        {
-          "authority": "social_cognition",
-          "responsibility_refs": [
-            "r1",
-            "r2"
-          ],
-          "reason_summary": "Decide grounded interaction for this addressed request without changing its meaning."
         },
         {
           "authority": "planner",
@@ -83,7 +77,8 @@
           "required_intent_details": {
             "direction": "向前",
             "duration": "4秒"
-          }
+          },
+          "body_effect_family": "task_physical_effect"
         },
         {
           "local_ref": "r2",
@@ -93,7 +88,8 @@
           ],
           "required_intent_details": {
             "count": 2
-          }
+          },
+          "body_effect_family": "task_physical_effect"
         }
       ],
       "unresolved": false,

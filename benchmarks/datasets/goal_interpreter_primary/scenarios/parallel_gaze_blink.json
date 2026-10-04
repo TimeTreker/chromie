@@ -59,13 +59,26 @@
       {
         "local_ref": "r1",
         "output_mode": "body_action",
-        "outcome": "看着我三秒，同时眨两下眼睛。",
+        "outcome": "看着我三秒",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
-          "source_end_token_ref": "t13"
+          "source_end_token_ref": "t4"
         },
-        "continuity_scope": "goal"
+        "continuity_scope": "goal",
+        "body_effect_family": "gaze_or_orientation"
+      },
+      {
+        "local_ref": "r2",
+        "output_mode": "body_action",
+        "outcome": "同时眨两下眼睛",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t6",
+          "source_end_token_ref": "t12"
+        },
+        "continuity_scope": "goal",
+        "body_effect_family": "social_expression"
       }
     ],
     "meaning_uncertainties": [],
@@ -73,7 +86,8 @@
       {
         "authority": "planner",
         "responsibility_refs": [
-          "r1"
+          "r1",
+          "r2"
         ],
         "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
       }

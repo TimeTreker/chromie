@@ -52,7 +52,10 @@ from .capabilities.validator import validate_args_for_schema
 from .planner_context import planner_goal_execution_requirements
 from .planner_grounding import (
     _argument_realization_contract,
+    _count_argument_names,
+    _is_count_binding,
     _material_values_equal,
+    count_binding_is_realized,
     literal_intent_argument,
     missing_argument_realizations,
     provider_resolves_required_source,
@@ -524,15 +527,6 @@ def validate_fast_advance_output(
     by_ref = {item.local_ref: item for item in responsibilities}
     allowed = {item["capability_id"]: item for item in capabilities}
 
-    def social_expression_only(capability_id: str) -> bool:
-        definition = allowed.get(capability_id) or {}
-        domains = {
-            str(value).strip().casefold()
-            for value in (definition.get("behavior_domains") or [])
-            if str(value).strip()
-        }
-        return "social_attention" in domains
-
     unresolved_meaning = {
         " ".join(item.description.strip().split())
         for item in request.meaning_uncertainties
@@ -543,28 +537,6 @@ def validate_fast_advance_output(
     terminal_activities = [
         item for item in output.activities if item.role in {"capability", "complete_response"}
     ]
-    capabilities_by_ref: dict[str, list[Any]] = {ref: [] for ref in responsibility_refs}
-    for activity in capability_activities:
-        for source_ref in activity.source_responsibility_refs:
-            if source_ref in capabilities_by_ref:
-                capabilities_by_ref[source_ref].append(activity)
-    for source_ref, activities in capabilities_by_ref.items():
-        social_only = [
-            item for item in activities if social_expression_only(item.capability_id)
-        ]
-        non_social = [
-            item for item in activities if not social_expression_only(item.capability_id)
-        ]
-        if social_only and non_social:
-            raise PlannerDTOContractError(
-                "Planner cannot attach social-expression-only Capability Work to a "
-                "different requested task under the same Responsibility; optional social "
-                "expression belongs to Social Cognition. Split independently requested "
-                "observable effects into separate UMI Responsibilities; source_ref="
-                + source_ref
-                + " social_capabilities="
-                + ",".join(item.capability_id for item in social_only)
-            )
     parallel_batch: list[Any] = []
     for activity in capability_activities:
         if activity.timing == "parallel":
@@ -679,17 +651,26 @@ def validate_fast_advance_output(
             if source_ref in numeric_args_by_ref:
                 numeric_args_by_ref[source_ref].update(activity_numbers)
     for source_ref, source in by_ref.items():
-        if semantic_numeric_values(source.bindings.get("count")):
-            for activity in capability_activities:
-                if source_ref not in activity.source_responsibility_refs:
-                    continue
-                definition = allowed.get(activity.capability_id, {})
-                properties = (definition.get("input_schema") or {}).get("properties") or {}
-                if "count" not in properties:
-                    raise PlannerDTOContractError(
-                        "Fast Planner cannot validate repetition through an unrelated "
-                        "numeric argument: Capability has no count input; "
-                        f"source_ref={source_ref} capability_id={activity.capability_id}"
+        owned_work = [
+            (allowed.get(activity.capability_id, {}), activity.args)
+            for activity in capability_activities
+            if source_ref in activity.source_responsibility_refs
+        ]
+        for name, raw in source.bindings.items():
+            binding = {**(raw if isinstance(raw, dict) else {}),
+                       "value": responsibility_binding_material_value(raw)}
+            if _is_count_binding(name, binding) and semantic_numeric_values(binding["value"]) and owned_work:
+                if not count_binding_is_realized(name, binding, owned_work):
+                    if not any(_count_argument_names(definition, name) for definition, _ in owned_work):
+                        raise PlannerDTOContractError(
+                            "Fast Planner cannot validate repetition through an unrelated "
+                            "numeric argument: Capability has no count input; "
+                            f"source_ref={source_ref} binding={name}"
+                        )
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner numeric Capability input contradicts UMI binding: "
+                        "owned work omitted the exact declared repetition value; "
+                        f"source_ref={source_ref} binding={name}"
                     )
         required_numbers = semantic_numeric_values(source.bindings)
         missing_numbers = sorted(required_numbers - numeric_args_by_ref.get(source_ref, set()))
@@ -835,9 +816,37 @@ def validate_fast_advance_output(
             )
         input_schema = definition.get("input_schema") or {}
         properties = input_schema.get("properties") or {}
+        scoped_count_bindings: set[str] = set()
+        scoped_count_parameters: set[str] = set()
+        for source_ref in activity.source_responsibility_refs:
+            if sum(source_ref in item.source_responsibility_refs for item in capability_activities) < 2:
+                continue
+            for name, raw in by_ref[source_ref].bindings.items():
+                binding = {**(raw if isinstance(raw, dict) else {}),
+                           "value": responsibility_binding_material_value(raw)}
+                if not _is_count_binding(name, binding):
+                    continue
+                if count_binding_is_realized(name, binding, [(definition, activity.args)]):
+                    continue
+                scoped_count_parameters.update(_count_argument_names(definition, name))
+                scoped_count_bindings.add(name)
+                for parameter in _count_argument_names(definition, name):
+                    if parameter not in activity.args:
+                        continue
+                    contract = properties.get(parameter) or {}
+                    if parameter in activity.argument_sources or (
+                        "default" in contract
+                        and _material_values_equal(activity.args[parameter], contract["default"])
+                    ):
+                        continue
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner sibling repetition requires its own source or Capability default: "
+                        f"{activity.capability_id}.{parameter}"
+                    )
         for source_ref in activity.source_responsibility_refs:
             missing = missing_argument_realizations(
-                definition, activity.args, list(by_ref[source_ref].bindings),
+                definition, activity.args,
+                [name for name in by_ref[source_ref].bindings if name not in scoped_count_bindings],
             )
             if missing:
                 raise AuthoritativeGroundingValidationError(
@@ -850,6 +859,8 @@ def validate_fast_advance_output(
         # Check each source independently, including optional/defaulted inputs.
         for source_ref in activity.source_responsibility_refs:
             for name, raw_expected in by_ref[source_ref].bindings.items():
+                if name in scoped_count_bindings:
+                    continue
                 expected = responsibility_binding_material_value(raw_expected)
                 parameter_schema = properties.get(name)
                 if (
@@ -900,6 +911,7 @@ def validate_fast_advance_output(
             str(name): responsibility_binding_material_value(value)
             for ref in activity.source_responsibility_refs
             for name, value in by_ref[ref].bindings.items()
+            if name not in scoped_count_bindings
         }
         binding_grounded_parameters = set(authoritative_bindings)
         for binding_name in authoritative_bindings:
@@ -909,6 +921,7 @@ def validate_fast_advance_output(
                     str(name) for name in realization.get("arguments") or []
                 )
         falsely_cited = binding_grounded_parameters.intersection(activity.argument_sources)
+        falsely_cited.difference_update(scoped_count_parameters)
         falsely_cited.update(
             parameter for parameter in activity.argument_sources
             if provider_resolves_required_source(definition, parameter)

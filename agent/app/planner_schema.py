@@ -260,6 +260,14 @@ def canonical_goal_binding_argument_response_schema(
             and any(
                 _is_count_binding(name, binding)
                 and not _count_argument_names(capability, name)
+                and not any(
+                    _argument_schema_accepts_canonical_binding(
+                        (candidate.get("input_schema") or {}).get("properties", {}).get(parameter, {}),
+                        binding["value"],
+                    )
+                    for candidate in capabilities or []
+                    for parameter in _count_argument_names(candidate, name)
+                )
                 for name, binding in _goal_binding_map(goal).items()
             )
         }
@@ -278,6 +286,12 @@ def canonical_goal_binding_argument_response_schema(
                 continue
             entity_type = _normalized_entity_type(argument_schema.pop("x-chromie-entity-type", ""))
             if not entity_type:
+                continue
+            if entity_type == "count":
+                # One compound Goal can own a counted effect and uncounted or
+                # independently counted siblings. Host conserves the exact count
+                # across owned steps; each branch retains its provider format.
+                constrained = True
                 continue
             # The Capability owner, rather than Planner or Host heuristics,
             # declares which canonical semantic dimension this argument carries.
@@ -298,6 +312,11 @@ def canonical_goal_binding_argument_response_schema(
                     "const": copy.deepcopy(argument_schema["default"])
                 }
         for name, value in exact_bindings.items():
+            if any(_is_count_binding(name, binding)
+                   for goal in authoritative_goals
+                   for binding_name, binding in _goal_binding_map(goal).items()
+                   if binding_name == name):
+                continue
             argument_schema = argument_properties.get(name)
             if not isinstance(argument_schema, dict) or not (
                 _argument_schema_accepts_canonical_binding(argument_schema, value)
@@ -673,7 +692,7 @@ def canonical_plan_response_schema(
     provider_media_goal_operations = {
         goal_id: operation
         for goal_id, operation in (provider_media_goal_operations or {}).items()
-        if goal_id in allowed_goals and operation in MEDIA_CAPABILITY_IDS
+        if goal_id in allowed_goals and (operation == "none" or operation in MEDIA_CAPABILITY_IDS)
     }
     vocal_capability_available = VOCAL_PERFORMANCE_CAPABILITY_ID in allowed_capabilities
     unavailable_provider_vocal_goal_set = (
@@ -682,7 +701,10 @@ def canonical_plan_response_schema(
     unavailable_provider_media_goal_set = {
         goal_id
         for goal_id, operation in provider_media_goal_operations.items()
-        if MEDIA_CAPABILITY_IDS[operation] not in allowed_capabilities
+        if not set(
+            MEDIA_CAPABILITY_IDS.values()
+            if operation == "none" else [MEDIA_CAPABILITY_IDS[operation]]
+        ).intersection(allowed_capabilities)
     }
     executable_source_goal_ids = [
         goal_id
@@ -1118,10 +1140,13 @@ def canonical_plan_response_schema(
                             )
                         ]
                 if goal_id in provider_media_goal_operations:
-                    exact_media_capability = MEDIA_CAPABILITY_IDS[
-                        provider_media_goal_operations[goal_id]
-                    ]
-                    media_capability_available = exact_media_capability in allowed_capabilities
+                    media_operation = provider_media_goal_operations[goal_id]
+                    media_capabilities = (
+                        set(MEDIA_CAPABILITY_IDS.values())
+                        if media_operation == "none"
+                        else {MEDIA_CAPABILITY_IDS[media_operation]}
+                    )
+                    media_capability_available = bool(media_capabilities.intersection(allowed_capabilities))
                     disposition_field = specialized_properties.get("disposition")
                     if isinstance(disposition_field, dict):
                         disposition_field["enum"] = (
@@ -2529,6 +2554,49 @@ def _fast_terminal_activity_contract() -> dict[str, Any]:
     }
 
 
+def _fast_enum_source_branches(
+    branch: dict[str, Any], *, capability: dict[str, Any],
+    grounded_parameters: set[str], owning_outcomes: list[str],
+    original_user_text: str,
+) -> list[dict[str, Any]]:
+    """Project the Host's literal-copy exception for each selected enum value.
+
+    A translated WHO is not the immutable source. Keep literal copies available
+    only when the same value occurs on both authoritative surfaces; all other
+    required enum values keep the existing Planner source-span obligation.
+    Complete object alternatives survive the native streaming grammar projection.
+    """
+    args = branch["properties"]["args"]
+    variants = [branch]
+    for name in args.get("required") or []:
+        contract = args.get("properties", {}).get(name)
+        if (name in grounded_parameters or provider_resolves_required_source(capability, name)
+                or not isinstance(contract, dict) or contract.get("type") != "string"
+                or not isinstance(contract.get("enum"), list)):
+            continue
+        literal_values = [value for value in contract["enum"]
+                          if any(literal_intent_argument(value, outcome=outcome,
+                                     source_text=original_user_text) for outcome in owning_outcomes)]
+        mapped_values = [value for value in contract["enum"] if value not in literal_values]
+        expanded = []
+        for variant in variants:
+            for values, needs_source in ((literal_values, False), (mapped_values, True)):
+                if not values:
+                    continue
+                current = copy.deepcopy(variant)
+                properties = current["properties"]
+                properties["args"]["properties"][name]["enum"] = values
+                if needs_source:
+                    source_required = properties["argument_sources"].setdefault("required", [])
+                    if name not in source_required:
+                        source_required.append(name)
+                    if "argument_sources" not in current["required"]:
+                        current["required"].append("argument_sources")
+                expanded.append(current)
+        variants = expanded
+    return variants
+
+
 def fast_advance_response_schema(
     responsibility_refs: list[str],
     *,
@@ -2536,6 +2604,7 @@ def fast_advance_response_schema(
     capabilities: list[dict[str, Any]] | None = None,
     meaning_uncertainties: list[UserMeaningUncertainty] | None = None,
     source_token_refs: list[str] | None = None,
+    original_user_text: str = "",
     committed_communicative: bool = False,
     suppress_new_communicative: bool = False,
     suppress_new_progress: bool = False,
@@ -3004,22 +3073,9 @@ def fast_advance_response_schema(
                                 source_bindings_schema["required"] = sorted(exact_source_bindings)
                                 source_schema["required"] = sorted(set(source_schema.get("required", [])) | {"bindings"})
                         grounded_parameters = trusted_grounded_parameters | bound_parameters | realized_parameters
+                        source_grounded_parameters = grounded_parameters - _count_argument_names(capability)
                         input_properties = input_schema.get("properties")
                         if isinstance(input_properties, dict):
-                            owning_outcomes = [item.outcome for item in responsibility_items if item.local_ref in compatible]
-                            # Host permits a literal string copy only when it occurs
-                            # in the owning intent AND immutable input. Test whether
-                            # even an exact source copy could match an owning intent,
-                            # including Host's case-only representation allowance.
-                            # If not, no real source could satisfy that exception.
-                            # Require the Planner's span; never infer an enum mapping.
-                            mapped_enum_inputs = {
-                                name for name, contract in input_properties.items()
-                                if isinstance(contract, dict) and contract.get("type") == "string"
-                                and contract.get("enum") and len(owning_outcomes) == len(compatible)
-                                and not any(literal_intent_argument(value, outcome=outcome, source_text=value)
-                                    for value in contract["enum"] for outcome in owning_outcomes)
-                            }
                             required_inputs = {
                                 str(name) for name in input_schema.get("required") or []
                             }
@@ -3029,9 +3085,8 @@ def fast_advance_response_schema(
                                 if name not in grounded_parameters
                                 and not provider_resolves_required_source(capability, name)
                                 and isinstance(input_properties.get(name), dict)
-                                and (input_properties[name].get("type")
-                                     in ("number", "integer", "boolean", "object", "array")
-                                     or name in mapped_enum_inputs)
+                                and input_properties[name].get("type")
+                                    in ("number", "integer", "boolean", "object", "array")
                             )
                             span_contract = user_turn_source_span_schema(source_token_refs)
                             properties["argument_sources"] = {
@@ -3040,7 +3095,7 @@ def fast_advance_response_schema(
                                     str(name): copy.deepcopy(span_contract)
                                     for name in sorted(input_properties)
                                     if name not in index_grounded_parameters
-                                    and name not in grounded_parameters
+                                    and name not in source_grounded_parameters
                                     and not provider_resolves_required_source(capability, name)
                                 },
                                 "required": required_source_inputs,
@@ -3053,12 +3108,19 @@ def fast_advance_response_schema(
                         properties["timing"] = {"type": "string", "enum": timings}
                         properties["source_responsibility_refs"]["items"] = {"type": "string", "enum": list(compatible)}
                         properties["source_responsibility_refs"]["maxItems"] = len(compatible)
-                        branches.append({
+                        branch = {
                             "type": "object",
                             "properties": properties,
                             "required": required,
                             "additionalProperties": False,
-                        })
+                        }
+                        branches.extend(_fast_enum_source_branches(
+                            branch, capability=capability,
+                            grounded_parameters=grounded_parameters,
+                            owning_outcomes=[item.outcome for item in responsibility_items
+                                             if item.local_ref in compatible],
+                            original_user_text=original_user_text,
+                        ))
             if branches:
                 capability_contract["oneOf"] = branches
             elif isinstance(activity_items, dict):
@@ -3236,11 +3298,13 @@ def fast_streaming_advance_response_schema(
     meaning_uncertainties: list[UserMeaningUncertainty] | None = None,
     language: str = "",
     source_token_refs: list[str] | None = None,
+    original_user_text: str = "",
 ) -> dict[str, Any]:
     """One complete Work result; independent SC owns communication latency."""
     schema = fast_advance_response_schema(
         responsibility_refs, responsibilities=responsibilities, capabilities=capabilities,
         meaning_uncertainties=meaning_uncertainties, source_token_refs=source_token_refs,
+        original_user_text=original_user_text,
     )
     compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
     compiled["title"] = "FastPlannerWorkAdvanceOutput"

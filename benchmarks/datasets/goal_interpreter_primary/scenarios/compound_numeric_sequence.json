@@ -77,13 +77,38 @@
       {
         "local_ref": "r1",
         "output_mode": "body_action",
-        "outcome": "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left",
+        "outcome": "walk ahead at 0.2 speed for 10 seconds",
         "confidence": 1.0,
         "source_evidence": {
           "source_start_token_ref": "t0",
+          "source_end_token_ref": "t9"
+        },
+        "continuity_scope": "goal",
+        "body_effect_family": "task_physical_effect"
+      },
+      {
+        "local_ref": "r2",
+        "output_mode": "body_action",
+        "outcome": "then nod your head twice",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t11",
+          "source_end_token_ref": "t15"
+        },
+        "continuity_scope": "goal",
+        "body_effect_family": "social_expression"
+      },
+      {
+        "local_ref": "r3",
+        "output_mode": "body_action",
+        "outcome": "then turn left",
+        "confidence": 1.0,
+        "source_evidence": {
+          "source_start_token_ref": "t17",
           "source_end_token_ref": "t19"
         },
-        "continuity_scope": "goal"
+        "continuity_scope": "goal",
+        "body_effect_family": "task_physical_effect"
       }
     ],
     "meaning_uncertainties": [],
@@ -91,7 +116,9 @@
       {
         "authority": "planner",
         "responsibility_refs": [
-          "r1"
+          "r1",
+          "r2",
+          "r3"
         ],
         "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
       }

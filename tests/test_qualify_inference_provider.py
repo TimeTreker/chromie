@@ -319,7 +319,8 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         # The frozen cohort keeps its historical evidence identity even though the
         # live semantic owner has been renamed to UMI.
         self.assertEqual(manifest["qualification_id"], "chromie.goal_interpreter.primary.v2")
-        self.assertEqual(len(manifest["cases"]), 24)
+        self.assertEqual(len(manifest["cases"]), 23)
+        self.assertNotIn("ambiguous_bare_referent", case_ids)
         self.assertGreaterEqual(len(groups), 6)
         self.assertTrue(
             {
@@ -327,7 +328,7 @@ class InferenceProviderQualificationTests(unittest.TestCase):
                 "compound_numeric_sequence",
                 "filler_blink_twice",
                 "parallel_gaze_blink",
-                "ambiguous_bare_referent",
+                "named_lookup_en",
                 "cross_clause_acquire_delivery",
             }.issubset(case_ids)
         )
@@ -345,7 +346,7 @@ class InferenceProviderQualificationTests(unittest.TestCase):
         wire["responsibilities"][0]["source_evidence"]["source_end_token_ref"] = "t999"
         self.assertTrue(_evaluate_user_meaning_interpreter_case_dimensions(
             cases["filler_blink_twice"], wire, wire)["source_evidence"])
-        self.assertFalse(cases["ambiguous_bare_referent"]["expected"]["unresolved"])
+        self.assertFalse(cases["named_lookup_en"]["expected"]["unresolved"])
 
     def test_binding_match_normalizes_text_and_integral_float(self) -> None:
         self.assertTrue(_binding_value_matches("  Tonight  ", ["tonight"]))

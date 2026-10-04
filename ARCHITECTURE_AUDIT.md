@@ -1,1070 +1,758 @@
-# Chromie project principles and implementation audit
+# Chromie 设计与实现审计
 
-**Updated:** 2026-09-16. **Pre-delivery base:** `f90dff450357cd49358bb49f03a4930a4d33a8d4`, `main`, fetched and equal to upstream before development. The delivery revision is the commit containing this report, [checkpoint](DEVELOPMENT_CHECKPOINT.md) and [handoff](HANDOFF.md).
+审计日期：2026-10-04；最后更新：2026-10-05。读者：项目负责人及维护者。本文记录发现和证据，
+不替代章程、组件契约或 [当前状态](docs/STATUS.md)。
 
-**Audience:** project owner and maintainers. **Owner:** the project owner owns principle decisions; implementation and evidence remain with their existing component owners. The owner explicitly authorized a project-wide audit, design/implementation repairs, up to 18 full-test iterations, commit and push. This authorizes reconciliation of obsolete wording ownership, not weakening safety or declaring unobserved success.
+## 结论与范围
 
-## Current conclusion and scope
+当前项目仍处于开发和资格验证阶段。本次发现实际职责冲突、过期参考数据、
+测试基础设施不匹配，以及把历史通过记录写成当前状态的问题。
+Goal-driven single-authority architecture 是审计依据；测试通过也不能覆盖章程冲突。
 
-The implemented authority split is coherent at maintained ingress boundaries: **UMI preserves complete intent; GA owns Goal continuity; Planner owns Work and scheduling; SC owns communication and optional expression; Host/Runtime owns admission, authorization, delivery and Evidence.** A compound intent can remain one Responsibility and one Goal while Planner creates several Activities. New UMI parameter tables and Planner-authored ordinary speech are forbidden.
+审计基线为 `main` 的 `90d0af90c9d3d2c0fe9847d140d09279dfdeff26`。
+开始审计及文档编辑前已抓取远端，`HEAD` 与 `origin/main` 相同。
+工作区原有 36 个变更路径，已完整备份；测试针对包含这些既有修改的工作区，
+不是干净提交。初次清理的新增修改限于文档和过时图资产，没有更改模型、提示词、
+DTO、运行时或测试断言，也没有提交、推送、重建或重启服务。
+后续原职责修复及新实时证据见下文；章程始终未修改。
 
-The audit reproduced and repaired a mixed future/ready Goal contract gap, removed a dead wording-authority export and reconciled current architecture/API/interaction documentation. A Planner prompt cleanup was evaluated and rejected after new truncation failures; its original instructions remain an open finding. Native model reliability remains a release blocker. A structurally accepted result can still map right to left; source citations and JSON validation are not semantic proof. No model or release profile is promoted by this audit.
+覆盖治理与恢复文档、Gateway/Attention Review、UMI、GA、Fast/Deep Planner、
+SC、Host/Runtime、文本验收工具、基准数据及完整本地测试。
+这里的“项目审计”不代表逐行证明所有分支正确，也不代表当前部署或实物资格验证。
 
-This is a cross-component source, authority and executable-workflow audit, not an assertion that every line, every model utterance, every external dependency or physical deployment has been proved correct. Existing owner-reported microphone/ASR acceptance remains separate. No physical microphone, audible speaker or robot test is fabricated.
+## 设计与实现不一致
 
-## Coverage and findings
-
-| Area and reviewed owners | Evidence and finding | Disposition |
+| 优先级 / 边界 | 应有契约与实际证据 | 处理及尚缺证据 |
 | --- | --- | --- |
-| Governance: Charter, Human-Like Interaction Contract, semantic authority, architecture, turn loop, API and component READMEs | Current paragraphs simultaneously assigned words to Planner and SC, timestamps/parameters to UMI and Planner, and treated implemented SC as unimplemented. An old HLIC paragraph forbade source quotations required by the newer intent-only contract. | Reconciled in existing owners. Current source-bound quotations remain required where declared; retired typed resource authoring is explicitly retained-state history. No new semantic owner/document/runtime switch. |
-| Gateway/admission/reflex | Distinct pre-semantic protective controls, immutable admitted envelope, no Host semantic phrase routing; covered by canonical Gateway/reflex, cancellation and unusable-audio tests. | No new reproduced defect in inspected paths; native addressedness and physical input quality are separate qualification. |
-| UMI | Closed intent/source/result-type wire rejects parameter/relationship fields. Baseline compound case preserves all three actions and has no false actor uncertainty. | Intent-only design preserved. Prior 19/24 native semantic result remains historical; this audit does not qualify the whole UMI role. |
-| GA and Goal state | New Goal meaning/type inherited from exact UMI ref; continuity and retained typed-state conservation remain Host checked. Concurrent baseline GA commits the intact compound Goal. | No new writer introduced. Retained typed corrections must use a source-bound replacement when an intent-only update would leave contradictory typed state. Existing 200 rejected legacy-update references are not new successful continuity evidence. |
-| Fast Planner Schema / Deep validation | Two independently accepted intents, one future and one ready: Fast Schema forbids the correct mixed result; Deep admits the JSON but rejects honest unmet future satisfaction. | Fixed at these two boundaries; new tests cover Schema, Host, actual controlled Runtime dispatch, completed acknowledgement, durable restart and one-shot wake. |
-| Planner prompt and catalog | Fast inherited canonical `source_quote`/strategy instructions inside an `argument_sources` transaction. Another sentence implied one Activity per Responsibility despite compositional Work. Full turn-sign contract was present in retained packets. | Tested separate provenance instructions and clarified Activity/ref cardinality, then rejected that candidate: two new truncations fail non-regression. Original prompt retained; wording ambiguity and native failures remain open. No phrase-to-action rules or second semantic reviewer. |
-| SC and interaction | Complete snapshot/identity/Need validation exists; SC independently sees UMI and actual Work facts. Baseline SC chooses silence partly because Needs are empty despite the standing interaction duty. | Native relevance/latency remains open. No forced acknowledgement template or Planner wording fallback. Removing the unused `PLANNER_COMMUNICATION_AUTHORITY_PROMPT` prevents accidental restoration of the retired writer. |
-| Runtime, WorkDAG and provider boundary | Registry availability/version, input/output schema, confirmation, monitor, exact Plan/request/result ownership, resource arbitration and scoped cancellation checked in source and canonical suites. Paired Soridormi owns physical execution/safety. | No new reproduced safety/provenance bypass in reviewed paths. Wrong model semantics can pass mechanical checks; no universal safety proof is claimed. |
-| Voice / TTS / delivery | Ordered playback and generation, cancellation generations, interruption and completion-qualified speech ledger remain Host-owned; relevant playback/TTS/VAD/barge-in suites run in canonical gates. | No new source defect reproduced. Discarded TTS in live text is not audible delivery evidence. |
-| Memory / stable Mind / Reflection | Disclosure gate precedes model context; private/unknown relational memory stays hidden, audience-limited memory requires supplied audience, ordinary proposals cannot grant disclosure. Durable personal facts require explicit consent. Reflection is advisory and cannot rewrite policy/history. | No new reproduced defect in inspected/tested boundaries. No live multi-person privacy or perceptual-identity qualification claim. |
-| Configuration / deployment / CI | Generated runtime env, source/image identity, pinned static checks, test ownership and GitHub Python 3.11/3.12 workflow inspected. Deployed Agent/ASR/LLM/TTS bind host ports to `127.0.0.1`. | Local source/image matching is required for each live candidate. Local Python 3.13 execution does not claim those CI jobs ran remotely. Ollama priority metadata does not prove SGLang scheduling or latency. |
-| Evidence and regression corpus | Baseline strict 6,000 passes. Readiness Schema change exposes 400 frozen-request mismatches, including four canonical test failures. | Retained failures, then explicit request-only refreeze; a second refreeze removes the rejected prompt candidate. Final diff: 400 workflow cases, zero prototype cases. All 6,000 scenario inputs, reference replies, fault injections and behavior oracles stay unchanged. Strict replay remains strict; final counts/hashes are in the handoff. |
+| P1 / UMI → Planner | 章程原则 30 禁止 UMI author `bindings`，由 Planner 提取规划参数；`CognitiveResponsibilityProposal.bindings` 及 UMI prompt 已要求提取稀疏字段。章程同一文件较早章节又允许这些字段，形成内部冲突。 | 保留并标记现有实现冲突，未修改章程或授权 UMI 参数提取。此前授权问题未解释清楚，负责人随后提出疑问；本次不据此推进职责变更。选择哪种边界仍需清楚的设计决定及验证。 |
+| P1 / Attention Review | 原则 30–31 禁止同一语义权威再次调用模型改判；现有 reviewer 根据问句、问候或名字的 surface cue 触发第二次 `generate`，输出来源为 `attention_review_model_repair`。 | 已用真实 reviewer 和脚本化模型结果复现两次调用。需在原权威中解决完整主结果与不确定性处理，不应由 Host 词表或第二次语义调用修复。未修改行为。 |
+| P1 / UMI Schema → DTO | 动态 Schema 的 `bindings` 允许任意键，DTO 递归拒绝 Planner-owned 字段。 | 现有 `umi-schema-binding-gap.json` 保留此问题。本次不以放宽 DTO 解决；须先确定 UMI 职责，再统一 Schema/DTO/native grammar。 |
+| P1 / 文本工具 → Conversation State | 生产 admission 在 cognition 前记录用户；文本工具在并行 SC 已交付后才 `record_user_turn`。实际矩阵包出现 assistant/user/assistant/user。 | 已复用生产 `record_accepted_user_turn` 修复；受控回归和新水任务历史证实 user/assistant/user/assistant 且无重复。水任务仍失败，不能声称此修复解决了接受提议后的 Work 理解。 |
+| P1 / GA 关联契约 | Schema 移除了已有 `new_goals` identity-only API，接收代码将历史/替代关系清空；完整媒体意思还被错误要求提前提供操作参数。 | 已在 GA 原契约恢复主结果关系数组、验证与原样传递；GA 和 Planner 各自移除错误的上游媒体参数前置条件。新部署两轮 79 案例已留存，但整体资格未通过。未改变 UMI WHAT/初始激活、Planner HOW、Host 状态职责或 Charter。 |
+| P1 / Planner 复合动作 | Charter 允许一个 Responsibility 保留完整复合意思，由 Planner 分解 Activities。真实主调用的能力过滤却排除点头；Fast/shared validator 还强制混合动作先被 UMI 分成不同 Goal。 | 真实 Schema 与合法参考被拒证明是 Planner 契约缺陷。负责人现已授权并实现取消类别排除和强制上游拆分；冻结12对照由9/12变为12/12。可选社交表达仍归 SC，真实模型完整回归待完成。 |
+| P2 / UMI 基准 | 旧 references 请求 standing `social_cognition`，850 个 body-action 结果缺现行 family。 | 已移除重复 standing request、补齐既有 family；1,496 当前 Schema/Host 通过。输入、完整意思、数量、来源、顺序和划分不变；不是模型推理或独立语义资格证明。 |
+| P2 / Planner 基准 | Fast 204-case corpus 的普通发言及可选 social decoration 已退休；原 qualification adapter 另造 Schema 并调用删除的 keyword。 | 已使用生产调用的实际 Schema；204 references 机械有效。退休能力的语义覆盖仍未重新合格，Deep 全面兼容性也未建立。 |
+| P2 / SC silence 决策 | 章程允许 SC 决定是否表达；fresh interpretation 且无 pending/already-spoken 时，Schema 排除 `silence`，Host 同样拒绝。 | 静态契约探针确认收窄。须复核“每次调用 SC”与“每次必须发言”的区别，结合明确确认/失败结果等强制义务设计对照案例。本次未将每次沉默都判为正确，也未改行为。 |
+| P2 / Workflow replay | 大量测试在首个 UMI HTTP 请求上返回 409 exact-request mismatch。 | 当前请求与冻结捕获包不一致，模型语义输出尚未发生；不能计作模型能力失败。不得无审阅地重新捕获并把目标改成候选答案。 |
+| P2 / 维护文档 | 状态、checkpoint、handoff 和 audit 叠加多个时期的“当前”说明；图资产无 SC，旧 Planner speech/PresentationCommit 描述与当前源不符。 | 本次合并恢复记录、删除退休图、修正索引和基准说明。相关接口、Gateway、生命周期和 rollout 的退休说明已一并修正；实现冲突仍保留。 |
 
-## Actual baseline workflow and earliest failures
+## 实际路径与最早错误边界
 
-Originating admitted input: “walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left”. Loop 1 SID `c0c5a0b6`; loop 2 SID `84b2e74d`. Each is a complete cohort invocation stopped at its first hard contract failure, not a successful aggregate.
+### Attention Review：两次调用改判同一语义
 
-```text
-admitted source -> UMI complete intent
-                    |-> SC independent interaction -> silence
-                    |-> GA continuity -> one canonical compound Goal
-                    `-> Fast Work -> source/provenance rejection
-                                      `-> no body dispatch; retained Goal; safe idle
+此为受控执行：使用真实 `AttentionReviewer`，模型结果由脚本提供。
+输入 voice / zh-CN `你好。`，gate enabled、inactive、无 prior dialogue；
+同一 turn/session/context digest 贯穿两次调用。没有真实模型或物理音频调用。
+
+| 模块 / 职责 | 权威输入、实际输出 | 预期及边界状态 |
+| --- | --- | --- |
+| Attention 主模型 / addressedness | 原始 turn；返回 addressed=false、speech_act=reply、confidence=.98。此组合在 inactive Schema 可通过。 | 应在主结果完成判断或诚实保留不确定性。脚本模拟误判，不证明部署模型错误率。 |
+| Reviewer / 机械验证 | Host surface greeting cue 判定与结果矛盾，构造含 primary classification 的 repair prompt。 | 不能利用普通词表成为另一语义判断者；这是确认的架构冲突边界。 |
+| Attention 第二次模型调用 | 同一输入加候选判断；返回 addressed=true、speech_act=greeting、confidence=.99。 | 禁止为同一语义改判再调用模型。实际总调用数 2。 |
+| Reviewer / Gateway handoff | 输出 admit、greeting，source=`cognitive_gateway.attention_review_model_repair`，保留原 correlation。 | 身份关联正确，语义生成路径不符合单权威原则。后续 UMI、SC、Planner 未在该探针调用。 |
+
+现有 `test_bare_chinese_greeting_primary_false_negative_is_repaired` 明确断言
+两次调用。它验证现有机制，却不能证明该机制符合章程。
+启动触发是模拟主模型误判；根因是 reviewer 的 surface 判定及同权威修复策略；
+下游 admit 是症状。修复应发生在该边界并增加主结果/不确定性对照覆盖。
+
+### 已留存的接受水任务：错误的历史顺序
+
+这段工作流来自此前完整矩阵包，不是本次重新执行的部署证据。
+
+```mermaid
+sequenceDiagram
+    participant U as 用户输入
+    participant H as 文本验收工具
+    participant M as Conversation State
+    participant I as UMI
+    participant S as Social Cognition
+    U->>H: 原水任务对话的前序用户 turn
+    H->>I: cognition 尚未先登记 user
+    I->>S: 并行交互
+    S->>M: 已交付 assistant 发言
+    H->>M: 稍后才追加 user
+    U->>H: Gemma 水提议后的接受
+    H->>I: 倒置的 prior role 顺序
+    I-->>H: speech-only acknowledgement，无 Planner request
+    Note over H,S: 没有水 Work；未调用水 Capability 或 Soridormi
 ```
 
-| Module / role | Authoritative input and actual output | Expected output / verdict |
+| 模块 / 职责 | 实际输入与输出、关联 | 预期及边界状态 |
 | --- | --- | --- |
-| Gateway/source | Original admitted text and exact source identity | Correct for the exercised text ingress; no ASR was invoked. |
-| UMI / WHAT | Full source -> one body-action Responsibility containing walking speed/duration, two nods and left turn; unresolved empty | Correct in these two traces. Three Activities do not require three UMI Responsibilities. |
-| Concurrent SC / interaction | Same accepted UMI; Work pending; no external Needs -> silence, with absence of Needs included in its rationale | Mechanically accepted. Relevance rationale is not qualified; absence of Needs alone is not permission to ignore its standing interaction duty. No claimed physical progress. |
-| Concurrent GA / continuity | Exact `r1` -> one new Goal with inherited complete text/type | Correct; preserved canonical state is not proof that Work ran. |
-| Fast / HOW | All required Capability contracts supplied, including positive yaw = left. Loop 1 returns three steps with decorated/unsupported source strings and negative yaw for left. Loop 2 returns mostly valid quotes but omits speed provenance and again selects negative yaw. | First wrong semantic output is Fast. Prompt wire/cardinality contradictions were contributing contract defects; correcting them alone did not qualify the model. |
-| Host / containment | Exact owned-source and argument-grounding checks reject before Capability dispatch | Correct rejection. Host does not strip decorations, invent a missing quote, flip yaw or ask another model to repair the Plan. |
-| Deep / execution / post-effect evidence | Deep not invoked to repair invalid Fast; body provider never called | Correct containment. Safe idle observed in headless simulator; no physical effect evidence. |
+| 文本工具 / 用户 admission | 同一对话 SID，先 await Runtime 再记录 user；并行 SC 已先写 assistant。 | 应复用生产 `record_accepted_user_turn`，每个用户 turn 在 assistant 前且只有一份。已确认错误。 |
+| Conversation State / 历史保留 | 按实际写入顺序提供 assistant/user/assistant/user。 | 所需顺序 user/assistant/user/assistant；存储不是另一语义修复者，不能猜测重排。 |
+| Gemma UMI / WHAT | 接受 turn SID `8dc72101`、primary call `llmcall_user_meaning_interpreter_5aadcd1f18784240`；speech-only acknowledgement，仅 GA request。 | 前一 turn 为显式水提议，应保留接受的完整意义。未请求 Planner 已确认，但错误上下文的因果份额未知。 |
+| GA / SC / 后续执行 | 关闭 speech interaction；Planner、水 Capability、Soridormi 未被调用。 | 正确承接还是语义遗漏须在纠正 admission 的受控完整重跑后判定；不能由 Runtime 关键词补发 Planner。 |
 
-## Mixed timing: reproduced contract failure and repair
+Qwen9 前序 turn 是饮品选择问句，4B 前序 turn 已错误声称自己口渴；
+不能将三个不同 episode 视为相同模型输入。
+探针、矩阵包和源位置保留在 Handoff 指定路径。
 
-The retained probe has two current UMI Responsibilities: “Nod twice at 2099-09-04T19:00:00+08:00” and “Blink three times now”. GA inherits two Goals without typed UMI time fields. One authored primary Planner reply proposes a blink step owned only by the ready Goal, one exact source-bound future condition, an unmet future outcome, and partial aggregate satisfaction.
+### 基准 references：未到候选模型的失败
 
-| Boundary | Before | After / regression |
+| 边界 / 所有者 | 输入与实际输出 | 预期及边界状态 |
 | --- | --- | --- |
-| Fast dynamic Schema | Ordinary alternative requires execution outcomes; waiting alternative requires all Goals waiting. Correct mixed reply is unrepresentable. Host alone can accept it when the test bypasses decoder enforcement. | Alternative preserves the already compiled Capability/argument/Work constraints and independently constrains each timed Goal. Linear per-Goal conditions avoid enumerating all ready/future subsets. |
-| Deep Schema → DTO/Host | Correct mixed reply is schema-valid; deterministic adequacy rejects future outcome score 0 as below 0.75. | Only already provenance-validated new readiness conditions join existing nonfulfilling reporting scope. A deliberately unmet future effect is not failed planning. No score is raised. |
-| SC / adapter / Runtime | Required acknowledgement still belongs to SC; Work and timer must retain independent Goal ownership. | Explicit controlled SC receipt plus real adapter/runtime dispatches exactly the ready blink; completed receipt does not close the future Goal. This is test-fixture speech, not native-model evidence. |
-| Goal store / restart / wake | Original future effect must remain open and cannot execute early. | Durable restart retains the timer; due−1 produces no opportunity, due produces only the future Goal, subsequent drain produces none. |
-| Negative controls | Early Work, fabricated fulfillment, foreign source time, duplicate timer | All remain rejected before dispatch for both planning depths, with one primary call. |
+| GA corpus author / 冻结参考 | 现存输入配旧 `new_goals` reference；validator 重建当前 association-only Schema。 | 当前目标应为 associations + unassociated refs；参考适配错误，非模型推理失败。 |
+| Fast qualification adapter / 事务组装 | 旧 keyword `auxiliary_social_capabilities` 传入当前 schema helper；TypeError。 | 使用当前 Work-only projection。失败在推理前，尚未证明后续 reference 合法。 |
+| Workflow replay transport / 冻结精确请求 | 当前 UMI 请求与 historical capture 不同；HTTP 409。 | 要保留真实事务与审阅过的捕获一致；本次未出现可判分的模型结果。 |
+| 生产 DTO/Host / containment | 拒绝退休字段或缺少 metadata 的 fixture。 | 不降低拒绝规则；保护契约与修正失效测试是不同工作。 |
 
-Initial focused proof: **2 failing positive cases, 8 passing negative cases**, then **99/99** related tests. The extended Runtime fixture initially selected an execution-only adapter for a Plan with communication Needs and then supplied an incomplete mock output schema; those harness defects were corrected to the maintained SC join and strict provider contract. They are not reported as production defects. The final integrated mixed-timing controls pass.
+## 2026-10-04 本地验证
 
-## Native transaction comparisons
+本节是初次文档清理前后的历史基线，最新修复结果见下文。
+完整原始输出保留在 `/home/chromie/github/chromie/.chromie/acceptance/project-audit-20261004T011454Z/`。
+该目录为本机忽略证据，不随 Git 传输，应在跨机器恢复前复制。
 
-Twelve individually frozen source cases cover six bilingual contrasts: compound sequence, reversed sequence, left, right, explicit walking speed/duration and counted nodding. The same complete captured production catalog, primary streaming transaction, context/output budgets (49,152 / 4,096), temperature 0, top-p 0.9 and `think:false` were used. Targets stayed outside inference. This is controlled accepted-UMI → native Fast evidence with no Runtime effects, not full pipeline qualification.
-
-| Candidate | Schema / Host accepted | Reviewed semantic pass | Decision |
-| --- | --- | --- | --- |
-| Existing Qwen3.5 4B prompt | 12/12 Schema, 1/12 Host | 1/12 | Baseline retained. |
-| Role-specific provenance/cardinality instructions, same 4B | 10/12 Schema, 2/12 Host | 2/12 | Rejected: left-turn EN/ZH now truncate at 4,096 tokens. One additional semantic pass does not offset new hard failures. |
-| Same candidate transaction, installed Qwen3.5 9B | 12/12 Schema, 3/12 Host | 2/12 | No promotion. “Turn right” mechanically passes with positive/left yaw. |
-
-Every raw result, including mechanical passes, was reviewed. Remaining defects include source-map omission, ungrounded count, inappropriate clarification/escalation, wrong direction and candidate truncation. A bigger model did not establish semantic improvement. The candidate's active prompt changes were reverted; only its unused import cleanup remains. Further example-specific prompt additions would not be an evidenced general repair, so this audit stops that local optimization and retains the open qualification blocker. No online critic, Host direction rule or model/profile change was added.
-
-## Validation ledger and delivery boundary
-
-Final loop 3 passes **3,471 tests / 1,017 subtests, 145 benchmarks, 20 legacy,
-6,000 strict replay outcomes and 45 Level A cases**. All required static/policy,
-ownership, configuration and docs gates pass; two existing FastAPI deprecations.
-The first loop passed local gates; loop 2 retained four canonical/400 replay request
-mismatches that the explicit refreeze corrected. Three of at most eighteen loops
-were used; rejected role comparisons are separate.
-
-Final rebuilt/source-verified live SID `9a5a54b0` selects all 74 cases but stops at
-the first Fast contract failure: **0/1, 73 unrun**, safe idle, zero body calls. UMI
-and GA preserve the complete intent. Fast still decorates exact source strings,
-omits speed/yaw citations and chooses negative yaw for left. SC independently
-mistakes the high-level request for forbidden low-level body control, invents a
-capability/safety limitation and returns silence. The log's one speech item is an
-acceptance-harness error diagnostic, not SC output. Deep is not invoked to repair
-the invalid Fast result. Every attempted case and all twelve native calls across
-the three aggregates are reviewed in `loop-*/adjudication.json`.
-
-The exact final test counts, source/image identities, final cohort stop and commands are recorded in the current [checkpoint](DEVELOPMENT_CHECKPOINT.md) and [handoff](HANDOFF.md). The maximum was 18 complete candidate loops; focused tests and role-only comparisons are separately labelled. An incomplete native cohort is never counted as a pass.
-
-Private evidence root: `.chromie/acceptance/full-audit-20260916-f90dff450/`.
-`iterations.json`, each `loop-*/`, `fast-corpus/`, `fast-{baseline,candidate,qwen9b}/`, `packet-migration.json`, and retained red/green logs preserve the evidence. These artifacts are local and private, not fabricated remote attachments. Reference scenarios remain `training_eligible=false` and same-agent/non-independent evidence.
-
-No new current Markdown document, runtime environment variable, product flag, architecture layer or semantic authority was introduced. Existing documentation owners were consolidated: Markdown files 102 → 102, docs-root Markdown 58 → 58, core reading path 15 → 15, checked by `check_docs.py`. Retired HLIC communication/result sections were merged into current SC ownership instead of adding another design document. File size is a review measurement, not the reason for the changes. This audit does not close native UMI/GA/Planner/SC coverage, foreground latency, concrete perception/audience adapters, remote target evidence, #24/#32, or physical commissioning.
-
-## Historical audit records
-
-The sections below retain their original revisions and superseded contracts. In particular, older UMI binding/`ready_at`, Planner wording and live-pass claims are historical evidence, not current implementation instructions.
-
-## Native UMI continuation and distance containment — #24/#32/#67
-
-The existing qwen3.5:4b candidate was held fixed on Ollama 0.33.2, context 16,384,
-512 output tokens, `think:false`. The unchanged 44-case diagnostic cohort has
-frozen references, exact request packets and source/model identities. Expected
-answers were never supplied to inference. One primary owns complete WHAT; only
-accepted genuine unresolved meaning may invoke its designated source-based deeper
-UMI once. No critic or repair invocation was introduced.
-
-| Native diagnostic before repair | Calls / normal stops / Schema and Host accepts | Complete primary-transaction review |
+| 检查 | 本次结果 | 证据与限制 |
 | --- | --- | --- |
-| Unchanged production baseline | 71 / 71 / 71 | 3 pass, 2 meaning-correct but provenance extent unqualified, 39 fail |
-| Source-first ordering experiment | 87 / 87 / 87 | 44 fail; also moved confidence, so not a clean single-variable control |
-| Source-only ordering experiment | 84 / 84 / 84 | 1 pass, 43 fail; only source_evidence property position moved |
+| Canonical `./scripts/run_tests.sh` | FAIL：benchmarks 6 failed / 147 passed | `canonical.before.log`；policy、ownership、Ruff、mypy、config、docs/scenario 前置阶段通过，main/legacy 后续阶段未到达。 |
+| Standalone `python -m pytest -q tests` | FAIL：124 failed / 3781 passed / 5 skipped，1013 subtests | `pytest.before.log`、`main-failures.json`；冻结请求、旧 GA shapes、mock 缺方法及 metadata 等多个簇，未逐项证明所有根因。 |
+| Standalone benchmarks | FAIL：6 failed / 147 passed | `benchmarks.before.log`；三个 corpus/qualification 边界受影响。 |
+| General Ability Level A | FAIL：39/45 | `level-a-before/`；六个案例缺当前 body-effect fixture metadata。仅确定性 Level A，不能视为 live robot 结果。 |
+| Semantic authority audit | PASS，但范围有限 | 未检出 Attention Review 第二次语义调用；通过不代表全部架构原则已满足。 |
+| 文档修改后的检查 | 文档、repository policy、test ownership PASS；canonical 仍 FAIL：6 benchmarks failed / 147 passed | `check_docs.after.log`、`policies.after.log`、`ownership.after.log`、`canonical.after.log`。清理未改变原有失败集合；main 结果来自清理前，源码/测试修改与初始备份一致。 |
+| 受控 Attention / SC 探针 | 2 次同权威调用；fresh SC dispositions 为 communicate/deliberate | `attention-probe.json`、`sc-silence-schema-probe.json`；不是 native inference 或行为资格验证。 |
 
-All 242 calls used `think:false` and returned no separate thinking content; this
-does not prove that every model role meets #24's resource/non-thinking contract.
-Every raw primary and deeper result was reviewed. The two ordering candidates are
-rejected: compound decomposition improves in one case, but invalid unitless numeric
-representation persists and previously good simple requests regress into false
-uncertainty. No production prompt or Schema ordering changes are adopted. A valid
-JSON/Host result is not proof of complete or correct meaning. Remaining native
-failures include lost independent effects, wrong information/speech mode, borrowed
-identity/operational values, and planning-input uncertainty incorrectly owned by UMI.
-These experiments do not establish a model-only root cause or a full UMI-role score.
+本次只读观察 Agent/LLM/ASR/TTS 服务健康，不验证其源码与当前工作区绑定。
+没有新 live cohort、麦克风、可闻播放、相机、抓取或实物机器人证据。
+既有矩阵成绩与 runtime identities 仍见 [Handoff](HANDOFF.md)，不得由健康状态升级为资格通过。
 
-### Reproduced case and earliest enforceable defect
+## 清理与后续工作
 
-| Owner / correlation | Authoritative input → actual output | Expected result / verdict |
+移除旧图的两组 SVG/PNG 及 manifest，共 5 个退休资产；README 改为链接现有
+章程图和 turn lifecycle。没有新建维护文档、环境变量、兼容路径或架构术语。
+保留最新矩阵及未解决 admission defect，旧累积恢复/审计叙事回归 Git 历史，
+修改前的脏文档也在本机备份。维护 Markdown 103→103，docs-root 58→58，
+core reading path 15→15；大小仅是测量，不是修复正确性的证明。
+
+未清空或重写失败测试，也没有批量改写冻结 reference JSON。
+[基准说明](benchmarks/datasets/fast_planner_daily_life/README.md)区分历史覆盖与当前资格。
+
+文本 admission 的后续修复和完整重跑见下文。下一步在原职责下统一 UMI
+Schema/DTO、移除 Attention Review 同语义修复路径；具体实现需遵循既有
+[资格验证方法](docs/LLM_PROMPT_QUALIFICATION_METHOD.md)与
+[Roadmap](ROADMAP.md#social-cognition-migration) 的当前交付顺序。
+SC silence 的条件应在对照输入和明确强制沟通义务下复核，不做盲目放宽。
+
+此次也对齐 HLIC、Turn Loop、Goal-driven architecture、API/Gateway、rollout 和
+延迟证据说明中的已确认退休职责；保留历史 canary 名称及原始证据，不将其冒充
+当前 SC 事务。Attention 的二次改判明确标为违规实现，未作为许可。
+章程自身的 binding 冲突明确保留，
+不可将其当作既有实现的自动授权。当前失败基线使交付、目标资格和模型能力排序保持开放。
+
+
+## 原职责修复与第二轮实时审计 — 2026-10-04
+
+负责人明确要求未证明必要性前不改章程。本轮未修改章程、模型、角色提示词、
+Schema、DTO 或认知职责。修改为文本工具的既有 admission 调用，以及六份正向
+Level A 场景中九个 body_action 参考结果的缺失 `body_effect_family`。
+走路使用既有 task_physical_effect；点头/眨眼使用 social_expression。
+输入、WHAT 原文、source spans、refs、请求、数量、顺序及其他原判据逐字段保持不变；
+预期输出补充同一类别。冻结 native 79-case corpus 没有修改。
+
+### 实际水任务路径与修复机制
+
+新 focused episode 的三个 SID 为 e2cf6af1、dbad9b42、7a903c8e：
+问候 → “I am a little thirsty, can you help me?” → “sure”。
+SC 第二 turn 明确说 “Would you like me to get you some water?”。
+这次不是原矩阵中的其他模型、其他前序提议。
+
+| 模块 / 所有者 | 权威输入与实际输出、关联 | 预期及边界判断 |
 | --- | --- | --- |
-| Admitted UMI request | `context-ambiguous_deictic_object`: `把那个拿给我。`; context `{}` | Correct input; object is unresolved and no distance is supplied |
-| Prompt/Schema projection | Current tokens plus static worked example; distance scalar shape | Example remains instructional, not factual source; representable exact positive references pass Schema/Host |
-| Native primary WHAT | Body responsibility with `distance="twenty meters"`, `direction="behind you"`, `entity="A parcel"`, `recipient="me"`; unresolved empty | Incorrect inference: the first three values occur in the prompt example, not admitted text/context |
-| Parser/DTO/Host admission | Original raw reply accepted despite unsupported distance | Incorrect containment: duration/speed/location had provenance checks, distance had none |
-| Deeper UMI / GA / Planner / Runtime | Not invoked in this direct-role case | No downstream or physical outcome demonstrated |
+| 文本 Gateway / admission | 同一 conversation、三个独立 SID；仅在 admit 后、Core 前调用既有记录 API。 | 用户先登记；正确。不新增语义分类、Goal/Task 或 Memory 提取。 |
+| Conversation State / 对话证据 | 前两次 SC 的历史从 []、[assistant,user] 变为 []、[user,assistant]；第三次从 [assistant,user,assistant,user] 变为 [user,assistant,user,assistant]。role hash 与已知角色的 SHA256-16 精确匹配。 | 正确；后续 `record_user_turn` 合并同 SID 用户记录，保留既有语义补充。 |
+| UMI / 当前 WHAT 与认知请求 | 新历史下仍将 sure 输出为 speech acknowledgement，仅请求 GA，confidence .98；没有 Planner 请求。 | 应保留接受明确取水提议的完整意义并请求所需 HOW；语义边界仍有缺陷，精确 prompt/context/contract 根因未全部隔离。 |
+| GA / 纵向关联；SC / 发言 | GA 承接现有 WHAT；SC 提议和确认已生成。关联 SID/refs 保留。 | 未重写 UMI，也未由 Host 补发 Planner。独立正确性不能由最终说话推定。 |
+| Planner / Work；Capability Runtime / 执行 | Planner、水 Capability、Soridormi 取水未被调用。 | 整例仍失败。新 full cohort 的确认语句说会取水，也没有实际 Work，不能算完成。 |
 
-The initiating failure is model-authored meaning. The bounded production repair
-extends the existing duration scalar validator to distance, rejecting unsupported
-strings and non-scalar values before admission. It does not remove invented values,
-guess the referent, repair meaning or delegate an invalid result. Primary rejection
-uses one call; rejection after genuine unresolved primary uses two total calls and
-stops. Numeric number-word normalization remains UMI-owned; this patch does not
-certify numerical semantics or every entity/direction binding.
+启动触发是并行 SC 在 checker 后置登记用户前交付。确认的根因是工具遗漏生产
+admission 的现有调用；Conversation State 按实际顺序存储不是根因，也不能猜测重排。
+本次修复该入口，保留后置语义合并。受控测试使用真实 State、Coordinator 和 Ledger，
+覆盖 SC 已交付及稍后交付；修改前 2 failed，修改后通过。Core 进入时已有用户，
+但没有提前创造 Goal/Task。它证明时序机制，不能证明 UMI 接受提议的语义已经正确。
 
-The original failure is retained unchanged. Revalidating all 242 original raw
-replies through the patched ordinary Host rejects exactly six previously accepted
-distance violations: the copied example once and translated measured surfaces five
-times. The other 236 admission outcomes are unchanged. Nine focused negative
-subcases fail before repair and pass after; valid English/Chinese, cross-clause,
-continuity and numeric-normalization controls retain their exact values. Focused
-UMI suite: 91 tests / 115 subtests pass. Broader and live delivery evidence is recorded
-in the current checkpoint/handoff; it must not be inferred from these focused tests.
+### 验证与限制
 
-The patched production-order native rerun completes all 44 cases / 71 calls with
-unchanged source/model identity. All parsed raw replies equal the reviewed original
-baseline replies. The unsupported translated-distance primary now rejects; 43 final
-decisions remain. This proves containment, not improved model understanding. The
-full local gate passes 3,217 tests / 818 subtests, 145 benchmarks and 20 legacy tests;
-Level A passes 45/45 and the unchanged 6,000-case corpus passes every expected outcome.
+证据根：`/home/chromie/github/chromie/.chromie/acceptance/audit-repair-20261004T014950Z/`。
+修改前再次 fetch，HEAD/origin/main 仍为 90d0af90；完整备份 55 个已脏路径。
+Agent 容器与当前 packaged source 精确匹配，digest 为
+8be8ad75cdd55dc7141ba4a031e3125dd65b70476638b6510a17740d4bb91bce。
+模型为固定 Qwen3.5-4B AWQ；runtime profile、模型设置、能力清单和服务镜像相同。
+Agent/LLM 未重建或重启；恢复原有 headless MuJoCo/MCP 服务后运行。
 
-### Rebuilt deployment and stopped aggregate
-
-Seven stale deployed files exactly matched known historical revisions; they had no
-container-only changes. Agent was rebuilt and all 113 Agent/shared source files
-matched local source. The old acceptance environment's qualification budgets did
-not match the currently generated interactive profile. Identity capture correctly
-rejected that mixture before any case. A new diagnostic text environment uses the
-current profile budgets through their existing synchronizer, with stdin/discard
-transport. Runtime identity is diagnostic-only because the patch was uncommitted:
-`b078a0b56709653f160d5c6bb805281cb4cac59a4ab0cddd11db17ea76d9c190`.
-
-One directory-discovered 51-case must-pass invocation used real Agent/LLM/TTS and
-headless Soridormi/MuJoCo with execution enabled, no microphone/ASR or audible output.
-It is **incomplete: two complete failures, one interrupted case, 48 unrun**. The
-older evidence watcher's stop set missed `model_contract`; reviewer inspection
-stopped the process on the first retained numeric-provenance failure after the next
-case had completed and a third had started. Exactly one debug bundle was collected.
-The original runner is frozen; its next-run copy now includes that hard-failure
-domain. Neither case is averaged into a pass. Both source trees were unchanged
-through the invocation. No same-stage retry or Deep Planner repair was attempted.
-
-| Actual episode / owner | Input → output and handoff | Verdict / downstream result |
-| --- | --- | --- |
-| Compound `cbe8a87b`: primary UMI | Walk at 0.2 for 10 seconds, then nod twice, then turn left → one fused Responsibility plus false `actor` uncertainty | First wrong boundary: native primary completeness/uncertainty; current Host admits |
-| Compound: source-based deeper UMI → GA | Three distinct effects/order; speed string `0.2 speed` → three canonical Goals with exact source bindings | Decomposition improves downstream but primary remains unqualified; noncanonical unitless speed survives; GA conserves values |
-| Compound: native Fast stream → Host | Empty presentation commit; terminal claims complete coverage but walking `vx_mps=0.02` instead of explicit 0.2 | Native value violation; existing numeric conservation correctly rejects before Capability execution |
-| Gaze/blink `8a11295e`: primary UMI → GA | Look at me three seconds while blinking twice → one fused gaze Responsibility, blink hidden in time_scope → one Goal | First wrong boundary: missing independent blink Responsibility; no deeper UMI invoked |
-| Gaze/blink: native Fast stream → Host | Gaze Capability plus blink as social decoration; auxiliary anchor_kind=communicative_act points to Capability Activity | Invalid anchor rejected; independently requested blink was also downgraded semantically; no body execution |
-| Milk `5b7a0a66`: interrupted Host request / late Agent UMI | Retained primary/deeper replies put `ahead of you about 50 meters` entirely in direction and invent then clear actor uncertainty | Partial only; typed distance omission remains a UMI defect. No completed Host outcome or downstream GA/Planner invocation observed |
-| Runtime / Soridormi | Applied body Activities absent; error speech uses discard transport. Post-stop status: sim, safe_idle=true, active_task=null, active_lanes={}, fallen=false, emergency_stop=false | Safe containment observed in simulator. Owned simulator/MCP stopped; no physical evidence |
-
-Nine completed native Agent calls are retained, including two late UMI replies after
-client cancellation. Transport status `accepted` does not mean semantic acceptance.
-The online failures remain #24/#32 evidence, outside #67's bounded string-provenance
-repair. No model profile, streaming target or training-data promotion is justified.
-
-Private evidence root: `.chromie/acceptance/issue24-source-order-20260914/`.
-`comparison.json`, three `semantic-review.json` files, original `corpus/` and all
-request/raw-response packets preserve rejected experiments; `distance-red.log`,
-`distance-green.log`, and `retained-host-before-after.json` preserve the regression.
-No new document, environment variable, profile, runtime switch or semantic owner.
-
-## Broader workflow audit — #60/#65/#66
-
-The September 13 owner-authorized expansion is **6,000/6,000 expected outcomes**, not
-6,000 executed actions or independent model inferences. GPT-6 Astra authored 60
-contrast families, expanded over four actions, five values and five language forms.
-The strict full baseline retained 100 failures in the single-Goal Planner outcome
-map boundary (#66). The final unchanged-source full run passes: 1,400 complete
-workflows, 1,800 state/fault/permission outcomes, 2,580 contract rejections and 220
-safe nonexecuting responses. All source, corpus and raw packet identities are retained.
-
-The original 1,500-case result at `6bf16ccf` remains historical: 1,450 expected successes
-and 50 failed #60 contract-gap probes. Its clean source identity was checked against
-retained evidence before editing. Those #60 IDs are preserved in the new corpus and
-now run **new input → UMI → GA → wait → restart → due wake → controlled execution**,
-without seeding a Goal. `new_readiness_gap` is a historical family identifier, not a
-remaining failure label. Separate prior-Goal timer cases remain as complementary tests.
-
-### Responsibility boundaries and fixes
-
-| Episode / owner | Authoritative input and actual output before repair | Expected output / first wrong boundary | Fix and downstream proof |
-| --- | --- | --- | --- |
-| #60 source → replayed UMI primary | `Blink 1 times at 2099-09-04T19:00:00+08:00.`; the authored model reply **already includes** `ready_at` | The simulator can return the field; UMI's closed Schema and Host vocabulary cannot admit it. This is a representability defect, not evidence of weak model inference | Owner-authorized Charter/architecture amendment: UMI authors requested temporal WHAT in its primary result; no extra semantic call |
-| #60 Gateway context → UMI prompt/Schema/Host | Trusted receipt instant was not projected as a usable normalization anchor; no admitted readiness key | Preserve a literal timezone-qualified timestamp, or a normalized instant plus exact source time/time_scope and trusted receipt clock | Schema/prompt expose `ready_at`; Host checks ISO shape, timezone and source/clock provenance. Gateway time anchors elapsed time and never invents the user's local timezone. Host does not parse natural-language time or judge normalization semantics |
-| #60 UMI → GA → Goal | Prior failed probes never reached GA | Preserve exactly the accepted temporal binding and all other WHAT values under the new canonical Goal ID | Existing GA conservation carries `ready_at` unchanged. Tests assert no pre-seeded Goal and equality through both owners |
-| #60 Planner → state → due re-entry → Runtime | Existing retained-Goal timing path worked, but could not establish fresh UMI admission | Register the exact due time, retain an open Goal, do no early Work, survive restart, wake the same scoped Goal once and execute the exact action | Absolute and relative episodes pass. At due−1 no provider call; at due one call; next drain no duplicate wake. New semantic cancellation survives restart and prevents wake |
-| #60 missing time meaning → primary/deeper UMI → Planner | `tomorrow at seven` lacks timezone and AM/PM | Preserve uncertainty, invoke only the designated source-based deeper UMI once, ask a genuine clarification and do no Work | Frozen primary/Deep uncertainty, GA, and Planner clarification complete with Goal open and no timer/provider call. Invalid date, naive timestamp, absent receipt and foreign source-time probes fail closed |
-| #66 UMI → GA → Deep primary | Clear action/count becomes one canonical Goal; hostile reply returns an execute step and exact aggregate satisfaction but `goal_outcomes={}` | Raw dynamic Schema rejects the missing Goal key | Deliberate fault injection, never a training reference; valid upstream owners are unchanged |
-| #66 shared Planner Host → canonical adapter | Map equality was checked only for multiple Goals or escalation; empty/foreign single-Goal maps were admitted; absence was also exempt | **First wrong production boundary:** a supplied map must exactly cover authoritative Goal IDs regardless of cardinality | Require exact map coverage for every Goal count, including absence, in the existing shared validator. Fast/Deep empty, absent and foreign map tests change from failure to rejection; complete-map controls still pass. All 100 frozen omissions reject before adapter/Runtime; no second call or fallback map is authored |
-
-Broader validation also reproduced the absent-map variant: after the first repair,
-60 empty-map contrasts rejected but 40 deliberately omitted-map contrasts still
-passed Host admission. Their original raw packets and the failing run are retained
-in `missing-map-red/`. The final repair removes the supplied-field exception too;
-`missing-map-green/` rejects all 100. Twenty-eight reference DTOs in 27 older unit tests were
-updated to include their declared per-Goal result while preserving the same action,
-parameter, response, satisfaction claim and intended downstream assertion. Seven
-initial failures, sixteen further missing-map failures, and four broader-reference
-failures remain retained; no model
-mock automatically adds an outcome. The dedicated negative tests keep missing/empty/
-foreign maps malformed and verify both primary tiers reject them.
-
-The complete temporal path is `admitted source/receipt → UMI WHAT → GA Goal → Planner
-waiting Plan → persisted Host condition → scoped due re-entry → Planner effect Plan
-→ controlled Capability Runtime → correlated outcome → satisfied Goal`. Semantic
-cancellation follows the same first three owners, removes the pending obligation and
-prevents the due re-entry. Operational stop cancels active work while preserving an
-unmet Goal. The fixture establishes receipt facts, initial role scheduling and, for
-one terminal-timer family, terminal state; it does not prove those facts' producers.
-
-### Coverage and reference review
-
-| Coverage | Concrete contrasts |
+| 检查 | 结果与证据边界 |
 | --- | --- |
-| Common execution and communication | Blink, walk, nod and head shake; Fast/Deep action plans; explicitly supplied speech content; mixed independent action/speech; exact quote delivery; two-Goal conservation |
-| Continuous interaction | Weather acquisition and rain/dry result re-entry; new and retained timers; relative/ambiguous times; restart, no-early-work and single wake; new/retained semantic cancellation; operational and late cancellation |
-| Primary authority and integrity | One designated deeper UMI invocation with resolved/unresolved outcomes; sparse binding/source/Goal conservation; duplicate/missing/foreign source maps; forbidden HOW and undeclared keys; parameter, timing and satisfaction errors |
-| Execution boundaries | Failure/refusal/invalid output/cancelled/timed-out provider observations; absent provider; required/withheld trusted authorization; duplicate/stale/foreign outcomes; overlapping declared resources |
+| 首次服务预检 | 79/79 在模型入口前连接失败；0 个可判语义案例。`before-preflight-adjudication.json`；不能当模型得分。 |
+| unchanged-source native baseline | 15/79 自动通过；逐案复核为 5 个有限语义通过、9 个自动误通过、1 个未决。`before-ready-adjudication.json`。 |
+| 修复后 focused 水任务 | 历史顺序正确；任务仍失败，无取水 Work。`admission-workflow-proof.json`。 |
+| 修复后完整 native cohort | 9/79 自动通过；逐案复核为 4 个有限通过、5 个自动误通过。`fixed-full-adjudication.json` 保留全部 79 个判断和 10 个自动增减案例。 |
+| 相关本地测试 | 266 passed、6 subtests；`repair.focused.final.log`。原回归 fail-first、142 项 State/checker 检查另有完整日志。 |
+| 全部 Level A | 六份陈旧 DTO fixture 补齐后 45/45；此前 39/45。`fixture-reconciliation.json` 证明其余数据未改；这不是模型/部署行为改善。 |
+| Canonical gate | 仍在 benchmarks 6 failed / 147 passed 停止；main/legacy 未到达。前置 policy、ownership、static、config、docs/scenario 检查通过。`canonical.fixed.log`；最终重复检查见 Handoff。 |
 
-Review did not accept every mechanical pass. Initial reference/harness failures are
-retained in `representatives-v1/` (337/420), `representatives-v2/` (212/240) and
-`representatives-v3/` (236/240). Corrections include dictionary-shaped Goal access,
-production speech-result correlation, proper supplied-proposition speech modality,
-confirmation wording in its allowed aggregate field, and 60 terminal dry-condition
-responses that retained blink-specific wording. These are reference/wiring corrections,
-not product defect claims or model improvements. Original answers/hashes remain in
-`reference-adjudication-notes.md`, `terminal-reference-review.json` and captures.
+两轮均尝试 79 案例、零 skipped，源/模型/corpus 未在各轮案例之间修改；
+先完成整批、各收一次 bundle，再选修复。因前序失败阻塞后续 turn，
+cohort_complete=false、qualification_complete=false。复核是同 agent、非独立评审。
+15→9 不能作模型排名或修复收益；7 个自动 pass→fail 为语音交付失败，
+另一个为 UMI 未请求 Planner。2 个 fail→pass 也保留；整体语义不退化尚未证明。
+观察到后半批 UMI 约 24 秒延迟、SC 超 2 秒目标、TTS 3.5 秒播放开始超时，
+不能由这些下游症状猜测全部根因。新 TTS 真实生成后丢弃播放；无麦克风、可闻
+扬声器、相机、抓取或实物机器人证明，资源获取/交付仍为 mock simulator。
 
-The resource family originally stopped at a singleton parallel group or numeric
-provenance check. Its corrected 100 cases contain two independently sourced Goals,
-explicit parameter provenance, both parallel members and a controlled catalog that
-allows parallel work except for a shared resource. They now require the specific
-`parallel_resource_claim_conflict` diagnostic from Deep validation and no executable
-output. Declared fixture resource metadata also reaches Runtime definitions. The
-original shallow passes and two unsuccessful refinements remain retained. This tests
-catalog-driven conflict containment, not concurrent physical execution.
+当前修复仅具备入口机制和 fixture 兼容性证据，仍是待审工作区变更，不是合格交付。
+UMI 参数职责与内部章程冲突、Attention 二次语义改判、SC silence、基准/replay
+失配、Work 激活、参数来源、服务延迟及独立语义复核继续阻塞资格关闭。
+本轮不修改章程来允许现有越权，也没有删掉失败测试或以自动分数代替证据。
 
-`benchmarks/integration/workflow_scenarios/manifest.json` retains the 6,000-case
-freeze and a pinned source revision. The current 6,000 case JSONs and 76 shared
-packet parts (288,195,530 bytes) are ignored local replay inputs, restored from
-`ac4e56274ecac59cff51e84d734dee05d04f7da9` with every hash checked. The earlier
-382,137,005-byte/898-part snapshot is historical. Existing Git history is preserved;
-no current runtime or generator is allowed to reconstruct new expected answers.
-Original
-five prototype responses are unchanged; only their UMI packets were explicitly
-refrozen for the authorized Schema/prompt amendment. Current model replies are
-references or labeled faults; none is runtime-generated from a verdict. The runner
-never imports the authoring module. Four isolated worker processes speed offline
-runs without sharing clock/UUID patches, state or providers; candidate mode requires
-one worker. Runtime/authoring source identities and primary prompt text are retained.
+## 区分模型能力与其他根因 — 2026-10-04
 
-All outputs remain training-ineligible and same-model/non-independent reviewed.
-3,600/1,200/1,200 splits keep each action/value's languages and contrast relatives
-together; they are parameter holdouts, not unseen-family generalization. Fixed peers
-support future one-role substitution, but an accepted novel output may reach an
-uncovered downstream packet and require a separately reviewed continuation. They do
-not establish native model ability or combined-model reliability. No LoRA job ran.
+负责人要求：模型本身能力不足则保留，不调模型；其他原因应修复。
+本轮仍未修改章程、模型、语义提示词、Schema/DTO 或认知职责。
+fetch 后 main/90d0af90 与 origin/main 相同，先保留全部 61 个已脏路径。
+证据根为 `/home/chromie/github/chromie/.chromie/acceptance/root-cause-audit-20261004T061558Z/`。
+以下结论区分根因、触发、症状和证据限制，不以自动 `model_contract` 标签代替诊断。
 
-This corpus excludes autonomous initial scheduling, Fast-to-Deep Planner delegation,
-native streaming, attention/reflection/skill selection, full Gateway/audio,
-wall-clock provider timeout expiry, confirmation dialogue interpretation, deployed
-service/registry compatibility, MuJoCo and physical robot evidence. Timeout cases inject
-terminal provider status. Nod/shake contracts are reduced qualification fixtures,
-using count 2–8 from the paired Soridormi manifest at `284273bc`; they are not its live
-registry. Known source speech is not external-information acquisition. #24/#32 remain
-open for their native/target evidence requirements.
+### 已修复的非模型边界
 
-Final validation: 3,214 tests/804 subtests, 145 benchmarks, 20 legacy tests and
-pinned static/configuration/policy/ownership gates pass; Level A is 45/45 across
-15 classes. Two pre-existing FastAPI deprecation warnings remain.
-
-Evidence lives in `.chromie/acceptance/workflow-6000-20260913/`. The [checkpoint](DEVELOPMENT_CHECKPOINT.md)
-and [handoff](HANDOFF.md) own final canonical checks, archive hashes and resume commands.
-The owner authorized #60/#65/#66 closure after verified Git delivery. This change
-uses existing owners: no new current Markdown document, environment variable,
-model profile or architecture layer; 102 current documents / 15 core-path documents
-remain unchanged. The larger authoring/driver files are reviewed as test-owned
-assembly and execution boundaries, not an exception to safety/ownership checks.
-
-## Expanded workflow audit — #61/#62/#63/#64
-
-This section records the preceding 1,500-case delivery at `6bf16ccf`; the current
-6,000-case result and subsequent repairs are described above.
-
-The owner approved 1,500 architecture/workflow/contract scenarios after the five-case
-prototype found a real defect. This is an explicitly authorized evidence expansion;
-it does not replace the native #24, streaming/target #32 or temporal-contract #60
-work. GPT-6 Astra authored 30 contrast families and their reference rules in this task,
-then deterministic expansion produced 2 actions × 5 values × 5 language forms per
-family. These are 1,500 executable cases, not 1,500 independent inferences or ability
-classes. Reference review is non-independent and every output is ineligible for
-training. Synthetic scenario text, exact request packets, reference responses and
-independent Runtime/state assertions are tracked in the existing benchmark owner.
-
-| Coverage group | Families | Cases / checked boundary |
+| 既有所有者 / 类别 | 实际输入→错误输出、最早错误边界 | 修复机制及证据 |
 | --- | --- | --- |
-| Ordinary execution | normal_fast, normal_deep, multi_goal | 150; real primary role clients, Goal coverage, exact arguments and sequential effects |
-| Conditional progress | conditional_rain, conditional_dry | 100; acquisition leaves Goal open, correlated result re-entry selects the frozen continuation |
-| Retention/cancellation | retained_timer, cancellation, cancel_timer, terminal_timer | 200; persist/restart, once-only wake, cancellation and no later Work; terminal_timer seeds a trusted terminal state |
-| Provider and Evidence faults | provider_failed, provider_refused, provider_invalid_output, duplicate_outcome, stale_outcome, foreign_goal_outcome | 300; fail-closed output/identity handling, no false closure or duplicate execution |
-| UMI/GA admission | ga_missing_source, ga_foreign_source, ga_duplicate_mapping, umi_forbidden_how, umi_duplicate_ref, umi_bad_source, umi_unknown_binding | 350; source conservation and authority/field boundaries |
-| Planner rejection | plan_wrong_parameter, plan_missing_parameter, plan_foreign_goal, plan_unknown_capability, acquisition_false_completion, multi_goal_omission, early_work | 350; argument, scope, acquisition and readiness constraints |
-| Unrepresentable new readiness | new_readiness_gap | 50; #60 remains a gap and never counts as passed |
+| Fast benchmark adapter / context_or_harness | 捕获生产 Planner 调用后，streaming 分支另造 Schema，使用退休 keyword `auxiliary_social_capabilities`；TypeError 发生在候选模型前。独立 Schema 还遗漏当前 mode/family、source-token 和 lookup 约束。 | 移除该副本，所有三个事务变体都使用实际调用的 `response_format`；回归逐项核对 system/user/Schema/options/family。修改前 streaming 失败，修改后 9 tests passed；204 references 全部机械有效。reference/manifest 未改，退休 Planner speech/decoration 的语义覆盖仍不合格。 |
+| CosyVoice worker / runtime_or_provider | 三个 voice 已有完整 native conditioning，但用于 reference audio 的 ONNX speech tokenizer 及 CUDA arena 一直驻留；真实 TTS 遇到 CUDA OOM，没有首 PCM。 | 缓存全部合法 voice 后、ready 前释放该 reference-only session；已登记 speaker 的 synthesis 使用原 conditioning。未改变模型、worker 并发、播放 timeout、voice prompt/wav、Capability 或 cognition。fail-first 和 cached-voice/reset 回归、隔离原生资源探针、正常服务 focused 与完整 cohort 均留存。 |
+| 两个 identity scenario / scenario_or_oracle | 英/中文身份问答由 SC 交付，Host 保留 satisfied Goal，Planner 未调用；旧 `min_goal_outcome_count=1` 错报遗漏 Plan 并标为模型失败。 | 替换为既有 `expect_created_goals_satisfied=true`，其余输入/身份/语言/延迟/安全判据逐字段不变。12 fail-first；完整 acceptance unit file 136 passed。完整 79 案例的保留输出离线重新验证，两个身份场景仍因原 2s SC 延迟失败，未增加分数或伪造新 native 运行。 |
 
-Language surfaces: 600 English, 600 Chinese and 300 mixed. Blink counts are 1/2/3/5/10;
-walk durations are 0.1/1/2/15/30 seconds. All language and positive/negative relatives
-for one action/value stay in one split: 900 train-candidate, 300 development and
-300 held-out. This holds out parameters inside shared families, not unseen semantic
-families. It cannot independently establish model generalization or training quality.
+### 原始 sadness/no-advice episode：模型正确，交付失败
 
-The semantic/oracle cohort was frozen before the complete baseline. Invalid model
-outputs are labeled `fault_injection`, separate from authored references; the #60
-requested result is `desired_unrepresentable_result`. Initial capture observes actual
-requests while supplying predetermined answers; subsequent execution is strict replay,
-never capture or semantic inference. Hash-checked shared prompt/Schema parts reduce
-repetition. The persisted corpus adds 1,500 cases, one manifest and 255 shared parts
-(88,054,200 bytes); the original five cases remain reproducible. No new document,
-environment variable, model profile or production architecture layer was added.
-Current Markdown/core-reading-path counts remain 102/15. Future corpus growth should
-reuse these shared packet parts and existing documentation owners.
+原 turn SID `169574e9`，输入为 “I'm sad. Please don't give me advice yet.”。
+UMI 保留 sad/no-advice，GA 与 SC 并发。SC primary call
+`llmcall_agent_a45b7a5180114637` 正常 stop、Schema/DTO 接受，约 2307ms 决策；
+答复 “I hear you, and I'll wait.” 没有建议。原始 call、请求和事件关联在
+`sad-model-calls.json`、`tts-root-cause.json` 及旧 full cohort case60 中。
 
-| Frozen aggregate | Expected successes | Unexpected failures | Known #60 gaps | Interpretation |
-| --- | ---: | ---: | ---: | --- |
-| Original production `0457db8d` | 1,328 | 122 | 50 | Baseline fails; two earliest-boundary clusters |
-| UMI binding-vocabulary repair | 1,378 | 72 | 50 | All 50 unknown-binding probes now reject |
-| Deep allocation repair | 1,450 | 0 | 50 | 36 valid multi-Goal cases proceed; 36 omission probes reach the intended rejection boundary |
-
-Final expected successes comprise 350 completed workflows, 400 expected state/fault
-outcomes, 675 explicit rejections and 25 nonexecuting clarify/refuse responses. The
-whole 1,500-case cohort remains failed/exit 1 because the 50 known gaps remain. A
-safe nonexecuting unknown-Capability response is correct containment, not a product
-bug. No hard failure is averaged away.
-
-### Actual defects and module I/O
-
-| Episode / owner | Authoritative input → actual output before repair | Expected output, correlation and first wrong boundary | Repair / downstream proof |
-| --- | --- | --- | --- |
-| #62 test admission → UMI primary HTTP | `Blink 1 times.` and exact source span; frozen primary result carries `count:1` plus `invented_owner_field` in `binding_items` | Raw dynamic Schema rejects the invented key; model output is intentional fault injection | Reference stays invalid; it is never training truth |
-| #62 UMI normalization → DTO/Host | Sparse bindings become canonical `bindings`; the open canonical dictionary admits the invented name | **First wrong production boundary:** semantic key admission must agree with the primary role vocabulary | Validate authored wire/canonical names against that request's Schema before returning. Existing canonical relation refs retain their existing validation. Unknown names fail closed after one call |
-| #62 UMI → GA/Planner/Runtime | Before repair the test detects acceptance and stops at UMI; downstream owners are not invoked in this probe | Do not infer any downstream execution from this fixture | After repair the same one-call probe rejects, no committed Goal/provider Work. Focused tests cover primary and designated Deep UMI; the 1,500 cohort itself does not cover Deep UMI |
-| #63 UMI → GA | `Blink 1 times. Walk forward for 0.1 seconds.` → two separate sourced responsibilities → two canonical Goals | Both boundaries correct; committed Goal IDs bind `${goal}` and `${goal2}` | Same input, outputs, source spans and Goal meanings retained |
-| #63 GA/state → Deep prompt projection | Two snapshots total 3,431 characters; a 3,200-character list-wide limit returns `required_context_over_budget`, attempt_count 0 | **First wrong boundary:** a single-Goal fragment allowance prevents a modest admitted multi-Goal request before inference | Association/snapshot allowance scales with authoritative Goal count (6,400 for two). Complete JSON is retained; other fragment and whole-request limits remain enforced |
-| #63 Deep primary → Host → Runtime | No Deep call or Work before repair on 72 cases | Valid two-Goal Plan must execute both effects; omission must fail before any provider call | After repair, full Plan executes exact blink/walk sequentially and satisfies both Goals. Omission fixture now reaches Host and is rejected. All 50 cases in each family produce their expected result |
-| #60 new turn → UMI → GA/Planner | Desired primary `ready_at` is outside current UMI Schema; Planner consumes that exact typed Goal binding | Contract has no admitted producer-to-consumer path; **known gap**, not repaired here | 50 probes remain failed. GA/Planner/Runtime are not invoked in these probes. Separate retained-timer cases seed the prior Goal explicitly |
-
-The #63 fix made 72 previously unrendered Deep packets available. An explicit second
-packet freeze added only these missing packets: every existing packet, authored reply
-and oracle was compared unchanged. Original manifest/hash and failed cases remain
-retained; neither failures nor expected answers were rewritten to manufacture a pass.
-No prompt wording, semantic authority or additional semantic call changed.
-
-Broader regression found one implementation omission in the initial #62 patch:
-direct parser validation built a context-free Schema and incorrectly rejected 34
-legitimate prior-assistant-utterance references. The fallback now includes the same
-accepted prior-speech fact used by the production Schema builder. Existing provenance
-validation still rejects absent or changed speech. The production primary/Deep paths
-already supply their actual request Schema. Eleven older behavior fixtures used
-undeclared aliases (`date`, `question`, `aspects`, `duration_s`, `duration_text`,
-`topic`, `order`, `concurrency`). Their reference/expected DTOs now express the same time, requested
-property, duration, referent and ordering through declared bindings or validated
-Responsibility relations. Source turns and intended success criteria remain; only their test representations
-are corrected, with no new production aliases or safety behavior. Original files and exact before/after hashes
-remain in `legacy-references/` and `legacy-reference-review.json`. These fixture
-migrations are distinct from production defect discoveries. Initial editing/test
-failures remain retained and are superseded only by successful reruns.
-
-The same review reproduced [#64](https://github.com/TimeTreker/chromie/issues/64):
-`_evaluate_user_meaning_interpretation_expectations` compared declared outcome text and
-bindings but ignored explicit `output_mode`. A body-action result against an expected
-speech modality produced no oracle error. The focused baseline test failed before
-the checker changed. The existing oracle now compares modality; the focused suite
-passes 10 tests/4 subtests. In the compound fixture, walk/blink/joke now have correct
-body/body/speech expectations, predicate-aligned source spans and only the explicitly
-requested joke-while-walking relation. The old fixture had swapped modalities/spans
-and invented blink concurrency. This corrects test evidence, not production semantics;
-GA/Planner/Runtime are not invoked by this direct oracle test. Semantic span entailment
-still requires reference review; adding a modality assertion does not automate it.
-
-### Single-role substitution and remaining limits
-
-The existing replay service can explicitly forward one selected UMI/GA/Fast/Deep role
-to an Ollama-compatible candidate endpoint. It forwards only the actual production
-request, replacing the model identifier; no reference, case rubric or evaluator
-output enters inference. Other roles require exact frozen requests. Raw candidate
-transport responses, termination and Schema observations are retained without a
-replacement answer or online critic. Intentional model-fault and unrepresentable
-reference cases are excluded from this mode, as are cases not invoking the selected
-role. There are 750 reference-only candidates before that role filter.
-
-An accepted candidate variation can change the next role's packet. Such a mismatch
-stops as `uncovered_replay_branch`; it is neither a semantic failure nor a pass.
-A raw candidate Schema violation takes precedence as `candidate_contract_failure`.
-Broader semantic judgment and valid alternative continuations require a separately
-reviewed branch/corpus. Local fixture services verify isolated routing for all four
-roles, altered-trajectory containment, incomplete termination preservation and HTTP
-failure without fallback. A 50-case UMI substitution CLI run passed with 50 calls to
-a second local fixture server, not native inference. This is plumbing proof only.
-
-LoRA training was not started. Before using these artifacts for training, review
-reference correctness independently, exclude fault injections, construct hidden
-semantic-family holdouts, match each role's actual prompt/Schema/transport, and judge
-candidate outputs at Schema/DTO/Host plus semantic boundaries. After isolated-role
-qualification, test the combined real-model system; frozen peers cannot prove its
-joint behavior. UMI uncertainty/Deep cognition, autonomous role scheduling, Fast-to-Deep
-escalation, native streaming, attention/reflection/skill selection, Gateway/audio,
-real services, resource contention and physical effects are outside this corpus's
-coverage. Two positive primary planner families do not prove escalation behavior.
-
-The [benchmark instructions](benchmarks/README.md#offline-workflow-replay) own commands;
-[Status](docs/STATUS.md), [checkpoint](DEVELOPMENT_CHECKPOINT.md) and [handoff](HANDOFF.md)
-own final gates, revision binding, retained archives and ordered remaining work.
-
-## Offline workflow replay — #59
-
-The owner explicitly requested architecture/workflow/contract tests excluding model
-ability. Five cases use GPT-6 Astra-authored reference replies, reviewed in the same
-task, through a strict loopback model HTTP service. They exercise UMI → GA → Fast or
-Deep → real Schema/DTO/Host → state/Capability Runtime, plus result/due re-entry.
-Initial admission and role scheduling are explicit driver inputs. Providers, speech
-receipts, wall time and UUIDs are controlled. No native inference or keyword-based
-semantic simulator runs. References and whole request packets are frozen separately
-from executable expectations; unchanged requests are required to receive a reply.
-
-The initiating probe is “Blink twice if rain is forecast in Hangzhou.” Its authoritative
-Goal has body-action mode, count 2 and location Hangzhou. Deep's correct current Work
-is a weather query, with both satisfaction assessments retaining the deferred blink.
-The first incorrect contract boundary was the dynamic Schema: its generic count
-filter removed the weather candidate because it has no repetition argument. The
-scripted reply was independently Schema-invalid; when supplied to the actual parser,
-the Host count guard rejected it too. Removing only that guard exposed the generic
-numeric guard's same demand. This is one stage-vs-effect obligation ownership defect,
-not evidence of bad model reasoning. Runtime never ran the rejected initial Plan.
-
-| Actual episode boundary / owner | Authoritative input → observed output before fix | Expected output / correlation / verdict |
+| 模块 / 职责 | 权威输入及实际输出、关联 | 预期与边界判定 |
 | --- | --- | --- |
-| Test admission → UMI WHAT | Exact synthetic turn/source tokens; reference emits one conditional body effect, count 2, Hangzhou | Complete WHAT, no Capability/HOW. Final reviewed source span t0–t7 includes condition/place. Correct fixture; initial short span was a reference defect corrected before final freeze. |
-| UMI → GA continuity | Accepted responsibility r1 → one new Goal carrying count/location | Exactly-once mapping and same meaning; real committed Goal ID binds the replay placeholder. Correct. |
-| Catalog/Goal → Deep dynamic Schema | Weather is declared safe_read; blink accepts count; generic count filter excludes weather for this Goal | Retain a representable prerequisite query. Earliest incorrect contract. |
-| Primary reply → parser/DTO/Host | Weather lookup `{location: Hangzhou}`, acquire_information, partial 0.5, both unmet obligations → count rejection, then numeric rejection when isolated | Accept complete acquisition Work while keeping Goal open. Original containment prevents execution but rejects valid progress. |
-| Accepted Plan → Runtime/provider, after fix | Same query is admitted; controlled forecast returns rain true/false with request/Goal/Plan provenance | Exactly one weather call, no blink before Evidence. Real result reconciliation retains open Goal. Correct. |
-| Terminal Evidence → actual Host re-entry → Fast | Trusted forecast and exact source Plan → blink count 2 when true; delivered no-effect response when false | Same Goal/scope; wrong forecast content fails frozen request matching. Correct; semantic choice itself is supplied by the reference. |
-| Runtime execution/speech receipt → state | True branch executes exactly two blinks; false branch has no blink and a controlled delivered response | Goal satisfied only after terminal execution/delivery. Correct within controlled-provider Level A scope. |
+| Text admission / Host | 用户原文先登记；同 SID 的完整 UMI Responsibilities；没有吞掉 no-advice。 | 完整 admission 正确；此前历史顺序修复已生效。 |
+| UMI / WHAT；GA / 纵向关联 | UMI 输出悲伤和不建议的 speech 意义；GA 承接同 refs，SC 同时收到当前互动证据。 | 未观察到该 episode 的意义遗漏；GA 独立语义资格不能由 SC 回答反推。Planner/物理 Capability 不需要且未调用。 |
+| SC / 当前发言 | primary call 上述原文，acknowledge、context_grounded、r1；Host 接受并排队。 | 该原始答复正确，没有 advice；不是模型不能理解悲伤造成的无声。 |
+| Host TTS scheduler / ordered playback | 4787.5ms schedule、4788.2ms request、4790.3ms stream；未发生较晚才启动 TTS。 | 及时派发正确，关联原 SC activity/语音 ID。 |
+| CosyVoice / native PCM | 5698ms `CUDA out of memory`，20MiB allocation、仅20.75MiB free；worker 用6.37GiB，GPU 总15.57GiB；没有 PCM。reference-only encoder 仍驻留。 | 最早已证明失败在 provider resource lifecycle；SC 模型结果已经正确。其他并驻模型/声学生成也是共享显存条件。 |
+| Playback barrier / delivery containment | 第二次 TTS 尝试后仍无 PCM；8288.4ms 到 3.5s 起播上限，8289.2ms cancel-before-start，8292.4ms SC task failed。 | 保持 fail closed、不记为已交付；timeout/cancel 是资源失败的下游症状，不通过加时来掩盖。 |
+| 后续 SC opportunity / 未交付沟通需要 | 不同 call `llmcall_agent_12d1b67b0c5648fe` 基于明确 TTS failure need 重试原 acknowledgment；仍未交付。 | 这是下游的新沟通需要，不是在线第二模型复判第一语义。重试不能将此 episode 算通过。 |
 
-Fix: the Schema retains declared information-acquisition candidates. Host reuses the
-existing whole-Plan acquisition validator (available executable information provider,
-valid arguments, expected outcome and both unmet assessments) to scope the deferred
-effect count/numeric exception. Supplied argument/provenance checks still run; the
-actual blink still requires count 2. Merely labeling a state-changing action as an
-acquisition or claiming completion cannot obtain the exception. Fast's direct catalog
-remains bounded; cross-domain composition stays with Deep. No prompt, model profile,
-extra semantic call, runtime flag or semantic authority is added. The existing #51
-Charter rule is clarified rather than replaced.
-
-Coverage is five episodes/18 local model-shaped HTTP calls: normal, conditional true,
-conditional false, retained scheduled Goal across restart/due/once-only wake, and
-in-flight cancellation. Cancellation stops current execution and leaves its unmet
-Goal open. The delayed case starts from an explicitly seeded prior Goal: UMI's current
-Schema rejects `ready_at`, while Planner consumes that exact typed binding. This is
-the separately open [#60](https://github.com/TimeTreker/chromie/issues/60) new-request
-contract gap; a successful seeded timer is not new-request scheduling evidence.
-
-Verification: canonical gate passed 3,131 tests/794 subtests, 145 benchmarks and 20
-legacy tests, with pinned static/policy/config/ownership checks. Level A remains
-45/45 cases across 15 classes. The 26 added tests exercise frozen HTTP episodes,
-request/order/Schema/options mismatch, unused/extra/unbound replies, wrong terminal
-Evidence, rejected missing/wrong action count, acquisition counterexamples and the
-documented readiness gap. Final reference-span correction is rerun in the focused
-suite and full replay. No model-ability or live qualification follows from these results.
-Preparation failures and harness/oracle corrections are retained separately from
-production defects; async due wake has no session ID, which the driver now preserves.
-
-Commands and fixture ownership are in [benchmarks](benchmarks/README.md#offline-workflow-replay).
-Private evidence is `.chromie/acceptance/workflow-replay-20260913/`; tracked raw packets,
-responses and corpus hashes are in `benchmarks/integration/scenarios/`. Current source
-and corpus hashes, per-call observations, state snapshots and failures accompany each
-run. #59 may close on delivery; #24, #32 and #60 remain open. New current Markdown
-owners: 0 (102 → 102); core reading path: 15 → 15; no environment-variable growth.
-
-## Native User Meaning Interpretation boundary investigation — #24
-
-The owner agreed to investigate the retained walk/nod/turn failure before continuing streaming qualification. The complete transaction was audited against the Charter, interaction contract and qualification method before changing an experimental packet. UMI must identify every independent WHAT, preserve material modifiers and exact source provenance, and express explicit ordering. It cannot select Goals, Capabilities or HOW. The current prompt already requires this complete primary decision; the dynamic Schema admits a correct three-effect result. All 44 frozen reference outputs pass the current Schema and Host, and all 88 original primary/deep packets match the earlier retained Qwen4b packets exactly.
-
-The production request uses Ollama 0.33.2, `qwen3.5:4b`, top-level `think:false`, `stream:false`, temperature 0, top-p 0.9, **16,384 request context and 512 output tokens**. The generated environment's 32k label does not override those actual packet values. Model metadata also supplies presence penalty 1.5 and top-k 20; native sampler logs confirm the tested penalty settings. The original live failure stopped normally after 212 output tokens. Missing source input or output truncation does not explain that particular failure.
-
-| Order / owner | Actual input, output and handoff | Boundary judgment / expected result |
-| --- | --- | --- |
-| Gateway provenance → UMI request | Admitted walk at 0.2 speed for 10 seconds, then nod twice, then turn left; complete original text and ordered tokens `t0`–`t19` reach the primary packet. The direct diagnostic starts from this retained request, not a new Gateway admission. | Correct retained input for this case. Preserve all three predicates and their modifiers. |
-| UMI prompt/context → dynamic Schema → native provider | Complete WHAT instructions, bounded Mind/context and exact current-token Schema are sent. No reference answer, score or expected decomposition enters the candidate messages. | Reference three-effect output is representable and passes both Schema and Host. Successful representation alone does not prove the model follows it. |
-| Primary UMI semantic result | Original live call emits one responsibility with the whole turn in `subtype`. Fresh unchanged baseline emits one responsibility with only the later nod/turn clauses in `subtype`; no count or coordination. Both are complete provider responses. | **First observed wrong output:** independent effects are merged into a modifier. Expected three responsibilities, correct speed/duration/count/direction, separate predicate provenance and explicit sequence. |
-| Parser / normalization / DTO / Host | Original whole-turn echo is rejected before downstream admission. Fresh partial echo passes Schema and Host and returns a decision. Mechanical normalization does not create the missing effects. | Correct containment of the literal whole-turn case; incomplete containment of semantic omission. A returned decision is not proof of complete meaning. |
-| Designated deep cognition | Primary compound outputs declare no unresolved meaning, so no deep call occurs. Other cohort cases may invoke the existing one source-based deep authority once. | The current uncertainty branch is followed. Confidence alone cannot replace material uncertainty or justify a semantic critic under Charter principles 30–31 and 34. |
-| Host endpoint → GA / Planner / Runtime | Original live call `llmcall_user_meaning_interpreter_d2278e1d3bfa4a1b` ends HTTP 503 `user_meaning_interpreter_unavailable`. GA, Planner and Runtime are not invoked. Direct-role experiments stop at the UMI return/error and never enter those modules, even when Host accepts. | Original live containment prevents execution. Downstream behavior for the newly accepted wrong decisions is unproven, not a live result. |
-
-```text
-retained admitted request -> exact UMI packet -> native primary result
-                                              |
-                         +--------------------+--------------------+
-                         |                                         |
-                 whole-turn hidden effects                 partial hidden effects
-                         |                                         |
-                   Host rejection                         Host returns wrong meaning
-                         |                                         |
-                 original live HTTP 503                     diagnostic ends here
-                 no GA / Planner / Runtime                 no downstream invocation
+```mermaid
+sequenceDiagram
+    participant U as Admitted user
+    participant I as UMI
+    participant G as Goal Association
+    participant S as Social Cognition
+    participant H as Host playback
+    participant T as CosyVoice worker
+    U->>I: SID169574e9 sad, no advice
+    par Goal continuity
+        I->>G: original Responsibilities
+    and Current communication
+        I->>S: same current meaning and provenance
+        S->>H: valid acknowledgment, no advice
+        H->>T: ordered native synthesis
+        T-->>H: CUDA OOM, no PCM
+        H-->>S: 3.5s start timeout, cancel, undelivered
+    end
+    Note over T: Fix releases reference-only encoder after all voice caches
+    Note over H: No fabricated playback or Goal completion
 ```
 
-Five complete 44-case cohorts and six cold controls ran sequentially against unchanged source. Each experiment's packets were frozen before inference. Each case uses one primary call, with at most the existing source-based deep delegation for an accepted unresolved primary result; there are no retries, critics or semantic repair calls. Every raw output was reviewed after inference. Reviews are post-hoc and non-independent. The 44 cases cover independent/single effects, modifiers, mode contrasts, bilingual/mixed-language inputs, explicit source bindings and material ambiguity; they do not constitute full UMI continuity/lifecycle qualification.
+隔离原生探针中，缓存三 voice 后释放 encoder，free memory 从 1,802,240,000
+增至 2,903,244,800 bytes，约释放 1.1GB；PyTorch reserved 仅降 8MiB，
+allocated 不变。五个英/中/混合 cached-voice 请求均有 PCM。
+该测量另运行 GC/PyTorch cache release 且禁用网络，有 normalizer fallback；
+它证明资源驻留和 cached synthesis 可用，不证明正常服务 cold latency。
+生产修改只释放 ONNX session，不增加 gc/empty_cache 或变更 frontend/provider 设置。
 
-| Experiment / exact comparison | Cases / calls | Final Host decisions | Meaning finding |
-| --- | --- | --- | --- |
-| Unchanged Qwen3.5:4b baseline | 44 / 66 | 43 | Compound and concurrent effects still merge; mode, binding and provenance failures remain. Partial hidden clauses evade the whole-turn guard. |
-| Append a derived Schema structure to baseline messages; full decoder Schema unchanged | 44 / 44 | 44 | Structure acceptance improves without complete meaning. Compound effects remain merged and modifiers move into incorrect fields. |
-| Baseline with only presence penalty 1.5 → 0 | 44 / 47 | 43 | Merging, missing count, incorrect modes and bindings remain. Some individual decompositions improve, others regress. |
-| Structure experiment with only decoder format changed to plain JSON; adjudicate against original full Schema/Host | 44 / 44 | 0 | Every output omits per-responsibility confidence; raw compound output still merges nod and turn. Removing constrained decoding does not produce a correct transaction. Diagnostic only; no proposed validation relaxation. |
-| Presence-zero experiment with only model changed to installed `qwen3:4b-instruct-2507-q4_K_M` | 44 / 44 | 43 | Three compound effects appear, but ordering is missing and speed becomes distance; invented/misassigned bindings remain. One reversed source span is correctly rejected. |
-| Six representative baseline cases with model absent before every call and `keep_alive=0` | 6 / 9 | 6 | Fresh model loads still merge effects, confuse query mode and invent obligations. Reused resident state is not required for these failures. This is not a claim that all provider/cache defects are excluded. |
+官方 Compose build 因重新拉取未固定系统依赖未完成；改用原镜像加同一
+provider source 文件的 proof image。首次 provisional service env 引入错误代理，
+该启动失败保留；随后恢复全部原61 env entries 和 mounts，逐项一致，再暖机、
+复现原 case。普通服务英/中/混合 readiness 全有 PCM；focused SID `be8fa701`
+实际 SC→PCM 877.141ms、discard 起播880.17ms，无 advice。
+镜像、source digest、准确恢复命令和原镜像 tag 均见 Handoff；不将 source-only
+build 当作官方依赖 rebuild 或 release。生成语音后丢弃播放，无可闻扬声器证明。
 
-All 254 calls finish normally, with top-level `think:false` and no separate thinking response field. Original full-Schema validation passes 210 calls; plain-JSON's 44 failures remain failures. Strict dimension counts are 5, 2, 5, 0, 0 and 0 respectively, **not semantic pass rates**: lexical/span oracle limitations and missed extra bindings were separately reviewed. No candidate qualifies regardless of those counts. Some schema-valid outputs put self-deliberation in `unresolved`; absence of a separate thinking field does not certify semantic discipline.
+### 完整重跑、误判修正及剩余根因边界
 
-The structure experiment was motivated by [Ollama's structured-output guidance](https://docs.ollama.com/capabilities/structured-outputs). Appending the full source-enumerated Schema would fail the actual conservative preflight for all 88 packets; that oversized variant was never inferred. Only a derived structural outline was tested, with exact lexical constraints preserved in the decoder. Native responses use 16k request context throughout. Sampled peak GPU use was 9,029 MiB with at least 6,917 MiB free and at most one resident model. These are sampled direct-role observations, not streaming latency, proven cache hits, concurrent TTS qualification or a combined-profile pass. The original development Qwen3.5:4b resident was restored afterward.
+固定4B、prompt、实际 model options、capability/corpus；TTS 部署绑定后一次运行
+全部79案例，过程中不编辑源码、不重建、不重启、不改模型或场景。各 source/
+container/image ID 的前后一致由 `source-verification.after-cohort.json` 验证。
+结束后只收一次 `/home/chromie/Downloads/chromie_debug_bundle_20261004_161413.tar.gz`。
 
-**Disposition:** the confirmed failure mechanism is incorrect raw semantic decomposition/binding followed by incomplete mechanical containment. Attribution among the remaining primary prompt/context representation, model and provider behavior is unresolved; these experiments do not establish a model intelligence ceiling. There is no qualified production repair to deliver. Keep #24 open, and keep #32 open for native typed-stream/terminal consistency, cancellation, latency, TTS and shared-resource evidence. No principle amendment, phrase-based semantic splitter, confidence-threshold routing or second semantic reviewer is justified by this evidence.
-
-Next, test one predeclared primary-packet/context or native-provider hypothesis while preserving the complete meaning contract. Retain these 44 cases as regressions, add independent coverage for the chosen hypothesis and missing UMI continuity/lifecycle boundaries, and qualify the whole role before downstream/combined-profile promotion. After a qualified repair, rebuild/verify the revision and rerun the full live cohort, then the narrow supervised voice/default target sequence. Repeating the already failed controls or weakening admission is not acceptance.
-
-Evidence: `.chromie/acceptance/issue24-umi-boundary-20260912/`, including frozen driver versions, packets/raw replies, per-case reviews, model digests, sampling, comparison summary and explicit metadata corrections. No raw private Mind/provider payload is published. The [handoff](HANDOFF.md) records the separately transferable archive and exact resume commands. The canonical source gate passed again: 3,105 tests/794 subtests, 145 benchmarks, 20 legacy tests, pinned static/config/policy/ownership checks. Prior Level A and live results below remain prior evidence; no behavior changed or new general-ability/live result is claimed by this investigation.
-
-## Issue disposition
-
-| Finding | Implemented resolution | Qualification boundary |
-| --- | --- | --- |
-| [#61](https://github.com/TimeTreker/chromie/issues/61) | 1,500 frozen cases, full baseline/reruns, isolated candidate-role forwarding and reproducible report. | Closes on delivery; 50 #60 gaps remain failed, no native qualification or training. |
-| [#62](https://github.com/TimeTreker/chromie/issues/62) | Enforce UMI binding vocabulary, retaining contextual prior-speech and typed relation validation. | 50 original failed probes now reject; primary/Deep and broader reference regressions pass. |
-| [#63](https://github.com/TimeTreker/chromie/issues/63) | Allocate complete Deep association/snapshot input for admitted Goal cardinality. | 72 premature failures removed; valid effects complete and omissions fail at Host. |
-| [#64](https://github.com/TimeTreker/chromie/issues/64) | Compare declared output modality in the existing behavior oracle; correct the faulty compound reference. | Baseline fails, focused/canonical checks pass; no native semantic claim. |
-| <a id="a01"></a>A01 — [#49](https://github.com/TimeTreker/chromie/issues/49) | Previously delivered at `c1585e78`: atomic complete-resource acquisition. | Closed; preserve cancellation while waiting and cross-interaction exclusion. |
-| <a id="a02"></a>A02 — [#50](https://github.com/TimeTreker/chromie/issues/50) | Previously delivered at `9be7b23f`: complete required Planner context or rejection before inference. | Closed; complete retained Goal meaning remains required. |
-| <a id="a03"></a>A03 — [#51](https://github.com/TimeTreker/chromie/issues/51) | Previously delivered at `f5522f87`: complete acquisition stage with honest unmet downstream obligations. | Closed; this delivery strengthens serialization and duplicate-response regressions. |
-| <a id="a04"></a>A04 — [#52](https://github.com/TimeTreker/chromie/issues/52) | Separate exact cancellation status, original Goal satisfaction, and read-only capability availability. Fast and Deep admit truthful zero-work reports. | Bilingual four-status/provider/depth contrasts, token revocation and independent-sibling tests; final Fast 204/Deep 40 and cancellation16 per tier pass. |
-| <a id="a05"></a>A05 — [#53](https://github.com/TimeTreker/chromie/issues/53) | Result planning precedes bounded optional Reflection. Existing background lifecycle owns cancellation, timeout and shutdown. | Event-order and lifecycle proof; no target latency claim. |
-| <a id="a06"></a>A06 — [#54](https://github.com/TimeTreker/chromie/issues/54) | Actual Host requests supply approved Mind. Retire current-turn advisory re-entry and its handled-Evidence bypass. | Advisory records cannot cause another Planner decision; only applied Memory counts as adaptation. |
-| <a id="a07"></a>A07 — [#35](https://github.com/TimeTreker/chromie/issues/35) | Reconcile staged/readiness reference regions; remove invented unspecified subjects; qualify complete roles in Fast-then-Deep order. | Offline fixed `gpt-5.6-sol/high` surrogate only; native-provider and target claims remain #24/#32. |
-| <a id="a08"></a>A08 — [#55](https://github.com/TimeTreker/chromie/issues/55) | Acceptance labels old voice evidence by revision; capability README derives counts and uses current registry ownership. Current status and handoff are consolidated. | Historical evidence retained, four status axes kept separate. |
-| Process — [#56](https://github.com/TimeTreker/chromie/issues/56) | Existing strict Mypy gate covers the whole contract package, including future files. | 30 contract files plus three tooling files locally; Python 3.11/3.12 CI passes on implementation commit `8aa3f499`. |
-| Process — [#57](https://github.com/TimeTreker/chromie/issues/57) | Review actual acquisition → outcome → continuation → delivery seam; keep its existing atomic owner. Add derived-property/Host-projection and duplicate-suppression regressions. | No extraction justified by current evidence; size remains a review measurement. |
-| New — [#58](https://github.com/TimeTreker/chromie/issues/58) | Future-bound Goals wait with zero current Work and an exact timer. A trusted wake can recover its persisted open Goal without a fresh GA decision. | Before/at/after due, restart, one-shot dispatch, cancellation, stale scope and ready sibling tests; final Fast 204/Deep 40, six due cases per tier and six additional Deep waiting cases pass. |
-
-The owner's authorization permits these bounded repairs and maintenance alongside the existing evidence-delivery line. It does not change the requirement for current live voice/default target evidence. No new product feature, runtime flag, architectural layer, standing document, or semantic owner was introduced.
-
-## Cancellation workflow — #52
-
-The retained episode is an 8 p.m. reminder request. Its canonical stateful-effect Goal remains the same across `cancelled`, `not_cancelled`, `uncertain`, and released stale confirmation; the provider may independently be available or unavailable. These are fixture dates and capabilities, not newly scheduled user reminders.
-
-| Order / owner | Material input and prior wrong output | Repaired output and downstream contract |
-| --- | --- | --- |
-| Trusted control + Goal state | Exact scoped status and original unmet reminder Goal. | Inputs remain authoritative; control reporting grants no Work or new confirmation. |
-| Planner context / catalog | Response-only permission emptied the catalog and described the original effect as provider-free speech. **First wrong boundary.** | Preserve WHAT and full read-only capability facts while exposing no effectful choices for the control scope. |
-| Prompt / dynamic Schema | Correct Fast `respond` at satisfaction 0 was rejected; Deep could report false provider absence. | Both tiers can author exact status with explicit original unmet obligations. Independent Goals retain ordinary execution/satisfaction checks. |
-| Host validation | Restricted scope and global capability absence were conflated. | Reject owned Work, auxiliary actions, timers, cancellation commands, new confirmation and false fulfillment for that scope. Do not rewrite the model's meaning. |
-| Confirmation / Runtime / state | Audit-only probe did not prove token revocation or delivery. | Tests dispatch actual named cancellation, revoke the old token, preserve an independent sibling, and replay the real adapter/Runtime with fake providers. Speech completion does not create the cancelled reminder. |
-
-The four control statuses × two languages × two provider states are frozen independently of the original four cases. Original outputs and oracle identities remain retained. Reports about unavailable confirmation are factual prerequisites, not new confirmation requests. Some candidate wording remains technical; no live naturalness or audible delivery claim is inferred.
-
-## Reflection workflow — #53/#54
-
-| Order / owner | Before | After / evidence |
-| --- | --- | --- |
-| Runtime outcome / Host closure | Exact completed/failed results produce a slow opportunity. | Immutable outcome, exact Goal scope and source Plan retained. |
-| Host scheduling | Awaited optional Reflection before calling the ready result Planner. **First wrong scheduling boundary.** | Await result planning first; then schedule one bounded Reflection worker using the existing task owner. A blocked stub cannot delay Planner entry or completion. |
-| Host Mind projection | Actual Reflection request omitted approved Mind. **First wrong input boundary.** | Only approved profile identity/version, worldview, household values and core principles enter the request; arbitrary private material stays out. |
-| Reflection result / state | Advisory presence could bypass handled-Evidence suppression although the prompt omitted it. | Remove the current-turn consumer and bypass. Diagnostic replan/clarify/correct proposals cannot trigger another Planner invocation. Only an actually applied bounded Memory proposal counts as adaptation. |
-| Cancellation / shutdown | Optional learning shared the response dependency. | Busy-worker suppression, bounded deadline, cancellation propagation, shutdown draining and stale-generation rejection are tested. Terminal outcomes cannot reopen. |
-
-```text
-trusted execution outcome -> eligible result Planner -> response delivery
-                                      |
-                                      +-> bounded optional Reflection -> allowed future Memory
-```
-
-The event-order proof uses real aggregate closure with controlled model dependencies. Physical latency and provider preemption when a new user turn arrives during background inference remain target-profile evidence under #24; logical scheduling alone does not qualify the shared GPU.
-
-## Future intention and restart workflow — #58
-
-The six original English/Chinese weather cases bind `ready_at=2099-09-04T19:00:00+08:00` (`4092202800000` ms) and explicitly prohibit an early query. The previous contract required current executable Work alongside a timer. All six exact model outputs passed Schema/Host checks yet dispatched an immediate weather lookup through the real adapter/Runtime with a fake provider. Goal reconciliation correctly kept the information Goal open; it could not undo early dispatch.
-
-| Order / owner | Actual boundary and evidence | Repaired contract |
-| --- | --- | --- |
-| Canonical Goal | Exact future time, place/date/period and Responsibility provenance. | Preserve original WHAT; catalog availability does not make the Goal ready. |
-| Planner contract / Schema | Required an executable step even when the requested work was not ready. **Earliest timing conflict.** | `respond` plus one exact Goal/time condition, original Goal unmet, no current owned Work. Ready independent siblings and monitors of already-running Work retain their meanings. |
-| Resolver / Host | Prompt, Schema and validation could observe different clock instants. | Capture readiness once for the primary transaction; a clock tick during inference cannot reinterpret its output. Host independently rejects early Work or fake satisfaction. |
-| Runtime / speech state | Old lookup dispatched now; timer only woke cognition later. | Fresh Fast outputs replay with zero provider dispatch, original Goal open after speech, and exactly one due opportunity. |
-| Durable state / wake loop | Timer and Goal survive restart and wake once, but Planner rejected the wake because it expected a fresh GA result. **Second reproduced handoff defect.** | Bind matching trusted opportunity to exactly one current open snapshot per Goal. Reuse the existing Goal projection; do not synthesize a GA decision. |
-| Host re-entry / Planner / Runtime | Restart regression originally failed before inference despite valid saved Goal provenance. | Real Host re-entry now admits one fresh lookup at due, preserves Responsibility and source Plan, and does not redispatch on repeated wake or another restart. Missing, mismatched, duplicate or terminal snapshots fail before any model call. |
-| Primary clock projection | Six actual persisted-wake model packets omitted the fact that the time had arrived; all models waited again. The first helper-only patch still omitted that text in actual packets. **Third reproduced input defect.** | Both tiers now render the captured Host already-arrived Goal/time map in the primary prompt. Two actual-packet tests distinguish before/at due; six fresh Fast and six Deep outputs each perform one exact acquisition, retain final delivery as unmet and create no replacement timer. |
-
-The bilingual restart regression uses real persistence, wake-loop entry, Host request construction, Planner Schema/Host validation and Runtime dispatch with scripted models/providers. The injected clock is explicit; no year-2099 live or physical evidence is claimed. Six actual Host requests are additionally frozen for target-blind role inference. This closes the demonstrated authority gap without adding a scheduler, retry chain, or new Goal identity.
-
-## Lifecycle ownership and the external review — #56/#57
-
-The friend's review was read before continuing. Its in-flight #51 test counts and proposed numeric ceilings are historical suggestions, not current project authority. The useful concerns were evaluated against source and observed workflows:
-
-| Review point | Decision and evidence |
+| 证据 | 本轮结果与范围 |
 | --- | --- |
-| Reading burden | Use existing report/status/checkpoint/handoff owners, with immutable links to previous records. There are still 102 tracked Markdown documents and a 15-document core reading path; no extra current document was added. |
-| Numeric size limits | Preserve owner-approved #45: file/method counts inform review, but do not decide correctness or force extraction. |
-| Runtime class size | `VoiceAssistant`: 7,549 → 7,524 file lines, 104 → 105 methods in the reviewed Reflection change. `ConversationStateManager`: 6,172 lines / 105 methods unchanged. These measurements do not prove a defect or a need for a new manager. |
-| Real lifecycle seam | The conditional-weather episode moves through acquisition, immutable outcome, derived continuation, exact Host re-entry, and confirmed effect or delivered explanation. Goal reconciliation, outcome attachment and pending bookkeeping must remain atomic. Existing closure/reconciler/state owners already separate responsibilities; extraction would add handoffs without an independently owned invariant. |
-| Derived continuation | A new executable regression serializes the outcome, proves the derived property is omitted on wire, recomputes it on decode, and checks both Host projections. A model-supplied override is rejected. |
-| Narrow typing | Expand the existing gate to the complete `shared/chromie_contracts` package. All 33 enforced files pass locally; no blanket ignore or checked-path removal. CI verifies supported Python versions. |
-| Qualification last | Keep live qualification active. The unchanged baseline and repaired-source aggregate both stop at UMI; downstream source repairs do not hide that failed prerequisite. |
-| Ruff families / large test files | No evidence justified unrelated rule changes or mechanical splitting. Review scenario and owner boundaries when touching those files. |
+| Provider/adapter focused tests | 39 passed、21 subtests；`focused.after.log`。 |
+| Fast frozen mechanical validation | 204 validated，51 contrast sets；streaming52 / primary72 / re-entry80。不是当前语义通过。 |
+| Full native automatic | 17 passed / 62 failed，79 attempted、zero skipped；前序失败阻塞后续 turn，cohort_complete=false、qualification_complete=false。 |
+| Same-agent full adjudication | 10 个有限结果通过、6 个自动误通过、1 个自动 pass 未决、62 个保留失败；独立评审仍未完成。 |
+| TTS events | 旧批次7 tts_error、19 playback-start-timeout；本批次均0，有103首PCM事件/81个session。旧7个error不全是同类OOM，不能混算。 |
+| Automatic flips | 9 gains / 1 loss，相对上一轮9/79；部分 gains仍是语言、未查询或具身真实性未决。loss为走路请求遗漏Planner；语义不退化尚未证明，不能算模型改进。 |
+| Canonical local gate | 5 benchmarks failed /151 passed，四GA、一UMI；main/legacy 未到达。旧6 failures因 Fast adapter 修复少一个；更早124 main failures是历史结果。 |
 
-The retained lifecycle episode's module I/O is: admitted conditional Goal → Planner authors a complete prerequisite read with the condition/effect unmet → fake provider returns correlated forecast → Runtime closes only that Work → outcome reconciliation keeps the Goal open and derives continuation → Host forwards exact immutable Evidence once → the same Planner decides the conditional effect or truthful no-effect explanation → confirmation/execution or complete speech delivery closes the appropriate obligation. Already handled or delivered Evidence cannot bypass suppression merely because legacy Reflection advice exists.
+自动误通过具体是三份中文输入收到英文回复（identity、tired、respectful
+disagreement），能力问句被改成自我介绍，公交只答“会查”而没有查询/不确定性
+交代，以及未经核实的群聊传闻变成协助传播。favorite-season/body-truth 的人格
+经历与具身表述需要 exact identity/Memory/context 复核，保持未决。
+点头两次的执行 args 看似 `{}`，实际 catalog default count=2；raw Planner
+确有 count2，眨眼count1及顺序已完成，不误报数量丢失。中文偏好 case 仅当前
+确认，不证明持久记忆和未来 turn。完整原文和边界在 `fixed-full-adjudication.json`。
 
-## Evidence ledger and remaining qualification blockers
+此前审计将 silent-nod/come-here 归因于 Reflex，是 reviewer 漏读
+`cognitive_runtime.metadata.core_interpretation`；原文确实进入 UMI，不能修复
+正确 Host 来弥补认知遗漏。come-here 场景的明确契约是无可信目标时不说话、不
+编造移动方向，所以其有限安全结果正确；UMI 将移动当 speech/turn 的职责判定
+仍未合格。先前错误报告未删除，修正在 `reflex-adjudication-correction.json`。
 
-R = `.chromie/acceptance/remaining-issues-20260912/` (private, ignored; transfer separately). Source, corpus and packets were frozen for each model cohort. The fixed offline candidate is `gpt-5.6-sol/high`, one target-blind primary call per case, no retry, output repair, case substitution or production critic. Reviews are post-hoc and non-independent.
+纯眨眼原 case SID `100ff423` 已核对 exact primary call、完整 t0..t5 source、
+无历史/active Goal、正确 sim 状态、正常 stop 和有效 Schema/DTO；输出保留
+blink-once/body_action/social_expression，却只请求 GA。相关 prompt 明确所需
+Planner HOW，Host 未增补请求是正确 containment。已确认的是 UMI 主输出遗漏
+Planner 请求；尚未证明是模型能力上限，也未排除提示/契约等因素。此前
+`model_inference` 分类过于确定，现修正为原始输出错误、内在原因未证实。
+UMI 仍负责初始 Planner 激活，未修改其模型、提示、DTO 或 Charter。
 
-| Evidence | Observed result | Claim limit |
+以下问题仍不能忽略为模型不足：GA/UMI 冻结目标与当前契约失配、historical
+workflow 请求409、UMI binding职责与章程冲突、Attention同语义二次改判，以及
+compound body-family/cardinality/catalog约束、参数来源和SC provenance/context。
+SC422、JSON截断和延迟需要各自的 primary事务/资源证据；当前根因未知处保留
+unknown。修复不得靠改章程、Host补发Planner、第二语义审查模型、兼容退休
+字段、放宽安全/来源/Goal覆盖或批量改写reference来获得绿灯。
+
+没有新增维护文档、环境变量、运行开关、架构层或项目术语；维护Markdown
+103→103、docs-root58→58、core reading path15→15。两份identity oracle改动
+发生在native cohort结束后，只有保留输出的离线重判；不将其冒充新部署证据。
+修复及审计仍待评审，整个项目/目标资格与交付保持未通过。
+
+
+## 冻结参考与验证工具的职责修复 — 2026-10-04
+
+本轮基于同一 main/90d0af90；fetch 再次确认与 origin/main 相同。开始时备份全部
+68 个已脏路径；GA JSON 在写入前另存原始字节。UMI 原始语料入场无变更，保留在
+Git 中；早先绝对路径备份未生成本地副本，最终从该 Git revision 重建并逐个核对
+全部1,496 修改前摘要，原始内容完整。`umi-original-backup-finalization.json` 记录此纠正。没有调用候选模型，
+没有更改 Charter、模型、角色 prompt、生产 Schema/DTO 或认知职责，没有新部署。
+证据根：`.chromie/acceptance/contract-fixture-repair-20261004T084054Z/`。
+
+| 所有者 / 最早错误边界 | 原始失败、预期契约及修复 | 当前证明与限制 |
 | --- | --- | --- |
-| Canonical source gate after persisted-Goal repair | 3,105 tests / 794 subtests, 145 benchmarks, 20 legacy tests; pinned static/config/policy/ownership pass. | Final delivery gate recorded in handoff; two existing FastAPI warnings. |
-| Future-readiness module | 50 passing cases, including bilingual real Host restart, 14 pre-inference rejection contrasts and two actual primary packet clock contrasts. | Scripted models, fake providers and explicit clock; source evidence. |
-| Level A ability suite | Final source run passes 45 distinct cases across all 15 classes. | No live behavior inferred. |
-| Fast full 1 | 203 Schema/Host; semantic review: 197 pass, six early-work failures, one malformed JSON reply. | All original results retained. |
-| Fast full 2, unchanged replication | 204 Schema/Host; semantic review: 198 pass, six early-work failures. | A replication, not a claimed fix for the isolated JSON failure. |
-| Fast full 3, waiting repair | 204 Schema/Host/frozen hard and semantic review; six waiting outputs pass Runtime replay. | Predates persisted-Goal wake repair. |
-| Deep full 1 | 40 Schema/Host/frozen hard and semantic review; 16 cancellation and six waiting contrasts reviewed. | Predates persisted-Goal wake repair; supplemental waiting oracle invocation was corrected separately after a harness nesting mistake. |
-| Persisted-wake Fast contrast 1 | Six Schema passes, zero Host/semantic passes: every raw result waits again at the already-consumed time. | Missing primary prompt projection of the Host’s already-reached readiness fact; the first incomplete helper-hook repair also fails six. Both failed batches retained. |
-| Final Fast cohort | `fast-full-5`:204 Schema/Host/frozen hard/semantic passes;16 cancellation and 6 persisted-due passes. | One allowed parameter-provenance normalization, zero disallowed semantic normalization. Final Fast source is unchanged through Deep qualification. |
-| Final Deep cohort and supplements | `deep-full-2`:40 Schema/Host/frozen hard/semantic passes;16 cancellation, 6 future-waiting and 6 persisted-due cases also pass. | Original future reference regions used correctly; all raw outputs reviewed, no retry or normalization. |
-| Local Qwen9b UMI output-budget contrast | 44 cases / 63 calls, source stable; 34 final decisions returned, only two pass all strict dimensions; still one 2,048-token truncation. | Strict literal span/wording failures are separate from concrete missing effects and wrong binding/mode failures. All 44 outputs reviewed; no profile promotion. |
-| Final behavior-source aggregate live preview | 51 must-pass cases; first UMI case fails, second startup interrupted, 49 unrun. Exactly one bundle; final simulator safe idle. | Incomplete failed cohort. GA, Planner and execution not reached in the failed case. |
+| UMI corpus / scenario_or_oracle | 1,496 参考仍请求 Runtime 已固定唤醒的 SC，850 个 body-action 缺现行 family。移除仅 SC request，保留其他请求及次序，补既有 body family 和对应审查标签。 | 1,496 Schema/Host 全通过；730 task physical、120 social expression。4 项测试通过，包括 manifest tree digest 和标签不一致拒绝。原文、WHAT、上下文、数量、来源、次序、contrast/split 不变；非 candidate inference/独立复核。 |
+| GA validator / context_or_harness | 自行重建 Schema，遗漏生产 continuity scopes、uncertainty refs 和 min-confidence 参数。改为捕获实际 primary `response_format`；Host 的已知拒绝不再阻止 qualification 工具捕获其主调用。 | 主调用 Schema 逐字核对与 fail-closed capture 回归通过；没有复制另一套生产规则，没有增加模型调用。 |
+| GA corpus / scenario_or_oracle | 无旧 Goal 关系的参考仅以旧 identity-only `new_goals` 表达未关联 refs。逐个证明原 related/supersedes 均空，按既有 association-only 契约迁移 1,300 个 wire references；退休 decision 和空 non-goal 集合移除。 | 全部 1,500 的原输入、WHAT、候选、原关系、置信度、路由、顺序、约束及划分保留；200 个含关系的 wire reference 未迁移。原始字节和逐文件前后摘要均保留。 |
+| GA oracle / scenario_or_oracle | 旧责任映射只检查 supersedes，遗漏 related identities，可能将历史引用丢失算通过。映射现在同时检查两类关系；参考验证与 qualification 共用同一映射，并核对 Host 物化结果。 | 新回归以 Schema 接受、Host resolved 但 related IDs 丢失的输出证明 hard/strict pass 都为 false。它暴露失败，没有修改候选结果。 |
+| Detached-dispatch test fixture / context_or_harness | 真实 Host 调用现行 `track_capability_dispatch`，过期 `_Sessions` 替身没有该方法，5 个测试在执行断言前抛 AttributeError。替身绑定现行 SessionTracker 跟踪逻辑。 | fail-first 5 failed/3 passed；修复后相关文件与 session trace 共14 passed。新增断言跟踪数量在派发期间为1、收尾后为0；生产执行/安全策略未变。 |
 
-The 9b experiment changes only the output budget from 512 to 2,048 against the same complete-Mind corpus and prior exact packets; `think:false` stays fixed. The blink case's `unresolved` field contains extended self-deliberation until truncation. Other outputs collapse walk/nod/turn or speech/body siblings into one responsibility, confuse duration with time scope, or turn an information query into speech. The budget-only hypothesis does not resolve these failures. Two-second GPU samples show at most 11,549 MiB used and at least 4,397 MiB free with one resident model; TTS was healthy but concurrent TTS load was not tested. This is neither a model intelligence ceiling nor a qualified combined profile.
+UMI tree digest 为 `d0c0cf766d23ecfb5c2fe317ca889a9bcbe5dd3586f707411c9fd34d693503e7`；
+GA tree digest 为 `ca2936e946b508bca7828e52cd1ed833fe916ea53cac0b9c691de85823e744b7`。
+`umi-reference-reconciliation.json` / `ga-reference-reconciliation.json` 记录可逆的逐文件
+迁移证明；仅恢复退休 wire 字段、移除新增既有 family/related 审查字段即可重建原值。
+所有参考仍为 training_eligible=false、independent_semantic_review=false。
+冻结测试的负责人复核、target-blind inference 和当前模型资格仍未完成。
 
-The live request is “walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left.” At final behavior-source runtime identity `ccb85b7e47fd86467f143fa6c7cbc4f2cd596494724659c779ccf4ba985c9470`, UMI call `llmcall_user_meaning_interpreter_d2278e1d3bfa4a1b` emits one body-action responsibility and copies the whole turn into `subtype`. Host rejects `invalid_primary_user_meaning_interpretation_semantics` with HTTP 503; GA/Planner/Runtime are not invoked. All 113 deployed Agent/shared files match the local source. Source and provider identity stay stable through that incomplete cohort; final simulator safe idle is verified and owned services stopped. The single debug bundle is `chromie_debug_bundle_20260912_193424.tar.gz`. This dirty-source diagnostic precedes final documentation/commit and is not clean-revision or physical evidence. Earlier unchanged and repaired-source failures remain separately retained.
+### GA 的实际反例路径与生产缺口
 
-The coverage-designed tracked corpora contain 204 Fast cases (17 capacities × three families × two conditions × two languages) and 40 Deep cases (ten capacities × two conditions × two languages), replacing earlier scale-based proposals. Cancellation and persisted-wake contrasts cover the newly reproduced boundaries. #35's offline evidence does not include UMI, GA, native stream/provider behavior, automatic Agent Skill selection, physical voice or target qualification. These remain separately scoped evidence; none is inherited from surrogate passes.
+这三个反例是真实 resolver 加脚本化参考输出的离线重放，不是 native LLM 或机器人
+episode。`ga.boundary-examples.json` 保存每案完整输入、实际 primary prompt/Schema/
+options、原始返回、物化结果和来源摘要；body probe 仅在内存补齐既有 social family。
 
-## Publication and reproducibility
-
-The [preceding audit](https://github.com/TimeTreker/chromie/blob/c142f16c6993ed60a93e2155c93906930c2fa445/ARCHITECTURE_AUDIT.md), [checkpoint](https://github.com/TimeTreker/chromie/blob/c142f16c6993ed60a93e2155c93906930c2fa445/DEVELOPMENT_CHECKPOINT.md), and [handoff](https://github.com/TimeTreker/chromie/blob/c142f16c6993ed60a93e2155c93906930c2fa445/HANDOFF.md) retain the friend's review context, original probes, #49–#51 deliveries and earlier exact evidence. Historical failures remain immutable; amended oracles require new inference and never relabel old results.
-
-GitHub closure is verified for #35 and #52–#58, including the supported-version CI evidence linked on #56. #24/#32 remain the only open Issues, with the failed native-model/live evidence above.
-
-A fresh clone can run the tracked source gates and full Planner corpus. Exact candidate raw replay, local-model comparison, captured persisted-wake requests and live evidence require the private archive identified in HANDOFF. Physical microphone/speaker/robot evidence remains absent. Close Issues only against delivered acceptance; keep #24/#32 and any still-failing qualification open with concrete evidence and resume commands.
-
-## Engineering integrity continuation — #24/#32, 2026-09-14
-
-Scope: acceptance collection and evidence, based on `d5a7985e`; no model, prompt,
-semantic Schema, production authority, or provider change. The originating live
-workflow is retained in the native UMI continuation section. This diagnosis concerns
-why collection continued after a correctly reported hard failure, not why the model
-misinterpreted the turn. Model-inference root cause for that separate question remains
-unresolved by this slice.
-
-| Order / owner | Authoritative input and actual output | Expected output / verdict |
+| 模块 / 职责 | 权威输入和实际输出 / 下一边界关联 | 预期、边界判定 |
 | --- | --- | --- |
-| 1. Native UMI → GA and Fast Planner | Compound walk/nod/turn session `cbe8a87b`: deeper UMI supplied three Responsibilities after primary fusion; GA conserved speed `0.2`; Fast authored `0.02`. Exact native correlations and raw-output review remain in the earlier section. | UMI primary meaning and Fast numeric result failed the semantic contract. This slice does not repair or requalify them. |
-| 2. Host validation / Runtime | Fast result rejected with `failure_domain=model_contract`, `failure_class=fast_stream_contract_invalid`, stage `fast_planner_stream`; no capability work started. | Correct containment. No second semantic repair call or substituted argument. |
-| 3. Text-check harness | Returned `ok=false`, the structured failure, SID and errors to General Ability. `status_after=null`; a separately retained later query proves post-stop safe idle only. | Correct failure propagation; per-case post-run idle remained unproven. |
-| 4. General Ability collection | Received that completed result, appended it, and immediately started the next selected case. It checked failure only after finishing the entire stage. | First wrong collection boundary. Integrity should stop before another case; ordinary scenario mismatches may finish the stage. |
-| 5. Private asynchronous watcher | Polled completed summary files; original domain set omitted `model_contract`. Second case `8a11295e` failed; reviewer stopped during the third. | Incorrect/missing automatic stop. Adding the domain alone would still leave a poll/start race. |
-| 6. Evidence/report handoff | Live run ended 2 failed / 1 interrupted / 48 unrun with one externally collected bundle. Final aggregate generation was interrupted. | Incomplete diagnostic, not a passing subset or qualification. |
+| UMI → GA fixture / 已接受 WHAT | r1 完整“别做原来的了，改成眨两下眼睛。”，旧开放 Goal `goal_07_05_a`；历史引用案保留完成 Goal 及“把刚才完成的目标内容再告诉我一次”。 | UMI 本身未调用；下游投影 DTO 接受。它不应写 Goal 关系或执行参数。不能据此声称真实 UMI 已理解这些 turn。 |
+| GA primary decoder / 关系表达 | 当前公共 wire 只能 associations 或未关联 ref。将新任务标为未关联时，Schema 接受 r1，但没有可写位置保留原 supersedes/related identities。 | 最早缺口在可表达的关联契约；单次主结果应能表达替代或历史关联且不重写 WHAT。不能靠 prompt 让不存在的字段变合法。 |
+| GA Host / 机械物化 | 从 r1 精确继承 WHAT，生成 new Goal；related/supersedes 都被固定为 []。 | WHAT 复制正确，关系丢失；新增 oracle 已拒绝该结果。该反例没有调用第二模型。 |
+| Orchestrator replacement owner / 状态与取消 | 生产 `apply_goal_replacement_resolution` 从 new Goals 的 supersedes IDs 建立取消及 superseded 状态；本重放未提交状态。 | 空关系不能触发已有替代路径。实际旧 Work 是否继续、取消 receipt、safe idle 和新动作执行均未知，不能由纯 resolver 重放断言。Planner、SC、Soridormi 未调用。 |
+| Media GA Host / 规划前置条件 | r1 完整“播放《晨光钢琴》”，media_playback、未关联；Schema 接受，Host 要求 UMI-owned media_operation binding，返回 fail_closed、无 Goal。 | GA 在 Planner 前要求参数，现行 Goal carrier 和 Planner projection 都有该前置条件。未往 UMI fixture 添加 binding 来通过；原意应交给 Planner 提取。相关生产契约尚未修改。 |
 
-```text
-case finishes -> structured hard failure -> synchronous collection check
-                                          -> retain failed case + unrun coverage
-                                          -> aggregate + reviewer artifacts -> exit
-                                                                           -> one debug bundle
-ordinary scenario mismatch -> remaining stage cases -> existing stage gate
+完整 GA 参考重放的 source/harness/corpus 摘要前后相同；结果为1,090 Host accepted、
+200 原有 typed-state negatives 正确 fail closed、1,290 validated，另210 errors：
+100 replacement、100 terminal reference、10 media creation。原有200 negatives 的
+拒绝原因仍为 intent-only update 无法更新缺少现行 meaning-source 的历史 typed Goal；
+没有状态泄漏。它们不是成功履行，也不是模型能力失败，仍保留原缺口标签。
+
+另发现 terminal reference 的上游 fixture 错将复述历史任务继承为 body_action/
+stateful_effect/media_playback，共50 案；这是 fixture 类型问题。仅在假设探针改变
+该元数据，未写入当前源；即使修正，历史 Goal 关系仍会丢失。信息型/普通发言的
+其他50 案不需把模式强行改成动作。
+
+修复关联的公共输出会使当前不能表达的有效关系变得可表达；按既有资格方法的
+Global change review，当时尚未修改生产 DTO/Schema。负责人后续明确要求修复 GA
+自己的契约、禁止其他模块代判；该指令及原职责修复证据见下方最新记录。
+提议保留 GA 的关系权威、UMI 的完整 WHAT、Planner 的 HOW 与 Host 的生成/状态权威，
+不需要修改 Charter，不添加第二语义调用。Media 前置条件、Attention 二次决定、
+SC silence、历史 workflow 409 和 live 参数/provenance/延迟问题继续开放。
+
+针对性 corpus/adapter suite 为20 passed（完整 corpus 检查另跑，未将排除视为通过），
+detached/session suite 为14 passed。迁移前 adapter 修复后 canonical 为3 failed/156 passed；
+迁移后的完整 canonical 为1 failed/159 passed，主测试118 failed/3,801 passed/5 skipped、
+1,013 passing subtests；这不是绿色 gate。Junit 保留117 个失败 testcase records（其中
+behavior suite 含两条失败），以原始终端118 failure 总数为准。82 条 testcase trace
+出现 workflow HTTP409；其余35 条仍需逐案 review，不能统称模型能力失败。
+维护文档/环境变量/运行开关/架构层数量未增加。本轮只有离线资产与测试工具证明，
+此前79-case native run 的身份和限制保持不变；没有新 voice、物理或 release 证明。
+
+
+Primary provider screen 还保留负责人此前撤回的 Tianxin 拼写歧义 turn 副本，指向
+已经删除的 live source scenario。现已删除该 active v2 case 和清单条目，24→23，
+其他23 个输入/目标不变；未知名字一般能力断言使用仍保留的 named_lookup_en。
+历史v1 及旧24-case证据保留为历史，不作当前可运行声明。这个清理不修复其余
+primary 参考缺少 body family 的问题：focused provider tests 仍5 failed/21 passed/
+4 subtests，最早错误从缺失来源转为 body reference Schema。未放宽加载器或添加
+含混 compound family 来取得通过；完整结果须继续保留为失败。
+
+
+随后复核 current DTO 与原有 compound split 回归，确认同一次 UMI 结果已有多个
+source-grounded Responsibilities 的表示；原 expected dimensions 本来就列出了这些
+独立请求。13 个单一动作补齐既有 family；两个 mixed 参考改用该现有 split variant，
+精确来源、用户原文、目标判据、数量、先后/同时、confidence、contrast/split 均保留。
+这没有扩展 DTO 表达能力、增加语义事实/模型调用或把 Activity/Capability/args
+交给 UMI；只是选择既有允许的参考结果，Planner 的 HOW 权威不变。
+
+新合法 body family 又被 provider oracle 的旧字段白名单误报为 downstream field。
+修复该已有 WHAT 字段的白名单；binding/HOW 拒绝仍在。修复前5 failed/21 passed，
+修复后26 tests/6 subtests 全通过；23 references 的现行 Schema、Host、原 semantic
+oracle 全接受。原始23 JSON、两个 split 变体的来源证明、逐文件摘要及完整中间失败
+均保留；独立复核和真实模型推理仍未完成。此阶段 full gates 为 canonical1 failed/159 passed；独立 main113 failed/3,806 passed/
+5 skipped/1,015 passing subtests，另20 legacy checks 通过。`validation.final.json` 证明
+测试期间 source patch 完全不变；所有失败保留，没有 delivery/target/训练资格声明。
+
+
+| Primary screen 模块 / 所有者 | 本案输入、实际旧输出与 handoff | 修复后的预期 / 边界 |
+| --- | --- | --- |
+| 冻结 fixture author / WHAT 参考 | “把那个拿给我。”的 r1 是 body_action，来源t0..t6，但缺 family；mixed walk/nod/turn 的单一 r1 与原目标列出的3个动作不同。 | 简单动作补已有 task family；mixed 使用当前已允许的 source-grounded 多-ref结果，各句保留 then/同时及原精确 token。用户输入/目标维度不变，不指定 Activity、Capability 或 args。 |
+| UMI dynamic Schema / DTO Host | 相同 request.text、language、context；原 body reference 在 schema/Host 拒绝，qualification 尚未调用 provider。 | 原语义、现行 WHAT field、同一请求覆盖全部 refs；23案通过；UMI模型本身未执行，不能据此声称模型正确。 |
+| Provider-screen semantic oracle / 判分 | 新合法 body family 到达白名单，被误报“UMI authored a downstream contract field”，首案阻断整个加载。 | 承认 DTO 已有的 WHAT family，保持 bindings/执行字段禁令和原完整意思/来源/计数/关系判据；26 tests/6 subtests passed。 |
+| Qualification runner / model-call boundary | 早先因缺失来源、schema或oracle失败而在真实 provider 请求前退出；后续 GA/Planner/SC、Runtime、Soridormi 均未调用。 | 仅证明参考与工具可加载；未执行真实模型资格、状态提交、Work或音频。未来完整 target-blind cohort 和独立复核仍需要保留。 |
+
+
+### 进一步修复过期模拟返回与断言
+
+主测试仍有20项在模拟返回进入现行契约时失败，未到达原来的行为断言。
+`handoff-fixtures.before.log` 保留20 failed/69 passed/6 subtests 的初始三个模块结果。
+逐个检查原始 wire：三个 GA 正向返回均仅选当前来源 refs，related/supersedes
+原本全空；因此改为现行 unassociated refs，不添加新关系、WHAT 或模型调用。
+未来任务参数、有效/无效时间、独立可执行任务、数量和错误来源等全部原断言保留。
+另三个 scenario 只为5个既有 body WHAT及其预期补齐已定义 family；移除该字段
+即可逐值重建原 JSON。用户输入、置信度、次序、来源和 Planner 请求不变。
+
+| 实际路径 / 所有者 | 初始输入、错误输出和下游症状 | 修复后的 I/O 与回归 |
+| --- | --- | --- |
+| 测试模拟器 → GA primary DTO → Host carrier → Planner | 复合动作、未来点头与立即眨眼等完整 r1/r2；模拟器仍返回已退休 identity-only new_goals，DTO 要求 unassociated refs，Host fail_closed，后续 Planner 断言未执行。 | 同一次主调用输出现行 ref 集合；实际主调用 Schema 验证通过，Host 完整继承 WHAT，Planner 数量/次序/证据/时间断言执行。17项恢复，未增加语义 authority。 |
+| 不确定性模拟器 → GA → clarification containment | 单字片段 Responsibility 已由 fixture 提供；旧 wire 被拒，测试还检查退休 decision/new_goals Schema字段。 | 保留全部已有含义，单次关联结果及 Host Goal carrier；GA没有 clarification 权限，主 Schema不暴露旧字段。原禁止问句权威的断言仍在。 |
+| 行为 scenario author → UMI DTO → suite oracle | walk、blink、nod5个正向参考缺当前 body family；真实 DTO 在其他行为验证前拒绝。 | 只添加既有 family及匹配预期；两个 suite 正向场景恢复。没有真实 UMI推理、机器人或音频。 |
+| Weather负向测试 author → GA primary DTO | intent_goal/create_goals helper只提取refs，错误的 output_mode被 helper丢弃，模型根本未收到待拒绝字段；原负向断言因此误报生产故障。 | 测试直接提交带非法 output_mode的公共 wire，Schema和Host都拒绝；正向继承 information及原地点/时间；错误 source_quote仍被 Planner拒绝。 |
+| Host exception containment / 固定故障通知；UMI context projection / 语义上下文 | 原测试检查退休的重说文案或 Goal context标题，但当前记录分别是真实系统未完成通知与不含 canonical ID的语义上下文。 | 保留 not_authorized及单次派发断言，故障通知按当前既有确定性契约；上下文检查精确 goal_id/task_id字段不泄漏、完整人类意思仍可见。只更正测试。 |
+
+全部六个相关模块150 passed/10 subtests；中间剩1项退休 GA prompt文字断言也
+保留，再改为当前 UMI WHAT/GA association-only合同后通过。原始8个文件、逐文件
+摘要、可逆 scenario差异和所有中间失败在 `handoff-fixture-reconciliation.json`
+及 `handoff-fixture-before/`，未改生产行为。最终 canonical仍1 failed/159 passed；
+独立主测试86 failed/3,831 passed/5 skipped/1,017 passing subtests；legacy20 passed。
+`canonical.last-fixtures.log`、`main.last-fixtures.log`/XML 与 `validation.final.json`
+记录同一未改变的 source patch。政策、文档和测试所有权检查另在最终文档更新后复核。
+
+工作流 HTTP409另保留完整只读首次失败探针 `workflow-first-boundary.json`：
+workflow-normal 的当前 admitted input生成真实 UMI请求，严格 replay在第一步gi
+拒绝该请求；position=0、accepted model outputs=0、candidate calls=0。
+冻结的Schema缺现行 body family、保留退休 SC激活枚举，system/user prompt也旧；
+服务的409是正确拒绝的下游症状，不是模型或远程服务能力证据。UMI DTO、GA、
+Planner、Runtime和provider均未进入。实际当前包和完整冻结包及17类差异均保留，
+没有放宽严格重放、改写请求或从执行结果拟合目标。86条最终失败记录中82条含
+该类409；另1条 workflow变体在进入 candidate之前被同样的旧包阻断，其余为两项
+prompt literal guard和一项退休 non_goal_schema断言。它们均未执行真实模型，
+不能算模型能力失败；完整6000-case参考的来源、错误注入和预期状态仍需在 GA接口
+定稿后逐项复核并重新冻结，不以替换请求哈希或删除测试取得绿色结果。
+
+
+## GA 原职责接口修复 — 2026-10-04
+
+负责人明确：UMI 判断是否请求 Planner；GA 自己返回正确关联契约；禁止其他模块
+代判或自行改变职责。按这条指令在 GA 原所有者修复；未修改 Charter、UMI
+提示/DTO、模型、Planner 或 Host 的运行职责。此前“需要授权”的术语指 GA
+Schema 无法表达已有的合法关系，不代表应该由其他模块来补判。
+
+本次受控原始案例为 `ga_daily_v1_07_00_supersede_existing`：接受的 r1 完整
+意思为“Forget the original goal; blink twice instead”，候选旧 Goal 为
+`goal_07_00_a`；参考选择 source r1、supersedes old ID、related=[]。另保留
+`ga_daily_v1_07_00_reference_terminal` 的历史解释关系，以及
+`ga_daily_v1_04_00_create_without_candidates` 的“Play Morning Piano”完整媒体
+意思。输入来自冻结 fixture，UMI/真实模型/状态提交/Planner/SC/provider 都未调用。
+
+| 模块 / 原所有者 | 权威输入、实际输出与最早边界 | 修复后的检查和传递 |
+| --- | --- | --- |
+| 接受的 UMI DTO / 上游 WHAT 与初始激活 | r1 的完整意思、来源、result type 和原 cognition requests 已给定；本次未调用 UMI。fixtures 是输入，不能用 GA 修正它们。 | 原输入/WHAT/request/oracle 保留。真实 UMI 正确性在此未证明。 |
+| GA primary Schema / GA 接口 | 原 Schema 删除 identity-only `new_goals`，只剩未关联 ref；合法历史/替代关系无法表达。这是最早错误，与模型能力无关。 | 主结果恢复 `associations` 与 `new_goals`；每个 identity row 只允许 source refs、related IDs、supersedes IDs。不得输出 WHAT/Capability/args。 |
+| GA raw→DTO / GA 主结果 | 受控参考返回完整三个数组；原接收代码忽略它并固定清空关系。有效结果应保留 GA 主选择。 | 必须显式完整数组；缺失/未知/重复/矛盾/终结任务替代/重写 WHAT 均拒绝。有效案例只一次 GA 调用，无语义补判。 |
+| GA materializer / 确定性传递 | 原媒体 case 的完整 WHAT 被要求提前有 UMI media_operation，导致 Planner 尚未收到意思就失败；这是接收契约越界。 | 复制 UMI WHAT、GA links，媒体无需执行参数前置条件；不推断播放操作、不补 Planner 请求。Planner 保留 HOW。 |
+| Host 状态/取消 / Runtime | 此 corpus 中未调用，不能声称 live Work 已安全停止。 | 现有 replacement/cancellation 原子状态测试随 focused suite 通过；代码未新增取消或确认旁路。真实执行仍需当前部署证明。 |
+| Planner / HOW、SC / wording、provider / 执行 | 三个受控案例中均未调用。 | 保留其职责；Schema/DTO/Host 成功不等于任务履行或机器人证据。 |
+
+```mermaid
+flowchart LR
+    U[冻结的接受 UMI 输入] --> S[GA 主 Schema]
+    S --> G[一次 GA 主关系选择]
+    G --> V[DTO 与确定性 ID 验证]
+    V --> H[复制 UMI WHAT 与 GA links]
+    H --> D[交给已有状态及 Planner 边界]
 ```
 
-The repair stays in `scripts/general_ability_acceptance.py`: inspect structured
-Runtime/model failure, existing LLM-integrity evidence and omission/provenance
-metrics, existing safe-idle checks, and typed harness exceptions before launching
-another case. Nested episode failure retains the actual runtime turn/SID separately
-from scenario-turn identity. Unavailable post-run status in execution mode is a stop,
-not fabricated unsafe-state evidence or proof of recovery. Collected records keep
-hard failures even when their incoming `ok` is accidentally true. Skipped cases
-remain explicit; incomplete episodes also make collection incomplete. Semantic
-review remains pending and cannot override the mechanical gate. No error-string
-phrase classifier, polling process, new model invocation or production switch.
+最早机制修复是让 GA 在主结果中表达自己的关系，并要求完整、原样传递。
+媒体修复仅去掉 GA 错误要求 UMI 先做 Planner 参数提取的前置条件，不增加新
+语义所有者。移除退休 WHAT decoder 分支及无用 helper，Schema 文件
+1,270→672 行；无新增维护文档、环境变量、运行开关、架构层或项目术语。
 
-Primary attribution: `context_or_harness`, specifically an implementation/process
-contract mismatch. Lower acceptance documents required unconditional stage completion;
-they now agree with the higher-authority integrity exception. The private watcher's
-missing domain and poll race contributed. The underlying semantic failure is the
-trigger, not an explanation for the collection defect.
+证据根 `.chromie/acceptance/ga-relationship-contract-20261004T111406Z/`：
+原3,099 dirty paths 和角色源全部留存；完整1500 baseline 为1090接受/200已知
+拒绝/210错误，关系修复后1280/200/20，媒体前置移除后1300/200/0。
+所有原输入、完整 WHAT、关系、oracle、请求、顺序、contrast/split 未变；
+1300 link-free rows 恢复显式空关系，200 linked rows 保留原选择；不是按模型
+答案改目标。原200 typed-state 拒绝仍无状态泄漏，不计作履行成功。
+50历史解释输入的旧 result type 仍需上游 fixture 审阅，GA 不替它改意思。
 
-Evidence under `.chromie/acceptance/engineering-integrity-20260914/`: 21 new tests
-fail on old source; focused runner/text-check suite passes 92 tests; all 45 Level A
-scenarios pass. `replay-boundary.py` injects each of the two exact retained failure
-summaries independently into the original and patched collection boundary over the
-frozen 51-case discovery. Before: 51 attempted slots. After: 1 attempted / 50 unrun.
-Repeated fault slots are scheduling probes, not 51 independent model results.
-Positive controls collect all selected cases in preview and execution-shaped fixtures;
-ordinary failure still exercises the existing stage gate. Final canonical result is
-recorded in the checkpoint/handoff after completion.
+回归3错/5正确拒绝→8通过；媒体两个 candidate/no-candidate case 先失败。
+focused256 tests/32 subtests、补充112/24及相关 Level A18/18 通过。机械参考
+验证没有真实模型推理、独立语义评审、训练或 live/voice/physical 资格。
+初始本次 canonical2失败/158通过；main86失败/3841通过/5跳过/1017 subtests。
+其中83个工作流记录仍是旧捕获契约；两个字面提示保护及一个退休媒体前置
+断言已在测试原所有者修正。UMI 通用 follow-up 示例不是确定性语义 phrase rule；
+GA 的来源覆盖和不改 WHAT 由行为测试验证，未为测试字符串修改 UMI 提示。
+后续 canonical、官方 Agent 构建与完整实时结果见下一节；这些初始结果保留为机制诊断历史。
 
-Evidence ceiling: Level A harness/source validation only. No native call, deployed
-change, physical audio, simulator action, model-quality improvement or fine-tuning
-readiness is claimed. Existing source/workflow replay cannot replace independent
-positive-reference review, injected-fault exclusion, hidden semantic-family holdouts,
-or isolated and combined production-role qualification. #24/#32 remain open.
+眨眼分类也已更正：原 SID100ff423 UMI 输出漏 Planner 请求是已确认观察；
+“内在模型能力不足”以及“已排除提示原因”均未证实。
+`blink-adjudication-correction.json` 保留这一区分，未覆盖原调用证据。
 
-Surface review: no new Markdown document, environment variable, profile, service or
-model-facing field. The existing collection owner gains one internal inspection
-function; file size grows because it now owns the previously private stop/report
-responsibility. A separate watchdog/module would add a handoff and preserve the race,
-so no extraction is justified. The private polling watcher is the consolidation
-opportunity and must not be used for future launches. Rollback would restore the
-proven collection defect; no model/runtime rollback is needed for this patch.
+## 历史 GA 与 Planner 配套诊断 — 2026-10-04
 
+GA 移除媒体前置条件后，Planner 自己仍在提取 `media_operation` 时拒绝现有
+`none`，完整“播放《晨光钢琴》”无法进入主 HOW 选择。这是确定的契约问题，
+不是模型能力问题。修复只发生在原有 GA/Planner 边界，没有让 GA 选择媒体操作。
 
-## Preflight admission continuation — #24/#32, 2026-09-14
-
-A controlled dependency reproduction found that the text acceptance checker recorded
-failed provider/state checks but still created a session. The triggering probe was
-`walk forward`; rejection is independent of its semantics. Models, prompts, runtime
-profiles and production semantic authorities are unchanged.
-
-| Order / owner | Authoritative input and actual output before repair | Expected output / verdict |
+| 模块 / 职责 | 实际案例的输入与最早错误 | 修复后的输出及下一边界 |
 | --- | --- | --- |
-| 1. Agent health / harness | Controlled health has no Soridormi manifest, or healthy manifest for status variants. Health JSON retained; missing manifest adds an error. | Correct detection; capability invocation beyond status must not be admitted after failure. |
-| 2. Soridormi status / harness | Controlled status varies simulator mode, safe-idle, active task, fallen or emergency state. Status JSON retained; mode and existing `safe_idle_errors` checks add errors. | Correct detection. The fixture establishes returned state, not physical state. |
-| 3. Text-check admission | Nonempty preflight errors still reach `create_session()`. All 28 invalid combinations reproduce this across preview/execution and owned/shared assistant lifecycles. | First wrong boundary: reject before session/Gateway admission. |
-| 4. Gateway → Core or reflex → final dispatch | Source inspection shows these paths follow session creation; Core permits early typed presentation before final planning. The outer dispatch guard checks accumulated errors later. Test deliberately stops at session creation. | Late guard cannot establish non-admission. Actual downstream effects were not measured; no physical leak is claimed. |
-| 5. Evidence and lifecycle | Before repair the admission sentinel raises; after repair a failed summary with null SID/cognition/execution/post-status returns to the caller, and owned-assistant cleanup runs. Shared cleanup remains with the sequence owner. | Correct repair/containment. Initial status is not relabeled post-run evidence. |
-| 6. General Ability collection | Structured preflight rejection reaches the existing synchronous integrity gate. Stage contrasts prove one attempted case and explicit unrun coverage. | Correct stop before another case; no model failure or semantic judgment is invented. |
+| 接受的 WHAT / UMI 上游输入 | r1=`Play Morning Piano`，media_playback；无 operation binding。受控探针没有调用 UMI。 | 原意思、来源及初始认知请求不变；不能据此证明 UMI 模型正确。 |
+| GA / 关系主结果与继承 | 完整身份行正确，Host 曾因无上游 operation 拒绝。 | GA 自己输出 refs/links；Host 继承 WHAT，保留现有 `operation=none`，不推断 play。 |
+| Planner context / HOW 输入 | `planner_provider_media_goal_operations` 在主推理前拒绝 none；合法 primary media Plan 在 provider validator 也被拒绝。 | 现有 none 表示操作尚未确定。已知操作继续原样传入，非法保留操作仍拒绝；不在 context 选择操作。 |
+| Planner primary Schema / 模型 HOW | 无上游 operation 时合法 media Capability 不能被选择。受控参考为一次 Planner 主结果；无真实模型调用。 | 主结果可从当前声明且可用的 media catalog 选择恰好一个能力；已知操作仍约束 exact capability。媒体不可用时 execute 被排除，speech/vocal 不得替代。 |
+| Host validator / 确定性检查 | 收到合法单一 media 主结果；此前错误前置使其失败。 | 保留参数、来源、Goal 范围、数量与可用性检查，不补操作、不改语义。此次未提交状态、调用媒体 provider 或实际播放。 |
 
-```text
-Agent health -> Soridormi initial status -> existing preflight checks
-                                             | failure
-                                             v
-                                retain rejection -> owner cleanup
-                                             -> cohort stop + unrun coverage
-                                             | no session/Gateway/Core/dispatch
-checks pass -> existing session admission -> unchanged production turn workflow
-```
+`planner-media-first-boundary.json` 留存原错；编辑前冻结的八个对照
+`planner-media-contrasts.frozen.json` 从3/8到8/8。
+`planner-media.after.log` 为158 passed/24 subtests；Fast204完整 references
+生产 Schema 检查保持有效；相关三个 Level A 类18/18通过。以上是机械证据，
+默认媒体 provider 不可用，不能称为真实播放资格。
 
-Root cause is a harness control-flow error: preflight validation accumulated errors
-without enforcing its admission contract. The later execution guard was a contributing
-condition, not an adequate boundary for the complete turn workflow. The repair adds
-an early failed result to the existing `run_check` owner. It uses the existing
-`harness_failure` channel and safe-idle validator; no additional runtime authority,
-semantic classifier, environment variable, flag, or document. Production deterministic
-stop/emergency processing remains unchanged; this gate controls acceptance-case
-admission only.
+### 当前本地门禁和两轮真实模型验收
 
-Evidence: `.chromie/acceptance/engineering-preflight-20260914/`. Fail-first run has
-28 failures and three valid-admission controls passing; final focused runner/checker
-suite passes 125 tests. Canonical passes 3,273 tests / 818 subtests, 145 benchmarks
-and 20 legacy tests, including policy/static/ownership/configuration/docs checks;
-Level A passes 45/45. `replay-admission.py` additionally drives the real checker,
-result validation and aggregate with controlled dependencies. Missing manifest
-rejects before session creation; one of 74 discovered cases is attempted and 73
-remain unrun. `admission-replay.json` retains that scheduling result, not semantic
-qualification of 74 cases. The positive
-non-simulator override uses controlled dependencies and proves option compatibility,
-not supervised hardware validation. No native inference or live target action ran.
-This removes a reproduced engineering blocker but does not close #24/#32 or establish
-fine-tuning readiness. Surface count remains 102 Markdown documents / 15 core-path;
-no new document, profile, service, environment variable or model-facing field.
+`canonical.planner-final.log`：policy、test ownership、固定 Ruff/mypy、配置、
+host-service/runtime 与文档阶段通过；benchmarks160通过；main83失败/
+3850通过/5跳过/1017 subtests通过。canonical legacy阶段未到达。
+83个失败仍是旧工作流捕获包，在候选推理前被严格契约拒绝；没有删除测试、
+放宽请求比较或改6000条参考目标来换取绿色。完整本地门禁仍失败。
 
+官方 Agent Dockerfile 已通过原生成 build args 和 host network 构建；原
+localhost proxy 失败及无代理 TLS 失败均留存，未关闭 TLS 验证。
+最新 Agent source9224b11c…与运行镜像一致，原服务环境逐键不变。
+两次完整目录发现79例的 live-text/simulator 主调用均已结束，每轮仅收集一次
+debug bundle，source/service identity 在轮内不变：
 
-## Bounded engineering iterations — #24/#32, 2026-09-14
+| 轮次 | 自动结果 | 全79例同一 coding agent 复核 | 证据 |
+| --- | --- | --- | --- |
+| GA 修复后 | 19通过/60失败 | 3有限通过、7部分、66失败、3证据不足 | `live-adjudication.final.json`、`live-iteration-integrity.json`；bundle195926。部分 canonical CPU 重叠，不能比较延迟。 |
+| GA + Planner 媒体修复后 | 18通过/61失败 | 6有限通过、5部分、65失败、3证据不足 | `live-planner-adjudication.final.json`、`live-planner-iteration-integrity.json`；bundle203439。无 canonical CPU 重叠。 |
 
-Historical pre-SC checkout evidence. The subsequent integration section supersedes
-its Planner communication ownership and runtime/model resume assumptions.
+所有79例均尝试，zero skipped；先前失败阻塞的后续 turn 仍未运行，因此
+cohort_complete/qualification_complete 均为 false。自动通过中，中文回应为英文、
+只承诺查询而无查询、错误建议或错误 UMI 意思均保留失败/部分判断。最新81个
+GA主调用全部接受，cognitive_requests 全为 []；没有 GA/Host 补发 Planner 请求。
+这些复核不是独立资格评审，也不是 current voice、可听扬声器或实物证明。
 
-Owner requested up to 18 test/diagnose/repair/retest iterations, keeping models fixed.
-Private ledger: `.chromie/acceptance/engineering-18-20260914/iterations.json`.
-Iteration 1 is an unchanged deployed baseline: one discovered 74-case live-text
-cohort, stdin/discard against headless MuJoCo. It stopped after the first hard failure,
-retained 73 unrun cases, and collected exactly one debug bundle. All 113 Agent/shared
-files matched source; Chromie and Soridormi identities remained stable. Four native
-calls and their exact requests/raw responses are retained and reviewed, with
-same-model/non-independent review explicitly recorded in `iteration-01/review.json`.
+眨眼 SID100ff423 的原始遗漏已确认；最新 SID4e0a1e04 UMI 请求 Planner、
+GA 不补请求、count1 的 blink 在 simulator 完成，但中文用户收到英文 Okay。
+保留对照证实模型/system/Schema/options相同，时间和上下文不同。
+不能把之后的正确激活归因于 GA 修复，也不能把原遗漏认定为模型能力上限。
 
-| Order / owner | Actual input → output | Contract / verdict |
+### 修复前证据：Planner 复合动作契约缺陷（后续授权修复见下文）
+
+原生案例 SIDd1406bd3（后一轮对应 SID9cbd5f07）：
+“walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left”。
+Charter 原则30允许一个 Responsibility 保留复合完整意思，由 Planner 分解
+Activities；UMI 此例确实保留全部动作并请求 Planner。
+
+| 模块 / 原所有者 | 权威输入 → 实际输出 | 预期、关联及边界状态 |
 | --- | --- | --- |
-| Gateway → UMI primary/deeper | Session `eb404c88`, compound walk/nod/turn source. Primary merges independent outcomes and invents actor uncertainty; designated deeper UMI keeps fusion and introduces speed-unit uncertainty. | WHAT must preserve independent outcomes. Semantic failure remains separate from the budget defect; no downstream resegmentation is authorized. |
-| GA and Fast concurrently | Same admitted one-Responsibility result. GA preserves it in one Goal; Fast has null presentation and escalates, with no executable activities. | GA conservation is correct for defective upstream input; Fast does not repair WHAT. Ambiguity sufficiency remains a semantic/oracle question. |
-| Deep catalog projection | 23 executable provider contracts serialize to 24,641 characters; fixed 12,000-character check raises `required_context_over_budget`, zero model attempts. | First wrong budget boundary. A catalog-only cap ignores the configured complete-request budget. |
-| Runtime → harness | Error is preserved, no Capability Work starts, cohort stops synchronously. Per-case post-status absent; separately queried post-stop state is safe idle. | Correct containment; separate state query cannot backfill per-case evidence. |
+| UMI / WHAT 与初始激活 | r1包含走十秒/0.2速度、点头两次、左转；body_action/task_physical_effect；请求 Planner。 | 完整意思和激活正确。没有需要 GA/Host 修正的遗漏。 |
+| GA / Goal 身份；Host / 继承 | 接受 r1，建立绑定同一 source ref 的 canonical Goal；完整 WHO进入 Planner。 | 本例关系和继承正确；GA 不分解动作、不选择能力。 |
+| Planner catalog/Schema / 可供主模型选择的 HOW | 主 Schema 只允许 acquire/deliver、sidestep、idle、turn、walk_forward、walk_velocity 六个 body Capability。因 family过滤，requested nod不在 enum。 | 最早确认错误：合法点头在推理前无法表达，不能归咎于模型能力。`planner-compound-native-schema-proof.json`。 |
+| Planner primary / 分解 Work | 原输出walk_velocity→turn(count2借用了点头数量)→idle，未点头。 | 应由该次 Planner 主结果安排请求的所有动作；不能强迫 UMI 为 Planner 先拆 Goal。数量误用是另一个待资格验证的输出错误。 |
+| Fast/shared validator / 权限保护 | 受控合法walk+blink同Goal参考通过DTO，却要求先有不同UMI Responsibility/Goal。 | 第二个已确认契约冲突。保护可选社交表达归SC是必要的，但当前条件把明确请求的复合动作也拒绝；不能简单删除保护。 |
+| Runtime/provider / 执行及安全 | 后一轮返回计划中的walk/turn/idle，完整终结执行证据缺失；safe_idle=true，点头 observation缺失。 | 不计为动作完成。SC并行交付英文Got it并不能修复 Work。物理执行未证明。 |
 
-Iteration 2 removes only the duplicate catalog character ceiling from both existing
-Deep prompt render paths. Exact schema/safety/resource/applicability facts and ordering
-are preserved. The existing transport rejects the whole request against model context,
-reserved output and safety margin before HTTP; the resolver's count bound remains.
-No model, context size, output allowance, semantic authority, Schema or runtime flag
-changed. This consolidates budget ownership without truncating the catalog or giving
-Host semantic selection. A new regression fails on the original 31,312-character
-catalog fixture, passes with complete preservation, and verifies an undersized context
-still rejects before HTTP. The captured provider catalog with a controlled Goal
-context needs an estimated 35,592 tokens including reserve/margin, below the unchanged
-49,152-token window. This controlled projection replay is not native inference.
+拟议范围限于 Planner 的目录/主结果来源依据/验证一致性，使原请求的复合动作
+可分解，同时继续拒绝没有用户请求依据的可选社交附加动作。Charter、UMI、GA、
+SC及Host的语义职责均不改变。当时该额外修复尚未应用；后续负责人授权、实现及真实回归见下文。
+这段是修改前诊断，不能再作为当前待批准状态；SC表达权限没有扩大。
 
-The full 6,000 workflow replay passes on unchanged source: 1,400 workflows, 1,800
-expected state/fault/permission outcomes, 2,580 expected rejections, 220 safe nonexecuting
-rejections. No candidate calls. Frozen Fast 204 / Deep 40 reference corpora validate;
-focused Deep/projection/Ollama tests pass 89 tests / 108 subtests. Native rerun and
-final gate outcomes belong in the checkpoint/handoff after completion. No model or
-training-reference qualification is inherited from these mechanical checks.
+### SC 中文语言对照：两次候选均撤回
+
+最新 native中文 identity、疲惫、眨眼确认和完成后的感谢均可能输出英文。
+八个编辑前冻结的真实主请求保留 original input、request.language 和
+source_turn.language；中文输入不是在投影时丢失。基线正确语言4/8；在system
+明确语言原则的候选4/8；将原则放在user输出契约尾部的候选3/8。
+每例只一次主模型调用，24个结果均通过原Schema/DTO/Host；模型、选项、上下文、
+Schema和目标保持不变。逐个检查后两候选均拒绝，SC原始源字节完整恢复，
+其中既有外部修改未丢失。无翻译器、后处理补判或模型替换。
+
+证据 `.chromie/acceptance/sc-language-policy-20261004T125029Z/adjudication.json`。
+已确认最早问题在SC主输出的语言选择；没有证明内在能力上限，也没有证明所有
+prompt/context/profile因素都正确。八例不足以覆盖显式长期语言偏好、旧act复用、
+所有隐私/社交内容或实物表现。恢复后的SC相关182 tests通过、5环境跳过。
+
+恢复文档合并为一个当前检查点和当前服务快照；历史完整内容保留在 entry backup、
+`final-docs-before/`、历史根与Git中。未新增维护文档、环境变量或模块职责。
+具体运行身份、两个完整bundle路径和下一步命令以 Handoff 为准。
 
 
-Iteration 2's full native rerun reached Deep inference (five calls total), proving
-the catalog blocker removed. The same first case still fails and 73 remain unrun;
-one bundle was collected, both source identities stayed stable, and the separate
-post-stop query confirms safe idle. Deep's raw result passes the exact supplied
-Schema but fails the existing DTO. It authors an `ask_user` resolution for
-`clarification_needed` / `speed_unit`, omits `blocking`, and provides no value.
-The DTO defaults `blocking` to false and rejects. It also authors a mixed aggregate for one clarify outcome and speech that omits
-turn-left; fixing the first structural failure does not certify those semantics.
-The `clarification_needed` reference is prospective: blocking parameter records
-may legitimately have no executable step, so that fact alone is not a defect. All five calls are reviewed in `iteration-02/review.json`.
+### Planner 复合动作修复：2026-10-04 负责人明确授权
 
-| Iteration 3 boundary | Actual → expected / repair |
+负责人确认：点头首先是可执行 Activity，social_attention 是行为用途；Charter
+允许完整复合意思保留为一个 Responsibility 并由 Planner 分解。明确授权取消
+验证器强制 UMI 拆多个 Goal 的规则，不修改 Charter、不移转模块职责。
+
+证据根目录：`.chromie/acceptance/planner-compound-contract-20261004T140758Z/`。
+`authorization.json`、修改前 source/test 副本与 dirty3113路径备份均已保留。
+先冻结12个独立对照 JSON，tree SHA256为
+`45b3b5b80322baedf388c612351a53188226fb8311f87aef134653cce0f07d15`。
+既有完整79场景真实主调用基线绑定 Agent9224b11c…；本次修改前后仅对 Planner
+目录、对应主提示的一致性与验证器执行一个共同根因修复，默认模型不变。
+
+| 实际环节 / 负责人 | 权威输入、修改前输出和判定 | 修复后的 I/O 与验证 |
+| --- | --- | --- |
+| UMI / 完整 WHAT 和 Planner 初始激活 | 已接受 r1 走十秒、点头两次、左转；body_action/task_physical_effect；已请求 Planner。该例并非 UMI 漏激活。 | 完整 r1 和调用请求均不改，UMI 不增加参数表、不被迫拆 Goal。 |
+| GA / 身份和关系 | 继承 r1 完整 WHAT；主输出只提供身份/关系。无必要把明确点头移成第二个 Goal。 | 无代码改变、无二次语义决策；canonical Fast/Deep 参考保持同一 goal-compound。 |
+| Planner 目录与主 Schema / HOW | 旧类别交集排掉 social_attention 的点头/眨眼，原请求在模型前不可表达，是最早已证实错误。 | body_action 保留各身体领域能力；speech/information/media/vocal 等现行通道、可用性和提供方契约继续约束。主模型独立选择原 WHAT 所需动作。 |
+| Planner 主结果 / HOW | 原生模型在错误目录下改成走、左转 count2、idle；点头缺失。不能用这次输出证明能力上限。 | 冻结合法参考允许 walk→nod→turn、walk→blink、look→walk，参数/顺序/来源不变；每例一次主结果，无第二模型纠错。后续完整原生回归见本节末尾；不能用参考通过代替真实模型证据。 |
+| Planner 验证器 / 机械契约 | streaming 和 shared Fast/Deep guard 把混合领域当成可选装饰，错误要求上游先拆 Responsibility/Goal。 | 删除错误规则和死函数/调用；保留来源引用、参数/Schema、可用性、输出通道、资源冲突以及禁止模型 author auxiliary_activities。SC 可选表达权威未变。 |
+| Trusted Runtime / 可信执行 | 修改前合法动作不可提交；原生案例仅有计划，没有 retained execution_status。 | 离线参考不声称执行；后续完整 live-text/simulator 回归见下文；不声称物理机器人证明。 |
+
+`baseline.json`→`after.json`：9/12→12/12，原阻塞的3种合法跨类别组合全部
+恢复，8个机械负例仍拒绝；每例一个脚本主调用，actual_model_inference=false、
+independent_semantic_review=false。foreign_span 负例先触发缺 r2 终结覆盖，
+不能据此声称独立证明所有词义归属。补充回归验证无效参数 token 被主 Schema
+拒绝；合法 ID/token 本身也不能证明动作或数量符合用户完整意思。
+
+`focused.current.log`：653 passed/5 skipped/445 passing subtests。
+canonical Fast/Deep 测试各一次调用、同一个 Goal、walk1s→blink2；实际生产
+Schema 验证完整参考，并拒绝外来 Goal。最初新增参考漏必填 reason_summary，
+已在测试引用修正，并补齐提供方 social_attention metadata。
+`canonical-reference-before.corrected.json` 在独立进程加载归档旧代码：Fast 主
+Schema 拒绝参考并升级，Deep Schema 接受但 shared guard 拒绝，返回 clarify
+且没有步骤。相同有效参考在新 resolver 测试各一次调用通过。最初 Deep 的
+参考格式失败不作为语义证据；修正后的旧代码结果才证明其 guard 冲突。
+`level-a/summary.json`：相关三个能力类18/18，证据限 Level A。
+
+官方 Agent Dockerfile 构建通过，原生成 build args 和原环境逐键保留；新镜像
+`sha256:2e6656e9e5877ced13650319a7e82d7997f94123c7cf529133d601ae350196e5`，
+source `caedb275bd80fc4fc0bb0757562b96ecf469e84c0edcb4bdd70c1138db3dba52`
+与宿主一致；healthy/restart0。这是复合目录修复的历史镜像，当前身份见下文及Handoff。
+该轮canonical benchmarks160通过、main83失败/3863通过/5跳过/1019 subtests；
+完整79例自动21通过/58失败，同一agent复核5有限通过/8部分/64失败/2证据不足；
+单bundle223730、轮内身份未变，未完成独立/实物或整体验收。
+
+### Planner 次数归属与原文来源：既有职责内的校验修复
+
+负责人追问每个能力为什么共用点头的参数规则。共用框架原本已经读取每个
+Capability 自己的 Schema；错误是框架之外的 count 守恒规则，把完整复合
+Responsibility 的 count=2 广播给每个 Activity。修复不让 UMI 提前拆动作或
+选择能力，也不让 Host 解释动作意思；次数仍须由 Planner 主结果放入所请求
+效果的声明参数，完整归属是否正确还需要语义资格检查。
+
+证据根是上述目录的 `count-scope/`。原生 SIDc9100620 是确认根因的案例：
+
+| 实际模块 / 职责 | 权威输入 → 实际输出 | 预期、交接和判定 |
+| --- | --- | --- |
+| admitted UserTurn / 原文 | walk ahead at0.2 for10s → nod twice → turn left。 | 原文、token范围t0:t19和同一SID进入UMI；已保留，不是新目标改写。 |
+| UMI / 完整WHAT、初始Planner激活 | r1含全部动作；body_action/task_physical_effect；legacy count2等bindings；请求Planner。 | 本例完整意思及初始请求正确；binding的Charter冲突仍另行保留，没有据此授权UMI参数提取。 |
+| GA / 身份关系；Host / 继承 | identity-only结果，无额外认知请求；Host原样继承为goal_49cb0b08e95f00213bfc。 | 关联和WHAT继承正确；GA不拆动作、不补Planner请求。 |
+| Fast Planner / 一次主HOW结果 | walk_velocity duration10/vx.2 → nod_yes count2/duration4/defaultsmall → turn_in_place left/count1/default2s/.12。 | 完整正确参考及原生输出保留在父根compound-primary-packet.json；提供方参数各自不同，模型client接受不等于Host接受。 |
+| Fast Host / 确定性校验 | 对walk也要求count2；walk没有count参数，提交前拒绝。 | 最早错误是程序次数范围；应在同源完整Work的声明重复参数中验证，不能让duration或另一Goal见证count。 |
+| shared/canonical Planner Schema和Host | 同样把count常量套给兄弟步骤或排除无count步骤；受控Fast/Deep对照复现。 | 改为完整owned Work守恒；兄弟count使用自己的原文依据或该能力默认值。单动作错数、漏数、外来来源和无count见证仍拒绝。 |
+| Runtime、Soridormi；Deep | 原生失败没有Work提交、provider执行或Deep调用，safe_idle保留；SC并发仅确认。 | 不把计划或Got it当作完成。Deep只在受控回归调用；没有新模型纠错链或物理证据。 |
+
+11个编辑前独立冻结count对照SHA256
+`54b0b0f8abe891cbc2de78a17f47c6a150a9d8bbf033f422bb33eeaaad2e6a25`，
+机械Schema/DTO/Host从6/11→11/11；父根12/12保持。
+最初一项正例漏掉“转两次”的实际意思，及token字段/typed fixture格式问题，
+都在生产编辑前更正并单独归档；不把无效参考失败当成语义证据。
+真实Fast/Deep resolver脚本回归各一次调用，并覆盖兄弟提供方只支持count1的
+自身格式。数值测试把旧的“每个Schema枝都有count const”断言改为类型和实际
+Host守恒行为，未放宽参数类型或错误次数拒绝。
+`focused.retained.log`为1090 passed/451 subtests；Level A相关三类18/18。
+
+Count修复后的完整固定版本79例自动18通过/61失败；全79同一coding agent复核
+5有限通过、12部分、61失败、1证据不足。所有例尝试但失败阻塞后续turn，
+cohort/qualification不完整。原复合案例SIDe857f79b的当前UMI没有bindings，
+Planner把turn-left选成sidestep-left；仅有planned观察且SC失败，没有执行，
+所以这例既不证明count binding修复的原生效果，也不证明模型能力上限。
+原生中文“往前走三秒，然后原地向右转一下”则暴露另一个Schema缺陷。
+
+| 来源案例SID5d91efa5的实际边界 | 输入 → 输出及判定 |
 | --- | --- |
-| Shared `PlanParameterResolution` Schema | Omits the DTO's strategy/blocking/value invariant. Exact retained native raw object passes the full old Schema. Schema must expose the already-binding DTO invariant; this is a mechanical realization, not new meaning. |
-| Model → DTO | `ask_user`, omitted blocking → default false → rejection. Host correctly rejects rather than filling blocking or inventing a value. |
-| Runtime → acceptance | Error retained as `unclassified_model_failure`; no Work starts, cohort stops. This repair addresses the earlier decoder contract; error taxonomy and missing per-case final status are separate review items. |
+| UMI / WHAT与激活 | 中文原文完整；r1英语WHO为move forward three seconds, then turn right in place，已请求Planner。完整意思和激活正确。 |
+| Planner primary Schema / 来源格式 | 判断任意enum在WHO出现，并把enum自身当source_text；因此英文化WHO的right可免来源，尽管中文原文无right。实际Schema接受空argument_sources。已确认程序投影与Host契约不一致，不能称为全部模型错误的唯一根因。 |
+| Planner primary / HOW及来源 | 一次原生输出walk3 → turnright/count1；说明文字提到右→right，却未写结构化source span。格式允许该遗漏，Host要求它；finish_reason=stop。 |
+| Fast Host / 来源保护 | 正确拒绝未绑定且非原文复制的direction；无动作提交或执行。来源保护不应删除，也不应由其他模块补语义。 |
+| 本次修复 / 同一Planner owner | 只把现有immutable original_user_text传给Schema生成，按选中enum值分组：literal需同时符合所属WHO和原文；映射值必须有已有argument_sources。Host不改、无翻译器、新DTO字段或第二语义调用。 |
 
-The shared DTO's generated Schema now requires explicit blocking for unresolved
-strategies, permits only null/absent value for those strategies, and requires a
-non-null value for resolved strategies. DTO behavior, valid semantic outcomes and
-model identities are unchanged. The Schema/DTO contrast matrix fails 68 subcases
-before repair and passes all 146 after, across raw DTO, canonical Fast and Deep.
-The exact native row now fails the new Schema at the predicted boundary. Focused
-Planner tests pass 200 / 319 subtests; 104 workflow tests pass after a reviewed
-mechanical input-schema rebind. Only request-format snapshots/hashes change in five
-prototype and 4,600 large-corpus cases, replacing 135 shared Schema artifacts.
-References, prompts, decoding options, scenarios, fault labels, splits and training
-eligibility are byte-value preserved outside those request-format changes.
-`iteration-03/schema-rebind.json` retains old/new manifest hashes and proof scope;
-the old 6,000 manifest remains immutable historical evidence. No reference or training
-promotion follows from rebinding an executable input contract.
+来源13个编辑前冻结对照SHA256
+`d985b2e2301dac143474d20e3a2d5de861dd1e28e7895d8bc9b3076ef1199ab0`，
+机械完整主流路径从10/13→13/13；179流式回归通过，count11/11和compound12/12
+保持，Level A三类18/18。case-only正例初稿用了第三种拼写，依据既有literal
+契约在生产编辑前改为一面原样、另一面只改字母大小写，并保留原稿。
+这些脚本参考不是native、独立语义或实物资格。
 
+```mermaid
+flowchart LR
+    T[同一原文] --> U[UMI 完整WHAT和初始请求]
+    U --> G[GA 身份关系]
+    U --> P[Planner 一次主HOW结果]
+    U --> S[SC 并发决定交互]
+    G --> J[可信Goal与Work交接]
+    P --> V[自身参数与来源校验]
+    V --> J
+    J --> X[Soridormi执行]
+    S --> W[可信交付记录]
+```
 
-Iterations 3–6 exposed a decoder implementation constraint: partial `anyOf`
-branches admitted incomplete native parameter objects when intersected by the
-provider. Iteration 3's focused call returned only strategy/value, omitting the
-required step/parameter. Iteration 4 repeats every required object property in
-both complete branches and propagates Fast/Deep field constraints into them.
-The same retained Deep input then passed the full Schema and parameter DTO
-invariant, but failed the separate single-Goal `mixed` aggregate invariant.
-Iteration 5 removes that invalid aggregate option for a single expected Goal.
-Its focused native reply no longer uses `mixed`, but violates already-exposed
-execution/unresolved and confirmation constraints; those remain failures.
-No Host filling, semantic rewriting or extra model reviewer was introduced.
-The final iteration 5 local gate passes 3,275 tests / 988 subtests, 145 benchmarks,
-20 legacy and the complete 6,000 workflow replay. All references remain
-training-ineligible and non-independent. Rebinding generated input Schemas does
-not qualify references or alter frozen expected answers.
+UMI激活、SC语言/内容、主HOW语义选择和旧workflow捕获仍需各自在原所有者
+资格审查。未把已观察的模型输出遗漏认定为内在能力不足，没有用GA/Host或
+二次模型修复它。维护文档、环境变量、运行开关、项目术语和DTO字段净新增均0；
+源码增长只在原有Planner owner，文件/方法数量按可维护性审阅，不设机械长度门槛。
 
-Iteration 5's first live run started while the rebuilt service was still warming:
-Host admission at 00:14:04 encountered a connection reset; Agent startup completed
-at 00:14:06. Only the explicit one-token startup warm call was observed, not a
-user semantic transaction. The run remains incomplete (one attempted / 73 unrun).
-Iteration 6 is the unchanged-source rerun after Docker reports healthy, not a
-silent replacement of that failed run. It attempted two cases and retained 72
-unrun. Its eight model-role records, and iteration 4's nine, were reviewed.
+来源Schema修复后的最新完整固定版本79例：自动20通过/59失败；同一coding agent
+逐项复核6有限通过、12部分、59失败、2证据不足。全部例尝试，zero skipped，
+失败阻塞后续turn，所以cohort/qualification仍不完整；不是模型排名或独立评审。
+SID923cce48保留count2 binding，同一个Goal顺序执行walk10/.2、nod2、left-turn1，
+三项provider结果和observations均completed/sim；原错误没有要求走路携带count。
+SID0b0cdc27的右转引用t11:t12，walk3→turnright1在sim完成；中文仍收到英文Okay。
+两个较短的nod→blink、walk→blink也有本轮完成记录。当前直接stop场景附加idle、
+只有planned记录且没有stop执行；不能借前轮取消证据声称当前停止资格。
+天气SID7b14073a有实际lookup、Evidence re-entry和有据数值，但语言仍为英文。
 
-| Actual re-entry episode / owner | Material input → actual output | Expected / first divergence |
-| --- | --- | --- |
-| UMI → GA → Fast primary, iteration 6 SID `51e18a48` | Walk at 0.2 speed for 10 seconds, nod twice, turn left. UMI retains a fused outcome; GA conserves one Goal with degraded subtype binding. Fast admits only `walk_velocity(vx_mps=0.2,duration_s=10)` while claiming complete coverage. | Required nod/turn absent. Complete semantic coverage remains unqualified; no downstream semantic splitting is authorized. |
-| Trusted Capability Runtime → Soridormi | The admitted walk runs and completes in headless MuJoCo. Completion Evidence reactivates Planner; post-run safe idle is true. | Correct mechanical execution of the authored Work, not proof that all requested Work was authored. |
-| Fast result projection | Current common catalog is 17,041 characters; fixed 9,000-character projection cap rejects before inference with `contract_failure`. | Separate catalog admission blocker; no model attempted. |
-| Host `_planner_state_reentry_response` | Returned Fast failure is recorded `resolved`; every `escalate` delegates to Deep without checking failure classification. | Earliest routing defect: technical failure must stop before Deep. Initial planning already enforced this rule, re-entry did not. |
-| Deep transport | Complete re-entry request exceeds the fixed context plus reserve/margin and rejects before inference. Iteration 4 required 50,391 against 49,152 tokens. | Correct budget containment; this cannot count as a semantic Deep answer or successful recovery. |
-| Host → General Ability | Deep failure also recorded `resolved`. Initial turn summary remains `applied`; collector proceeds to the next case. No TTS was scheduled. | Incorrect failure evidence/collection. Absent speech cannot be attributed only to model wording because re-entry failed. |
-| Next case, SID `8b94a64c` | Gaze three seconds with blink twice. Fast authors a Capability primary but a blink auxiliary with `anchor_kind=communicative_act`. | Host correctly rejects anchor-kind mismatch before dispatch; it exposes a raw contract failure and stops the cohort. Required blink as decoration is not independently qualified. |
+本轮canonical policy、ownership、固定Ruff/mypy37文件、配置/runtime和docs阶段通过；
+benchmarks160通过；main83失败/3885通过/5跳过/1023 subtests通过，legacy未到达。
+失败IDs与count修复前后83项完全相同，没有删除6000参考或放宽严格replay。
+UMI漏初始激活/错类型/错指代、Planner额外或错选Work、SC重复ID/输出预算截断、
+语言/内容/延迟及旧工作流契约仍保留为未解决边界；不存在已证明的内在能力上限。
 
-Iteration 7 restores the existing rule at the shared Host re-entry owner. Both
-Fast and Deep calls now pass through one observed boundary: returned technical
-failures, exceptions and changed Goal scope record `failed` and re-raise before
-adaptation or commitment. A Fast contract failure cannot reach Deep. Semantic
-escalation and direct slow readiness retain their existing permitted paths.
-Acceptance reads the trusted failed-stage status, including when initial dispatch
-was already applied; it does not interpret redacted error prose. Structured
-metrics and cohort stopping use the same stage evidence. The existing classified
-exception handler moves into this shared boundary, still a diagnostic re-raise;
-no broad-exception exemption or blanket ignore was added.
-
-Nine regressions fail at these boundaries on original source after correcting
-fixture construction (the earlier fixture failures are retained separately).
-The focused suite passes 103 tests / three subtests, including provider, result,
-cancellation and turn closure. The full 6,000 replay passes with stable source;
-Level A passes 45/45. Final canonical/native evidence remains in the active
-checkpoint and iteration ledger. These repairs change routing/evidence, not
-semantic authority, model weights/options or physical execution policy.
-
-Iterations 8–12 continued the same fixed-model line. Iteration 7's canonical gate
-passed 3,285 tests / 988 subtests and its native cohort attempted two cases / 72
-unrun. Its Deep clarification satisfied the repaired parameter and single-Goal
-Schema contracts; the second Fast result failed unresolved-meaning conservation.
-That run did not reach result re-entry, so iteration 7's routing repair initially
-had focused executable evidence only.
-
-| Episode / ordered owner | Material input → actual output | Earliest boundary, repair and evidence |
-| --- | --- | --- |
-| Iteration 8: Fast catalog projection → transport | Retained result re-entry catalogs exceed the separate 9,000-character cap. Non-streaming initial/layered/re-entry renderers rejected before inference, although complete-request admission owns the actual budget. | Removed the three duplicate limits; preserved complete catalog facts and transport rejection. Streaming projection remains its existing smaller authorized surface. The regression covers each variant, lossless content and rejection by an undersized transport budget. |
-| Iteration 8 native aggregate: UMI → GA/Fast → Host | UMI preserves three requested outcomes; Fast changes speed 0.2 to 0.02. Host numeric conservation rejects before execution: one attempted / 73 unrun. | Model numeric error, correctly contained. No numerical default or semantic repair was added. |
-| Iteration 8 isolated blink: UMI → GA/Fast → Runtime/provider → Fast re-entry | SID `0fdb87af`: one requested blink, one executed blink. Result re-entry supplies all 10 common contracts / 15,653 characters; Fast returns a grounded completion with no further Work. | Native proof that the Fast catalog obstruction is removed and legitimate re-entry remains operational. Safe idle retained. This one-case pass does not qualify the aggregate or physical hardware. |
-| Iteration 9: typed Planner DTO rejection → shared error taxonomy → Runtime/collector | Retained iteration 2 raw reply raises `PlannerDTOContractError`, previously reported as `unclassified_model_failure`. | Existing typed error now supplies `structured_output_validation` / `model_contract`, non-retryable, attribution not evaluated; shared metadata extraction honors the existing exception protocol. Unknown exceptions remain unclassified. Three fail-first subtests, 215 focused tests / 349 subtests and exact native-raw replay prove classification; no semantic diagnosis is invented from error prose. |
-| Iteration 9 native gaze/blink: UMI → GA → Fast → provider → Fast re-entry | SID `ff3f04e7`: UMI fuses gaze and blink, GA conserves that input, Fast authors only gaze. Provider executes gaze; Fast result speech claims blinking twice without blink evidence. | Hard semantic failure despite mechanical success and safe idle. The first omission is upstream WHAT fusion; downstream false completion is separately unqualified. No phrase detector, second model critic or Host resegmentation was introduced. |
-| Iteration 9 resource: UMI → GA and Fast → Host conservation | SID `bcd2ab86`: accepted recipient `me`; Fast emits `recipient.description="me"`. The live provider declares a structured recipient input but omits its argument realization. Host falls back to comparing the object with the scalar and rejects. Runtime/provider are not invoked. | Earliest responsible declaration belongs to Soridormi. This was a false structural contradiction, not evidence that the model substituted a recipient. |
-| Iteration 10: admitted runtime failure → text-check harness → collector | After a handled non-preview runtime failure, the existing dispatch guard skipped the final status probe. The collector could not establish post-case state. | Moved the existing probe outside the success-only dispatch block; rejected Work still cannot dispatch. Six controlled safe/unsafe/unavailable and preview contrasts include three fail-first failures. SID `f427576b` natively rejects malformed Fast meaning and now retains fresh stand/safe-idle/no-active-task status. Preflight rejection and preview still do not imply post-execution evidence. |
-| Iteration 11: provider declaration → Agent catalog → Fast/Host → provider → re-entry | Existing resource skill now declares entity/quantity→resource, recipient→recipient, direction/location/distance/route→source. Input Schema and embodied safety policy are unchanged. MCP reload and Agent refresh expose all seven mappings. SID `add2cbb0` preserves milk, source and recipient, executes the scripted resource provider and reaches completion speech with safe idle. | Provider-owned contract repair; Planner still authors values and Host does not infer missing semantics. Exact retained raw result now passes; changing recipient to `someone else` still rejects. The mock resource sequence is not real-world acquisition/delivery evidence, and completion perspective is not independently qualified. |
-| Iteration 11 aggregate: UMI → GA/Fast → Deep Schema → DTO → Runtime/harness | SID `cd1b19d7`: fused compound, a speed-unit gap, Fast semantic escalation; Deep authors a nonexecuting clarification with `ask_user`, `blocking=true`, but omits `source_goal_ids`. Exact supplied Schema accepts; CanonicalPlan rejects before Work. Fresh safe-idle status is retained. | Another decoder/DTO mismatch. Iteration 12 requires explicit Goal ownership in Deep's complete unresolved-resolution branches. Existing enum/minimum validation and Host ownership remain; no IDs are filled. Exact raw replay fails under repaired Schema, a controlled correct Goal passes Schema and CanonicalPlan, and foreign ownership rejects. Eight fail-first subtests and 194 focused tests / 423 subtests pass. |
-
-The post-admission failure path is now:
-`admitted turn → failed Planner boundary → Runtime error → fresh status probe →
-retained failed stage/status → cohort integrity stop`. Successful execution still
-follows `Runtime → provider result → owned Fast re-entry → validated response`.
-The former success-only status probe and technical Fast-to-Deep delegation are
-removed at their original owners. Model failures are retained, not repaired by
-another same-authority call.
-
-Iteration 11's paired Soridormi gate passes 792 tests with two target-dependent
-skips, 159 body-concurrency tests, 142 task-contract tests, governance, compilation
-and manifest validation. Its mounted manifest SHA is
-`b12a2d75832ede53efa3107da50af59d507f37201e78b567f56ceefb6107053c`.
-The local host lacks the provider dependencies; the full suite ran inside the
-existing dependency-complete Compose container against the mounted whole checkout.
-No skip is counted as target proof. Provider changes are confined to the existing
-manifest, registry execution tests, interface guide and Status; unrelated dirty
-workspace content is preserved.
-
-Iteration 12 mechanically rebinds two prototype and 2,000 large-corpus request
-Schemas (64 shared artifact replacements). It preserves every expected output,
-prompt, decoding option, case, fault label, split and training-eligibility value.
-Large manifest: `e67d15d3025667b667f19cfb976eaabd0f610692b3569d2a75399de0bc5db35a`;
-prototype: `24cb3921f304643a7d5b422f8866fefbe16f87807660aa621048c0ac8d1ea1fa`.
-Earlier rebind manifests remain historical evidence in the retained archives.
-
-Review distinguishes supported contract defects from semantic/oracle uncertainty.
-For example, clarification of a unitless speed is not itself proven wrong, even
-when the scenario expected execution. Remaining UMI fusion, invented uncertainty,
-Planner omission/numeric errors and unsupported completion claims are not repaired
-by stronger mechanical pass counts. The 6,000 authored references remain
-non-independent, training-ineligible and without hidden semantic-family splits.
-Current evidence does not establish fine-tuning or default target-evidence closure.
-No model, context/decoding setting, architectural authority, profile, runtime
-switch or current document was added; Chromie's surface remains 102 documents /
-15 core-path documents. Final gate/native counts and resume commands are recorded
-in the checkpoint and handoff; the private per-iteration reviews retain each call,
-source identities, exact stopping point, unrun coverage and one bundle per run.
-
-Iteration 12 final canonical passes 3,296 tests / 1,071 subtests, 145 benchmarks
-and 20 legacy tests; all pinned checks pass with the two existing FastAPI warnings.
-The full 6,000 replay remains source-stable and Level A passes 45/45. Aggregate SID
-`fd0a301a` stops after one attempted / 73 unrun: primary UMI fuses the request,
-designated deeper UMI recovers three ordered outcomes, GA conserves, and Fast
-authors 0.02 speed / six seconds instead of 0.2 / ten, plus head movement instead
-of a body turn. Host numeric conservation rejects before dispatch; fresh safe idle
-is retained. All four role calls were reviewed; Deep was not invoked in that run.
-The isolated exact iteration 11 Deep packet, changing only the ownership Schema,
-then natively supplies the correct Goal ID and passes the full supplied Schema and
-CanonicalPlan. It is a model-boundary proof without runtime effects, not a full
-workflow or independent semantic qualification. One bundle is retained per run.
-Final safe idle/no active task was observed, owned simulator/MCP were stopped,
-and ports 5555/8000 no longer listen. The twelve-iteration ledger retains six
-unused iterations; no further engineering change is justified by this final
-failure without a new boundary diagnosis. Fine-tuning readiness remains false.
-
-## Integrating upstream Social Cognition — 2026-09-15
-
-Both upstream branches advanced during the pre-SC experiment. The owner explicitly
-authorized integration and required fetch-before-development as a durable rule.
-Recovery stashes retain all old source and generated artifacts; integration starts
-from Chromie `2e18f86a` and Soridormi `0af3d09`, without rewriting remote history.
-The upstream amendment is binding: SC owns words, silence and social expression;
-Planner owns Work/facts, never a draft for SC to review. Remote priority scheduling,
-Vocal/Activity waiting queues, prepared-start alignment, weather/evidence handling
-and manifest validation are preserved.
-
-| Boundary | Conflict and integration decision | Evidence / qualification |
-| --- | --- | --- |
-| Planner prompt projection | Old local renderers combine planning and wording; remote replaces them with `_canonical_work_prompt`. Keep the new Work owner and port only lossless catalog budgeting there and into layered projections. | Focused Fast/Deep catalog preservation, transport refusal and SC authority tests pass. No old response-writer path restored. |
-| Parameter DTO → generated Schema | Shared invariant remains present after SC migration; local complete branches, single-Goal aggregate and blocking ownership constraints remain applicable. | Upstream frozen requests initially mismatch only Schema. Rebind current SC-aware format snapshots; preserve every prompt, response, case, option, fault and training flag. Old pre-SC artifacts are not substituted. |
-| Runtime result → Work re-entry / independent SC | Remote adds independent SC fixtures and communication. Local failure handler rejects technical/scope failures before Work adaptation and improper Deep delegation. | Combine both test sets. SC stays a distinct authority; failed Work is not repaired through SC or Host wording. |
-| Provider declaration → manifest validator → Host | Remote adds generic validation and primitive argument mappings; local adds composite resource mappings. | Retain upstream validator, add complete resource mapping regressions and rerun the paired provider suite. No raw motor fields or changed embodied policy. |
-| Acceptance admission/results | Local preflight rejection, structured asynchronous failure stopping and post-failure state capture apply around current SC-aware runtime. | Focused acceptance/SC suite passes. Original native counts and current target qualification remain separate. |
-
-Initial focused combined suite passes 785 tests / 364 subtests. The first 104-case
-workflow suite has 68 exact request-Schema mismatches; this is stale executable
-input evidence, not permission to change model answers. Final combined gates,
-manifest identities, remote delivery revisions and limitations belong in the two
-handoffs. The earlier raw Qwen traces remain historical and cannot prove SC behavior.
-
-The provider auto-merge produced overlapping `argument_realization` objects;
-JSON loading selected the later local object and hid upstream named entries.
-The upstream manifest regression failed before delivery. Resolution restores
-all upstream entries and names, then adds only `physical_resource_route`.
-Eight execution-contract cases cover entity/item/quantity/recipient and four
-source bindings; the existing manifest tests prove upstream keys remain visible.
-Combined provider validation passes 798 tests / two skips, body 165 and task 147,
-plus governance, compile and manifest checks. Commit `fa6331f` is pushed to
-`origin/codex/turn-count`; unrelated Open_Duck_Playground content is preserved.
-
-The current SC-aware corpus rebind changes five prototype and 4,600 large cases,
-replacing 126 Schema artifacts. Each changed case is compared with its original
-with only request.format excluded; all other fields are equal. Large manifest:
-`9ad69c12b0f60554df1ec5da249cd1cb300e81a79cec9d7d09b8933c6137dba8` →
-`3ba46381bf230f7a930982b05f8cebd9cb672ccd4efbfbdee14d0c4994084f04`.
-Prototype manifest: `cf242af89fac44494202247c90e5056cc2ac024c252bbb225176f8f84109dc5e`.
-The rebound focused workflow suite passes 104/104. Work re-entry diagnostics now
-identify the Fast planning pass instead of incorrectly labeling it the wording
-owner; regressions assert that SC's ownership is not assigned to Planner metadata.
-
-Final combined canonical passes 3,382 tests / 1,139 subtests, 145 benchmarks and
-20 legacy tests; pinned policy, ownership, static/configuration/docs checks pass.
-The two existing FastAPI warnings remain. Full SC-aware 6,000 replay passes with
-source unchanged, retaining the 1,400 / 1,800 / 2,580 / 220 expected-outcome split.
-Level A passes 45/45. No new native SC, deployment, model or physical evidence is
-claimed; reference independence, hidden semantic-family evaluation and target
-closure remain open. Both handoffs carry the exact integrated scope and resume
-boundary; the fetch-before-development rule is committed in both AGENTS.md files.
+官方Agent镜像124a02f6…、source93b58310…与宿主一致，原环境逐键未变，
+healthy/restart0；模型、ASR/TTS均未改变。轮内full-tree SHA256为
+`00212ba188af4eec80049e5751dbcdbea4a2b44e05fb6cc9c263b8b8aa8f055b`，
+前后服务/source一致；之后仅更新现有四个状态/交接文档，不把文档差异藏入该hash。
+本轮只收集一次bundle：`/home/chromie/Downloads/chromie_debug_bundle_20261005_003209.tar.gz`。
+293完整调用、285直接SID关联调用、82个GA主结果cognitive_requests全部为空；
+后台Evidence激活另行保留，不冒充GA补UMI请求。详见`source-schema/live-adjudication.final.json`、
+`live-iteration-integrity.json`及原生主packet。28个排除的外来路径字节/删除状态未变，
+stage为空；源修复patch已应用且reverse-check通过，不应再次apply。

@@ -71,10 +71,10 @@ experience artifacts. See
 
 ## Architecture
 
-The retained [overview](docs/assets/chromie-cognitive-capability-overview.svg) and
-[detailed diagram](docs/assets/chromie-event-driven-cognition-flow-light.svg)
-predate the Social Cognition ownership migration. The current owner summary is below;
-the [turn lifecycle](docs/COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle) owns its detail.
+The [Charter architecture](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
+and [turn lifecycle](docs/COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle) own
+current communication and Work responsibilities. The obsolete pre-SC diagram
+assets have been removed; the current owner summary is below.
 
 <details>
 <summary>Current communication and Work ownership</summary>
@@ -178,12 +178,15 @@ Retained target evidence additionally proves:
 - one supervised physical microphone -> ASR -> cognition -> TTS -> audible
   speaker turn.
 
-## Remaining qualification, not missing core functionality
+## Open implementation and qualification work
 
+- resolve the design/source authority conflicts and restore the failing local
+  gate documented in the [project audit](ARCHITECTURE_AUDIT.md);
+- fix text-tool user admission chronology before using multi-turn comparison scores;
 - clean full-matrix generated-speech acceptance after the post-merge fixes;
 - positive Agent Skill selection with trustworthy real provider-backed weather
   execution and follow-up conversation;
-- a reviewed current-Plan auxiliary Social Attention live baseline;
+- a reviewed SC-owned social expression live baseline;
 - second-machine LAN exposure validation;
 - broader/bilingual audio quality, physical acoustic barge-in, hot-plug, and
   current-revision qualification against the declared warm interaction latency targets; and
@@ -377,4 +380,4 @@ documented in
 - [Operations Runbook](CHROMIE_RUNBOOK.md): startup and recovery
 - [User Manual](docs/USER_MANUAL.md): current simulator operation
 - [Documentation Index](docs/README.md): owner for every documentation fact
-- [Architecture Audit](ARCHITECTURE_AUDIT.md): point-in-time principles/implementation audit, 2026-09-12, with Issue breakdown and reproducible probes; not a maintained authority
+- [Architecture Audit](ARCHITECTURE_AUDIT.md): current design/source audit, 2026-10-04, with failed local gates and controlled workflow evidence; not a normative authority

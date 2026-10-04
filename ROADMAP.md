@@ -23,35 +23,21 @@ it does not reopen other audit findings or replace the remaining model/voice/tar
 qualification order. See [Status](docs/STATUS.md) and the current
 [checkpoint](DEVELOPMENT_CHECKPOINT.md) for evidence and resume scope.
 
-The owner authorized completion of the remaining Issues and normal main delivery.
-[Audit index #36](https://github.com/TimeTreker/chromie/issues/36) and the
-[September 12 audit](ARCHITECTURE_AUDIT.md) preserve the prior deliveries and current
-repair evidence. #49–#51 are delivered and closed. The current delivery implements
-#52 cancellation reporting, #53/#54 Reflection scheduling/context, #55 evidence
-labels, #56 complete contract typing, #57 lifecycle regressions, and newly reproduced
-#58 future-readiness/persisted-wake handoff. The owner authorized the corresponding
-Charter decisions and bounded maintenance in this session. No new model profile,
-architecture layer or product feature is promoted.
+The accepted September authority amendments and implementation sequences below
+remain design context; they do not carry forward old iteration budgets, commit/push
+authorization or claims that a previous gate is still green. The
+[current audit](ARCHITECTURE_AUDIT.md) was refreshed on 2026-10-04. Canonical
+local validation currently fails; the exact baseline and remaining evidence gaps
+belong to [Status](docs/STATUS.md), the [checkpoint](DEVELOPMENT_CHECKPOINT.md)
+and [Handoff](HANDOFF.md).
 
-The September 16 owner-authorized continuation makes UMI's complete natural-language
-intent and provider-neutral result type authoritative, with no capability parameters
-or canonical Goal relationships. GA owns continuity; Host inherits UMI meaning;
-Planner owns realization and readiness. Fast's all-capability index plus full common
-contracts supports one bounded detail lookup before its complete Plan. This is the
-explicit amendment to the existing delivery constraint; no new service, current
-document or runtime switch was added. The latest canonical/replay gates pass, but
-native qualification remains open: Fast provenance/direction and SC communication
-fail in the retained aggregate. Source completion is not release closure. See the
-current checkpoint for the actual workflow, 200 retained typed-update limitations,
-and exact next evidence work. No remote Issue is silently closed by this amendment.
-
-The subsequent owner-authorized full audit reconciles stale current authority prose
-and repairs independently ready/newly scheduled Goal handling in Fast Schema and
-Deep adequacy, with controlled Runtime/restart proof. Its native prompt candidate
-is rejected for new truncations; no model/profile is promoted. The audit's maximum
-18 test loops is a ceiling, not a completion criterion. Source repair and local
-regression success do not close the native Fast/SC and target-evidence blockers.
-The current checkpoint and audit retain failed iterations as well as passing gates.
+The accepted intent-only boundary gives UMI complete natural-language meaning and
+provider-neutral result type; GA owns retained Goal association and Host inherits
+new Goal meaning; Planner owns parameter extraction, realization and readiness;
+SC owns ordinary communication. Current `bindings` and Attention semantic-repair
+conflicts are recorded in the audit, not authorized by old implementation prose.
+No model, profile or release is promoted. Historical Issue closure statements
+below are bound to their original delivery records and were not rechecked remotely.
 
 ## Owner-approved semantic transaction simplification and generalization line — 2026-09-16
 
@@ -197,8 +183,9 @@ These are architecture/workflow/contract tests, not native model qualification. 
 training is not started: references, faults, hidden semantic holdouts and actual
 candidate outputs need separate review. #24/#32 retain their native/target requirements.
 
-Ordered offline Fast/Deep qualification and supported-version CI pass. GitHub
-#35 and #52–#58 are closed; follow the remaining #24/#32 native qualification line below.
+Historical ordered offline Fast/Deep qualification and supported-version CI
+results belong to their original revision. The current local gate fails; current
+#24/#32 work must use the Status/checkpoint evidence rather than inherit those passes.
 Exact current results belong in [Status](docs/STATUS.md) and the
 [checkpoint](DEVELOPMENT_CHECKPOINT.md). Retain all original failures and separately
 frozen staged/readiness oracle amendments. The coverage-designed 204 Fast/40 Deep
@@ -217,7 +204,7 @@ but do not select a new model/backend to compensate for avoidable model-contract
 Numeric class/document sizes remain review measurements, and #57's reasoned no-extraction
 result does not authorize unrelated refactoring.
 
-The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#2026-09-06-transaction-fidelity-source-closure). Continue in this order:
+The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#current-verification-and-deployment-state--2026-10-04). Continue in this order:
 
 1. **Preserve revision-bound full source qualification.** The latest observed source gate is recorded in Status/checkpoint; avoid duplicating revision-specific counts here. After a source change, rerun the documented policy, static, ownership, configuration, documentation and complete main-tree gates and retain their exact revision. A source pass does not supersede the failing qualification cohorts.
 2. **Freeze and qualify the complete model transaction on that exact source.** Re-run target-blind UMI/GA/Fast/Deep cohorts with the production prompt projections, schemas/decoder transport, one-call topology, early commit guard, and failure-state reconciliation. A model or serving backend may be promoted only from revision-bound evidence.
@@ -255,37 +242,24 @@ concept, manager, workflow, contract field, or mechanism.
 
 Reviewed architecture status (each item states its implementation state explicitly):
 
-1. **UMI/Planner input-ownership boundary — implemented and source-guarded.** UMI is
-   WHAT-only: Responsibility meaning, explicit/contextual semantic bindings, Goal
-   relation, provider-neutral output modality, and bounded unresolved meaning. UMI has no authority or
-   DTO fields to create/resolve planning InformationGaps, declare Capability inputs
-   missing/blocking, or choose `ask_user`, context, observation/query, or default. Fast
-   Planner fast pass owns execution-input completeness, source/default policy, gap provenance, and
-   clarification selection without reinterpreting Responsibility. The temporary Deep-UMI
-   external-evidence/`ask_user` defense is removed; Deep UMI is one source-based pass only
-   for genuine consequential semantic ambiguity. Runtime commits a Planner gap to its
-   exact GA-owned Goal before the question can be delivered.
-2. **Planner fast-pass first advancement — implemented in the maintained path.** Keep
-   Responsibility evidence as User Meaning Interpretation's provider-neutral WHAT handoff. The
-   Planner fast pass is the first HOW path: before canonical Goal binding it may author
-   one immediate safe Communicative Act and typed continuation dispositions for
-   Goal Association and/or Planner deep pass. Goal Association remains the only canonical
-   Goal-continuity authority; commitment-bearing Capability work still requires
-   applicable canonical Goal grounding and trusted validation. User Meaning Interpretation
-   has no speech or response contract. A Communicative Activity contains function,
-   exact wording, timing, truth/evidence provenance, and constraints. The Host validates
-   and schedules it mechanically before Vocal/TTS delivery; there is no second
-   response-authoring semantic owner.
-3. **Planner-owned communication and Evidence re-entry — implemented and source-guarded.**
-   Planner is the only ordinary response semantic owner. Trusted Runtime/Host binds
-   terminal Evidence through immutable request
-   provenance to exact Goal IDs, then creates a bounded readiness opportunity for Planner
-   with a version-consistent Goal/Evidence/Work snapshot. Planner chooses answer,
-   follow-up Work, revision, clarification, waiting, silence, or no new Activity. The
-   same primary Planner result may include optional `auxiliary_activities[]` attached
-   to an observable Main Activity; Runtime cannot reselect and decoration never delays it.
-   Retain separate first-commit, TTS-first-PCM, playback-start, result-reentry,
-   auxiliary validation/dispatch, and auxiliary suppression timing evidence.
+1. **UMI/Planner input boundary — contract retained, conformance open.** UMI owns
+   complete contextual WHAT, provider-neutral requested result type, source evidence
+   and genuine unresolved meaning. GA owns retained Goal association; Planner owns
+   parameter extraction, Capability selection and execution-input completeness.
+   The current UMI binding conflict is recorded in the audit, not an extension of
+   this boundary. Source-based Deep UMI resolves genuine consequential ambiguity,
+   not missing Capability arguments.
+2. **Independent interaction and Work advancement — migration implemented.** Runtime
+   starts the standing SC interaction while requested GA/Planner may advance from the
+   same accepted UMI. SC authors exact words, timing and truth provenance; Planner
+   produces complete Work. Early safe reads require exact declared contracts;
+   effectful Work still needs canonical Goal binding and trusted prerequisites.
+3. **Evidence re-entry — distinct SC and Planner owners.** Runtime binds terminal
+   Evidence to immutable request/Goal provenance. Planner reasons about remaining
+   Work, reuse, revision, readiness or gaps; SC reasons about grounded answer,
+   follow-up, repair or silence. Eligible optional expression belongs to SC and
+   cannot complete a Goal. Retain separate SC commit, TTS-first-PCM, playback,
+   Work re-entry and expression validation/suppression evidence.
 4. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
    Extend existing capability/evidence contracts to represent claim-specific required
    observations, provenance/trust-domain independence, alternatives/corroboration,
@@ -494,7 +468,7 @@ available.
    event should resume from current Goal/Work/Evidence state rather than restart the
    whole request. Corrections revise current meaning, reuse compatible Work, and repair
    incompatible speech or effects forward without rewriting history.
-5. **Add restrained embodied expression.** Qualify Planner-owned auxiliary social
+5. **Add restrained embodied expression.** Qualify SC-owned auxiliary social
    Activities only around an explicit primary Activity with current target/scene evidence. Optional gaze, posture,
    or expression remains resource-aware and fail-soft, never delays the primary outcome,
    and never becomes Goal-completion Evidence. Missing expression is preferable to a
@@ -796,7 +770,7 @@ authority behind a new manager.
    the deterministic provider fault matrix; target-evidence closure adds a
    `current_revision_qualification` profile requiring the same clean revision across source,
    Gateway/Core, Agent Skill/weather, directory-discovered live interaction behavior, live provider
-   faults, Planner-owned auxiliary social behavior, and LAN tracks. The interaction track now requires explicit
+   faults, SC-owned auxiliary social behavior, and LAN tracks. The interaction track now requires explicit
    passing coverage for human-like continuity, Planner/Goal semantic quality, WorkDAG
    multi-Goal revision/cardinality, and continuous-cognition recovery in addition to the
    retained baseline probes and warm Fast-Planner/playback budgets. Source qualification pins
@@ -820,7 +794,7 @@ sequential milestone numbers. Earlier incremental work is represented by two com
   an open evidence track.
 - **Goal-driven control-plane foundation:** Cognitive Gateway admission,
   immutable turn envelopes, Core-owned User Meaning Interpretation, Goal Association,
-  Fast and Deep Planner contracts, Planner-owned Communicative Activities, Trusted Capability
+  Fast and Deep Planner contracts, SC-owned Communicative Activities, Trusted Capability
   Runtime validation, outcome evidence, and fail-closed execution.
 
 These foundations are maintained only while their automated contracts remain
@@ -873,7 +847,7 @@ Exit criteria:
 - no authoritative failure enters another semantic planner;
 - current docs, profiles, and source describe the same authority and lane policy.
 
-### Streaming Planner with Early Typed Presentation Commit — source-gated, qualification open
+### Social Cognition interaction and independent Work — source implemented, qualification open
 
 The owner-approved SC migration supersedes the earlier #32 presentation-frame
 implementation. `/fast-advance` emits one complete Work decision; `/social-cognition`
@@ -916,7 +890,7 @@ Exit criteria:
 - Goal Association receives bounded recent Interaction Context and later
   Planners receive the Goal-scoped projection so they can produce
   only the still-needed delta;
-- A Fast Planner Communicative Activity scheduled before GA finishes retains UMI Responsibility refs and is
+- An SC Communicative Activity scheduled before GA finishes retains UMI Responsibility refs and is
   later bound only through GA-owned canonical Goal identity;
 - Goal-bound speech cannot be reused for unrelated Goals or a different Plan;
 - scheduled and delivered speech remain distinct, and neither proves Activity
@@ -1066,7 +1040,7 @@ delta suppression. Missing Responsibility provenance fails closed instead of fab
 a callback Responsibility. This extraction removes nine private methods from
 `VoiceAssistant`, lowering its method count from 159 to 150. A second mechanical slice
 moves TTS text segmentation and Goal-list console projection behind existing Host/runtime
-module boundaries, lowering the composition root from 150 to 142 methods. Stateless observability-recording containment then lowers it to 139 methods. Fixed-reflex confirmation-token revocation, widening evidence, and state bookkeeping now live with the existing ConfirmationDialogue owner, lowering it to 136 methods while confirmation meaning remains GA-owned and confirmation speech remains Planner-owned. OS-default audio-device detection, pending-switch queueing, cross-device input reset, and output rollover then move to stateless `audio_device_lifecycle.py`, lowering the root to 129 methods while device discovery remains `AudioDeviceManager`-owned and output I/O remains `PlaybackTransport`-owned. Top-level process teardown then moves to stateless `shutdown_lifecycle.py`: it reuses the existing InputTurn task owner, Playback wait/duck/transport owners, Session trace finalizer, and concrete ASR/HTTP/audio resource closers. Removing the old `VoiceAssistant.cleanup()` method and cleanup-only output-close compatibility wrapper lowers the root to 127 methods. Accelerator telemetry schedule/sample/task-tracking then moves into the existing stateless observability policy, lowering the root to 124 methods while Session remains the trace owner and telemetry remains non-semantic. The next mechanical slice removes the seven remaining PlaybackTransport/TTS compatibility delegates from `VoiceAssistant`: the transport now calls its own provider/output methods, Host call sites access the cached transport directly, and the existing TTS/playback trace spans move to that real owner. This lowers the root to 117 methods without moving Planner-authored speech semantics, playback-generation authority, or barge-in/reflex interruption policy. The next slice removes twelve `VoiceAssistant` input/session compatibility delegates: `InputSessionRuntime` calls its own microphone callback, VAD/ASR queue, routed-turn lifecycle, injected/device audio streams, and session-idle sweep directly, while Host integration obtains that existing runtime explicitly and `InputTurnLifecycle` remains the task-state owner. This lowers the root to 105 methods without moving Gateway, turn, reflex, or conversation semantics. None of these
+module boundaries, lowering the composition root from 150 to 142 methods. Stateless observability-recording containment then lowers it to 139 methods. Fixed-reflex confirmation-token revocation, widening evidence, and state bookkeeping now live with the existing ConfirmationDialogue owner, lowering it to 136 methods while confirmation meaning remains GA-owned and confirmation speech remains SC-owned. OS-default audio-device detection, pending-switch queueing, cross-device input reset, and output rollover then move to stateless `audio_device_lifecycle.py`, lowering the root to 129 methods while device discovery remains `AudioDeviceManager`-owned and output I/O remains `PlaybackTransport`-owned. Top-level process teardown then moves to stateless `shutdown_lifecycle.py`: it reuses the existing InputTurn task owner, Playback wait/duck/transport owners, Session trace finalizer, and concrete ASR/HTTP/audio resource closers. Removing the old `VoiceAssistant.cleanup()` method and cleanup-only output-close compatibility wrapper lowers the root to 127 methods. Accelerator telemetry schedule/sample/task-tracking then moves into the existing stateless observability policy, lowering the root to 124 methods while Session remains the trace owner and telemetry remains non-semantic. The next mechanical slice removes the seven remaining PlaybackTransport/TTS compatibility delegates from `VoiceAssistant`: the transport now calls its own provider/output methods, Host call sites access the cached transport directly, and the existing TTS/playback trace spans move to that real owner. This lowers the root to 117 methods without moving SC-authored speech semantics, playback-generation authority, or barge-in/reflex interruption policy. The next slice removes twelve `VoiceAssistant` input/session compatibility delegates: `InputSessionRuntime` calls its own microphone callback, VAD/ASR queue, routed-turn lifecycle, injected/device audio streams, and session-idle sweep directly, while Host integration obtains that existing runtime explicitly and `InputTurnLifecycle` remains the task-state owner. This lowers the root to 105 methods without moving Gateway, turn, reflex, or conversation semantics. None of these
 slices adds a semantic owner, manager, state store, service, environment key, or public
 runtime path.
 
