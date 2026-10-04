@@ -102,6 +102,9 @@ class TextScenarioCase:
     forbidden_plan_agent_skills: tuple[str, ...] = field(default_factory=tuple)
     require_llm_integrity: bool = True
     require_safe_idle: bool = False
+    interrupt_text: str = ""
+    interrupt_capability_prefix: str = "soridormi."
+    expect_cancelled: bool = False
     expected_repeat_of_previous_speech: bool = False
     forbid_repeat_of_previous_speech: bool = False
     trusted_target_context: dict[str, Any] = field(default_factory=dict)
@@ -1086,6 +1089,9 @@ def _text_scenario_case(
         ),
         require_llm_integrity=bool(raw.get("require_llm_integrity", True)),
         require_safe_idle=bool(raw.get("require_safe_idle", False)),
+        interrupt_text=str(raw.get("interrupt_text") or "").strip(),
+        interrupt_capability_prefix=str(raw.get("interrupt_capability_prefix") or "soridormi."),
+        expect_cancelled=bool(raw.get("expect_cancelled", False)),
         expected_repeat_of_previous_speech=bool(
             raw.get("expected_repeat_of_previous_speech", False)
         ),
@@ -1439,6 +1445,9 @@ def validate_library(
                     f"{ability.ability_id}/{case_id}: unknown difficulty "
                     f"{ref.difficulty!r}"
                 )
+            for turn in ref.case.turns or (ref.case,):
+                if turn.expect_cancelled and not turn.interrupt_text:
+                    errors.append(f"{ability.ability_id}/{turn.case_id}: expect_cancelled requires interrupt_text")
             try:
                 policy = OraclePolicy.from_mapping(ref.oracle_policy)
             except ValueError as exc:
@@ -1966,10 +1975,10 @@ def _live_case_namespace(
         expect_arg=list(case.expected_args) if args.assertion_scope == "full" else [],
         arg_tolerance=args.arg_tolerance,
         timeout_s=args.timeout_s,
-        interrupt_text="",
-        interrupt_capability_prefix="soridormi.",
+        interrupt_text=case.interrupt_text,
+        interrupt_capability_prefix=case.interrupt_capability_prefix,
         interrupt_start_timeout_s=30.0,
-        expect_cancelled=False,
+        expect_cancelled=case.expect_cancelled,
         capability_timeout_s=args.capability_timeout_s,
         reject_internal_speech=True,
         reject_speech_pattern=[],
@@ -2211,6 +2220,8 @@ def _semantic_review_bundle(
             }
         else:
             inputs = {"text": case.text, "language": case.language}
+            if case.interrupt_text:
+                inputs["interrupt_text"] = case.interrupt_text
         rubric = dict(ref.review_rubric)
         primary_outcomes = list(rubric.pop("primary_outcomes", []))
         acceptable_auxiliary = list(rubric.pop("acceptable_auxiliary", []))
@@ -2800,11 +2811,26 @@ def print_summary(summary: dict[str, Any]) -> None:
             print(f"Evidence: {summary['evidence_dir']}")
         return
 
-    print(
-        "General ability acceptance: "
-        f"{summary.get('passed', 0)}/{summary.get('case_count', 0)} passed "
-        f"mode={summary.get('mode')} evidence={summary.get('evidence_level', 'library')}"
-    )
+    if summary.get("mode") == "live-text":
+        planned = summary.get("planned_case_count", summary.get("case_count", 0))
+        print(
+            "General ability acceptance: "
+            f"{summary.get('passed', 0)}/{planned} automatic checks passed; "
+            f"attempted={summary.get('case_count', 0)}/{planned} "
+            f"skipped={summary.get('skipped_case_count', 0)} "
+            f"evidence={summary.get('evidence_level', 'library')}"
+        )
+        print(
+            f"Semantic review: {summary.get('semantic_review_status', 'unknown')} "
+            f"({summary.get('semantic_review_pending', 0)} pending); "
+            f"qualification_complete={summary.get('qualification_complete', False)}"
+        )
+    else:
+        print(
+            "General ability acceptance: "
+            f"{summary.get('passed', 0)}/{summary.get('case_count', 0)} passed "
+            f"mode={summary.get('mode')} evidence={summary.get('evidence_level', 'library')}"
+        )
     for stage in summary.get("stage_results", []):
         if not isinstance(stage, dict):
             continue

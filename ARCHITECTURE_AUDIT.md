@@ -756,3 +756,31 @@ healthy/restart0；模型、ASR/TTS均未改变。轮内full-tree SHA256为
 后台Evidence激活另行保留，不冒充GA补UMI请求。详见`source-schema/live-adjudication.final.json`、
 `live-iteration-integrity.json`及原生主packet。28个排除的外来路径字节/删除状态未变，
 stage为空；源修复patch已应用且reverse-check通过，不应再次apply。
+
+## 2026-10-05 非模型修复的后续交付审查
+
+首批审计/Planner修复已推送为`b693467ca…`。负责人随后授权：属于非LLM能力问题
+的剩余改动可以提交推送。本节审查31个此前保留的路径/共享差异；本次没有新增
+源码行为，只核对已有修复、运行验证并更新现有交接文档。完整原始diff与字节备份在
+`.chromie/acceptance/non-model-delivery-20261005/`，不纳入Git。
+
+| 实际路径、模块职责 | 输入→首次错误输出与下游 | 修复、预期输出及证据界限 |
+| --- | --- | --- |
+| Gemma主UMI→SGLang普通JSON→Host DTO；serving负责格式约束，UMI负责WHAT | 完整primary Schema的普通JSON分派未使用已有有限空白选项；结构空白耗尽4096输出预算、finish=`length`，Host拒绝。此时没有可判定的完整语义结果。 | 客户端传16字符结构空白约束，现有XGrammar后端执行；Schema语义、字符串、模型、primary调用和Host均保留。当前运行镜像10项正反grammar检查通过；128字符字符串空白仍允许，无LLM调用。历史原生日志在`text-model-comparison-20260930/native-whitespace-{before,after}.log`。 |
+| 接受的Chongqing Goal→Fast参数→天气地理编码provider | SID`c1e97c64`、Fast request`fastreq_9dbcbc11f082f770e531`保留Chongqing；provider却按回复语言zh请求中文地名，返回重庆，严格身份保护拒绝。首错是provider查询语言，不是GA或Planner。 | locale按已接受地名及显式限定选择，query/Goal地点和回复语言均不改；同ID1814906及坐标的英文返回被原有身份检查接受。历史真实provider报告`weather-native-after.json`和语言探针保留；其他复合地点仍需独立资格。 |
+| 新天气Evidence→Fast re-entry→SC context→预算preflight→SC | digest核验的`llmcall_agent_b0c56de0969e4a0b`请求重复承载top-level与Session Memory相同快照；39,356输入+1,024输出+2,048余量=42,428，超40,960而未推理。首错为context重复投影，preflight正确。 | 只在拷贝视图移除逐值相等的重复项；当前事实、不同/独有Memory和原trusted request/digest保留。原生同tokenizer/Schema预算37,077；`sc-mirror-native-budget.json`有精确摘要。SC措辞、延迟及语义失败不由此宣称解决。 |
+| active-stop场景→文本runner→既有interrupt harness→Soridormi receipt | 原两turn runner先等待十秒走路结束，再输入停下；随后safe idle无法证明取消运行中动作。首错为测试episode编排，不是模型或停止控制实现。 | runner转发现有interrupt参数，观察provider已开始且未完成后发送停下，必须有cancelled walking Evidence及safe idle；没有改变生产停止权威。当前固定79例仍未获得该stop执行证据，不借历史取消记录作当前通过。 |
+| UMI fixture/oracle→Schema/DTO/语义审阅 | ambiguous_move_there缺必填body metadata，DTO在预期deep delegation之前拒绝；clarification/draft仅ack可误过，天气原文字面地点可误拒同一地理身份。 | 补已有fixture必填字段；要求合适的SC act并保持相关性审阅；天气身份仍为blocking semantic review，错误城市、限定、无Evidence或虚构都失败。日期、period、Capability、来源和执行检查保留；两条天气canonical-hold断言按已有safe-read契约移除。未用候选答案改写冻结目标。 |
+
+相关focused347通过、5环境跳过、57 subtests；3能力类Level A19/19唯一案例，
+均是确定性证据。当前Agent host/package摘要仍为93b58310…，与既有完整79例
+原生迭代相同；未改模型、UMI/SC语义提示词、Charter、模块职责或生成环境。
+未重建/重启服务，未增加第二语义调用，未收集新的cohort bundle或执行新模型cohort。
+既有原生20/79自动通过与逐项6/12/59/2判断仍绑定原runtime/source身份；它们不证明
+新Git修订的全体验收、物理机器人/音频、独立语义资格或模型内在能力上限。
+已有canonical冻结捕获失败继续保持严格，不删除6000参考或伪称通过。
+当前完整gate为benchmarks160通过、main83失败/3885通过/5跳过/1023 subtests通过，
+与最新完整source-Schema run的83失败IDs相同，无新增；首批交付的fixture缺字段
+失败已消失。日志`.chromie/acceptance/non-model-delivery-20261005.canonical.log`及
+`canonical-comparison.json`保留；legacy未到达。模型前拒绝仍是未关闭的程序/证据边界。
+维护文档/环境变量/运行开关/架构术语净新增0；新增内容由原审计/状态/交接所有者承载。

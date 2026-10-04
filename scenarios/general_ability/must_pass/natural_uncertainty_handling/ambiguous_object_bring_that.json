@@ -35,6 +35,8 @@
   "text": "把那个拿给我。",
   "language": "zh-CN",
   "expect_no_capabilities": true,
+  "require_social_communicative_act": true,
+  "expected_social_communicative_functions": ["ask"],
   "require_speech": true,
   "description": "A missing demonstrative referent should produce a genuine object clarification.",
   "general_ability": {

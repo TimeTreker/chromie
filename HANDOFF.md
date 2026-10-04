@@ -2,27 +2,66 @@
 
 ## Current resume point — 2026-10-05
 
-Pre-delivery checkout `main` / `90d0af90c9d3d2c0fe9847d140d09279dfdeff26`
-contains fetched `origin/main`. The owner authorized commit and push on 2026-10-05
-after disclosure of the failed gates. Expected resume revision: latest `main`
+Pre-delivery checkout `main` / `b693467caab54650c5cbc923e4bc722e287ba055`
+contains fetched `origin/main`; the first audit/Planner delivery is already pushed.
+The owner authorized commit/push of the remaining non-model repairs on 2026-10-05.
+Expected resume revision: latest `main`
 commit containing this Handoff and [checkpoint](DEVELOPMENT_CHECKPOINT.md).
-Inherited unrelated changes are preserved outside the delivery. Follow the
-checkpoint and [audit](ARCHITECTURE_AUDIT.md).
+The31 formerly excluded paths/shared differences were reviewed and included as
+serving, context, provider and test-evidence repairs. Follow the checkpoint and
+[audit](ARCHITECTURE_AUDIT.md).
 The delivery line is still canonical local gate → current-revision voice proof →
 default target-evidence closure; all remain open. Charter, UMI prompt/DTO, initial
 Planner activation, GA relationships and SC ordinary/optional expression ownership
 are unchanged. The owner authorized the existing-Charter Planner compound repair.
 Count ownership and source-Schema repairs remain within that Planner owner.
 
-## Latest retained proof
+## Current non-model follow-up
+
+Root `/home/chromie/github/chromie/.chromie/acceptance/non-model-delivery-20261005/`.
+`pending.before.patch`, `before.json` and `before/` preserve all31 reviewed pending
+paths and the handoff/status/audit originals against pre-delivery `b693467ca…`.
+They are already-applied local changes, not a patch to apply again.
+
+- UMI wire formatting:16-character structural whitespace bound forwarded by
+  SGLang/XGrammar; strings, Schema meaning and model unchanged.
+- SC model view:one exact copy of current mirrored snapshots; unique/divergent
+  Memory and trusted request/digest unchanged. Historical native budget proof is
+  42,428→37,077 against40,960; source/context issue before inference.
+- Weather provider:geocoding locale follows admitted geographic names/qualifiers;
+  reply-language preference, canonical location and strict identity checks unchanged.
+- Test evidence:forward existing interrupt controls and require provider-start then
+  cancelled walking receipt; strengthen clarification/draft acts; geographic identity
+  remains blocking semantic review. Include required ambiguous-movement body metadata,
+  previously withdrawn Tianxin case deletion and79-case inventory/documentation.
+- Current focused suite347 pass/5 environment skips/57 subtests; Level A19/19 unique
+  cases across3 relevant classes. `native-grammar.log`:bounded0/8/16 accepted,17/128
+  rejected; unbounded reference accepts all5;128 semantic string spaces retained.
+- `agent-source.json` still matches host/package93b58310…; Agent image124a02f6… and
+  LLM image2330d155… remain running/restart0. No model/profile/prompt, Charter or
+  module-authority change, no service rebuild/restart, no additional LLM decision.
+- Current full gate `.chromie/acceptance/non-model-delivery-20261005.canonical.log`,
+  exit1:benchmarks160 pass, main83 fail/3885 pass/5 skips/1023 passing subtests.
+  Policy/ownership/pinned Ruff/mypy/configuration/docs/scenario stages pass;
+  legacy not reached. `canonical-comparison.json`:same83 ordinary failure IDs as
+  latest full local-tree source-Schema run, no new IDs/subtest failures. Former
+  first-delivery fixture failure now passes. All6000 targets and strict replay remain.
+  Final status/Handoff/audit/checkpoint edits are documentation-only after that gate.
+
+This follow-up commits the local source already used by the latest retained79-case
+native iteration below. It does not create a new native cohort, reuse its runtime
+identity for a new run, or qualify this new Git revision. Native residual failures,
+physical/independent evidence gaps and the red canonical gate remain open.
+
+## Latest retained native proof and first-delivery history
 
 Root `/home/chromie/github/chromie/.chromie/acceptance/planner-compound-contract-20261004T140758Z/`;
 latest source/target iteration is `count-scope/source-schema/`.
 
-- Entry backup retains3113 dirty paths; exact corpus/input/foreign preservation and
+- First-delivery entry backup retains3113 dirty paths; exact corpus/input/foreign preservation and
   `combined-*-patch-paths.txt` inventories remain at the root.28 excluded paths are
-  unchanged in `source-schema/foreign-preservation.json`. Delivery staging excludes
-  unrelated hunks in Agent README, Acceptance and general-ability tests. The
+  unchanged in `source-schema/foreign-preservation.json`. First-delivery staging excluded
+  hunks in Agent README, Acceptance and general-ability tests now included above. The
   already-dispatched SC presentation handling and its regression are included as
   prerequisites for the admitted-user chronology repair. Do not blanket-add
   ignored evidence or other work.
@@ -54,9 +93,9 @@ latest source/target iteration is `count-scope/source-schema/`.
 - Root `repair-only.patch` and per-phase repair-only patches are already applied,
   not files to apply again. Source-schema reverse-check is successful. Later four
   status/audit/Handoff/checkpoint edits are documentation-only delta from that
-  frozen tree; full local Agent source remains matched. Delivery staging excludes
-  unrelated source/context/oracle changes, so the clean committed snapshot differs
-  from that native-proof tree. This delivery does not deploy or qualify that snapshot.
+  frozen tree; full local Agent source remains matched. First-delivery staging
+  excluded source/context/oracle changes now included in this follow-up. Historical
+  full-tree identities remain bound to their original runs and documentation deltas.
 
 ## Historical immutable native iterations
 
@@ -156,7 +195,7 @@ python scripts/general_ability_acceptance.py --mode live-text --keep-going \
 test "$task_live_rc" -eq 0
 ```
 
-## Historical evidence and patch preservation
+## Historical evidence and first-delivery patch preservation
 
 Earlier roots, retained for causality and original bytes:
 
@@ -200,23 +239,23 @@ failed with `frozen archive is incomplete`; `snapshot-bootstrap.json` retains th
 failure and the6076 unchanged files copied. This bootstrap failure is open for a
 cold checkout and must not be concealed by regenerating fixtures or expected output.
 
-The full local native proof above includes excluded client/SC/oracle changes. Use
+The full local native proof above includes client/SC/oracle changes formerly excluded. Use
 its exact identities and retained evidence when reproducing it; do not treat a
-checkout of the delivery commit alone as the tested deployed Agent image. Remaining
-28 whole-file changes and3 shared-file differences are local work, not part of this
-delivery. Preserve them before any cross-machine integration.
+checkout of a delivery commit alone as the tested runtime identity. The former
+28 whole-file changes and3 shared-file differences are included in this follow-up;
+verify final status and preserve any subsequently added work before integration.
 
 Delivery snapshot gate: `delivery/canonical.staged.ready.log`, exit1;
 benchmarks160 pass, main84 fail/3843 pass/5 skipped/1018 passing subtests.
 Those totals precede recovery of the count-scope test. Its final isolated rerun
 passes1 test covering9 contrasts (`delivery/count-regression.final.log`);
 production code and fixture inputs did not change after the full gate.
-The83 workflow failure IDs match the full local-tree run exactly. The additional
+The83 workflow failure IDs matched the full local-tree run exactly. The additional
 UMI behavior-truth subtest reads the unchanged committed
 `scenarios/user_meaning_interpretation/ambiguous_move_there.json`, which lacks
-required `body_effect_family`; primary DTO fails closed before expected deep
-delegation. The local metadata-only correction is in the excluded inventory and
-remains unstaged. No new production failure is established by this fixture error.
+required `body_effect_family`; primary DTO failed closed before expected deep
+delegation. The local metadata-only correction is included in this follow-up and
+its focused behavior-truth regression passes. No production failure was established.
 `delivery/canonical-comparison.json` records both ordinary failures and that subtest.
 Policies, test ownership, pinned Ruff/mypy, configuration, docs and benchmarks pass;
 legacy stage is not reached. Final handoff edits are documentation-only and checked

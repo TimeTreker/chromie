@@ -35,6 +35,8 @@
   "text": "调大一点。",
   "language": "zh-CN",
   "expect_no_capabilities": true,
+  "require_social_communicative_act": true,
+  "expected_social_communicative_functions": ["ask"],
   "require_speech": true,
   "description": "A context-free scalar adjustment must clarify its missing object.",
   "general_ability": {

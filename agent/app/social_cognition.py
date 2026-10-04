@@ -949,6 +949,14 @@ def _social_model_context(
     for key in ("canonical_plan_resolution", "source_canonical_plan"):
         if key in projected:
             projected[key] = _social_plan_facts(projected[key])
+    # Session Memory mirrors current Goal/Work/tool snapshots already supplied
+    # at the top level. Keep one exact copy; divergent snapshots and unique
+    # Memory facts remain intact. This never summarizes or selects semantics.
+    memory = projected.get("session_memory")
+    if isinstance(memory, dict):
+        for key in tuple(memory):
+            if key in projected and memory[key] == projected[key]:
+                memory.pop(key)
     return projected
 
 

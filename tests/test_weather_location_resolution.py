@@ -15,6 +15,55 @@ from agent.app.local_tool_execution import _weather_output
 
 
 class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_geocoding_identity_is_independent_of_reply_language(self) -> None:
+        for location, reply_language, context, names, expected in (
+            ("Chongqing", "zh-CN", None,
+             {"en": "Chongqing", "zh": "重庆"}, "Chongqing"),
+            ("Berlin", "zh-CN", None,
+             {"en": "Berlin", "zh": "柏林"}, "Berlin"),
+            ("重庆", "en-US", None,
+             {"en": "Chongqing", "zh": "重庆"}, "重庆"),
+            ("重庆", "zh-CN", WeatherLocationContext(
+                locality="Chongqing", admin1="Chongqing", country="China"),
+             {"en": "Chongqing", "zh": "重庆"}, "Chongqing"),
+        ):
+            with self.subTest(location=location, reply_language=reply_language, context=context):
+                forecast_calls = []
+
+                def handler(request: httpx.Request) -> httpx.Response:
+                    if request.url.path.endswith("/search"):
+                        locale = request.url.params["language"]
+                        berlin = names["en"] == "Berlin"
+                        country = ("Germany", "德国") if berlin else ("China", "中国")
+                        admin1 = ("Berlin", "柏林") if berlin else ("Chongqing", "重庆市")
+                        return httpx.Response(200, json={"results": [{
+                            "name": names[locale],
+                            "latitude": 52.52 if berlin else 29.56,
+                            "longitude": 13.41 if berlin else 106.55,
+                            "country": country[locale == "zh"],
+                            "admin1": admin1[locale == "zh"],
+                        }]})
+                    forecast_calls.append(request)
+                    return httpx.Response(200, json={
+                        "timezone": "Asia/Shanghai",
+                        "current": {"temperature_2m": 20.0},
+                        "daily": {"time": ["2026-09-30", "2026-10-01"]},
+                    })
+
+                client = OpenMeteoWeatherClient(
+                    geocoding_url="https://example.test/v1/search",
+                    forecast_url="https://example.test/v1/forecast",
+                    transport=httpx.MockTransport(handler),
+                )
+                query = WeatherQuery(location=location, language=reply_language,
+                                     location_context=context)
+                report = await client.lookup(query)
+                self.assertEqual(report.location_name, expected)
+                self.assertEqual(report.requested_location, location)
+                self.assertEqual(query.location, location)
+                self.assertEqual(query.language, reply_language)
+                self.assertEqual(len(forecast_calls), 1)
+
     async def test_transliterated_search_match_is_not_location_identity(self) -> None:
         # Retrieval keys may collide or choose the wrong reading of a name.
         for requested, returned in (("重庆", "Zhongqing"), ("南京", "南津")):

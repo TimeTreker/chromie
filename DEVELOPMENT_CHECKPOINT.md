@@ -2,13 +2,15 @@
 
 ## Current resume point — 2026-10-05
 
-Pre-delivery base `main` / `90d0af90c9d3d2c0fe9847d140d09279dfdeff26` matches
-fetched `origin/main`. The owner authorized commit and push on 2026-10-05 after
-the failed gates were disclosed. Expected resume revision: the latest `main`
+Pre-delivery base `main` / `b693467caab54650c5cbc923e4bc722e287ba055` matches
+fetched `origin/main`. The first audit/Planner delivery is already pushed. The
+owner authorized this follow-up for the remaining non-model repairs on 2026-10-05.
+Expected resume revision: the latest `main`
 commit containing this checkpoint and [Handoff](HANDOFF.md). This is an audit and
 bounded repair delivery; canonical, voice and default-target qualification remain
-open. Inherited unrelated work is retained outside the commit. Do not resume from
-superseded iteration budgets or commands in historical evidence.
+open. All31 previously excluded paths/shared differences were reviewed as serving,
+context, provider or test-evidence repairs; they are included in this follow-up.
+Do not resume from superseded iteration budgets or historical commands.
 
 The current focus remains Goal-driven single-authority architecture. The active
 delivery line remains canonical local verification → narrow
@@ -52,6 +54,16 @@ module or add a second semantic model call.
   field, second model call or downstream repair; Host contract is unchanged.
 - Earlier text admission repair records the admitted user before concurrent SC
   delivery and enriches the same turn once. Accepted-water Work still fails.
+- UMI serving bounds structural JSON whitespace at16 characters through the
+  existing XGrammar option, preserving semantic strings and the complete primary
+  Schema. SC projects exact duplicate snapshots once; divergent/unique facts and
+  trusted request/digest remain. Weather geocoding locale follows admitted names
+  and qualifiers, independently of reply language; identity checks remain strict.
+- Acceptance forwards the existing provider-start interruption controls, requires
+  cancelled walking Evidence, strengthens clarification/draft act checks and
+  keeps geographic identity as a blocking semantic review. Ambiguous movement's
+  fixture receives required body metadata. Previously withdrawn Tianxin deletion
+  and79-case inventory are now included. No model, prompt or authority repair.
 - CosyVoice releases the reference-only ONNX encoder after all registered native
   voice conditionings are cached, before readiness. Isolated resource proof frees
   about1.1GB; originating sadness/no-advice now delivers PCM. No concurrency,
@@ -74,10 +86,10 @@ changes, are restored. No runtime translator, semantic repair or model substitut
 
 | Axis | Observed result |
 | --- | --- |
-| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Charter, UMI prompt/DTO, SC source, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain in the audit. |
-| Automatic verification | GA1500 references:1300 accepted/200 retained refusals/zero errors; media3/8→8/8; compound9/12→12/12; count6/11→11/11; source-Schema10/13→13/13. Scripted resolver checks, not model qualification. Count focused1090/451 subtests and final stream179 pass; relevant Level A18/18. Full local-tree canonical:benchmarks160 pass, main83 fail/3885 pass/5 skipped/1023 passing subtests. Delivery snapshot:benchmarks160 pass, main84 fail/3843 pass/5 skipped/1018 passing subtests;83 identical workflow failure IDs plus one stale fixture subtest described below. Policies, ownership, pinned static/configuration and docs pass; legacy stage not reached. Whole gate red. |
+| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Follow-up includes serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
+| Automatic verification | GA1500 references:1300 accepted/200 retained refusals/zero errors; media3/8→8/8; compound9/12→12/12; count6/11→11/11; source-Schema10/13→13/13. Scripted resolver checks, not model qualification. Count focused1090/451 subtests and source stream179 pass; their Level A18/18. Current non-model focused347 pass/5 skips/57 subtests, related Level A19/19. Current canonical:benchmarks160 pass, main83 fail/3885 pass/5 skipped/1023 passing subtests; same83 strict pre-inference workflow capture failures. First-delivery extra fixture subtest is resolved; policies, ownership, pinned static/configuration and docs pass; legacy stage not reached. Whole gate red. |
 | Target validation | Latest immutable full79 live-text/simulator run:20 automatic pass/59 fail; same-agent review6 bounded pass/12 partial/59 fail/2 insufficient evidence. All79 attempted/zero skipped; blocked dependent turns leave cohort/qualification incomplete. Compound walk10/.2→nod2→left-turn1 and Chinese walk3→right-turn1 have completed simulator observations; Chinese wording still English. No independent, current voice, physical/audible or default-target qualification. |
-| Deployment state | Official Agent image124a02f6… and packaged/host source93b58310… match the full local working tree used for native proof, including retained unrelated changes. Original environment unchanged, healthy/restart0; source/service identity fixed through that run. Default4B LLM and ASR/TTS unchanged; TTS dependency rebuild remains unqualified. This Git delivery excludes unrelated changes and is not a deployment, promotion or release. |
+| Deployment state | Official Agent image124a02f6… and packaged/host source93b58310… match current Agent bytes; this follow-up includes the formerly excluded local changes used in native proof. Original environment unchanged, healthy/restart0; source/service identity fixed through that run. Default4B LLM and ASR/TTS unchanged; TTS dependency rebuild remains unqualified. No service was rebuilt/restarted for this Git delivery; no promotion, release or fresh native revision qualification. |
 
 Each complete iteration retained exactly one post-cohort bundle. Latest GA82 primary
 calls have empty cognition-request arrays; GA/Host did not supply missing initial
@@ -95,25 +107,32 @@ Previous GA/media native baseline:
 SC experiment: `.chromie/acceptance/sc-language-policy-20261004T125029Z/`.
 Exact images, source digests, bundles, patch inventory and commands are in Handoff.
 
-The final delivery inventory has3094 paths:3012 corpus/reference paths,77 text paths
-and5 retired diagram assets.28 unrelated paths are excluded. Unrelated hunks in
-Agent README, Acceptance and general-ability tests remain outside the commit;
-already-dispatched SC presentation handling and its regression are retained as
-prerequisites for the admitted-user chronology repair. The committed snapshot
-therefore differs from the full local native-proof tree. Delivery verification
-and exact staging preservation are retained in the compound root's `delivery/`;
-native results above must not be presented as qualification of a clean Git checkout.
-The parent3093-path inventory omitted the owned count-scope regression in
-`tests/test_planner_binding_representation.py`; final staging recovers it.
-The gate totals above precede that inventory recovery; the added regression passed
-separately (1 test covering9 contrasts), with production code and fixtures unchanged.
-The additional delivery-snapshot subtest is
+The first delivery `b693467ca…` had3094 paths:3012 corpus/reference paths,77 text
+paths and5 retired diagram assets. It excluded28 whole-file changes and3 shared
+differences now reviewed and included in this follow-up. Its isolated snapshot gate
+was84 fail/3843 pass/5 skips/1018 passing subtests, recorded in the compound root's
+`delivery/`. The parent3093-path inventory had omitted the owned count regression
+in `tests/test_planner_binding_representation.py`; it was recovered before that
+commit and passed separately (1 test covering9 contrasts). Current full-suite
+totals above include that test. Native results remain bound to their exact runtime
+and source identities, not automatic qualification of a new clean Git checkout.
+The additional first-delivery snapshot subtest was
 `BehaviorTruthSuiteTests.test_all_behavior_scenario_suites` for UMI:
-excluded `ambiguous_move_there.json` has a local metadata repair that is not in this
-delivery. Its unchanged committed fixture omits required `body_effect_family`, so
-the primary DTO rejects it before the expected deep delegation. This is fixture
-contract drift, not a demonstrated production or intrinsic-model failure. Preserve
-the local repair for its owning delivery; do not compensate in UMI or Host.
+then-excluded `ambiguous_move_there.json` omitted required `body_effect_family`, so
+the primary DTO rejected it before expected deep delegation. This follow-up includes
+the metadata-only fixture repair; its behavior-truth regression passes. No production
+or intrinsic-model failure was established; UMI and Host are unchanged.
+
+Current follow-up evidence: `.chromie/acceptance/non-model-delivery-20261005/`;
+related source identities, retained native proof, exact scope and commands are in
+Handoff. Focused347 pass/5 skips/57 subtests; relevant Level A19/19. Native grammar
+accepts bounded0/8/16 layout spaces, rejects17/128, keeps128 spaces inside strings;
+unbounded reference accepts all5 layouts. Agent package/host93b58310… still match.
+No new semantic inference or full native cohort was run for unchanged source bytes.
+Canonical log: `.chromie/acceptance/non-model-delivery-20261005.canonical.log`, exit1.
+`canonical-comparison.json` retains the identical83 failure IDs against the latest
+full local-tree source-Schema gate. All6000 pinned workflow targets are preserved;
+strict replay is not weakened. No new full-suite failure is introduced.
 
 ## Next work and blockers
 

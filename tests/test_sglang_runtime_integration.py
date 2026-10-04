@@ -123,6 +123,27 @@ class SGLangProtocolTests(unittest.TestCase):
                 self.assertEqual(wire, expected)
                 self.assertNotIn("x-guidance", schema)
 
+    def test_actual_umi_schema_bounds_formatting_without_changing_meaning(self) -> None:
+        import copy
+        from jsonschema import Draft202012Validator
+        from tests.test_user_meaning_interpreter_llm_prompt import _valid_output
+
+        text = "What's the weather in Chongqing today?"
+        schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(
+            admitted_turn=text,
+        )
+        original = copy.deepcopy(schema)
+        payload = build_sglang_chat_payload(
+            model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+            options={}, response_format=schema, stream=False, priority_step=100,
+        )
+        wire = payload["response_format"]["json_schema"]["schema"]
+        compatible, _ = candidate_compatible_schema(schema)
+        self.assertEqual(wire, {**compatible, "x-guidance": {"max_whitespace_cnt": 16}})
+        self.assertEqual(schema, original)
+        for contract in (schema, wire):
+            Draft202012Validator(contract).validate(_valid_output(text))
+
     def test_priority_preserves_provider_neutral_compute_order(self) -> None:
         self.assertGreater(
             sglang_priority(CognitionComputeClass.REALTIME),

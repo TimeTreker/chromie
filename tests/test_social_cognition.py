@@ -2159,9 +2159,13 @@ def test_social_context_filters_nested_unbound_tasks_without_losing_memory(
     context = {"session_memory": memory, "current_task": memory["current_task"],
                "work_failure": failure}
     projected = _social_model_context(context, trigger=trigger, goal_ids=goal_ids)
-    for key in ("active_task_contexts", "active_task_snapshots", "current_task", "current_task_context"):
+    for key in ("active_task_contexts", "active_task_snapshots", "current_task_context"):
         assert (key in projected["session_memory"]) is retain
+    # A bound current_task remains once at the top level, without a Memory mirror.
+    assert "current_task" not in projected["session_memory"]
     assert ("current_task" in projected) is retain
+    if retain:
+        assert projected["current_task"] == memory["current_task"]
     for key in ("active_memory", "recent_user_request", "recent_tool_evidence"):
         assert projected["session_memory"][key] == memory[key]
     assert context["session_memory"] is memory
@@ -2487,3 +2491,26 @@ def test_current_turn_output_guard_keeps_direct_chat_compact() -> None:
     guard = _social_current_turn_output_guard(current)
     assert "default to one compact sentence" in guard
     assert "not a checklist of facts to volunteer" in guard
+
+
+@pytest.mark.parametrize("trigger", ["interpretation", "work_state"])
+@pytest.mark.parametrize("same_snapshot", [False, True])
+def test_social_projection_keeps_one_exact_memory_mirror_and_preserves_distinct_facts(trigger, same_snapshot):
+    import copy
+    from agent.app.social_cognition import _social_model_context
+
+    current = [{"source_ref": "weather-result", "location": "Chongqing",
+                "outcome": {"rain_probability": 32}, "status": "completed"}]
+    older = current if same_snapshot else [{"source_ref": "older-result", "location": "Berlin"}]
+    context = {"recent_tool_evidence": current, "session_memory": {
+        "recent_tool_evidence": older, "active_memory": {"content": "Prefers Chinese"},
+    }}
+    original = copy.deepcopy(context)
+    projected = _social_model_context(context, trigger=trigger, goal_ids=["weather-goal"])
+    assert projected["recent_tool_evidence"] == current
+    assert projected["session_memory"]["active_memory"] == original["session_memory"]["active_memory"]
+    if same_snapshot:
+        assert "recent_tool_evidence" not in projected["session_memory"]
+    else:
+        assert projected["session_memory"]["recent_tool_evidence"] == older
+    assert context == original

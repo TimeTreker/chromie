@@ -35,6 +35,8 @@
   "text": "一会儿提醒我。",
   "language": "zh-CN",
   "expect_no_capabilities": true,
+  "require_social_communicative_act": true,
+  "expected_social_communicative_functions": ["ask"],
   "require_speech": true,
   "description": "A reminder needs both content and a resolvable trigger before any scheduling claim.",
   "general_ability": {

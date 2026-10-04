@@ -55,6 +55,18 @@ The existing provider preflight still checks the complete request's model budget
 
 ## Authority boundary
 
+Social Cognition projects an exact Session Memory mirror only once when the same
+Goal/Work/tool snapshot already exists at the top level. Unique and divergent
+Memory facts remain complete; the trusted request and snapshot digest are unchanged.
+This avoids repeated transport snapshots exhausting the role's context budget
+without summarizing meaning or raising the budget.
+
+SGLang UMI requests bound JSON layout whitespace to 16 characters between
+elements through the existing `x-guidance.max_whitespace_cnt` decoder option.
+The serving adapter forwards this option for ordinary JSON requests as well
+as tagged formats. This prevents layout from exhausting the output budget;
+string values, semantic Schema/DTO rules and primary-call ownership are unchanged.
+
 UMI hands off complete natural-language intentions, their existing provider-neutral
 `output_mode`, confidence and source evidence alongside immutable original input.
 All actions, modifiers, quantities, units, negation and relations stay in `outcome`.

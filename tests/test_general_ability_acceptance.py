@@ -443,12 +443,13 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(
             [(stage.stage_id, len(stage.scenario_paths)) for stage in manifest.stages],
-            [("must_pass", 56), ("core", 16), ("challenge", 8)],
+            [("must_pass", 55), ("core", 16), ("challenge", 8)],
         )
-        self.assertEqual(len(live_ids), 80)
+        self.assertEqual(len(live_ids), 79)
+        self.assertNotIn("tianxin_ambiguous_tool", live_ids)
         self.assertEqual(
             len({ref.source_path for ability in manifest.ability_classes for ref in ability.live_text_cases}),
-            80,
+            79,
         )
         generated = [
             ref
@@ -1748,6 +1749,28 @@ def _social_test_summary(summary):
     return summary
 
 
+@pytest.mark.parametrize("case_id", [
+    "ambiguous_destination_go_there", "ambiguous_object_bring_that",
+    "contextless_turn_it_up", "single_letter_b", "underspecified_reminder",
+    "daily_mixed_language_fragment",
+])
+@pytest.mark.parametrize("function", ["acknowledge", "ask"])
+def test_clarification_cases_do_not_accept_acknowledgement_as_a_question(case_id, function):
+    library = load_scenario_library()
+    case = next(ref.case for ability in library.ability_classes
+                for ref in ability.live_text_cases if ref.case.case_id == case_id)
+    summary = {"interaction_response": {
+        "speech": [{"text": "Could you clarify?" if function == "ask" else "Okay."}],
+        "metadata": {"social_cognition_resolution": {
+            "semantic_owner": "social_cognition", "disposition": "communicate",
+            "activities": [{"activity_id": "act", "function": function,
+                            "text": "Could you clarify?" if function == "ask" else "Okay."}],
+        }},
+    }}
+    errors = validate_live_text_result(case, summary)
+    assert any("SC communicative function mismatch" in error for error in errors) is (function != "ask")
+
+
 def test_silent_or_missing_sc_output_cannot_satisfy_spoken_latency_target():
     from scripts.general_ability_acceptance import _social_response_timing_evidence
     for output in (None, {"semantic_owner": "social_cognition", "disposition": "silence", "activities": []}):
@@ -1756,6 +1779,41 @@ def test_silent_or_missing_sc_output_cannot_satisfy_spoken_latency_target():
             "started_elapsed_ms": 100, "finished_elapsed_ms": 200, "duration_ms": 100,
         }]}}
         assert _social_response_timing_evidence(summary)["derived"]["sc_decision_ms"] is None
+
+
+def test_active_stop_probe_waits_for_walking_in_the_existing_interrupt_harness(tmp_path):
+    library = load_scenario_library()
+    case = next(ref.case for ability in library.ability_classes
+                for ref in ability.live_text_cases if ref.case.case_id == "active_walk_direct_stop")
+    args = build_parser().parse_args(["--mode", "live-text", "--execute"])
+    namespace = _live_case_namespace(args, case, tmp_path)
+    assert namespace.interrupt_text == "停下！"
+    assert namespace.interrupt_capability_prefix == "soridormi.walk"
+    assert namespace.expect_cancelled is True
+
+
+@pytest.mark.parametrize("status", ["completed", "cancelled"])
+def test_active_stop_probe_cannot_pass_a_walk_that_finished_before_stop(status):
+    library = load_scenario_library()
+    case = next(ref.case for ability in library.ability_classes
+                for ref in ability.live_text_cases if ref.case.case_id == "active_walk_direct_stop")
+    # This focused oracle proof isolates body Evidence from model/speech checks.
+    case = replace(case, require_llm_integrity=False, require_speech=False)
+    summary = {
+        "interaction_response": {"speech": [], "capabilities": [{
+            "request_id": "walk", "capability_id": "soridormi.walk_forward",
+            "args": {"duration_s": 10.0},
+        }]},
+        "status_after": {"mode": "sim", "safe_idle": True, "active_task": None,
+                         "active_lanes": {}, "standing": True, "fallen": False,
+                         "emergency_stop": False},
+        "execution": {"status": status, "results": [{
+            "request_id": "walk", "capability_id": "soridormi.walk_forward",
+            "status": status,
+        }]},
+    }
+    errors = validate_live_text_result(case, summary)
+    assert any("missing expected observation" in error for error in errors) is (status != "cancelled")
 
 
 def test_redacted_sc_reentry_retains_verifiable_communication_structure(tmp_path):
@@ -1782,3 +1840,61 @@ def test_redacted_sc_reentry_retains_verifiable_communication_structure(tmp_path
     assert acts[0]["function"] == "inform"
     assert acts[0]["text"]["redacted"] is True
     assert "Private result" not in json.dumps(summary)
+
+
+@pytest.mark.parametrize("case_id", [
+    "chongqing_afternoon_rain_paraphrase_fresh_evidence",
+    "debug_bundle_beijing_tomorrow_rain", "user_probe_chongqing_tonight_hot",
+    "beijing_rain_evidence_bound_result", "chongqing_daytime_weather_progress_and_lookup",
+    "shanghai_tomorrow_temperature", "chongqing_afternoon_heavy_rain_fresh_evidence",
+    "chongqing_tonight_weather_truth_gate_and_lookup",
+])
+@pytest.mark.parametrize("wrong_time", [False, True])
+def test_weather_oracle_allows_localized_identity_but_preserves_time_checks(case_id, wrong_time):
+    from scripts.interaction_text_mujoco_check import validate_contract
+    from shared.chromie_contracts.interaction import InteractionResponse
+
+    library = load_scenario_library()
+    case = next(ref.case for ability in library.ability_classes
+                for ref in ability.live_text_cases if ref.case.case_id == case_id)
+    namespace = _live_case_namespace(build_parser().parse_args(["--mode", "live-text", "--assertion-scope", "full"]),
+                                     case, Path("/tmp/weather-oracle"))
+    expected = list(namespace.expect_arg)
+    args = {key: value for _, key, value in expected}
+    # The admitted Goal may use the provider's English name for the same city.
+    city = "Beijing" if "beijing" in case_id else "Shanghai" if "shanghai" in case_id else "Chongqing"
+    args["location"] = city
+    time_key = next(key for _, key, _ in expected if key in {"date", "period"})
+    if wrong_time:
+        args[time_key] = "wrong temporal scope"
+    response = InteractionResponse(capabilities=[{
+        "capability_id": "chromie.weather.lookup", "args": args,
+    }])
+    errors = validate_contract(
+        interpretation=None, response=response, expected_capabilities=list(case.expected_capabilities),
+        expect_no_capabilities=False, expected_args=expected, arg_tolerance=0.001,
+    )
+    if wrong_time:
+        assert any(time_key in error for error in errors)
+    else:
+        assert errors == []
+    # This automatic check never establishes geographic equivalence by itself.
+    assert next(ref.oracle_policy for ability in library.ability_classes
+                for ref in ability.live_text_cases if ref.case.case_id == case_id)["semantic_blocking"] is True
+
+
+@pytest.mark.parametrize("function", ["acknowledge", "respond", "inform", "ask"])
+def test_apology_draft_requires_more_than_receipt_acknowledgement(function):
+    library = load_scenario_library()
+    case = next(ref.case for ability in library.ability_classes
+                for ref in ability.live_text_cases if ref.case.case_id == "daily_draft_apology_not_send")
+    summary = {"interaction_response": {
+        "speech": [{"text": "Got it." if function == "acknowledge" else "Could you clarify what happened?"}],
+        "metadata": {"social_cognition_resolution": {
+            "semantic_owner": "social_cognition", "disposition": "communicate",
+            "activities": [{"activity_id": "act", "function": function,
+                            "text": "Got it." if function == "acknowledge" else "Could you clarify what happened?"}],
+        }},
+    }}
+    errors = validate_live_text_result(case, summary)
+    assert any("SC communicative function mismatch" in error for error in errors) is (function == "acknowledge")

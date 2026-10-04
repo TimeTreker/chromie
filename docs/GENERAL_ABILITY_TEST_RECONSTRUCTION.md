@@ -35,9 +35,11 @@ This is implemented and automatically verifiable at Level A. It is not target
 validation and it does not prove microphone, speaker, simulator execution, or
 physical hardware behavior.
 
-The current live library contains 73 cases: 50 `must_pass`, 15 `core`, and 8
-`challenge`. The first stage includes the retained 25-case regression cohort and
-25 independently generated common-scene probes covering ordinary language,
+The current live library contains 79 cases: 55 `must_pass`, 16 `core`, and 8
+`challenge`. The spelling-error probe `tianxin_ambiguous_tool` was removed at
+the owner's request; historical 80-case reports are not rewritten. The first
+stage includes retained regression and owner-reported cases plus 25
+independently generated common-scene probes covering ordinary language,
 supported body skills, composition, safety controls, uncertainty, evidence, and
 conversation continuity. The generated files declare scenario-local authoring
 provenance so later database extraction can distinguish them from migrated or

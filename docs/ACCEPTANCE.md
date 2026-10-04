@@ -576,9 +576,11 @@ tool/conversation lane discipline, deterministic safety controls, and evidence
 claim discipline, plus multi-goal daily-life planning. The runner writes evidence summaries under
 `.chromie/acceptance/general-ability/` unless `--no-write` is supplied.
 
-The live cohort has three ordered stages: 50 `must_pass`, 15 `core`, and 8
-`challenge` cases. The 50-case first stage contains the retained 25-case
-regression cohort plus 25 independently generated common-scene probes. The new
+The live cohort has three ordered stages: 55 `must_pass`, 16 `core`, and 8
+`challenge` cases (79 total). The owner removed the spelling-error probe
+`tianxin_ambiguous_tool`; previous 80-case scores remain historical evidence.
+The first stage includes retained regressions, owner-reported conversations,
+and 25 independently generated common-scene probes. The generated
 batch declares scenario-local `provenance` with its origin, batch id, and whether
 it was derived from an existing scenario; this metadata is retained in live-run
 summaries and semantic-review bundles. Stage and difficulty are separate metadata: the directory
@@ -596,13 +598,36 @@ coverage is incomplete; `qualification_complete` additionally requires all hard
 gates and semantic review. Neither an early stop nor an unreviewed passing subset
 qualifies the revision.
 
-The text simulator checker publishes admitted user dialogue through
-`record_accepted_user_turn` before Core entry and concurrent SC delivery, matching
-production admission. Later semantic recording enriches that same user turn;
-it must not append another copy or move the user after the delivered assistant
-reply. Positive scripted UMI fixtures must carry the current required
-`body_effect_family` for body actions; fixture compatibility is Level A evidence,
-not native inference qualification.
+Live console scores describe automatic checks, not a model's semantic ability.
+The console also reports pending semantic review and qualification status.
+Clarification scenarios require a typed SC `ask` act; acknowledgment alone
+cannot pass. The question's relevance still requires semantic review. The apology-draft probe
+also requires a response, information, genuine question or repair act; a receipt
+acknowledgment alone is insufficient. Weather probes retain capability, date/period,
+provenance and execution checks, but place identity is adjudicated from the original
+request and returned geographic Evidence in the blocking semantic review, rather
+than requiring the reference city's literal spelling. Localized names alone do not
+establish equivalence or permit a different place. Weather safe reads may start
+under accepted Responsibility provenance before Goal binding, as permitted by
+the interaction contract: complete arguments, available provider, schema validity,
+no confirmation, side-effect-free safe-read classification and declared parallel
+safety remain mandatory. The two weather probes therefore do not require the
+obsolete universal hold-until-canonical-Goal condition; evidence re-entry and
+all contract/integrity failures still block. Physical Work keeps its canonical
+validation requirement.
+The text simulator checker consumes `presentation_already_dispatched` delivery
+without submitting the same speech or optional decoration a second time.
+It publishes admitted user dialogue through `record_accepted_user_turn` before
+Core entry and concurrent SC delivery, matching production admission. Later
+semantic recording enriches that same user turn; it must not append another copy
+or move the user after the delivered assistant reply. Positive scripted UMI
+fixtures must carry the current required `body_effect_family` for body actions;
+fixture compatibility is Level A evidence, not native inference qualification.
+The active-stop scenario uses the checker's existing `interrupt_text`,
+`interrupt_capability_prefix` and `expect_cancelled` settings. It waits for a
+trusted provider-start observation on the walking request before sending stop,
+then requires cancelled walking Evidence and safe idle. A completed walk followed
+by an idle stop does not establish active cancellation and cannot pass that case.
 
 A passing `--mode level-a` run is still Level A deterministic evidence only. It
 does not prove live services, microphone/speaker behavior, simulator execution,

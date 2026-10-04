@@ -135,6 +135,10 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
             # global settings. This also prevents the reproduced Planner/Skill JSON
             # whitespace loop; strings retain their exact model-authored content.
             schema["x-guidance"] = {"whitespace_flexible": False}
+        if schema.get("title") == "UserMeaningInterpretationDecision":
+            # Preserve flexible JSON layout while preventing structural whitespace
+            # from consuming UMI's output budget. String contents are unchanged.
+            schema["x-guidance"] = {"max_whitespace_cnt": 16}
         return {
             "type": "json_schema",
             "json_schema": {

@@ -576,6 +576,11 @@ class OpenMeteoWeatherClient:
 
         context = _merge_location_context(location, query.location_context)
         candidates = _provider_query_candidates(location, context)
+        # Localized provider names must match the admitted geographic identity,
+        # independently of the conversation's response-language preference.
+        # Explicit qualifiers retain priority; identity validation stays strict.
+        geocoding_identity = context.admin1 or context.country or context.locality or location
+        geocoding_language = "zh" if re.search(r"[\u4e00-\u9fff]", geocoding_identity) else "en"
         async with httpx.AsyncClient(
             timeout=httpx.Timeout(self.timeout_s),
             trust_env=False,
@@ -586,7 +591,7 @@ class OpenMeteoWeatherClient:
                 requested_location=location,
                 candidates=candidates,
                 context=context,
-                language=query.language,
+                language=geocoding_language,
             )
             latitude = result.get("latitude")
             longitude = result.get("longitude")

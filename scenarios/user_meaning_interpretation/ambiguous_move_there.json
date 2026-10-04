@@ -24,6 +24,7 @@
               "outcome": "Can you move over there a little?",
               "confidence": 0.78,
               "output_mode": "body_action",
+              "body_effect_family": "task_physical_effect",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t7"
@@ -62,6 +63,7 @@
               "outcome": "Can you move over there a little?",
               "confidence": 0.78,
               "output_mode": "body_action",
+              "body_effect_family": "task_physical_effect",
               "source_evidence": {
                 "source_start_token_ref": "t0",
                 "source_end_token_ref": "t7"
@@ -107,7 +109,8 @@
         "local_ref": "r1",
         "outcome": "Can you move over there a little?",
         "confidence": 0.78,
-        "output_mode": "body_action"
+        "output_mode": "body_action",
+        "body_effect_family": "task_physical_effect"
       }
     ]
   },

@@ -44,6 +44,8 @@
   },
   "text": "B.",
   "expect_no_capabilities": true,
+  "require_social_communicative_act": true,
+  "expected_social_communicative_functions": ["ask"],
   "description": "A low-information fragment should clarify instead of becoming blink or another nearby skill.",
   "general_ability": {
     "memberships": [

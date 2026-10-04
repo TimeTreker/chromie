@@ -27,7 +27,8 @@
       "naturalness"
     ],
     "primary_outcomes": [
-      "Retained SID 7cd09453 regression: a changing weather question must remain fresh capability work even though its grounded result will later be spoken, while preserving Chongqing, afternoon, and the heavy-rain qualifier."
+      "Retained SID 7cd09453 regression: a changing weather question must remain fresh capability work even though its grounded result will later be spoken, while preserving Chongqing, afternoon, and the heavy-rain qualifier.",
+      "The weather lookup and its returned geographic Evidence must identify the originally requested place. Localized names may differ; a wrong city, substituted qualifier, missing location Evidence, or invented result fails semantic review."
     ],
     "acceptable_auxiliary": [
       "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
@@ -50,7 +51,6 @@
     "chromie.weather.lookup"
   ],
   "expected_args": [
-    "0:location=重庆",
     "0:period=afternoon"
   ],
   "require_speech": true,

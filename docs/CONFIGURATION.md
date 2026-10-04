@@ -468,8 +468,11 @@ provider key such as `河南省内乡县` -> `neixiang` and tries that bare key 
 descriptive English forms. Transliterations are retrieval hints, never identity
 evidence: returned names must match an admitted locality or equivalent alias,
 and every supplied administrative and country qualifier must match. Result
-localization follows the requested language even for a Latin search key, so a
-provider-localized name can establish that match. Missing localization or an
+localization follows the admitted geographic names: explicit administrative or
+country qualifiers take priority, then the locality. The bilingual adapter uses
+Chinese localization for Chinese names and English otherwise, independently of
+the conversation's reply language and even for a Latin retrieval key. This
+changes no canonical binding, alias, or qualifier. Missing localization or an
 unconfirmed cross-language name fails closed; it does not authorize substitution.
 If none match, the tool returns typed
 `location_not_found`.

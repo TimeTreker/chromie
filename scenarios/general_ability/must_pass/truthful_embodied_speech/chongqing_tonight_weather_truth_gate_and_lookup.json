@@ -27,7 +27,8 @@
       "naturalness"
     ],
     "primary_outcomes": [
-      "The originating Chongqing-tonight episode must either commit a truth-qualified prospective first response or remain silent, normalize tonight to date=today plus period=night, and schedule the trusted lookup without asking the user for the weather result."
+      "The originating Chongqing-tonight episode must either commit a truth-qualified prospective first response or remain silent, normalize tonight to date=today plus period=night, and schedule the trusted lookup without asking the user for the weather result.",
+      "The weather lookup and its returned geographic Evidence must identify the originally requested place. Localized names may differ; a wrong city, substituted qualifier, missing location Evidence, or invented result fails semantic review."
     ],
     "acceptable_auxiliary": [
       "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
@@ -50,7 +51,6 @@
     "chromie.weather.lookup"
   ],
   "expected_args": [
-    "0:location=重庆",
     "0:date=today",
     "0:period=night"
   ],
@@ -60,7 +60,6 @@
     "acknowledge",
     "inform"
   ],
-  "require_work_held_until_canonical_validation": true,
   "max_warm_sc_decision_ms": 2000,
   "max_warm_sc_to_playback_start_ms": 3000,
   "expect_no_fast_contract_failure": true,

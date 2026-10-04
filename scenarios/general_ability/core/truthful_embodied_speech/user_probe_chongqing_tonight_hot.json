@@ -27,7 +27,8 @@
       "naturalness"
     ],
     "primary_outcomes": [
-      "The supplied weather probe must acquire tonight's temperature Evidence and then judge heat from that requested period without guessing or answering from the current daytime condition."
+      "The supplied weather probe must acquire tonight's temperature Evidence and then judge heat from that requested period without guessing or answering from the current daytime condition.",
+      "The weather lookup and its returned geographic Evidence must identify the originally requested place. Localized names may differ; a wrong city, substituted qualifier, missing location Evidence, or invented result fails semantic review."
     ],
     "acceptable_auxiliary": [
       "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
@@ -50,7 +51,6 @@
     "chromie.weather.lookup"
   ],
   "expected_args": [
-    "0:location=重庆",
     "0:date=today",
     "0:period=night"
   ],

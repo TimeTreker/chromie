@@ -52,7 +52,8 @@ path.write_text(source.replace(before, after))
 PY
 
 # XGrammar must honor the same per-schema whitespace annotation already used
-# by SGLang's llguidance backend. Remove when the pinned upstream supports it.
+# by SGLang's llguidance backend, plus XGrammar's existing finite whitespace
+# option for normal JSON requests. Remove when the pinned upstream supports it.
 # The complete schema string remains the cache key, including this annotation.
 RUN python3 - <<'PY'
 from pathlib import Path
@@ -69,8 +70,12 @@ after = '''                schema = json.loads(key_string)
                 any_whitespace = guidance.get("whitespace_flexible", self.any_whitespace)
                 if not isinstance(any_whitespace, bool):
                     raise RuntimeError("whitespace_flexible must be a boolean")
+                limit = guidance.get("max_whitespace_cnt")
+                if limit is not None and (type(limit) is not int or limit < 1):
+                    raise RuntimeError("max_whitespace_cnt must be a positive integer")
                 ctx = self.grammar_compiler.compile_json_schema(
-                    schema=key_string, any_whitespace=any_whitespace
+                    schema=key_string, any_whitespace=any_whitespace,
+                    max_whitespace_cnt=limit,
                 )'''
 if source.count(before) != 1:
     raise RuntimeError('Pinned XGrammar dispatch changed; review request formatting before building')
@@ -166,5 +171,20 @@ for i in range(64):
     backend.set_cache(('json', key), grammar)
 if backend.cache:
     raise RuntimeError('Backend retained a second unbounded grammar cache')
+
+# Exercise normal JSON dispatch through the same backend used by live UMI.
+# Layout bounds must never limit whitespace inside a semantic string value.
+plain = {'type': 'object', 'properties': {'text': {'type': 'string'}},
+         'required': ['text'], 'additionalProperties': False}
+bounded = {**plain, 'x-guidance': {'max_whitespace_cnt': 16}}
+for count in (0, 8, 16, 17, 128):
+    raw = '{' + ' ' * count + '"text":"left   of me"}'
+    for schema, expected in ((plain, True), (bounded, count <= 16)):
+        grammar = backend.dispatch_json(json.dumps(schema))
+        if grammar.matcher.accept_string(raw) is not expected:
+            raise RuntimeError('Normal JSON whitespace policy was not enforced')
+raw = json.dumps({'text': 'left' + ' ' * 128 + 'of me'})
+if not backend.dispatch_json(json.dumps(bounded)).matcher.accept_string(raw):
+    raise RuntimeError('Layout policy changed whitespace in a string value')
 backend.executor.shutdown(wait=True)
 PY

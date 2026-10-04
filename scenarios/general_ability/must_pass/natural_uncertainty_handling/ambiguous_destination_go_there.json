@@ -35,6 +35,8 @@
   "text": "去那边等我。",
   "language": "zh-CN",
   "expect_no_capabilities": true,
+  "require_social_communicative_act": true,
+  "expected_social_communicative_functions": ["ask"],
   "require_speech": true,
   "description": "An unbound spatial deictic must not authorize locomotion.",
   "general_ability": {

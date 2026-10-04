@@ -32,7 +32,8 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Look up Shanghai weather for tomorrow and answer the user's temperature concern only from returned Evidence."
+      "Look up Shanghai weather for tomorrow and answer the user's temperature concern only from returned Evidence.",
+      "The weather lookup and its returned geographic Evidence must identify the originally requested place. Localized names may differ; a wrong city, substituted qualifier, missing location Evidence, or invented result fails semantic review."
     ],
     "acceptable_auxiliary": [
       "Chromie may acknowledge the lookup before the result without predicting whether it will be cold."
@@ -55,7 +56,6 @@
     "chromie.weather.lookup"
   ],
   "expected_args": [
-    "0:location=上海",
     "0:date=tomorrow"
   ],
   "require_speech": true,

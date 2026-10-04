@@ -49,6 +49,8 @@
   },
   "language": "en-US",
   "expect_no_capabilities": true,
+  "require_social_communicative_act": true,
+  "expected_social_communicative_functions": ["ask"],
   "require_speech": true,
   "description": "Preserve the mixed-language uncertainty and ask about the missing object instead of inventing a tool target.",
   "derived_from": "benchmarks/datasets/daily_conversation/scenarios/uncertainty_repair/mixed_language_fragment.json",

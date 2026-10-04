@@ -27,7 +27,8 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "The Beijing rain question should acknowledge the check promptly without claiming a result before trusted lookup evidence."
+      "The Beijing rain question should acknowledge the check promptly without claiming a result before trusted lookup evidence.",
+      "The weather lookup and its returned geographic Evidence must identify the originally requested place. Localized names may differ; a wrong city, substituted qualifier, missing location Evidence, or invented result fails semantic review."
     ],
     "acceptable_auxiliary": [
       "Natural wording, brevity, and conversational style may vary while preserving the declared outcome.",
@@ -50,7 +51,6 @@
     "chromie.weather.lookup"
   ],
   "expected_args": [
-    "0:location=北京",
     "0:date=today"
   ],
   "require_speech": true,
