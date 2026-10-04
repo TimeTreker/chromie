@@ -2,21 +2,77 @@
 
 ## Current resume point — 2026-10-05
 
-Pre-delivery checkout `main` / `b693467caab54650c5cbc923e4bc722e287ba055`
-contains fetched `origin/main`; the first audit/Planner delivery is already pushed.
-The owner authorized commit/push of the remaining non-model repairs on 2026-10-05.
-Expected resume revision: latest `main`
-commit containing this Handoff and [checkpoint](DEVELOPMENT_CHECKPOINT.md).
-The31 formerly excluded paths/shared differences were reviewed and included as
-serving, context, provider and test-evidence repairs. Follow the checkpoint and
-[audit](ARCHITECTURE_AUDIT.md).
-The delivery line is still canonical local gate → current-revision voice proof →
-default target-evidence closure; all remain open. Charter, UMI prompt/DTO, initial
-Planner activation, GA relationships and SC ordinary/optional expression ownership
-are unchanged. The owner authorized the existing-Charter Planner compound repair.
-Count ownership and source-Schema repairs remain within that Planner owner.
+Pre-delivery checkout `main` / `489bd63968e791d90c4855401f38d70f6bd547e6`
+contains fetched `origin/main`; the previous non-model delivery is already pushed.
+The owner requested more non-model repair and previously authorized conditional
+commit/push for that scope. Expected resume revision: latest `main` commit containing
+this Handoff and [checkpoint](DEVELOPMENT_CHECKPOINT.md). Canonical local gate now
+passes; current-revision voice proof and default target closure remain open.
+Charter, production prompts/Schema/DTO/Host, model and module authority are unchanged.
 
-## Current non-model follow-up
+## Current workflow corpus repair
+
+Root `/home/chromie/github/chromie/.chromie/acceptance/workflow-contract-audit-20261005/`.
+The6000-case fixed baseline failed before UMI output: exact-request HTTP409,
+zero external inference/provider calls. Earliest wrong owner: stale frozen corpus,
+not production interpretation or model capability. Request-only captures showed
+missing required live UMI body classification and retired GA wire fields.
+
+Repair: author existing body classification from the original scenario action;
+remove only retired `decision=create_goals` and empty `non_goal_responsibility_refs`;
+recapture exact current production requests. `invariant-review.final.json` compares
+all6000 cases plus5 prototypes: original inputs/context, historical Goals, full meaning,
+Goal relationship choices, Planner outputs/parameters, provider contracts/observations,
+fault payloads, rejection/terminal assertions and splits remain. No runtime semantic
+conversion, weaker matching, candidate-fitted targets or new inference is introduced.
+
+- `baseline/summary.json`:6000 UMI mismatches, fixed source, zero candidate calls.
+- `capture-summary.json`:request-only recapture still fails61/65 representatives;
+  `capture-full-summary.json`:6000 authored workflows pass. Authoring is separate
+  from strict replay and remains non-independent, `training_eligible=false`.
+- `focused.log`:first strict run5 fail/115 pass. Extra nonrequired prior-Goal metadata
+  did not match the original seed used for capture; removed, with original Goals
+  retained exactly. `timer-harness-diff.json` and earlier captures remain.
+- `focused.final.log`:120 pass. `strict-full/summary.json`:6000/6000 pass, fixed source,
+  zero candidate calls;1400 complete workflows,1800 state handling,2500 expected
+  rejections,300 safe nonexecuting rejections. `adjudication.json` covers all60 families.
+- `canonical.log`, exit0:benchmarks164 pass, main3968 pass/5 environment skips/
+  1023 passing subtests,20 legacy Agent tests pass. Policies, ownership, pinned
+  Ruff/mypy, configuration/runtime and docs pass. All former83 workflow failures close.
+- `cold-baseline.json`:the original Git source now restores all6076 files in this
+  checkout. Earlier isolated-export incomplete-source evidence remains historical.
+  `cold-final.json`:new source restores6050 exact files; verified cache restores0.
+
+The complete reviewed source is retained as
+`benchmarks/integration/workflow_scenarios/frozen.tar.xz` (1,244,372 bytes;
+SHA256 `fd9a07d3004a4643d04b54ffc570796080b6d13501459334e21c2ab6b191be7c`).
+The manifest binds all6000 case and50 shared-packet hashes plus the source archive
+and its inner manifest; current shallow checkout needs no historical fetch.
+Historical Git-source support keeps the original freeze retrievable. The restoration
+owner verifies the complete archive before publication and never overwrites changed
+cache or regenerates answers. One maintained corpus asset is added; no new document,
+environment variable, runtime flag, production module or architecture term.
+
+Fresh-checkout resume:
+
+```bash
+cd /home/chromie/github/chromie
+python -m benchmarks.regression restore-fixtures
+./scripts/run_tests.sh
+```
+
+On a populated older checkout, preserve the previous ignored case/packet cache before
+removing it and restoring the new freeze. Do not remove the tracked manifest/archive;
+do not blindly overwrite mismatched files. The current checkout already has the new
+verified cache. `corpus-before/`, `seeds-before/`, previous manifest and failed captures
+retain earlier bytes locally. Do not stage private evidence.
+
+This patch affects benchmark evidence only. No services were rebuilt/restarted,
+no model/prompt/profile/Charter/module authority changed, and no native cohort,
+physical microphone/speaker/robot or independent qualification was performed.
+Native residual failures and source-bound runtime evidence below remain open.
+
+## Previous non-model delivery — 489bd639…
 
 Root `/home/chromie/github/chromie/.chromie/acceptance/non-model-delivery-20261005/`.
 `pending.before.patch`, `before.json` and `before/` preserve all31 reviewed pending
@@ -236,8 +292,9 @@ review artifact. `delivery/snapshot/` is an isolated export of the candidate tre
 its offline workflow fixtures were copied from local retained files only after
 checking every pinned manifest digest. Direct Git archive restoration initially
 failed with `frozen archive is incomplete`; `snapshot-bootstrap.json` retains that
-failure and the6076 unchanged files copied. This bootstrap failure is open for a
-cold checkout and must not be concealed by regenerating fixtures or expected output.
+failure and the6076 unchanged files copied. This was a failure of that isolated export. The current cold-restore audit above
+passes against the same historical pin; retain both observations rather than claiming
+a current blocker or regenerating expected output.
 
 The full local native proof above includes client/SC/oracle changes formerly excluded. Use
 its exact identities and retained evidence when reproducing it; do not treat a

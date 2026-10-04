@@ -15,9 +15,9 @@ fixed input-to-action mappings.
   reserved homes for later benchmark phases; existing scenarios remain in place.
 - `reports/`: generated local reports. Generated JSON should not be committed
   unless a release process explicitly retains it as evidence.
-- `integration/workflow_scenarios/manifest.json`: tracked freeze and source revision.
+- `integration/workflow_scenarios/manifest.json`: tracked freeze and source identity.
   Its expanded cases and shared packet files are ignored local inputs restored from
-  that immutable revision; they are not regenerated from current prompts or outputs.
+  the retained `frozen.tar.xz`; they are not regenerated from current prompts or outputs.
 
 The maintained User Meaning Interpretation fixtures live in
 `scenarios/user_meaning_interpretation/`. The source manifest references that
@@ -193,20 +193,25 @@ python -m pytest -q tests/test_workflow_replay.py
 ```
 
 The source gate and replay runner restore missing expanded inputs from the
-manifest's exact Git revision already in local history. For a shallow checkout,
-run `python -m benchmarks.regression restore-fixtures --fetch` once to fetch that
-revision from `origin`; CI includes this explicit preparation. Restoration verifies
-all 6,000 case hashes, 76 shared-packet hashes and the original archive manifest
-before publishing missing files. Changed existing inputs are rejected, never
-silently overwritten. Direct pytest collection uses the committed case list so an
-absent local cache cannot silently remove the 60 family regressions.
+manifest's checksum-pinned `frozen.tar.xz`, retained in the checkout. A shallow
+checkout needs no historical fetch for this freeze. Historical manifests that pin
+a Git revision still require explicit `restore-fixtures --fetch` when that revision
+is absent. Restoration verifies the complete archive, all declared 6,000 case and
+shared-packet hashes, and the original archive manifest before publishing missing
+files. Changed existing inputs are rejected, never silently overwritten. Direct
+pytest collection uses the committed case list so an absent local cache cannot
+silently remove the 60 family regressions.
 
 Keep benchmark code, schemas, authored datasets, five prototype episodes and the
-freeze manifest in Git. Expanded replay files and generated reports stay ignored.
-The immutable source is currently retained in existing repository history; this
-cleanup does not rewrite history or reduce a full historical clone. Future corpus
-changes must retain their reviewed bytes at an immutable retrievable revision and
-update the source pin and hashes together. Updating a generator is not a new freeze.
+freeze manifest and compressed reviewed source in Git. Expanded replay files and
+generated reports stay ignored. The compressed source replaces reliance on an older
+Git revision for the current freeze; that historical source remains retrievable.
+Future corpus changes must retain their reviewed bytes and update the archive pin
+and case/part hashes together. Updating a generator is not a new freeze.
+When pulling a new freeze into a populated checkout, preserve the previous ignored
+case/packet cache before removing it and restoring the new bytes. A cache from an
+older freeze fails the same hash check as any other mismatch; restoration deliberately
+does not overwrite it. Do not remove the tracked manifest or source archive.
 
 Use an unused evidence directory and run without Python `-O`. The runner discovers
 `integration/workflow_scenarios/workflow-*.json`: 6,000 cases from 60 authored

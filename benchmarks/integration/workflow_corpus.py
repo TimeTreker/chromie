@@ -470,7 +470,35 @@ def reject(case, role):
 
 def reference_case(family, action, value_index, form):
     """Migrate reviewed reference authorship; fault intent and source inputs stay fixed."""
-    return _intent_reference(_raw_reference_case(family, action, value_index, form))
+    return current_contract_reference(_intent_reference(_raw_reference_case(family, action, value_index, form)))
+
+
+def current_contract_reference(case):
+    """Author existing required WHAT metadata and remove retired GA wire fields.
+
+    This is explicit corpus maintenance, never part of load_case or strict replay.
+    The action is an authored scenario parameter, not inferred from model output.
+    Prototype episodes all concern blinking; multi-Goal contrasts declare a second
+    walk for blink, otherwise a second blink. Fault payloads remain intact.
+    """
+    case = copy.deepcopy(case)
+    action = case.get('parameters', {}).get('action', 'blink')
+    body_family = {'walk': 'task_physical_effect', 'blink': 'social_expression',
+                   'nod': 'social_expression', 'shake': 'social_expression'}
+    multi = case.get('coverage_family') in {'multi_goal', 'multi_goal_omission', 'plan_conflicting_resource'}
+    for step in case['model_steps']:
+        if step['role'] == 'umi':
+            for index, responsibility in enumerate(step['response']['responsibilities']):
+                if responsibility['output_mode'] == 'body_action':
+                    selected = ('walk' if action == 'blink' else 'blink') if multi and index == 1 else action
+                    responsibility['body_effect_family'] = body_family[selected]
+        elif step['role'] == 'ga':
+            if (step['response'].get('decision') not in {None, 'create_goals'}
+                    or step['response'].get('non_goal_responsibility_refs')):
+                raise ValueError('Nonempty retired GA decisions need explicit reference review')
+            step['response'].pop('decision', None)
+            step['response'].pop('non_goal_responsibility_refs', None)
+    return case
 
 
 def _intent_reference(case):

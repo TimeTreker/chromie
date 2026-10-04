@@ -17,16 +17,28 @@ def restore_frozen_corpus(corpus: Path, *, repo_root: Path, fetch: bool = False)
     """Restore immutable test inputs, never regenerate answers from current code.
 
     Present files must already match the freeze. Missing files are staged and
-    verified before publication; a shallow checkout fetches only when requested.
+    verified before publication. Current freezes retain a checksum-pinned archive
+    in the checkout; historical Git sources fetch only when requested.
     """
     manifest = load_json(corpus / "manifest.json")
     source = manifest.get("storage") or {}
-    revision, source_path = source.get("git_revision", ""), source.get("git_path", "")
-    if (not re.fullmatch(r"[a-f0-9]{40}", revision) or not source_path
+    revision = source.get("git_revision", "")
+    packed_path = source.get("archive_path", "")
+    source_path = packed_path or source.get("git_path", "")
+    if (not isinstance(source_path, str) or not source_path
             or Path(source_path).is_absolute() or ".." in Path(source_path).parts
             or Path(source_path).as_posix() != source_path
-            or not re.fullmatch(r"[a-f0-9]{64}", source.get("manifest_sha256", ""))):
+            or not re.fullmatch(r"[a-f0-9]{64}", source.get("manifest_sha256", ""))
+            or (packed_path and ("git_revision" in source or "git_path" in source
+                or not re.fullmatch(r"[a-f0-9]{64}", source.get("archive_sha256", ""))))
+            or (not packed_path and not re.fullmatch(r"[a-f0-9]{40}", revision))):
         raise ContractError("invalid frozen corpus source identity")
+    packed_archive = repo_root / packed_path if packed_path else None
+    if packed_archive is not None:
+        if (packed_archive.is_symlink() or any(parent.is_symlink() for parent in packed_archive.parents)
+                or not packed_archive.is_file()
+                or hashlib.sha256(packed_archive.read_bytes()).hexdigest() != source["archive_sha256"]):
+            raise ContractError("frozen source archive is missing or its hash mismatches")
     expected = {**manifest["case_sha256"], **{
         f"artifacts/{name}": digest for name, digest in manifest["artifact_sha256"].items()
     }}
@@ -53,22 +65,24 @@ def restore_frozen_corpus(corpus: Path, *, repo_root: Path, fetch: bool = False)
     if not missing:
         return {"verified": len(expected), "restored": 0}
     git = ["git", "-C", str(repo_root)]
-    available = subprocess.run(git + ["cat-file", "-e", f"{revision}^{{commit}}"], capture_output=True)
-    if available.returncode and not fetch:
+    available = None if packed_archive else subprocess.run(
+        git + ["cat-file", "-e", f"{revision}^{{commit}}"], capture_output=True)
+    if available is not None and available.returncode and not fetch:
         raise ContractError(
             f"frozen corpus revision {revision} is unavailable; run "
             "python -m benchmarks.regression restore-fixtures --fetch once in this checkout"
         )
     try:
-        if available.returncode:
+        if available is not None and available.returncode:
             subprocess.run(git + ["fetch", "--no-tags", "--depth=1", "origin", revision],
                            check=True, capture_output=True, timeout=300)
         with tempfile.TemporaryDirectory(prefix=".restore-", dir=corpus) as temp:
             stage = Path(temp)
-            archive_path = stage / "corpus.tar"
-            with archive_path.open("wb") as output:
-                subprocess.run(git + ["archive", f"{revision}:{source_path}"], stdout=output,
-                               stderr=subprocess.PIPE, check=True, timeout=120)
+            archive_path = packed_archive or stage / "corpus.tar"
+            if packed_archive is None:
+                with archive_path.open("wb") as output:
+                    subprocess.run(git + ["archive", f"{revision}:{source_path}"], stdout=output,
+                                   stderr=subprocess.PIPE, check=True, timeout=120)
             archive_expected = {**expected, "manifest.json": source["manifest_sha256"]}
             seen = set()
             with tarfile.open(archive_path) as archive:
@@ -96,7 +110,8 @@ def restore_frozen_corpus(corpus: Path, *, repo_root: Path, fetch: bool = False)
                 (stage / "files" / name).replace(target)
     except (OSError, subprocess.SubprocessError, tarfile.TarError) as exc:
         raise ContractError(f"cannot restore frozen corpus: {exc}") from exc
-    return {"verified": len(expected), "restored": len(missing), "git_revision": revision}
+    identity = {"archive_sha256": source["archive_sha256"]} if packed_archive else {"git_revision": revision}
+    return {"verified": len(expected), "restored": len(missing), **identity}
 
 
 def load_json(path: Path) -> dict[str, Any]:

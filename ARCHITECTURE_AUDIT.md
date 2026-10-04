@@ -784,3 +784,63 @@ stage为空；源修复patch已应用且reverse-check通过，不应再次apply�
 失败已消失。日志`.chromie/acceptance/non-model-delivery-20261005.canonical.log`及
 `canonical-comparison.json`保留；legacy未到达。模型前拒绝仍是未关闭的程序/证据边界。
 维护文档/环境变量/运行开关/架构术语净新增0；新增内容由原审计/状态/交接所有者承载。
+
+## 2026-10-05 冻结重放记录的非模型修复
+
+负责人要求继续修复模型能力以外的问题。基线为`main/489bd639…`，已fetch并确认
+包含最新上游。原83项测试失败属于`scenario_or_oracle`：完整固定语料6000例
+全部在UMI首次请求匹配处HTTP409，模型和provider均未调用。不是模型推理失败，
+也不是模型能力上限的证据。根因是冻结记录未随现行契约维护：提示词/Schema/上下文
+已过期，旧UMI参考缺必填`body_effect_family`，旧GA参考保留已退休的`decision`
+及空`non_goal_responsibility_refs`。仅重录请求仍有61/65代表例不能进入预期边界。
+
+证据根：`.chromie/acceptance/workflow-contract-audit-20261005/`。
+`baseline/summary.json`记录6000次UMI处失败、zero candidate calls及固定source；
+`request-diff.json`、`capture-summary.json`保留请求及参考契约诊断。
+
+| 顺序、所有者 | 权威输入及实际输出 | 应有结果、修复与判定 |
+| --- | --- | --- |
+| 语料维护者→Episode | 原始`Blink 1 times.`、既定blink/count1、参考回复及原冻结请求。 | 场景本身不变；维护者应冻结符合现行契约的请求/参考。首错为记录过期。 |
+| UMI客户端→strict HTTP replay | 当前生产提示词、动态Schema和完整原文；与旧请求不同。HTTP409，position0、无原始语义输出。 | 客户端如实生成当前请求；replay严格拒绝正确，不应放宽匹配或运行在线fallback。 |
+| UMI解析→GA身份→Planner HOW | 基线均未到达。仅重录请求时，UMI缺必填body分类或GA携带退休字段被自身契约拒绝。 | 在离线参考所有者补既有必填分类、移除退休空字段；保留完整WHAT、GA关系、HOW/参数和故障载荷。生产模块不补语义。 |
+| 当前参考→同一客户端/Schema/Host→受控Runtime | 修复后严格匹配，真实解析器、验证器、状态和Runtime执行；正例保留原参数，反例到原定边界拒绝。 | 6000/6000严格重放通过：1400完整流程、1800状态处理、2500预期拒绝、300安全不执行。源码固定、zero外部推理、所有硬断言保留。Level A，不是原生或实物资格。 |
+
+```mermaid
+flowchart LR
+    I[原始场景及既定断言] --> U[生产UMI请求]
+    U --> R[严格匹配冻结记录]
+    R --> M[预先审阅的脚本参考]
+    M --> V[生产Schema与Host校验]
+    V --> G[GA身份关系]
+    G --> P[Planner HOW]
+    P --> X[受控Runtime与原有结果断言]
+```
+
+修复仅在语料作者及已有恢复工具。`invariant-review.final.json`逐项比较全部6000例
+及5原型：原文/上下文、历史Goal、WHAT、关系选择、Planner参数、provider契约及输出、
+故障、预期拒绝/终态和split全部保留。新的body分类依据预先编写的场景动作参数，
+没有依据候选模型输出拟合答案；严格replay从不导入作者转换。参考审阅是本coding
+agent的非独立审阅，`training_eligible=false`和原证据上限保留。
+
+首次严格代表集仍有5例失败，保留在`focused.log`：作者重录用原始历史Goal，
+发布却额外添加非必需body分类，输入不一致。该补充已撤销；历史Goal完整原样保留，
+`timer-harness-diff.json`、`migration-ledger.final.json`保留过程。随后120项相关检查通过。
+没有将这次作者工具错误归因于生产Planner或通过重放器归一化掩盖它。
+
+完整新冻结源以同一语料目录的`frozen.tar.xz`保存，1,244,372字节，绑定archive、
+6000 case、50共享packet及内层manifest SHA256。恢复仅解包已审阅字节，先完整验证
+再发布，拒绝篡改缓存、额外成员/路径及坏摘要；不重生成请求或答案。当前新freeze
+在浅checkout无需历史fetch，原Git pin仅保留为历史恢复来源。原freeze不删除。
+新增1个受维护测试资产，替代当前freeze对历史revision的依赖；现行文档、环境变量、
+开关、模块/架构术语净新增0。没有新增生产架构或兼容行为。
+
+`cold-baseline.json`本次验证原pin能完整恢复6076文件；此前隔离导出环境的
+`frozen archive is incomplete`是保留的历史失败，不能继续宣称当前checkout仍阻塞。
+`cold-final.json`验证新freeze完整恢复6050文件、复用缓存时恢复0文件。
+模型、生产提示词、Schema/DTO/Host、Charter及模块职责均未改；没有新模型调用、
+服务重建/重启、原生cohort、音频或机器人证明。完整gate结果见当前checkpoint/Handoff。
+
+本轮完整gate exit0：benchmarks164通过、main3968通过/5环境跳过/1023 subtests通过，
+legacy Agent20通过。原83个workflow失败全部关闭，没有放宽严格匹配、减少语料、
+修改故障断言或改变生产模块。`canonical.log`保留所有阶段；最终文档另做policy、
+ownership和docs检查。这只关闭本地程序/证据gate，当前版本voice和default-target仍未关闭。

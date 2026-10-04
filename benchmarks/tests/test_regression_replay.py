@@ -4,6 +4,7 @@ import json
 import hashlib
 from pathlib import Path
 import subprocess
+import tarfile
 import tempfile
 import unittest
 
@@ -169,6 +170,56 @@ class FrozenCorpusStorageTests(unittest.TestCase):
         result = restore_frozen_corpus(clone / "frozen", repo_root=clone, fetch=True)
         self.assertEqual(result["restored"], 2)
         self.assertEqual(subprocess.check_output(["git", "-C", str(clone), "rev-parse", "HEAD"]), head)
+
+    def retain_packed_source(self):
+        # Pack the original reviewed bytes, not regenerated expectations.
+        self.git("archive", "HEAD:frozen", "-o", str(self.repo / "frozen.tar"))
+        archive = self.repo / "frozen.tar"
+        self.manifest["storage"] = {
+            "archive_path": "frozen.tar",
+            "archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+            "manifest_sha256": self.manifest["storage"]["manifest_sha256"],
+        }
+        (self.corpus / "manifest.json").write_text(json.dumps(self.manifest))
+        return archive
+
+    def test_packed_source_restores_in_shallow_checkout_without_fetch(self):
+        self.retain_packed_source()
+        self.commit()
+        clone = Path(self.temp.name) / "shallow"
+        subprocess.run(["git", "clone", "--depth=1", self.repo.as_uri(), str(clone)],
+                       check=True, capture_output=True)
+        result = restore_frozen_corpus(clone / "frozen", repo_root=clone)
+        self.assertEqual(result["restored"], 2)
+        self.assertEqual((clone / "frozen/workflow-example.json").read_bytes(), self.case)
+        self.assertEqual((clone / "frozen/artifacts" / self.part_name).read_bytes(), self.part)
+
+    def test_packed_source_corruption_cannot_be_hidden_by_populated_cache(self):
+        archive = self.retain_packed_source()
+        restore_frozen_corpus(self.corpus, repo_root=self.repo)
+        archive.write_bytes(b"tampered")
+        with self.assertRaisesRegex(ContractError, "source archive"):
+            restore_frozen_corpus(self.corpus, repo_root=self.repo)
+
+    def test_packed_source_member_mismatch_publishes_nothing(self):
+        self.retain_packed_source()
+        self.manifest["artifact_sha256"][self.part_name] = "0" * 64
+        (self.corpus / "manifest.json").write_text(json.dumps(self.manifest))
+        with self.assertRaisesRegex(ContractError, "archive hash mismatch"):
+            restore_frozen_corpus(self.corpus, repo_root=self.repo)
+        self.assertFalse((self.corpus / "workflow-example.json").exists())
+
+    def test_packed_source_undeclared_member_publishes_nothing(self):
+        archive = self.retain_packed_source()
+        extra = self.repo / "extra.json"
+        extra.write_text("{}")
+        with tarfile.open(archive, "a") as output:
+            output.add(extra, arcname="../extra.json")
+        self.manifest["storage"]["archive_sha256"] = hashlib.sha256(archive.read_bytes()).hexdigest()
+        (self.corpus / "manifest.json").write_text(json.dumps(self.manifest))
+        with self.assertRaisesRegex(ContractError, "unexpected frozen archive entry"):
+            restore_frozen_corpus(self.corpus, repo_root=self.repo)
+        self.assertFalse((self.corpus / "workflow-example.json").exists())
 
 
 if __name__ == "__main__":

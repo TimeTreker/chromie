@@ -2,20 +2,21 @@
 
 ## Current resume point — 2026-10-05
 
-Pre-delivery base `main` / `b693467caab54650c5cbc923e4bc722e287ba055` matches
-fetched `origin/main`. The first audit/Planner delivery is already pushed. The
-owner authorized this follow-up for the remaining non-model repairs on 2026-10-05.
-Expected resume revision: the latest `main`
-commit containing this checkpoint and [Handoff](HANDOFF.md). This is an audit and
-bounded repair delivery; canonical, voice and default-target qualification remain
-open. All31 previously excluded paths/shared differences were reviewed as serving,
-context, provider or test-evidence repairs; they are included in this follow-up.
-Do not resume from superseded iteration budgets or historical commands.
+Pre-delivery base `main` / `489bd63968e791d90c4855401f38d70f6bd547e6` matches
+fetched `origin/main`. The previous non-model delivery is already pushed. The
+owner requested further non-model repairs; the earlier conditional commit/push
+authorization applies to this corpus maintenance. Expected resume revision: the
+latest `main` commit containing this checkpoint and [Handoff](HANDOFF.md).
+Canonical local verification now passes. Current-revision voice proof and default
+target-evidence closure remain open. Production cognition, prompts, model, Charter
+and module responsibilities were not changed. Do not resume from historical red
+workflow captures or superseded iteration budgets.
 
 The current focus remains Goal-driven single-authority architecture. The active
 delivery line remains canonical local verification → narrow
 current-revision voice proof → default target-evidence closure within the
-[Roadmap migration](ROADMAP.md#social-cognition-migration). All three remain open.
+[Roadmap migration](ROADMAP.md#social-cognition-migration). The local gate is closed
+for the current tested tree; the voice and target gates remain open.
 No new feature line, architecture layer, runtime flag, model promotion or Charter
 amendment is authorized by this audit.
 
@@ -73,6 +74,13 @@ module or add a second semantic model call.
   detached-dispatch fake tracking and the withdrawn Tianxin duplicate were
   reconciled at their owners. Inputs, complete meanings, counts, provenance,
   relation choices, oracles and split membership are preserved in retained proofs.
+- Offline workflow references now match current contracts: required live UMI body
+  classification is authored from the original scenario parameters; retired empty
+  GA fields are removed; exact production requests are recaptured. All6000 source
+  probes, meanings, relationship choices, Planner parameters, provider/fault/terminal
+  assertions, prior Goals and splits remain. Strict replay and production validators
+  are unchanged. The complete freeze is retained in one checksum-pinned1.2MB
+  archive, with shallow/cold restoration guards at the existing benchmark owner.
 - Current status/resume documents are consolidated; retired diagram and
   Planner-speaking/presentation descriptions are removed. No maintained document,
   environment variable or architectural owner was added.
@@ -87,9 +95,9 @@ changes, are restored. No runtime translator, semantic repair or model substitut
 | Axis | Observed result |
 | --- | --- |
 | Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Follow-up includes serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
-| Automatic verification | GA1500 references:1300 accepted/200 retained refusals/zero errors; media3/8→8/8; compound9/12→12/12; count6/11→11/11; source-Schema10/13→13/13. Scripted resolver checks, not model qualification. Count focused1090/451 subtests and source stream179 pass; their Level A18/18. Current non-model focused347 pass/5 skips/57 subtests, related Level A19/19. Current canonical:benchmarks160 pass, main83 fail/3885 pass/5 skipped/1023 passing subtests; same83 strict pre-inference workflow capture failures. First-delivery extra fixture subtest is resolved; policies, ownership, pinned static/configuration and docs pass; legacy stage not reached. Whole gate red. |
+| Automatic verification | Current workflow strict aggregate6000/6000 pass:1400 complete workflows,1800 state cases,2500 expected rejections,300 safe nonexecuting rejections; zero inference, source fixed. Focused120 pass. Canonical benchmarks164 pass, main3968 pass/5 environment skips/1023 passing subtests,20 legacy Agent tests pass; policy/ownership/pinned static/configuration/docs stages pass. Former83 workflow failures are closed. Previous model-role/ability proofs remain historical and bounded. |
 | Target validation | Latest immutable full79 live-text/simulator run:20 automatic pass/59 fail; same-agent review6 bounded pass/12 partial/59 fail/2 insufficient evidence. All79 attempted/zero skipped; blocked dependent turns leave cohort/qualification incomplete. Compound walk10/.2→nod2→left-turn1 and Chinese walk3→right-turn1 have completed simulator observations; Chinese wording still English. No independent, current voice, physical/audible or default-target qualification. |
-| Deployment state | Official Agent image124a02f6… and packaged/host source93b58310… match current Agent bytes; this follow-up includes the formerly excluded local changes used in native proof. Original environment unchanged, healthy/restart0; source/service identity fixed through that run. Default4B LLM and ASR/TTS unchanged; TTS dependency rebuild remains unqualified. No service was rebuilt/restarted for this Git delivery; no promotion, release or fresh native revision qualification. |
+| Deployment state | Production Agent bytes are unchanged from489bd639…. Last retained native Agent image124a02f6… / packaged-host source93b58310… and healthy/restart0 observation remain bound to that native cohort. This corpus repair performs no service rebuild/restart, model/profile/prompt change, promotion, release or fresh native revision qualification. TTS dependency rebuild remains unqualified. |
 
 Each complete iteration retained exactly one post-cohort bundle. Latest GA82 primary
 calls have empty cognition-request arrays; GA/Host did not supply missing initial
@@ -123,24 +131,36 @@ the primary DTO rejected it before expected deep delegation. This follow-up incl
 the metadata-only fixture repair; its behavior-truth regression passes. No production
 or intrinsic-model failure was established; UMI and Host are unchanged.
 
-Current follow-up evidence: `.chromie/acceptance/non-model-delivery-20261005/`;
-related source identities, retained native proof, exact scope and commands are in
-Handoff. Focused347 pass/5 skips/57 subtests; relevant Level A19/19. Native grammar
-accepts bounded0/8/16 layout spaces, rejects17/128, keeps128 spaces inside strings;
-unbounded reference accepts all5 layouts. Agent package/host93b58310… still match.
-No new semantic inference or full native cohort was run for unchanged source bytes.
-Canonical log: `.chromie/acceptance/non-model-delivery-20261005.canonical.log`, exit1.
-`canonical-comparison.json` retains the identical83 failure IDs against the latest
-full local-tree source-Schema gate. All6000 pinned workflow targets are preserved;
-strict replay is not weakened. No new full-suite failure is introduced.
+Latest workflow repair evidence:
+`.chromie/acceptance/workflow-contract-audit-20261005/`.
+`baseline/summary.json`:6000 first-UMI mismatches, no inference. The reviewed
+current-contract corpus retains all original probes and assertions;
+`invariant-review.final.json` compares6000 cases plus5 prototypes, including
+unchanged historical Goals. `strict-full/summary.json`:all6000 pass, source fixed,
+zero candidate calls. `adjudication.json` records all60 families and evidence limits.
+`focused.final.log`:120 pass; `canonical.log`:benchmarks164 pass, main3968 pass/
+5 skips/1023 subtests,20 legacy tests. The gate is green, not native-model qualification.
+`cold-final.json`:6050 exact files restored and0 on reuse; the1,244,372-byte
+`frozen.tar.xz` is retained in Git with case/part/archive/inner-manifest hashes.
+Original freeze and failed authoring iterations are retained. The first post-capture
+representative run failed5 prior-Goal cases because unnecessary author metadata
+was published with requests captured from the original seed; that metadata was
+removed, without changing replay or production, before focused/full reruns.
+
+Previous347-test non-model delivery, Level A19/19 and native grammar checks remain
+at `.chromie/acceptance/non-model-delivery-20261005/`. Its83-failure gate is historical.
+This repair changes benchmark references/restoration only; production Agent source
+remains the previously matched93b58310… bytes. No service/model/prompt/Charter/authority
+change, native inference, fresh native cohort, audio or robot proof was performed.
 
 ## Next work and blockers
 
-1. Review the frozen workflow corpus at its owner:82 failures reject the first
-   UMI request with exact-request HTTP409 before output/candidate inference; one
-   variation is likewise blocked before candidate admission. Do not weaken strict
-   replay, replace hashes or derive targets from candidate output to turn83 red
-   tests green. Preserve all6000 references until reviewed/refrozen.
+1. Preserve the reviewed workflow freeze and passing local gate. Strict replay must
+   keep rejecting changed requests/caches and uncovered candidate branches. On an
+   existing checkout, preserve the previous ignored case/packet cache before removing
+   it and restoring the new freeze; never regenerate expected answers from current
+   outputs. Next active delivery step is narrow current-revision voice proof, then
+   default target-evidence closure; automated text/simulator evidence does not replace it.
 2. Keep the completed bounded compound/count/source repairs and their exact native
    packets; broader qualification remains open. Latest full79 review is retained,
    not pending. Do not treat source IDs or a same-Goal numeric witness as proof of
@@ -153,7 +173,7 @@ strict replay is not weakened. No new full-suite failure is introduced.
    context/latency, geographic/provider scene and Goal/effect coverage gaps.
    Chinese-language SC input is intact; rejected prompt trials do not isolate
    intrinsic ability versus context/profile reliability.
-5. Restore the canonical gate, then retain narrow current-revision voice and
+5. Retain the canonical gate, then retain narrow current-revision voice and
    default target evidence. Physical microphone/speaker/robot proof remains
    supervised; mock acquisition/handover and discarded TTS are not that evidence.
 

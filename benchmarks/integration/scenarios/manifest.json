@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-09-23",
+  "frozen_on": "2026-10-05",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "0daf181f8df6123c96512f7ddadcae31d6cd05b7b56f717c0dd22ea98cb56eff",
-    "workflow-conditional-dry.json": "549cea3a0378e5dd01ecb28b23f3d92589b227354ea13f8d1b70b8745e8e45ee",
-    "workflow-conditional-rain.json": "54ddb4bce9132b2b7fa9115cc0ee1ce7531ff315d880ad5a4dd3f07210e51f6c",
-    "workflow-delayed.json": "29bd5205fdbcdae9430eea735dd1df4d358e69cab2cbfa175642df4b95e99e3e",
-    "workflow-normal.json": "35eac4af7c37e5849ce17cc86db3021a9b1951588545221ebaf8ac240a6f7a07"
+    "workflow-cancellation.json": "1f1f918292f0d80d79dd9dba47f2082de0b3838176ddd8185dd60192a3956d3d",
+    "workflow-conditional-dry.json": "831383eb5ee0d11641398d78f62c4a1c50260ae433cb88e86f8a05a99f56a5b9",
+    "workflow-conditional-rain.json": "9bb5fbb721f7c5c25e2d9435362c4930dd436401777f7ceb7f205446c226cd4a",
+    "workflow-delayed.json": "564f1de834ec7eb6191b8dafade030b7cf10b3d7ea787fb0633eb27b5db773e4",
+    "workflow-normal.json": "bd798e75f5f531b69123402c56f24b17d2aadd1d0c86649e6cd1fa65f87c3cf4"
   },
-  "freeze_revision": 14,
-  "freeze_note": "Request-only migrations: adopted turn-wide GA instruction and UMI ordered source-span decoder matching existing Host invariant. Scenario inputs, response oracles and faults unchanged.",
+  "freeze_revision": 15,
+  "freeze_note": "Reviewed current-contract body metadata and removal of retired GA fields; complete exact request recapture. Original inputs, response meaning, provider outcomes and faults unchanged.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

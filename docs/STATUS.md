@@ -9,12 +9,19 @@ actual module I/O; it does not amend authority or establish full qualification.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Non-model follow-up includes serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
-| Automatic verification | GA1500 references:1300 accepted/200 retained refusals/zero errors; media3/8→8/8; compound9/12→12/12; count6/11→11/11; source-Schema10/13→13/13. Scripted resolver checks, not model qualification. Count focused1090/451 subtests and source stream179 pass; their Level A18/18. Current non-model focused347 pass/5 skips/57 subtests, related Level A19/19. Current canonical:benchmarks160 pass, main83 fail/3885 pass/5 skipped/1023 passing subtests;83 identical strict pre-inference workflow failures, no new IDs. First-delivery fixture failure is resolved. Policies, ownership, pinned static/configuration and docs pass; legacy stage not reached. Whole gate red. |
+| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Non-model repairs include serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Current offline workflow freeze matches existing contracts; complete probes/faults/expected outcomes remain and strict matching is unchanged. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
+| Automatic verification | Current workflow strict aggregate6000/6000 pass:1400 complete workflows,1800 state cases,2500 expected rejections,300 safe nonexecuting rejections; zero inference, source fixed. Focused120 pass. Canonical benchmarks164 pass, main3968 pass/5 environment skips/1023 passing subtests,20 legacy Agent tests pass; policy/ownership/pinned static/configuration/docs stages pass. Former83 workflow failures are closed. Previous model-role/ability proofs remain historical and bounded. |
 | Target validation | Latest immutable full79 live-text/simulator run:20 automatic pass/59 fail; same-agent review6 bounded pass/12 partial/59 fail/2 insufficient evidence. All79 attempted/zero skipped; blocked dependent turns leave cohort/qualification incomplete. Compound walk10/.2→nod2→left-turn1 and Chinese walk3→right-turn1 have completed simulator observations; Chinese wording still English. No independent, current voice, physical/audible or default-target qualification. |
-| Deployment state | Official Agent image124a02f6… and packaged/host source93b58310… match current Agent bytes; non-model follow-up includes formerly excluded source/context/oracle repairs used in native proof. Original environment unchanged, healthy/restart0; source/service identity fixed through that run. Default4B LLM and ASR/TTS unchanged; TTS dependency rebuild remains unqualified. No service rebuild/restart for this delivery, no promotion, release or fresh native Git-revision qualification. |
+| Deployment state | Production Agent bytes are unchanged from489bd639…. Last retained native Agent image124a02f6… / packaged-host source93b58310… and healthy/restart0 observation remain bound to that native cohort. This corpus repair performs no service rebuild/restart, model/profile/prompt change, promotion, release or fresh native revision qualification. TTS dependency rebuild remains unqualified. |
 
-Latest proof: `.chromie/acceptance/planner-compound-contract-20261004T140758Z/count-scope/source-schema/`.
+Latest local proof: `.chromie/acceptance/workflow-contract-audit-20261005/`:
+strict aggregate6000/6000, focused120, complete canonical gate passing. Original83
+failures were stale replay records before inference, not model ability failures.
+All6000 scenario probes and5 prototypes retain their original semantic/provider/fault
+assertions and prior Goals. Frozen source bytes and strict recovery guards are retained;
+review is non-independent Level A, not native qualification.
+
+Latest native proof: `.chromie/acceptance/planner-compound-contract-20261004T140758Z/count-scope/source-schema/`.
 The full native cohort is complete at the case-admission level; failures blocked
 some later turns, so neither cohort-complete nor qualification-complete is claimed.
 All79 summaries, exact primary packets, same-agent review and immutable runtime
@@ -69,7 +76,7 @@ No amendment to permit UMI parameter extraction was made in this audit.
 | --- | --- |
 | [Gateway](COGNITIVE_GATEWAY.md) / Host admission | Deterministic protective controls and immutable admitted turn exist. Attention model repair conflicts with single semantic authority. Physical audio admission needs source-bound proof. |
 | [Turn lifecycle](COGNITIVE_TURN_LOOP.md) / Cognitive Runtime | Concurrent SC and GA/Work, exact identity, cancellation, prerequisite joins and Evidence re-entry exist. Text admission chronology repaired and mechanically proved; water Work activation and native coverage/latency remain open. |
-| [Semantic authorities](SEMANTIC_AUTHORITY.md) / UMI, GA, Planner, SC | Source ownership migration is implemented; preserved original wording is authoritative. Corpus compatibility and several authority conflicts remain unresolved. |
+| [Semantic authorities](SEMANTIC_AUTHORITY.md) / UMI, GA, Planner, SC | Source ownership migration is implemented; preserved original wording is authoritative. Current workflow corpus compatibility is repaired; other authority conflicts and native coverage remain unresolved. |
 | [Agent Skills](AGENT_SKILLS_ARCHITECTURE.md) / planner and registry | Semantic methods and Capability contracts exist. Frozen references are not independent/native-model qualification. |
 | [Execution lanes](EXECUTION_LANES_AND_COORDINATION.md) / Trusted Runtime | Confirmation, cancellation, coordination, provider truth and safe-idle contracts remain blocking. No permission comes from premature speech. |
 | [Resource acquisition](RESOURCE_ACQUISITION_AND_DELIVERY.md) / providers | Provider-owned source resolution is implemented; observed milk object/pose and mixed-place qualification remain gaps. Simulator handover does not prove real acquisition. |
@@ -90,8 +97,8 @@ feature line or revive historical iteration authorizations.
    Existing binding and Attention authority conflicts remain open; Charter is unchanged.
 2. Retain repaired user-before-assistant admission; qualify accepted-offer Work
    activation against complete actual context before interpreting model-comparison scores.
-3. Migrate stale fixtures/corpus transactions through reviewed frozen references;
-   restore the canonical local gate without retired fields or weaker assertions.
+3. Preserve the passing canonical local gate and current reviewed workflow freeze;
+   remaining historical-restatement fixtures still need upstream meaning/type review.
 4. Qualify exact Schema/DTO/native grammar, SC context budget/latency, provider
    scene and geographic Evidence, Goal/action/provenance coverage.
 5. Retain narrow current-revision voice and the default
