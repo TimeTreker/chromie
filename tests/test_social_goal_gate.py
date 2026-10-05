@@ -311,7 +311,6 @@ async def test_mixed_greeting_and_work_plans_only_work_concurrently_with_ga() ->
             {
                 "local_ref": "blink",
                 "outcome": "Blink once.",
-                "bindings": {"count": 1},
                 "output_mode": "body_action",
                 "continuity_scope": "goal",
                 "confidence": 1.0,

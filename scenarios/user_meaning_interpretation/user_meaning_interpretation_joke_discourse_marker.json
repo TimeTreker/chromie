@@ -20,10 +20,6 @@
           "schema_version": 1,
           "local_ref": "r1",
           "outcome": "tell the user a short joke about robots",
-          "bindings": {
-            "topic": "robots",
-            "length": "short"
-          },
           "confidence": 0.91,
           "output_mode": "speech",
           "continuity_scope": "goal"

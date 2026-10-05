@@ -85,6 +85,9 @@ def test_complete_intent_needs_no_capability_fields(text):
 
 @pytest.mark.parametrize("name,value", [
     ("binding_items", {"duration": "10 seconds"}),
+    ("bindings", {}),
+    ("bindings", {"count": 2}),
+    ("bindings", {"source_location": "front table"}),
     ("bindings", {"capability_id": "test.walk"}),
     ("capability_id", "test.walk"),
     ("relationship", "new"),
@@ -870,3 +873,79 @@ async def test_fast_uses_library_lookup_instead_of_substituting_unrelated_common
     assert "Never substitute an unrelated loaded Capability" in first_prompt
     assert "test.wave" in model.packets[1][0]
     assert frames[0].advance.activities[0].capability_id == "test.wave"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("text,outcome,place", [
+    ("Bring it to me.", "Bring the milk from the front table about 50 meters away to me.", "front table about 50 meters away"),
+    ("把它拿给我。", "把前方约50米桌上的牛奶拿给我。", "前方约50米桌上"),
+])
+@pytest.mark.parametrize("fault", [None, "unknown_owner", "unknown_token", "missing_citation"])
+async def test_planner_cites_contextual_source_without_umi_bindings(text, outcome, place, fault):
+    request = request_for(text)
+    request.responsibilities[0] = request.responsibilities[0].model_copy(update={"outcome": outcome})
+    entry = capability("deliver", {"source": {
+        "type": "object", "properties": {
+            "status": {"type": "string", "enum": ["known", "unknown", "provider_resolved"]},
+            "description": {"type": "string"},
+        }, "required": ["status"], "additionalProperties": False,
+    }})
+    entry = entry.model_copy(update={"hints": {
+        "semantic_type": "body_action", "semantic_scope": {"source_resolution": "provider_owned"},
+        "resource_contract": {"provider_owns": ["source_resolution", "perception"]},
+    }})
+    citation = {**source_span(outcome, place), "source_responsibility_ref": "r1"}
+    if fault == "unknown_owner":
+        citation["source_responsibility_ref"] = "r2"
+    if fault == "unknown_token":
+        citation["source_end_token_ref"] = "t999"
+    sources = {} if fault == "missing_citation" else {"source": citation}
+    raw = work([activity("deliver", {"source": {"status": "provider_resolved", "description": place}}, sources)])
+    model = Model([raw])
+    frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
+    assert len(model.packets) == 1
+    if fault:
+        assert isinstance(frames[0], FastPlannerStreamFailure)
+        return
+    assert isinstance(frames[0], FastPlannerStreamTerminal), frames[0]
+    assert request.responsibilities[0].bindings == {}
+    ga = Model([{"new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
+                "cognitive_requests": [], "referent_updates": [], "resolved_references": [],
+                "confidence": 1.0, "reason_summary": "New complete request."}])
+    association = await GoalAssociationResolver(ga).resolve(request)
+    assert association.new_goals[0].description == outcome
+    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        advance=frames[0].advance, association=association, user_text=text,
+        responsibilities=request.responsibilities,
+    )
+    resolution = plan.parameter_resolutions[0]
+    assert resolution.source_quote == place
+    assert resolution.source_goal_ids == [association.new_goals[0].goal_id]
+    assert plan.steps[0].args["source"]["status"] == "provider_resolved"
+    from agent.app.planner_validation import validate_user_supplied_parameter_provenance
+    validate_user_supplied_parameter_provenance(
+        plan,
+        authoritative_goals=[goal.model_dump() for goal in association.new_goals],
+    )
+
+
+def test_canonical_binding_rejects_context_citation_from_sibling_requirement():
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.goal import GoalAssociationResolution
+    from shared.chromie_contracts.plan import FastPlannerAdvance
+    from shared.chromie_contracts.semantic_task import SemanticGoal
+    first = CognitiveResponsibilityProposal(local_ref="r1", outcome="Bring milk", confidence=1.)
+    sibling = CognitiveResponsibilityProposal(local_ref="r2", outcome="Visit the living room", confidence=1.)
+    advance = FastPlannerAdvance(turn_id="t", **work([
+        activity("deliver", {"source": {"status": "provider_resolved", "description": "living room"}}, {
+            "source": {**source_span(sibling.outcome, "living room"), "source_responsibility_ref": "r2"},
+        }),
+    ]))
+    association = GoalAssociationResolution(turn_id="t", resolution_status="resolved", confidence=1., new_goals=[
+        SemanticGoal(goal_id="g1", source_responsibility_refs=["r1"], description=first.outcome, source_text="Do it."),
+        SemanticGoal(goal_id="g2", source_responsibility_refs=["r2"], description=sibling.outcome, source_text="Do it."),
+    ])
+    with pytest.raises(ValueError, match="exact accepted Responsibility owner"):
+        GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+            advance=advance, association=association, user_text="Do it.", responsibilities=[first, sibling],
+        )

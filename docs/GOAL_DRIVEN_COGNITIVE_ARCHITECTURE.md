@@ -119,7 +119,7 @@ composition. Those belong to the Goal-Driven Cognitive Core.
 
 User Meaning Interpretation is an Agent-owned WHAT stage inside the Goal-Driven Cognitive
 Core. It receives an admitted `UserTurnEnvelope` projection and emits only
-provider-neutral Responsibility evidence, material semantic bindings, bounded
+provider-neutral Responsibility evidence with complete material meaning, bounded
 confidence, and unresolved meaning. It does not emit `route`, `intent`, response
 wording, Activity/Work/Plan contracts, Capability/provider identity, executable
 arguments, or authorization. Fast Planner is the first HOW owner; Goal Association
@@ -1076,12 +1076,14 @@ core principles.
 
 `CognitiveResponsibilityProposal` is the provider-neutral Goal-Interpretation evidence
 for what human outcome appears to be owed. It carries a local reference, outcome,
-material semantic bindings, its proposed relation to supplied Goal IDs, whether work
-remains, whether fresh evidence is required, and bounded unresolved meaning. It does
+complete natural-language meaning, provider-neutral output mode and continuity scope,
+current-turn source evidence, typed unresolved meaning and requested cognitive owners.
+Goal relationships and identities belong to GA; execution inputs belong to Planner. It does
 not introduce, resolve, prioritize, or select a source for planning InformationGaps. It
 is not a canonical Goal commit, Plan, Capability selection, or execution
 authorization. Capability IDs, executable arguments, actions, providers, realization,
-and execution methods are forbidden in its bindings. Responsibility evidence must
+and execution methods are forbidden in live UMI output, as are `bindings` and
+structured parameter tables. Responsibility evidence must
 preserve every explicit material qualifier that changes what would satisfy the human
 outcome—such as severity, intensity, magnitude, threshold, subtype, negation,
 comparison, quantity, or temporal scope—rather than generalizing a narrower request
@@ -2244,7 +2246,7 @@ path. Invalid or incomplete output fails closed with no Goal commit or effect.
 
 Fast/Deep User Meaning Interpretation are depths of the same WHAT authority. Their maintained
 model-facing contract is provider-neutral Responsibility evidence only: intended outcome,
-material semantic bindings, Goal relation, bounded unresolved meaning, and confidence.
+complete material meaning, typed unresolved meaning, cognitive requests and confidence.
 There are no `chat`, `tool`, `memory`, `robot_action`, `deep_thought`, route, intent,
 Capability, Activity, or provider-selection branches in the current UMI contract.
 
@@ -2539,7 +2541,7 @@ Trusted validation checks only mechanics:
 - source references belong to the authoritative admitted turn;
 - source spans are ordered, known and non-overlapping;
 - result types belong to the closed provider-neutral contract;
-- Goal relationship/identity and execution/provider fields are forbidden on live UMI output; sparse source-grounded semantic bindings are allowed only when they conserve WHAT;
+- bindings, parameter tables, Goal relationship/identity and execution/provider fields are forbidden on live UMI output; complete material WHAT remains in the outcome;
 - unavailable provider support does not remove the semantic Responsibility.
 
 Completeness and independence remain one model-authored semantic decision in the
@@ -2911,8 +2913,8 @@ but it must not silently turn all-or-nothing behavior back on.
 
 ### 10.1 Planning ownership
 
-User Meaning Interpretation supplies only understood Responsibility meaning, explicit/contextual
-semantic bindings, and bounded unresolved meaning. It does not decide whether a
+User Meaning Interpretation supplies complete understood Responsibility meaning with all
+explicit/contextual material details and bounded unresolved meaning. It does not decide whether a
 Capability parameter is missing. The Planner owns that comparison and decides whether
 a required execution input can be supplied by:
 
@@ -2921,6 +2923,7 @@ a required execution input can be supplied by:
 - owner-approved preference;
 - low-consequence ordinary default;
 - current observation;
+- source- and time-qualified Active Memory as a candidate, followed by observation where needed;
 - trusted service;
 - user clarification;
 - or no valid source.

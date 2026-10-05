@@ -12,25 +12,6 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.user_turn import UserTurnEnvelope
 
 
-def _normalized_scalar_texts(value: Any) -> set[str]:
-    if isinstance(value, str):
-        normalized = " ".join(value.strip().casefold().split())
-        return {normalized} if normalized else set()
-    if isinstance(value, dict):
-        return {
-            text
-            for item in value.values()
-            for text in _normalized_scalar_texts(item)
-        }
-    if isinstance(value, (list, tuple)):
-        return {
-            text
-            for item in value
-            for text in _normalized_scalar_texts(item)
-        }
-    return set()
-
-
 class UserMeaningInterpretationRequest(BaseModel):
     """Internal request for already-admitted User Meaning Interpretation.
 
@@ -110,16 +91,22 @@ class UserMeaningInterpretationDecision(BaseModel):
         ),
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def reject_binding_authorship(cls, value: Any) -> Any:
+        if isinstance(value, dict):
+            for item in (value.get("responsibilities") if isinstance(value.get("responsibilities"), list) else []):
+                if isinstance(item, dict) and "bindings" in item:
+                    raise ValueError("UMI must not author bindings; preserve complete meaning in outcome")
+                if isinstance(item, CognitiveResponsibilityProposal) and item.bindings:
+                    raise ValueError("UMI must not author bindings; preserve complete meaning in outcome")
+        return value
+
     @model_validator(mode="after")
     def validate_local_refs(self) -> "UserMeaningInterpretationDecision":
         refs = [item.local_ref for item in self.responsibilities]
         if len(refs) != len(set(refs)):
             raise ValueError("responsibility local_ref values must be unique")
-        bound_values = {
-            value
-            for item in self.responsibilities
-            for value in _normalized_scalar_texts(item.bindings)
-        }
         uncertainty_refs = [item.local_ref for item in self.meaning_uncertainties]
         if len(uncertainty_refs) != len(set(uncertainty_refs)):
             raise ValueError("meaning uncertainty local_ref values must be unique")
@@ -145,7 +132,6 @@ class UserMeaningInterpretationDecision(BaseModel):
         scope_by_ref = {
             item.local_ref: item.continuity_scope for item in self.responsibilities
         }
-        repeated_bound_values: list[str] = []
         for uncertainty in self.meaning_uncertainties:
             unknown_refs = set(uncertainty.responsibility_refs) - known_refs
             if unknown_refs:
@@ -159,12 +145,4 @@ class UserMeaningInterpretationDecision(BaseModel):
                     "one meaning uncertainty cannot span turn-local and goal-scoped "
                     "Responsibilities; UMI must keep those semantic uncertainties separate"
                 )
-            normalized = " ".join(uncertainty.description.strip().casefold().split())
-            if normalized in bound_values:
-                repeated_bound_values.append(uncertainty.description)
-        if repeated_bound_values:
-            raise ValueError(
-                "already-bound semantic values are not uncertain: "
-                + ",".join(sorted(repeated_bound_values))
-            )
         return self

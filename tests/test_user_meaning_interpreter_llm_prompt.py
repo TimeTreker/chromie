@@ -284,15 +284,15 @@ def test_umi_system_prompt_keeps_answer_facts_and_bare_assertions_out_of_what() 
     assert "do not invent an information Responsibility" in prompt
 
 
-def test_umi_system_prompt_carries_contextual_resource_facts_with_canonical_bindings() -> None:
+def test_umi_system_prompt_carries_contextual_resource_facts_in_complete_outcome() -> None:
     prompt = (
         Path(__file__).parents[1]
         / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
     ).read_text(encoding="utf-8")
     assert "previously introduced physical resource" in prompt
     assert "entity, location, distance, quantity, recipient" in prompt
-    assert "`entity` for the referred item and `recipient` for the intended person" in prompt
-    assert "`object` or `destination` keys" in prompt
+    assert "present in this Responsibility's complete outcome" in prompt
+    assert "Do not author `bindings` or another structured fact/parameter table" in prompt
 
 
 class UserMeaningInterpreterPromptTests(unittest.TestCase):
@@ -702,9 +702,9 @@ class UserMeaningInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
             with self.subTest(case=label):
                 text = "Nod twice."
                 raw = _valid_output(text)
-                raw["responsibilities"][0].update(
-                    outcome="nod", bindings=bindings, output_mode="speech"
-                )
+                raw["responsibilities"][0].update(outcome="nod", output_mode="speech")
+                if bindings:
+                    raw["responsibilities"][0]["bindings"] = bindings
                 raw.update(overrides)
                 if label == "missing confidence":
                     del raw["confidence"]

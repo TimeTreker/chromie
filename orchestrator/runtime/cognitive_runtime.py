@@ -18,6 +18,7 @@ from agent.app.capabilities.validator import validate_args_for_schema
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
     CognitiveWorkRequest,
     CoreInterpretationResult,
 )
@@ -3425,6 +3426,7 @@ class GoalDrivenRuntimeCoordinator:
         association: GoalAssociationResolution,
         user_text: str,
         retained_goals: list[dict[str, Any]] | None = None,
+        responsibilities: list[CognitiveResponsibilityProposal] | None = None,
     ) -> CanonicalPlan:
         """Bind Fast Planner's first Activity Plan to GA's canonical Goals."""
 
@@ -3502,14 +3504,29 @@ class GoalDrivenRuntimeCoordinator:
                     )
                 )
 
+        outcomes_by_ref = {item.local_ref: item.outcome for item in responsibilities or []}
+        def argument_source_text(span: Any, owner_refs: list[str]) -> str:
+            ref = getattr(span, "source_responsibility_ref", None)
+            if ref is None:
+                return user_text
+            if ref not in outcomes_by_ref or ref not in owner_refs:
+                raise ValueError("Fast argument source has no exact accepted Responsibility owner")
+            return outcomes_by_ref[ref]
+
         parameter_resolutions = [
             PlanParameterResolution(
                 step_id=activity.activity_id, parameter=parameter,
                 strategy="semantic_realization", value=activity.args[parameter],
-                source_quote=resolve_user_turn_source_span(user_text, span),
+                source_quote=resolve_user_turn_source_span(
+                    argument_source_text(span, activity.source_responsibility_refs), span,
+                ),
                 confidence=advance.confidence,
                 source_goal_ids=list(dict.fromkeys(
-                    goal_id for ref in activity.source_responsibility_refs
+                    goal_id for ref in (
+                        [span.source_responsibility_ref]
+                        if getattr(span, "source_responsibility_ref", None) is not None
+                        else activity.source_responsibility_refs
+                    )
                     for goal_id in refs_to_goals[ref]
                 )),
             )
@@ -5607,6 +5624,7 @@ class GoalDrivenRuntimeCoordinator:
                     association=association,
                     user_text=work_request.original_user_text,
                     retained_goals=planning_context.get("active_goal_snapshots", []),
+                    responsibilities=list(work_request.responsibilities),
                 )
                 terminal_plan = fast_plan
                 fast_planner_path = "terminal"

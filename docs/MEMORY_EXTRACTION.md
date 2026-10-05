@@ -83,6 +83,12 @@ semantic responsibility to UMI, GA or Planner.
 | GA | How does that accepted meaning relate to existing Goals? | Accepted UMI Responsibilities and any explicit unresolved material; relevant canonical Goals, bounded Goal/progress history and unfulfilled commitments; disclosure-permitted activated Memory needed for association. |
 | Planner | Given the intent, Goals and actual state, what should happen now? | Relevant Responsibilities and available canonical Goals; prepared, queued, running and completed Work projections; trusted Evidence and delivered/pending communication records; the broader Planner-scoped Active Memory projection, including remembered world/task priors. |
 
+Historical world/task entries remain usable when their location is outside current
+perception. Both Memory's prompt entry and its cognitive projection preserve
+`created_ms`, `updated_ms` and original source references. A previous delivery to the
+living room supplies a candidate search location, not proof the water is still there.
+Planner may use that prior to choose search Work; perception verifies current state.
+
 These are views of existing owners, not three Memory stores. Activation first chooses bounded,
 disclosure-safe entries from Working and Long-term Memory; `cognitive_roles` then controls which
 cognitive owner may consume each activated entry. UMI is conservative by default: identity,

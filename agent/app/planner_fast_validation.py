@@ -27,6 +27,7 @@ try:
     from chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
+        FastPlannerResponsibilityArgumentSource,
         FastPlannerProgressAct,
         validate_communicative_activity_identity,
     )
@@ -44,6 +45,7 @@ except ImportError:  # pragma: no cover
     from shared.chromie_contracts.plan import (
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
+        FastPlannerResponsibilityArgumentSource,
         FastPlannerProgressAct,
         validate_communicative_activity_identity,
     )
@@ -881,27 +883,34 @@ def validate_fast_advance_output(
                         f"{activity.capability_id}.{name}; source_ref={source_ref} "
                         f"expected={expected!r} actual={actual!r}"
                     )
-        source_text = request.original_user_text
         for parameter, span in activity.argument_sources.items():
             if parameter not in activity.args:
                 raise AuthoritativeGroundingValidationError(
                     "Fast Planner argument source names a missing argument: "
                     f"{activity.activity_id}.{parameter}"
                 )
+            source_text = request.original_user_text
+            contextual = isinstance(span, FastPlannerResponsibilityArgumentSource)
+            if contextual:
+                if span.source_responsibility_ref not in activity.source_responsibility_refs:
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner argument source must cite an owning Responsibility"
+                    )
+                source_text = by_ref[span.source_responsibility_ref].outcome
             try:
                 quote = resolve_user_turn_source_span(source_text, span)
             except ValueError as exc:
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner argument source must cite the immutable UserTurn: "
+                    "Fast Planner argument source must cite its immutable source: "
                     f"{activity.activity_id}.{parameter}"
                 ) from exc
-            if not quote.strip() or not any(
+            if not quote.strip() or (not contextual and not any(
                 by_ref[ref].source_evidence is not None
                 and user_turn_source_span_contains(
                     by_ref[ref].source_evidence, span, source=source_text,
                 )
                 for ref in activity.source_responsibility_refs
-            ):
+            )):
                 raise AuthoritativeGroundingValidationError(
                     "Fast Planner argument source must stay inside an owning Responsibility source span: "
                     f"{activity.activity_id}.{parameter}"
@@ -922,10 +931,6 @@ def validate_fast_advance_output(
                 )
         falsely_cited = binding_grounded_parameters.intersection(activity.argument_sources)
         falsely_cited.difference_update(scoped_count_parameters)
-        falsely_cited.update(
-            parameter for parameter in activity.argument_sources
-            if provider_resolves_required_source(definition, parameter)
-        )
         if falsely_cited:
             raise AuthoritativeGroundingValidationError(
                 "Fast Planner binding-grounded argument cannot cite the current UserTurn: "
@@ -1045,10 +1050,15 @@ def validate_fast_advance_output(
                 continue
             if provider_resolves_required_source(definition, parameter):
                 source_value = activity.args.get(parameter)
-                if source_value not in ({"status": "unknown"}, {"status": "provider_resolved"}):
+                unresolved = source_value in ({"status": "unknown"}, {"status": "provider_resolved"})
+                if not unresolved and parameter not in activity.argument_sources:
                     raise AuthoritativeGroundingValidationError(
                         "Fast Planner unbound provider-resolved source must contain "
                         f"only its unresolved status: {activity.capability_id}.{parameter}"
+                    )
+                if unresolved and parameter in activity.argument_sources:
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner unresolved provider source cannot claim a source citation"
                     )
                 continue
             derivation = _argument_derivation_contract(definition, parameter)
@@ -1396,7 +1406,8 @@ def collapse_redundant_idempotent_read_activities(
 
 
 def canonicalize_fast_argument_source_spans(
-    output: FastPlannerAdvanceModelOutput, *, source: str
+    output: FastPlannerAdvanceModelOutput, *, source: str,
+    responsibilities: list[CognitiveResponsibilityProposal] | None = None,
 ) -> FastPlannerAdvanceModelOutput:
     """Mechanically minimize unique literal provenance inside model-selected spans."""
 
@@ -1405,11 +1416,17 @@ def canonicalize_fast_argument_source_spans(
         if activity.role != "capability" or not activity.argument_sources:
             activities.append(activity)
             continue
-        narrowed = {
-            parameter: canonical_literal_user_turn_source_span(
-                source, span, activity.args.get(parameter)
+        outcomes = {item.local_ref: item.outcome for item in responsibilities or []}
+        narrowed = {}
+        for parameter, span in activity.argument_sources.items():
+            contextual = isinstance(span, FastPlannerResponsibilityArgumentSource)
+            span_source = outcomes[span.source_responsibility_ref] if contextual else source
+            narrowed_span = canonical_literal_user_turn_source_span(
+                span_source, span, activity.args.get(parameter)
             )
-            for parameter, span in activity.argument_sources.items()
-        }
+            narrowed[parameter] = (FastPlannerResponsibilityArgumentSource(
+                **narrowed_span.model_dump(exclude={"source_responsibility_ref"}),
+                source_responsibility_ref=span.source_responsibility_ref,
+            ) if contextual else narrowed_span)
         activities.append(activity.model_copy(update={"argument_sources": narrowed}))
     return output.model_copy(update={"activities": activities})

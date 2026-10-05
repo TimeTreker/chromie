@@ -1,369 +1,158 @@
 # Chromie Handoff
 
-## Current resume point — 2026-10-05
+## Current delivery — UMI/Planner and historical Memory, 2026-10-05
 
-Pre-delivery checkout `main` / `3feff0b56f7fa21459b385768701bc7f47dddbfc`
-contains fetched `origin/main`; the previous non-model delivery is already pushed.
-The owner requested remaining non-model defects to be repaired, committed and
-pushed. Expected resume revision: latest `main` commit containing
-this Handoff and [checkpoint](DEVELOPMENT_CHECKPOINT.md). Canonical local gate now
-passes; current-revision voice proof and default target closure remain open.
-Charter, production prompts/Schema/DTO/Host, model and module authority are unchanged.
+Checkout `/home/chromie/github/chromie`, branch `main`, remote
+`https://github.com/TimeTreker/chromie.git`. Pre-delivery base
+`0848b07d14886a0238ca71ceae3aa65fd0bcd103` matches fetched `origin/main` before
+edits and after the native aggregate. Expected resume revision is the newest commit
+containing both this file and [checkpoint](DEVELOPMENT_CHECKPOINT.md).
+Owner authorization: fix non-model defects, commit and push; UMI must not author
+bindings. Principles and module responsibilities are unchanged; earlier contradictory
+Charter allowance was removed. UMI and Planner prompt changes enforce this approved
+contract, not general semantic tuning. Model/profile and SC prompt are unchanged.
 
-## Current historical-restatement fixture repair
+The current local gate passes. Current-revision voice proof and default target closure
+remain open. This is a bounded contract/projection repair, not a release or overall
+behavior qualification. Attention second-call and SC silence/provenance findings remain
+open. Do not repair UMI activation/meaning through GA, Planner or Host.
 
-Root `/home/chromie/github/chromie/.chromie/acceptance/ga-history-fixture-audit-20261005/`.
-The retained GA corpus's historical-description requests copied prior task types
-into current Responsibilities:70 cases,35 per language, comprising20 information,
-20 body,20 state and10 media. The older50 count omitted information. Earliest
-wrong boundary is the upstream fixture author; GA correctly conserved that input.
+## Implemented workflow and provenance
 
-Only the current input's `output_mode` and corresponding hidden target-map value
-change to `speech`. Original words, complete outcomes, provenance, prior terminal
-Goals, identity choices, raw reference outputs, primary Schemas, contrasts and
-splits remain. Production UMI/GA/Planner/SC/Host, prompts, Charter and model are
-unchanged. No services were rebuilt/restarted and no native/audio/robot inference
-was run. Reference maintenance is not independent semantic qualification.
+- UMI primary/Deep Schema, parser and Decision reject even empty `bindings` keys.
+  Complete WHAT, current-turn spans, uncertainty and initial activation remain UMI.
+  Core rejects nonempty bindings; shared internal empty defaults/read-only retained
+  canonical bindings are not fresh UMI authorship.
+- Planner extracts arguments and cites original speech or exact owning accepted
+  outcome tokens. `source_responsibility_ref` is an argument provenance selector,
+  not another semantic owner. Host binds the exact quote only to that GA Goal;
+  unknown tokens, owners and sibling citations fail closed. Typed retained constraints
+  cannot be overridden. Valid coordinates alone do not prove semantic conversion.
+- Provider-resolved resource sources may retain cited reported search clues. Perception
+  verifies current conditions; a user report is not an observed object. Historical
+  Memory remains Planner context outside sight, with original creation/update times
+  and source refs. The controlled projection test does not prove search execution,
+  automatic persistence of robot actions or that yesterday's water still exists.
+- Stale UMI references/template are reconciled. Strict6000 records and5 prototypes
+  change only captured production request packets; original inputs, reference decisions,
+  meaning, relationships, parameters, prior Goals, provider/fault outcomes, assertions
+  and splits are unchanged. No permissive replay or candidate-fitted answers.
 
-- `baseline.json`:all1500 mechanically valid,1300 accepted/200 expected typed-state
-  refusals. It accepted the self-consistent wrong fixture types; model capacity
-  was not tested. `cases.before.json` and `dataset.before.json` retain originals.
-- `diagnosis.json`:all100 historical turns reviewed,70 incorrect current types.
-  `focused.before.log`:new semantic regression1 fail/4 pass before fixture repair.
-- `migration-ledger.json`:all1500 compared;70 differ in exactly those two values,
-  1430 are unchanged. New tree digest
-  `2ba2e1a8edb4ef81efa4a0f820742c3081b9776b14aa6a8acbaa52e0101d1d2f`.
-- `history-workflows.json`:100 before/after production-shaped reference workflows,
-  each one primary reference call, Schema accepted/Host resolved; unchanged raw
-  GA decisions and Schemas. External inference0; downstream Planner/SC/provider
-  and state submission were not invoked.
-- `after.json`:full1500 validate,1300 accepted/200 retained fail-closed negatives.
-  `focused.after.log`:22 tests pass. The new corpus guard rejects all four copied
-  non-speech types before GA; production validation is unchanged.
-- `canonical.log`, exit0:benchmarks169 pass, main3968 pass/5 environment skips/
-  1023 passing subtests,20 legacy Agent tests pass. Pinned Ruff/mypy, policy/
-  ownership, configuration/runtime and docs checks pass. Final rechecks pass in
-  `policies.final.log`, `ownership.final.log` and `docs.final.log`.
-  Roadmap/resume and manifest status text are
-  reconciled with observed results rather than the obsolete red gate/210-error
-  baseline. No maintained document, environment variable, runtime flag, asset or
-  architectural owner was added.
+## Evidence actually retained
 
-Preserve the freeze and run the existing owner checks when resuming:
+Root `/home/chromie/github/chromie/.chromie/acceptance/umi-no-bindings-20261005/`
+is ignored private evidence and does not travel with Git. Preserve/copy it before
+cross-machine resume; review private prompts/payloads before external transfer.
 
-```bash
-cd /home/chromie/github/chromie
-python -m benchmarks.datasets.goal_association_daily_life.validate --json
-python -m pytest -q benchmarks/tests/test_goal_association_daily_life_dataset.py
-./scripts/run_tests.sh
-```
+| Artifact | Observed result and ceiling |
+| --- | --- |
+| `frozen-manifest.json`, `scenarios/`, `boundary.before.json`, `boundary.final-current.json` | Frozen bilingual20, initial8/20 → final20/20 through actual Schema/Host, one primary reference per case, zero external inference. |
+| `grammar-conditional-wire-packets.json`, `native-grammar.conditional-wire.log` | Exact production response-format codec and pinned native decoder20/20; isolated container/network-none/2GB, no inference. Cross-field source/citation condition is Host enforced, not claimed native decoder semantics. |
+| `memory.before.log`, `focused.owner-final.log` | Original Memory regression fails on missing created_ms; final runtime/Memory84 tests pass. No live water search. |
+| `focused.pre-live.log`, `final-fixture-check.log` |215 focused tests/78 subtests pass; final2 fixture/hash checks pass. |
+| `umi-corpus.after.log`, `fast-corpus.after.log`, `level-a/`, `level-a.log` | UMI1496/Fast204 references mechanically valid; Level A19/19 across3 relevant classes. No native behavior claim. |
+| `capture-full-summary.json`, `workflow-invariant-review.json`, `prototype-request-capture.json` |6000+5 request-only maintenance; every non-request field unchanged, zero candidate inference. Original archive/cache/prototypes retained privately. |
+| `strict-full/summary.json`, `strict-full.log` |6000/6000 pass, fixed production source, zero candidate calls:1400 complete workflows,1800 expected states,2500 expected rejections,300 safe nonexecuting rejections. |
+| `canonical.final.log` | Exit0:169 benchmark tests,3981 main tests/5 environment skips/1023 subtests,20 legacy Agent tests pass; policy/ownership/pinned Ruff+mypy/configuration/runtime/docs pass. Initial `canonical.log`19 failures were a missing Unit source_text and stale5 prototype requests; original failed log retained. |
+| `runtime.before.json`, `runtime.after-baseline.json`, `live-baseline/`, `llm_calls.baseline.jsonl`, `live-adjudication.baseline.json` | Unchanged-source native79,22 automatic pass/57 fail; same-agent review6 pass/10 partial/61 fail/2 insufficient. Nine primary nonempty binding outputs admitted by stale contract. |
+| `runtime.native.before.json`, `runtime.native.after.json`, `live-after/`, `llm_calls.after-window.jsonl`, `live-adjudication.after.json` | Changed-source native79,13 automatic pass/66 fail; review5 pass/7 partial/67 fail. All cases attempted/zero skipped; blocked followups mean cohort/qualification incomplete. Native86 UMI primary outputs have zero binding keys. Source and service identities fixed. No overall behavioral gain established. |
 
-## Previous workflow corpus repair — 3feff0b56…
+Exactly one bundle per aggregate:
 
-Root `/home/chromie/github/chromie/.chromie/acceptance/workflow-contract-audit-20261005/`.
-The6000-case fixed baseline failed before UMI output: exact-request HTTP409,
-zero external inference/provider calls. Earliest wrong owner: stale frozen corpus,
-not production interpretation or model capability. Request-only captures showed
-missing required live UMI body classification and retired GA wire fields.
+- Baseline: `/home/chromie/Downloads/chromie_debug_bundle_20261005_183008.tar.gz`.
+- Changed source: `/home/chromie/Downloads/chromie_debug_bundle_20261005_192414.tar.gz`.
 
-Repair: author existing body classification from the original scenario action;
-remove only retired `decision=create_goals` and empty `non_goal_responsibility_refs`;
-recapture exact current production requests. `invariant-review.final.json` compares
-all6000 cases plus5 prototypes: original inputs/context, historical Goals, full meaning,
-Goal relationship choices, Planner outputs/parameters, provider contracts/observations,
-fault payloads, rejection/terminal assertions and splits remain. No runtime semantic
-conversion, weaker matching, candidate-fitted targets or new inference is introduced.
+Native milk SID71d2b376 retains ahead/about50meters but requests GA only; Planner/
+provider absent. Native walk/right-turn SIDb26d7667 completes simulator actions but
+Planner call `llmcall_agent_6e97211283764259` falsely cites three-second walk tokens
+for turn duration2s. This automatic pass is a semantic provenance failure, not a
+proof of correct argument grounding. Current-time Planner is invoked (SID2b093bbb)
+but authors response-only Work; no clock acquisition. Raw errors do not establish
+intrinsic model incapacity. No model tuning, semantic lexer or second-call repair added.
 
-- `baseline/summary.json`:6000 UMI mismatches, fixed source, zero candidate calls.
-- `capture-summary.json`:request-only recapture still fails61/65 representatives;
-  `capture-full-summary.json`:6000 authored workflows pass. Authoring is separate
-  from strict replay and remains non-independent, `training_eligible=false`.
-- `focused.log`:first strict run5 fail/115 pass. Extra nonrequired prior-Goal metadata
-  did not match the original seed used for capture; removed, with original Goals
-  retained exactly. `timer-harness-diff.json` and earlier captures remain.
-- `focused.final.log`:120 pass. `strict-full/summary.json`:6000/6000 pass, fixed source,
-  zero candidate calls;1400 complete workflows,1800 state handling,2500 expected
-  rejections,300 safe nonexecuting rejections. `adjudication.json` covers all60 families.
-- `canonical.log`, exit0:benchmarks164 pass, main3968 pass/5 environment skips/
-  1023 passing subtests,20 legacy Agent tests pass. Policies, ownership, pinned
-  Ruff/mypy, configuration/runtime and docs pass. All former83 workflow failures close.
-- `cold-baseline.json`:the original Git source now restores all6076 files in this
-  checkout. Earlier isolated-export incomplete-source evidence remains historical.
-  `cold-final.json`:new source restores6050 exact files; verified cache restores0.
+Freeze revision16 archive: `benchmarks/integration/workflow_scenarios/frozen.tar.xz`,
+1,294,716 bytes, SHA256
+`17003c9696a28553d6ca1b888ede28c2ba76c9de79ecc6829837f98f90d9bb58`.
+Strict cohort manifest SHA256
+`51d9e344eb593d2fb474435fb3685a4fdf32b22318386d0732ea961094fd96fa`.
+Original archive/cache remain in `workflow-frozen.before.tar.xz`,
+`workflow-cache.before/`, with5 originals in `prototypes.before/`.
+Final document consolidation follows the frozen native run; production bytes remain
+identical. Do not treat the final documentation tree as that pre-document full-tree identity.
 
-The complete reviewed source is retained as
-`benchmarks/integration/workflow_scenarios/frozen.tar.xz` (1,244,372 bytes;
-SHA256 `fd9a07d3004a4643d04b54ffc570796080b6d13501459334e21c2ab6b191be7c`).
-The manifest binds all6000 case and50 shared-packet hashes plus the source archive
-and its inner manifest; current shallow checkout needs no historical fetch.
-Historical Git-source support keeps the original freeze retrievable. The restoration
-owner verifies the complete archive before publication and never overwrites changed
-cache or regenerates answers. One maintained corpus asset is added; no new document,
-environment variable, runtime flag, production module or architecture term.
+## Runtime and probe incident
 
-Fresh-checkout resume:
+Native frozen full tree:4492 paths, SHA256
+`cc5de677facde4bc441fa9d141ee477339038b3d847796e046cb0939e5b1b273`;
+identity SHA256 `d13bb2ac5787364a605da161735281784be71df48549f4492180dccf468bd671`.
 
-```bash
-cd /home/chromie/github/chromie
-python -m benchmarks.regression restore-fixtures
-./scripts/run_tests.sh
-```
+Selected Agent image `chromie-agent:umi-boundary-memory-source-20261005` /
+`bc6577e4b8996a55c3ea9ae6d996f757c8584460cd66a8a227871d3d4b17e9c7`;
+container `1d73c9d3f87348308ee1f9d986aab5cec6adf0212cf71566b3e65661cdea59d3`.
+Source-only rebuild preserves the original124a02f6… dependency layers. Environment
+changed keys=[]; healthy/restart0. Packaged/host digest
+`8140dcc34fdade7d6291bcb92b9dc5bd29f8a464ff4d7d1c35fd26d7dada0b25`
+matches before/after in `agent-source.native.before.log` and `.after.log`.
+The full official Agent build completed but was not deployed because its transitive
+dependency resolution was outside the fixed-source comparison.
 
-On a populated older checkout, preserve the previous ignored case/packet cache before
-removing it and restoring the new freeze. Do not remove the tracked manifest/archive;
-do not blindly overwrite mismatched files. The current checkout already has the new
-verified cache. `corpus-before/`, `seeds-before/`, previous manifest and failed captures
-retain earlier bytes locally. Do not stage private evidence.
+LLM remains `chromie-sglang:qwen35-4b-awq`, image2330d155… and model/options
+unchanged. An initial manual grammar probe inside the running LLM omitted production
+Schema sharing/shape codec, triggered OOM and automatic container recovery (exit137,
+2026-10-05T10:46:14Z). `llm-service-after-probe.log` retains failure/recovery.
+No manual LLM rebuild/restart or profile change. Native run binds the recovered
+service identity; final healthy/restart1/start time unchanged. Subsequent grammar
+proof is isolated/network-none/2GB and uses exact production transport. Experimental
+three-branch source Schema failed pinned compilation and was rejected; final canonical
+conditional plus existing transport shape passes. Never repeat heavyweight probes
+inside the serving LLM. `services.native.after.log` retains final service states.
 
-This patch affects benchmark evidence only. No services were rebuilt/restarted,
-no model/prompt/profile/Charter/module authority changed, and no native cohort,
-physical microphone/speaker/robot or independent qualification was performed.
-Native residual failures and source-bound runtime evidence below remain open.
+ASR42d3df2e…, TTSa56b2486… remain unchanged. TTS started2026-10-04T07:57:44Z,
+ASR2026-10-04T01:08:44Z, both healthy/restart0. No microphone, audible speaker,
+camera, grasp or physical robot qualification. Simulator acquisition is mock evidence.
+Soridormi HEAD `2af3034a91842ecb9964a45ce24e9bdc18fcde58` has unrelated dirty owner
+work; do not stage/reset it. Existing simulator and keepalive remain running.
+Private `compose-files.private.json` and `agent-proof.private.json` retain the exact
+Agent source proof service chain; use generated runtime env, never edit `.env.runtime`.
 
-## Previous non-model delivery — 489bd639…
+## Resume from Git
 
-Root `/home/chromie/github/chromie/.chromie/acceptance/non-model-delivery-20261005/`.
-`pending.before.patch`, `before.json` and `before/` preserve all31 reviewed pending
-paths and the handoff/status/audit originals against pre-delivery `b693467ca…`.
-They are already-applied local changes, not a patch to apply again.
-
-- UMI wire formatting:16-character structural whitespace bound forwarded by
-  SGLang/XGrammar; strings, Schema meaning and model unchanged.
-- SC model view:one exact copy of current mirrored snapshots; unique/divergent
-  Memory and trusted request/digest unchanged. Historical native budget proof is
-  42,428→37,077 against40,960; source/context issue before inference.
-- Weather provider:geocoding locale follows admitted geographic names/qualifiers;
-  reply-language preference, canonical location and strict identity checks unchanged.
-- Test evidence:forward existing interrupt controls and require provider-start then
-  cancelled walking receipt; strengthen clarification/draft acts; geographic identity
-  remains blocking semantic review. Include required ambiguous-movement body metadata,
-  previously withdrawn Tianxin case deletion and79-case inventory/documentation.
-- That delivery's focused suite347 pass/5 environment skips/57 subtests; Level A19/19 unique
-  cases across3 relevant classes. `native-grammar.log`:bounded0/8/16 accepted,17/128
-  rejected; unbounded reference accepts all5;128 semantic string spaces retained.
-- `agent-source.json` still matches host/package93b58310…; Agent image124a02f6… and
-  LLM image2330d155… remain running/restart0. No model/profile/prompt, Charter or
-  module-authority change, no service rebuild/restart, no additional LLM decision.
-- That delivery's full gate `.chromie/acceptance/non-model-delivery-20261005.canonical.log`,
-  exit1:benchmarks160 pass, main83 fail/3885 pass/5 skips/1023 passing subtests.
-  Policy/ownership/pinned Ruff/mypy/configuration/docs/scenario stages pass;
-  legacy not reached. `canonical-comparison.json`:same83 ordinary failure IDs as
-  latest full local-tree source-Schema run, no new IDs/subtest failures. Former
-  first-delivery fixture failure now passes. All6000 targets and strict replay remain.
-  Final status/Handoff/audit/checkpoint edits are documentation-only after that gate.
-
-This follow-up commits the local source already used by the latest retained79-case
-native iteration below. It does not create a new native cohort, reuse its runtime
-identity for a new run, or qualify this new Git revision. Native residual failures,
-physical/independent evidence gaps and the red canonical gate remain open.
-
-## Latest retained native proof and first-delivery history
-
-Root `/home/chromie/github/chromie/.chromie/acceptance/planner-compound-contract-20261004T140758Z/`;
-latest source/target iteration is `count-scope/source-schema/`.
-
-- First-delivery entry backup retains3113 dirty paths; exact corpus/input/foreign preservation and
-  `combined-*-patch-paths.txt` inventories remain at the root.28 excluded paths are
-  unchanged in `source-schema/foreign-preservation.json`. First-delivery staging excluded
-  hunks in Agent README, Acceptance and general-ability tests now included above. The
-  already-dispatched SC presentation handling and its regression are included as
-  prerequisites for the admitted-user chronology repair. Do not blanket-add
-  ignored evidence or other work.
-- Frozen compound12 references9/12→12/12; count11 references6/11→11/11;
-  exact source/enum13 references10/13→13/13. Frozen targets and existing provider
-  formats/bounds/defaults remain; source IDs alone are not semantic proof.
-  All are scripted primary Schema/DTO/Host checks, no native/independent training proof.
-- Count focused1090 passed/451 subtests; source stream179 passed; each relevant
-  Level A3 classes18/18. At that native iteration canonical benchmarks160 pass, main83 fail/3885 pass/
-  5 skipped/1023 subtests. `source-schema/canonical-comparison.json`:same83 failure
-  IDs, no new ones; strict stale workflow HTTP409 precedes candidate inference;
-  legacy stage not reached. Do not rewrite6000 targets or weaken strict comparisons.
-- Full native79 automatic20 pass/59 fail; all79 reviewed by same coding agent:
-  6 bounded pass/12 partial/59 fail/2 insufficient. All79 attempted/zero skipped;
-  blocked dependent turns keep cohort/qualification incomplete. Exact module I/O,
-  delivered speech, completed/planned results and limits are in
-  `source-schema/live-adjudication.final.json`. No independent/physical/audible qualification.
-- Native SID923cce48 has count2 binding and completed sim walk10/.2→nod2→left-turn1;
-  SID0b0cdc27 has direction source t11:t12 and completed sim walk3→right-turn1,
-  with English wording for Chinese input. Current direct-stop case has unrequested
-  idle and planned-only records, no stop execution. Weather lookup/Evidence in
-  SID7b14073a is real provider evidence, with English wording. Automatic safe idle,
-  acknowledgement and an empty execution do not establish task completion.
-- `source-schema/live-iteration-integrity.json`:source/service unchanged throughout;
-  source tree `00212ba188af4eec80049e5751dbcdbea4a2b44e05fb6cc9c263b8b8aa8f055b`. One bundle:
-  `/home/chromie/Downloads/chromie_debug_bundle_20261005_003209.tar.gz`.293 full calls,285 SID-correlated,
-  all82 GA primary cognition requests empty; background Evidence activation is
-  retained separately. No GA/Host addition of initial Planner requests.
-- Root `repair-only.patch` and per-phase repair-only patches are already applied,
-  not files to apply again. Source-schema reverse-check is successful. Later four
-  status/audit/Handoff/checkpoint edits are documentation-only delta from that
-  frozen tree; full local Agent source remains matched. First-delivery staging
-  excluded source/context/oracle changes now included in this follow-up. Historical
-  full-tree identities remain bound to their original runs and documentation deltas.
-
-## Historical immutable native iterations
-
-| Iteration | Automatic | Same-agent review: pass/partial/fail/insufficient | One bundle |
-| --- | --- | --- | --- |
-| GA relationships | 19/60 | 3/7/66/3 | `chromie_debug_bundle_20261004_195926.tar.gz` |
-| GA + Planner media | 18/61 | 6/5/65/3 | `chromie_debug_bundle_20261004_203439.tar.gz` |
-| Planner body compound | 21/58 | 5/8/64/2 | `chromie_debug_bundle_20261004_223730.tar.gz` |
-| Planner count | 18/61 | 5/12/61/1 | `chromie_debug_bundle_20261004_235201.tar.gz` |
-| Count + source-Schema, current | 20/59 | 6/12/59/2 | `chromie_debug_bundle_20261005_003209.tar.gz` |
-
-All bundle basenames above are under `/home/chromie/Downloads/`; each cohort tried
-79 cases but blocked later turns remain unknown. Earlier GA/media source identities
-and full records remain in `.chromie/acceptance/ga-relationship-contract-20261004T111406Z/`;
-compound/count records in the current root. Only the first GA run overlapped
-canonical CPU work; do not infer latency improvement or model ranking from scores.
-SC language trials remain in `.chromie/acceptance/sc-language-policy-20261004T125029Z/`:
-eight native packets,4/8 baseline,4/8 system-policy,3/8 footer; both rejected and
-exact SC bytes restored including foreign changes. Original blink UMI omission is
-real, but intrinsic capacity and prompt/context soundness are unproved; no downstream
-repair or model substitution. Current native failures remain at their own owners.
-
-## Tested services and evidence limits
-
-Current Agent tag `chromie-agent:audit-planner-source-schema-20261005`, image
-`sha256:124a02f6aaae067e98c2b5e56ec4d95a7d85772c562a74d15a8c76fe3202f935`, container
-`db950343b37b7db2fd660a094486f70c93d28fd851e91b3d22d8b920f7ab18e6`, started `2026-10-04T16:17:39.47574139Z`.
-`source-schema/agent-deployment.json`:healthy/restart0/zero environment changes.
-`agent-source.pre-live.json` and `agent-source.after.json`:host/package digest
-`93b58310173575dd106a108cd680d5d26ff524d6d4b16efe3e4b13bda81e8284` matches. Build used official Agent Dockerfile,
-original generated build args and host networking; exact original environment is
-retained in ignored `source-schema/agent-proof.private.json`. Historical count
-image9600b13a…/sourcec03788ff… and compound image2e6656e9…/sourcecaedb275… are not current.
-
-Default `chromie-qwen35-4b` / Qwen3.5-4B AWQ is unchanged, LLM image2330d155…,
-UMI context/output32768/4096, Fast40960/4096. ASR unchanged. TTS tag
-`chromie-tts:audit-resource-fix-20261004`, image
-`sha256:a56b24862af4acf7d26cb87376db9ff3013ae6204674d2ee5b33bb5ec21f0ed0`,
-provider source `df06d27d86a634c5f7f6b2c870d2408c1e02309dea6474b48923b60d5f28eded`.
-TTS is a source-only proof image over saved dependencies; official dependency
-rebuild remains unqualified. Its original61 env entries/mounts are retained in
-ignored `root-cause-audit-20261004T061558Z/tts-source-proof.private.yaml`.
-`.env.runtime` is generated and unchanged; default Compose alone does not identify
-these tested source images. Do not restart LLM/ASR/TTS to resume an Agent proof.
-
-Soridormi `/home/chromie/github/soridormi` remains HEAD
-`2af3034a91842ecb9964a45ce24e9bdc18fcde58`, headless MuJoCo5555/MCP8000;
-acquisition/handover mocked. Preserve its foreign README/script/test/workspace changes.
-Actual milk object/pose and mixed-place lookup qualification remain open. TTS PCM
-is generated with discarded playback. No physical microphone/audible speaker/camera,
-real grasp or physical robot proof. Supervised-only hardware/audio flags must not
-be used to claim automated evidence.
-
-## Resume commands
-
-Verify saved proof images/private overrides first. If Agent source differs, rebuild
-through its official Dockerfile and verify the package before fresh identity capture.
-Stop interactive Host before a cohort. Never edit/rebuild/restart during the full
-cohort; after it ends collect once and judge every case. The local gate is green;
-rerun it after changes:
+Fetch latest source and preserve dirty work before integrating. The current archive
+restores complete exact records through existing checks; preserve a changed ignored
+cache before replacement, never regenerate expected answers. Run from repository root:
 
 ```bash
 cd /home/chromie/github/chromie
-set -euo pipefail
-git fetch origin
-git merge-base --is-ancestor origin/main HEAD
-git status --short --branch
 python scripts/check_repository_policies.py
 python scripts/check_test_ownership.py
 ./scripts/run_tests.sh
 python scripts/check_docs.py
-```
-
-A separate bounded diagnostic does not waive the gate. Use a new evidence directory
-and freshly captured identity, never the previous tree snapshot:
-
-```bash
-cd /home/chromie/github/chromie
-set -euo pipefail
-task_proof=.chromie/acceptance/planner-compound-contract-20261004T140758Z/count-scope/source-schema
-task_resume="$task_proof/resume-native-$(date -u +%Y%m%dT%H%M%SZ)"
-mkdir -p "$task_resume"
 python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
-python scripts/capture_runtime_identity.py --allow-dirty \
-  --runtime-profile .chromie/runtime_profile.json --orchestrator-env .env.runtime \
-  --capability-manifest capabilities/soridormi.json \
-  --compose-override docker-compose.sglang-rtx4090-laptop.yml \
-  --compose-override .chromie/voice-runtime/compose.voice-mujoco.yaml \
-  --compose-override .chromie/acceptance/root-cause-audit-20261004T061558Z/tts-source-proof.private.yaml \
-  --compose-override "$task_proof/agent-proof.private.json" \
-  --output "$task_resume/runtime.before.json"
-task_live_rc=0
-python scripts/general_ability_acceptance.py --mode live-text --keep-going \
-  --assertion-scope full --execute --runtime-identity "$task_resume/runtime.before.json" \
-  --evidence-dir "$task_resume/live" --soridormi-repo /home/chromie/github/soridormi \
-  || task_live_rc=$?
-./scripts/collect_debug_bundle.sh
-test "$task_live_rc" -eq 0
 ```
 
-## Historical evidence and first-delivery patch preservation
+Next evidence is narrow supervised current-revision voice proof, then default target
+closure. New native diagnostic runs need a fresh identity/evidence directory and a
+full directory-discovered cohort; do not reuse or overwrite this root. Bind one source
+and runtime, judge every case, collect exactly one bundle after the aggregate, then
+select a fix. Prior/native automatic scores cannot authorize model promotion.
 
-Earlier roots, retained for causality and original bytes:
+## Earlier evidence retained, not current resume commands
 
-- `.chromie/acceptance/project-audit-20261004T011454Z/`:initial design/document
-  audit, dirty36-path backup, Attention two-call and SC-silence probes.
-- `.chromie/acceptance/audit-repair-20261004T014950Z/`:text admission chronology,
-  actual State/Runtime regressions and Level A fixture repairs; dirty55-path backup.
-- `.chromie/acceptance/root-cause-audit-20261004T061558Z/`:TTS OOM/encoder proof,
-  original blink primary, native17/79 and one bundle
-  `/home/chromie/Downloads/chromie_debug_bundle_20261004_161413.tar.gz`.
-  Focused sadness/no-advice produces PCM877ms after SC commitment; no physical proof.
-- `.chromie/acceptance/contract-fixture-repair-20261004T084054Z/`:original UMI/GA
-  bytes, reversible reference/adaptor/oracle repair, dirty68-path preservation.
-- `.chromie/acceptance/text-model-comparison-20260930/`:historical three-model
-  final matrix9B30/79, Gemma17/79, default4B18/79; incorrect then-user chronology
-  invalidates intrinsic ranking. All237 same-agent reviews and one bundle/cohort
-  are retained. These are superseded source/model runs, not current qualification.
+| Root under `.chromie/acceptance/` | Retained purpose |
+| --- | --- |
+| `project-audit-20261004T011454Z/` | Initial design audit, dirty36-path backup, Attention two-call/SC silence probes. |
+| `audit-repair-20261004T014950Z/` | Text admission chronology and Level A metadata repair, dirty55 backup. |
+| `root-cause-audit-20261004T061558Z/` | Original blink omission, TTS OOM/encoder proof, native17/79; no intrinsic capacity proof. |
+| `contract-fixture-repair-20261004T084054Z/` | Original UMI/GA bytes and reference/adapter/oracle reconciliation, dirty68 backup. |
+| `ga-relationship-contract-20261004T111406Z/` | GA identity/relations and Planner media repair. |
+| `planner-compound-contract-20261004T140758Z/` | Compound/count/source repairs and historical native cohorts; `delivery/` retains first staged snapshot failures, owned patch/path inventory and count test recovery. |
+| `sc-language-policy-20261004T125029Z/` | Rejected language trials4/8,4/8,3/8; original SC bytes restored. |
+| `non-model-delivery-20261005/` | Prior347 focused pass and historical83 replay failures. |
+| `workflow-contract-audit-20261005/` |6000 strict replay repair, archive/cold restoration, all original inputs/assertions preserved. |
+| `ga-history-fixture-audit-20261005/` |70 current-description type repairs,1500 invariants,100 before/after reference workflows; canonical3968 main pass at0848b07d…. |
+| `text-model-comparison-20260930/` | Historical237-case three-model matrix; incorrect then-user chronology prevents intrinsic ranking. |
 
-Latest combined review manifest in the Planner compound root: `combined-patch-paths.json`,
-`combined-corpus-patch-paths.txt`, `combined-text-patch-paths.txt`,
-`combined-asset-patch-paths.txt`, `patch-manifest-summary.json`.
-That historical inventory includes3093 paths (3012 corpus,76 text,5 retired assets), excluding28
-other changed paths. Reviewed selective staging preserves unrelated hunks in shared
-files. `repair-only.patch` is the already-applied continuation delta against entry
-backups; do not apply again, stage private evidence or blanket-add the workspace.
-Preservation proof and source/corpus hashes remain beside the manifest. Keep all
-ignored artifacts before cross-machine resume; sanitize private payloads before
-external transfer. This owner-authorized delivery updates both Handoff/checkpoint;
-all red gates and target-evidence limits remain open.
-
-The compound root's final `delivery/scope.json` and `delivery/owned-paths.txt`
-record3094 intended paths (3012 corpus,77 text,5 retired assets) and selective
-staging. The parent inventory omitted the owned count-scope regression in
-`tests/test_planner_binding_representation.py`; final staging recovers it.
-`selective-index.patch` removes only unrelated shared hunks from
-the index; it is not a worktree rollback. `owned-delivery.patch` retains the staged
-review artifact. `delivery/snapshot/` is an isolated export of the candidate tree;
-its offline workflow fixtures were copied from local retained files only after
-checking every pinned manifest digest. Direct Git archive restoration initially
-failed with `frozen archive is incomplete`; `snapshot-bootstrap.json` retains that
-failure and the6076 unchanged files copied. This was a failure of that isolated export. The current cold-restore audit above
-passes against the same historical pin; retain both observations rather than claiming
-a current blocker or regenerating expected output.
-
-The full local native proof above includes client/SC/oracle changes formerly excluded. Use
-its exact identities and retained evidence when reproducing it; do not treat a
-checkout of a delivery commit alone as the tested runtime identity. The former
-28 whole-file changes and3 shared-file differences are included in this follow-up;
-verify final status and preserve any subsequently added work before integration.
-
-Delivery snapshot gate: `delivery/canonical.staged.ready.log`, exit1;
-benchmarks160 pass, main84 fail/3843 pass/5 skipped/1018 passing subtests.
-Those totals precede recovery of the count-scope test. Its final isolated rerun
-passes1 test covering9 contrasts (`delivery/count-regression.final.log`);
-production code and fixture inputs did not change after the full gate.
-The83 workflow failure IDs matched the full local-tree run exactly. The additional
-UMI behavior-truth subtest reads the unchanged committed
-`scenarios/user_meaning_interpretation/ambiguous_move_there.json`, which lacks
-required `body_effect_family`; primary DTO failed closed before expected deep
-delegation. The local metadata-only correction is included in this follow-up and
-its focused behavior-truth regression passes. No production failure was established.
-`delivery/canonical-comparison.json` records both ordinary failures and that subtest.
-Policies, test ownership, pinned Ruff/mypy, configuration, docs and benchmarks pass;
-legacy stage is not reached. Final handoff edits are documentation-only and checked
-again after this full gate. Both the delivery and full local native revision remain
-unqualified; do not report either failed gate as passed.
+Earlier detailed operational narrative is recoverable from `0848b07d…` in Git and
+`resume-docs.before/` in the current root. Original ignored evidence and dirty backups
+were not deleted. Earlier hashes, red gates and proof limits remain bound to their own
+revisions; this consolidation does not convert them into current or physical evidence.

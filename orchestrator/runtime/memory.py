@@ -351,6 +351,8 @@ class MemoryEntry:
             "persistence_policy": self.persistence_policy,
             "consent_basis": self.consent_basis,
             "expires_ms": self.expires_ms,
+            "created_ms": self.created_ms,
+            "updated_ms": self.updated_ms,
             "scope": self.scope,
             "kind": self.kind,
             "key": self.key,

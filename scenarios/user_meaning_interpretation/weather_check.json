@@ -19,10 +19,6 @@
           "schema_version": 1,
           "local_ref": "r1",
           "outcome": "tell the user whether it will rain today at their intended location",
-          "bindings": {
-            "date": "today",
-            "question": "rain"
-          },
           "confidence": 0.84,
           "output_mode": "information",
           "continuity_scope": "goal"

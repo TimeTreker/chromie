@@ -752,35 +752,14 @@ class OllamaUserMeaningInterpreter:
             "body_effect_family",
             "continuity_scope",
             "outcome",
-            "bindings",
             "confidence",
             "source_evidence",
         )
         item["properties"] = {name: item["properties"][name] for name in fields}
-        # Semantic bindings are optional because complete meaning remains in outcome,
-        # but when UMI can ground a material semantic fact (place/time/count/relation)
-        # it may expose that typed fact for GA/Planner without choosing HOW.
-        item["required"] = [name for name in fields if name not in {"bindings", "body_effect_family"}]
+        item["required"] = [name for name in fields if name != "body_effect_family"]
         item["properties"]["outcome"]["description"] = (
             "Complete natural-language user request with every material detail, in the source language. "
             "Never a category name, code or underscore-separated identifier."
-        )
-        item["properties"]["bindings"]["description"] = (
-            "Sparse provider-neutral semantic facts that are part of the accepted WHAT. "
-            "Use native JSON values, not semantic descriptor envelopes: entity/recipient/location "
-            "scalars are direct strings; a numeric measurement with its unit must remain "
-            "a value/unit object rather than a formatted string. "
-            "For a pronoun/ellipsis that resolves a previously introduced physical resource, carry "
-            "forward every still-applicable known source fact needed by the current requested effect "
-            "(for example entity, location, distance, quantity, recipient, direction or route). "
-            "Source location (including a relative place or direction such as ahead or "
-            "left of Chromie) and measured distance are separate facts: if both were "
-            "supplied, bind both as source_location and source_distance on the original "
-            "report and any later context-resolved resource request. A range alone does "
-            "not preserve the reported source place. "
-            "Context-derived facts belong here even though source_evidence remains current-turn-only; "
-            "never hide those facts only in outcome/cognitive request prose or fabricate a current-turn "
-            "source span for them."
         )
         item["properties"]["output_mode"]["description"] = (
             "Expected human result type only; the complete request belongs in outcome. "
@@ -971,10 +950,10 @@ class OllamaUserMeaningInterpreter:
             )
         proposals = parsed.get("responsibilities")
         fields = {
-            "local_ref", "outcome", "bindings", "output_mode", "body_effect_family", "continuity_scope",
+            "local_ref", "outcome", "output_mode", "body_effect_family", "continuity_scope",
             "confidence", "source_evidence",
         }
-        required_fields = fields - {"bindings", "body_effect_family"}
+        required_fields = fields - {"body_effect_family"}
         for item in proposals if isinstance(proposals, list) else []:
             if not isinstance(item, dict):
                 continue  # Closed DTO handles malformed objects.

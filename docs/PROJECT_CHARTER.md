@@ -670,9 +670,9 @@ Read the diagram with these boundaries:
 - User Meaning Interpretation owns **provider-neutral contextual Responsibility evidence**:
   complete natural-language meaning with its material details and typed semantic uncertainty.
   GA owns how that meaning relates to supplied Goals; UMI does not author
-  relationship labels, Goal IDs, or execution/provider bindings. UMI may retain sparse
-  semantic bindings such as grounded place, time, quantity, measurement, or ordering when
-  they preserve WHAT without choosing HOW. It may preserve a
+  relationship labels, Goal IDs, bindings, or parameter tables. Grounded place, time,
+  quantity, measurement, ordering and contextual details remain in the complete outcome;
+  Planner extracts and realizes Capability parameters as required by principle 30. UMI may preserve a
   requested human-level modality such as speech, information, an embodied effect, or
   a durable state change when that modality is part of WHAT. Explicit requirements for
   freshness, a new observation, repeated action, or a particular historical result remain

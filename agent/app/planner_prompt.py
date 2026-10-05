@@ -115,11 +115,15 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "binding, select its exact immutable source span as "
     "argument_sources[parameter]={source_start_token_ref,source_end_token_ref} from "
     "the supplied UserTurn source_tokens. Never copy or paraphrase the source wording. "
+    "For parameters grounded in contextual meaning preserved by UMI, use the owning "
+    "Responsibility's outcome_source_tokens with the same span fields plus "
+    "source_responsibility_ref. These spans cite accepted WHAT, not words spoken in the "
+    "current turn. UMI authors no bindings. Planner alone extracts and realizes parameters. "
     "Trusted code materializes the span into canonical source_quote and Goal provenance; "
     "you remain responsible for correct mapping, conversion and coverage. "
     "Existing typed Responsibility and Goal constraints remain binding and cannot be "
     "overridden by a Planner HOW choice or a quote. "
-    "A typed Responsibility binding may come from earlier conversational context. "
+    "A retained canonical Responsibility binding may come from earlier context. "
     "Realize that binding into the declared Capability argument, but never cite "
     "current UserTurn tokens as its source. Binding-grounded arguments do not "
     "need argument_sources. When a physical resource source_distance binding is a "
@@ -898,7 +902,11 @@ def fast_advance_layered_prompt(
         "Planning or satisfaction is prospective, never proof of execution or delivery."
     )
     facts = {
-        "responsibilities": [item.model_dump(mode="json", exclude_defaults=True) for item in responsibilities],
+        "responsibilities": [
+            {**item.model_dump(mode="json", exclude_defaults=True),
+             "outcome_source_tokens": user_turn_source_tokens(item.outcome)}
+            for item in responsibilities
+        ],
         "meaning_uncertainties": [
             item.model_dump(mode="json") for item in request.meaning_uncertainties
         ],

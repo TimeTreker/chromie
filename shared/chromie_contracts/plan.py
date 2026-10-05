@@ -335,6 +335,16 @@ class FastPlannerProgressAct(_FastPlannerCommunicativeActBase):
         return normalized
 
 
+class FastPlannerResponsibilityArgumentSource(UserTurnSourceSpan):
+    """Planner-selected span in an immutable accepted Responsibility outcome.
+
+    This cites complete WHAT, including resolved dialogue context. It grants no
+    UMI parameter authority and never presents context as current-turn speech.
+    """
+
+    source_responsibility_ref: str = Field(min_length=1, max_length=80)
+
+
 class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     """One Fast-Planner-authored executable Activity over Responsibility evidence."""
 
@@ -343,11 +353,13 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     role: Literal["capability"]
     activity_id: str = Field(min_length=1, max_length=160)
     args: dict[str, Any] = Field(default_factory=dict)
-    argument_sources: dict[str, UserTurnSourceSpan] = Field(
+    argument_sources: dict[str, UserTurnSourceSpan | FastPlannerResponsibilityArgumentSource] = Field(
         default_factory=dict,
         description=(
             "For each argument actually realized from the current user turn, cite the "
-            "closed UserTurnEnvelope token span that grounds it. Planner owns the mapping "
+            "closed UserTurnEnvelope token span that grounds it. For contextual meaning, "
+            "cite an owning accepted outcome span with source_responsibility_ref. "
+            "Planner owns the mapping "
             "and conversion; trusted code materializes the exact source surface. Never "
             "retype or paraphrase source text. Omit provenance entries for provider "
             "defaults, Planner-owned HOW choices and trusted Runtime target references. "

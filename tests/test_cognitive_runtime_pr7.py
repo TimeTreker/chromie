@@ -1184,8 +1184,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             responsibilities=[
                 {
                     "local_ref": "weather",
-                    "outcome": "Check Neixiang weather.",
-                    "bindings": {"location": "内乡", "date": "today"},
+                    "outcome": "Check today's Neixiang (内乡) weather.",
                     "confidence": 0.98,
                 }
             ],
@@ -1801,8 +1800,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             responsibilities=[
                 {
                     "local_ref": "weather",
-                    "outcome": "Check Chongqing weather today.",
-                    "bindings": {"location": "重庆", "date": "today"},
+                    "outcome": "Check Chongqing (重庆) weather today.",
                     "confidence": 0.97,
                 }
             ],
@@ -1917,8 +1915,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 responsibilities=[
                     {
                         "local_ref": "weather",
-                        "outcome": "Check Chongqing weather today.",
-                        "bindings": {"location": "重庆", "date": "today"},
+                        "outcome": "Check Chongqing (重庆) weather today.",
                         "confidence": 0.97,
                     }
                 ],
@@ -2084,8 +2081,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             responsibilities=[
                 {
                     "local_ref": "weather",
-                    "outcome": "Check the corrected weather scope.",
-                    "bindings": {"location": "内乡", "date": "today"},
+                    "outcome": "Check today's corrected weather scope, Neixiang (内乡).",
                     "confidence": 0.98,
                 }
             ],
@@ -2257,8 +2253,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             responsibilities=[
                 {
                     "local_ref": "weather",
-                    "outcome": "Check Chongqing weather today.",
-                    "bindings": {"location": "重庆", "date": "today"},
+                    "outcome": "Check Chongqing (重庆) weather today.",
                     "confidence": 0.98,
                 }
             ],
@@ -2584,7 +2579,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 {
                     "local_ref": "restaurant",
                     "outcome": "recommend good nearby restaurants",
-                    "bindings": {"proximity": "nearby"},
                     "confidence": 0.95,
                 }
             ],
@@ -3941,7 +3935,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     "local_ref": "r1",
                     "outcome": "blink twice",
                     "output_mode": "body_action",
-                    "bindings": {"count": 2},
                     "confidence": 0.97,
                 },
                 {
@@ -5249,7 +5242,7 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
         coordinator = GoalDrivenRuntimeCoordinator(agent_client=client, adapter=CanonicalPlanRuntimeAdapter(runtime),
             policy=CognitiveRuntimePolicy(mode="apply"))
         core, envelope = admitted_core("查询重庆天气", sid="early-read", language="zh-CN", responsibilities=[{
-            "local_ref": "weather", "outcome": "查询重庆天气", "bindings": {"location": "重庆", "date": "today"}, "confidence": 0.99}])
+            "local_ref": "weather", "outcome": "查询重庆今天的天气", "confidence": 0.99}])
         result = await asyncio.wait_for(coordinator.resolve(object(), text="查询重庆天气", sid="early-read",
             core_interpretation=core, turn_envelope=envelope, context={"history": []}, history=[], language="zh-CN"), 2)
         self.assertEqual(result.status, "applied", (result.fallback_reason, result.metadata))

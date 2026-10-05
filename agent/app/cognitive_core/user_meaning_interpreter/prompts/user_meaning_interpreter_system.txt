@@ -95,26 +95,14 @@ route), even when those facts were established in bounded prior dialogue rather 
 in the current utterance. If the current request asks to acquire, carry, move or deliver a
 context-resolved physical resource whose source/location/distance is already known in bounded
 semantic context, those still-applicable source facts are part of the current WHAT and MUST be
-present in this Responsibility's bindings. Mentioning them only in a cognitive_requests
-reason_summary or silently relying on Planner to recover them is incomplete UMI output.
-For a physical resource, a relative source place or direction (ahead, behind, left,
-right, on a named surface) is `source_location`; a measured range is
-`source_distance` with its value and unit. They are independent facts: the range
-does not tell Planner which direction or place the resource was reported at.
-Preserve both when bounded dialogue supplies both, including on the original
-report and on a later pronoun request. A user report still is not Chromie's
-perception Evidence.
-Context-derived bindings remain context-derived: source_evidence still cites only the current
-turn and must never be widened or fabricated to pretend the older location/distance words were
-spoken again. Use provider-neutral semantic binding names consistently: `entity` for the referred item and `recipient` for the intended person; do not switch those same meanings to
-ad-hoc `object` or `destination` keys. Use bindings sparsely for semantic facts that are
-explicitly/contextually grounded and useful to preserve exactly (for example location, time,
-count, measurement, before/after or parallel relations). Use native JSON values directly:
-a primitive count is `count: 6`, not a mini-schema such as
-`count: {"value": 6, "type": "integer"}`. Likewise, a scalar person/object binding is
-`recipient: "user"` or `entity: "bottle of milk"`, never a descriptor envelope containing
-`name`, `entity_type`, `confidence`, and `value`. Keep an object only when its structure is
-itself semantic, such as a measured value together with its unit. Never put provider arguments, defaults or execution realization there.
+present in this Responsibility's complete outcome. Mentioning them only in a cognitive_requests
+reason_summary is incomplete UMI output. Preserve the reported source place/direction and measured
+range together when both are supplied. A user report is not Chromie's perception Evidence.
+Context-derived meaning remains context-derived: source_evidence still cites only the current
+turn and must never be widened or fabricated to pretend older location/distance words were
+spoken again. Do not author `bindings` or another structured fact/parameter table. Keep quantities,
+units, durations, directions, order and concurrency in the complete natural-language outcome.
+Planner extracts and realizes parameters under the selected Capability contract.
 The source_evidence span must cover every current-turn material clause that
 determines what, where, which, whom or under what condition the Responsibility means;
 never cite only the final command/question clause when earlier current-turn material is

@@ -1181,7 +1181,7 @@ async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
         policy=CognitiveRuntimePolicy(mode="apply"), goal_state_apply=lambda *args, **kwargs: [],
         social_task_tracker=sessions.track_social_task)
     core, envelope = admitted_core("眨一次眼", sid=sid, language="zh-CN", responsibilities=[{
-        "local_ref": "r1", "outcome": "Blink once", "bindings": {"count": 1}, "output_mode": "body_action", "confidence": 1,
+        "local_ref": "r1", "outcome": "Blink once", "output_mode": "body_action", "confidence": 1,
     }])
     try:
         result = await asyncio.wait_for(coordinator.resolve(None, text="眨一次眼", sid=sid,

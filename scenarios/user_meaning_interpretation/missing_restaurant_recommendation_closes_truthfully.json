@@ -24,9 +24,6 @@
           "schema_version": 1,
           "local_ref": "r1",
           "outcome": "recommend good nearby places for the user to eat",
-          "bindings": {
-            "proximity": "nearby"
-          },
           "confidence": 0.93,
           "output_mode": "information",
           "continuity_scope": "goal"

@@ -1,206 +1,86 @@
 # Chromie Development Checkpoint
 
-## Current resume point — 2026-10-05
+## Current resume point — UMI/Planner and historical Memory contracts
 
-Pre-delivery base `main` / `3feff0b56f7fa21459b385768701bc7f47dddbfc` matches
-fetched `origin/main`. The previous non-model delivery is already pushed. The
-owner requested remaining non-model defects to be repaired, committed and pushed.
-Expected resume revision: latest `main` commit containing this checkpoint and
-[Handoff](HANDOFF.md).
-Canonical local verification now passes. Current-revision voice proof and default
-target-evidence closure remain open. Production cognition, prompts, model, Charter
-and module responsibilities were not changed. Do not resume from historical red
-workflow captures or superseded iteration budgets.
+Pre-delivery base `main` / `0848b07d14886a0238ca71ceae3aa65fd0bcd103` matches
+fetched `origin/main`; upstream was checked before source edits and again after the
+native cohort. Expected resume revision is the latest `main` commit containing this
+checkpoint and [Handoff](HANDOFF.md). The owner authorized non-model repairs, commit
+and push, and explicitly forbids UMI-authored `bindings`.
 
-The current focus remains Goal-driven single-authority architecture. The active
-delivery line remains canonical local verification → narrow
-current-revision voice proof → default target-evidence closure within the
-[Roadmap migration](ROADMAP.md#social-cognition-migration). The local gate is closed
-for the current tested tree; the voice and target gates remain open.
-No new feature line, architecture layer, runtime flag, model promotion or Charter
-amendment is authorized by this audit.
-
-The owner confirmed existing responsibilities: UMI retains complete WHAT and
-decides initial Planner activation; GA authors Goal relationships; Planner chooses
-Capabilities and HOW; SC authors ordinary communication; Host validates and
-commits without repairing semantic decisions. Do not move an omission to another
-module or add a second semantic model call.
+The current focus remains Goal-driven single-authority architecture.
+The active delivery line remains canonical local verification → current-revision
+voice proof → default target-evidence closure. Local verification passes; voice and
+target closure remain open. No new feature line, semantic owner, Memory store,
+runtime switch or model/profile change is introduced.
 
 ## Implemented at existing owners
 
-- GA primary Schema/DTO/prompt restores identity-only `new_goals` rows containing
-  explicit source, related and superseded ID arrays. The incomplete
-  unassociated-ref-only API and dead WHAT decoder branches are removed. Host
-  inherits UMI WHAT and copies GA links unchanged; unknown, missing, duplicated,
-  contradictory or terminal-replacement identities fail closed.
-- GA no longer demands a pre-extracted media operation. Planner context retains
-  known operations and carries unresolved HOW as existing `none`; its primary
-  result may select one available declared media Capability. Known operation
-  restrictions, unavailable-provider refusal, evidence and scope validation remain.
-  No operation is inferred by GA or Host, and vocal/speech cannot replace media.
-- Planner body catalogs retain executable body Activities across domain labels.
-  Removed streaming and shared Fast/Deep guards requiring mixed-domain requested
-  effects to have separate upstream Responsibilities/Goals. One complete WHAT may
-  produce multiple sequential Activities; source, arguments, mode, availability,
-  resource and SC auxiliary-field checks remain. No optional SC expression authority
-  is transferred. Owner explicitly approved this existing-Charter realization.
-- Planner validates repetition in the complete owned Work's declared count slots,
-  rather than applying one Responsibility count to every Activity. Siblings keep
-  their own provider parameter formats/defaults or source-grounded independent
-  counts; duration or another Goal cannot witness repetition. Fast/shared/Deep
-  production paths and Schema preserve existing safety and provenance checks.
-- Fast primary Schema now projects the actual immutable UserTurn and checks the
-  selected required enum value. A translated value needs its existing source span;
-  literal copies still use the Host's exact two-surface exception. No new DTO
-  field, second model call or downstream repair; Host contract is unchanged.
-- Earlier text admission repair records the admitted user before concurrent SC
-  delivery and enriches the same turn once. Accepted-water Work still fails.
-- UMI serving bounds structural JSON whitespace at16 characters through the
-  existing XGrammar option, preserving semantic strings and the complete primary
-  Schema. SC projects exact duplicate snapshots once; divergent/unique facts and
-  trusted request/digest remain. Weather geocoding locale follows admitted names
-  and qualifiers, independently of reply language; identity checks remain strict.
-- Acceptance forwards the existing provider-start interruption controls, requires
-  cancelled walking Evidence, strengthens clarification/draft act checks and
-  keeps geographic identity as a blocking semantic review. Ambiguous movement's
-  fixture receives required body metadata. Previously withdrawn Tianxin deletion
-  and79-case inventory are now included. No model, prompt or authority repair.
-- CosyVoice releases the reference-only ONNX encoder after all registered native
-  voice conditionings are cached, before readiness. Isolated resource proof frees
-  about1.1GB; originating sadness/no-advice now delivers PCM. No concurrency,
-  playback-timeout, model, voice asset or cognition change.
-- Qualification adapters capture actual production primary Schemas. Stale UMI/GA
-  references and current body metadata, retired identity Planner assertions,
-  detached-dispatch fake tracking and the withdrawn Tianxin duplicate were
-  reconciled at their owners. Inputs, complete meanings, counts, provenance,
-  relation choices, oracles and split membership are preserved in retained proofs.
-- Offline workflow references now match current contracts: required live UMI body
-  classification is authored from the original scenario parameters; retired empty
-  GA fields are removed; exact production requests are recaptured. All6000 source
-  probes, meanings, relationship choices, Planner parameters, provider/fault/terminal
-  assertions, prior Goals and splits remain. Strict replay and production validators
-  are unchanged. The complete freeze is retained in one checksum-pinned1.2MB
-  archive, with shallow/cold restoration guards at the existing benchmark owner.
-- Current status/resume documents are consolidated; retired diagram and
-  Planner-speaking/presentation descriptions are removed. No maintained document,
-  environment variable or architectural owner was added.
-- Historical-description fixture inputs now use speech instead of copying the
-  prior task's body/state/media/information result type.70 cases (35 per language)
-  change only current `output_mode` and matching hidden target-map value; all1500
-  material comparisons preserve complete meanings, provenance, prior Goals, raw
-  GA identity decisions, contrasts and splits. All100 before/after Host projections
-  conserve the supplied WHAT in one reference call; the offline corpus validator
-  now rejects the four copied types before GA. No production authority is changed.
-
-Charter, UMI prompt/DTO, model and initial activation ownership are unchanged.
-Two SC language-policy candidates were rejected (4/8 baseline,4/8 system-policy,
-3/8 output-contract-footer). Exact pre-experiment SC bytes, including inherited
-changes, are restored. No runtime translator, semantic repair or model substitution.
+- UMI keeps complete natural WHAT, current-turn provenance, uncertainty and initial
+  cognition requests. Primary/Deep Schema, parser and Decision reject the `bindings`
+  key, including empty objects. Core rejects nonempty bindings; the shared DTO's
+  empty default and read-only retained canonical Goal projections remain internal.
+  Earlier Charter prose allowing sparse UMI bindings is removed to follow existing
+  principle30. The principle and module responsibilities are unchanged.
+- Planner alone extracts Capability parameters. Fast arguments may cite current-turn
+  tokens or exact owning accepted outcome tokens with `source_responsibility_ref`.
+  Host materializes the selected quote and binds it only to that Responsibility's
+  GA Goal; it cannot infer missing meaning, borrow a sibling or fabricate a source.
+  Provider-owned source resolution accepts cited reported search clues, while bare
+  unresolved source cannot claim a citation. Retained typed constraints remain binding.
+- Historical object/location Memory remains Planner context outside current sight.
+  Both prompt-entry and cognitive projections retain existing creation/update times
+  and source references. A past living-room water delivery suggests where to search;
+  it does not prove current presence. This is a controlled projection regression,
+  not proof of automatic action persistence, an executed search or actual acquisition.
+- Stale UMI scenario/fixture outputs and the template are reconciled without dropping
+  material meaning. All6000 workflow records and5 prototypes are request-only
+  recaptured: inputs, raw reference decisions, complete meaning, parameters, prior
+  Goals, faults, provider outcomes, assertions and splits remain unchanged. Strict
+  replay and oracles are not weakened. The complete archive is freeze revision16.
+- Superseded checkpoint/handoff narratives and resume commands are consolidated here
+  and in Handoff. Historical evidence remains retained and recoverable from Git.
+  No maintained document, environment variable or architectural owner is added.
 
 ## Current evidence ceiling
 
+Evidence root: `.chromie/acceptance/umi-no-bindings-20261005/`.
+
 | Axis | Observed result |
 | --- | --- |
-| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Follow-up includes serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Historical-restatement inputs are repaired in70 fixture/target pairs, with full1500 validation and unchanged GA semantics. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
-| Automatic verification | Current workflow strict aggregate6000/6000 pass:1400 complete workflows,1800 state cases,2500 expected rejections,300 safe nonexecuting rejections; zero inference, source fixed. Focused120 pass. Canonical benchmarks169 pass, main3968 pass/5 environment skips/1023 passing subtests,20 legacy Agent tests pass; policy/ownership/pinned static/configuration/docs stages pass. Former83 workflow failures are closed. Previous model-role/ability proofs remain historical and bounded. |
-| Target validation | Latest immutable full79 live-text/simulator run:20 automatic pass/59 fail; same-agent review6 bounded pass/12 partial/59 fail/2 insufficient evidence. All79 attempted/zero skipped; blocked dependent turns leave cohort/qualification incomplete. Compound walk10/.2→nod2→left-turn1 and Chinese walk3→right-turn1 have completed simulator observations; Chinese wording still English. No independent, current voice, physical/audible or default-target qualification. |
-| Deployment state | Production Agent bytes are unchanged from489bd639…. Last retained native Agent image124a02f6… / packaged-host source93b58310… and healthy/restart0 observation remain bound to that native cohort. This corpus repair performs no service rebuild/restart, model/profile/prompt change, promotion, release or fresh native revision qualification. TTS dependency rebuild remains unqualified. |
+| Implementation | UMI binding authority conflict, Fast source/contextual provenance restriction and Memory timestamp projection loss are repaired at existing owners. Model, initial activation ownership and GA/SC/Host boundaries remain. Other conformance findings remain open. |
+| Automatic verification | Frozen bilingual20 before8/20 → final20/20 Schema/Host; exact production wire/pinned native decoder20/20 without inference. UMI1496/Fast204 references valid. Focused215+84 tests pass. Level A19/19 across3 relevant classes. Strict6000/6000 replay passes with zero candidate calls; request-only6000+5 invariants hold. Canonical169 benchmarks,3981 main tests/5 environment skips/1023 subtests and20 legacy Agent tests pass; policy, ownership, pinned static, configuration and docs pass. |
+| Target validation | Unchanged baseline79:22 automatic pass/57 fail, same-agent review6 pass/10 partial/61 fail/2 insufficient. Changed-source full79:13 automatic pass/66 fail, review5 pass/7 partial/67 fail. All cases attempted, zero skipped; blocked later turns make cohort/qualification incomplete. Overall behavior improvement is not established.86 native UMI primary outputs contain zero binding keys, but activation/meaning omissions remain. No independent, current voice, physical/audible or default-target qualification. |
+| Deployment state | Agent-only source imagebc6577e4… retains original dependency layers; packaged/host source8140dcc3… matches before/after. Model/profile/environment unchanged. Native source/tree and service identities fixed for each aggregate. One pre-cohort grammar probe caused LLM OOM/automatic recovery; the changed-source cohort uses its recovered identity, with no further restart. No promotion/release; TTS dependency rebuild remains unqualified. |
 
-Each complete iteration retained exactly one post-cohort bundle. Latest GA82 primary
-calls have empty cognition-request arrays; GA/Host did not supply missing initial
-Planner activation. Observed output omissions, incorrect choices and SC failures
-are not intrinsic model-capacity proofs. Same-model success on later packets does
-not isolate causation; immutable inputs/context and source identities remain bound
-to their own runs. Original compound count failure and Chinese source-Schema failure
-were reconstructed at the earliest program boundary before their respective edits.
-
-Latest compound/count/source evidence root:
-`.chromie/acceptance/planner-compound-contract-20261004T140758Z/`;
-latest revision in `count-scope/source-schema/`.
-Previous GA/media native baseline:
-`.chromie/acceptance/ga-relationship-contract-20261004T111406Z/`.
-SC experiment: `.chromie/acceptance/sc-language-policy-20261004T125029Z/`.
-Exact images, source digests, bundles, patch inventory and commands are in Handoff.
-
-The first delivery `b693467ca…` had3094 paths:3012 corpus/reference paths,77 text
-paths and5 retired diagram assets. It excluded28 whole-file changes and3 shared
-differences now reviewed and included in this follow-up. Its isolated snapshot gate
-was84 fail/3843 pass/5 skips/1018 passing subtests, recorded in the compound root's
-`delivery/`. The parent3093-path inventory had omitted the owned count regression
-in `tests/test_planner_binding_representation.py`; it was recovered before that
-commit and passed separately (1 test covering9 contrasts). Current full-suite
-totals above include that test. Native results remain bound to their exact runtime
-and source identities, not automatic qualification of a new clean Git checkout.
-The additional first-delivery snapshot subtest was
-`BehaviorTruthSuiteTests.test_all_behavior_scenario_suites` for UMI:
-then-excluded `ambiguous_move_there.json` omitted required `body_effect_family`, so
-the primary DTO rejected it before expected deep delegation. This follow-up includes
-the metadata-only fixture repair; its behavior-truth regression passes. No production
-or intrinsic-model failure was established; UMI and Host are unchanged.
-
-Latest workflow repair evidence:
-`.chromie/acceptance/workflow-contract-audit-20261005/`.
-`baseline/summary.json`:6000 first-UMI mismatches, no inference. The reviewed
-current-contract corpus retains all original probes and assertions;
-`invariant-review.final.json` compares6000 cases plus5 prototypes, including
-unchanged historical Goals. `strict-full/summary.json`:all6000 pass, source fixed,
-zero candidate calls. `adjudication.json` records all60 families and evidence limits.
-`focused.final.log`:120 pass; `canonical.log`:benchmarks164 pass, main3968 pass/
-5 skips/1023 subtests,20 legacy tests. The gate is green, not native-model qualification.
-`cold-final.json`:6050 exact files restored and0 on reuse; the1,244,372-byte
-`frozen.tar.xz` is retained in Git with case/part/archive/inner-manifest hashes.
-Original freeze and failed authoring iterations are retained. The first post-capture
-representative run failed5 prior-Goal cases because unnecessary author metadata
-was published with requests captured from the original seed; that metadata was
-removed, without changing replay or production, before focused/full reruns.
-
-Previous347-test non-model delivery, Level A19/19 and native grammar checks remain
-at `.chromie/acceptance/non-model-delivery-20261005/`. Its83-failure gate is historical.
-This repair changes benchmark references/restoration only; production Agent source
-remains the previously matched93b58310… bytes. No service/model/prompt/Charter/authority
-change, native inference, fresh native cohort, audio or robot proof was performed.
-
-Latest historical-description fixture evidence:
-`.chromie/acceptance/ga-history-fixture-audit-20261005/`.
-`baseline.json` mechanically validated1500 despite70 wrong current result types;
-`diagnosis.json` separates authoring defects from model inference. Original data
-and the exact two-field/all1500 comparison are retained in `cases.before.json`,
-`dataset.before.json` and `migration-ledger.json`. `history-workflows.json` retains
-all100 before/after primary reference packets and actual Host results: raw GA
-outputs and Schemas unchanged; current types are inherited without reinterpretation.
-`after.json`:1500 valid,1300 accepted/200 preserved fail-closed negatives.
-`focused.before.log`:1 fail/4 pass; `focused.after.log`:22 pass.
-`canonical.log`, exit0:benchmarks169 pass, main3968 pass/5 environment skips/1023
-passing subtests,20 legacy Agent tests pass; pinned static, policy/ownership,
-configuration/runtime and docs checks pass. Final policy/ownership/docs rechecks
-pass in `policies.final.log`, `ownership.final.log` and `docs.final.log`.
-The previous50 count omitted20 information cases. No native, independent semantic,
-production UMI correction, voice or physical proof was performed.
+The raw milk result now retains ahead/about50meters but requests GA only; Planner
+and resource provider are not invoked. Controlled complete-WHAT references prove
+only the downstream program repair. Native walk3s/right-turn2s completes in simulation,
+but Planner falsely cites the walk's three-second phrase for its turn duration2s;
+semantic provenance review therefore fails despite the automatic pass. Valid source
+coordinates do not prove correct parameter mapping. Raw omissions or incorrect choices
+are not proof of an intrinsic model-capacity limit and were not tuned or repaired downstream.
 
 ## Next work and blockers
 
-1. Preserve the reviewed workflow freeze and passing local gate. Strict replay must
-   keep rejecting changed requests/caches and uncovered candidate branches. On an
-   existing checkout, preserve the previous ignored case/packet cache before removing
-   it and restoring the new freeze; never regenerate expected answers from current
-   outputs. Next active delivery step is narrow current-revision voice proof, then
-   default target-evidence closure; automated text/simulator evidence does not replace it.
-2. Keep the completed bounded compound/count/source repairs and their exact native
-   packets; broader qualification remains open. Latest full79 review is retained,
-   not pending. Do not treat source IDs or a same-Goal numeric witness as proof of
-   semantic action assignment. Current direct-stop case has planned-only Work with
-   unrequested idle, so current native stop proof remains unestablished.
-3. Qualify UMI activation/result-type and accepted-offer continuity using exact
-   primary packets. GA/Host must not fill omissions. Historical-restatement fixture
-   types are repaired at their author; GA still cannot reinterpret accepted WHAT.
-4. Review existing binding-authority, Attention second-call, SC silence/provenance,
-   context/latency, geographic/provider scene and Goal/effect coverage gaps.
-   Chinese-language SC input is intact; rejected prompt trials do not isolate
-   intrinsic ability versus context/profile reliability.
-5. Retain the canonical gate, then retain narrow current-revision voice and
-   default target evidence. Physical microphone/speaker/robot proof remains
-   supervised; mock acquisition/handover and discarded TTS are not that evidence.
+1. Preserve the green canonical gate and exact workflow freeze. Next delivery evidence
+   is narrow current-revision voice proof, then default target closure. Physical
+   microphone/speaker/robot evidence remains supervised; text, discarded TTS and mock
+   acquisition/handover do not replace it.
+2. Preserve all79 before/after primary packets and adjudications. Do not claim a native
+   semantic pass, motion/stop proof for unexecuted cases, or a behavioral improvement.
+   UMI activation/result-type, accepted-offer continuity and genuine uncertainty remain
+   unqualified; GA/Host cannot fill omissions. The owner excludes model-ability tuning.
+3. Review retained Attention same-authority second-call and SC fresh-turn silence/
+   provenance findings under the current Issue and existing Charter. They are not
+   fixed by this patch. Broad/compound exact-Goal-count oracles and historical-memory
+   search-to-execution coverage also need qualification; they must not dictate a new
+   upstream split or promote historical candidates to current facts.
+4. Resume only from fetched current source; preserve Soridormi's unrelated dirty work,
+   running simulator and ignored evidence. Detailed identities, artifacts, failed
+   iterations and copy-ready checks are in Handoff. No new architecture or authority
+   amendment is authorized by this delivery.
 
-Historical evidence and original dirty bytes remain at the roots listed in
-Handoff and the audit. Superseded gate counts/model comparisons are historical;
-none qualify this working revision or authorize Charter changes.
+Earlier delivery mechanisms and evidence are summarized in Handoff and
+[the audit](ARCHITECTURE_AUDIT.md). Their older green/red totals and service identities
+remain historical, not current qualification or commands to deploy retired images.

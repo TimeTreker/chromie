@@ -23,16 +23,15 @@ def test_user_meaning_interpreter_preserves_same_turn_material_context() -> None
     assert "object/resource" in prompt
     assert "source/location" in prompt
     assert "recipient/target" in prompt
-    assert "use bindings sparsely for semantic facts" in prompt
-    assert "never put provider arguments, defaults or execution realization" in prompt
+    assert "keep material semantic facts in the complete outcome" in prompt
+    assert "do not author `bindings`" in prompt
 
 
-def test_user_meaning_interpreter_uses_native_json_binding_values() -> None:
+def test_user_meaning_interpreter_keeps_material_values_in_complete_meaning() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 
-    assert "a primitive count is `count: 6`" in prompt
-    assert "not a mini-schema" in prompt
-    assert "measured value together with its unit" in prompt
+    assert "units, durations, directions, order and concurrency" in prompt
+    assert "planner extracts and realizes parameters" in prompt
 
 
 def test_primitive_binding_type_wrapper_is_representation_only() -> None:
@@ -72,7 +71,7 @@ def test_user_meaning_interpreter_source_span_covers_material_clauses_not_only_c
 
 
 
-def test_nested_umi_binding_descriptors_normalize_to_material_values() -> None:
+def test_retained_responsibility_binding_descriptors_normalize_to_material_values() -> None:
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 
     proposal = CognitiveResponsibilityProposal(
@@ -122,16 +121,14 @@ def test_nested_umi_binding_descriptors_normalize_to_material_values() -> None:
     }
 
 
-def test_user_meaning_interpreter_requires_contextual_resource_source_bindings() -> None:
+def test_user_meaning_interpreter_preserves_contextual_resource_meaning() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 
     assert "those still-applicable source facts are part of the current what and must be" in prompt
-    assert "present in this responsibility's bindings" in prompt
+    assert "present in this responsibility's complete outcome" in prompt
     assert "cognitive_requests" in prompt and "reason_summary" in prompt
     assert "source_evidence still cites only the current" in prompt
     assert "turn and must never be widened or fabricated" in prompt
-    assert 'recipient: "user"' in prompt
-    assert 'entity: "bottle of milk"' in prompt
 
 def test_user_meaning_interpreter_goal_context_is_semantic_without_canonical_identity() -> None:
     from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import (

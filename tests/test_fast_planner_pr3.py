@@ -6873,7 +6873,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertTrue(list(Draft202012Validator(schema).iter_errors(known)))
         unknown = copy.deepcopy(raw)
         unknown["activities"][0]["args"]["source"] = {"status": "unknown"}
-        self.assertTrue(list(Draft202012Validator(schema).iter_errors(unknown)))
+        self.assertEqual(list(Draft202012Validator(schema).iter_errors(unknown)), [])
         planner_fast_validation.validate_fast_advance_output(
             FastPlannerAdvanceModelOutput.model_validate(raw), request=work,
             responsibilities=work.responsibilities, capabilities=[capability],

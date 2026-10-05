@@ -18,10 +18,7 @@
         {
           "schema_version": 1,
           "local_ref": "r1",
-          "outcome": "design a thorough test strategy",
-          "bindings": {
-            "depth": "deep"
-          },
+          "outcome": "design a thorough test strategy with deep thought",
           "confidence": 0.92,
           "output_mode": "information",
           "continuity_scope": "goal"
@@ -49,7 +46,7 @@
     "responsibilities": [
       {
         "local_ref": "r1",
-        "outcome": "design a thorough test strategy",
+        "outcome": "design a thorough test strategy with deep thought",
         "confidence": 0.92,
         "output_mode": "information"
       }

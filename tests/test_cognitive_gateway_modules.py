@@ -410,7 +410,6 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
                 {
                     "local_ref": "r1",
                     "outcome": "provide current reference status",
-                    "bindings": {"subject": "reference status"},
                     "confidence": 0.98,
                 },
                 {
@@ -425,8 +424,8 @@ class CognitiveGatewayModuleTests(unittest.TestCase):
         self.assertEqual(len(interpretation.responsibilities), 2)
         self.assertEqual(interpretation.responsibilities[0].local_ref, "r1")
         self.assertEqual(
-            interpretation.responsibilities[0].bindings,
-            {"subject": "reference status"},
+            interpretation.responsibilities[0].outcome,
+            "provide current reference status",
         )
         dumped = interpretation.model_dump(mode="json")
         self.assertNotIn("capability_id", dumped["responsibilities"][0])

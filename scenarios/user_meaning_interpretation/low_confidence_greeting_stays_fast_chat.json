@@ -22,7 +22,6 @@
           "schema_version": 1,
           "local_ref": "r1",
           "outcome": "respond to the user greeting and wellbeing question",
-          "bindings": {},
           "confidence": 0.72,
           "output_mode": "speech",
           "continuity_scope": "goal"

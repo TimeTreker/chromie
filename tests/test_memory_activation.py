@@ -387,3 +387,28 @@ def test_untrusted_memory_update_cannot_self_promote_into_umi_projection() -> No
         if item.get("key") == "old_location"
     )
     assert entry["cognitive_roles"] == ["ga", "planner"]
+
+
+def test_historical_object_location_reaches_planner_without_current_visibility() -> None:
+    import json
+    from shared.chromie_contracts.memory import role_memory_context
+
+    store = MemoryStore(max_entries=16)
+    remembered = MemoryEntry(
+        scope="session", kind="fact", key="water_location",
+        text="Yesterday Chromie delivered water to the living room; it may have moved since.",
+        created_ms=1_000, updated_ms=1_000,
+        source_turn_ids=["turn-yesterday"], source_sids=["delivery-yesterday"],
+        source_ref_ids=["execution-water-delivery"],
+    )
+    store.add(remembered)
+    entries = store.prompt_entries(limit=3, activation_texts=["Please find some water."])
+    context = {"session_memory": {"active_memory": {"entries": entries}},
+               "perception": {"living_room_visible": False}}
+    planner = json.loads(role_memory_context(context, role="planner").split("\n")[1])
+    assert planner == entries
+    assert planner[0]["text"] == remembered.text
+    assert planner[0]["created_ms"] == 1_000
+    assert planner[0]["source_turn_ids"] == ["turn-yesterday"]
+    assert planner[0]["source_ref_ids"] == ["execution-water-delivery"]
+    assert "water_location" not in role_memory_context(context, role="umi")

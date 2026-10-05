@@ -23,10 +23,6 @@
           "schema_version": 1,
           "local_ref": "r1",
           "outcome": "向前移动十五秒",
-          "bindings": {
-            "direction": "forward",
-            "duration_s": 15
-          },
           "confidence": 0.95,
           "output_mode": "body_action",
           "continuity_scope": "goal"
@@ -35,9 +31,6 @@
           "schema_version": 1,
           "local_ref": "r2",
           "outcome": "在向前移动时眨眼",
-          "bindings": {
-            "timing": "while moving forward"
-          },
           "confidence": 0.95,
           "output_mode": "body_action",
           "continuity_scope": "goal"

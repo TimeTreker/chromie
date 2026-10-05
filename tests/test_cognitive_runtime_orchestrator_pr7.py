@@ -269,7 +269,6 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                     {
                         "local_ref": "weather",
                         "outcome": "Tell whether it is raining in Beijing today.",
-                        "bindings": {"location": "北京", "time": "today"},
                         "confidence": 0.95,
                     }
                 ],

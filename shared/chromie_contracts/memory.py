@@ -158,7 +158,7 @@ def role_memory_context(context: dict[str, Any], *, role: Literal["umi", "ga", "
         "id", "scope", "kind", "key", "text", "confidence", "relation",
         "subject_refs", "source_person_refs", "source_ref_ids", "source_turn_ids",
         "source_sids", "audience_refs", "disclosure_scope", "persistence_policy",
-        "consent_basis", "expires_ms", "memory_tier", "memory_backing",
+        "consent_basis", "expires_ms", "created_ms", "updated_ms", "memory_tier", "memory_backing",
         "cognitive_roles",
     )
     for entry in entries if isinstance(entries, list) else []:

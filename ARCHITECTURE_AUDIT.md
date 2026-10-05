@@ -14,7 +14,8 @@ Goal-driven single-authority architecture 是审计依据；测试通过也不�
 工作区原有 36 个变更路径，已完整备份；测试针对包含这些既有修改的工作区，
 不是干净提交。初次清理的新增修改限于文档和过时图资产，没有更改模型、提示词、
 DTO、运行时或测试断言，也没有提交、推送、重建或重启服务。
-后续原职责修复及新实时证据见下文；章程始终未修改。
+后续原职责修复及新实时证据见下文。最新负责人决定保留原则30：UMI 不编写
+`bindings`；章程较早的相反描述已删除，原则、目标和模块职责未改。
 
 覆盖治理与恢复文档、Gateway/Attention Review、UMI、GA、Fast/Deep Planner、
 SC、Host/Runtime、文本验收工具、基准数据及完整本地测试。
@@ -24,9 +25,9 @@ SC、Host/Runtime、文本验收工具、基准数据及完整本地测试。
 
 | 优先级 / 边界 | 应有契约与实际证据 | 处理及尚缺证据 |
 | --- | --- | --- |
-| P1 / UMI → Planner | 章程原则 30 禁止 UMI author `bindings`，由 Planner 提取规划参数；`CognitiveResponsibilityProposal.bindings` 及 UMI prompt 已要求提取稀疏字段。章程同一文件较早章节又允许这些字段，形成内部冲突。 | 保留并标记现有实现冲突，未修改章程或授权 UMI 参数提取。此前授权问题未解释清楚，负责人随后提出疑问；本次不据此推进职责变更。选择哪种边界仍需清楚的设计决定及验证。 |
+| P1 / UMI → Planner | 章程原则 30 禁止 UMI author `bindings`，由 Planner 提取规划参数；`CognitiveResponsibilityProposal.bindings` 及 UMI prompt 已要求提取稀疏字段。章程同一文件较早章节又允许这些字段，形成内部冲突。 | 负责人明确禁止 UMI 编写 bindings。已移除主/Deep 输出字段并统一 Schema/parser/DTO/Host；完整 WHAT 和来源保留。Planner 从原要求整理参数，未转移语义权威；最新对照与实时证据见末节。 |
 | P1 / Attention Review | 原则 30–31 禁止同一语义权威再次调用模型改判；现有 reviewer 根据问句、问候或名字的 surface cue 触发第二次 `generate`，输出来源为 `attention_review_model_repair`。 | 已用真实 reviewer 和脚本化模型结果复现两次调用。需在原权威中解决完整主结果与不确定性处理，不应由 Host 词表或第二次语义调用修复。未修改行为。 |
-| P1 / UMI Schema → DTO | 动态 Schema 的 `bindings` 允许任意键，DTO 递归拒绝 Planner-owned 字段。 | 现有 `umi-schema-binding-gap.json` 保留此问题。本次不以放宽 DTO 解决；须先确定 UMI 职责，再统一 Schema/DTO/native grammar。 |
+| P1 / UMI Schema → DTO | 动态 Schema 的 `bindings` 允许任意键，DTO 递归拒绝 Planner-owned 字段。 | 历史探针保留；最新修复按负责人决定禁止整个字段，包括空对象。原 WHAT、来源、未决语义及初始激活仍由 UMI 主调用负责。 |
 | P1 / 文本工具 → Conversation State | 生产 admission 在 cognition 前记录用户；文本工具在并行 SC 已交付后才 `record_user_turn`。实际矩阵包出现 assistant/user/assistant/user。 | 已复用生产 `record_accepted_user_turn` 修复；受控回归和新水任务历史证实 user/assistant/user/assistant 且无重复。水任务仍失败，不能声称此修复解决了接受提议后的 Work 理解。 |
 | P1 / GA 关联契约 | Schema 移除了已有 `new_goals` identity-only API，接收代码将历史/替代关系清空；完整媒体意思还被错误要求提前提供操作参数。 | 已在 GA 原契约恢复主结果关系数组、验证与原样传递；GA 和 Planner 各自移除错误的上游媒体参数前置条件。新部署两轮 79 案例已留存，但整体资格未通过。未改变 UMI WHAT/初始激活、Planner HOW、Host 状态职责或 Charter。 |
 | P1 / Planner 复合动作 | Charter 允许一个 Responsibility 保留完整复合意思，由 Planner 分解 Activities。真实主调用的能力过滤却排除点头；Fast/shared validator 还强制混合动作先被 UMI 分成不同 Goal。 | 真实 Schema 与合法参考被拒证明是 Planner 契约缺陷。负责人已授权并实现取消类别排除和强制上游拆分；冻结12对照由9/12变为12/12。全79实时复测及复合动作模拟器完成证据已留存；整体资格未通过，可选社交表达仍归 SC。 |
@@ -139,8 +140,8 @@ SC silence 的条件应在对照输入和明确强制沟通义务下复核，不
 此次也对齐 HLIC、Turn Loop、Goal-driven architecture、API/Gateway、rollout 和
 延迟证据说明中的已确认退休职责；保留历史 canary 名称及原始证据，不将其冒充
 当前 SC 事务。Attention 的二次改判明确标为违规实现，未作为许可。
-章程自身的 binding 冲突明确保留，
-不可将其当作既有实现的自动授权。当前失败基线使交付、目标资格和模型能力排序保持开放。
+初次审计保留章程 binding 冲突；最新负责人决定及修复见末节。
+初次失败基线不能授予越权许可、目标资格或模型能力排名。
 
 
 ## 原职责修复与第二轮实时审计 — 2026-10-04
@@ -894,3 +895,62 @@ docs复核也通过，完整记录在对应的 `.final.log`。
 继续保留 UMI bindings 的 canonical 冲突、Attention 第二次语义修补、SC 沉默
 契约与实时语义覆盖的未关闭状态；此次 fixture 修复并未解决或掩盖它们。
 模型输出遗漏的观察不等于已证实模型内在能力不足，不能靠下游补判绕过。
+
+
+## UMI 参数权威与历史位置记忆 — 2026-10-05
+
+负责人明确决定：UMI 不编写 `bindings`，完整 WHAT 由 UMI 保留，参数由 Planner 整理。
+实现据此恢复原则30；章程较早章节的相反描述已删除，原则和模块职责没有改动。
+修复前完整79实时案例固定源码/服务，自动22通过/57失败；同一代理审查6通过/
+10部分/61失败/2证据不足。不能由整体失败推断模型能力上限。
+
+| 实际流程 / 职责 | 权威输入、实际输出及关联 | 预期、根因和修复 |
+| --- | --- | --- |
+| 原生 milk 案例 UMI / WHAT 与初始激活 | 当前完整“前方约50米的牛奶，拿给我”；实际 outcome 省略位置/距离，仅请求 GA。原始调用及 turn 关联保留在 `llm_calls.baseline.jsonl`、`live-adjudication.baseline.json`。 | 最早可见错误为主结果遗漏；Planner/provider 未调用，不能把这个实际失败归因于下游 source 校验，更未证明模型能力不足。保留该输出问题，不由 GA/Host 补发 Planner。 |
+| 受控合法 UMI / 完整含上下文 WHAT | 中英文完整地点/距离、当前 source span、Planner request；无需 bindings。旧模型 Schema 同时要求提取参数，DTO 允许 sparse binding。 | UMI 只保留完整自然意思。主/Deep Schema、parser、Decision 禁止 bindings key，包括空对象；Core 禁止非空内容。内部共享 DTO 的空默认值不授予 UMI 编写权限。 |
+| 受控 Fast Planner / HOW | “把它拿给我” + 已接受完整“前方50米桌上牛奶”；旧 Schema 强制无提示 provider source，validator 禁止引用非当前 turn 的线索。冻结20对照初始8通过。 | 参数归 Planner。新增既有 argument_sources 的 outcome span 形状，引用所属 Responsibility；原 turn span 不变。Host 只还原原文并绑定 GA identity，非法坐标/所有者拒绝。 |
+| GA / identity，Host / canonical Plan | 完整 WHAT 一份，GA 返回 identity-only new Goal source ref；原文进入 Goal description。 | GA 不重写意义、不补 bindings；上下文参数证据只归该引用的 Goal，未转移 authority。 |
+| Resource provider / 感知执行 | Planner 的 provider_resolved source 可带有来源的用户报告线索。 | 地点、距离是寻找线索，现场感知仍由 provider 确认。受控引用验收不等于现场发现牛奶。 |
+| Memory → prompt entry → Planner role projection | 原记录已有 created/update 时间及执行 source refs，客厅当前不可见；两次投影丢掉时间，原回归 `memory.before.log` 因缺 created_ms 失败。 | 两个既有投影保留原时间；历史位置仍是候选。无新 Memory store、自动行动或当前物体存在声明。UMI 默认不接收这类世界位置事实。 |
+
+```mermaid
+flowchart LR
+    T[当前请求与对话上下文] --> U[UMI 完整 WHAT 与初始请求]
+    U --> P[Planner 整理参数与动作]
+    U --> G[GA Goal 身份与关系]
+    M[带时间与来源的记忆候选] --> P
+    P --> H[Host 验证引用并绑定 Goal]
+    G --> H
+    H --> C[感知与执行 Capability 核实当前环境]
+```
+
+证据根 `.chromie/acceptance/umi-no-bindings-20261005/` 保留原输入/参考及判分。
+程序引用校验不证明模型参数映射语义正确；完整证据分别保留：
+
+| 验证 | 本轮实际结果 |
+| --- | --- |
+| 冻结对照/机械来源 |20/20 Schema/Host；原8/20。精确生产 wire + 固定原生 decoder20/20，隔离/network-none/2GB，无模型推理；跨字段 citation 条件由 Host 执行。 |
+| 相关回归与 references |215+84 tests 通过；UMI1496/Fast204 references 通过，Level A 三类19/19。 |
+| 完整6000与5 prototypes | 仅 recapture 当前请求；所有原始输入、原始决定、意思、参数、历史 Goals、provider/fault、断言与 split 保持。严格6000/6000通过，推理0。 |
+| Canonical gate | benchmarks169/main3981/1023 subtests/legacy20通过，5环境跳过；policy/ownership/固定静态/config/docs通过。 |
+| 变更源码完整79原生案例 | 自动13通过/66失败；逐案审查5通过/7部分/67失败，整体验收不合格。全部尝试、0跳过，但后续 turn 因前序失败未运行。 |
+
+变更版本的86个原生 UMI 主输出没有 bindings key。源码4492路径的固定摘要为
+`cc5de677facde4bc441fa9d141ee477339038b3d847796e046cb0939e5b1b273`；
+Agent package/host 为8140dcc3…，服务/源码在整批前后相同。各轮各保留一个 bundle；
+本轮 `/home/chromie/Downloads/chromie_debug_bundle_20261005_192414.tar.gz`。
+自动22→13、审查通过6→5，不能宣称整体行为改善。模型/配置未改，主输出错误仍未证明能力上限。
+
+| 新原生 episode / module I/O | 边界判定 |
+| --- | --- |
+| milk SID71d2b376：完整请求→UMI 保留 ahead/about50meters，但 GA-only request→GA identity→SC Got it→无 Planner/provider。 | UMI 初始激活漏项仍在；独立受控参数修复不能被称为这个原生 episode 已成功。 |
+| walk/right-turn SIDb26d7667：UMI 完整 WHAT + Planner request→GA一个 Goal→Planner walk3s/right-turn2s→Host引用 t3:t4→Soridormi 两动作完成→SC英文。 | Planner 原始输出错误地把走路“三秒”引用为转身2s的来源。坐标校验通过不证明语义映射正确，自动通过被审查判失败。没有添加 Host 语义词表或二次模型补判。 |
+| Memory：已有历史客厅送水记录 + 当前房间不可见→prompt entry→Planner role context，UMI默认无此世界事实。 | 两次投影保留原时间/source refs；仅受控回归，未证明实际搜索、自动行动记录或取水成功。 |
+
+部署仅替换 Agent 源码且保留旧依赖层。一次在运行 LLM 内的手动 grammar 探针未走完整
+生产 codec，引发 OOM/自动恢复；日志、exit137 和恢复身份保留。此后改为隔离探针，
+固定原生20/20通过；新79整批使用恢复后的固定身份，期间没有重启或改模型/配置。
+完整 Agent 官方构建成功但未部署，避免把未固定依赖带入源比较。没有 release/promotion。
+最终交接文档清理发生在整批结束后，不改变生产字节。无物理麦克风、可闻扬声器、
+相机、抓取或机器人证据。
+Attention 同语义修复和 SC silence 审查仍开放，未由本修复宣称解决。

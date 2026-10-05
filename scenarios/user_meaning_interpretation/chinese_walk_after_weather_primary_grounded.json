@@ -3,7 +3,7 @@
   "id": "chinese_walk_after_weather_primary_grounded",
   "suite": "user_meaning_interpretation",
   "level": "integration",
-  "description": "A Chinese forward-motion request remains semantically grounded even with weather context present: Fast User Meaning Interpretation states the human outcome and material bindings, while Planner authority owns the walking Capability.",
+  "description": "A Chinese forward-motion request remains semantically grounded even with weather context present: Fast User Meaning Interpretation states the human outcome with its material details, while Planner authority owns the walking Capability.",
   "tags": [
     "voice-log",
     "goal-interpretation-contract",

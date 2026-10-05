@@ -199,29 +199,32 @@ resolve execution-local source details, while semantic target choice remains Chr
 
 ## Goal Association ownership
 
-Goal Association decides only whether the current resource Responsibility associates with,
-continues, modifies, clarifies, or otherwise relates to a retained Goal. It does not create a new
-resource interpretation and its live model schema cannot author `new_goals` or a
-`resource_responsibility`. When no retained Goal matches, trusted lifecycle code materializes the
-new Goal mechanically from UMI-owned WHAT/bindings.
+Goal Association owns canonical identity and relationships. Its live primary result names
+new Goal source references or relations to retained Goals; it cannot author new resource
+meaning or a `resource_responsibility`. Host materializes a new Goal by preserving UMI's
+complete WHAT. UMI does not author `bindings` or a structured resource/parameter table.
 
-`SemanticGoal.resource_responsibility`, when present from an authoritative upstream typed contract,
-remains the resource domain's sole persisted structured semantic authority. GA may preserve or
-source-bind changes to that retained structure, but it cannot synthesize resource identity, kind,
-quantity, source, recipient, delivery mode, query scope, or acquisition bindings merely from its
-own interpretation. New Goals produced from today's UMI contract therefore inherit UMI semantic
-bindings directly; Planner consumes those Goal bindings and advertised Capability semantics. A
-future richer UMI resource DTO may populate the same canonical resource structure without changing
-GA's association-only authority. Generic Planner checks may derive transient views but never write
-them back as a second truth. A Goal description is a human-readable summary: it may be checked for
-material contradiction but never
-supplies, overrides, or repairs a typed resource fact. Generic Goal bindings and
-Planner argument views must not be separately model-authored copies of resource
-facts. When an existing consumer needs a flat quantity, source, recipient, or
-other resource parameter view, trusted code constructs a frozen deterministic
-projection from the canonical resource object and retains exact field provenance.
-The projection is absent from every model response schema and has no mutation or
-persistence authority.
+Planner extracts Capability parameters from that complete requirement. For Fast arguments,
+current-turn token spans cite original speech; contextual spans name the owning
+`source_responsibility_ref` and exact accepted outcome tokens. Host materializes the exact
+quote and binds it only to that Responsibility's canonical Goal. It cannot invent facts,
+borrow a sibling's requirement or pretend contextual words were spoken in the current turn.
+Reported location/distance can accompany `source.status=provider_resolved` as search clues;
+provider perception/navigation still resolves and verifies the execution-local source.
+
+Active Memory may supply historical object/location candidates even when the place is
+outside current perception. A retained delivery record can suggest searching the living
+room for water; its original source and time must remain visible. It does not establish
+that water is still there. Planner chooses HOW to search and the perception Capability
+confirms current conditions. Memory activation, perception and execution retain their
+existing owners; UMI is not required to extract environment objects or search parameters.
+
+`SemanticGoal.resource_responsibility`, when supplied by a retained authoritative typed
+contract, remains that resource domain's persisted semantic authority. GA can preserve or
+source-bind validated changes to that retained structure without synthesizing resource
+identity, source or parameters. Planner must preserve its constraints. Deterministic
+read-only projections retain exact field provenance and are never accepted back as
+model-authored copies. A description cannot override a contradictory typed retained fact.
 
 Resource source bindings live inside the canonical `ResourceSource.bindings`
 object. Information query-scope attributes live inside the canonical resource
@@ -229,7 +232,7 @@ descriptor rather than masquerading as source evidence. Any temporary adapter fo
 an older consumer is output-only, mechanically derived, and removed with that
 consumer; it is never accepted back as semantic input.
 
-At the Goal Association model boundary, a physical object's complete identity is
+In the retained typed resource contract, a physical object's complete identity is
 written in `resource.description` and its normalized count in `quantity`;
 physical `resource.attributes` is closed. This makes acquisition location,
 distance, direction, and route structurally writable only in `source.bindings`,
@@ -240,7 +243,8 @@ other provider-neutral query scope.
 `source.description` is a human-readable summary rather than typed source truth.
 Consequently, `source.status=known` requires at least one typed `source.bindings`
 entry. `unknown` carries neither description nor bindings, while
-`provider_resolved` delegates source selection without inventing a known source.
+`provider_resolved` delegates execution-local source resolution and may retain grounded
+reported search clues without claiming a current observation.
 Canonical validation also rejects an identical typed `(entity_type, value)` fact
 when it appears under both `resource.attributes` and `source.bindings`, even if
 the model gives the two copies different names. Normalized measurement aliases

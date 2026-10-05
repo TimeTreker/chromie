@@ -26,9 +26,11 @@ inference or independent semantic review.
 
 UMI preserves complete contextual WHAT, requested result type, uncertainty and
 exact current-turn source evidence. Planner owns parameter extraction, Capability
-selection and Work; SC owns wording. The live `bindings` surface conflicts with
-Charter principle 30 and is an open design/source finding in the
-[project audit](../../../ARCHITECTURE_AUDIT.md), not an approved dataset extension.
+selection and Work; SC owns wording. Live UMI output forbids `bindings`, including
+an empty object; complete natural-language WHAT retains every material detail.
+The former conflict is repaired under principle 30 at the Schema/DTO/Host boundary;
+retained canonical Goal bindings remain read-only context. Native meaning and
+activation coverage still require qualification.
 
 ## Validation and migration
 

@@ -28,7 +28,7 @@ _UMI_BINDING_ENVELOPE_KEYS = _UMI_BINDING_PROVENANCE_KEYS | frozenset({
 
 
 def _matches_json_primitive_type(value: Any, declared_type: Any) -> bool:
-    """Recognize representation-only JSON type annotations on UMI binding values."""
+    """Recognize representation-only JSON type annotations on retained binding values."""
 
     kind = str(declared_type or "").strip().casefold()
     if kind == "integer":
@@ -49,9 +49,9 @@ def _matches_json_primitive_type(value: Any, declared_type: Any) -> bool:
 
 
 def responsibility_binding_material_value(value: Any) -> Any:
-    """Return the semantic value of one UMI binding.
+    """Return the semantic value of one retained Responsibility binding.
 
-    UMI bindings own WHAT, not a second provenance envelope. Some model outputs
+    Retained bindings carry canonical WHAT, not a second provenance envelope. Some model outputs
     wrap a scalar as ``{"value": ..., "source_evidence": ...}`` or as a
     constrained-model descriptor such as
     ``{"name": "recipient", "entity_type": "person", "value": "user"}`` even
@@ -101,7 +101,7 @@ def responsibility_binding_material_value(value: Any) -> Any:
     return value
 
 
-def _normalize_umi_binding_values(value: Any) -> Any:
+def _normalize_responsibility_binding_values(value: Any) -> Any:
     if not isinstance(value, dict):
         return value
     return {
@@ -212,10 +212,10 @@ class CognitiveResponsibilityProposal(BaseModel):
     bindings: dict[str, Any] = Field(
         default_factory=dict,
         description=(
-            "Sparse material user-semantic facts from the authoritative turn or bounded "
-            "semantic context only; never runtime/session identifiers or HOW fields. "
-            "Counts, measurements, activation and field-specific Goal updates retain "
-            "typed evidence; other details may remain solely in the complete outcome. "
+            "Read-only retained canonical semantic facts for downstream Responsibility "
+            "projections. Live UMI cannot author this field. Counts, measurements and "
+            "relations in fresh UMI meaning remain in the complete outcome; Planner "
+            "owns parameter extraction. Never runtime/session identifiers or HOW fields. "
             "Use native JSON scalar types directly; do not wrap a primitive as value+type "
             "merely to restate its JSON type. Preserve an explicitly measured value and "
             "its semantic unit together as one exact "
@@ -308,7 +308,7 @@ class CognitiveResponsibilityProposal(BaseModel):
     def normalize_and_reject_low_level_bindings(
         cls, value: Any,
     ) -> Any:
-        normalized = _normalize_umi_binding_values(value)
+        normalized = _normalize_responsibility_binding_values(value)
         if not isinstance(normalized, dict):
             return normalized
         reject_forbidden_low_level_fields(normalized)
@@ -474,6 +474,8 @@ class CoreInterpretationResult(BaseModel):
 
     @model_validator(mode="after")
     def validate_responsibility_refs(self) -> "CoreInterpretationResult":
+        if any(item.bindings for item in self.responsibilities):
+            raise ValueError("UMI must not author bindings; preserve complete meaning in outcome")
         refs = [item.local_ref for item in self.responsibilities]
         if len(refs) != len(set(refs)):
             raise ValueError("User Meaning Interpretation responsibility local_ref values must be unique")

@@ -18,14 +18,21 @@
           "schema_version": 1,
           "local_ref": "r1",
           "outcome": "respond to the user request: $text",
-          "bindings": {},
-          "relationship": "new",
-          "target_goal_ids": [],
           "confidence": 0.8,
-          "output_mode": "speech"
+          "output_mode": "speech",
+          "continuity_scope": "turn"
         }
       ],
-      "unresolved": []
+      "meaning_uncertainties": [],
+      "cognitive_requests": [
+        {
+          "authority": "goal_association",
+          "responsibility_refs": [
+            "r1"
+          ],
+          "reason_summary": "Associate the complete current meaning."
+        }
+      ]
     }
   },
   "expect": {
@@ -39,11 +46,9 @@
       {
         "local_ref": "r1",
         "outcome": "respond to the user request: $text",
-        "bindings": {},
-        "relationship": "new",
-        "target_goal_ids": [],
         "confidence": 0.8,
-        "output_mode": "speech"
+        "output_mode": "speech",
+        "continuity_scope": "turn"
       }
     ]
   }

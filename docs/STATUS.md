@@ -9,12 +9,21 @@ actual module I/O; it does not amend authority or establish full qualification.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Non-model repairs include serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Current offline workflow freeze matches existing contracts; complete probes/faults/expected outcomes remain and strict matching is unchanged. Historical-restatement inputs are repaired in70 fixture/target pairs, with full1500 validation and unchanged GA semantics. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
-| Automatic verification | Current workflow strict aggregate6000/6000 pass:1400 complete workflows,1800 state cases,2500 expected rejections,300 safe nonexecuting rejections; zero inference, source fixed. Focused120 pass. Canonical benchmarks169 pass, main3968 pass/5 environment skips/1023 passing subtests,20 legacy Agent tests pass; policy/ownership/pinned static/configuration/docs stages pass. Former83 workflow failures are closed. Previous model-role/ability proofs remain historical and bounded. |
-| Target validation | Latest immutable full79 live-text/simulator run:20 automatic pass/59 fail; same-agent review6 bounded pass/12 partial/59 fail/2 insufficient evidence. All79 attempted/zero skipped; blocked dependent turns leave cohort/qualification incomplete. Compound walk10/.2→nod2→left-turn1 and Chinese walk3→right-turn1 have completed simulator observations; Chinese wording still English. No independent, current voice, physical/audible or default-target qualification. |
-| Deployment state | Production Agent bytes are unchanged from489bd639…. Last retained native Agent image124a02f6… / packaged-host source93b58310… and healthy/restart0 observation remain bound to that native cohort. This corpus repair performs no service rebuild/restart, model/profile/prompt change, promotion, release or fresh native revision qualification. TTS dependency rebuild remains unqualified. |
+| Implementation | Owner-confirmed principle30 is enforced: UMI preserves complete WHAT and cannot author bindings; Planner owns parameter extraction and contextual provenance. Provider perception and GA/SC/Host authority remain. Memory projections now preserve historical creation/update times and sources. Earlier Charter sparse-binding prose is reconciled with principle30. Model/profile and initial activation ownership are unchanged. |
+| Automatic verification | Frozen20 Schema/Host and exact-wire pinned decoder20/20 pass; UMI1496/Fast204 references valid, focused215+84 tests pass, Level A19/19. Request-only6000+5 captures conserve every non-request field. Strict6000/6000 replay passes with zero inference. Canonical169 benchmarks,3981 main tests/5 environment skips/1023 subtests and20 legacy tests pass; policy/ownership/pinned static/configuration/docs pass. |
+| Target validation | Baseline79:22 automatic pass/57 fail, review6 pass/10 partial/61 fail/2 insufficient. Changed-source79:13 automatic pass/66 fail, review5 pass/7 partial/67 fail. All cases attempted/zero skipped; blocked followups leave cohort/qualification incomplete.86 native UMI outputs have zero binding keys; activation/meaning failures remain. No overall behavior gain, independent, current voice, audible/physical or default-target qualification. |
+| Deployment state | Agent-only source imagebc6577e4… preserves original dependency layers; packaged/host source8140dcc3… matches before/after. Profile/environment/model unchanged. Native source/services fixed within each aggregate. A pre-cohort grammar probe caused LLM OOM/automatic recovery; fresh native identity binds the recovered service. No release/promotion; TTS dependency rebuild remains unqualified. |
 
-Latest local proof: `.chromie/acceptance/ga-history-fixture-audit-20261005/`:70
+Current repair evidence: `.chromie/acceptance/umi-no-bindings-20261005/`.
+Changed-source bundle: `/home/chromie/Downloads/chromie_debug_bundle_20261005_192414.tar.gz`.
+All79 cases were reviewed, including automatic passes. Milk retains ahead/about50meters
+but has no initial Planner request; no resource provider is invoked. Walk3s/right-turn2s
+completes in simulation but cites the walk duration as the turn-duration source, so
+semantic provenance fails. Quote validity alone does not qualify parameter mapping.
+Historical Memory projection is proved outside current sight, with original time/source;
+actual search, action persistence and resource acquisition remain unproved.
+
+Previous local proof: `.chromie/acceptance/ga-history-fixture-audit-20261005/`:70
 upstream historical-description input/target type repairs, with all1500 material
 comparisons preserving original meaning, prior Goals and identity choices. Complete
 reference validation1500, focused22 and canonical169 benchmark/3968 main tests pass.
@@ -27,13 +36,13 @@ All6000 scenario probes and5 prototypes retain their original semantic/provider/
 assertions and prior Goals. Frozen source bytes and strict recovery guards are retained;
 review is non-independent Level A, not native qualification.
 
-Latest native proof: `.chromie/acceptance/planner-compound-contract-20261004T140758Z/count-scope/source-schema/`.
+Previous native proof: `.chromie/acceptance/planner-compound-contract-20261004T140758Z/count-scope/source-schema/`.
 The full native cohort is complete at the case-admission level; failures blocked
 some later turns, so neither cohort-complete nor qualification-complete is claimed.
 All79 summaries, exact primary packets, same-agent review and immutable runtime
-identity are retained. Latest single bundle is
+identity are retained. That historical cohort's single bundle is
 `/home/chromie/Downloads/chromie_debug_bundle_20261005_003209.tar.gz`.
-Current case SID923cce48 retains count2 binding and all3 requested completed body
+Its case SID923cce48 retains count2 binding and all3 requested completed body
 results; SID0b0cdc27 retains right-direction source t11:t12 and completed walk/turn.
 The direct-stop case has no execution/stop evidence after an unrequested idle was
 planned. A planned observation or acknowledgement alone is never completion.
@@ -72,8 +81,9 @@ GA output does not author new Goal meaning: Host preserves exact UMI WHAT when
 materializing identity-only `new_goals` rows. `turn` is Goal lifetime, not a no-Goal routing rule.
 
 This describes current intended ownership, not full conformance. The audit found
-UMI bindings conflicting with principle 30, Attention same-authority semantic repair,
-and SC fresh-turn silence restrictions needing contract/qualification review.
+UMI binding conflict is repaired under the owner-confirmed principle 30 boundary;
+complete WHAT remains UMI-owned and Planner owns parameter extraction. Attention
+same-authority semantic repair and SC fresh-turn silence restrictions still need review.
 No amendment to permit UMI parameter extraction was made in this audit.
 
 ## Component implementation and qualification
@@ -100,7 +110,7 @@ feature line or revive historical iteration authorizations.
 
 1. Retain completed bounded Planner compound/count/source proofs; qualify remaining
    primary HOW choices and current stop coverage without changing SC expression authority.
-   Existing binding and Attention authority conflicts remain open; Charter is unchanged.
+   Attention authority and SC silence findings remain open; UMI cannot author bindings.
 2. Retain repaired user-before-assistant admission; qualify accepted-offer Work
    activation against complete actual context before interpreting model-comparison scores.
 3. Preserve the passing canonical local gate and current reviewed workflow freeze;

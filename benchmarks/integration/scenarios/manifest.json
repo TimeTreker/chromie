@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "1f1f918292f0d80d79dd9dba47f2082de0b3838176ddd8185dd60192a3956d3d",
-    "workflow-conditional-dry.json": "831383eb5ee0d11641398d78f62c4a1c50260ae433cb88e86f8a05a99f56a5b9",
-    "workflow-conditional-rain.json": "9bb5fbb721f7c5c25e2d9435362c4930dd436401777f7ceb7f205446c226cd4a",
-    "workflow-delayed.json": "564f1de834ec7eb6191b8dafade030b7cf10b3d7ea787fb0633eb27b5db773e4",
-    "workflow-normal.json": "bd798e75f5f531b69123402c56f24b17d2aadd1d0c86649e6cd1fa65f87c3cf4"
+    "workflow-cancellation.json": "60a6e5a76e47fcc793c06871d4673ff4943f2fa4101a859b1f6ed23d3460b1d7",
+    "workflow-conditional-dry.json": "a60fbe2de6e21f9d214d69b8626ec828987c4502cf2f2d780984a5e1bd9e175a",
+    "workflow-conditional-rain.json": "ff28b54ede1c1ad335de69775bd018d88883890b470c573ab40dbc5fa7f6be15",
+    "workflow-delayed.json": "e98153fbb5d5dcfebbccec2b2df086c23fee468fef1360704f1bc2677dd67c79",
+    "workflow-normal.json": "9c7553dba615e4ab24bcc6171eb076e6d496eca6f72266743a7760da3e2a7583"
   },
-  "freeze_revision": 15,
-  "freeze_note": "Reviewed current-contract body metadata and removal of retired GA fields; complete exact request recapture. Original inputs, response meaning, provider outcomes and faults unchanged.",
+  "freeze_revision": 16,
+  "freeze_note": "Request-only recapture for owner-confirmed UMI no-bindings and Planner contextual argument provenance. All five original inputs, reference decisions, complete meaning, relations, parameters, prior Goals, provider outcomes, faults and assertions unchanged.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

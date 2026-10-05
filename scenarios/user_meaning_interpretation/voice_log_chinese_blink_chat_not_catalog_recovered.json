@@ -23,9 +23,6 @@
           "schema_version": 1,
           "local_ref": "r1",
           "outcome": "眨眼两次",
-          "bindings": {
-            "count": 2
-          },
           "confidence": 0.9,
           "output_mode": "body_action",
           "continuity_scope": "goal"

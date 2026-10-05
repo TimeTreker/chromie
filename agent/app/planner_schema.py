@@ -6,7 +6,7 @@ from itertools import product
 from typing import Any
 
 try:
-    from chromie_contracts.user_turn import user_turn_source_span_schema
+    from chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
     from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty, responsibility_binding_material_value
     from chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
@@ -18,7 +18,7 @@ try:
         GOAL_SATISFACTION_SCORE_BANDS,
     )
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.user_turn import user_turn_source_span_schema
+    from shared.chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty, responsibility_binding_material_value
     from shared.chromie_contracts.interaction import (
         MEDIA_CAPABILITY_IDS,
@@ -3022,35 +3022,6 @@ def fast_advance_response_schema(
                                     for name in realization.get("arguments") or []
                                 )
                         source_schema = properties["args"].get("properties", {}).get("source")
-                        source_binding_names = {
-                            binding_name
-                            for binding_name in bound_parameters
-                            if _resource_source_binding_type(capability, binding_name)
-                        }
-                        if (
-                            isinstance(source_schema, dict)
-                            and provider_resolves_required_source(capability, "source")
-                            and not source_binding_names
-                        ):
-                            # Provider-owned source resolution is an execution
-                            # boundary, not a semantic choice for Fast Planner.
-                            # When UMI/Goal supplied no source fact, make the
-                            # unresolved provider handoff read-only in the decoder
-                            # instead of offering `known` and rejecting it after
-                            # inference. This preserves the Host validator while
-                            # eliminating a schema/semantic contradiction.
-                            properties["args"]["properties"]["source"] = {
-                                "type": "object",
-                                "properties": {
-                                    "status": {
-                                        "type": "string",
-                                        "const": "provider_resolved",
-                                    },
-                                },
-                                "required": ["status"],
-                                "additionalProperties": False,
-                            }
-                            source_schema = properties["args"]["properties"]["source"]
                         source_bindings_schema = (
                             source_schema.get("properties", {}).get("bindings")
                             if isinstance(source_schema, dict) else None
@@ -3088,7 +3059,19 @@ def fast_advance_response_schema(
                                 and input_properties[name].get("type")
                                     in ("number", "integer", "boolean", "object", "array")
                             )
-                            span_contract = user_turn_source_span_schema(source_token_refs)
+                            span_contract = {"oneOf": [
+                                user_turn_source_span_schema(source_token_refs),
+                                *[
+                                    {**branch, "properties": {
+                                        **branch["properties"],
+                                        "source_responsibility_ref": {"const": item.local_ref, "type": "string"},
+                                    }, "required": [*branch["required"], "source_responsibility_ref"]}
+                                    for item in responsibility_items if item.local_ref in compatible
+                                    for branch in user_turn_source_span_schema(
+                                        [token["ref"] for token in user_turn_source_tokens(item.outcome)]
+                                    )["oneOf"]
+                                ],
+                            ]}
                             properties["argument_sources"] = {
                                 "type": "object",
                                 "properties": {
@@ -3096,7 +3079,6 @@ def fast_advance_response_schema(
                                     for name in sorted(input_properties)
                                     if name not in index_grounded_parameters
                                     and name not in source_grounded_parameters
-                                    and not provider_resolves_required_source(capability, name)
                                 },
                                 "required": required_source_inputs,
                                 "additionalProperties": False,
@@ -3114,6 +3096,23 @@ def fast_advance_response_schema(
                             "required": required,
                             "additionalProperties": False,
                         }
+                        if (provider_resolves_required_source(capability, "source")
+                                and "source" not in source_grounded_parameters):
+                            # The canonical cross-field invariant is also checked by
+                            # Host. Native transport exposes the same object shape;
+                            # it does not promise decoder support for this condition.
+                            unresolved_sources = [{"status": "unknown"}, {"status": "provider_resolved"}]
+                            branch["allOf"] = [{
+                                "if": {"properties": {"args": {"properties": {
+                                    "source": {"enum": unresolved_sources},
+                                }, "required": ["source"]}}, "required": ["args"]},
+                                "then": {"properties": {"argument_sources": {
+                                    "not": {"required": ["source"]},
+                                }}},
+                                "else": {"properties": {"argument_sources": {
+                                    "required": ["source"],
+                                }}, "required": ["argument_sources"]},
+                            }]
                         branches.extend(_fast_enum_source_branches(
                             branch, capability=capability,
                             grounded_parameters=grounded_parameters,

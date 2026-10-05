@@ -21,11 +21,6 @@
           "schema_version": 1,
           "local_ref": "weather",
           "outcome": "判断并告知用户今天上午重庆会不会下雨",
-          "bindings": {
-            "location": "重庆",
-            "date": "today",
-            "time_of_day": "上午"
-          },
           "confidence": 0.95,
           "output_mode": "information",
           "continuity_scope": "goal"

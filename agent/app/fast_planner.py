@@ -250,7 +250,7 @@ class FastPlannerResolver:
                         bounded_json(duplicate_read_repairs, 2400),
                     )
                 output = canonicalize_fast_argument_source_spans(
-                    output, source=current.original_user_text
+                    output, source=current.original_user_text, responsibilities=responsibilities,
                 )
                 break
             else:
