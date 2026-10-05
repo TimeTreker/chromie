@@ -29,11 +29,12 @@ SC、Host/Runtime、文本验收工具、基准数据及完整本地测试。
 | P1 / UMI Schema → DTO | 动态 Schema 的 `bindings` 允许任意键，DTO 递归拒绝 Planner-owned 字段。 | 现有 `umi-schema-binding-gap.json` 保留此问题。本次不以放宽 DTO 解决；须先确定 UMI 职责，再统一 Schema/DTO/native grammar。 |
 | P1 / 文本工具 → Conversation State | 生产 admission 在 cognition 前记录用户；文本工具在并行 SC 已交付后才 `record_user_turn`。实际矩阵包出现 assistant/user/assistant/user。 | 已复用生产 `record_accepted_user_turn` 修复；受控回归和新水任务历史证实 user/assistant/user/assistant 且无重复。水任务仍失败，不能声称此修复解决了接受提议后的 Work 理解。 |
 | P1 / GA 关联契约 | Schema 移除了已有 `new_goals` identity-only API，接收代码将历史/替代关系清空；完整媒体意思还被错误要求提前提供操作参数。 | 已在 GA 原契约恢复主结果关系数组、验证与原样传递；GA 和 Planner 各自移除错误的上游媒体参数前置条件。新部署两轮 79 案例已留存，但整体资格未通过。未改变 UMI WHAT/初始激活、Planner HOW、Host 状态职责或 Charter。 |
-| P1 / Planner 复合动作 | Charter 允许一个 Responsibility 保留完整复合意思，由 Planner 分解 Activities。真实主调用的能力过滤却排除点头；Fast/shared validator 还强制混合动作先被 UMI 分成不同 Goal。 | 真实 Schema 与合法参考被拒证明是 Planner 契约缺陷。负责人现已授权并实现取消类别排除和强制上游拆分；冻结12对照由9/12变为12/12。可选社交表达仍归 SC，真实模型完整回归待完成。 |
+| P1 / Planner 复合动作 | Charter 允许一个 Responsibility 保留完整复合意思，由 Planner 分解 Activities。真实主调用的能力过滤却排除点头；Fast/shared validator 还强制混合动作先被 UMI 分成不同 Goal。 | 真实 Schema 与合法参考被拒证明是 Planner 契约缺陷。负责人已授权并实现取消类别排除和强制上游拆分；冻结12对照由9/12变为12/12。全79实时复测及复合动作模拟器完成证据已留存；整体资格未通过，可选社交表达仍归 SC。 |
 | P2 / UMI 基准 | 旧 references 请求 standing `social_cognition`，850 个 body-action 结果缺现行 family。 | 已移除重复 standing request、补齐既有 family；1,496 当前 Schema/Host 通过。输入、完整意思、数量、来源、顺序和划分不变；不是模型推理或独立语义资格证明。 |
 | P2 / Planner 基准 | Fast 204-case corpus 的普通发言及可选 social decoration 已退休；原 qualification adapter 另造 Schema 并调用删除的 keyword。 | 已使用生产调用的实际 Schema；204 references 机械有效。退休能力的语义覆盖仍未重新合格，Deep 全面兼容性也未建立。 |
 | P2 / SC silence 决策 | 章程允许 SC 决定是否表达；fresh interpretation 且无 pending/already-spoken 时，Schema 排除 `silence`，Host 同样拒绝。 | 静态契约探针确认收窄。须复核“每次调用 SC”与“每次必须发言”的区别，结合明确确认/失败结果等强制义务设计对照案例。本次未将每次沉默都判为正确，也未改行为。 |
-| P2 / Workflow replay | 大量测试在首个 UMI HTTP 请求上返回 409 exact-request mismatch。 | 当前请求与冻结捕获包不一致，模型语义输出尚未发生；不能计作模型能力失败。不得无审阅地重新捕获并把目标改成候选答案。 |
+| P2 / Workflow replay | 历史完整6000重放在首个 UMI HTTP 请求上返回 409 exact-request mismatch，模型语义输出尚未发生。 | 已在冻结记录所有者审阅并修复现行请求/旧字段；完整6000严格重放通过，原83主测试失败关闭。保留全部原始输入、目标、故障和断言；无真实模型推理或更宽松匹配。 |
+| P2 / GA 历史重述输入 | 当前请求描述已完成任务，70个 fixture 却复制原任务的信息/身体/状态/媒体类型；输入和隐藏目标一起错，旧机械检查仍通过。 | 仅修复当前 input/target type 为 speech；全部1500其他内容不变，100个前后 Host 流程保留。离线作者检查阻止错误复制，生产 GA 不改 WHAT。旧50计数漏掉 information20。 |
 | P2 / 维护文档 | 状态、checkpoint、handoff 和 audit 叠加多个时期的“当前”说明；图资产无 SC，旧 Planner speech/PresentationCommit 描述与当前源不符。 | 本次合并恢复记录、删除退休图、修正索引和基准说明。相关接口、Gateway、生命周期和 rollout 的退休说明已一并修正；实现冲突仍保留。 |
 
 ## 实际路径与最早错误边界
@@ -844,3 +845,52 @@ agent的非独立审阅，`training_eligible=false`和原证据上限保留。
 legacy Agent20通过。原83个workflow失败全部关闭，没有放宽严格匹配、减少语料、
 修改故障断言或改变生产模块。`canonical.log`保留所有阶段；最终文档另做policy、
 ownership和docs检查。这只关闭本地程序/证据gate，当前版本voice和default-target仍未关闭。
+
+## 2026-10-05 历史重述场景的输入类型修复
+
+本轮从已推送 `3feff0b56…` 开始，上游已获取且未推进。实际案例
+`ga_daily_v1_03_00_reference_terminal` 当前话语为
+“Tell me again what that completed goal was about.”，历史已满足 Goal
+`goal_03_00_a` 的内容是“Move forward for 3 seconds.”。
+当前人要求描述历史任务，并未要求再次走路。场景作者却把历史任务的
+`body_action` 复制到当前 Responsibility 和隐藏预期；GA 原样继承它。
+这是最早的证据输入错误，既不是 GA 越界，也不是 LLM 能力证据。
+
+| 实际边界 / 所有者 | 权威输入、实际输出及判定 | 修复后的 I/O / 下游传递 |
+| --- | --- | --- |
+| 场景作者 / 上游测试 WHAT | 原当前话语、完整 `Reference: Move forward for 3 seconds. (...)` 和 token 来源；错误输出 r1.type=`body_action`。应为描述已完成任务的 `speech`；最早错误。真实 UMI 未调用，不能归责它。 | 仅当前 type 改为 speech；完整 outcome、原话、来源、历史 Goal body 类型/已满足状态全部不变。 |
+| 离线语料验证器 / oracle 与输入一致性 | 旧检查允许输入和预期一起复制错误类型；完整1500机械通过（1300接受/200既有拒绝）。错误在进入模型前已存在。 | 根据该已定义“历史内容重述”对照类检查当前 speech；四种错误复制在 GA 调用前拒绝。此规则不进入生产或选择运行语义。 |
+| GA primary / 关联关系 | 输入当前 r1 和终结 Goal；受控原始参考返回 `associations=[]`、new.source=[r1]、related=[goal_03_00_a]、supersedes=[]。正确保留历史关系；一次 reference 调用，不是真实模型推理。 | 原参考输出和主 Schema 字节结构不变；当前正确类型来自上游 fixture，GA 不重新判断 WHAT。 |
+| GA DTO、Host materializer / ID 校验和确定性继承 | 原输入与预期一致，所以 Schema/DTO 接受、Host resolved 并输出 body 类型新 Goal。这是正确传递错误上游输入的下游症状。 | 同样一次调用及 related identity，Host 继承 speech。完整100个历史案例都留存前后请求、主包、参考输出及实际 Resolution。没有 Host 语义修补。 |
+| 状态提交、Planner/HOW、SC/表达、provider/执行 | 本次离线路径均未调用；没有走路执行、说话或外部效果。 | 不变，不能把参考验证称为行为履行、真实 UMI 修复或实时资格。 |
+
+```mermaid
+flowchart LR
+    T[当前重述请求和已完成 Goal] --> F[场景作者提供当前 WHAT]
+    F --> V[离线类型与 oracle 检查]
+    V --> G[GA 一次参考关系输出]
+    G --> H[DTO 和 Host 原样继承 WHAT]
+    H --> R[保留 Resolution 无状态提交]
+```
+
+完整100个历史案例实际有70错误，英文/中文各35：information20、body20、
+state20、media10；之前50计数漏掉 information。修复70份独立 JSON 的当前
+输入 type 和对应预期 type；其余1430份不变。全部1500的可逆比较证明原话、
+完整意思、上下文、历史 Goal、关联选择、参考输出、contrast/split 保留。
+场景树摘要重新冻结为
+`2ba2e1a8edb4ef81efa4a0f820742c3081b9776b14aa6a8acbaa52e0101d1d2f`。
+
+根目录 `.chromie/acceptance/ga-history-fixture-audit-20261005/` 保留原数据、
+诊断、迁移账本、100个完整前后 workflow，以及完整1500的 baseline/after。
+新回归修复前1失败/4通过，修复后22通过；完整1500仍1300接受/200安全拒绝，
+既有负向状态断言没有减少。独立语义评审=false、training_eligible=false；
+外部推理0。生产模型、提示词、Schema/DTO/Host、Charter 和职责未改。
+Roadmap 和交接恢复命令的“本地 gate 失败”旧描述已清理；语料 manifest
+不再宣称已关闭的210/媒体错误仍存在。完整 `canonical.log` exit0：benchmarks169
+通过、main3968通过/5环境跳过/1023 subtests通过，legacy Agent20通过；政策、
+所有权、固定静态分析、配置/runtime 和 docs 检查通过。最终policy、ownership、
+docs复核也通过，完整记录在对应的 `.final.log`。
+
+继续保留 UMI bindings 的 canonical 冲突、Attention 第二次语义修补、SC 沉默
+契约与实时语义覆盖的未关闭状态；此次 fixture 修复并未解决或掩盖它们。
+模型输出遗漏的观察不等于已证实模型内在能力不足，不能靠下游补判绕过。

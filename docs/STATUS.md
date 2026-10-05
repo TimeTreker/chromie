@@ -9,12 +9,18 @@ actual module I/O; it does not amend authority or establish full qualification.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Non-model repairs include serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Current offline workflow freeze matches existing contracts; complete probes/faults/expected outcomes remain and strict matching is unchanged. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
-| Automatic verification | Current workflow strict aggregate6000/6000 pass:1400 complete workflows,1800 state cases,2500 expected rejections,300 safe nonexecuting rejections; zero inference, source fixed. Focused120 pass. Canonical benchmarks164 pass, main3968 pass/5 environment skips/1023 passing subtests,20 legacy Agent tests pass; policy/ownership/pinned static/configuration/docs stages pass. Former83 workflow failures are closed. Previous model-role/ability proofs remain historical and bounded. |
+| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Non-model repairs include serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Current offline workflow freeze matches existing contracts; complete probes/faults/expected outcomes remain and strict matching is unchanged. Historical-restatement inputs are repaired in70 fixture/target pairs, with full1500 validation and unchanged GA semantics. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
+| Automatic verification | Current workflow strict aggregate6000/6000 pass:1400 complete workflows,1800 state cases,2500 expected rejections,300 safe nonexecuting rejections; zero inference, source fixed. Focused120 pass. Canonical benchmarks169 pass, main3968 pass/5 environment skips/1023 passing subtests,20 legacy Agent tests pass; policy/ownership/pinned static/configuration/docs stages pass. Former83 workflow failures are closed. Previous model-role/ability proofs remain historical and bounded. |
 | Target validation | Latest immutable full79 live-text/simulator run:20 automatic pass/59 fail; same-agent review6 bounded pass/12 partial/59 fail/2 insufficient evidence. All79 attempted/zero skipped; blocked dependent turns leave cohort/qualification incomplete. Compound walk10/.2→nod2→left-turn1 and Chinese walk3→right-turn1 have completed simulator observations; Chinese wording still English. No independent, current voice, physical/audible or default-target qualification. |
 | Deployment state | Production Agent bytes are unchanged from489bd639…. Last retained native Agent image124a02f6… / packaged-host source93b58310… and healthy/restart0 observation remain bound to that native cohort. This corpus repair performs no service rebuild/restart, model/profile/prompt change, promotion, release or fresh native revision qualification. TTS dependency rebuild remains unqualified. |
 
-Latest local proof: `.chromie/acceptance/workflow-contract-audit-20261005/`:
+Latest local proof: `.chromie/acceptance/ga-history-fixture-audit-20261005/`:70
+upstream historical-description input/target type repairs, with all1500 material
+comparisons preserving original meaning, prior Goals and identity choices. Complete
+reference validation1500, focused22 and canonical169 benchmark/3968 main tests pass.
+No production UMI correction or native inference was performed.
+
+Retained workflow proof: `.chromie/acceptance/workflow-contract-audit-20261005/`:
 strict aggregate6000/6000, focused120, complete canonical gate passing. Original83
 failures were stale replay records before inference, not model ability failures.
 All6000 scenario probes and5 prototypes retain their original semantic/provider/fault
@@ -98,7 +104,8 @@ feature line or revive historical iteration authorizations.
 2. Retain repaired user-before-assistant admission; qualify accepted-offer Work
    activation against complete actual context before interpreting model-comparison scores.
 3. Preserve the passing canonical local gate and current reviewed workflow freeze;
-   remaining historical-restatement fixtures still need upstream meaning/type review.
+   historical-restatement input types are repaired at their fixture owner. Keep
+   reference validity distinct from native-model semantic qualification.
 4. Qualify exact Schema/DTO/native grammar, SC context budget/latency, provider
    scene and geographic Evidence, Goal/action/provenance coverage.
 5. Retain narrow current-revision voice and the default

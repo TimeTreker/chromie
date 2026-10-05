@@ -4,11 +4,11 @@
     "contrast_set_size": 15,
     "path_pattern": "scenarios/<split>/<category>/<scenario-id>.json",
     "scenario_count": 1500,
-    "scenario_tree_sha256": "7b344bd734de86d3971ebfea7cd049aeca4a8cc591cf14dd3631b1a9ba051d3a",
+    "scenario_tree_sha256": "2ba2e1a8edb4ef81efa4a0f820742c3081b9776b14aa6a8acbaa52e0101d1d2f",
     "semantic_seed_count": 100
   },
   "authority": "offline qualification evidence only; never production Goal policy",
-  "claim_boundary": "Partially reconciled assistant-authored reference corpus; 200 linked references remain unsupported and 10 media references fail Host. Not independently reviewed, model-qualified, training-eligible, service, voice, simulator, hardware, or release evidence.",
+  "claim_boundary": "Current-contract assistant-authored reference corpus: 1300 Host-accepted references and 200 retained typed-state negatives. Historical restatement inputs use speech while preserving terminal Goal identity and meaning. Not independently reviewed, model-qualified, training-eligible, service, voice, simulator, hardware, or release evidence.",
   "coverage_contract": {
     "categories": {
       "cancel_active": 100,

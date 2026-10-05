@@ -2,15 +2,63 @@
 
 ## Current resume point — 2026-10-05
 
-Pre-delivery checkout `main` / `489bd63968e791d90c4855401f38d70f6bd547e6`
+Pre-delivery checkout `main` / `3feff0b56f7fa21459b385768701bc7f47dddbfc`
 contains fetched `origin/main`; the previous non-model delivery is already pushed.
-The owner requested more non-model repair and previously authorized conditional
-commit/push for that scope. Expected resume revision: latest `main` commit containing
+The owner requested remaining non-model defects to be repaired, committed and
+pushed. Expected resume revision: latest `main` commit containing
 this Handoff and [checkpoint](DEVELOPMENT_CHECKPOINT.md). Canonical local gate now
 passes; current-revision voice proof and default target closure remain open.
 Charter, production prompts/Schema/DTO/Host, model and module authority are unchanged.
 
-## Current workflow corpus repair
+## Current historical-restatement fixture repair
+
+Root `/home/chromie/github/chromie/.chromie/acceptance/ga-history-fixture-audit-20261005/`.
+The retained GA corpus's historical-description requests copied prior task types
+into current Responsibilities:70 cases,35 per language, comprising20 information,
+20 body,20 state and10 media. The older50 count omitted information. Earliest
+wrong boundary is the upstream fixture author; GA correctly conserved that input.
+
+Only the current input's `output_mode` and corresponding hidden target-map value
+change to `speech`. Original words, complete outcomes, provenance, prior terminal
+Goals, identity choices, raw reference outputs, primary Schemas, contrasts and
+splits remain. Production UMI/GA/Planner/SC/Host, prompts, Charter and model are
+unchanged. No services were rebuilt/restarted and no native/audio/robot inference
+was run. Reference maintenance is not independent semantic qualification.
+
+- `baseline.json`:all1500 mechanically valid,1300 accepted/200 expected typed-state
+  refusals. It accepted the self-consistent wrong fixture types; model capacity
+  was not tested. `cases.before.json` and `dataset.before.json` retain originals.
+- `diagnosis.json`:all100 historical turns reviewed,70 incorrect current types.
+  `focused.before.log`:new semantic regression1 fail/4 pass before fixture repair.
+- `migration-ledger.json`:all1500 compared;70 differ in exactly those two values,
+  1430 are unchanged. New tree digest
+  `2ba2e1a8edb4ef81efa4a0f820742c3081b9776b14aa6a8acbaa52e0101d1d2f`.
+- `history-workflows.json`:100 before/after production-shaped reference workflows,
+  each one primary reference call, Schema accepted/Host resolved; unchanged raw
+  GA decisions and Schemas. External inference0; downstream Planner/SC/provider
+  and state submission were not invoked.
+- `after.json`:full1500 validate,1300 accepted/200 retained fail-closed negatives.
+  `focused.after.log`:22 tests pass. The new corpus guard rejects all four copied
+  non-speech types before GA; production validation is unchanged.
+- `canonical.log`, exit0:benchmarks169 pass, main3968 pass/5 environment skips/
+  1023 passing subtests,20 legacy Agent tests pass. Pinned Ruff/mypy, policy/
+  ownership, configuration/runtime and docs checks pass. Final rechecks pass in
+  `policies.final.log`, `ownership.final.log` and `docs.final.log`.
+  Roadmap/resume and manifest status text are
+  reconciled with observed results rather than the obsolete red gate/210-error
+  baseline. No maintained document, environment variable, runtime flag, asset or
+  architectural owner was added.
+
+Preserve the freeze and run the existing owner checks when resuming:
+
+```bash
+cd /home/chromie/github/chromie
+python -m benchmarks.datasets.goal_association_daily_life.validate --json
+python -m pytest -q benchmarks/tests/test_goal_association_daily_life_dataset.py
+./scripts/run_tests.sh
+```
+
+## Previous workflow corpus repair — 3feff0b56…
 
 Root `/home/chromie/github/chromie/.chromie/acceptance/workflow-contract-audit-20261005/`.
 The6000-case fixed baseline failed before UMI output: exact-request HTTP409,
@@ -90,13 +138,13 @@ They are already-applied local changes, not a patch to apply again.
   cancelled walking receipt; strengthen clarification/draft acts; geographic identity
   remains blocking semantic review. Include required ambiguous-movement body metadata,
   previously withdrawn Tianxin case deletion and79-case inventory/documentation.
-- Current focused suite347 pass/5 environment skips/57 subtests; Level A19/19 unique
+- That delivery's focused suite347 pass/5 environment skips/57 subtests; Level A19/19 unique
   cases across3 relevant classes. `native-grammar.log`:bounded0/8/16 accepted,17/128
   rejected; unbounded reference accepts all5;128 semantic string spaces retained.
 - `agent-source.json` still matches host/package93b58310…; Agent image124a02f6… and
   LLM image2330d155… remain running/restart0. No model/profile/prompt, Charter or
   module-authority change, no service rebuild/restart, no additional LLM decision.
-- Current full gate `.chromie/acceptance/non-model-delivery-20261005.canonical.log`,
+- That delivery's full gate `.chromie/acceptance/non-model-delivery-20261005.canonical.log`,
   exit1:benchmarks160 pass, main83 fail/3885 pass/5 skips/1023 passing subtests.
   Policy/ownership/pinned Ruff/mypy/configuration/docs/scenario stages pass;
   legacy not reached. `canonical-comparison.json`:same83 ordinary failure IDs as
@@ -126,7 +174,7 @@ latest source/target iteration is `count-scope/source-schema/`.
   formats/bounds/defaults remain; source IDs alone are not semantic proof.
   All are scripted primary Schema/DTO/Host checks, no native/independent training proof.
 - Count focused1090 passed/451 subtests; source stream179 passed; each relevant
-  Level A3 classes18/18. Latest canonical benchmarks160 pass, main83 fail/3885 pass/
+  Level A3 classes18/18. At that native iteration canonical benchmarks160 pass, main83 fail/3885 pass/
   5 skipped/1023 subtests. `source-schema/canonical-comparison.json`:same83 failure
   IDs, no new ones; strict stale workflow HTTP409 precedes candidate inference;
   legacy stage not reached. Do not rewrite6000 targets or weaken strict comparisons.
@@ -210,7 +258,8 @@ be used to claim automated evidence.
 Verify saved proof images/private overrides first. If Agent source differs, rebuild
 through its official Dockerfile and verify the package before fresh identity capture.
 Stop interactive Host before a cohort. Never edit/rebuild/restart during the full
-cohort; after it ends collect once and judge every case. The local gate is red:
+cohort; after it ends collect once and judge every case. The local gate is green;
+rerun it after changes:
 
 ```bash
 cd /home/chromie/github/chromie

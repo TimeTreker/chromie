@@ -98,7 +98,7 @@
           "confidence": 1.0,
           "local_ref": "r1",
           "outcome": "Reference: 播放《家庭歌单》。 (把刚才完成的目标内容再告诉我一次。)",
-          "output_mode": "media_playback",
+          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
@@ -145,7 +145,7 @@
           "operation": "new_goal",
           "relationship": "new",
           "target_goal_ids": [],
-          "output_mode": "media_playback",
+          "output_mode": "speech",
           "supersedes_goal_ids": [],
           "related_goal_ids": [
             "goal_04_09_a"

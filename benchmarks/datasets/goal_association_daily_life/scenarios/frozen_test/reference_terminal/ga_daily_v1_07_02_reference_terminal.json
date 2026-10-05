@@ -122,7 +122,7 @@
           "confidence": 1.0,
           "local_ref": "r1",
           "outcome": "Reference: Provide a simple explanation of photosynthesis. (Tell me again what that completed goal was about.)",
-          "output_mode": "information",
+          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
@@ -169,7 +169,7 @@
           "operation": "new_goal",
           "relationship": "new",
           "target_goal_ids": [],
-          "output_mode": "information",
+          "output_mode": "speech",
           "supersedes_goal_ids": [],
           "related_goal_ids": [
             "goal_07_02_a"

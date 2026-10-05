@@ -222,6 +222,13 @@ async def _validate_cases(cases: list[dict[str, Any]]) -> tuple[list[str], dict[
             request = CognitiveWorkRequest.model_validate(case["input"]["request"])
             if request.language != case["input"]["language"]:
                 raise ValueError("request language drift")
+            if case["category"] == "reference_terminal" and any(
+                item.output_mode != "speech" for item in request.responsibilities
+            ):
+                # This authored contrast asks for a description of completed
+                # work, not repetition of its effects. Check the corpus input;
+                # production GA must preserve, never repair, accepted UMI WHAT.
+                raise ValueError("historical restatement requires a speech Responsibility")
             request_key = json.dumps(request.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)
             if request_key in seen_requests:
                 raise ValueError("duplicate complete GA request")

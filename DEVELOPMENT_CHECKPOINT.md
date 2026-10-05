@@ -2,11 +2,11 @@
 
 ## Current resume point — 2026-10-05
 
-Pre-delivery base `main` / `489bd63968e791d90c4855401f38d70f6bd547e6` matches
+Pre-delivery base `main` / `3feff0b56f7fa21459b385768701bc7f47dddbfc` matches
 fetched `origin/main`. The previous non-model delivery is already pushed. The
-owner requested further non-model repairs; the earlier conditional commit/push
-authorization applies to this corpus maintenance. Expected resume revision: the
-latest `main` commit containing this checkpoint and [Handoff](HANDOFF.md).
+owner requested remaining non-model defects to be repaired, committed and pushed.
+Expected resume revision: latest `main` commit containing this checkpoint and
+[Handoff](HANDOFF.md).
 Canonical local verification now passes. Current-revision voice proof and default
 target-evidence closure remain open. Production cognition, prompts, model, Charter
 and module responsibilities were not changed. Do not resume from historical red
@@ -84,6 +84,13 @@ module or add a second semantic model call.
 - Current status/resume documents are consolidated; retired diagram and
   Planner-speaking/presentation descriptions are removed. No maintained document,
   environment variable or architectural owner was added.
+- Historical-description fixture inputs now use speech instead of copying the
+  prior task's body/state/media/information result type.70 cases (35 per language)
+  change only current `output_mode` and matching hidden target-map value; all1500
+  material comparisons preserve complete meanings, provenance, prior Goals, raw
+  GA identity decisions, contrasts and splits. All100 before/after Host projections
+  conserve the supplied WHAT in one reference call; the offline corpus validator
+  now rejects the four copied types before GA. No production authority is changed.
 
 Charter, UMI prompt/DTO, model and initial activation ownership are unchanged.
 Two SC language-policy candidates were rejected (4/8 baseline,4/8 system-policy,
@@ -94,8 +101,8 @@ changes, are restored. No runtime translator, semantic repair or model substitut
 
 | Axis | Observed result |
 | --- | --- |
-| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Follow-up includes serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
-| Automatic verification | Current workflow strict aggregate6000/6000 pass:1400 complete workflows,1800 state cases,2500 expected rejections,300 safe nonexecuting rejections; zero inference, source fixed. Focused120 pass. Canonical benchmarks164 pass, main3968 pass/5 environment skips/1023 passing subtests,20 legacy Agent tests pass; policy/ownership/pinned static/configuration/docs stages pass. Former83 workflow failures are closed. Previous model-role/ability proofs remain historical and bounded. |
+| Implementation | GA relationship, Planner media/compound, repetition ownership and exact enum-source projection repairs are implemented at existing owners. Follow-up includes serving layout, exact SC snapshot projection, geocoding locale and test-evidence repairs. Historical-restatement inputs are repaired in70 fixture/target pairs, with full1500 validation and unchanged GA semantics. Charter, UMI prompt/DTO, SC decision/wording authority, model and initial activation ownership remain unchanged; broader authority/conformance gaps remain. |
+| Automatic verification | Current workflow strict aggregate6000/6000 pass:1400 complete workflows,1800 state cases,2500 expected rejections,300 safe nonexecuting rejections; zero inference, source fixed. Focused120 pass. Canonical benchmarks169 pass, main3968 pass/5 environment skips/1023 passing subtests,20 legacy Agent tests pass; policy/ownership/pinned static/configuration/docs stages pass. Former83 workflow failures are closed. Previous model-role/ability proofs remain historical and bounded. |
 | Target validation | Latest immutable full79 live-text/simulator run:20 automatic pass/59 fail; same-agent review6 bounded pass/12 partial/59 fail/2 insufficient evidence. All79 attempted/zero skipped; blocked dependent turns leave cohort/qualification incomplete. Compound walk10/.2→nod2→left-turn1 and Chinese walk3→right-turn1 have completed simulator observations; Chinese wording still English. No independent, current voice, physical/audible or default-target qualification. |
 | Deployment state | Production Agent bytes are unchanged from489bd639…. Last retained native Agent image124a02f6… / packaged-host source93b58310… and healthy/restart0 observation remain bound to that native cohort. This corpus repair performs no service rebuild/restart, model/profile/prompt change, promotion, release or fresh native revision qualification. TTS dependency rebuild remains unqualified. |
 
@@ -153,6 +160,23 @@ This repair changes benchmark references/restoration only; production Agent sour
 remains the previously matched93b58310… bytes. No service/model/prompt/Charter/authority
 change, native inference, fresh native cohort, audio or robot proof was performed.
 
+Latest historical-description fixture evidence:
+`.chromie/acceptance/ga-history-fixture-audit-20261005/`.
+`baseline.json` mechanically validated1500 despite70 wrong current result types;
+`diagnosis.json` separates authoring defects from model inference. Original data
+and the exact two-field/all1500 comparison are retained in `cases.before.json`,
+`dataset.before.json` and `migration-ledger.json`. `history-workflows.json` retains
+all100 before/after primary reference packets and actual Host results: raw GA
+outputs and Schemas unchanged; current types are inherited without reinterpretation.
+`after.json`:1500 valid,1300 accepted/200 preserved fail-closed negatives.
+`focused.before.log`:1 fail/4 pass; `focused.after.log`:22 pass.
+`canonical.log`, exit0:benchmarks169 pass, main3968 pass/5 environment skips/1023
+passing subtests,20 legacy Agent tests pass; pinned static, policy/ownership,
+configuration/runtime and docs checks pass. Final policy/ownership/docs rechecks
+pass in `policies.final.log`, `ownership.final.log` and `docs.final.log`.
+The previous50 count omitted20 information cases. No native, independent semantic,
+production UMI correction, voice or physical proof was performed.
+
 ## Next work and blockers
 
 1. Preserve the reviewed workflow freeze and passing local gate. Strict replay must
@@ -167,8 +191,8 @@ change, native inference, fresh native cohort, audio or robot proof was performe
    semantic action assignment. Current direct-stop case has planned-only Work with
    unrequested idle, so current native stop proof remains unestablished.
 3. Qualify UMI activation/result-type and accepted-offer continuity using exact
-   primary packets. GA/Host must not fill omissions. Fifty historical-restatement
-   fixtures still have wrong upstream types; GA cannot reinterpret them.
+   primary packets. GA/Host must not fill omissions. Historical-restatement fixture
+   types are repaired at their author; GA still cannot reinterpret accepted WHAT.
 4. Review existing binding-authority, Attention second-call, SC silence/provenance,
    context/latency, geographic/provider scene and Goal/effect coverage gaps.
    Chinese-language SC input is intact; rejected prompt trials do not isolate

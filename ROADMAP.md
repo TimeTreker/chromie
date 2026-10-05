@@ -26,8 +26,9 @@ qualification order. See [Status](docs/STATUS.md) and the current
 The accepted September authority amendments and implementation sequences below
 remain design context; they do not carry forward old iteration budgets, commit/push
 authorization or claims that a previous gate is still green. The
-[current audit](ARCHITECTURE_AUDIT.md) was refreshed on 2026-10-04. Canonical
-local validation currently fails; the exact baseline and remaining evidence gaps
+[current audit](ARCHITECTURE_AUDIT.md) was refreshed on 2026-10-05. Canonical
+local validation passes; current-revision voice and default target evidence remain
+open. The exact results and remaining evidence gaps
 belong to [Status](docs/STATUS.md), the [checkpoint](DEVELOPMENT_CHECKPOINT.md)
 and [Handoff](HANDOFF.md).
 

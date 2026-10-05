@@ -104,7 +104,7 @@
           "confidence": 1.0,
           "local_ref": "r1",
           "outcome": "Reference: Create a reminder to feed the cat before school. (Tell me again what that completed goal was about.)",
-          "output_mode": "stateful_effect",
+          "output_mode": "speech",
           "schema_version": 1,
           "source_evidence": {
             "source_end_token_ref": "tok_r1_end",
@@ -151,7 +151,7 @@
           "operation": "new_goal",
           "relationship": "new",
           "target_goal_ids": [],
-          "output_mode": "stateful_effect",
+          "output_mode": "speech",
           "supersedes_goal_ids": [],
           "related_goal_ids": [
             "goal_02_04_a"

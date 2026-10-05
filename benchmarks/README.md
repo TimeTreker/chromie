@@ -588,8 +588,11 @@ changing the maintained cohort size.
 reviewable GA inputs, split evenly between Chinese and English. Every JSON file
 supplies accepted GI Responsibilities together with bounded existing and recent
 Goal state. The fifteen continuity families cover creation, association, Goal
-lifecycle operations, replacement, merge/split decisions, and the deliberately
-retained mixed association-plus-creation contract gap.
+lifecycle operations, replacement, merge/split decisions, and mixed association
+plus creation. The 200 retained typed-state negatives must still fail closed;
+they are not successful fulfillment. Historical-reference turns describe prior
+work using a current speech Responsibility, while retaining the original terminal
+Goal and its relationship. The corpus validator checks that distinction.
 
 The corpus has no generator or combined scenario source: one scenario file is
 the authoritative unit. `dataset.json` owns aggregate counts and the complete

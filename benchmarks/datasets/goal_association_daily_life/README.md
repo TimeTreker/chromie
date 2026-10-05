@@ -35,10 +35,19 @@ is handed to Planner for argument extraction. The final cohort and gate logs are
 retained in that evidence root. Typed-state negatives remain fail closed without
 state leakage; they are not successful fulfillment.
 
-Fifty historical-restatement inputs still carry the old body's/state's/media's
-result type. Their accepted WHAT is preserved, rather than corrected by GA; they
-need upstream fixture review. Mechanical validity does not make them independently
-reviewed semantic targets or native-model qualification.
+The 2026-10-05 upstream fixture review found 70 historical-restatement inputs
+copying the referenced task's result type: 20 information, 20 body, 20 state and
+10 media cases, evenly divided between Chinese and English. The previous count
+of 50 omitted information cases. These turns ask for a description of completed
+work, so their current Responsibility and matching target map now use `speech`.
+The original words, complete outcomes, provenance, terminal Goal snapshots,
+related IDs, reference model decisions, contrast membership and splits are
+unchanged; GA still conserves its supplied WHAT. Corpus validation rejects this
+self-consistent but semantically wrong input/target pairing before invoking GA.
+All 1,500 before/after cases and the two-field migration ledger are retained in
+`.chromie/acceptance/ga-history-fixture-audit-20261005/`. This is reference-author
+maintenance, not a production UMI correction, independent semantic review or
+native-model qualification.
 
 Validation now captures the exact production primary Schema and checks Host
 materialization against the full responsibility map, including related and

@@ -23,6 +23,7 @@ from benchmarks.datasets.goal_association_daily_life.validate import (
     FAMILIES,
     _ReferenceModel,
     _request_schema,
+    _validate_cases,
     load_cases,
     scenario_paths,
     scenario_tree_digest,
@@ -92,6 +93,35 @@ def test_clarify_oracles_do_not_claim_an_unproven_gap_resolution() -> None:
         assert len(associations) == 1
         assert associations[0]["relationship"] == "clarify"
         assert associations[0]["resolved_gap_ids"] == []
+
+
+def test_historical_restatements_describe_completed_work_without_repeating_effects() -> None:
+    cases = [case for case in load_cases() if case["category"] == "reference_terminal"]
+    assert len(cases) == 100
+    prior_modes = set()
+    for case in cases:
+        request = case["input"]["request"]
+        assert {item["output_mode"] for item in request["responsibilities"]} == {"speech"}
+        expected = case["target"]["semantic_expectations"]["responsibility_map"]
+        assert {item["output_mode"] for item in expected} == {"speech"}
+        snapshots = request["context"]["recent_goal_snapshots"]
+        assert all(item["responsibility_status"] == "satisfied" for item in snapshots)
+        prior_modes.update(item["goal"]["metadata"]["output_mode"] for item in snapshots)
+        assert expected[0]["related_goal_ids"] == [item["goal_id"] for item in snapshots]
+        assert expected[0]["supersedes_goal_ids"] == []
+    assert prior_modes == {"speech", "information", "body_action", "media_playback", "stateful_effect"}
+
+
+@pytest.mark.parametrize("copied_mode", ["information", "body_action", "media_playback", "stateful_effect"])
+def test_corpus_validation_rejects_self_consistent_but_wrong_restatement_type(copied_mode) -> None:
+    case = copy.deepcopy(next(item for item in load_cases() if item["category"] == "reference_terminal"))
+    case["input"]["request"]["responsibilities"][0]["output_mode"] = copied_mode
+    case["target"]["semantic_expectations"]["responsibility_map"][0]["output_mode"] = copied_mode
+
+    errors, counts = asyncio.run(_validate_cases([case]))
+
+    assert f"{case['id']}: ValueError: historical restatement requires a speech Responsibility" in errors
+    assert counts.get("validated", 0) == 0
 
 
 def test_goal_association_qualification_replays_hidden_mixed_oracle() -> None:
