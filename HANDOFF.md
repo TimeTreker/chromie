@@ -1,5 +1,134 @@
 # Chromie Handoff
 
+## Current isolation — decoder profile and late SC failure, 2026-10-07
+
+Checkout `main`, pre-delivery base `ee74ee8f9cc76982e5a06170e50f2601d06f5788`;
+fetched `origin/main` matches. The owner authorized commit and push of this
+in-progress patch; the delivery revision is the commit containing this checkpoint
+and handoff. This records local repairs and open qualification, not a complete fix.
+Fixed deployed candidate `chromie-gemma4-12b`; no model promotion or scheduler change.
+
+Implemented scope: UMI accepted-effect prompt/context projection (all facts retained),
+explicit default array `items={}` in the shared decoder projection, preservation of the
+primary Planner title through readiness/lookup wrappers, and typed Social Cognition
+request/validation failures at the existing Host containment boundary. Canonical
+semantic authority, DTO cardinality, confirmation and fail-closed Work remain intact.
+The proposed relocation of native `oneOf`/`anyOf` behind `allOf` was withdrawn:
+actual XGrammar admitted forbidden silence/covered. Current projection keeps those
+alternatives intact; exact grammar proof rejects covered silence and accepts pending silence.
+
+Observed failures: the original `sure` is now physical water intent, but two same-scope
+Planner calls race and the canonical call previously failed HTTP 400 before inference.
+The readiness wrapper had dropped the role title, bypassing array/shape/format settings.
+An exact native replay with the retained title now returns HTTP 200, stop, complete JSON
+in 22.959s; raw Schema and semantics still fail (invented location gaps and deferral).
+All provider-owned source-resolution metadata was present in that request; missing
+capability projection is not established. Planner correctness remains open.
+
+The next bound aggregate stopped at compound UMI r4 relation-only/overlapping provenance
+(1/79 attempted, 78 unrun; bundle `chromie_debug_bundle_20261007_171342.tar.gz`).
+Focused water then stopped at its greeting: SC delivered the greeting, later emitted
+forbidden silence/covered, Agent returned 422, and Host appended a generic apology.
+Its bundle is `chromie_debug_bundle_20261007_172100.tar.gz`; water turns were unrun.
+The Host repair classifies thrown RuntimeError/ValueError as `social_cognition` failure:
+existing containment preserves a completed speech-only response while retaining failure
+telemetry; body Work still fails and cannot dispatch. Four valid red regressions pass green;
+combined focused suites pass 42 tests and 85 subtests. No corrected live proof yet.
+
+Qualification: accepted-effect UMI 14 native contrasts pass that narrow scope, with
+Chinese open-help language still unqualified. Frozen 25 compound/need contrasts:
+baseline has six Schema/Host failures; the first candidate is mechanically valid but
+loses relations/grouping. A later focused prompt improves ordering but does not qualify
+independent effect/body-family coverage. Neither candidate is promoted. Field-order
+experiment suffered global host OOM killing the provider scheduler at 17:35:27 +08
+(112449912 kB anonymous RSS); causative compiler growth is unproven. It is an incomplete
+service-integrity run, not five semantic failures. One bundle
+`chromie_debug_bundle_20261007_173617.tar.gz`; provider auto-recovered with changed runtime
+identity. Further syntax probes use isolated bounded containers, no GPU inference.
+
+Historical freeze 19 strict replay passed 6000/6000, zero candidate calls; its full gate
+passed 169 benchmark, 3985 main, five skips, 1063 subtests and 20 legacy tests, but covers
+the withdrawn decoder projection. Final-source request capture passes 6000/6000 and five
+prototypes; freeze 20 retains every non-request field and strict replay and the first full canonical gate passed; latest Host repair gates are recorded below. Agent was rebuilt and source-verified before the latest diagnostic live runs; final Host live proof remains pending.
+No current voice, physical microphone/speaker/robot, release or target qualification.
+
+Evidence root: `/home/chromie/github/chromie/.chromie/acceptance/water-context-repair-20261007/`.
+Bundles above are under `/home/chromie/Downloads/`. Native receipts are in
+`mixed-decoder-branches/`; red/green containment logs and request-only capture are retained.
+Open blockers: UMI obsolete sibling-ref instructions versus natural WHAT, Planner semantic
+completeness/provenance, same-scope invocation race (explicit owner scheduling approval
+pending), and provider source-binding truth (provider not invoked in blocked episodes).
+
+### Follow-up isolation — silent SC state erases a completed response
+
+Corrected Agent source digest `2b4f22989ef91b38b4ec210d85c83ab77f8dbd40af999ac0b7062d897791d7c8`
+matched the checkout before the next bound aggregate. That aggregate's first compound
+case executed walk10s/vx0.2, default-count2 nod, then left turn in simulation and ended
+safe_idle. It still fails: UMI omitted explicit ordering in outcomes, and a7-char
+acknowledgement's first PCM took4883.5ms against3500ms start deadline. One bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261007_181405.tar.gz`.
+1/79 attempted,78unrun; reviewed fail, not qualification. Provider performance cause
+beyond this observed deadline miss remains unproven.
+
+Same-runtime focused water attempted greeting and thirst, not accepted-water turn.
+Greeting is mechanically accepted but SC authors identical words under `greet_and_status`
+and later `resp_001`, causing two real synthetic playback occurrences. Thirst UMI is
+one turn-scoped speech Responsibility; SC delivered `offer_water_help`. GA then requests
+goal-state SC, which correctly chooses silence. Host replaces its sole social-task handle
+with that silence. The redundant canonical Planner's score/status DTO fails; completed
+speech containment now sees only silence, requests a failure update and leaves the
+already addressed interaction Goal open/planning. One bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261007_181616.tar.gz`.
+Every attempted turn reviewed fail; turn03unrun. No water provider invocation.
+
+Current Host repair retains the initial task handle and joins original/current state tasks
+without replacing delivered speech by silence. For newly materialized speech-only Goals,
+it invokes the existing source-ref/Goal-ID completion join from SC respond + actual delivery.
+Two regression cases prove retained speech and actual Goal closure versus non-speech
+receipt: body Work remains error/open, no dispatch. Valid red pointer failure and separate
+red lingering-Goal assertion are retained; green combined suites44 tests/85subtests,
+adjacent8 tests pass. No scheduling, semantic re-authoring or text deduplication introduced.
+The corrected Host source still needs renewed live evidence.
+
+Freeze20: changed2700Fast/1900Deep requests, four prototype Planner requests; all6000+5
+non-request records identical, zero candidate calls. Archive SHA256
+`6f4c7e7986ead2a6b3bad5b0c2b00e1ecf7398fa69e55f9b69c992319a6ad052`.
+Strict6000/6000 and first full gate20 pass:169 benchmark,3991 main,5skips,1063subtests,
+20legacy. Those gates precede silent-state retention/closure. Pointer-only strict6000 also
+passed. Its full gate was intentionally terminated before completion for the reproduced
+Goal-closure repair; it is not a pass. Final-source canonical rerun passed:169 benchmark,3993 main,5 skips,1063 subtests,20 legacy. Final strict replay passed6000/6000 with source unchanged and zero model calls; Level A passed30 distinct cases across six ability classes. Policy, docs, test ownership and diff checks passed. Receipts: `run-tests-sc-final.log`, `strict-sc-final/`, `level-a-sc-final/`. These are local proofs, not live qualification.
+
+Another private compound prompt candidate completed all25 fixed-model primary transactions:
+source-language and retained order improve, but four hard cases fail (politeness creates
+an extra speech result; mixed body-family grouping; one missing joke plus overlapping
+provenance). Candidate rejected, source prompt unchanged. Same-agent post-hoc ledgers are
+retained, not independent evaluation or a Runtime repair. The duplicate greeting has a focused namespace contrast in `live-current-water/identity-namespace/`: changing only Planner Need fact `activity_id` to existing name `fast_activity_id` in all three prompt mirrors changed the primary SC output from duplicate `resp_001` to existing delivered act `greet_and_status`. Both native grammars accept either ID. This supports context ambiguity, but the wider SC corpus is unrun and no source projection fix is applied. Pending owner approval is still
+required for narrow same-scope Planner consolidation; no scheduler change applied.
+
+Owner scope correction: keep subsequent turns to one defect and one focused fix.
+The owner subsequently authorized delivery of the current patch without expanding it.
+Resume with one defect and one focused fix per turn. Next candidate is SC act-ID
+namespace qualification; do not bundle it with Planner scheduling or compound UMI work.
+Final Host live proof remains pending; source and evidence gaps above remain open.
+
+Resume from `/home/chromie/github/chromie`; inspect the retained SC namespace
+contrast first, freeze its complete contrast matrix before another native batch, and
+keep Planner scheduling and compound UMI repair out of that turn. Local receipts
+above already cover the delivered source; do not rerun them just to restate a pass.
+
+```bash
+cd /home/chromie/github/chromie
+git status --short
+rg -n 'activity_id|fast_activity_id|communication_needs' agent/app/social_cognition.py
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
+```
+
+For subsequent live proof, bind a fresh identity and a new evidence directory; do not
+reuse `runtime-identity-current.json` or overwrite the retained `live-current-*` runs.
+Private evidence and bundles are local artifacts, not distributed by this commit.
+Run the frozen full cohort without source changes, stop on hard integrity failure,
+collect one bundle and judge every attempted case. No scheduler change is approved.
+
 ## Current delivery — open-ended help, GA ownership and SC failure update, 2026-10-07
 
 Checkout `/home/chromie/github/chromie`, branch `main`; fetched upstream base

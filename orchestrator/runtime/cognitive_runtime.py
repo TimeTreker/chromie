@@ -2773,14 +2773,29 @@ class GoalDrivenRuntimeCoordinator:
             evidence_refs=list(evidence_refs or []), communication_needs=list(plan.communication_needs),
             context=source_context,
         ).model_copy(deep=True)
-        result = await self._observe_workflow_stage(
-            sid=session_id, stage="social_cognition", input_payload=request,
-            operation=self.agent_client.resolve_social_cognition(
-                session, request=request,
-                timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deep_planner_timeout_ms),
-            ),
-        )
-        result.validate_request(request)
+        try:
+            result = await self._observe_workflow_stage(
+                sid=session_id, stage="social_cognition", input_payload=request,
+                operation=self.agent_client.resolve_social_cognition(
+                    session, request=request,
+                    timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deep_planner_timeout_ms),
+                ),
+            )
+            result.validate_request(request)
+        except CognitiveStageFailure:
+            raise
+        except (RuntimeError, ValueError) as exc:
+            # This is a cognitive service/contract failure, not a Host bug.
+            # Preserve the existing completed-conversation containment while
+            # retaining the failure and keeping non-speech Work fail closed.
+            raise CognitiveStageFailure("social_cognition", {
+                "failure_class": "social_cognition_request_failed",
+                "failure_domain": "cognitive_service",
+                "architecture_attribution": "not_evaluated",
+                "retryable": False,
+                "error_type": type(exc).__name__,
+                "error": str(exc),
+            }) from exc
         current_interaction = self._interaction_context(sid=session_id, context=current_context, goal_ids=plan.goal_ids)
         for act in result.activities:
             validate_communicative_activity_identity(
@@ -4625,6 +4640,7 @@ class GoalDrivenRuntimeCoordinator:
         planning_snapshot: dict[str, Any] | None = None
         planning_commit: dict[str, Any] | None = None
         state_social_task: asyncio.Task[Any] | None = None
+        initial_social_task: asyncio.Task[Any] | None = None
         planner_refs: list[str] = []
         initial_meaning_uncertainty_count = len(work_request.meaning_uncertainties)
         post_ga_meaning_uncertainty_count = initial_meaning_uncertainty_count
@@ -4807,23 +4823,27 @@ class GoalDrivenRuntimeCoordinator:
         async def finish_independent_social_interaction() -> None:
             """Work failure does not revoke this turn's already admitted SC work."""
             nonlocal interaction
-            if state_social_task is None:
-                return
-            try:
-                result, = await asyncio.gather(state_social_task, return_exceptions=True)
-            except asyncio.CancelledError:
-                # The outer deadline or explicit interruption still owns cancellation,
-                # including Runtime delivery that has already been submitted.
-                await self.cancel_social_interaction()
-                raise
-            if isinstance(result, BaseException):
-                stage_diagnostics.append(self._stage_failure_metadata(
-                    "social_cognition",
-                    {"error_type": type(result).__name__, "error": str(result)},
-                    default_failure_class="social_interaction_failed",
-                ))
-            elif result is not None:
-                _social_result, interaction = result
+            # State re-entry may replace the current task with intentional silence.
+            # Join the original delivery too; silence cannot erase its receipt.
+            for task in dict.fromkeys((initial_social_task, state_social_task)):
+                if task is None:
+                    continue
+                try:
+                    result, = await asyncio.gather(task, return_exceptions=True)
+                except asyncio.CancelledError:
+                    # Outer deadline/interruption still owns submitted delivery.
+                    await self.cancel_social_interaction()
+                    raise
+                if isinstance(result, BaseException):
+                    stage_diagnostics.append(self._stage_failure_metadata(
+                        "social_cognition",
+                        {"error_type": type(result).__name__, "error": str(result)},
+                        default_failure_class="social_interaction_failed",
+                    ))
+                elif result is not None:
+                    _social_result, response = result
+                    if interaction is None or response.speech or not interaction.speech:
+                        interaction = response
 
         async def communicate_terminal_work_failure(
             *, stage: str, failure_class: str, failure_domain: str, failure_reason: str,
@@ -4936,6 +4956,7 @@ class GoalDrivenRuntimeCoordinator:
                 work_request=work_request,
                 turn_id=turn_id,
             )
+            initial_social_task = state_social_task
             association_task = (
                 asyncio.create_task(
                     self._resolve_and_commit_goal_association(
@@ -5926,7 +5947,12 @@ class GoalDrivenRuntimeCoordinator:
                 item.output_mode == "speech"
                 for item in work_request.responsibilities
             )
-            if delivered_current_interaction and conversational_only:
+            if delivered_current_interaction and conversational_only and interaction is not None:
+                direct_social_completion_results = (
+                    self._reconcile_delivered_direct_social_response(
+                        association=association, interaction=interaction, sid=sid,
+                    ) if association is not None else []
+                )
                 return self._finish(
                     mode=self.policy.mode,
                     status=(
@@ -5947,6 +5973,7 @@ class GoalDrivenRuntimeCoordinator:
                         "suppressed_failure_class": str(
                             exc.failure_metadata.get("failure_class") or type(exc).__name__
                         ),
+                        "direct_social_completion_results": direct_social_completion_results,
                         "stage_diagnostics": stage_diagnostics,
                         **path_metadata(),
                     },

@@ -1,11 +1,26 @@
 # Chromie Current Status
 
+## Current in-progress isolation, 2026-10-07
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Dirty UMI accepted-effect context/prompt repair, equivalent default array projection, retained Planner decoder title through readiness/lookup, typed late SC request failure containment, and retained initial delivery/Goal completion across silent state re-entry. Unsafe relocation of decision alternatives withdrawn. UMI compound, Planner semantic/provenance and same-scope invocation failures remain open. |
+| Automatic verification | Current focused 42 tests/85 subtests pass; exact native grammar preserves SC silent-need restrictions and compiles corrected Fast. Native Fast replay HTTP 200/complete JSON still fails Schema/semantics. Accepted-effect UMI14 passes limited scope. Frozen25 compound baseline/candidates remain unqualified. Final6000+5 request capture preserves non-request data; freeze20 strict6000 and gate169/3991/5skip/1063subtests/20legacy pass before the latest silent-state/closure fix; current44 focused/85subtests and adjacent8 pass; final gate169/3993/5skip/1063subtests/20legacy, strict6000/6000 and Level A30 distinct cases/six classes pass. Latest SC ID namespace contrast supports context ambiguity but is not broadly qualified or applied. Historical freeze19 gate passed but tested withdrawn projection. |
+| Target validation | Bound aggregate stopped first compound case: relation-only overlapping UMI output (1/79). Focused water stopped at greeting: late SC422 after speech caused generic apology; subsequent water turns unrun. Corrected Agent bound aggregate executed three simulator actions but TTS missed playback-start deadline; focused water repeats greeting under new SC ID and loses completed thirst response to later silence before a Planner DTO failure. Latest Host retention/closure proof pending. No supervised physical audio/robot evidence. |
+| Deployment state | Agent rebuilt from existing dependencies and packaged source verified as2b4f2298… before diagnostic live runs; voice_mujoco retained. Native field-order experiment hit global host OOM; LLM automatically recovered, requiring fresh identity binding. Fixed Gemma4-12B, owner-authorized in-progress Git delivery; no promotion, release or qualification. |
+
+Private evidence: `.chromie/acceptance/water-context-repair-20261007/`.
+One bundle per stop: `171342` aggregate, `172100` greeting and `173617` provider OOM
+under `/home/chromie/Downloads/chromie_debug_bundle_20261007_<time>.tar.gz`.
+See [audit](../ARCHITECTURE_AUDIT.md), [checkpoint](../DEVELOPMENT_CHECKPOINT.md)
+and [handoff](../HANDOFF.md) for actual module I/O and resume order.
+
 Updated: 2026-10-07. Current focus: Goal-driven single-authority architecture,
 canonical local verification, current-revision voice proof and default target-evidence closure.
 The [project audit](../ARCHITECTURE_AUDIT.md) records design/source conflicts and
 actual module I/O; it does not amend authority or establish full qualification.
 
-## Current verification and deployment state — water acceptance, 2026-10-07
+## Previous verification snapshot — water acceptance, 2026-10-07
 
 | Axis | Current evidence |
 | --- | --- |

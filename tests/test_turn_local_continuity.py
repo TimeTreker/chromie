@@ -643,3 +643,169 @@ async def test_late_fast_planner_failure_cannot_invalidate_delivered_conversatio
     assert result.metadata["optional_cognition_failure_after_delivered_interaction"] is True
     assert result.metadata["suppressed_failure_stage"] == "fast_planner_stream"
     assert agent.social_calls == 1, "late Fast failure must not trigger a second failure response"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("speech_only", [True, False])
+@pytest.mark.parametrize("error_type", [RuntimeError, ValueError])
+async def test_late_sc_request_failure_preserves_delivered_conversation_but_not_body_work(
+    speech_only, error_type,
+) -> None:
+    from shared.chromie_contracts.plan import CanonicalPlan
+    from tests.test_cognitive_runtime_pr7 import ScriptedClient, respond_plan
+
+    goal_id = "goal-late-sc"
+    association = new_goal_association(goal_id) if speech_only else body_goal_association(goal_id)
+    plan = respond_plan(goal_id) if speech_only else CanonicalPlan(
+        plan_id="unavailable-body", planner_tier="fast", disposition="unavailable",
+        coverage="uncertain", confidence=1.0, goal_ids=[goal_id],
+        goal_summary="The requested body effect is unavailable.",
+        unresolved=["No executable body Work is available."],
+    )
+
+    class Agent(ScriptedClient):
+        def __init__(self):
+            super().__init__(association=association, fast_plans=[plan])
+            self.social_calls = 0
+            self.social_words[goal_id] = "An internal error prevented completion."
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            self.social_calls += 1
+            if request.trigger == "interpretation":
+                return SocialCognitionResolution(
+                    request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                    disposition="communicate", activities=[{
+                        "activity_id": "initial-reply", "text": "Hello." if speech_only else "Okay.",
+                        "function": "respond" if speech_only else "acknowledge",
+                        "truth_stage": "context_grounded" if speech_only else "pre_evidence",
+                        "progress_kind": None if speech_only else "acknowledge_work",
+                        "source_responsibility_refs": ["r1"],
+                    }], need_outcomes={}, reason_summary="Initial interaction.", model_call_count=1,
+                )
+            if self.social_calls == 2:
+                raise error_type("Agent Social Cognition HTTP 422: raw Schema rejected")
+            return await super().resolve_social_cognition(session, request=request, **kwargs)
+
+    agent = Agent()
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=agent, adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+    )
+    text = "Hello." if speech_only else "Blink twice."
+    core, envelope = admitted_core(
+        text, sid="late-sc", language="en-US", responsibilities=[{
+            "local_ref": "r1", "outcome": "Greet the user." if speech_only else "Blink twice.",
+            "output_mode": "speech" if speech_only else "body_action",
+            "continuity_scope": "turn" if speech_only else "goal", "confidence": 1.0,
+        }], cognitive_requests=[{
+            "authority": "planner", "responsibility_refs": ["r1"],
+            "reason_summary": "Determine the requested HOW.",
+        }],
+    )
+    result = await coordinator.resolve(
+        object(), text=text, sid="late-sc", core_interpretation=core, turn_envelope=envelope,
+        context={"history": []}, history=[], language="en-US",
+    )
+    if speech_only:
+        assert result.status == "applied", result.fallback_reason
+        assert result.interaction_response.speech[0].text == "Hello."
+        assert result.metadata["optional_cognition_failure_after_delivered_interaction"] is True
+        assert result.metadata["suppressed_failure_stage"] == "social_cognition"
+        assert agent.social_calls == 2, "No apology or retry after the completed conversation."
+    else:
+        assert result.status == "error"
+        assert result.metadata["failure_stage"] == "social_cognition"
+        assert agent.social_calls == 3, "An acknowledgement does not complete body Work."
+        assert result.interaction_response.capabilities == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("speech_only", [True, False])
+async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_failure(speech_only):
+    import asyncio
+    from orchestrator.runtime.cognitive_runtime import CognitiveStageFailure
+    from tests.test_cognitive_runtime_pr7 import ScriptedClient, respond_plan
+
+    goal_id = "goal-silent-state"
+    association = new_goal_association(goal_id) if speech_only else body_goal_association(goal_id)
+    data = association.model_dump(mode="json")
+    data["cognitive_requests"] = [
+        {"authority": "planner", "responsibility_refs": ["r1"],
+         "reason_summary": "Check canonical Work."},
+        {"authority": "social_cognition", "responsibility_refs": ["r1"],
+         "reason_summary": "Observe Goal state."},
+    ]
+    association = type(association).model_validate(data)
+
+    class Agent(ScriptedClient):
+        def __init__(self):
+            super().__init__(association=association, fast_plans=[respond_plan(goal_id)])
+            self.social_calls = 0
+            self.state_seen = asyncio.Event()
+
+        async def resolve_fast_plan(self, *args, **kwargs):
+            await self.state_seen.wait()
+            raise CognitiveStageFailure("fast_planner", {
+                "failure_class": "structured_output_validation",
+                "failure_domain": "model_contract", "retryable": False,
+            })
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            self.social_calls += 1
+            if request.trigger == "interpretation":
+                return SocialCognitionResolution(
+                    request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                    disposition="communicate", activities=[{
+                        "activity_id": "initial-delivered",
+                        "text": "Can I get you some water?" if speech_only else "Okay.",
+                        "function": "respond" if speech_only else "acknowledge",
+                        "truth_stage": "context_grounded" if speech_only else "pre_evidence",
+                        "progress_kind": None if speech_only else "acknowledge_work",
+                        "source_responsibility_refs": ["r1"],
+                    }], need_outcomes={}, reason_summary="Initial interaction.", model_call_count=1,
+                )
+            if request.trigger == "goal_state":
+                self.state_seen.set()
+                return SocialCognitionResolution(
+                    request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+                    disposition="silence", activities=[], need_outcomes={},
+                    reason_summary="Prior response delivered; no new interaction.", model_call_count=1,
+                )
+            return await super().resolve_social_cognition(session, request=request, **kwargs)
+
+    agent = Agent()
+    state = ConversationStateManager(base_conversation_id="silent-state")
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=agent, adapter=RecordingPlannerAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"),
+        goal_state_apply=state.apply_goal_association_resolution,
+        communicative_goal_completion_apply=state.reconcile_communicative_goal_completion,
+    )
+    text = "I am thirsty, can you help?" if speech_only else "Blink twice."
+    core, envelope = admitted_core(
+        text, sid="silent-state", language="en-US", responsibilities=[{
+            "local_ref": "r1", "outcome": "Address thirst help." if speech_only else text,
+            "output_mode": "speech" if speech_only else "body_action",
+            "continuity_scope": "turn" if speech_only else "goal", "confidence": 1.0,
+        }], cognitive_requests=[{
+            "authority": "planner", "responsibility_refs": ["r1"],
+            "reason_summary": "Determine HOW.",
+        }],
+    )
+    result = await asyncio.wait_for(coordinator.resolve(
+        object(), text=text, sid="silent-state", core_interpretation=core,
+        turn_envelope=envelope, context={"history": []}, history=[], language="en-US",
+    ), 3)
+    if speech_only:
+        assert result.status == "applied", result.fallback_reason
+        assert result.interaction_response.speech[0].text == "Can I get you some water?"
+        assert result.metadata["suppressed_failure_stage"] == "fast_planner"
+        assert agent.social_calls == 2
+        assert state.active_goal_snapshots() == []
+        assert state.recent_goal_snapshots()[0]["responsibility_status"] == "satisfied"
+    else:
+        assert result.status == "error"
+        assert result.metadata["failure_stage"] == "fast_planner"
+        assert agent.social_calls == 3
+        assert result.interaction_response.capabilities == []
+        assert state.active_goal_snapshots()[0]["responsibility_status"] == "open"

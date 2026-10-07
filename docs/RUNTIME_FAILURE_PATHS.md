@@ -216,6 +216,18 @@ The finalized workflow reports `failed`, not successful interaction completion.
 denotes a sealed trace; neither alone proves successful delivery. Optional failure
 does not replay Work, rewrite speech, or invoke a model repair.
 
+Social Cognition request/DTO validation RuntimeError or ValueError is classified as a
+`social_cognition` CognitiveStageFailure before outer handling. If the same turn has
+actually delivered all speech-only Responsibilities, existing conversation containment
+retains that response and failure telemetry without an appended apology. A receipt for
+body Work is insufficient: that turn remains failed, no Work is authorized, and its
+failure may require SC result communication. This is failure classification, not a
+semantic retry or conversion of failed Work into success. The Host joins the original
+interpretation-time delivery as well as the latest same-turn state task: intentional
+silence cannot erase a completed response. If GA newly materialized speech-only Goals,
+the existing immutable Responsibility-ref/Goal-ID join applies SC respond plus actual
+delivery as completion evidence. A body receipt does not enter that join.
+
 The same containment applies to result, provider, time and Situation re-entry:
 returned technical failures and thrown call errors are retained as failed workflow
 stages before adaptation or commitment. A Fast technical failure cannot invoke

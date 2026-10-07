@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "629ef5ba80ae95f037ab49e929a0ec065db6dc1a83ed097e04354b7354a06ede",
-    "workflow-conditional-dry.json": "c23a758bbf108eed4e94a8d65da3982346962c7b91bbcf1e65b6662f99ab4773",
-    "workflow-conditional-rain.json": "1d5ed57dc2e0c141be8769ab8e0cc8858867f81f8f42a2d4ef4d3d75221114d5",
-    "workflow-delayed.json": "55446e42a0c7dc9271ca8bf6955e8f524c250a31e5a9daa1e27b9de9e1de5f07",
-    "workflow-normal.json": "36b3abace2ae079fda2bad7a427f5cfbfba8d7994b6ebead2044a99ad57f6e1a"
+    "workflow-cancellation.json": "227989ef5265d9090962b49521bdc638b53b61bf6dac2daf341b4bc23346a354",
+    "workflow-conditional-dry.json": "33b08b61f792097a23eb9f6a4f381630968409972a5d6652893b2e9b7be2862f",
+    "workflow-conditional-rain.json": "36c037fe31a2b6a2f58c0461c464e7b3b7f2ae2a129cfdff67f1e0db44055776",
+    "workflow-delayed.json": "3b8831c6e7196a682ae321840aa13d8b203546be93a5c3d1efbee7f8f59368fe",
+    "workflow-normal.json": "fffb52f2118113e20ca5ad9ceda5d859cf8b520f0c55c75453a914b0f643b9d9"
   },
-  "freeze_revision": 17,
-  "freeze_note": "Request-only recapture for current UMI prompt and previously stale prototype user/Schema packets. Five original inputs, model reference decisions, complete meaning, Goal relations, parameters, prior Goals, provider outcomes, faults and assertions remain unchanged.",
+  "freeze_revision": 20,
+  "freeze_note": "Request-only recapture for current UMI projection, explicit array defaults preserving native alternatives, and retained primary Planner decoder profile through readiness/lookup wrappers. All inputs, reference decisions, meanings, relationships, provider outcomes and assertions are unchanged.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

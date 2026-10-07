@@ -3,6 +3,188 @@
 审计日期：2026-10-04；最后更新：2026-10-05。读者：项目负责人及维护者。本文记录发现和证据，
 不替代章程、组件契约或 [当前状态](docs/STATUS.md)。
 
+## 2026-10-07：原始水对话的最新完整路径与 decoder 修复
+
+已部署 UMI 修复的 focused run 绑定了事先采集的 dirty diagnostic identity。
+第一例 `accepted_water_offer_executes` 在第三轮 `sure` 停止，第二例未执行。
+本次 retained call evidence 中：
+
+| 模块 / 权威 | 实际输入与输出 | 下一边界与判断 |
+| --- | --- | --- |
+| UMI / 当前 WHAT | 原始 `sure`，上一轮拿水提议，旧口渴求助 Goal → 一个 r1，body_action/task_physical_effect，`get some water for the user` | 向 GA、Fast、SC 并发传递；本次接受含义正确 |
+| SC / 交互表达 | 已接受 r1、规划未完成 → `Okay.` | 正确收据，不声称执行 |
+| GA / 身份与连续性 | r1 → 新物理 Goal `goal_a906754617cbb5a724d6`，关联旧求助 Goal；同时请求 Planner | Goal mapping 可机械绑定；触发另一 Fast 调用需审查 |
+| Host / 协调 | UMI scope r1 的 streaming_advance 仍在运行；GA scope 同为 r1 的 primary canonical Fast 同时开始 | 两个 Fast HOW 调用竞赛；没有新增 Capability Evidence，后者失败取消前者 |
+| SGLang / decoder 协议 | canonical Fast wire 的 allOf 分支里 bounded arrays 省略 items → HTTP 400，minItems=1 被解释为 closed empty tuple | 此次 canonical Planner 模型推理根本没有开始；确认接口根因 |
+| Host / 失败收敛 | inference_transport:http_error → 取消 streaming Planner、阻断 Work | GA 已提交，但没有物理 provider 调用；正确 fail closed |
+| SC / 终态真实更新 | 已接受的水任务、内部 HTTP 400 → `I couldn't get that water for you because of a technical error.` | 没有要求用户重复；正确区分理解与执行失败 |
+
+```mermaid
+sequenceDiagram
+    participant UMI
+    participant Host
+    participant GA
+    participant Fast
+    participant Decoder
+    participant SC
+    UMI->>Host: r1 physical water delivery
+    par Original Work invocation
+        Host->>Fast: streaming_advance(r1)
+    and Canonical binding
+        Host->>GA: associate r1
+        GA->>Host: new Goal + Planner request(r1)
+        Host->>Fast: canonical primary(r1)
+        Fast->>Decoder: bounded array refinement without items
+        Decoder-->>Host: HTTP 400 before inference
+    end
+    Host->>Fast: cancel streaming invocation
+    Host->>SC: terminal technical failure, accepted meaning
+    SC-->>Host: truthful failure update
+```
+
+当前接口根因补充：`planner_readiness_response_schema` 丢弃主 schema 的 title，
+lookup wrapper 无法保留已经丢失的 title，`_openai_response_format` 因而跳过
+该 Planner 的 array/shape/compact 格式投影。修复保留已有主 schema title，
+array 的默认 items 显式化，canonical Schema/DTO/Host 保持原语义。
+原先把 decision alternatives 移到 allOf 的方案已经撤回：实际 XGrammar 会接受
+SC 禁止的 silence/covered。当前 native oneOf 原位保留；原始 SC 合同对照明确
+拒绝 covered silence，接受 pending silence。新 Fast wire 编译通过；同一完整
+请求 native replay 在22.959秒以 HTTP200/stop 返回完整 JSON，但 Schema/语义
+仍失败：编造 source/recipient location 缺口及 deferral，没有实际执行。
+完整 catalog 已包含 provider-owned source/perception/navigation 信息，
+不能把缺失投影当作已确认原因，也不能宣称 Planner 已修好。
+
+历史 freeze19 完整 gate 通过，但覆盖已撤回的方案；当前 focused42 tests/
+85 subtests 通过，完整 gates 与 corrected deployment live proof 待重新保留。
+
+本次唯一 bundle：`/home/chromie/Downloads/chromie_debug_bundle_20261007_164625.tar.gz`。
+证据：`.chromie/acceptance/water-context-repair-20261007/live-water-focused/`。
+已请求负责人明确批准：同一 accepted scope 只保留一个 primary Planner，
+GA 提供 canonical binding；真实新 Evidence/不同 scope 仍可有合法 re-entry。
+在答复前不改 canonical 调度规则。该请求来自 AGENTS.md 的架构 authority 审批边界。
+
+## 2026-10-07：greeting 后 SC422 与 Host 失败边界
+
+同一 decoder image 的 bound aggregate 第一例 UMI 生成三项真实效果及额外关系
+Responsibility r4，source span 与 r2 重叠；Host 正确503阻断，GA/Planner/SC/Work
+未执行。1/79 attempted，78 unrun；唯一 bundle171342。
+之后 focused water 仅到第一轮 greeting，SID2144f717；thirst/sure 均未执行。
+唯一 bundle172100。恢复 SC JSON log 时移除的是穿插的 HTTP logging 行，
+没有修复模型结果；原日志和恢复后的请求/原始输出均保留。
+
+| 模块 / 所有者 | 实际权威输入 → 实际输出 | 预期 / handoff 与判断 |
+| --- | --- | --- |
+| UMI / WHAT | greeting + how doing → r1回答/r2招呼，均speech | 当前含义正确；同一SID向SC/GA/Fast并发传递 |
+| GA / Goal身份 | 两项speech → 两个interaction Goals | 保留各自身份；此处未观察错误 |
+| 初始SC / 表达 | accepted greeting → `Hi! I'm doing great, thanks for asking. How are you?` | 已有synthetic TTS delivery；正确，没有physical audio证据 |
+| Fast / Work need | speech Responsibilities → response need | 已有speech可复用，实际完成need accounting仍需SC验证 |
+| later SC / 结果记账 | work-state + delivered greeting → silence + covered need | canonical禁止silence作为covered witness；这是首个错误主输出，Agent422；错误wire alternatives是贡献条件 |
+| Host / 失败分类 | Agent422抛RuntimeError → generic runtime catch → terminal apology | 应保留已完成speech并记录late bookkeeping failure；该错误绕过existing CognitiveStageFailure containment |
+| terminal SC / 下游症状 | generic failure need → apology | 用户听到/看到greeting后又道歉；没有再次解释用户或调用身体provider的依据 |
+
+```mermaid
+sequenceDiagram
+    participant Host
+    participant SC
+    participant Fast
+    participant Agent
+    Host->>SC: accepted greeting
+    SC-->>Host: greeting act
+    Host->>Host: synthetic delivery completes
+    Fast-->>Host: response need
+    Host->>SC: work-state + delivery evidence
+    SC-->>Agent: silence + covered
+    Agent-->>Host: HTTP422 / RuntimeError
+    Host->>Host: formerly generic error → apology
+    Note over Host: fix classifies social_cognition failure
+    Host->>Host: existing completed-conversation containment
+```
+
+修复在 `resolve_plan_interaction` 现有owner：Agent调用及request-validation的
+RuntimeError/ValueError转为 `CognitiveStageFailure(social_cognition)`，保留
+错误分类和telemetry，不重试、不补写语义。四项有效red→green回归包含两种错误
+和speech-only/body两个对照：真正已完成conversation保留原speech；body receipt
+不能满足physical Work，仍error、没有dispatch。当前combined42 tests/85 subtests
+通过。该修复尚无corrected live证据，不能覆盖canonical SC primary output错误。
+
+复合关系冻结25例的baseline有6项Schema/Host失败；candidate机械25/25但丢失
+完整关系/独立effect分组，未晋升。规则后置focused改善顺序但body-family覆盖
+仍未qualified。field-order实验首调用provider断开，其余尝试无可评分结果；
+kernel17:35:27 +08确认global OOM杀死sglang scheduler，anonymous RSS112449912kB。
+无法据此证明compiler具体增长机制。唯一bundle173617，自动恢复改变runtime identity；
+后续syntax grammar实验以network-none/2GiB/1CPU/55s disposable container执行。
+生产schema字段顺序、模型和调度未更改。
+
+## 2026-10-07：silent re-entry 丢失原始 delivery 与 Goal closure
+
+最新 bound aggregate SID77582b68：UMI三个effect丢失显式then关系；Planner读取
+immutable原话后按顺序完成walk10s/vx0.2、default count2 nod、left turn，provider
+safe_idle。SC短ack7chars的PCM4883.5ms晚于3500ms deadline，取消synthetic playback。
+因此1/79 attempted、78unrun，不能把physical-like动作完成平均为pass。bundle181405。
+
+focused water SID6f08c738 greeting先交付`greet_and_status`，后SC用新ID`resp_001`
+再交付相同words：两次synthetic playback，是SC identity accounting错误，未通过。
+SID14353a8f thirst实际流程如下，bundle181616；accepted-water第三轮未执行。
+
+| 模块 / owner | 权威输入 → 实际输出 | 预期 / 判断 |
+| --- | --- | --- |
+| UMI / WHAT | thirst/help → one speech/turn r1 | 当前meaning正确，SC/GA/Fast并发 |
+| 初始SC / communication | r1 → respond `offer_water_help`，实际TTS完成 | 已回答开放求助，不是physical receipt；正确 |
+| GA / identity | r1 → 新speech Goal25159dc…，请求Planner与goal-state SC | canonical binding可机械join；same-scope Planner调用仍需审批 |
+| goal-state SC | 原始delivery ledger + 新Goal → silence | 没有新social change；正确 |
+| Host / async bookkeeping | `state_social_task`被silence task替换，原始handle丢失 | silent state不撤销delivered answer；错误containment输入 |
+| canonical Planner / HOW | 同一r1 → satisfaction score0.95但status不匹配，DTO拒绝 | 主输出contract错误；不允许semantic retry |
+| Host / failure containment | 只join最新silence，没有原speech → failure Need，Goal仍open/planning | 应保留原speech/telemetry并进行已有GA/SC/delivery join；错误下游收敛 |
+| terminal SC / symptom | trusted failure Need → user-facing failure update | Host提供错误工作义务；不是没听懂，provider未调用 |
+
+修复在Host原owner保留initial task handle，join原始与最新task；silence不覆盖
+实际speech。新speech-only Goal通过已有 `_reconcile_delivered_direct_social_response`
+机械绑定immutable refs与canonical Goal IDs，以SC respond和实际delivery作完成证据。
+pointer red→green；另一个red确认Goal仍open，closure join后green。44 focused/
+85subtests与adjacent8通过；body负对照继续error/open、无dispatch。无新semanticowner、
+调用、phrase规则或scheduler更改；最新live仍待保留，完整gate结果见下。
+
+freeze20 strict6000与完整169bench/3991main/5skip/1063subtests/20legacy通过，仅覆盖
+pointer/closure之前的source。pointer-only strict6000通过，之后full gate为closure
+repair主动终止，不能记pass。最终source完整gate通过169bench/3993main/5skip/1063subtests/20legacy，strict6000/6000 source unchanged、零modelcall；Level A六类30个独立case通过。最新compound private25
+candidate有4项hard failure，未晋升；具体逐例post-hoc ledger保留。
+
+## 2026-10-07：换模型后进一步隔离（进行中）
+
+基线 `ee74ee8f9cc76982e5a06170e50f2601d06f5788`，固定 Gemma4-12B，
+没有晋升另一模型。证据保留于 `.chromie/acceptance/water-context-repair-20261007/`。
+以下是已观察的边界，不把候选失败归因于模型固有能力。
+
+| 实际流程 / 所有者 | 权威输入 → 实际输出 | 应有输出 / 边界判断 |
+| --- | --- | --- |
+| 历史对话与当前输入 → UMI | 较早的口渴求助 speech Goal、刚提出的拿水选项、当前接受/选择；原主调用把接受归为 speech，或把拿取归为 stateful_effect | 当前同意的完整物理效果；错误首先发生在 UMI |
+| UMI 提示与上下文投影 | 仅改解析说明不能稳定修复选择；补充物理效果定义后仍把信息同意解释为旧求助；把旧 Goal 放在当前对话之前后，冻结 14 个对照均通过本次语义审阅及 Schema/Host 校验 | 组合修复保留所有上下文，强调当前命题与可观察结果；信息同意和延后不授权拿水；未增加调用、权限或语义 DTO |
+| 已接受 Responsibility → Fast Planner | 拿水或保留 50 米前方奶瓶的任务；原及候选调用生成无依据 known source、错误引用、额外动作或丢失距离 | 原主调用完整保留 WHAT、只规划必要 HOW；Planner 修复尚未通过，候选均未应用 |
+| Planner 来源坐标 → Host | 原始话语与 outcome 都用 tN；显式水瓶例中 outcome t6–t7 是“the user”，缺 scope 时 Host 按原话坐标解释并拒绝 | 命名空间存在接口歧义；分离坐标实验仍有其他错误，未宣称修复或改变 canonical provenance |
+| 最新部署复合动作 → UMI → Host | 第一例生成 r1/r2/r3 三个结果后完全重复三项，local_ref 重复；Host 返回 interpretation_unavailable | Host 正确阻断；GA、Planner、SC 和物理 provider 未被调用，首个错误为 UMI 主输出完整性；不能通过去重改变其 cardinality |
+| Soridormi acquire provider（原错误路径未调用） | 配对源码读取 source status，但取得/递送计划未消费 source 的位置/距离 bindings | 广告参数与执行实现可能存在额外契约差距；不是已阻断案例的启动根因，尚无执行证明 |
+
+触发条件是省略表达与历史 Goal 共存；已确认 UMI 根因是当前命题优先级、
+结果类型定义和上下文投影的共同缺口。Planner 坐标歧义是贡献条件，
+额外动作与来源编造仍需独立修复，不能用坐标修复掩盖。
+进一步分离实验未应用：固定唯一 ID 的 decoder 仍输出新的重叠/重复义务；
+仅更正结构化 sibling 指令的候选失去顺序；追加完整 assembly 说明虽通过
+原 walk/nod/turn 单例，在既有复合对照中把眨眼误分为 task_physical_effect，
+并产生重叠源跨度。说明机械通过和单例通过均不足以晋升候选。
+UMI 原提示仍含“reciprocal parallel_with sibling refs”，与不 author bindings
+的现行边界冲突；修复需要保留自然语言中的完整关系及独立义务，不放松 Host。
+Planner 的说明字段被提前/要求必填后，模型仍明确把额外 wave/nod 解释为
+确认或礼貌，违反任务/SC 分工；删除身份/表达指导、去除历史上下文以及改变
+source status 枚举顺序也没有让完整四例通过。所有这些仅用于因果隔离。
+
+冻结水/奶、中文、信息同意、延后和开放求助对照支持 UMI 局部修复，
+不证明任意复合动作或实时全流程。离线 6,000 案例回放通过，无候选模型调用。
+最新 live aggregate 在首例完整性错误停止（1/79，78 未执行）；
+一次保留 bundle `/home/chromie/Downloads/chromie_debug_bundle_20261007_163526.tar.gz`。
+此前 profile 生成导致 dry-run preflight 停止，单独 bundle 为
+`/home/chromie/Downloads/chromie_debug_bundle_20261007_163045.tar.gz`，该次不是产品行为证据。
+物理麦克风、扬声器和机器人证据仍缺失。
+
 ## 结论与范围
 
 当前项目仍处于开发和资格验证阶段。本次发现实际职责冲突、过期参考数据、

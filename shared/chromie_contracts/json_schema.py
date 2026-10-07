@@ -130,6 +130,11 @@ def expose_intersection_shapes(node: Any) -> None:
         # into another copy of itself.
         for value in list(node.values()):
             expose_intersection_shapes(value)
+        # JSON Schema defaults absent items to accepting every item. XGrammar
+        # treats a bounded refinement without items as a closed empty tuple.
+        # Spell out the equivalent default before exposing the intersection.
+        if node.get("type") == "array" and "items" not in node and "prefixItems" not in node:
+            node["items"] = {}
         shape_keys = (
             ("type", "properties", "required", "additionalProperties")
             if node.get("type") == "object" and "properties" in node
@@ -143,6 +148,9 @@ def expose_intersection_shapes(node: Any) -> None:
             and "oneOf" not in node
             and "anyOf" not in node
         ):
+            # Preserve existing decision alternatives at the decoder boundary.
+            # Moving them into allOf behind a single shape alternative loses
+            # their restrictions in XGrammar despite JSON-Schema equivalence.
             node["anyOf"] = [{
                 key: copy.deepcopy(node[key])
                 for key in shape_keys

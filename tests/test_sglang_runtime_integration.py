@@ -62,6 +62,47 @@ class SGLangProtocolTests(unittest.TestCase):
                     self.assertEqual(Draft202012Validator(wire).is_valid(value), expected)
                     self.assertEqual(Draft202012Validator(schema).is_valid(value), expected)
 
+    def test_mixed_intersections_preserve_decision_branches_and_array_defaults(self) -> None:
+        import copy
+        from jsonschema import Draft202012Validator
+
+        for combinator in ("anyOf", "oneOf"):
+            schema = {
+                "title": "FastPlannerModelOutput", "type": "object",
+                "properties": {
+                    "steps": {"type": "array", "items": {"type": "string"}},
+                    "outcomes": {"type": "object", "required": ["goal"],
+                                 "properties": {"goal": {"type": "string"}},
+                                 "additionalProperties": False},
+                },
+                "required": ["steps", "outcomes"], "additionalProperties": False,
+                "allOf": [{}],
+                combinator: [
+                    {"properties": {"steps": {"type": "array", "minItems": 1, "maxItems": 2}}},
+                    {"properties": {"steps": {"type": "array", "maxItems": 0}}},
+                ],
+            }
+            original = copy.deepcopy(schema)
+            payload = build_sglang_chat_payload(
+                model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+                options={}, response_format=schema, stream=False, priority_step=100,
+            )
+            wire = payload["response_format"]["json_schema"]["schema"]
+            self.assertEqual(schema, original)
+            self.assertEqual(wire["required"], ["steps", "outcomes"])
+            self.assertEqual(len(wire[combinator]), 2)
+            self.assertEqual(wire["allOf"], [{}])
+            alternative = wire[combinator][0]["properties"]["steps"]
+            self.assertEqual(alternative["items"], {})
+            for steps in ([], ["fetch"], ["fetch", "deliver"], ["a", "b", "c"], [1]):
+                for outcomes in ({"goal": "pending"}, [], {}, {"goal": 1}):
+                    value = {"steps": steps, "outcomes": outcomes}
+                    with self.subTest(combinator=combinator, value=value):
+                        self.assertEqual(
+                            Draft202012Validator(original).is_valid(value),
+                            Draft202012Validator(wire).is_valid(value),
+                        )
+
     def test_streaming_json_keeps_schema_authority_and_decoder_compatible_shapes(self) -> None:
         import copy
         from jsonschema import Draft202012Validator
@@ -94,6 +135,81 @@ class SGLangProtocolTests(unittest.TestCase):
         self.assertTrue(validator.is_valid({"text": "checking", "duration": 0.12}))
         self.assertFalse(validator.is_valid({"text": "checking?", "duration": 0.12}))
         self.assertFalse(validator.is_valid({"text": "checking", "duration": 0.9}))
+
+    def test_social_wire_decision_alternatives_enforce_silent_need_state(self) -> None:
+        from jsonschema import Draft202012Validator
+        from agent.app.social_cognition import social_cognition_response_schema
+        from shared.chromie_contracts.social_cognition import (
+            SocialCognitionRequest, SocialCommunicationNeed,
+        )
+
+        request = SocialCognitionRequest(
+            request_id="completed-greeting", trigger="work_state", source_refs=["plan:1"],
+            goal_ids=["goal:1"], communication_needs=[SocialCommunicationNeed(
+                need_id="answer:1", owner="planner", kind="answer", reference_id="plan:1",
+                source_goal_ids=["goal:1"],
+            )],
+        )
+        schema = social_cognition_response_schema(request, [])
+        payload = build_sglang_chat_payload(
+            model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+            options={}, response_format=schema, stream=False, priority_step=100,
+        )
+        wire = payload["response_format"]["json_schema"]["schema"]
+        # Exercise the decoder-visible alternatives independently of allOf and
+        # conditional support. Logical equivalence alone missed the live failure.
+        native = {"$defs": wire["$defs"], "oneOf": wire["oneOf"]}
+        for outcome, expected in (("covered", False), ("pending", True)):
+            value = {"need_outcomes": {"answer:1": outcome}, "disposition": "silence",
+                     "activities": [], "reason_summary": "The greeting was already delivered."}
+            self.assertEqual(Draft202012Validator(native).is_valid(value), expected)
+            self.assertEqual(Draft202012Validator(schema).is_valid(value), expected)
+
+    def test_readiness_and_lookup_preserve_primary_planner_decoder_contract(self) -> None:
+        from types import SimpleNamespace
+        from jsonschema import Draft202012Validator
+        from agent.app.planner_schema import (
+            canonical_plan_response_schema, capability_lookup_response_schema,
+            planner_readiness_response_schema,
+        )
+
+        base = canonical_plan_response_schema(
+            planner_tier="fast", expected_goal_ids=["goal:water"],
+            allowed_capability_ids=["resource.deliver"], requires_execution=True,
+        )
+        schema = capability_lookup_response_schema(
+            planner_readiness_response_schema(base, ["goal:water"]),
+            [SimpleNamespace(capability_id="resource.deliver")],
+        )
+        payload = build_sglang_chat_payload(
+            model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+            options={}, response_format=schema, stream=False, priority_step=100,
+        )
+        wire = payload["response_format"]["json_schema"]["schema"]
+        self.assertEqual(wire["title"], base["title"])
+        self.assertEqual(wire["x-guidance"], {"whitespace_flexible": False})
+        arrays = []
+
+        def visit(node):
+            if isinstance(node, dict):
+                if node.get("type") == "array" and "prefixItems" not in node:
+                    arrays.append(node)
+                for child in node.values():
+                    visit(child)
+            elif isinstance(node, list):
+                for child in node:
+                    visit(child)
+
+        visit(wire)
+        self.assertTrue(arrays)
+        self.assertTrue(all("items" in item for item in arrays))
+        for value in (
+            {"requested_capability_ids": ["resource.deliver"]},
+            {"requested_capability_ids": []},
+            {"requested_capability_ids": ["invented"]},
+        ):
+            self.assertEqual(Draft202012Validator(schema).is_valid(value),
+                             Draft202012Validator(wire).is_valid(value))
 
     def test_compact_formatting_is_scoped_without_mutating_contract(self) -> None:
         for title in (

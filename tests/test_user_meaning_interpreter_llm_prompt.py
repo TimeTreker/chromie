@@ -508,7 +508,28 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
         )
         self.assertIn("No sugar.", user_text)
         self.assertIn("cup of coffee", user_text)
-        self.assertIn("omitted repeated subjects", user_text)
+        self.assertIn('"canonical_value":"cup of coffee"', user_text)
+
+    def test_current_offer_follows_retained_goal_context_without_losing_either(self) -> None:
+        previous_goal = "Address an earlier request for help and clarify the need."
+        current_offer = "Would you like me to bring the parcel to you?"
+        request = UserMeaningInterpretationRequest(
+            text="Yes, please.",
+            context={
+                "history": [{"role": "assistant", "text": current_offer}],
+                "user_meaning_goal_context": [{
+                    "goal": {"description": previous_goal,
+                             "metadata": {"output_mode": "speech"}},
+                    "responsibility_status": "open",
+                }],
+            },
+        )
+        payload = self._interpreter().build_interpretation_payload(request)
+        _system, user_text, _all = _payload_message_texts(payload)
+        self.assertLess(user_text.index(previous_goal), user_text.index(current_offer))
+        self.assertIn('"output_mode":"speech"', user_text)
+        self.assertIn('"original_text":"Yes, please."', user_text)
+        self.assertEqual(len(payload["messages"]), 2)
 
     def test_primary_prompt_does_not_expose_runtime_sid(self) -> None:
         payload = self._interpreter().build_interpretation_payload(

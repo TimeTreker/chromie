@@ -147,17 +147,7 @@ makes that cognition useful. GA and Planner may be requested concurrently. A sti
 aspect blocks only cognition that actually depends on it; it must not automatically block
 unrelated grounded cognition. Do not request Deep Planner; Planner owns its own reasoning depth.
 
-output_mode describes the requested observable result, never a Capability or plan. Use
-body_action for physical movement/posture/gaze/gesture/manipulation; for every body_action also
-author body_effect_family as provider-neutral WHAT: task_physical_effect for locomotion, posture,
-manipulation, acquisition/carrying/handover; social_expression for an explicitly requested gesture
-or facial expression; gaze_or_orientation for explicitly requested looking/attention orientation.
-This refinement never names a Capability/provider/Activity and must not be inferred from what tools
-are available. Use information for a requested fact or judgment, never for Chromie's
-internal decision about which help to offer; speech for an ordinary communicative
-obligation; preserve
-specific authored vocal modes; media_playback is existing media; stateful_effect is an
-external durable/future state change outside embodiment. When a person asks Chromie to
+Choose output_mode from the complete context-resolved observable effect, not from the current expression's conversational form, a prior Goal mode, a Capability or a plan. A requested or accepted physical acquisition, carrying or delivery is body_action/task_physical_effect: making a resource available by physically getting or bringing it is an embodied effect, not stateful_effect and not speech. Physical movement, posture, gaze, gesture and manipulation also use body_action. For body_action author provider-neutral body_effect_family: task_physical_effect for locomotion, posture, manipulation, acquisition/carrying/handover; social_expression for an explicitly requested gesture/facial expression; gaze_or_orientation for explicitly requested looking/attention orientation. Never infer these from available tools. Use information for a requested fact or judgment, never an internal decision about help; speech for an ordinary communicative obligation. Preserve specific authored vocal modes; media_playback is existing media. Use stateful_effect only for a requested external durable/future state change outside embodiment, not as a generic label for completing an accepted physical task. When a person asks Chromie to
 obtain, inspect, check, look up, determine, or otherwise acquire information on that person's
 behalf, preserve the terminal human outcome: the requested information must be established
 and made available to the intended recipient. Acquiring or checking the source alone is not

@@ -3451,7 +3451,11 @@ def planner_readiness_response_schema(
     definitions = {**schema.get("$defs", {}), **{
         "Waiting" + name: rename(value) for name, value in waiting.pop("$defs", {}).items()
     }}
-    return {"$defs": definitions, "anyOf": [
+    # Keep the primary contract's decoder profile through readiness and the
+    # subsequent capability-lookup wrapper. Losing it bypasses native array
+    # defaults, shape exposure and bounded JSON formatting on the real call.
+    return {**({"title": schema["title"]} if "title" in schema else {}),
+            "$defs": definitions, "anyOf": [
         {key: value for key, value in schema.items() if key != "$defs"}, rename(waiting),
     ]}
 
