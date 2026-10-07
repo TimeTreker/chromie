@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-05",
+  "frozen_on": "2026-10-07",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "60a6e5a76e47fcc793c06871d4673ff4943f2fa4101a859b1f6ed23d3460b1d7",
-    "workflow-conditional-dry.json": "a60fbe2de6e21f9d214d69b8626ec828987c4502cf2f2d780984a5e1bd9e175a",
-    "workflow-conditional-rain.json": "ff28b54ede1c1ad335de69775bd018d88883890b470c573ab40dbc5fa7f6be15",
-    "workflow-delayed.json": "e98153fbb5d5dcfebbccec2b2df086c23fee468fef1360704f1bc2677dd67c79",
-    "workflow-normal.json": "9c7553dba615e4ab24bcc6171eb076e6d496eca6f72266743a7760da3e2a7583"
+    "workflow-cancellation.json": "629ef5ba80ae95f037ab49e929a0ec065db6dc1a83ed097e04354b7354a06ede",
+    "workflow-conditional-dry.json": "c23a758bbf108eed4e94a8d65da3982346962c7b91bbcf1e65b6662f99ab4773",
+    "workflow-conditional-rain.json": "1d5ed57dc2e0c141be8769ab8e0cc8858867f81f8f42a2d4ef4d3d75221114d5",
+    "workflow-delayed.json": "55446e42a0c7dc9271ca8bf6955e8f524c250a31e5a9daa1e27b9de9e1de5f07",
+    "workflow-normal.json": "36b3abace2ae079fda2bad7a427f5cfbfba8d7994b6ebead2044a99ad57f6e1a"
   },
-  "freeze_revision": 16,
-  "freeze_note": "Request-only recapture for owner-confirmed UMI no-bindings and Planner contextual argument provenance. All five original inputs, reference decisions, complete meaning, relations, parameters, prior Goals, provider outcomes, faults and assertions unchanged.",
+  "freeze_revision": 17,
+  "freeze_note": "Request-only recapture for current UMI prompt and previously stale prototype user/Schema packets. Five original inputs, model reference decisions, complete meaning, Goal relations, parameters, prior Goals, provider outcomes, faults and assertions remain unchanged.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

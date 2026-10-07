@@ -402,6 +402,74 @@ def test_terminal_work_failure_result_need_cannot_choose_silence():
     assert schema["properties"]["need_outcomes"]["properties"][need.need_id]["const"] == "covered"
 
 
+def test_prior_acknowledgement_cannot_cover_later_terminal_failure():
+    from agent.app.social_cognition import social_cognition_prompt, validate_social_cognition_output
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    need = SocialCommunicationNeed(
+        need_id="need:failure", owner="runtime", kind="result",
+        source_goal_ids=["goal:1"], source_responsibility_refs=["r1"],
+        reference_id="work_failure:turn:goal_association",
+        facts={"status": "failed", "required_result_update": True},
+    )
+    current = request(
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="Bring a bottle of water to the user.",
+            output_mode="body_action", body_effect_family="task_physical_effect",
+            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
+        )],
+        communication_needs=[need],
+        context={
+            "work_failure": {"status": "failed", "effect_execution": "not_authorized_or_not_completed"},
+            "interaction_context": {"already_spoken": [{
+                "text": "Got it.", "metadata": {
+                    "communicative_activity_ids": ["ack"], "addressed_need_ids": [],
+                },
+            }]},
+        },
+    )
+    schema = social_cognition_response_schema(current, [])
+    prompt = social_cognition_prompt(current, [], num_ctx=4096)
+    assert "Current terminal result need:" in prompt
+    assert "do not ask them to repeat or rephrase" in prompt
+    old_ack = response(activity_id="ack", text="Got it.",
+                       addressed_need_ids=[need.need_id], source_responsibility_refs=["r1"])
+    old_ack["need_outcomes"] = {need.need_id: "covered"}
+    assert not Draft202012Validator(schema).is_valid(old_ack)
+    with pytest.raises(ValueError, match="prior communicative act"):
+        validate_social_cognition_output(
+            SocialCognitionOutput.model_validate(old_ack), current, [],
+        )
+
+    failure_update = response(
+        activity_id="failure-update", text="I understood, but I couldn't complete the request.",
+        addressed_need_ids=[need.need_id], source_responsibility_refs=["r1"],
+    )
+    failure_update["need_outcomes"] = {need.need_id: "covered"}
+    assert Draft202012Validator(schema).is_valid(failure_update)
+    validate_social_cognition_output(
+        SocialCognitionOutput.model_validate(failure_update), current, [],
+    )
+
+    already_reported = current.model_copy(update={"context": {
+        **current.context,
+        "interaction_context": {"already_spoken": [{
+            "text": failure_update["activities"][0]["text"],
+            "metadata": {
+                "communicative_activity_ids": ["failure-update"],
+                "addressed_need_ids": [need.need_id],
+            },
+        }]},
+    }})
+    repeat_schema = social_cognition_response_schema(already_reported, [])
+    assert Draft202012Validator(repeat_schema).is_valid(failure_update)
+    validate_social_cognition_output(
+        SocialCognitionOutput.model_validate(failure_update), already_reported, [],
+    )
+
+
 @pytest.mark.asyncio
 async def test_silence_keeps_upstream_obligations_intact():
     current = request()

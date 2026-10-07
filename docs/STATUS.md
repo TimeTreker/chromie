@@ -1,11 +1,41 @@
 # Chromie Current Status
 
-Updated: 2026-10-05. Current focus: Goal-driven single-authority architecture,
+Updated: 2026-10-07. Current focus: Goal-driven single-authority architecture,
 canonical local verification, current-revision voice proof and default target-evidence closure.
 The [project audit](../ARCHITECTURE_AUDIT.md) records design/source conflicts and
 actual module I/O; it does not amend authority or establish full qualification.
 
-## Current verification and deployment state — 2026-10-05
+## Current verification and deployment state — water acceptance, 2026-10-07
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | UMI's open-ended-help prompt preserves one need/help Responsibility; SGLang GA wire schema bounds ownership rows by current source-ref count; SC requires a fresh terminal-failure result act and avoids a false repeat request. Canonical Host authority is unchanged. New live water-acceptance failures at UMI and Fast Planner remain unrepaired. |
+| Automatic verification | Direct recorded GA 3/3 and SC 5/5 Schema/Host replays, focused 68 tests, four relevant Level A classes 22/22 and frozen workflow replay 6,000/6,000 pass. Final `./scripts/run_tests.sh` exited 0 (169 benchmark, 3,983 main, five environment skips, 1,023 subtests, 20 legacy Agent); policy and docs checks pass. Same-model and Level A evidence do not prove live general behavior. |
+| Target validation | A diagnostic deployed text cohort attempted all 79 cases: 13 automatic passes, 66 failures, 59 integrity failures, and all 79 retained for semantic review. Agent service loss and identity change left `cohort_complete=false` and `qualification_complete=false`. The first thirst turn offered help, but subsequent accepted water requests failed at UMI or Planner. No supervised microphone, speaker or physical robot proof. |
+| Deployment state | Current dirty source was built into the Agent for the diagnostic text run; port 8092 became unavailable mid-cohort and later recovered/recreated. Outage cause is unknown. No release, promotion or stable fixed-identity qualification. |
+
+Private evidence: `.chromie/acceptance/ga-duplicate-20261007/` and
+`.chromie/acceptance/sc-internal-failure-20261007/`; originating bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20261007_110927.tar.gz`.
+The earlier UMI open-ended-help patch is included in this delivery revision.
+Diagnostic evidence: `.chromie/acceptance/thirst-offer-20261007/`; bundle:
+`/home/chromie/Downloads/chromie_debug_bundle_20261007_121723.tar.gz`.
+
+## Previous patch — open-ended help interpretation, 2026-10-07
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | UMI prompt preserves one open-ended help Responsibility when a reported need qualifies the request; SC still owns wording and Planner owns HOW. The primary semantic split in live text SID `a87066b5` was the earliest observed failure. No model/profile, Schema, DTO, Host or authority changed. |
+| Automatic verification | Frozen eight-case English/Chinese direct-model contrast: baseline 6/8 and selected prompt 8/8 Schema/Host valid. Request-only freeze revision 17 preserves 6,000 non-request records; full strict replay 6,000/6,000 and focused workflow tests 104/104 pass. Robust-intent Level A 8/8, UMI focused 44/44, benchmarks 169/169, main tests 3,981 with five skips/1,023 subtests and legacy Agent 20/20 pass. Policy, ownership, static, configuration, runtime and docs checks pass. The single `run_tests.sh` invocation did not complete successfully in this session; its components were run separately after preserving stale local freeze files and recapturing requests. |
+| Target validation | The originating English request is mechanically accepted by the selected model/prompt transaction. The Chinese open-ended help output remains in English despite Host acceptance; bilingual semantic qualification is open. Current-revision deployed Host, live voice, audible/physical and default-target proof were not run. Previous 79-case native cohorts remain historical and incomplete as below. |
+| Deployment state | The active operator text console and its pre-patch `chromie-agent:latest` service were left running. Direct SGLang model calls used the current prompt and retained production request/Schema; no Agent rebuild, service restart or promotion occurred. |
+
+Private evidence: `.chromie/acceptance/umi-help-split-20261007/`; originating
+bundle: `/home/chromie/Downloads/chromie_debug_bundle_20261007_093607.tar.gz`.
+See [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) for
+the exact resume sequence and evidence limits.
+
+## Previous verification and deployment state — 2026-10-05
 
 | Axis | Current evidence |
 | --- | --- |

@@ -1474,6 +1474,11 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
     def test_candidate_schema_partitions_current_refs_between_associated_and_unassociated(self):
         retained = active_goal("goal-old", "Retained task")
         schema = self._schema(("r1", "r2"), [retained])
+        from agent.app.clients.sglang_protocol import _openai_response_format
+
+        wire = _openai_response_format(schema)["json_schema"]["schema"]
+        assert wire["properties"]["associations"]["maxItems"] == 2
+        assert wire["properties"]["new_goals"]["maxItems"] == 2
         validator = Draft202012Validator(schema)
         valid = {
             "associations": [{
@@ -1490,6 +1495,28 @@ class GoalAssociationOnlyContractTests(unittest.TestCase):
         self.assertTrue(validator.is_valid(valid))
         self.assertFalse(validator.is_valid({**valid, "new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}, {"source_responsibility_refs": ["r2"], "related_goal_ids": [], "supersedes_goal_ids": []}]}))
         self.assertFalse(validator.is_valid({**valid, "new_goals": []}))
+
+    def test_single_responsibility_bounds_native_ga_ownership_arrays(self):
+        retained = active_goal("goal-water", "Help with thirst")
+        schema = self._schema(("r1",), [retained])
+        assert schema["properties"]["associations"]["maxItems"] == 8
+        assert schema["properties"]["new_goals"]["maxItems"] == 8
+
+        from agent.app.clients.sglang_protocol import _openai_response_format
+
+        wire = _openai_response_format(schema)["json_schema"]["schema"]
+        assert wire["properties"]["associations"]["maxItems"] == 1
+        duplicate = {
+            "associations": [
+                {"relationship": "continue", "source_responsibility_refs": ["r1"],
+                 "target_goal_ids": ["goal-water"], "confidence": 1.0},
+                {"relationship": "continue", "source_responsibility_refs": ["r1"],
+                 "target_goal_ids": ["goal-water"], "confidence": 1.0},
+            ],
+            "new_goals": [], "referent_updates": [], "resolved_references": [],
+            "cognitive_requests": [], "confidence": 1.0, "reason_summary": "Same mapping twice.",
+        }
+        assert not Draft202012Validator(wire).is_valid(duplicate)
 
     def test_terminal_goal_is_history_not_mutable_association_target(self):
         terminal = active_goal("goal-done", "Finished task")

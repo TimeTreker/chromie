@@ -210,8 +210,13 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "When context.work_failure is supplied, treat its known_cause as trusted cause evidence, "
     "not as wording to quote. A runtime-owned result need with required_result_update=true is "
     "authoritative terminal Work state: address that result now, even if older Goal/Work context "
-    "still says planning or a previous acknowledgement was already delivered. Explain the most "
-    "specific user-relevant cause that evidence "
+    "still says planning or a previous acknowledgement was already delivered. A prior receipt "
+    "acknowledgement cannot cover a later failed result need: make clear in "
+    "ordinary language that the requested Work did not start or complete, as the supplied "
+    "effect_execution permits. When the person's meaning was accepted and the known cause is "
+    "internal processing, do not ask them to repeat or rephrase the request; ask for input "
+    "only when a supplied input need or unusable-input evidence establishes that need. Explain "
+    "the most specific user-relevant cause that evidence "
     "supports, while abstracting away module/class names, activity IDs, schemas, contracts, "
     "and internal_stage/internal_failure_class. Distinguish failure before execution from "
     "failure during execution and from true Capability unavailability; never claim a "
@@ -232,7 +237,9 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
     IDs remain reusable with their exact wording; prior-turn IDs are repair refs only.
     """
     known: dict[str, set[str]] = {}
+    known_need_bindings: dict[str, set[str]] = {}
     prior_ids: set[str] = set()
+    terminal_failure_need_ids = _terminal_failure_need_ids(request)
     context = request.context.get("interaction_context", {})
     for key in (
         "events", "already_spoken", "pending_speech", "prior_delivered_speech"
@@ -243,6 +250,11 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
                 for identity in ids:
                     identity = str(identity).strip()
                     known.setdefault(identity, set()).add(normalize_whitespace(row.get("text") or ""))
+                    addressed = row.get("metadata", {}).get("addressed_need_ids")
+                    if isinstance(addressed, list):
+                        known_need_bindings.setdefault(identity, set()).update(
+                            need_id for need_id in addressed if isinstance(need_id, str)
+                        )
                     if key == "prior_delivered_speech":
                         prior_ids.add(identity)
 
@@ -299,6 +311,10 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
         for identity, messages in known.items():
             if identity in prior_ids or len(messages) != 1:
                 continue  # Earlier turns and conflicting wording cannot be reused.
+            if terminal_failure_need_ids and not terminal_failure_need_ids.issubset(
+                known_need_bindings.get(identity, set())
+            ):
+                continue  # An earlier act cannot report a failure that happened later.
             text = next(iter(messages))
             text_contract = branch["properties"]["text"]
             if ("const" in text_contract and text_contract["const"] != text) or not (
@@ -338,23 +354,26 @@ def _fresh_addressed_turn_requires_acknowledgement(
     )
 
 
+def _terminal_failure_need_ids(request: SocialCognitionRequest) -> set[str]:
+    """Identify result Needs created for this terminal Work failure."""
+    failure = request.context.get("work_failure")
+    if request.trigger != "work_state" or not isinstance(failure, dict) or failure.get("status") != "failed":
+        return set()
+    return {
+        need.need_id for need in request.communication_needs
+        if need.owner == "runtime" and need.kind == "result"
+        and need.facts.get("status") == "failed"
+        and need.facts.get("required_result_update") is True
+    }
+
+
 def _terminal_work_failure_requires_result_update(
     request: SocialCognitionRequest,
 ) -> bool:
     """A terminal requested-Work failure with a result Need is not optional chatter."""
 
-    failure = request.context.get("work_failure")
     return bool(
-        request.trigger == "work_state"
-        and isinstance(failure, dict)
-        and failure.get("status") == "failed"
-        and any(
-            need.owner == "runtime"
-            and need.kind == "result"
-            and need.facts.get("status") == "failed"
-            and need.facts.get("required_result_update") is True
-            for need in request.communication_needs
-        )
+        _terminal_failure_need_ids(request)
         and not user_turn_prohibits_speech(request.context.get("user_turn_envelope"))
     )
 
@@ -723,12 +742,7 @@ def validate_social_cognition_output(
             "fresh addressed turn without pending or delivered reply requires acknowledgement"
         )
     if _terminal_work_failure_requires_result_update(request):
-        required_failure_need_ids = {
-            need.need_id for need in request.communication_needs
-            if need.owner == "runtime" and need.kind == "result"
-            and need.facts.get("status") == "failed"
-            and need.facts.get("required_result_update") is True
-        }
+        required_failure_need_ids = _terminal_failure_need_ids(request)
         if output.disposition != "communicate" or any(
             output.need_outcomes.get(need_id) != "covered"
             for need_id in required_failure_need_ids
@@ -736,6 +750,26 @@ def validate_social_cognition_output(
             raise ValueError(
                 "terminal requested-Work failure result need must be communicated and covered"
             )
+        previous_need_bindings: dict[str, set[str]] = {}
+        for key in ("events", "already_spoken", "pending_speech"):
+            for row in request.context.get("interaction_context", {}).get(key, []):
+                metadata = row.get("metadata", {})
+                for identity in metadata.get("communicative_activity_ids") or []:
+                    addressed = metadata.get("addressed_need_ids")
+                    if isinstance(addressed, list):
+                        previous_need_bindings.setdefault(identity, set()).update(
+                            need_id for need_id in addressed if isinstance(need_id, str)
+                        )
+                    else:
+                        previous_need_bindings.setdefault(identity, set())
+        for act in output.activities:
+            newly_addressed = required_failure_need_ids.intersection(act.addressed_need_ids)
+            if newly_addressed and act.activity_id in previous_need_bindings and not newly_addressed.issubset(
+                previous_need_bindings[act.activity_id]
+            ):
+                raise ValueError(
+                    "a prior communicative act cannot cover a later terminal Work failure"
+                )
     allowed = {item["capability_id"]: item for item in candidates}
     scopes = {
         "source_responsibility_refs": {item.local_ref for item in request.responsibilities},
@@ -1042,6 +1076,25 @@ def social_cognition_prompt(
     # the larger Goal/Work snapshot. This is a read-only projection only.
     interaction = payload["context"].pop("interaction_context", {})
     opportunity = _social_interaction_opportunity(request, interaction)
+    terminal_result_notice = ""
+    if _terminal_work_failure_requires_result_update(request):
+        terminal_result_notice = (
+            "\nCurrent terminal result need: an earlier acknowledgement cannot report a "
+            "later Work failure unless its delivered act already addressed this exact result "
+            "need. Provide a concise result update saying the requested Work did not complete, "
+            "with only the cause supported by trusted facts. This result update is not a repair "
+            "of an acknowledgement."
+        )
+        if (
+            request.responsibilities
+            and not request.meaning_uncertainties
+            and not any(need.kind == "input" for need in request.communication_needs)
+        ):
+            terminal_result_notice += (
+                " The person's meaning was accepted and no new input need is supplied; "
+                "do not ask them to repeat or rephrase the request."
+            )
+        terminal_result_notice += "\n"
     packet = {
         "interaction_context": interaction,
         "request": payload,
@@ -1051,6 +1104,7 @@ def social_cognition_prompt(
         STABLE_MIND_SEMANTIC_CONTRACT
         + "\nImmediate interaction opportunity:\n"
         + required_json(opportunity, max_chars=2048, label="Social Cognition interaction opportunity")
+        + terminal_result_notice
         + "\nTrusted interaction snapshot:\n"
         + required_json(packet, max_chars=num_ctx * 3, label="Social Cognition complete snapshot")
     )

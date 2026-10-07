@@ -1,6 +1,103 @@
 # Chromie Development Checkpoint
 
-## Current resume point — UMI/Planner and historical Memory contracts
+## Current resume point — water acceptance still fails, 2026-10-07
+
+Delivery base `main` / fetched `origin/main` was
+`073abb4daad94c8bb419db6b05ba8f6310c4a0a6`. This revision combines the
+open-ended-help UMI prompt repair, the GA native wire ownership-row bound, the
+SC terminal-failure result-accounting repair, regression tests and request-only
+workflow fixture recapture. Canonical Schema/Host authority is unchanged. The
+delivered revision is the commit containing this checkpoint and [Handoff](HANDOFF.md).
+
+The original text episodes crossed two different boundaries. In SID `a87066b5`,
+UMI split “I am a little thirsty, can you help me?” into overlapping speech and
+invented information Responsibilities; Host rejected it before GA/Planner/SC. In
+SID `d7e6f1a3`, UMI accepted the water delivery request, GA duplicated ownership
+of its one source ref, Host rejected it and cancelled speculative planning, and
+SC falsely asked for repetition after an internal failure. The source repair
+addresses those earliest observed boundaries without creating a second semantic
+authority. Direct same-model contrasts/replays passed their reported Schema/Host
+checks, but do not establish general live behavior.
+
+The canonical local gate now passes: `./scripts/run_tests.sh` exited 0 (169
+benchmark, 3,983 main, five environment skips, 1,023 subtests, 20 legacy Agent
+tests); repository policy and docs checks pass. Four relevant Level A ability
+classes pass 22/22. Strict request-only workflow replay passed 6,000/6,000.
+Evidence is private under `.chromie/acceptance/umi-help-split-20261007/`,
+`.chromie/acceptance/ga-duplicate-20261007/`,
+`.chromie/acceptance/sc-internal-failure-20261007/` and
+`.chromie/acceptance/thirst-offer-20261007/`.
+
+A deployed text aggregate attempted all 79 discovered cases on the current dirty
+source; 13 passed automatically and 66 failed, including 59 integrity failures.
+The cohort and qualification are incomplete. The Agent endpoint became unavailable
+partway through the run, and its runtime identity changed; outage cause is unknown.
+One bundle was collected afterward:
+`/home/chromie/Downloads/chromie_debug_bundle_20261007_121723.tar.gz`. On the
+water dialogue, Chromie offered help on the first turn but UMI reduced “Sure,
+water is perfect!” to speech on a follow-up; separately, Fast Planner emitted an
+invalid provider-resolved source for accepted “sure”. No physical work was
+authorized in those failures. Candidate prompt/decoder experiments were rejected
+and reverted because they introduced unsafe or ungrounded results; their retained
+contrasts are in the thirst-offer evidence root. No safe general repair of these
+new boundaries is claimed.
+
+Next: establish a stable deployed identity and service, diagnose the UMI and
+Planner acceptance boundaries from retained packets, and obtain owner approval
+before any canonical semantic contract change. Repair the earliest boundary,
+rerun focused scenarios and the complete live cohort, then perform narrow
+current-revision supervised voice proof and default target-evidence closure.
+Physical microphone, speaker and robot proof is still absent.
+
+## Previous patch — open-ended help interpretation, 2026-10-07
+
+Pre-delivery base `main` / `073abb4daad94c8bb419db6b05ba8f6310c4a0a6`
+matched fetched `origin/main` before edits. Expected resume revision is the latest
+commit containing this checkpoint and [Handoff](HANDOFF.md). At the time of that
+patch's initial handoff it was not committed or pushed. The historical planned
+delivery sequence was local gate, narrow current-revision voice proof, then
+default target-evidence closure; current blockers and resume order are above.
+
+The live text turn “I am a little thirsty, can you help me?” failed at primary UMI:
+one response/acknowledgement Responsibility and one internal help-selection
+`information` Responsibility cited overlapping source words. The UMI validator
+correctly rejected that semantic split; Core returned 503 and Host spoke the safe
+retry notice. The existing UMI prompt now states that an open-ended request with
+a reported need is one conversational Responsibility unless the person separately
+requests an effect, fact or speech act. UMI still owns WHAT; SC owns wording,
+Planner owns HOW, GA owns continuity and Host does not repair semantics. No new
+model, runtime switch, authority, document or environment variable was added.
+
+Current evidence root: `.chromie/acceptance/umi-help-split-20261007/` (ignored,
+private). A frozen eight-case English/Chinese contrast baseline had two primary
+source-overlap failures; the selected prompt produced eight Schema/Host-valid
+outputs, including the exact English originating turn. Its Chinese open-ended
+help outcome remained in English, so bilingual semantic qualification is open.
+No current-revision deployed Host/voice claim follows from these direct model calls.
+The existing `thirsty_then_water_delivery` general-ability scenario already retains
+the original two-turn episode; its full live run remains due.
+
+The five prototypes and complete 6,000-case workflow archive were recaptured
+request-only at freeze revision 17. Full replay passed 6,000/6,000 with zero
+candidate calls and identical non-request fields; focused workflow replay passed
+104/104. The robust-intent Level A class passed 8/8, UMI focused tests passed
+44/44 with 77 subtests, benchmark tests passed 169/169, main tests passed
+3,981 with five environment skips and 1,023 subtests, and 20 legacy Agent tests
+passed. Policy, ownership, pinned Ruff/mypy, configuration, runtime and docs checks
+passed. `./scripts/run_tests.sh` did not itself exit 0 in this session: it first
+met pre-existing stale ignored freeze files, then a command termination (143),
+then 83 stale request-packet failures. Those files were preserved and the pinned
+archive restored; the final benchmark and main components passed separately after
+request recapture. Do not report the single-command canonical gate as passed.
+
+Next: run the single-command gate in an uninterrupted shell; then run the existing
+two-turn thirst/water scenario with the current source and a bound service identity
+when the active operator text console can be left undisturbed. Judge the complete
+speech, Goal and Work path, not only UMI acceptance. Qualify Chinese outcome-language
+and material-need retention before claiming a bilingual UMI fix or default-target
+closure. Physical microphone, speaker and robot proof remains supervised.
+
+## Previous delivery — UMI/Planner and historical Memory contracts
 
 Pre-delivery base `main` / `0848b07d14886a0238ca71ceae3aa65fd0bcd103` matches
 fetched `origin/main`; upstream was checked before source edits and again after the

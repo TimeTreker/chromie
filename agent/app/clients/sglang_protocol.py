@@ -104,6 +104,27 @@ def _share_stream_source_spans(schema: dict[str, Any]) -> None:
     visit(schema)
 
 
+def _bound_ga_ownership_rows(schema: dict[str, Any]) -> None:
+    """Expose GA's existing one-owner-per-source limit to the native decoder."""
+    definitions = schema.get("$defs", {})
+    association_refs = (
+        definitions.get("GoalAssociationModelAssociation", {})
+        .get("properties", {}).get("source_responsibility_refs", {})
+        .get("items", {}).get("enum")
+    )
+    new_goal_refs = (
+        definitions.get("GoalAssociationModelGoal", {})
+        .get("properties", {}).get("source_responsibility_refs", {})
+        .get("items", {}).get("enum")
+    )
+    if not isinstance(association_refs, list) or not association_refs or association_refs != new_goal_refs:
+        return
+    for name in ("associations", "new_goals"):
+        rows = schema.get("properties", {}).get(name)
+        if isinstance(rows, dict):
+            rows["maxItems"] = min(rows.get("maxItems", len(association_refs)), len(association_refs))
+
+
 def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
     if response_format == "text":
         return None
@@ -111,6 +132,8 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         return {"type": "json_object"}
     if isinstance(response_format, dict):
         schema, _ = candidate_compatible_schema(response_format)
+        if schema.get("title") == "GoalAssociationModelOutput":
+            _bound_ga_ownership_rows(schema)
         if schema.get("title") == "FastPlannerWorkAdvanceOutput":
             _stream_decoder_constraints(schema)
         if schema.get("title") in {
