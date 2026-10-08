@@ -1,6 +1,59 @@
 # Chromie Development Checkpoint
 
-## Current delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
+## Current delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
+
+Pre-delivery base: local commit `05af832a4` (SC act identity) on top of fetched
+`origin/main` `601b73f09`. The expected resume revision is the latest commit containing
+this checkpoint and [Handoff](HANDOFF.md). This implements the owner's two-Planner decision
+recorded in the SC act-identity delivery below. One defect, one focused fix.
+
+Defect: when GA requested another Planner pass while the UMI-triggered plan was still
+running, the Host took whichever plan finished first. A GA plan that failed fast (HTTP 400,
+Oct 7 turns `3e47eecb` "把那个拿给我" and `81b5ee51` water "sure") cancelled the still-valid
+UMI plan, and the person heard a technical-error apology. A UMI failure also ended the turn
+before a requested GA plan could finish. This violated Charter "concurrent model completion
+order never establishes semantic priority" and line 725.
+
+| Order | Module / owner | Actual (old) | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | UMI → Fast Planner stream | valid plan still running | finish | correct |
+| 2 | GA → Fast Planner primary | HTTP 400 after 0.3 s | — | failed (separate decoder defect, fixed in `4208f001a`) |
+| 3 | Host plan settlement | first finisher wins: cancels UMI plan, raises GA failure | GA success supersedes; GA failure keeps the valid UMI plan | incorrect (first wrong boundary) |
+| 4 | SC | truthful failure update | the planned answer | symptom |
+
+Repair in `orchestrator/runtime/cognitive_runtime.py` (`_resolve`):
+- The early wait never cancels by completion order. A running or failed UMI plan is
+  settled after GA.
+- Settlement runs after the goal-state SC launch, so communication is never blocked
+  behind planning. A successful GA plan supersedes; a failed GA plan (exception or
+  contract-failure escalation) falls back to a valid UMI plan when it covers the
+  GA-requested refs.
+- Metadata `ga_revision_failure_contained`; the failure of either plan is retained in
+  `stage_diagnostics`.
+
+`docs/COGNITIVE_TURN_LOOP.md` states the failure rule.
+
+Evidence (`.chromie/acceptance/ga-revision-containment-20261008/`):
+- Four new regressions in `IndependentPlanningTests`: red on original, green now.
+- `test_silent_goal_update_keeps_delivered_initial_response_on_late_work_failure`
+  previously had a valid first plan and asserted the old erase-on-GA-failure outcome.
+  It now fails both plans so it keeps covering the delivered-response containment it
+  was written for.
+- First canonical attempt failed: a deadlock, because settlement awaited the GA plan
+  before goal-state SC started. It was fixed by moving settlement; the final strict
+  replay and gate are recorded in Handoff.
+- Live (3 retained race episodes): the race path ran once (water "sure", `90114e51`).
+  The UMI plan was rejected by Host stream validation and the GA plan by readiness
+  ("exact owned Goal source quote"), so the turn failed honestly after waiting for both.
+  Before this fix the turn would have ended at the UMI failure. Keeping a valid first
+  plan is not yet live-proven. The other two cases failed in Fast clarification
+  contract and LLM transport (`Server disconnected`). Bundle
+  `/home/chromie/Downloads/chromie_debug_bundle_20261008_160823.tar.gz`.
+
+Next, one item each: deliver `final`-phase SC speech after body Work; then the Planner
+provenance/readiness repair (now the dominant failure in every live run); then latency.
+
+## Previous delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
 
 Pre-delivery base `601b73f09dfbcb0175233219f96d7b6ee11f8f89` (fetched `origin/main`
 matched). The expected resume revision is the latest commit containing this checkpoint

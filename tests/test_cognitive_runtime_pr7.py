@@ -5204,6 +5204,75 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(client.request.planning_task_id.startswith("ga:"))
         self.assertEqual(result.terminal_plan.plan_id, "independent-goal-plan")
 
+    async def _revision_episode(self, *, ga_plan_fails: bool, umi_plan_fails: bool, ga_returns_contract_failure: bool = False):
+        # Retained Oct 7 turns 3e47eecb/81b5ee51: GA asked for a revision while the
+        # UMI plan was still running, the GA plan failed first, and the Host
+        # cancelled the valid UMI plan, so the person heard a technical error.
+        goal_planned = asyncio.Event()
+        association = GoalAssociationResolution(
+            resolution_status="resolved", turn_id="turn-revision",
+            cognitive_requests=[{"authority": "planner", "responsibility_refs": ["r1"],
+                                 "reason_summary": "GA continuity may change the Work decision."}],
+            associations=[{"association_id": "update", "relationship": "modify",
+                "source_responsibility_refs": ["r1"], "target_goal_ids": ["goal-1"],
+                "goal_update": {"description": "Respond to the revised request."}, "confidence": 0.98}],
+            confidence=0.98,
+        )
+        plan = CanonicalPlan(plan_id="ga-revision-plan", planner_tier="fast", disposition="respond",
+            coverage="complete", goal_ids=["goal-1"], response_text="按新的要求来。", confidence=0.98)
+        contract_failure = CanonicalPlan(plan_id="ga-contract-failure", planner_tier="fast",
+            disposition="escalate", coverage="uncertain", goal_ids=["goal-1"], confidence=0.0,
+            escalation_reason="fast_planner_contract_failure",
+            metadata={"path_classification": "contract_failure", "failure_class": "dto_contract_invalid"})
+
+        class Client(ScriptedClient):
+            async def stream_fast_advance(self, *args, **kwargs):
+                await goal_planned.wait()
+                if umi_plan_fails:
+                    yield FastPlannerStreamFailure(turn_id=kwargs["request"].sid, failure_stage="before_commit",
+                        failure_class="fast_stream_contract_invalid", failure_domain="model_contract")
+                    return
+                async for frame in super().stream_fast_advance(*args, **kwargs):
+                    yield frame
+
+            async def resolve_fast_plan(self, *args, **kwargs):
+                goal_planned.set()
+                if ga_returns_contract_failure:
+                    return contract_failure
+                if ga_plan_fails:
+                    raise RuntimeError("SGLang returned HTTP 400 before inference")
+                return await super().resolve_fast_plan(*args, **kwargs)
+
+        client = Client(association=association, fast_plans=[plan])
+        coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
+            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()), policy=CognitiveRuntimePolicy(mode="apply"))
+        core, envelope = admitted_core("按新的要求来。", sid="turn-revision", language="zh-CN")
+        return await asyncio.wait_for(coordinator.resolve(object(), text="按新的要求来。", sid="turn-revision",
+            core_interpretation=core, turn_envelope=envelope, context={"history": []}, history=[], language="zh-CN"), 2)
+
+    async def test_failed_ga_revision_does_not_erase_the_valid_first_plan(self):
+        for contract in (False, True):
+            with self.subTest(ga_returns_contract_failure=contract):
+                result = await self._revision_episode(ga_plan_fails=True, umi_plan_fails=False,
+                                                      ga_returns_contract_failure=contract)
+                self.assertEqual(result.status, "applied", (result.fallback_reason, result.metadata))
+                self.assertTrue(result.metadata["ga_revision_failure_contained"])
+                self.assertFalse(result.metadata["umi_planning_superseded"])
+                self.assertEqual(result.metadata["fast_planner_path"], "terminal")
+                self.assertTrue(any(item["stage"] == "fast_planner" for item in result.metadata["stage_diagnostics"]))
+
+    async def test_failed_first_plan_waits_for_requested_ga_plan(self):
+        result = await self._revision_episode(ga_plan_fails=False, umi_plan_fails=True)
+        self.assertEqual(result.status, "applied", (result.fallback_reason, result.metadata))
+        self.assertEqual(result.terminal_plan.plan_id, "ga-revision-plan")
+        self.assertFalse(result.metadata["ga_revision_failure_contained"])
+        self.assertTrue(any(item["stage"] == "fast_planner_stream" for item in result.metadata["stage_diagnostics"]))
+
+    async def test_turn_fails_honestly_when_both_plans_fail(self):
+        result = await self._revision_episode(ga_plan_fails=True, umi_plan_fails=True)
+        self.assertNotEqual(result.status, "applied")
+        self.assertTrue(any(item["stage"] == "fast_planner_stream" for item in result.metadata["stage_diagnostics"]))
+
     async def test_safe_read_executes_before_ga_and_is_not_dispatched_again(self):
         from orchestrator.runtime.capability_runtime import MockCapabilityProvider
         from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator

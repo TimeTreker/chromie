@@ -1,6 +1,18 @@
 # Chromie Current Status
 
-## Current delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
+## Current delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Owner decision implemented at the existing Cognitive Runtime owner, per Charter lines 559-585/725. A successful GA-requested plan supersedes the UMI plan (newer continuity state). A failed GA plan no longer cancels or erases a valid UMI plan for the same Responsibilities. A failed UMI plan waits for a requested GA plan. Both failures are retained as diagnostics. No new model call, authority, switch or prompt change. |
+| Automatic verification | Four new regressions (revision exception, revision contract failure, first-plan failure rescued, both fail) are red on the original source and green now. The existing supersession test is unchanged. The Oct 7 late-failure test now fails both plans so its delivered-response containment stays covered. Strict replay 6,000/6,000 with zero model calls; canonical gate passes. |
+| Target validation | Live retained race episodes (water ×2, "把那个拿给我"): the GA-revision path ran once (water "sure"). Both plans were rejected by Planner provenance/readiness validation, so the turn failed honestly. The old code would have failed earlier without waiting for the GA plan. Keeping a valid first plan is proven only by regression tests so far. 0/3 automatic passes; all failures are Planner provenance or LLM transport. |
+| Deployment state | Host-side change; Agent source unchanged; dirty-source diagnostic identity; no rebuild, promotion or release. |
+
+Evidence: `.chromie/acceptance/ga-revision-containment-20261008/`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_160823.tar.gz`.
+
+## Previous delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
 
 | Axis | Current evidence |
 | --- | --- |

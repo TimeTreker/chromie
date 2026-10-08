@@ -533,7 +533,9 @@ nor the Host infer a semantic correction.
 
 UMI and GA trigger separate Planner tasks/calls when each has distinct planning input.
 A GA-triggered call may finish while the UMI-triggered stream is still running; a complete
-new Goal plan supersedes the unfinished UMI result. Already delivered or pending speech
+new Goal plan supersedes the unfinished UMI result. A failed GA-triggered call does not
+erase a valid UMI result covering the same Responsibilities, and a failed UMI result waits
+for a requested GA plan; completion order alone never decides. Already delivered or pending speech
 is retained in Interaction Context. An identity-only GA join of unchanged Responsibility
 meaning remains mechanical and does not require another call. No task reviews or repairs
 another task's semantic decision.

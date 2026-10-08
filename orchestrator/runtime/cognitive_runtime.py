@@ -8,7 +8,7 @@ import json
 import logging
 import time
 from collections import Counter, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, AsyncIterator, Awaitable, Callable, Iterable, Literal, Protocol
@@ -4641,6 +4641,7 @@ class GoalDrivenRuntimeCoordinator:
         association_task: asyncio.Task[_GoalAssociationStageResult] | None = None
         umi_planning_task: asyncio.Task[None] | None = None
         umi_planning_superseded = False
+        ga_revision_failure_contained = False
         planning_snapshot: dict[str, Any] | None = None
         planning_commit: dict[str, Any] | None = None
         state_social_task: asyncio.Task[Any] | None = None
@@ -4749,6 +4750,7 @@ class GoalDrivenRuntimeCoordinator:
                     post_ga_meaning_uncertainty_count
                 ),
                 "umi_planning_superseded": umi_planning_superseded,
+                "ga_revision_failure_contained": ga_revision_failure_contained,
                 "independent_goal_planning": goal_planning_started(),
                 "planning_commit": planning_commit,
                 "retained_work_activities": [item for item in retained_work_activities
@@ -5048,34 +5050,32 @@ class GoalDrivenRuntimeCoordinator:
                     name="umi-planning:" + turn_id,
                 )
                 if association_task is not None:
-                    done, _pending = await asyncio.wait(
+                    await asyncio.wait(
                         {umi_planning_task, association_task},
                         return_when=asyncio.FIRST_COMPLETED,
                     )
-                    if umi_planning_task in done:
-                        await umi_planning_task
-                    if association_task in done:
-                        early_association = await association_task
-                        if early_association.planning_task is not None:
-                            done, _pending = await asyncio.wait(
-                                {umi_planning_task, early_association.planning_task},
-                                return_when=asyncio.FIRST_COMPLETED,
-                            )
-                            if (
-                                early_association.planning_task in done
-                                and not umi_planning_task.done()
-                            ):
-                                umi_planning_task.cancel()
-                                await asyncio.gather(
-                                    umi_planning_task, return_exceptions=True
-                                )
-                                umi_planning_superseded = True
-                            else:
-                                await umi_planning_task
-                        else:
+                    umi_succeeded = (
+                        umi_planning_task.done()
+                        and not umi_planning_task.cancelled()
+                        and umi_planning_task.exception() is None
+                    )
+                    if not umi_succeeded and umi_planning_task.done():
+                        # A failed first plan defers only to a GA-requested plan
+                        # settled after association; otherwise its failure stands.
+                        early_outcome, = await asyncio.gather(
+                            association_task, return_exceptions=True
+                        )
+                        if (
+                            isinstance(early_outcome, BaseException)
+                            or early_outcome.planning_task is None
+                        ):
                             await umi_planning_task
-                    else:
-                        await umi_planning_task
+                    elif not umi_succeeded:
+                        # A running first plan is settled against a GA-requested
+                        # plan after association, never by completion order.
+                        early_association = await association_task
+                        if early_association.planning_task is None:
+                            await umi_planning_task
                 else:
                     await umi_planning_task
             else:
@@ -5283,6 +5283,71 @@ class GoalDrivenRuntimeCoordinator:
                     goal_ids=association_goal_ids,
                 )
 
+            if umi_planning_task is not None and association_stage.planning_task is not None:
+                # UMI and committed GA state are independent Planner triggers. A
+                # successful GA-requested plan rests on newer continuity state and
+                # supersedes the first plan; completion order never decides, and a
+                # failed revision does not erase a valid first plan (Charter).
+                ga_result, = await asyncio.gather(
+                    association_stage.planning_task, return_exceptions=True
+                )
+                ga_failed = isinstance(ga_result, BaseException) or (
+                    ga_result.disposition == "escalate"
+                    and self._fast_plan_path(ga_result) == "contract_failure"
+                )
+                if not ga_failed:
+                    if not umi_planning_task.done():
+                        umi_planning_task.cancel()
+                        await asyncio.gather(umi_planning_task, return_exceptions=True)
+                        umi_planning_superseded = True
+                    elif not umi_planning_task.cancelled() and umi_planning_task.exception() is not None:
+                        umi_failure = umi_planning_task.exception()
+                        stage_diagnostics.append(self._stage_failure_metadata(
+                            "fast_planner_stream",
+                            umi_failure.failure_metadata
+                            if isinstance(umi_failure, CognitiveStageFailure)
+                            else {"error_type": type(umi_failure).__name__, "error": str(umi_failure)},
+                            default_failure_class="first_plan_failed_ga_plan_retained",
+                        ))
+                else:
+                    umi_result, = await asyncio.gather(
+                        umi_planning_task, return_exceptions=True
+                    )
+                    ga_planner_refs = {
+                        ref
+                        for item in association_stage.association.cognitive_requests
+                        if item.authority == "planner"
+                        for ref in item.responsibility_refs
+                    }
+                    if (
+                        not isinstance(umi_result, BaseException)
+                        and fast_advance is not None
+                        and ga_planner_refs <= speculative_ref_set
+                    ):
+                        failure = (
+                            ga_result.failure_metadata
+                            if isinstance(ga_result, CognitiveStageFailure)
+                            else {"error_type": type(ga_result).__name__, "error": str(ga_result)}
+                            if isinstance(ga_result, BaseException)
+                            else ga_result.metadata
+                        )
+                        stage_diagnostics.append(self._stage_failure_metadata(
+                            "fast_planner",
+                            {**failure, "architecture_attribution": "planner"},
+                            default_failure_class="ga_revision_failed_first_plan_retained",
+                        ))
+                        association_stage = replace(association_stage, planning_task=None)
+                        ga_revision_failure_contained = True
+                    elif isinstance(umi_result, BaseException):
+                        # Both plans failed; retain the first plan's cause beside the
+                        # GA failure that the turn reports.
+                        stage_diagnostics.append(self._stage_failure_metadata(
+                            "fast_planner_stream",
+                            umi_result.failure_metadata
+                            if isinstance(umi_result, CognitiveStageFailure)
+                            else {"error_type": type(umi_result).__name__, "error": str(umi_result)},
+                            default_failure_class="first_plan_failed",
+                        ))
             if (
                 fast_advance is None
                 and association_stage.planning_task is None

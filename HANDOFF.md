@@ -1,6 +1,47 @@
 # Chromie Handoff
 
-## Current delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
+## Current delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
+
+Checkout `/home/chromie/github/chromie`, branch `main`. Base: local commit `05af832a4`
+(SC act identity, not yet pushed) on fetched `origin/main` `601b73f09`.
+
+Changed files:
+- `orchestrator/runtime/cognitive_runtime.py`: plan settlement in `_resolve`, flag
+  `ga_revision_failure_contained`, diagnostics for either failure, `dataclasses.replace` import.
+- `tests/test_cognitive_runtime_pr7.py`: four `IndependentPlanningTests` regressions.
+- `tests/test_turn_local_continuity.py`: the late-failure test now fails both plans.
+- `docs/COGNITIVE_TURN_LOOP.md`: failure rule.
+- `docs/STATUS.md`, this file and the checkpoint.
+
+Commands and results:
+
+```bash
+python -m pytest -q tests/test_cognitive_runtime_pr7.py tests/test_turn_local_continuity.py   # 105 passed; original source fails the 3 new containment/rescue tests
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir .chromie/acceptance/ga-revision-containment-20261008/strict-replay-final2   # 6000/6000, 0 model calls
+./scripts/run_tests.sh   # final: exit 0, 169 benchmark, 4006 main, 5 skipped, 1065 subtests, 20 legacy (run-tests-final2.log)
+```
+
+The first gate attempt (`run-tests.log`) failed 2 tests by deadlock: settlement awaited a
+GA plan that waits for goal-state SC. It was fixed by moving settlement after that launch.
+
+Live: identity `runtime-identity.json` (diagnostic, dirty). One invocation over
+`ambiguous_object_bring_that`, `accepted_water_offer_executes` and
+`thirsty_then_water_delivery` → `live-focused/summary.json`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_160823.tar.gz`. GA-revision path:
+turn `90114e51` (both plans rejected; honest failure).
+
+Resume (next: deliver final-phase SC speech after body Work):
+
+```bash
+cd /home/chromie/github/chromie
+git fetch origin && git status --short && git log --oneline -3
+rg -n 'communication_after_step_ids|delivery_phase == "final"|phase == "final"' orchestrator/runtime/cognitive_runtime.py
+```
+
+Evidence for that defect is in `.chromie/acceptance/sc-act-identity-20261008/live-focused/`
+(`multi_goal_blink_and_joke`, `nod_and_say_hello`) and `ab-original-code/`.
+
+## Previous delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
 
 Checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery base
 `601b73f09dfbcb0175233219f96d7b6ee11f8f89` (matched fetched `origin/main`).

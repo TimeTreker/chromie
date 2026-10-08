@@ -750,6 +750,16 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
                 "failure_domain": "model_contract", "retryable": False,
             })
 
+        async def stream_fast_advance(self, *args, **kwargs):
+            # The first plan fails too: a valid first plan would now be retained
+            # (IndependentPlanningTests), so only a late failure of every plan
+            # exercises the delivered-response containment this test protects.
+            from shared.chromie_contracts.plan import FastPlannerStreamFailure
+            yield FastPlannerStreamFailure(
+                turn_id=kwargs["request"].sid, failure_stage="before_commit",
+                failure_class="structured_output_validation", failure_domain="model_contract",
+            )
+
         async def resolve_social_cognition(self, session, *, request, **kwargs):
             self.social_calls += 1
             if request.trigger == "interpretation":
