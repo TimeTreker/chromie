@@ -1,6 +1,65 @@
 # Chromie Development Checkpoint
 
-## Current isolation — decoder profile and late SC failure, 2026-10-07
+## Current delivery — Evidence-bound claim oracle, 2026-10-08
+
+Checkout `main`, pre-delivery base `4208f001a841abb86d852398d088f6da82a0c62f`
+(fetched `origin/main` matched before edits). The expected resume revision
+is the latest commit containing this checkpoint and [Handoff](HANDOFF.md). This is the
+first item of the owner-approved audit follow-up order: (1) keep unsupported changing-fact
+answers as hard failures, (2) SC act identity and live proof, (3) a qualified provenance
+repair, (4) latency measured from end of input. One defect and one focused fix per delivery.
+
+Defect: in the Oct 7 cohort (SID `a0437395`), "今天几号，星期几？" received
+"今天是2025年5月22日，星期四。" with `inform/context_grounded`, no Evidence and no clock
+call. The SC prompt contained no date or time source. The harness recorded only a missing
+clock observation, and the same-agent triage filed it as a possible profile gap.
+
+| Order | Module / owner | Actual output | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | UMI / WHAT | r1 `speech/turn`, Planner requested | `information/goal` per prompt line 150 (UMI typed it so on Sep 23 and Oct 8) | incorrect, nondeterministic |
+| 2a | SC / communication (concurrent) | fabricated date as `inform/context_grounded`, no Evidence | pre-evidence receipt or silence | incorrect |
+| 2b | Fast Planner / HOW (concurrent) | `clock.local` with empty source refs → `fast_stream_contract_invalid` | clock activity bound to r1 | incorrect |
+| 3 | Host / containment | Planner failure suppressed as optional because r1 was speech-only and SC had spoken | correct under the speech typing it received | correct given input |
+| 4 | Acceptance harness / test evidence | `missing expected observation` only | hard provenance failure | incorrect (repaired here) |
+
+Repair, test-evidence owner only: scenario turns whose answer must come from capability
+Evidence declare `require_evidence_bound_claims`. In those turns, an SC `respond` or `inform`
+act that cites neither Evidence nor a Host-established need is a hard
+`provenance:unsupported_evidence_claim` failure. This is a typed-field check; wording is
+never read. Thirteen pure clock/weather lookup turns declare it; mixed social+lookup turns
+do not. UMI, SC, Planner, Host, prompts, Schemas and the workflow freeze are unchanged.
+
+Evidence (`.chromie/acceptance/evidence-bound-claims-20261008/`):
+- Focused: 40 tests pass. The original harness fails the six evidence-bound regressions
+  (hard failure, two integrity-stop variants, three controls).
+- Canonical `./scripts/run_tests.sh` exit 0: 169 benchmark, 4,002 main, 5 skips,
+  1,063 subtests, 20 legacy. Evidence-class Level A 6/6; library check 15 classes,
+  45 Level A, 79 live.
+- Retroactive re-score of 713 retained flagged-turn summaries flags only the Oct 7
+  fabrication. Only 19 of those summaries contain SC acts, so the false-positive check is narrow.
+- Live (dirty-source diagnostic identity; Agent source `2b4f2298…` matched; simulator
+  executed, `--keep-going`): 13/13 attempted, 4 automatic passes, 0 unsupported claims
+  across 24 SC acts. Seven cases failed at Fast Planner `chromie.weather.lookup.location`
+  provenance, including clock questions routed to weather lookup and a follow-up that lost
+  the prior city. One SC delivery failure (scheduled 2, played 0); one weather provider
+  failure for 河南省内乡县. Same-agent review: Chongqing ×3 passes grounded; Shanghai partial
+  (temperatures, no cold judgment). Failure updates cite an internal "no location" cause
+  that the user had in fact supplied. First playback was 13.2–15.5 s after input.
+  Bundle `/home/chromie/Downloads/chromie_debug_bundle_20261008_134254.tar.gz`.
+
+Not established: no production repair of UMI typing, SC fabrication or Planner provenance,
+and no voice, physical or release qualification.
+
+Next (item 2, one focused fix): the SC duplicate-speech identity defect. The Host projects
+the whole Fast Planner communicative activity into SC need `facts`
+(`orchestrator/runtime/cognitive_runtime.py`, streaming-advance need producer), including
+the Planner's own `activity_id`. In retained Oct 7 calls, 6 of 12 SC requests carrying that
+fact reused it as the SC act ID. Both observed different-ID duplicate playbacks coincide
+with that reuse. Freeze an SC contrast corpus from retained requests before changing the
+projection. Owner approval for same-scope Planner consolidation is still pending, and it
+blocks the water live proof.
+
+## Previous isolation — decoder profile and late SC failure, 2026-10-07
 
 Checkout `main`, pre-delivery base `ee74ee8f9cc76982e5a06170e50f2601d06f5788`;
 fetched `origin/main` matches. The owner authorized commit and push of this

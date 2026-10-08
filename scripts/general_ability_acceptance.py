@@ -85,6 +85,7 @@ class TextScenarioCase:
     expected_social_communicative_functions: tuple[str, ...] = field(
         default_factory=tuple
     )
+    require_evidence_bound_claims: bool = False
     require_fast_planner_evidence_reentry: bool = False
     require_work_held_until_canonical_validation: bool = False
     require_canonical_work_reconciliation: bool = False
@@ -314,6 +315,27 @@ def _social_activities(summary: dict[str, Any]) -> list[dict[str, Any]]:
     return list(acts.values())
 
 
+def _unsupported_evidence_claims(summary: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return SC answers that neither cite Evidence nor address a Host-established need.
+
+    Applies only where a scenario declares that its requested answer is
+    Evidence-bound. Typed fields decide; wording is never inspected. Receipts
+    (`acknowledge`) and questions (`ask`) make no result claim, and failure or
+    limitation updates address the Host need that established them.
+    """
+    return [
+        {
+            "activity_id": str(act.get("activity_id") or ""),
+            "function": str(act.get("function") or ""),
+            "truth_stage": str(act.get("truth_stage") or ""),
+        }
+        for act in _social_activities(summary)
+        if str(act.get("function") or "") in {"respond", "inform"}
+        and not act.get("evidence_refs")
+        and not act.get("addressed_need_ids")
+    ]
+
+
 def _is_expressive_cue_capability(item: dict[str, Any]) -> bool:
     metadata = item.get("metadata")
     return bool(
@@ -452,6 +474,11 @@ def _structured_case_metrics(
         runtime_status = "failed"
         runtime_failure_stage = str(failed_stage.get("stage") or "")
         runtime_failure_class = "workflow_stage_failed"
+    unsupported_claims = (
+        _unsupported_evidence_claims(summary)
+        if case.require_evidence_bound_claims
+        else []
+    )
     return {
         "new_goal_count": len(new_goals),
         "required_new_goal_count": case.min_new_goal_count,
@@ -465,6 +492,8 @@ def _structured_case_metrics(
         "provenance_attachment_rejected": _provenance_attachment_rejected(
             cognitive
         ),
+        "unsupported_evidence_claim_count": len(unsupported_claims),
+        "unsupported_evidence_claims": unsupported_claims,
         "llm_integrity_failure_count": len(violations),
         "runtime_status": runtime_status,
         "runtime_failure_stage": runtime_failure_stage,
@@ -644,10 +673,16 @@ def diagnostic_evaluation(
         earliest_boundary = "planner_contract"
     elif metrics["safe_idle"] is False:
         earliest_boundary = "capability_runtime_or_provider"
+    elif metrics["unsupported_evidence_claim_count"]:
+        earliest_boundary = "social_cognition_claim_provenance"
     elif errors:
         earliest_boundary = "response_or_user_outcome_boundary"
     overall_score = round(sum(axes.values()) / len(axes))
-    if metrics["runtime_integrity_failed"] or metrics["llm_integrity_failure_count"]:
+    if (
+        metrics["runtime_integrity_failed"]
+        or metrics["llm_integrity_failure_count"]
+        or metrics["unsupported_evidence_claim_count"]
+    ):
         overall_score = min(overall_score, 40)
     return {
         "passed": not errors,
@@ -932,6 +967,15 @@ def validate_live_text_result(
         )
     if structured_metrics["provenance_attachment_rejected"]:
         errors.append("planner Agent Skill provenance attachment was rejected")
+    if structured_metrics["unsupported_evidence_claim_count"]:
+        errors.append(
+            "Social Cognition authored an Evidence-bound answer without Evidence "
+            "or a Host-established need: "
+            + ", ".join(
+                f"{item['activity_id']}({item['function']}/{item['truth_stage']})"
+                for item in structured_metrics["unsupported_evidence_claims"]
+            )
+        )
 
     def record_internal(message: str) -> None:
         if assertion_scope == "full":
@@ -1036,6 +1080,9 @@ def _text_scenario_case(
         ),
         expected_social_communicative_functions=_tuple_of_strings(
             raw.get("expected_social_communicative_functions")
+        ),
+        require_evidence_bound_claims=bool(
+            raw.get("require_evidence_bound_claims", False)
         ),
         require_fast_planner_evidence_reentry=bool(
             raw.get("require_fast_planner_evidence_reentry", False)
@@ -2347,6 +2394,8 @@ def _live_integrity_stop(
         metrics = (result.get("diagnostic_evaluation") or {}).get("metrics") or {}
         if metrics.get("provenance_attachment_rejected"):
             failure = {"failure_domain": "provenance", "failure_class": "provenance_attachment_rejected"}
+        elif metrics.get("unsupported_evidence_claim_count"):
+            failure = {"failure_domain": "provenance", "failure_class": "unsupported_evidence_claim"}
         elif metrics.get("goal_omission_rate", 0) > 0:
             failure = {"failure_domain": "model_contract", "failure_class": "goal_omission"}
         else:

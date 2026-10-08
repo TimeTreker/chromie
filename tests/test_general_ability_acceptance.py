@@ -224,6 +224,7 @@ def test_identity_delivery_requires_goal_completion_without_planner_work(
      "sid": None, "cognitive_runtime": None, "execution": None, "status_after": None},
     {"diagnostic_evaluation": {"metrics": {"goal_omission_rate": 0.5}}},
     {"diagnostic_evaluation": {"metrics": {"provenance_attachment_rejected": True}}},
+    {"diagnostic_evaluation": {"metrics": {"unsupported_evidence_claim_count": 1}}},
     {"turns": [{"turn_id": "first", "cognitive_runtime": {
         "status": "error", "metadata": {"failure_domain": "model_contract"},
     }}]},
@@ -1898,3 +1899,81 @@ def test_apology_draft_requires_more_than_receipt_acknowledgement(function):
     }}
     errors = validate_live_text_result(case, summary)
     assert any("SC communicative function mismatch" in error for error in errors) is (function == "acknowledge")
+
+
+def _library_turn(case_id):
+    library = load_scenario_library()
+    return next(ref.case for ability in library.ability_classes
+                for ref in ability.live_text_cases if ref.case.case_id == case_id)
+
+
+def _sc_answer_summary(**act):
+    # Shape retained from live SID a0437395 (2026-10-07): SC answered a clock
+    # question before any clock Evidence existed.
+    return {"interaction_response": {
+        "speech": [{"text": act.get("text", "今天是2025年5月22日，星期四。")}],
+        "capabilities": [],
+        "metadata": {"social_cognition_resolution": {
+            "semantic_owner": "social_cognition", "request_id": "sc:a0437395",
+            "disposition": "communicate",
+            "activities": [{"activity_id": "date_response_001",
+                            "text": "今天是2025年5月22日，星期四。",
+                            "source_responsibility_refs": ["r1"], **act}],
+        }},
+    }, "preview_only": True, "cognitive_runtime": {"status": "applied"}}
+
+
+def test_evidence_bound_answer_without_evidence_is_a_hard_provenance_failure():
+    from scripts.general_ability_acceptance import _live_integrity_stop
+
+    case = _library_turn("current_date_and_weekday")
+    assert case.require_evidence_bound_claims is True
+    summary = _sc_answer_summary(function="inform", truth_stage="context_grounded")
+
+    errors = validate_live_text_result(case, summary)
+
+    assert any("Evidence-bound answer without Evidence" in item and "date_response_001" in item
+               for item in errors), errors
+    evaluation = summary["diagnostic_evaluation"]
+    assert evaluation["metrics"]["unsupported_evidence_claim_count"] == 1
+    assert evaluation["earliest_suspect_boundary"] == "social_cognition_claim_provenance"
+    assert evaluation["overall_score"] <= 40
+    stop = _live_integrity_stop(summary, execute=False)
+    assert (stop["failure_domain"], stop["failure_class"]) == ("provenance", "unsupported_evidence_claim")
+
+
+@pytest.mark.parametrize("act", [
+    {"function": "acknowledge", "truth_stage": "pre_evidence", "progress_kind": "check_information",
+     "text": "我看一下。"},
+    {"function": "respond", "truth_stage": "post_evidence", "evidence_refs": ["ev:clock:1"]},
+    {"function": "inform", "truth_stage": "context_grounded", "addressed_need_ids": ["need:failure"],
+     "text": "抱歉，我没能查到现在的时间。"},
+    {"function": "ask", "truth_stage": "context_grounded", "text": "你想问哪里的时间？"},
+])
+def test_evidence_bound_scenario_accepts_receipts_grounded_answers_and_failure_updates(act):
+    from scripts.general_ability_acceptance import _live_integrity_stop
+
+    summary = _sc_answer_summary(**act)
+    errors = validate_live_text_result(_library_turn("current_date_and_weekday"), summary)
+
+    assert not any("Evidence-bound answer" in item for item in errors), errors
+    assert summary["diagnostic_evaluation"]["metrics"]["unsupported_evidence_claim_count"] == 0
+    assert _live_integrity_stop(summary, execute=False) is None
+
+
+def test_context_grounded_answer_stays_legal_without_an_evidence_bound_declaration():
+    case = TextScenarioCase(case_id="identity", text="你是谁？")
+    summary = _sc_answer_summary(function="respond", truth_stage="context_grounded",
+                                 text="我是 Chromie。")
+
+    errors = validate_live_text_result(case, summary)
+
+    assert not any("Evidence-bound answer" in item for item in errors), errors
+    assert summary["diagnostic_evaluation"]["metrics"]["unsupported_evidence_claim_count"] == 0
+
+
+def test_mixed_social_and_lookup_turn_is_not_declared_evidence_bound():
+    # "I am travelling tomorrow" may receive an ordinary social reply; only pure
+    # Evidence-bound lookup turns carry the declaration.
+    assert _library_turn("debug_bundle_beijing_tomorrow_rain").require_evidence_bound_claims is False
+    assert _library_turn("user_probe_current_local_time").require_evidence_bound_claims is True

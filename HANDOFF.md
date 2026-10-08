@@ -1,6 +1,54 @@
 # Chromie Handoff
 
-## Current isolation — decoder profile and late SC failure, 2026-10-07
+## Current delivery — Evidence-bound claim oracle, 2026-10-08
+
+Checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery base
+`4208f001a841abb86d852398d088f6da82a0c62f` (matched fetched `origin/main`). The delivery
+commit contains this file and the [checkpoint](DEVELOPMENT_CHECKPOINT.md).
+
+Changed files:
+- `scripts/general_ability_acceptance.py`: `require_evidence_bound_claims` field,
+  `_unsupported_evidence_claims`, metric, hard-gate error, score cap, earliest boundary
+  `social_cognition_claim_provenance`, and integrity stop `provenance:unsupported_evidence_claim`.
+- 13 scenario JSON turns gain the declaration (date, time, eleven weather turns); the
+  mixed `debug_bundle_beijing_tomorrow_rain` is deliberately excluded.
+- Regressions in `tests/test_general_ability_acceptance.py`.
+- Docs: `scenarios/README.md`, `docs/ACCEPTANCE.md`, `docs/STATUS.md`.
+
+Commands run and results:
+
+```bash
+python -m pytest -q tests/test_general_ability_acceptance.py -k "evidence_bound or integrity_failure or context_grounded or mixed_social"  # 40 passed; original harness: 6 new regressions fail
+./scripts/run_tests.sh                                   # exit 0: 169 benchmark, 4002 main, 5 skipped, 1063 subtests, 20 legacy
+python scripts/general_ability_acceptance.py --mode check   # 15 classes, 45 Level A, 79 live
+python scripts/general_ability_acceptance.py --mode level-a --ability-class evidence_coverage_and_claim_discipline --no-write  # 6/6
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent  # matches=true, 2b4f22989ef9...
+```
+
+Live proof needed the Soridormi simulator, which was not running at session start; it was
+started per runbook §5.2 (`../soridormi/scripts/run_sim_server.sh --backend mujoco --profile
+open_duck_forward --no-viewer` plus `docker compose -f compose.sim.yaml --profile mcp-runtime
+up -d --no-build mcp-runtime`). The identity was captured with `--allow-dirty` (diagnostic,
+dirty source) at `.chromie/acceptance/evidence-bound-claims-20261008/runtime-identity.json`.
+The cohort was one invocation of `--mode live-text --goal-driven-runtime apply --execute
+--keep-going` over the 13 declared cases. Summary:
+`.chromie/acceptance/evidence-bound-claims-20261008/live-flagged/summary.json`; log
+`live-flagged.log`; bundle `/home/chromie/Downloads/chromie_debug_bundle_20261008_134254.tar.gz`.
+
+The run produced 4/13 automatic passes and 0 unsupported-claim hits. Failure clusters
+are in the checkpoint; none is repaired by this delivery.
+Original episode evidence: `.chromie/acceptance/thirst-offer-20261007/live-baseline/12-must_pass-evidence_coverage_and_claim_discipline-current_date_and_weekday/`.
+
+Resume (item 2, SC act identity):
+
+```bash
+cd /home/chromie/github/chromie
+git fetch origin && git status --short
+rg -n 'facts=activity.model_dump' orchestrator/runtime/cognitive_runtime.py
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
+```
+
+## Previous isolation — decoder profile and late SC failure, 2026-10-07
 
 Checkout `main`, pre-delivery base `ee74ee8f9cc76982e5a06170e50f2601d06f5788`;
 fetched `origin/main` matches. The owner authorized commit and push of this

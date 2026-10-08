@@ -58,6 +58,7 @@
   "expected_args": [
     "0:date=tomorrow"
   ],
+  "require_evidence_bound_claims": true,
   "require_speech": true,
   "require_social_communicative_act": true,
   "expected_social_communicative_functions": [

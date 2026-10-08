@@ -51,6 +51,7 @@
       "expected_capabilities": [
         "chromie.weather.lookup"
       ],
+      "require_evidence_bound_claims": true,
       "require_speech": true,
       "description": "Establish a real completed weather Goal and retained weather Skill context."
     },

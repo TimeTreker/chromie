@@ -1,6 +1,18 @@
 # Chromie Current Status
 
-## Current in-progress isolation, 2026-10-07
+## Current delivery — Evidence-bound claim oracle, 2026-10-08
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Acceptance-only: scenarios declaring `require_evidence_bound_claims` (13 clock/weather lookup turns) turn an SC `respond`/`inform` act without Evidence refs or an addressed Host need into hard `provenance:unsupported_evidence_claim`. Production runtime, prompts, Schemas and the workflow freeze are unchanged. |
+| Automatic verification | Original harness fails the 6 new evidence-bound regressions; patched harness passes 40 focused tests. Canonical gate passes 169 benchmark, 4,002 main, 5 skips, 1,063 subtests, 20 legacy. Evidence-class Level A 6/6. Retroactive re-score of 713 retained flagged-turn summaries (19 contain SC acts) flags only the Oct 7 fabricated date. |
+| Target validation | Dirty-source diagnostic simulator run of the 13 declared cases: 4/13 automatic pass, 0 unsupported-claim hits across 24 SC acts. 7 cases fail at Fast Planner `weather.lookup.location` provenance, including clock questions routed to weather lookup; 1 SC delivery failure; 1 weather provider failure. The Oct 7 fabrication did not recur because UMI typed the question `information` this time (it typed `speech/turn` on Oct 7). |
+| Deployment state | Agent packaged source matched checkout (`2b4f2298…`); the harness change is host-side only. No rebuild, promotion or release. |
+
+Evidence: `.chromie/acceptance/evidence-bound-claims-20261008/`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_134254.tar.gz`.
+
+## Previous in-progress isolation, 2026-10-07
 
 | Axis | Current evidence |
 | --- | --- |
@@ -15,7 +27,7 @@ under `/home/chromie/Downloads/chromie_debug_bundle_20261007_<time>.tar.gz`.
 See [audit](../ARCHITECTURE_AUDIT.md), [checkpoint](../DEVELOPMENT_CHECKPOINT.md)
 and [handoff](../HANDOFF.md) for actual module I/O and resume order.
 
-Updated: 2026-10-07. Current focus: Goal-driven single-authority architecture,
+Updated: 2026-10-08. Current focus: Goal-driven single-authority architecture,
 canonical local verification, current-revision voice proof and default target-evidence closure.
 The [project audit](../ARCHITECTURE_AUDIT.md) records design/source conflicts and
 actual module I/O; it does not amend authority or establish full qualification.

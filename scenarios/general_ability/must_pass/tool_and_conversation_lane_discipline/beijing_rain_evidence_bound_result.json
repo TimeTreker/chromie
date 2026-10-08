@@ -53,6 +53,7 @@
   "expected_args": [
     "0:date=today"
   ],
+  "require_evidence_bound_claims": true,
   "require_speech": true,
   "require_social_communicative_act": true,
   "require_fast_planner_evidence_reentry": true,

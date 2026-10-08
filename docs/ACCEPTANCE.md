@@ -587,10 +587,13 @@ summaries and semantic-review bundles. Stage and difficulty are separate metadat
 controls promotion order, while each file declares `difficulty=easy|medium|hard`.
 Scenario-local `require_safe_idle=true` makes an executed final safe-idle state
 a non-overridable mechanical assertion; preview output cannot satisfy it.
+Scenario-local `require_evidence_bound_claims=true` makes an SC `respond`/`inform` act
+without Evidence refs or an addressed Host need a `provenance:unsupported_evidence_claim`
+hard failure, so an unsupported changing fact cannot be triaged as a profile gap.
 Use `--stage must_pass` for the cheapest broad-change gate. In a full run the
 runner collects ordinary scenario mismatches through the current stage before
 gating later stages. Structured Runtime/model-contract and LLM-integrity failures,
-observed Goal omission/provenance rejection, unsafe status, missing post-run status
+observed Goal omission/provenance rejection, unsupported Evidence-bound answers, unsafe status, missing post-run status
 in execution mode, and harness exceptions instead stop before the next case in
 any stage. The aggregate and reviewer packet retain the exact `integrity_stop`,
 planned/executed counts and unrun cases. `cohort_complete=false` means selected

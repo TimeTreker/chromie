@@ -27,6 +27,12 @@ session workflow stages. Cases can require `require_social_communicative_act` wi
 `expected_social_communicative_functions`, or forbid interaction with
 `forbid_social_communicative_act`. Work needs never count as utterances. Detached
 speech counts as delivered only through correlated completed playback records.
+A turn whose requested answer must come from trusted Capability Evidence (clock,
+weather and similar lookups) declares `require_evidence_bound_claims`. Then every SC
+`respond`/`inform` act must cite Evidence or address a Host-established need such as a
+failure update; otherwise the turn records `provenance:unsupported_evidence_claim`, a
+hard integrity failure. Receipts and questions make no result claim. Do not declare it
+on turns that also carry an ordinary social obligation; context-grounded answers stay legal there.
 Latency bounds use `max_warm_sc_decision_ms` and
 `max_warm_sc_to_playback_start_ms`; SC computation and delivery remain separate.
 

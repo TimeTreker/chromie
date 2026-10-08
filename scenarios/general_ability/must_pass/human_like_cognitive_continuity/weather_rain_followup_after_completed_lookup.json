@@ -48,6 +48,7 @@
       "text": "Can you help me check the weather today in chongqing?",
       "language": "en-US",
       "expected_capabilities": ["chromie.weather.lookup"],
+      "require_evidence_bound_claims": true,
       "require_speech": true,
       "expect_created_goals_satisfied": true,
       "require_fast_planner_evidence_reentry": true,

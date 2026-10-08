@@ -43,6 +43,7 @@
   },
   "text": "查一下重庆今晚热不热。",
   "language": "zh-CN",
+  "require_evidence_bound_claims": true,
   "require_social_communicative_act": true,
   "expected_social_communicative_functions": [
     "acknowledge",

@@ -35,6 +35,7 @@
   "text": "今天几号，星期几？",
   "language": "zh-CN",
   "expected_capabilities": ["chromie.clock.local"],
+  "require_evidence_bound_claims": true,
   "require_speech": true,
   "require_fast_planner_evidence_reentry": true,
   "description": "Current calendar facts require trusted local-clock evidence and complete delivery.",

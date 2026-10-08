@@ -54,6 +54,7 @@
     "0:date=today",
     "0:period=morning"
   ],
+  "require_evidence_bound_claims": true,
   "require_speech": true,
   "require_social_communicative_act": true,
   "expected_social_communicative_functions": [
