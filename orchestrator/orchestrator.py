@@ -6553,6 +6553,27 @@ class VoiceAssistant:
 
         return receipt
 
+    def start_soridormi_ambient_perception(self) -> asyncio.Task | None:
+        """Start the one mechanical ambient scene poll for this Host, if enabled.
+
+        Every Host entrypoint that admits turns against Soridormi uses this, so
+        Planner Situation reflects current trusted perception in voice and text.
+        """
+
+        if not getattr(self, "enable_soridormi_capabilities", False):
+            return None
+        existing = getattr(self, "_ambient_perception_task", None)
+        if existing is not None and not existing.done():
+            return existing
+        task = asyncio.create_task(
+            run_soridormi_ambient_perception_loop(self),
+            name="soridormi-ambient-perception",
+        )
+        self.active_cognitive_runtime_tasks[task] = "soridormi-ambient-perception"
+        task.add_done_callback(self._cognitive_runtime_task_done)
+        self._ambient_perception_task = task
+        return task
+
     def _cognitive_runtime_task_done(self, task: asyncio.Task) -> None:
         result_tasks = getattr(self, "active_cognitive_runtime_tasks", None)
         if isinstance(result_tasks, dict):
@@ -7791,15 +7812,7 @@ class VoiceAssistant:
             "time-condition-cognition-wake"
         )
         time_condition_task.add_done_callback(self._cognitive_runtime_task_done)
-        if getattr(self, "enable_soridormi_capabilities", False):
-            ambient_perception_task = asyncio.create_task(
-                run_soridormi_ambient_perception_loop(self),
-                name="soridormi-ambient-perception",
-            )
-            self.active_cognitive_runtime_tasks[ambient_perception_task] = (
-                "soridormi-ambient-perception"
-            )
-            ambient_perception_task.add_done_callback(self._cognitive_runtime_task_done)
+        self.start_soridormi_ambient_perception()
         if self.conversation_state.runtime_revalidation_candidates():
             task = asyncio.create_task(
                 self._revalidate_restored_goals_from_provider_state(),

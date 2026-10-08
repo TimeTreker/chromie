@@ -1,6 +1,27 @@
 # Chromie Handoff
 
-## Current delivery — Information-query free text must cite its source span, 2026-10-08
+## Current delivery — Text harness runs live ambient perception, 2026-10-08
+
+Base: local commit `89de55fb5`. Owner-requested defect: the text acceptance Host never
+started the ambient scene poll (only `VoiceAssistant.run()` did), so every live text turn
+planned with `situation: {}`. Repair: `VoiceAssistant.start_soridormi_ambient_perception()`
+is the one idempotent starter used by `run()`. `scripts/interaction_text_mujoco_check.py`
+primes one read after a passing preflight, starts the same poll and records
+`ambient_perception.json`/summary `ambient_perception`. Regressions in
+`tests/test_soridormi_scene_perception.py` are red→green; the canonical gate passes
+(169/4,013/5/1,065/20, `.chromie/acceptance/ambient-perception-text-20261008/run-tests.log`).
+Live proof is NOT done. The default Soridormi scene has zero objects. The
+`thirst_water_delivery` scene fails to start: its scenario runner opens GLFW on `:0`
+even with `--no-viewer` and with `MUJOCO_GL=egl`. That is a Soridormi environment defect,
+not edited here. The simulator and MCP runtime were stopped by `run_scenario.sh` and must be
+restarted before any live run.
+
+Next (owner-requested): the water source is marked `known` without evidence. Replace the
+decoder-ignored `allOf if/then` in `agent/app/planner_schema.py` with two `oneOf` branches:
+unresolved forbids the source span, known requires it. Then run strict replay; a freeze
+recapture is likely, using `.chromie/acceptance/water-context-repair-20261007/` tooling.
+
+## Previous delivery — Information-query free text must cite its source span, 2026-10-08
 
 Checkout `/home/chromie/github/chromie`, branch `main`. Base: local commit `20e394a3c`
 (after-Work speech, not pushed) on `origin/main` `23d924ee2`.

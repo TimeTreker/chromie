@@ -186,3 +186,72 @@ def test_planning_situation_carries_goal_free_perception_forward() -> None:
     )
     assert planning.interpretations[0].relevance_goal_ids == []
     assert planning.source_refs[0].kind == "perception"
+
+
+class _TextHost:
+    """The Host surface the text harness and ambient poll actually touch."""
+
+    def __init__(self, invoker: SceneInvoker) -> None:
+        from types import SimpleNamespace
+
+        self.enable_soridormi_capabilities = True
+        self.interaction_runtime = SimpleNamespace(soridormi_invoker=invoker)
+        self.active_cognitive_runtime_tasks: dict[asyncio.Task, str] = {}
+        self.started = 0
+
+    def build_context(self, sid):
+        return {}
+
+    def _cognitive_runtime_task_done(self, task) -> None:
+        self.active_cognitive_runtime_tasks.pop(task, None)
+
+    def start_soridormi_ambient_perception(self):
+        from orchestrator.orchestrator import VoiceAssistant
+
+        self.started += 1
+        return VoiceAssistant.start_soridormi_ambient_perception(self)
+
+
+def test_text_check_primes_and_keeps_live_ambient_perception() -> None:
+    # Live text runs on 2026-10-08 planned water with `situation: {}` because only
+    # the voice main loop started the ambient poll.
+    from scripts.interaction_text_mujoco_check import _prepare_ambient_perception
+
+    async def exercise():
+        host = _TextHost(SceneInvoker(scene()))
+        record = await _prepare_ambient_perception(host)
+        first = host._ambient_perception_task
+        await _prepare_ambient_perception(host)  # a later turn on the same Host
+        assert host._ambient_perception_task is first
+        assert host.active_cognitive_runtime_tasks == {first: "soridormi-ambient-perception"}
+        first.cancel()
+        await asyncio.gather(first, return_exceptions=True)
+        return host, record
+
+    host, record = asyncio.run(exercise())
+    assert record == {"enabled": True, "primed": "updated", "scene_revision": 3,
+                      "interpretation_count": 1}
+    assert host._ambient_situation_projection.interpretations[0].value == (
+        "bottle of milk, 50 meters in front of Chromie (simulated)"
+    )
+    assert host.started == 2
+
+
+def test_text_check_records_unavailable_perception_without_blocking() -> None:
+    from scripts.interaction_text_mujoco_check import _prepare_ambient_perception
+
+    class Failing(SceneInvoker):
+        async def invoke(self, tool_name, args, *, context=None):
+            return ToolCallOutcome.failed("scene provider offline")
+
+    async def exercise():
+        host = _TextHost(Failing(scene()))
+        record = await _prepare_ambient_perception(host)
+        host._ambient_perception_task.cancel()
+        await asyncio.gather(host._ambient_perception_task, return_exceptions=True)
+        return record
+
+    record = asyncio.run(exercise())
+    assert record["enabled"] is True
+    assert record["primed"].startswith("unavailable:RuntimeError")
+    assert record["interpretation_count"] == 0

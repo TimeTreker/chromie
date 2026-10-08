@@ -42,6 +42,7 @@ from orchestrator.runtime.observability_recording import (
     record_cognitive_runtime_evidence,
 )
 from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
+from orchestrator.runtime.soridormi_scene_perception import refresh_soridormi_ambient_scene_once
 from scripts.outcome_observations import observed_capability_args
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "text-mujoco"
 DEFAULT_TEXT = (
@@ -903,6 +904,30 @@ async def dispatch_initial_reflex(
     return reflex_projection, response, reflex_evidence, errors
 
 
+async def _prepare_ambient_perception(assistant: Any) -> dict[str, Any]:
+    """Give the text Host the live Host's trusted perception before a turn.
+
+    A live Host polls the scene before the microphone opens. Text admits a turn at
+    once, so prime one read, then keep the same mechanical poll running for this
+    Host's lifetime. An unavailable read is recorded; it never blocks the turn.
+    """
+
+    if not getattr(assistant, "enable_soridormi_capabilities", False):
+        return {"enabled": False}
+    try:
+        primed = await refresh_soridormi_ambient_scene_once(assistant)
+    except Exception as exc:  # the production poll also records and continues
+        primed = f"unavailable:{type(exc).__name__}: {str(exc)[:200]}"
+    assistant.start_soridormi_ambient_perception()
+    projection = getattr(assistant, "_ambient_situation_projection", None)
+    return {
+        "enabled": True,
+        "primed": primed,
+        "scene_revision": getattr(assistant, "_ambient_scene_revision", None),
+        "interpretation_count": len(projection.interpretations) if projection is not None else 0,
+    }
+
+
 async def run_check(
     args: argparse.Namespace,
     *,
@@ -1000,6 +1025,8 @@ async def run_check(
             _write_json(evidence_dir / "summary.json", summary)
             return summary
 
+        ambient_perception = await _prepare_ambient_perception(assistant)
+        _write_json(evidence_dir / "ambient_perception.json", ambient_perception)
         sid = assistant.create_session()
         context = assistant.build_context(sid)
         robot_state = dict(context.get("robot_state") or {})
@@ -1592,6 +1619,7 @@ async def run_check(
             "cognitive_events": str(
                 evidence_dir / "cognitive_runtime_events.jsonl"
             ),
+            "ambient_perception": ambient_perception,
             "status_before": status_before,
             "status_after": status_after,
             "session_state": assistant.sessions.state.get(sid),

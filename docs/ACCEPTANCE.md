@@ -743,6 +743,10 @@ or probe error is retained without dispatching rejected Work; preview remains
 nonexecuting and does not claim final execution state. The cohort runner treats that rejection as an
 integrity stop, preserving unrun coverage. A later dispatch guard is insufficient
 because Core realization and deterministic reflexes precede that guard.
+After a passing preflight the text checker primes the same mechanical ambient scene poll a live
+Host runs before its microphone opens, then keeps it running for the Host's lifetime, so
+Planner Situation carries current trusted perception. `ambient_perception.json` records the
+read; an unavailable read is retained and never blocks the turn.
 `--soridormi-repo` records a declared paired checkout for diagnostic
 provenance; it does not prove which source revision is executing behind the MCP
 endpoint.
