@@ -1,6 +1,46 @@
 # Chromie Development Checkpoint
 
-## Current delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
+## Current delivery — SC answers ordered after body Work are spoken again, 2026-10-08
+
+Pre-delivery base `23d924ee2debbf0a9588984641a1c6bf2ba78ae7` (pushed `origin/main`).
+The expected resume revision is the latest commit containing this checkpoint and
+[Handoff](HANDOFF.md). One defect, one focused fix.
+
+Defect: "Blink twice and tell me a short joke." and "点两下头，再跟我说声你好。" executed
+the body action, but the SC answer ordered after it was never played. Two such cases
+passed mechanically. An A/B on earlier source reproduced it
+(`.chromie/acceptance/sc-act-identity-20261008/ab-original-code/`).
+
+| Order | Module / owner | Actual | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | Fast Planner | blink step, then a `complete_response` need after it | same | correct |
+| 2 | SC | joke act, `final`, `context_grounded`, need covered | same | correct |
+| 3 | Response projection | `timing=after_capabilities`, `ordered_context_grounded_after_work=True`, `source=social_cognition` | same | correct |
+| 4 | Interaction coordinator | speech dropped as result-deferred, because the exemption still required `source=planner_communicative_activity` | keep it after the blink | incorrect (first wrong boundary; stale since the Sep 14 SC split, `ec4a5c268`) |
+| 5 | Re-entry | none, since no result Evidence was needed | — | the answer was lost |
+
+Repair: `orchestrator/runtime/interaction_coordinator.py` exempts the trusted
+`social_cognition` source too. The trusted projection sets that flag only for
+context-grounded speech whose Goals are not executable, so result claims about Work stay
+deferred to terminal Evidence.
+
+Evidence (`.chromie/acceptance/after-work-speech-20261008/`):
+- New regression `test_social_cognition_answer_ordered_after_body_work_is_spoken`
+  red→green.
+- Strict replay 6,000/6,000 with zero model calls; Level A `multi_goal_daily_life` 10/10;
+  canonical gate exit 0 (169/4,007/5/1,065/20).
+- Live class (simulator executed): 5/6 automatic passes. Both originating answers are now
+  played after the body action. The joke case still fails because the initial "Got it."
+  first PCM took 4,786 ms against the 3,500 ms start deadline. It was cancelled, SC
+  delivery was reported failed, and the scenario counted two speech outputs where it
+  allows one. That TTS start latency is the known Oct 7 issue and is not repaired here.
+  Bundle `/home/chromie/Downloads/chromie_debug_bundle_20261008_162840.tar.gz`.
+
+Next: Planner provenance/readiness repair, the dominant live failure (water source binding,
+weather location, clock vs weather choice, "exact owned Goal source quote"). After that,
+latency, including the TTS start deadline above.
+
+## Previous delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
 
 Pre-delivery base: local commit `05af832a4` (SC act identity) on top of fetched
 `origin/main` `601b73f09`. The expected resume revision is the latest commit containing

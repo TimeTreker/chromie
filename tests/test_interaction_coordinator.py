@@ -1138,6 +1138,51 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.status, "completed")
         self.assertEqual([item["text"] for item in spoken], ["你好"])
 
+    async def test_social_cognition_answer_ordered_after_body_work_is_spoken(
+        self,
+    ) -> None:
+        # Retained live SID 1f5308a3 (2026-10-08): "Blink twice and tell me a short
+        # joke." SC authored the joke after the blink; it was dropped as result speech.
+        spoken: list[dict[str, Any]] = []
+        coordinator = InteractionRuntimeCoordinator(
+            lambda args: spoken.append(args) or {"scheduled": True},
+            soridormi_invoker=_SoridormiInvoker(),
+        )
+        joke = "Why did the chicken cross the road? To get to the other side!"
+
+        result = await _execute_to_terminal(
+            coordinator,
+            InteractionResponse(
+                speech=[
+                    {
+                        "text": joke,
+                        "timing": "after_capabilities",
+                        "metadata": {
+                            "source": "social_cognition",
+                            "wording_owner": "social_cognition",
+                            "canonical_plan_id": "plan-blink-joke",
+                            "ordered_context_grounded_after_work": True,
+                            "truth_stages": ["context_grounded"],
+                        },
+                    }
+                ],
+                capabilities=[
+                    {
+                        "request_id": "blink-before-joke",
+                        "capability_id": "soridormi.nod_yes",
+                    }
+                ],
+                metadata={
+                    "language": "en-US",
+                    "canonical_plan_id": "plan-blink-joke",
+                },
+            ),
+            session_id="sid-blink-joke",
+        )
+
+        self.assertEqual(result.status, "completed")
+        self.assertEqual([item["text"] for item in spoken], [joke])
+
     async def test_cognitive_body_failure_defers_terminal_speech_to_turn_closure(
         self,
     ) -> None:

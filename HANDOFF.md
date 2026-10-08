@@ -1,6 +1,45 @@
 # Chromie Handoff
 
-## Current delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
+## Current delivery — SC answers ordered after body Work are spoken again, 2026-10-08
+
+Checkout `/home/chromie/github/chromie`, branch `main`, base `23d924ee2` (= `origin/main`).
+
+Changed files:
+- `orchestrator/runtime/interaction_coordinator.py`: after-Work exemption accepts
+  `source=social_cognition`.
+- `tests/test_interaction_coordinator.py`: SC-source regression.
+- `docs/STATUS.md`, this file and the checkpoint.
+
+Commands and results:
+
+```bash
+python -m pytest -q tests/test_interaction_coordinator.py   # 50 passed; original source fails the new test
+python scripts/general_ability_acceptance.py --mode level-a --ability-class multi_goal_daily_life --no-write   # 10/10
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir .chromie/acceptance/after-work-speech-20261008/strict-replay   # 6000/6000, 0 model calls
+./scripts/run_tests.sh   # exit 0: 169 benchmark, 4007 main, 5 skipped, 1065 subtests, 20 legacy
+```
+
+Live: identity `.chromie/acceptance/after-work-speech-20261008/runtime-identity.json`
+(diagnostic, dirty). One invocation of `--ability-class multi_goal_daily_life --execute
+--keep-going` → `live-class/summary.json`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_162840.tar.gz`.
+
+Resume (next: Planner provenance/readiness repair). Start from the retained failing
+packets, not from prompt edits:
+
+```bash
+cd /home/chromie/github/chromie
+git fetch origin && git status --short && git log --oneline -3
+rg -n 'exact owned Goal source quote|cannot invent an unbound Capability input' agent/app orchestrator
+```
+
+Retained failures:
+- `.chromie/acceptance/evidence-bound-claims-20261008/live-flagged/` — weather location,
+  clock vs weather.
+- `.chromie/acceptance/sc-act-identity-20261008/live-focused/` — water `acquire_and_deliver_resource`.
+- `.chromie/acceptance/ga-revision-containment-20261008/live-focused/` — readiness quote.
+
+## Previous delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
 
 Checkout `/home/chromie/github/chromie`, branch `main`. Base: local commit `05af832a4`
 (SC act identity, not yet pushed) on fetched `origin/main` `601b73f09`.

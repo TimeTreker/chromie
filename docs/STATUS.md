@@ -1,6 +1,18 @@
 # Chromie Current Status
 
-## Current delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
+## Current delivery — SC answers ordered after body Work are spoken again, 2026-10-08
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | The interaction coordinator's exemption for context-grounded speech ordered after Work (not a result claim) now accepts the trusted `social_cognition` source as well as the legacy Planner source. The Sep 14 SC split changed that source without updating the exemption, so every such SC answer was dropped as "result speech for re-entry". Result-claim speech remains deferred to terminal Evidence. |
+| Automatic verification | New SC-source coordinator regression red→green; strict replay 6,000/6,000 with zero model calls; `multi_goal_daily_life` Level A 10/10; canonical gate 169/4,007/5 skips/1,065 subtests/20 legacy. |
+| Target validation | Live `multi_goal_daily_life` class (simulator executed), 5/6 automatic passes. "你好！" after the nod and the joke after the blink are now actually played; neither was before. The remaining failure is the known TTS start deadline: the initial "Got it." took 4,786 ms to first PCM against 3,500 ms, was cancelled, and SC reported delivery failure. |
+| Deployment state | Host-side change; Agent source unchanged; dirty-source diagnostic identity. |
+
+Evidence: `.chromie/acceptance/after-work-speech-20261008/`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_162840.tar.gz`.
+
+## Previous delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
 
 | Axis | Current evidence |
 | --- | --- |

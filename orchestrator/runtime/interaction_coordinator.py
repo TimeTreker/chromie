@@ -1014,8 +1014,9 @@ class InteractionRuntimeCoordinator:
         # Evidence. Drop that pre-authored wording so Cognitive result re-entry
         # can compose a grounded follow-up. A distinct context-grounded speech
         # Goal explicitly ordered after Work (for example, perform A then greet)
-        # is not a completion claim about A; the Planner/Runtime projection marks
+        # is not a completion claim about A; the trusted response projection marks
         # that exact case and the scheduler preserves it after the capabilities.
+        # Social Cognition is the wording owner of such speech since the SC split.
         deferred_speech_ids = [
             speech.id
             for speech in prepared.speech
@@ -1023,7 +1024,7 @@ class InteractionRuntimeCoordinator:
             and not (
                 speech.metadata.get("ordered_context_grounded_after_work") is True
                 and speech.metadata.get("source")
-                == "planner_communicative_activity"
+                in {"planner_communicative_activity", "social_cognition"}
                 and str(speech.metadata.get("canonical_plan_id") or "").strip()
                 == str(prepared.metadata.get("canonical_plan_id") or "").strip()
                 and bool(str(prepared.metadata.get("canonical_plan_id") or "").strip())
