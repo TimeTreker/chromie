@@ -1,6 +1,66 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Evidence-bound claim oracle, 2026-10-08
+## Current delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
+
+Pre-delivery base `601b73f09dfbcb0175233219f96d7b6ee11f8f89` (fetched `origin/main`
+matched). The expected resume revision is the latest commit containing this checkpoint
+and [Handoff](HANDOFF.md). Audit follow-up item 2a: one defect, one focused fix.
+
+Owner decision (2026-10-08): keep both Planner triggers. The UMI-triggered Planner acts
+on the current state. The GA-triggered Planner runs only when continuity changes Work, and
+must revise without erasing a valid first plan. This conforms to Charter lines 559-585 and
+725, so no amendment is needed. It replaces the pending Oct 7 request to keep one primary
+Planner per scope.
+
+Defect: SC repeated delivered words under a new act ID (two real playbacks). Retained
+SID `6f08c738`: initial SC delivered `greet_and_status`; a later work-state SC request
+carried the Planner need fact `"activity_id": "resp_001"` and SC returned the same words
+as new act `resp_001`.
+
+| Order | Module / owner | Actual output | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | Fast Planner / HOW | `complete_response` activity `resp_001` | Work-side identity | correct |
+| 2 | Host need projection | SC need `facts` = whole activity, including `activity_id` | obligation facts only | incorrect (first wrong boundary) |
+| 3 | SC / communication | copies `resp_001` as its own act ID with delivered words | reuse `greet_and_status` or stay silent | incorrect given misleading input |
+| 4 | Host delivery | new act ID, so it is played again | — | correct per identity contract |
+
+Repair: in `orchestrator/runtime/cognitive_runtime.py` (Fast streaming-advance Need
+producer), the Host omits `activity_id` from the Need `facts`. The identity stays in
+`need_id` and before/after step order, and no consumer read it.
+
+Evidence (`.chromie/acceptance/sc-act-identity-20261008/`):
+- Native contrast: all 16 retained SC requests carrying the fact, model fixed, temperature 0.
+  The candidate removes only that key; baseline repeated identically. Planner ID copied
+  7→0, fresh-ID duplicates 4→0, Schema errors 0→0. c03, c06 and c15 now reuse the
+  delivered act. c00, c05, c07 and c09 keep equivalent meaning. c11 avoids the duplicate
+  but chooses `silence` with its need pending instead of reusing `ask_help_type`; this
+  SC need-accounting choice remains open.
+- Unit regression red→green; strict workflow replay 6,000/6,000 with zero model calls
+  (no freeze recapture); canonical gate exit 0: 169/4,003/5 skips/1,063 subtests/20 legacy.
+- Live (dirty diagnostic identity; Agent `2b4f2298…` verified; simulator executed): 11
+  former duplicate cases; 34 SC calls with 0 copied IDs, 0 duplicate replays and 7
+  delivered-ID reuses; 3/11 automatic passes; no same-scope Planner race occurred.
+  Failures:
+  - water ×3: Fast `acquire_and_deliver_resource` contract invalid;
+  - no-motion identity: Fast terminal contract;
+  - reminder: Deep structured output;
+  - three identity/greeting latency misses (SC 5.2–10.0 s).
+  Bundle `/home/chromie/Downloads/chromie_debug_bundle_20261008_153201.tar.gz`.
+- New pre-existing defect: SC answers ordered after body Work (`delivery_phase=final`,
+  `after_step_ids`) are authored but never scheduled for TTS in executed runs. The joke
+  and "你好！" after blink/nod were never heard; two cases nonetheless passed mechanically.
+  An A/B on the original code (`ab-original-code/`) reproduces it with the copied IDs.
+  No earlier executed run ever exercised this path.
+
+Next, one item each:
+1. GA-triggered Planner as a non-destructive revision. Priority comes from newer
+   continuity state, not completion order; GA plan failure falls back to the valid UMI
+   plan; UMI plan failure waits for a requested GA plan.
+2. Deliver `final`-phase SC speech after body Work completes.
+3. Provenance repair (UMI typing nondeterminism; Planner clock/weather choice).
+4. Latency from end of input.
+
+## Previous delivery — Evidence-bound claim oracle, 2026-10-08
 
 Checkout `main`, pre-delivery base `4208f001a841abb86d852398d088f6da82a0c62f`
 (fetched `origin/main` matched before edits). The expected resume revision

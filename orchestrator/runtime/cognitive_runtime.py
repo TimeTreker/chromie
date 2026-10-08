@@ -3564,6 +3564,9 @@ class GoalDrivenRuntimeCoordinator:
                                                    for goal_id in refs_to_goals[ref]))
             # This preserves the validated ordered Work obligation. SC supplies
             # words later without moving that obligation across task Activities.
+            # The Planner activity_id names Work and already lives in need_id and
+            # step order; under SC's own act-identity key it invited SC to author
+            # delivered words again as a "new" act.
             phase = ("final" if capability_indexes and index > max(capability_indexes)
                      else "immediate" if capability_indexes and index > min(capability_indexes)
                      else "pre_action" if capability_indexes else "immediate") if activity.timing == "sequential" else "immediate"
@@ -3571,7 +3574,8 @@ class GoalDrivenRuntimeCoordinator:
                 need_id=communication_need_id(plan_id, activity.activity_id), owner="planner",
                 kind="input" if activity.role == "clarification" else "answer",
                 source_goal_ids=activity_goal_ids, source_responsibility_refs=list(activity.source_responsibility_refs),
-                reference_id=plan_id, delivery_phase=phase, facts=activity.model_dump(mode="json"),
+                reference_id=plan_id, delivery_phase=phase,
+                facts=activity.model_dump(mode="json", exclude={"activity_id"}),
                 before_step_ids=[item.activity_id for item in advance.activities[index+1:] if item.role == "capability"] if activity.timing == "sequential" else [],
                 after_step_ids=[item.activity_id for item in advance.activities[:index] if item.role == "capability"] if activity.timing == "sequential" else [],
             ))

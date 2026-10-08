@@ -16,6 +16,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerCapabilityActivity,
     FastPlannerResponseNeed,
     FastPlannerProgressAct,
+    communication_need_id,
 )
 
 
@@ -97,6 +98,47 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
         self.assertEqual(plan.communicative_acts, [])
         self.assertEqual(plan.communication_needs[0].kind, "answer")
         self.assertEqual(plan.communication_needs[0].source_goal_ids, ["goal-greeting"])
+
+    def test_need_facts_do_not_offer_planner_work_identity_as_an_act_id(self) -> None:
+        # Retained SID 6f08c738: SC copied the Planner's `resp_001` from need facts
+        # and re-delivered its already spoken greeting under that new act ID.
+        advance = FastPlannerAdvance(
+            turn_id="turn-greeting",
+            disposition="respond",
+            coverage="complete",
+            covered_responsibility_refs=["r1"],
+            activities=[
+                FastPlannerResponseNeed(
+                    activity_id="resp_001",
+                    role="complete_response",
+                    rationale="Answer the greeting and the status question.",
+                    source_responsibility_refs=["r1"],
+                )
+            ],
+            confidence=1.0,
+        )
+        association = GoalAssociationResolution(
+            turn_id="turn-greeting",
+            resolution_status="resolved",
+            new_goals=[
+                SemanticGoal(
+                    goal_id="goal-greeting",
+                    description="Answer the greeting.",
+                    source_text="hi, how are you?",
+                    source_responsibility_refs=["r1"],
+                )
+            ],
+            confidence=1.0,
+        )
+
+        need = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+            advance=advance, association=association, user_text="hi, how are you?",
+        ).communication_needs[0]
+
+        self.assertNotIn("activity_id", need.facts)
+        self.assertNotIn("resp_001", str(need.facts))
+        self.assertEqual(need.facts["rationale"], "Answer the greeting and the status question.")
+        self.assertEqual(need.need_id, communication_need_id(need.reference_id, "resp_001"))
 
     def test_fast_activity_order_projects_after_work_speech_to_final_phase(self) -> None:
         advance = FastPlannerAdvance(

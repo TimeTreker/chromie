@@ -1,6 +1,18 @@
 # Chromie Current Status
 
-## Current delivery — Evidence-bound claim oracle, 2026-10-08
+## Current delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Host projection of Fast Planner communicative Needs into SC `facts` omits the Planner `activity_id`; it remains encoded in `need_id` and step order. SC owns act identity; no prompt, Schema, model or authority change. |
+| Automatic verification | Frozen native contrast of all 16 retained SC requests that carried the fact (baseline repeated, stable): Planner ID copied 7→0, delivered words re-authored under a new ID 4→0, Schema errors 0→0. One request (c11) now leaves its need pending in silence instead of reusing the delivered act. Unit regression red→green; strict replay 6,000/6,000 with zero model calls; canonical gate 169/4,003/5 skips/1,063 subtests/20 legacy. |
+| Target validation | Live simulator run of 11 former duplicate cases: 34 SC calls, 0 copied IDs, 0 duplicate replays, 7 correct delivered-ID reuses; 3/11 automatic passes. Remaining failures are Planner contract failures (water ×3, identity, reminder) and SC latency (5.2–10.0 s vs 2 s). A pre-existing defect surfaced: SC speech ordered after body Work (`final` phase) is authored but never played; an A/B on the original code reproduces it. |
+| Deployment state | Host-side change; Agent source unchanged (`2b4f2298…` verified). Dirty-source diagnostic identity; no rebuild, promotion or release. |
+
+Evidence: `.chromie/acceptance/sc-act-identity-20261008/`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_153201.tar.gz`.
+
+## Previous delivery — Evidence-bound claim oracle, 2026-10-08
 
 | Axis | Current evidence |
 | --- | --- |

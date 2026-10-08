@@ -1,6 +1,48 @@
 # Chromie Handoff
 
-## Current delivery — Evidence-bound claim oracle, 2026-10-08
+## Current delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
+
+Checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery base
+`601b73f09dfbcb0175233219f96d7b6ee11f8f89` (matched fetched `origin/main`).
+
+Changed files:
+- `orchestrator/runtime/cognitive_runtime.py`: Need `facts` exclude `activity_id`.
+- `tests/test_planner_communication_pr6.py`: retained-episode regression.
+- `docs/STATUS.md`, this file and the checkpoint.
+
+Commands and results:
+
+```bash
+python -m pytest -q tests/test_planner_communication_pr6.py   # 7 passed; original source fails the new test
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir .chromie/acceptance/sc-act-identity-20261008/strict-replay   # 6000/6000, 0 model calls
+./scripts/run_tests.sh   # exit 0: 169 benchmark, 4003 main, 5 skipped, 1063 subtests, 20 legacy
+cd .chromie/acceptance/sc-act-identity-20261008 && python contrast.py <scratch-with-extracted-bundles>   # freeze 16 cases
+ARM=baseline python contrast.py; ARM=candidate python contrast.py; ARM=baseline REPEAT=-repeat python contrast.py
+```
+
+The contrast replays each frozen request on `http://127.0.0.1:30000/v1/chat/completions`
+(`chromie-gemma4-12b`, temperature 0). Its results are in `baseline/`, `candidate/`,
+`baseline-repeat/` and `contrast.log`.
+
+Live: identity `runtime-identity.json` (diagnostic, dirty). One invocation of
+`--mode live-text --goal-driven-runtime apply --execute --keep-going` over 11 cases →
+`live-focused/summary.json`. The A/B on original source (only `cognitive_runtime.py`
+stashed; identity `runtime-identity-ab.json`) → `ab-original-code/`. Bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_153201.tar.gz`.
+
+The Soridormi simulator (`run_sim_server.sh --profile open_duck_forward --no-viewer`) and
+`soridormi-runtime-mcp` were left running for the next live item.
+
+Resume (next: GA-triggered Planner as a non-destructive revision):
+
+```bash
+cd /home/chromie/github/chromie
+git fetch origin && git status --short
+rg -n 'umi_planning_superseded|ga_model_requested_reentry|cancel_uncommitted_fast_work' orchestrator/runtime/cognitive_runtime.py
+python -m pytest -q tests/test_cognitive_runtime_pr7.py -k IndependentPlanning
+```
+
+## Previous delivery — Evidence-bound claim oracle, 2026-10-08
 
 Checkout `/home/chromie/github/chromie`, branch `main`, pre-delivery base
 `4208f001a841abb86d852398d088f6da82a0c62f` (matched fetched `origin/main`). The delivery
