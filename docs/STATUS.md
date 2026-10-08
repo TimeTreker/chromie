@@ -1,6 +1,18 @@
 # Chromie Current Status
 
-## Current delivery — SC answers ordered after body Work are spoken again, 2026-10-08
+## Current delivery — Information-query free text must cite its source span, 2026-10-08
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Owner-approved option A. For `acquire_information` Capabilities, the Fast decoder now requires an `argument_sources` span for required free-text inputs (weather `location`), as it already did for numbers. The Host checks that a same-script cited value appears in its span; cross-script renderings (`北京`→`Beijing`) remain allowed. Authored text (vocal/speak) and enum strings keep their existing paths. Prompt unchanged. |
+| Automatic verification | Frozen native contrast over all 20 retained weather requests. The baseline repeated identically; candidate Schema errors were 0. Genuine weather cases accepted by Host provenance went from 10/16 to 16/16, and all 56 candidate citations pass the new Host check. New decoder-level regression red→green; weather literal contract test updated, with negatives (other city, prefix, sibling) still rejected. Strict replay 6,000/6,000 with zero model calls (no recapture); canonical gate 169/4,011/5 skips/1,065 subtests/20 legacy. |
+| Target validation | Agent rebuilt (source `8b820086…`). Same 13 weather/clock live cases: 8/13 automatic passes (4/13 before). 10/11 weather questions got correct grounded answers, including Beijing (previously rejected). Two failed only the SC 2 s latency target. 内乡县 was mistranslated and the provider failed. Date/time questions are still routed to weather lookup and now fail at the provider instead of the Host (separate clock-choice defect). |
+| Deployment state | `chromie-agent:latest` rebuilt from the Oct 7 base with current `agent/app`; the previous image is tagged `chromie-agent:pre-string-provenance-20261008`. Dirty-source diagnostic identity; no release. |
+
+Evidence: `.chromie/acceptance/string-input-provenance-20261008/`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_174448.tar.gz`.
+
+## Previous delivery — SC answers ordered after body Work are spoken again, 2026-10-08
 
 | Axis | Current evidence |
 | --- | --- |

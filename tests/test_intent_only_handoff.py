@@ -281,7 +281,9 @@ async def test_provider_resource_contract_materializes_information_acquisition_p
         "activity_id": "weather-read",
         "capability_id": "chromie.weather.lookup",
         "args": {"location": "Chongqing"},
-        "argument_sources": {},
+        # A required free-text input cites its span even when copied literally.
+        "argument_sources": {"location": {"source_start_token_ref": "t4",
+                                          "source_end_token_ref": "t4"}},
         "timing": "sequential",
         "source_responsibility_refs": ["r1"],
         "reason_summary": "Acquire fresh weather Evidence before answering.",
@@ -293,6 +295,51 @@ async def test_provider_resource_contract_materializes_information_acquisition_p
     activity = frames[0].advance.activities[0]
     assert activity.step_purpose == "acquire_information"
     assert activity.expected_outcome
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("sources, accepted", [
+    ({}, False),
+    ({"location": {"source_start_token_ref": "t2", "source_end_token_ref": "t3"}}, True),
+])
+async def test_translated_required_location_must_cite_its_source_span(sources, accepted):
+    # Retained live turn (2026-10-08): "今天北京下雨了没有？" planned location
+    # "Beijing" without a span; the decoder admitted it and Host rejected it later.
+    text = "今天北京下雨了没有？"
+    result = intent_result(text, "information")
+    result["responsibilities"][0]["outcome"] = "告诉用户北京今天有没有下雨"
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+        UserMeaningInterpretationRequest(text=text), json.dumps(result, ensure_ascii=False),
+    )
+    request = CognitiveWorkRequest(sid="weather-location-span", text=text,
+        responsibilities=decision.responsibilities, interpretation_confidence=1.0)
+    weather = CatalogCapability(
+        capability_id="chromie.weather.lookup", agent_id="chromie.weather",
+        description="Retrieve current weather or forecast data for a named place.",
+        input_schema={"type": "object", "properties": {"location": {"type": "string"}},
+                      "required": ["location"], "additionalProperties": False},
+        interaction_executable=True, prompt_tier="common", can_run_parallel=True,
+        side_effect_free=True, effects=["read_only", "external_read", "weather_lookup"],
+        hints={"semantic_scope": {"responsibility_type": "acquire_and_deliver_resource",
+                                  "resource_kinds": ["information"]},
+               "resource_contract": {"provider_role": "acquire_information", "plan_requires": [],
+                                     "plan_provides": ["resource_acquired"],
+                                     "final_delivery_owner": "planner_communicative_activity"}},
+        parallel_metadata_declared=True,
+    )
+    raw = work([{"role": "capability", "activity_id": "weather-read",
+                 "capability_id": "chromie.weather.lookup", "args": {"location": "Beijing"},
+                 "argument_sources": sources, "timing": "sequential",
+                 "source_responsibility_refs": ["r1"],
+                 "reason_summary": "Acquire fresh weather Evidence before answering."}])
+    model = Model([raw])
+    frames = [frame async for frame in
+              FastPlannerResolver(model, Catalog([weather])).stream_advance(request)]
+    assert isinstance(frames[0], FastPlannerStreamTerminal) is accepted, frames[0]
+    # The constrained decoder itself must exclude the unspanned value, not only Host.
+    decoder_schema = model.packets[0][1]["response_format"]
+    errors = list(Draft202012Validator(decoder_schema).iter_errors(raw))
+    assert (not errors) is accepted, errors[:1]
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("fault", [None, "unknown_id", "second_lookup", "mixed_plan", "invented_quote"])

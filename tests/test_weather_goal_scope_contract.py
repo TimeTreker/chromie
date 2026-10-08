@@ -208,37 +208,62 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("text,outcome,location,bindings,accepted", [
-    ("What is the weather today in Chongqing?", "what the weather is today in Chongqing", "Chongqing", {}, True),
-    ("明天重庆天气怎么样？", "明天重庆天气怎么样", "重庆", {}, True),
-    ("Can you help me check the weather today in chongqing?", "Provide the current weather conditions for Chongqing as of today.", "chongqing", {}, True),
-    ("What is the weather in Paris?", "what the weather is in Chongqing", "Chongqing", {}, False),
-    ("Check Chongqing weather and Beijing time.", "determine Beijing time", "Chongqing", {}, False),
-    ("Check Chongqing weather.", "check Chongqing weather", "Chong", {}, False),
-    ("Compare Beijing and Chongqing weather.", "compare Beijing and Chongqing weather", "Beijing", {"location": "Chongqing"}, False),
+@pytest.mark.parametrize("text,outcome,location,cited,bindings,accepted", [
+    ("What is the weather today in Chongqing?", "what the weather is today in Chongqing", "Chongqing", "Chongqing", {}, True),
+    ("明天重庆天气怎么样？", "明天重庆天气怎么样", "重庆", "重庆", {}, True),
+    ("Can you help me check the weather today in chongqing?", "Provide the current weather conditions for Chongqing as of today.", "Chongqing", "chongqing", {}, True),
+    ("今天北京下雨了没有？", "告诉用户北京今天有没有下雨", "Beijing", "北京", {}, True),
+    ("What is the weather today in Chongqing?", "what the weather is today in Chongqing", "Chongqing", None, {}, False),
+    ("What is the weather in Paris?", "what the weather is in Chongqing", "Chongqing", "Paris", {}, False),
+    ("Check Chongqing weather and Beijing time.", "determine Beijing time", "Chongqing", "Chongqing", {}, False),
+    ("Check Chongqing weather.", "check Chongqing weather", "Chong", "Chongqing", {}, False),
+    ("Compare Beijing and Chongqing weather.", "compare Beijing and Chongqing weather", "Beijing", None, {"location": "Chongqing"}, False),
 ])
-async def test_fast_query_literal_arguments_require_own_intent_and_original_source(text, outcome, location, bindings, accepted):
-    # Exercise the production pre-GA boundary, where required inputs formerly
-    # needed a duplicate same-name UMI binding even for exact source literals.
+async def test_fast_query_location_cites_span_of_own_intent_and_original_source(text, outcome, location, cited, bindings, accepted):
+    # A required free-text query input must cite its span: the decoder cannot
+    # enforce literal copies, and a translated city ("Beijing" for 北京) stays
+    # provable. Host still rejects same-script values the cited words lack.
     from tests.test_fast_planner_pr3 import WeatherCatalog, FastPlannerResolver as StreamingResolver
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
 
+    tokens = user_turn_source_tokens(text)
+    own_span = {"source_start_token_ref": tokens[0]["ref"], "source_end_token_ref": tokens[-1]["ref"]}
+    if text.startswith("Check Chongqing weather and"):
+        # The owning Responsibility covers only the time request.
+        start = next(t["ref"] for t in tokens if t["surface"] == "Beijing")
+        own_span = {"source_start_token_ref": start, "source_end_token_ref": tokens[-1]["ref"]}
     request = CognitiveWorkRequest(text=text, responsibilities=[{
         "local_ref": "r1", "outcome": outcome, "output_mode": "information",
-        "confidence": 1.0, "bindings": bindings,
+        "confidence": 1.0, "bindings": bindings, "source_evidence": own_span,
     }], context={"user_turn_envelope": {
         "turn_id": "source-literal-test", "original_input": {"text": "  " + text + "\n"},
     }})
+    argument_sources = {}
+    if cited is not None:
+        joined = [t for t in tokens if t["surface"] in cited]
+        argument_sources = {"location": {"source_start_token_ref": joined[0]["ref"],
+                                         "source_end_token_ref": joined[-1]["ref"]}}
     from tests.test_fast_planner_pr3 import FakeOllama as StreamingFakeOllama
     candidate = StreamingFakeOllama({
         "disposition": "execute", "coverage": "complete",
         "covered_responsibility_refs": ["r1"], "activities": [{
             "activity_id": "query", "role": "capability",
             "capability_id": "chromie.weather.lookup", "args": {"location": location},
+            "argument_sources": argument_sources,
             "source_responsibility_refs": ["r1"], "timing": "sequential",
         }], "continuations": [], "confidence": 1.0, "unresolved": [],
         "reason_summary": "Acquire the requested information.",
     })
-    advance = await StreamingResolver(candidate, WeatherCatalog()).resolve_advance(request)
+    catalog = WeatherCatalog()
+    catalog.items = [
+        item.model_copy(update={"hints": {**item.hints, "resource_contract": {
+            "provider_role": "acquire_information", "plan_requires": [],
+            "plan_provides": ["resource_acquired"],
+            "final_delivery_owner": "planner_communicative_activity",
+        }}}) if item.capability_id == "chromie.weather.lookup" else item
+        for item in catalog.items
+    ]
+    advance = await StreamingResolver(candidate, catalog).resolve_advance(request)
     assert (advance.disposition == "execute") is accepted, advance.metadata
     if accepted:
         assert advance.activities[0].args["location"] == location

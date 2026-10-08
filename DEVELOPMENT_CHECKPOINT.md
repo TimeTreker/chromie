@@ -1,6 +1,62 @@
 # Chromie Development Checkpoint
 
-## Current delivery — SC answers ordered after body Work are spoken again, 2026-10-08
+## Current delivery — Information-query free text must cite its source span, 2026-10-08
+
+Pre-delivery base: local commit `20e394a3c` on pushed `origin/main` `23d924ee2`. The
+expected resume revision is the latest commit containing this checkpoint and
+[Handoff](HANDOFF.md). The owner chose option A: required free-text inputs cite spans like
+numbers.
+
+Defect: "今天北京下雨了没有？" planned `location: "Beijing"` with no span. The Host admits
+an ungrounded required string only as an exact literal or with a span, so it rejected the
+plan; the person heard "no location". This was the most frequent live Planner rejection
+(8 on Oct 8).
+
+| Order | Module / owner | Actual | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | UMI | information Responsibility with the city in its outcome | same | correct |
+| 2 | Fast decoder contract | `argument_sources` optional; strings excluded from forced spans | require the span the Host needs | incorrect (first wrong boundary) |
+| 3 | Fast Planner model | translated city, no span (the prompt already asks for a span or a literal) | span or literal | symptom of 2 |
+| 4 | Host grounding | rejects the unbound input | same | correct |
+
+Repair:
+- `agent/app/planner_schema.py`: for `fast_capability_acquires_information` Capabilities,
+  required non-enum strings join `required_source_inputs`. Trusted-grounded inputs
+  (`target_ref`, memory IDs) and provider-resolved `source` stay excluded.
+- `agent/app/planner_fast_validation.py`: a same-script cited value must appear in its
+  span (Latin is word-bounded); cross-script renderings stay allowed, since they cannot
+  be checked mechanically.
+
+Evidence (`.chromie/acceptance/string-input-provenance-20261008/`):
+- Native contrast (`contrast.py`, frozen `manifest.json` + `corpus/`, 20 requests):
+  baseline/repeat identical. Genuine weather cases with Host-accepted provenance 10/16 →
+  16/16, and all 56 candidate citations pass the new Host check.
+  Known weakness: three clock questions misrouted to weather can now cite the whole
+  sentence for `current_location`, which passes cross-script and fails later at the
+  provider.
+- First broad attempt (all required free-text strings): the canonical gate caught
+  Planner-authored vocal `text` and was narrowed to information queries.
+- Tests:
+  - `test_translated_required_location_must_cite_its_source_span` asserts the decoder
+    schema itself; red→green.
+  - `test_fast_query_location_cites_span_of_own_intent_and_original_source` replaces the
+    literal-only test; same-script negatives remain rejected.
+  - One fixture now cites its span.
+- Strict replay 6,000/6,000 with zero calls; canonical gate exit 0 (169/4,011/5/1,065/20).
+- Live (Agent rebuilt, same 13 cases): 8/13 (4/13 before); 10/11 weather answers correct.
+  Remaining: SC latency ×2, 内乡县 mistranslated ("Xiang County"), date/time misrouted to
+  weather. Bundle `/home/chromie/Downloads/chromie_debug_bundle_20261008_174448.tar.gz`.
+
+Next, as owner-requested, one item each:
+1. The text harness never starts the ambient perception loop, so live text Situation is
+   empty.
+2. The provider-owned water `source` is marked `known` without evidence, because the
+   decoder ignores the `if/then`.
+3. The clock-vs-weather Capability choice.
+Live water proof needs Soridormi's `thirst_water_delivery` scene; the default scene has
+no objects.
+
+## Previous delivery — SC answers ordered after body Work are spoken again, 2026-10-08
 
 Pre-delivery base `23d924ee2debbf0a9588984641a1c6bf2ba78ae7` (pushed `origin/main`).
 The expected resume revision is the latest commit containing this checkpoint and

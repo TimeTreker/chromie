@@ -9,6 +9,7 @@ import copy
 from dataclasses import dataclass, field
 from decimal import Decimal
 import json
+import re
 from typing import Any
 
 from pydantic import ValidationError
@@ -189,6 +190,27 @@ def _contains_exact_material_value(container: Any, expected: Any) -> bool:
     if isinstance(container, list):
         return any(_contains_exact_material_value(value, expected) for value in container)
     return False
+
+
+def _cited_span_supports_string(value: str, quote: str) -> bool:
+    """Check a cited free-text value representationally, never semantically.
+
+    A same-script value must appear in its cited span as an independent token run
+    (so "Chong" or a sibling city cannot borrow a span). A cross-script rendering,
+    such as a translated place name, cannot be checked mechanically; its span still
+    proves where the value came from.
+    """
+
+    def unsegmented(text: str) -> bool:
+        return any("㐀" <= ch <= "鿿" or "豈" <= ch <= "﫿" for ch in text)
+
+    if unsegmented(value) != unsegmented(quote):
+        return True
+    if unsegmented(value):
+        return value in quote
+    return re.search(
+        r"(?<![0-9a-z])" + re.escape(value.casefold()) + r"(?![0-9a-z])", quote.casefold()
+    ) is not None
 
 
 def _argument_derivation_contract(
@@ -883,6 +905,7 @@ def validate_fast_advance_output(
                         f"{activity.capability_id}.{name}; source_ref={source_ref} "
                         f"expected={expected!r} actual={actual!r}"
                     )
+        cited_quotes: dict[str, str] = {}
         for parameter, span in activity.argument_sources.items():
             if parameter not in activity.args:
                 raise AuthoritativeGroundingValidationError(
@@ -899,6 +922,7 @@ def validate_fast_advance_output(
                 source_text = by_ref[span.source_responsibility_ref].outcome
             try:
                 quote = resolve_user_turn_source_span(source_text, span)
+                cited_quotes[parameter] = quote
             except ValueError as exc:
                 raise AuthoritativeGroundingValidationError(
                     "Fast Planner argument source must cite its immutable source: "
@@ -1112,6 +1136,18 @@ def validate_fast_advance_output(
                 continue
             if parameter not in authoritative_bindings:
                 if parameter in activity.argument_sources:
+                    value = activity.args.get(parameter)
+                    if (
+                        fast_capability_acquires_information(definition)
+                        and parameter_schema.get("type") == "string"
+                        and not parameter_schema.get("enum")
+                        and isinstance(value, str)
+                        and not _cited_span_supports_string(value, cited_quotes[parameter])
+                    ):
+                        raise AuthoritativeGroundingValidationError(
+                            "Fast Planner cited span does not contain its string value: "
+                            f"{activity.capability_id}.{parameter}"
+                        )
                     continue
                 # Planner owns HOW inside the selected Capability contract. UMI need
                 # not duplicate an exact named value already in its complete outcome.

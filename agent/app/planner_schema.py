@@ -3050,14 +3050,25 @@ def fast_advance_response_schema(
                             required_inputs = {
                                 str(name) for name in input_schema.get("required") or []
                             }
+                            # An information query's free-text inputs (a place to look up)
+                            # come from the person's words. Host admits them only as an
+                            # exact literal or with a span, and the decoder cannot enforce
+                            # literalness, so they must cite a span (a translated city stays
+                            # provable). Authored text and enum strings keep their own paths.
+                            acquires_information = fast_capability_acquires_information(capability)
                             required_source_inputs = sorted(
                                 name
                                 for name in required_inputs
                                 if name not in grounded_parameters
                                 and not provider_resolves_required_source(capability, name)
                                 and isinstance(input_properties.get(name), dict)
-                                and input_properties[name].get("type")
+                                and (
+                                    input_properties[name].get("type")
                                     in ("number", "integer", "boolean", "object", "array")
+                                    or (acquires_information
+                                        and input_properties[name].get("type") == "string"
+                                        and not input_properties[name].get("enum"))
+                                )
                             )
                             span_contract = {"oneOf": [
                                 user_turn_source_span_schema(source_token_refs),

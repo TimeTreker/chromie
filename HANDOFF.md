@@ -1,6 +1,41 @@
 # Chromie Handoff
 
-## Current delivery — SC answers ordered after body Work are spoken again, 2026-10-08
+## Current delivery — Information-query free text must cite its source span, 2026-10-08
+
+Checkout `/home/chromie/github/chromie`, branch `main`. Base: local commit `20e394a3c`
+(after-Work speech, not pushed) on `origin/main` `23d924ee2`.
+
+Changed files:
+- `agent/app/planner_schema.py` and `agent/app/planner_fast_validation.py`: decoder span
+  requirement and Host same-script check.
+- Tests: `tests/test_intent_only_handoff.py`, `tests/test_weather_goal_scope_contract.py`.
+- `docs/STATUS.md`, this file and the checkpoint.
+
+Commands and results:
+
+```bash
+cd .chromie/acceptance/string-input-provenance-20261008 && python contrast.py <scratch-with-extracted-bundles>   # freeze 20
+ARM=baseline python contrast.py; ARM=candidate python contrast.py; ARM=baseline REPEAT=-repeat python contrast.py
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir .chromie/acceptance/string-input-provenance-20261008/strict-replay-final   # 6000/6000
+./scripts/run_tests.sh   # final run-tests-final.log: exit 0, 169 / 4011 / 5 skipped / 1065 subtests / 20 legacy
+```
+
+The first gate (`run-tests.log`, broad rule) failed 9 tests; this led to the narrowed rule.
+
+Agent redeploy:
+
+```bash
+docker tag chromie-agent:latest chromie-agent:pre-string-provenance-20261008   # rollback
+docker build -f .chromie/acceptance/string-input-provenance-20261008/AgentDockerfile -t chromie-agent:latest .
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent   # matches, 8b820086...
+```
+
+Live: `live-flagged/summary.json` (13 cases, `--execute --keep-going`, identity
+`runtime-identity.json`); bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261008_174448.tar.gz`.
+
+## Previous delivery — SC answers ordered after body Work are spoken again, 2026-10-08
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `23d924ee2` (= `origin/main`).
 
