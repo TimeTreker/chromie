@@ -345,6 +345,29 @@ class FastPlannerResponsibilityArgumentSource(UserTurnSourceSpan):
     source_responsibility_ref: str = Field(min_length=1, max_length=80)
 
 
+class FastPlannerSituationArgumentSource(BaseModel):
+    """Planner-selected current Situation observation that grounds a provider source.
+
+    Perception, not the person, says where an unstated resource is. Trusted code
+    admits it only for a provider-owned resource source and only for an
+    established perception interpretation of the current turn's Situation.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    situation_interpretation_ref: str = Field(min_length=1, max_length=200)
+
+    @field_validator("situation_interpretation_ref", mode="before")
+    @classmethod
+    def normalize_ref(cls, value: Any) -> Any:
+        return normalize_whitespace(value)
+
+
+FastPlannerArgumentSource = (
+    UserTurnSourceSpan | FastPlannerResponsibilityArgumentSource | FastPlannerSituationArgumentSource
+)
+
+
 class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     """One Fast-Planner-authored executable Activity over Responsibility evidence."""
 
@@ -353,12 +376,14 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     role: Literal["capability"]
     activity_id: str = Field(min_length=1, max_length=160)
     args: dict[str, Any] = Field(default_factory=dict)
-    argument_sources: dict[str, UserTurnSourceSpan | FastPlannerResponsibilityArgumentSource] = Field(
+    argument_sources: dict[str, FastPlannerArgumentSource] = Field(
         default_factory=dict,
         description=(
             "For each argument actually realized from the current user turn, cite the "
             "closed UserTurnEnvelope token span that grounds it. For contextual meaning, "
             "cite an owning accepted outcome span with source_responsibility_ref. "
+            "A provider-owned resource source observed rather than stated cites its "
+            "current Situation interpretation as situation_interpretation_ref. "
             "Planner owns the mapping "
             "and conversion; trusted code materializes the exact source surface. Never "
             "retype or paraphrase source text. Omit provenance entries for provider "

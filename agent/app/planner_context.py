@@ -947,6 +947,28 @@ def situation_prompt_projection(context: dict[str, Any] | None) -> dict[str, Any
         return {}
 
 
+def situation_source_observations(context: dict[str, Any] | None) -> dict[str, str]:
+    """Return citable current perception interpretations by ID.
+
+    Only established interpretations grounded entirely in perception can say where
+    an unstated resource is. The decoder offers these IDs and Host admits only them.
+    """
+
+    raw = (context if isinstance(context, dict) else {}).get("situation")
+    if not isinstance(raw, dict):
+        return {}
+    try:
+        situation = SituationProjection.model_validate(raw)
+    except ValidationError:
+        return {}
+    perception_refs = {item.reference_id for item in situation.source_refs if item.kind == "perception"}
+    return {
+        item.interpretation_id: item.value
+        for item in situation.interpretations
+        if item.epistemic_status == "established" and set(item.source_refs) <= perception_refs
+    }
+
+
 
 def recent_dialogue_prompt_projection(history: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Keep exact prior surface dialogue and its provenance, without retired labels."""

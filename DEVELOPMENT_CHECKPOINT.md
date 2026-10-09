@@ -1,6 +1,68 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Text harness runs live ambient perception, 2026-10-08
+## Current delivery — Perception can ground a provider-owned resource source, 2026-10-09
+
+Base: `origin/main` `08f018296`. Owner-requested defect: the Planner marked the water
+`source` `known` without evidence. Owner decisions: option A (a source may cite what
+Chromie sees) and "trust what you see" when a stated place and an observation disagree.
+
+Observed (live, HEAD, ambient perception running): for "sure" and "Chromie, please bring
+me some water." the Planner wrote the observed "5.32 m in front" or "4.039 m behind" into
+`source` and cited the person's "sure"/"bring". Host accepted, because it checks only that
+a span exists. Native decoding also ignored the `allOf if/then`, so uncited
+`{"status":"known"}` reached Host and failed.
+
+| Order | Module / owner | Input → actual output | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | Ambient perception → Situation | scene → established "bottle of water, 4.039 m behind" | same | correct |
+| 2 | UMI | turn → resource Responsibility, no place | same | correct |
+| 3 | Fast decoder contract | user spans the only citation path; `if/then` unenforced | status + span or observation | incorrect (earliest) |
+| 4 | Fast Planner model | copies the observed place, cites "bring" | cite the observation | symptom of 3 |
+| 5 | Host grounding | accepts (span exists) | reject observed values cited to the person | gap, now closed |
+| 6 | Soridormi | ignores `description`/`bindings`, finds the object itself | same | correct |
+
+Repair:
+- `FastPlannerSituationArgumentSource` (`shared/chromie_contracts/plan.py`).
+- `situation_source_observations()` (`agent/app/planner_context.py`): established,
+  perception-only interpretations, shared by the decoder and the Host.
+- `_provider_source_status_branches` (`agent/app/planner_schema.py`): `{"status":"unknown"}`
+  with no citation, or `{"status":"known"}` with a span or observation. The Planner never
+  retypes a place.
+- Host checks (`agent/app/planner_fast_validation.py`).
+- `observed_context` resolution (`orchestrator/runtime/cognitive_runtime.py`).
+- Scoped prompt guidance (`agent/app/planner_prompt.py`).
+- Docs: `docs/RESOURCE_ACQUISITION_AND_DELIVERY.md`, `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md`.
+
+Evidence (`.chromie/acceptance/provider-source-branches-20261009/`, README.md):
+- 18 regressions in `tests/test_intent_only_handoff.py`, red on `08f018296`.
+- Canonical gate in a clean worktree: exit 0, 169/4,031/5 skips/1,065 subtests/20 legacy
+  (`run_tests_rev6_clean.log`); docs recheck with these records passes. The main
+  checkout's docs check scanned another session's `.claude/worktrees/` and failed for that
+  reason only.
+- Strict replay 6,000/6,000 with zero model calls (`strict-replay-rev6/`).
+- Frozen contrast `contrast2.py` / `manifest2.json` (37 requests). Six candidates were tried;
+  rev1–rev5 left perception numbers cited to the person or drifted weather. rev6 runs on a
+  fresh SGLang lifetime and reproduces 37/37 (`c2_candidate_rev6_fresh*`):
+  - water visible: 4/4 cite the observation;
+  - weather and speech: byte-identical to the baseline;
+  - b15: cites the milk it sees.
+- Live (`live-water-rev6/`, bundle `chromie_debug_bundle_20261009_144736`): 4/4 delivery turns
+  cite the correct observation; 1/4 cases pass end to end.
+
+Known failures:
+1. A lone `parallel` auxiliary Activity (blink) fails Host's "parallel group of 2 or more"
+   check. This is a pre-existing decoder/Host mismatch, in bundles since 2026-10-07, and it
+   failed 3/4 live cases.
+2. Milk is cited for water when only milk is visible (synthetic, 3/3).
+3. "known" plus "sure" when nothing is observed (legacy no-Situation captures, 7/9).
+4. SC latency/TTS start (case 1).
+5. SGLang greedy outputs depend on server-lifetime history. Restart before each contrast
+   arm; `--enable-deterministic-inference` is an unqualified owner decision.
+
+Next: encode the parallel-group invariant in the Fast decoder (same class as this fix),
+then rerun the live water cohort.
+
+## Previous delivery — Text harness runs live ambient perception, 2026-10-08
 
 Base: local commit `89de55fb5`. Owner-requested defect: the text acceptance Host never
 started the ambient scene poll (only `VoiceAssistant.run()` did), so every live text turn

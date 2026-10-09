@@ -209,8 +209,9 @@ current-turn token spans cite original speech; contextual spans name the owning
 `source_responsibility_ref` and exact accepted outcome tokens. Host materializes the exact
 quote and binds it only to that Responsibility's canonical Goal. It cannot invent facts,
 borrow a sibling's requirement or pretend contextual words were spoken in the current turn.
-Reported location/distance can accompany `source.status=provider_resolved` as search clues;
-provider perception/navigation still resolves and verifies the execution-local source.
+A reported place is a cited clue for an unbound provider-owned source (see below), not
+retyped text. Provider perception/navigation still resolves and verifies the
+execution-local source.
 
 Active Memory may supply historical object/location candidates even when the place is
 outside current perception. A retained delivery record can suggest searching the living
@@ -307,8 +308,27 @@ Host does not attach turns by recency or a phrase rule.
 When the selected capability explicitly owns source resolution and perception,
 an unbound source is instead realized as `{"status":"unknown"}` in its required
 provider argument. That provider-owned input is not a missing user input and
-has no current-turn `argument_sources` citation. A source location supplied in
-the conversation is still retained with its actual contextual provenance.
+has no citation. Otherwise the unbound source is only `{"status":"known"}` plus cited
+evidence of where. The Fast Planner never retypes a location, distance or direction
+into it; the provider resolves the place itself and trusted code keeps the cited
+surface. If the person said where, the citation is the token span; Host materializes the
+exact quote as the canonical `source_quote`. If the current Situation observed it, the
+citation is `argument_sources.source={"situation_interpretation_ref": <interpretation_id>}`.
+The decoder offers only these shapes. Host admits a Situation citation only for a
+provider-owned source and only for an established, perception-grounded interpretation of
+this turn's Situation. The canonical Plan records it as `observed_context` with the ref in
+`rationale`, never as a `source_quote` of the person's words. As a guard for other
+producers, Host rejects source numbers that do not come from a cited observation, and
+observed numbers cited to the person's words. Host cannot judge whether the observed
+object is the requested resource; that stays the Planner's semantic choice.
+
+Owner decision, 2026-10-09: when the person's stated place and a current observation of
+that resource disagree, Chromie trusts what it observes and cites the observation. The
+person's words stay context, as a human would say "I see it about 10 m ahead". The Fast
+prompt carries the source guidance only when the output-mode-qualified catalog has a
+provider-owned source, and the Situation part only when citable observations exist. A
+source location supplied in the conversation is still retained with its actual
+contextual provenance.
 
 ## Continuous progress across resource responsibilities
 

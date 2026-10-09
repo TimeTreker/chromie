@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.user_turn import user_turn_source_tokens
 
 from .prompt_projection import bounded_json, required_json
+from .planner_grounding import provider_resolves_required_source
 from .planner_context import (
     PlannerGoalContext,
     canonical_goal_grounding,
@@ -39,6 +40,7 @@ from .planner_context import (
     planner_goal_context,
     planner_provider_vocal_goal_ids,
     situation_prompt_projection,
+    situation_source_observations,
 )
 
 try:
@@ -144,6 +146,41 @@ EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
     "declared defaults. Missing consequential required input must use "
     "a genuine Planner gap or the declared depth path, without invented Work. "
 )
+
+PROVIDER_SOURCE_PROMPT = (
+    "A provider-owned resource source is only its status plus cited evidence of where; "
+    "never retype a location, distance or direction into it, because trusted code keeps "
+    "the cited surface and the provider resolves the place itself. If the person said "
+    "where, set status known and cite those words in argument_sources.source. With no "
+    "evidence of where, leave it unresolved and cite nothing. "
+)
+
+FAST_SITUATION_SOURCE_PROMPT = (
+    "If a current situation.interpretations entry observes the requested resource itself, "
+    "set status known and cite argument_sources.source={\"situation_interpretation_ref\": "
+    "its interpretation_id}; never cite the person's words for a place they did not say. "
+    "An observed object of another kind is not the requested resource. When the person's "
+    "stated place and your current observation of that resource disagree, trust what you "
+    "observe and cite the observation; their words stay context. "
+)
+
+
+def provider_source_evidence(*, observed: bool) -> dict[str, Any]:
+    """The ways a provider-owned source may be grounded, beside its Capability."""
+
+    return {
+        "source": {"status": "known"},
+        "said_by_person": {"argument_sources.source": "token span of the words that say where"},
+        **({
+            "observed_in_situation": {
+                "argument_sources.source": {"situation_interpretation_ref": "<interpretation_id>"},
+                "use_when": "a situation.interpretations entry observes this requested resource itself",
+            },
+            "said_and_observed_disagree": "trust what you observe: use observed_in_situation",
+        } if observed else {}),
+        "neither": {"source": {"status": "unknown"}, "argument_sources.source": "omitted"},
+    }
+
 
 # Planner prompt/projection mechanics only. This module does not invoke a model,
 # validate or commit a Plan, mutate Goal/Work state, or authorize effects.
@@ -819,6 +856,10 @@ def fast_advance_layered_prompt(
     capabilities: list[dict[str, Any]], response_schema: dict[str, Any] | None = None,
 ) -> LayeredPrompt:
     context = request.context if isinstance(request.context, dict) else {}
+    # Source guidance only where it can apply: the output-mode-qualified catalog has a
+    # provider-owned source; the Situation part only when something is observed now.
+    provider_sources = any(provider_resolves_required_source(item, "source") for item in capabilities)
+    observed_sources = provider_sources and bool(situation_source_observations(context))
     contract = PLANNER_WORK_AUTHORITY_PROMPT + (
         "UMI owns WHAT. This Fast invocation decides Work over exact Responsibility refs while "
         "GA independently binds canonical Goals. The responsibilities array below is the complete "
@@ -928,12 +969,16 @@ def fast_advance_layered_prompt(
         "history": recent_dialogue_prompt_projection(request.history),
         "language": request.language,
         "situation": situation_prompt_projection(context),
-        "capabilities": fast_advance_streaming_capability_prompt_projection(capabilities),
+        "capabilities": fast_advance_streaming_capability_prompt_projection(
+            capabilities, observed_sources=observed_sources,
+        ),
         "capability_index": context.get("capability_index", []),
         "capability_details_loaded": context.get("capability_details_loaded", []),
     }
     rendered = (
-        role_memory_context(context, role="planner") + contract + EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT + CAPABILITY_LOOKUP_PROMPT
+        role_memory_context(context, role="planner") + contract + EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
+        + (PROVIDER_SOURCE_PROMPT if provider_sources else "")
+        + (FAST_SITUATION_SOURCE_PROMPT if observed_sources else "") + CAPABILITY_LOOKUP_PROMPT
         + "\nOwner-approved Chromie identity JSON:\n" + bounded_identity_json(context)
         + "\nOwner-approved Personality Expression JSON:\n" + bounded_personality_json(context)
         + "\nOwner-approved Stable Mind JSON:\n" + bounded_stable_mind_json(context)
@@ -1004,7 +1049,7 @@ def _fast_streaming_prompt_input_schema(input_schema: dict[str, Any]) -> dict[st
 
 
 def fast_advance_streaming_capability_prompt_projection(
-    capabilities: list[dict[str, Any]],
+    capabilities: list[dict[str, Any]], *, observed_sources: bool = False,
 ) -> list[dict[str, Any]]:
     """Keep one argument contract beside each semantic catalog entry.
 
@@ -1019,6 +1064,9 @@ def fast_advance_streaming_capability_prompt_projection(
             "args_schema": _fast_streaming_prompt_input_schema(
                 capability.get("input_schema") or {}
             ),
+            # Evidence for a provider-owned source sits beside the argument it grounds.
+            **({"source_evidence": provider_source_evidence(observed=observed_sources)}
+               if provider_resolves_required_source(capability, "source") else {}),
         }
         for capability in capabilities
     ]

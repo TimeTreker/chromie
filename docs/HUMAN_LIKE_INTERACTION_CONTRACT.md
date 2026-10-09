@@ -1183,6 +1183,8 @@ typed value matches the claimed argument and occurs in the claimed Goal; it
 must not infer or repair the mapping. Retained typed values can be checked directly;
 new intent-derived values carry an exact owned source quote. Fast uses
 `argument_sources`; canonical Plans use `source_quote` in parameter resolutions.
+What perception saw, rather than what the person said, cites its current
+Situation interpretation (see Resource Acquisition and Delivery).
 These citations prove source membership, not semantic correctness. Their format is
 part of the declared contract, and invalid provenance fails closed before execution.
 

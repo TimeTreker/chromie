@@ -947,7 +947,8 @@ async def test_planner_cites_contextual_source_without_umi_bindings(text, outcom
     if fault == "unknown_token":
         citation["source_end_token_ref"] = "t999"
     sources = {} if fault == "missing_citation" else {"source": citation}
-    raw = work([activity("deliver", {"source": {"status": "provider_resolved", "description": place}}, sources)])
+    # The place is cited, never retyped: trusted code keeps the exact quote.
+    raw = work([activity("deliver", {"source": {"status": "known"}}, sources)])
     model = Model([raw])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
     assert len(model.packets) == 1
@@ -968,7 +969,7 @@ async def test_planner_cites_contextual_source_without_umi_bindings(text, outcom
     resolution = plan.parameter_resolutions[0]
     assert resolution.source_quote == place
     assert resolution.source_goal_ids == [association.new_goals[0].goal_id]
-    assert plan.steps[0].args["source"]["status"] == "provider_resolved"
+    assert plan.steps[0].args["source"] == {"status": "known"}
     from agent.app.planner_validation import validate_user_supplied_parameter_provenance
     validate_user_supplied_parameter_provenance(
         plan,
@@ -996,3 +997,188 @@ def test_canonical_binding_rejects_context_citation_from_sibling_requirement():
         GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
             advance=advance, association=association, user_text="Do it.", responsibilities=[first, sibling],
         )
+
+
+SEEN_WATER = "scene-1:object-0"
+SEEN_JUICE = "scene-1:object-1"
+
+
+def observed_scene():
+    from shared.chromie_contracts.situation import (
+        SituationInterpretation, SituationProjection, SituationSourceRef,
+    )
+
+    def seen(ref, value, status):
+        return SituationInterpretation(interpretation_id=ref, subject_ref="sim-object:" + ref,
+            relation="scene.simulated_object", value=value, epistemic_status=status,
+            source_refs=["scene-1"])
+
+    return SituationProjection.create(turn_id="intent-handoff", source_refs=[
+        SituationSourceRef(kind="perception", reference_id="scene-1", owner="soridormi")], interpretations=[
+        seen(SEEN_WATER, "bottle of water, 4.039 meters behind Chromie (simulated)", "established"),
+        seen(SEEN_JUICE, "bottle of juice, 2 meters ahead of Chromie (simulated)", "provisional"),
+    ]).model_dump(mode="json")
+
+
+def provider_source_capability():
+    entry = capability("deliver", {"source": {
+        "type": "object", "properties": {
+            "status": {"type": "string", "enum": ["known", "unknown", "provider_resolved"]},
+            "description": {"type": "string"},
+            "bindings": {"type": "object"},
+        }, "required": ["status"], "additionalProperties": False,
+    }, "speed": {"type": "number"}}).model_copy(update={"hints": {
+        "semantic_type": "body_action", "semantic_scope": {"source_resolution": "provider_owned"},
+        "resource_contract": {"provider_owns": ["source_resolution", "perception"]},
+    }})
+    entry.input_schema["required"] = ["source"]
+    return entry
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source, cite, decoder_ok, host_ok", [
+    ({"status": "known"}, None, False, False),  # retained live "sure" turn, 2026-10-07/08
+    ({"status": "known"}, "span", True, True),  # the person said where
+    ({"status": "unknown"}, "span", False, False),
+    ({"status": "provider_resolved"}, None, True, True),
+    ({"status": "provider_resolved"}, "span", False, False),  # bare provider_resolved is unresolved
+    # Never retype a place: live 2026-10-09 copied observed distances into source and
+    # cited the person's "sure"/"bring" for them.
+    ({"status": "known", "description": "front table about 50 meters away"}, "span", False, False),
+    ({"status": "known", "description": "front table about 50 meters away"}, None, False, False),
+    ({"status": "known"}, SEEN_WATER, True, True),  # seen, not said: cite the observation
+    ({"status": "provider_resolved"}, SEEN_WATER, False, False),
+    ({"status": "known", "description": "4.039 meters behind Chromie"}, SEEN_WATER, False, False),
+    ({"status": "known", "bindings": {"distance": 4.039, "direction": "behind"}}, SEEN_WATER, False, False),
+    ({"status": "known"}, SEEN_JUICE, False, False),  # provisional observations are not citable
+])
+async def test_decoder_offers_only_legal_provider_source_shapes(source, cite, decoder_ok, host_ok):
+    # Native decoders ignore if/then, so the old schema let the model claim a known
+    # water source without any evidence; Host then rejected the whole plan.
+    outcome = "Bring the milk from the front table about 50 meters away to me."
+    request = request_for("Bring it to me.")
+    request.responsibilities[0] = request.responsibilities[0].model_copy(update={"outcome": outcome})
+    request.context["situation"] = observed_scene()
+    citation = (
+        {**source_span(outcome, "front table about 50 meters away"), "source_responsibility_ref": "r1"}
+        if cite == "span" else {"situation_interpretation_ref": cite} if cite else None
+    )
+    raw = work([activity("deliver", {"source": source}, {"source": citation} if citation else {})])
+    model = Model([raw])
+    frames = [frame async for frame in FastPlannerResolver(
+        model, Catalog([provider_source_capability()])).stream_advance(request)]
+    def native(schema):
+        # What a native structured decoder enforces: conditionals are ignored.
+        if isinstance(schema, dict):
+            return {key: native(value) for key, value in schema.items()
+                    if key not in {"if", "then", "else", "not"}}
+        return [native(item) for item in schema] if isinstance(schema, list) else schema
+
+    from agent.app.clients.sglang_protocol import build_sglang_chat_payload
+    from agent.app.inference_compute import CognitionComputeClass
+
+    # Judge the projected payload the decoder receives, not the canonical schema.
+    payload = build_sglang_chat_payload(
+        model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+        options=None, response_format=model.packets[0][1]["response_format"],
+        stream=True, priority_step=1,
+    )
+    errors = list(Draft202012Validator(native(payload["response_format"]["json_schema"]["schema"])).iter_errors(raw))
+    assert (not errors) is decoder_ok, errors[:1]
+    assert isinstance(frames[0], FastPlannerStreamTerminal) is host_ok, frames[0]
+
+
+def test_situation_cited_source_is_recorded_as_observed_context():
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.goal import GoalAssociationResolution
+    from shared.chromie_contracts.plan import FastPlannerAdvance
+    from shared.chromie_contracts.semantic_task import SemanticGoal
+    from agent.app.planner_validation import validate_user_supplied_parameter_provenance
+    owner = CognitiveResponsibilityProposal(local_ref="r1", outcome="Bring me some water", confidence=1.)
+    advance = FastPlannerAdvance(turn_id="t", **work([activity(
+        "deliver", {"source": {"status": "known", "description": "4.039 meters behind Chromie"}},
+        {"source": {"situation_interpretation_ref": SEEN_WATER}},
+    )]))
+    association = GoalAssociationResolution(turn_id="t", resolution_status="resolved", confidence=1., new_goals=[
+        SemanticGoal(goal_id="g1", source_responsibility_refs=["r1"], description=owner.outcome, source_text="sure"),
+    ])
+    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        advance=advance, association=association, user_text="sure", responsibilities=[owner],
+    )
+    # Never presented as words the person said.
+    [resolution] = plan.parameter_resolutions
+    assert (resolution.strategy, resolution.source_quote) == ("observed_context", "")
+    assert resolution.rationale == f"situation_interpretation_ref={SEEN_WATER}"
+    assert resolution.source_goal_ids == ["g1"]
+    validate_user_supplied_parameter_provenance(
+        plan, authoritative_goals=[goal.model_dump() for goal in association.new_goals],
+    )
+
+
+def test_host_admits_situation_citation_only_for_a_provider_owned_source():
+    from agent.app.planner_fast_validation import validate_fast_advance_output
+    from agent.app.planner_fast_validation import AuthoritativeGroundingValidationError
+    from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
+
+    request = request_for("Bring it to me fast.")
+    request.context["situation"] = observed_scene()
+    capabilities = [provider_source_capability().model_dump(mode="json")]
+    def validate(args, sources):
+        output = FastPlannerAdvanceModelOutput.model_validate(work([activity("deliver", args, sources)]))
+        validate_fast_advance_output(output, request=request,
+            responsibilities=request.responsibilities, capabilities=capabilities)
+
+    validate({"source": {"status": "known", "description": "4.039 meters behind"}},
+             {"source": {"situation_interpretation_ref": SEEN_WATER}})
+    with pytest.raises(AuthoritativeGroundingValidationError, match="provider-owned source"):
+        validate({"source": {"status": "provider_resolved"}, "speed": 4.039},
+                 {"speed": {"situation_interpretation_ref": SEEN_WATER}})
+    with pytest.raises(AuthoritativeGroundingValidationError, match="provider-owned source"):
+        validate({"source": {"status": "known", "description": "2 meters ahead"}},
+                 {"source": {"situation_interpretation_ref": SEEN_JUICE}})
+    request.context.pop("situation")
+    with pytest.raises(AuthoritativeGroundingValidationError, match="provider-owned source"):
+        validate({"source": {"status": "known", "description": "4.039 meters behind"}},
+                 {"source": {"situation_interpretation_ref": SEEN_WATER}})
+
+
+def test_host_rejects_observed_values_cited_to_the_persons_words():
+    from agent.app.planner_fast_validation import (
+        AuthoritativeGroundingValidationError, validate_fast_advance_output,
+    )
+    from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
+
+    text = "Sure, bring it from fifty meters away."
+    request = request_for(text)
+    request.context["situation"] = observed_scene()
+    capabilities = [provider_source_capability().model_dump(mode="json")]
+    def validate(source, excerpt):
+        output = FastPlannerAdvanceModelOutput.model_validate(work([activity(
+            "deliver", {"source": source}, {"source": source_span(text, excerpt)})]))
+        validate_fast_advance_output(output, request=request,
+            responsibilities=request.responsibilities, capabilities=capabilities)
+
+    # Live 2026-10-09: the observed 4.039 m was cited to the person's "bring".
+    with pytest.raises(AuthoritativeGroundingValidationError, match="observed value"):
+        validate({"status": "known", "description": "4.039 meters behind Chromie"}, "Sure")
+    # A spoken number word that perception did not report stays the Planner's mapping.
+    validate({"status": "known", "bindings": {"distance": 50}}, "fifty meters away")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("observed, provider_source, expected", [
+    (True, True, True),
+    (False, True, False),  # nothing observed: no Situation citation to offer
+    (True, False, False),  # weather/speech catalogs carry no provider-owned source
+])
+async def test_situation_source_guidance_appears_only_where_it_can_apply(observed, provider_source, expected):
+    request = request_for("Bring it to me.")
+    if observed:
+        request.context["situation"] = observed_scene()
+    entry = provider_source_capability() if provider_source else capability("walk", {"speed": {"type": "number"}})
+    model = Model([work([])])
+    _ = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
+    prompt = model.packets[0][0]
+    assert ("never retype a location" in prompt) is provider_source
+    assert ("trust what you observe and cite the observation" in prompt) is expected
+    assert ("observed_in_situation" in prompt) is expected

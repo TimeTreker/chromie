@@ -2554,6 +2554,76 @@ def _fast_terminal_activity_contract() -> dict[str, Any]:
     }
 
 
+_UNRESOLVED_PROVIDER_SOURCE_STATUSES = ("unknown", "provider_resolved")
+
+
+def _provider_source_status_branches(
+    branch: dict[str, Any], *, situation_source_refs: list[str],
+) -> list[dict[str, Any]]:
+    """Express the Host's provider-source invariant as decoder-enforceable branches.
+
+    The provider resolves the source itself, so the Planner never retypes a location
+    into it. A bare unresolved status cites nothing. A known source is its status
+    plus cited evidence of where: the span where the person said it, or the current
+    Situation observation that saw it; trusted code keeps the cited surface. Native
+    structured decoders do not apply ``if``/``then``, so each choice is a branch.
+    """
+
+    source_schema = branch["properties"]["args"]["properties"]["source"]
+    if set(source_schema.get("required", [])) - {"status"}:
+        return [branch]
+    statuses = list(((source_schema.get("properties") or {}).get("status") or {}).get("enum") or [])
+
+    def status_only(current: dict[str, Any], allowed: list[str]) -> dict[str, Any]:
+        current["properties"]["args"]["properties"]["source"] = {
+            "type": "object",
+            "properties": {"status": {"type": "string", "enum": allowed}},
+            "required": ["status"],
+            "additionalProperties": False,
+        }
+        return current["properties"].get("argument_sources")
+
+    variants = []
+    unresolved = [status for status in statuses if status in _UNRESOLVED_PROVIDER_SOURCE_STATUSES]
+    if unresolved:
+        current = copy.deepcopy(branch)
+        spans = status_only(current, unresolved)
+        if isinstance(spans, dict):
+            spans.get("properties", {}).pop("source", None)
+            if "source" in spans.get("required", []):
+                spans["required"].remove("source")
+        variants.append(current)
+    # Host treats a bare provider_resolved as unresolved; cited evidence makes it known.
+    cited = ["known"] if "known" in statuses else []
+    spans = branch["properties"].get("argument_sources")
+    evidence = []
+    if isinstance(spans, dict) and "source" in spans.get("properties", {}):
+        evidence.append(spans["properties"]["source"])
+    if situation_source_refs:
+        evidence.append({
+            "type": "object",
+            "properties": {"situation_interpretation_ref": {
+                "type": "string", "enum": list(situation_source_refs),
+            }},
+            "required": ["situation_interpretation_ref"],
+            "additionalProperties": False,
+        })
+    if cited and evidence:
+        current = copy.deepcopy(branch)
+        current_spans = status_only(current, cited)
+        current_spans.setdefault("properties", {})["source"] = (
+            copy.deepcopy(evidence[0]) if len(evidence) == 1 else {"oneOf": copy.deepcopy(evidence)}
+        )
+        if "source" not in current_spans.setdefault("required", []):
+            current_spans["required"].append("source")
+        if "source" not in current["properties"]["args"].setdefault("required", []):
+            current["properties"]["args"]["required"].append("source")
+        if "argument_sources" not in current["required"]:
+            current["required"].append("argument_sources")
+        variants.append(current)
+    return variants or [branch]
+
+
 def _fast_enum_source_branches(
     branch: dict[str, Any], *, capability: dict[str, Any],
     grounded_parameters: set[str], owning_outcomes: list[str],
@@ -2605,6 +2675,7 @@ def fast_advance_response_schema(
     meaning_uncertainties: list[UserMeaningUncertainty] | None = None,
     source_token_refs: list[str] | None = None,
     original_user_text: str = "",
+    situation_source_refs: list[str] | None = None,
     committed_communicative: bool = False,
     suppress_new_communicative: bool = False,
     suppress_new_progress: bool = False,
@@ -3107,30 +3178,22 @@ def fast_advance_response_schema(
                             "required": required,
                             "additionalProperties": False,
                         }
+                        variants = [branch]
                         if (provider_resolves_required_source(capability, "source")
                                 and "source" not in source_grounded_parameters):
-                            # The canonical cross-field invariant is also checked by
-                            # Host. Native transport exposes the same object shape;
-                            # it does not promise decoder support for this condition.
-                            unresolved_sources = [{"status": "unknown"}, {"status": "provider_resolved"}]
-                            branch["allOf"] = [{
-                                "if": {"properties": {"args": {"properties": {
-                                    "source": {"enum": unresolved_sources},
-                                }, "required": ["source"]}}, "required": ["args"]},
-                                "then": {"properties": {"argument_sources": {
-                                    "not": {"required": ["source"]},
-                                }}},
-                                "else": {"properties": {"argument_sources": {
-                                    "required": ["source"],
-                                }}, "required": ["argument_sources"]},
-                            }]
-                        branches.extend(_fast_enum_source_branches(
-                            branch, capability=capability,
-                            grounded_parameters=grounded_parameters,
-                            owning_outcomes=[item.outcome for item in responsibility_items
-                                             if item.local_ref in compatible],
-                            original_user_text=original_user_text,
-                        ))
+                            # Host also checks this cross-field invariant; the decoder
+                            # must offer only its legal combinations.
+                            variants = _provider_source_status_branches(
+                                branch, situation_source_refs=situation_source_refs or [],
+                            )
+                        for variant in variants:
+                            branches.extend(_fast_enum_source_branches(
+                                variant, capability=capability,
+                                grounded_parameters=grounded_parameters,
+                                owning_outcomes=[item.outcome for item in responsibility_items
+                                                 if item.local_ref in compatible],
+                                original_user_text=original_user_text,
+                            ))
             if branches:
                 capability_contract["oneOf"] = branches
             elif isinstance(activity_items, dict):
@@ -3309,12 +3372,13 @@ def fast_streaming_advance_response_schema(
     language: str = "",
     source_token_refs: list[str] | None = None,
     original_user_text: str = "",
+    situation_source_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     """One complete Work result; independent SC owns communication latency."""
     schema = fast_advance_response_schema(
         responsibility_refs, responsibilities=responsibilities, capabilities=capabilities,
         meaning_uncertainties=meaning_uncertainties, source_token_refs=source_token_refs,
-        original_user_text=original_user_text,
+        original_user_text=original_user_text, situation_source_refs=situation_source_refs,
     )
     compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
     compiled["title"] = "FastPlannerWorkAdvanceOutput"

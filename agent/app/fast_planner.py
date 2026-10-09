@@ -46,6 +46,7 @@ from .planner_context import (
     fast_capability_context,
     planner_effectful_goal_ids,
     planner_goal_context,
+    situation_source_observations,
 )
 from .planner_validation import (
     information_acquisition_goal_ids,
@@ -202,6 +203,7 @@ class FastPlannerResolver:
                     language=str(request.language or ""),
                     source_token_refs=[item["ref"] for item in user_turn_source_tokens(current.original_user_text)],
                     original_user_text=current.original_user_text,
+                    situation_source_refs=list(situation_source_observations(current.context)),
                 )
                 if not loaded_ids:
                     schema = capability_lookup_response_schema(schema, [

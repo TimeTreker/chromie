@@ -1,6 +1,48 @@
 # Chromie Handoff
 
-## Current delivery — Text harness runs live ambient perception, 2026-10-08
+## Current delivery — Perception can ground a provider-owned resource source, 2026-10-09
+
+Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `08f018296`.
+Evidence: `.chromie/acceptance/provider-source-branches-20261009/` (README.md lists every arm).
+
+Changed files: `shared/chromie_contracts/plan.py`, `agent/app/{planner_context,planner_schema,
+planner_fast_validation,planner_prompt,fast_planner}.py`, `orchestrator/runtime/cognitive_runtime.py`,
+`tests/test_intent_only_handoff.py`, `docs/RESOURCE_ACQUISITION_AND_DELIVERY.md`,
+`docs/HUMAN_LIKE_INTERACTION_CONTRACT.md`, `docs/STATUS.md`, this file and the checkpoint.
+
+Frozen native contrast. Greedy outputs depend on SGLang lifetime history: restart before
+each arm and send no other traffic.
+
+```bash
+cd .chromie/acceptance/provider-source-branches-20261009
+python contrast2.py freeze                                  # 37 cases; manifest2.json sha256 4d99c3fb…
+./run_fresh_arms.sh candidate_rev6_fresh candidate_rev6_fresh_repeat   # 37/37 reproducible
+python adjudicate2.py candidate_rev6_fresh baseline        # c2_baseline = fresh lifetime
+```
+
+Agent and live run:
+
+```bash
+docker tag chromie-agent:latest chromie-agent:pre-situation-source-20261009   # rollback
+docker build -f .chromie/acceptance/provider-source-branches-20261009/AgentDockerfile -t chromie-agent:situation-source-rev6-20261009 .
+docker tag chromie-agent:situation-source-rev6-20261009 chromie-agent:latest
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+python scripts/capture_runtime_identity.py --allow-dirty --verify-agent-source chromie-agent   # 892bb7e1…
+(cd ../soridormi && ./scripts/run_scenario.sh --scenario configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer)
+docker restart chromie-llm
+python scripts/general_ability_acceptance.py --mode live-text --goal-driven-runtime apply --execute --keep-going \
+  --runtime-identity <identity> --evidence-dir <dir> --only-case thirsty_then_water_delivery \
+  --only-case direct_water_delivery --only-case accepted_water_offer_executes --only-case user_probe_fetch_milk_fifty_meters
+```
+
+Notes:
+- The water scene needs `--viewer`, because compose pins `MUJOCO_GL=glfw`.
+- If the simulator died, stop a stale `soridormi-runtime-mcp` before relaunching.
+- Live: `live-water-rev6/`; bundle `/home/chromie/Downloads/chromie_debug_bundle_20261009_144736.tar.gz`.
+- SGLang image `b419ac92…` comes from the parallel memory session (rollback
+  `chromie-sglang:pre-wrapper-cache-bound-20261009`).
+
+## Previous delivery — Text harness runs live ambient perception, 2026-10-08
 
 Base: local commit `89de55fb5`. Owner-requested defect: the text acceptance Host never
 started the ambient scene poll (only `VoiceAssistant.run()` did), so every live text turn

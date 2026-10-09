@@ -1,6 +1,18 @@
 # Chromie Current Status
 
-## Current delivery — Information-query free text must cite its source span, 2026-10-08
+## Current delivery — Perception can ground a provider-owned resource source, 2026-10-09
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Owner-approved option A plus "trust what you see". An unbound provider-owned resource `source` is `{"status":"unknown"}` with no citation, or `{"status":"known"}` with a cited span or a current Situation observation (`situation_interpretation_ref`). The decoder encodes this as `oneOf` branches; native decoders ignored the old `if`/`then`. Host admits only established, perception-grounded observations of this turn, and rejects observed numbers cited to the person's words. The Plan records `observed_context`. Fast prompt guidance appears only when the qualified catalog has a provider-owned source; the Situation part only when something is observed. The text harness now runs ambient perception (`08f018296`), proven live. |
+| Automatic verification | 18 targeted regressions (red on `08f018296`); canonical gate in a clean worktree exit 0 (169/4,031/5 skips/1,065 subtests/20 legacy); strict replay 6,000/6,000 with zero model calls. Frozen native contrast over 37 retained requests, each arm on a fresh SGLang lifetime: rev6 reproduces 37/37 across a restart; weather and speech are byte-identical to the baseline. When water was visible, 4/4 cite the observation; b15 cites the milk it sees (owner rule). Remaining: milk cited for water when only milk is visible (3/3, synthetic), and "known" plus "sure" when nothing is observed (7/9, legacy no-Situation captures). |
+| Target validation | Live water cohort on rev6 (fresh SGLang lifetime): 4/4 delivery turns cite the correct observation (milk for milk, water for water, even with both visible); no user words cited for an observed place. 1/4 cases pass end to end. The other 3 fail on a pre-existing contract (a lone `parallel` auxiliary Activity; Host needs a group of 2 or more), seen in bundles since 2026-10-07. Case 1 also missed a TTS start. |
+| Deployment state | `chromie-agent:latest` = `situation-source-rev6-20261009` (rollback `pre-situation-source-20261009`). SGLang image changed by the parallel memory session (`b419ac92…`, output-neutral on a fresh restart). Greedy outputs depend on server-lifetime history, so a contrast arm needs its own restart. Dirty-source diagnostic identity; no release. |
+
+Evidence: `.chromie/acceptance/provider-source-branches-20261009/` (README.md); bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261009_144736.tar.gz`.
+
+## Previous delivery — Information-query free text must cite its source span, 2026-10-08
 
 | Axis | Current evidence |
 | --- | --- |

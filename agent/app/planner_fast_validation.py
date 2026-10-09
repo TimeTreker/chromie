@@ -29,6 +29,7 @@ try:
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
         FastPlannerResponsibilityArgumentSource,
+        FastPlannerSituationArgumentSource,
         FastPlannerProgressAct,
         validate_communicative_activity_identity,
     )
@@ -47,12 +48,13 @@ except ImportError:  # pragma: no cover
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
         FastPlannerResponsibilityArgumentSource,
+        FastPlannerSituationArgumentSource,
         FastPlannerProgressAct,
         validate_communicative_activity_identity,
     )
 
 from .capabilities.validator import validate_args_for_schema
-from .planner_context import planner_goal_execution_requirements
+from .planner_context import planner_goal_execution_requirements, situation_source_observations
 from .planner_grounding import (
     _argument_realization_contract,
     _count_argument_names,
@@ -211,6 +213,22 @@ def _cited_span_supports_string(value: str, quote: str) -> bool:
     return re.search(
         r"(?<![0-9a-z])" + re.escape(value.casefold()) + r"(?![0-9a-z])", quote.casefold()
     ) is not None
+
+
+def _source_numbers(value: Any) -> set[Decimal]:
+    """Collect the numbers a source value states, from text and structured leaves."""
+
+    if isinstance(value, bool):
+        return set()
+    if isinstance(value, (int, float)):
+        return {Decimal(str(value))}
+    if isinstance(value, str):
+        return {Decimal(item) for item in re.findall(r"\d+(?:\.\d+)?", value)}
+    if isinstance(value, dict):
+        value = list(value.values())
+    if isinstance(value, list):
+        return {number for item in value for number in _source_numbers(item)}
+    return set()
 
 
 def _argument_derivation_contract(
@@ -549,6 +567,7 @@ def validate_fast_advance_output(
             "Fast Planner must cover exactly the authoritative Responsibility refs"
         )
     by_ref = {item.local_ref: item for item in responsibilities}
+    situation_observations = situation_source_observations(request.context)
     allowed = {item["capability_id"]: item for item in capabilities}
 
     unresolved_meaning = {
@@ -912,6 +931,20 @@ def validate_fast_advance_output(
                     "Fast Planner argument source names a missing argument: "
                     f"{activity.activity_id}.{parameter}"
                 )
+            if isinstance(span, FastPlannerSituationArgumentSource):
+                observed = situation_observations.get(span.situation_interpretation_ref)
+                if observed is None or not provider_resolves_required_source(definition, parameter):
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner Situation source must cite a current perception "
+                        f"observation for a provider-owned source: {activity.activity_id}.{parameter}"
+                    )
+                # Where the resource is comes from that observation, so its numbers do.
+                if not _source_numbers(activity.args[parameter]) <= _source_numbers(observed):
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner Situation source contradicts its cited observation: "
+                        f"{activity.activity_id}.{parameter}"
+                    )
+                continue
             source_text = request.original_user_text
             contextual = isinstance(span, FastPlannerResponsibilityArgumentSource)
             if contextual:
@@ -928,6 +961,17 @@ def validate_fast_advance_output(
                     "Fast Planner argument source must cite its immutable source: "
                     f"{activity.activity_id}.{parameter}"
                 ) from exc
+            if provider_resolves_required_source(definition, parameter):
+                # A number perception reported and the cited words lack came from the
+                # observation; attributing it to the person is false provenance.
+                observed_numbers = {
+                    number for value in situation_observations.values() for number in _source_numbers(value)
+                }
+                if (_source_numbers(activity.args[parameter]) & observed_numbers) - _source_numbers(quote):
+                    raise AuthoritativeGroundingValidationError(
+                        "Fast Planner source attributes an observed value to the person's words; "
+                        f"cite its Situation observation: {activity.activity_id}.{parameter}"
+                    )
             if not quote.strip() or (not contextual and not any(
                 by_ref[ref].source_evidence is not None
                 and user_turn_source_span_contains(
@@ -1455,6 +1499,9 @@ def canonicalize_fast_argument_source_spans(
         outcomes = {item.local_ref: item.outcome for item in responsibilities or []}
         narrowed = {}
         for parameter, span in activity.argument_sources.items():
+            if isinstance(span, FastPlannerSituationArgumentSource):
+                narrowed[parameter] = span
+                continue
             contextual = isinstance(span, FastPlannerResponsibilityArgumentSource)
             span_source = outcomes[span.source_responsibility_ref] if contextual else source
             narrowed_span = canonical_literal_user_turn_source_span(

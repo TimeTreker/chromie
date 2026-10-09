@@ -66,6 +66,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerAdvance,
     FastPlannerCapabilityActivity,
     FastPlannerCommunicativeAct,
+    FastPlannerSituationArgumentSource,
     FastPlannerStreamFailure,
     FastPlannerStreamFrame,
     FastPlannerStreamTerminal,
@@ -3529,6 +3530,17 @@ class GoalDrivenRuntimeCoordinator:
             return outcomes_by_ref[ref]
 
         parameter_resolutions = [
+            PlanParameterResolution(
+                step_id=activity.activity_id, parameter=parameter,
+                strategy="observed_context", value=activity.args[parameter],
+                rationale=f"situation_interpretation_ref={span.situation_interpretation_ref}",
+                confidence=advance.confidence,
+                source_goal_ids=list(dict.fromkeys(
+                    goal_id for ref in activity.source_responsibility_refs
+                    for goal_id in refs_to_goals[ref]
+                )),
+            )
+            if isinstance(span, FastPlannerSituationArgumentSource) else
             PlanParameterResolution(
                 step_id=activity.activity_id, parameter=parameter,
                 strategy="semantic_realization", value=activity.args[parameter],
