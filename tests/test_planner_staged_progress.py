@@ -99,7 +99,7 @@ def read_reply(request):
                     "step_id": "read-forecast",
                     "capability_id": "chromie.weather.lookup",
                     "args": {"location": "Hangzhou", "date": "2026-09-04", "period": "morning"},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": [gid],
                     "step_purpose": "acquire_information",
                     "expected_outcome": "Forecast establishes whether rain is predicted for the requested place and period.",
@@ -147,7 +147,7 @@ def next_reply(request, rain):
             {
                 "step_id": "create-reminder",
                 "reason_summary": "Create the exact requested conditional reminder.",
-                "timing": "sequential",
+                "depends_on": [],
                 "capability_id": "chromie.reminder.create",
                 "args": {
                     "due_at": "2026-09-04T07:30:00+08:00",
@@ -648,8 +648,9 @@ def test_acquisition_does_not_waive_sibling_adequacy_or_complete_it(weak_sibling
         sibling = "goal-independent-reminder"
         raw = plan.model_dump(mode="json")
         raw["goal_ids"].append(sibling)
-        write = next_reply(request, True)["steps"][0]
-        write["source_goal_ids"] = [sibling]
+        # A model step joins this canonical plan in canonical shape (Host-derived timing).
+        write = {key: value for key, value in next_reply(request, True)["steps"][0].items() if key != "depends_on"}
+        write.update(source_goal_ids=[sibling], timing="sequential")
         raw["steps"].append(write)
         raw["goal_outcomes"].append(
             {

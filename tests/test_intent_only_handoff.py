@@ -476,7 +476,7 @@ async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp
     raw = json.loads(Path("benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
     raw = json.loads(json.dumps(raw).replace("${goal}", future))
     raw.update(disposition="mixed", steps=[{"step_id": "blink-now", "capability_id": "test.blink",
-        "args": {"count": 3}, "timing": "sequential", "source_goal_ids": [ready]}])
+        "args": {"count": 3}, "depends_on": [], "source_goal_ids": [ready]}])
     raw["parameter_resolutions"] = [{"step_id": "blink-now", "parameter": "count",
         "strategy": "semantic_realization", "value": 3, "source_quote": "three times",
         "source_goal_ids": [ready], "confidence": 1.0, "blocking": False}]

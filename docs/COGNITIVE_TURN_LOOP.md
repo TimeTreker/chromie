@@ -1049,8 +1049,9 @@ correlation establishes that the later Plan requested the same operation.
 Otherwise it remains unused turn-scoped evidence and cannot complete a Goal or
 silently replace the canonical request.
 
-Independent non-physical work may use bounded concurrency only when capability
-and resource contracts allow it. Physical work remains sequential. A specialist
+Independent work, physical or not, may run concurrently only when it has no
+dependency and its capability and resource contracts allow it; otherwise Runtime
+serializes it. A specialist
 handoff is an implementation detail; it never transfers ownership of the user
 conversation or final answer away from the Core.
 

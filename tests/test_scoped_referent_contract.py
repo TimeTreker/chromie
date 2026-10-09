@@ -39,7 +39,7 @@ def _execute_output(*, goal_id: str, capability_id: str, args: dict) -> dict:
                 "step_id": "weather-read-operation",
                 "capability_id": capability_id,
                 "args": args,
-                "timing": "parallel",
+                "depends_on": [],
                 "source_goal_ids": [goal_id],
                 "reason_summary": "Execute the grounded read.",
             }

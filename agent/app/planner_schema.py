@@ -585,7 +585,6 @@ def canonical_plan_response_schema(
     single_step_goal_ids: list[str] | None = None,
     required_numeric_goal_values: dict[str, list[int | float]] | None = None,
     confirmation_required_capability_ids: list[str] | None = None,
-    nonparallel_capability_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
@@ -1366,7 +1365,7 @@ def canonical_plan_response_schema(
             "step_id",
             "capability_id",
             "args",
-            "timing",
+            "depends_on",
             "source_goal_ids",
             "reason_summary",
         ):
@@ -1376,7 +1375,6 @@ def canonical_plan_response_schema(
             step_schema,
             allowed_capabilities=allowed_capabilities,
             capability_input_schemas=capability_input_schemas,
-            nonparallel_capability_ids=nonparallel_capability_ids,
         )
     if planner_tier == "deep" and requires_execution and not response_goal_set:
         schema.setdefault("allOf", []).append(
@@ -1781,7 +1779,7 @@ def fast_multi_goal_response_schema(
             "step_id",
             "capability_id",
             "args",
-            "timing",
+            "depends_on",
             "source_goal_ids",
             "reason_summary",
         ):
@@ -2349,7 +2347,6 @@ def _constrain_planner_step_args(
     *,
     allowed_capabilities: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None,
-    nonparallel_capability_ids: list[str] | None = None,
 ) -> None:
     """Bind each model-selected capability to its exact provider arg schema."""
 
@@ -2370,10 +2367,6 @@ def _constrain_planner_step_args(
             "enum": [capability_id],
         }
         properties["args"] = copy.deepcopy(input_schema)
-        if capability_id in set(nonparallel_capability_ids or []):
-            timing = properties.get("timing")
-            if isinstance(timing, dict):
-                timing["enum"] = ["sequential"]
         branches.append(
             {
                 "type": "object",
@@ -3432,7 +3425,6 @@ def deep_plan_response_schema(
     single_step_goal_ids: list[str] | None = None,
     required_numeric_goal_values: dict[str, list[int | float]] | None = None,
     confirmation_required_capability_ids: list[str] | None = None,
-    nonparallel_capability_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     return canonical_plan_response_schema(
         planner_tier="deep",
@@ -3449,7 +3441,6 @@ def deep_plan_response_schema(
         single_step_goal_ids=single_step_goal_ids,
         required_numeric_goal_values=required_numeric_goal_values,
         confirmation_required_capability_ids=(confirmation_required_capability_ids),
-        nonparallel_capability_ids=nonparallel_capability_ids,
     )
 
 

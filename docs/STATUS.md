@@ -1,6 +1,17 @@
 # Chromie Current Status
 
-## Current delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
+## Current delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Owner-approved convergence of the Deep path. `PlannerModelStep` (Deep, multi-goal Fast, Evidence re-entry `new_work`) authors `depends_on` (earlier step_ids or completed retained Work), not a `timing` label. Host materialization (`schedule_planner_steps`) validates references and derives timing and `execution_group` with the same DAGEngine wave and resource-split function as Fast. A resource `plan_requires` must come from a dependency ancestor. The decoder no longer strips `parallel` for non-parallel Capabilities (`nonparallel_capability_ids` removed); conflicting resources serialize. Host fallback Plans keep explicit timing. |
+| Automatic verification | Clean-worktree gate exit 0 (169/4,040/5 skips/1,065 subtests/20 legacy; policies, docs and test ownership 0). Strict replay 6,000/6,000 with zero model calls on the exact patch, corpora re-frozen at revision 21 (`plan_conflicting_resource` now expects completion with serialization). Frozen native Deep contrast (56 requests, fresh SGLang lifetimes) in progress at commit time, not adjudicated. |
+| Target validation | Not run for this patch. Last live evidence is the Fast WorkDAG rev7 (6/12). |
+| Deployment state | `chromie-agent:latest` = `workdag-deps-20261009` (Fast only; this patch is not deployed). No release. |
+
+Evidence: `.chromie/acceptance/workdag-deep-20261009/`.
+
+## Previous delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
 
 | Axis | Current evidence |
 | --- | --- |

@@ -137,7 +137,7 @@ def media_plan(
                     "step_id": "media-step",
                     "capability_id": capability_id,
                     "args": args,
-                    "timing": "parallel",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-media"],
                     "reason_summary": "Use the qualified peer media provider.",
                 }

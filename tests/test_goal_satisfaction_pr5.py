@@ -168,7 +168,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 4},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
@@ -280,7 +280,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 1},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
@@ -314,7 +314,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 4},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-blink"],
                 }
             ],

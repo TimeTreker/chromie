@@ -91,7 +91,7 @@ def _weather_output(
                         "aspects": list(aspects or ASPECTS),
                         **realized_args,
                     },
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": [goal_id],
                     "reason_summary": "Fetch the requested weather aspects.",
                 }
@@ -235,7 +235,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "step_id": "walk",
                         "capability_id": "soridormi.walk_forward",
                         "args": {},
-                        "timing": "sequential",
+                        "depends_on": [],
                         "source_goal_ids": ["goal-walk"],
                     }
                 ],
@@ -488,7 +488,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "step_id": "walk",
                         "capability_id": "soridormi.walk_velocity",
                         "args": {"vx_mps": 0.2, "duration_s": 10.0},
-                        "timing": "sequential",
+                        "depends_on": [],
                         "source_goal_ids": [goal_id],
                         "reason_summary": "Execute the requested bounded walk.",
                     }
@@ -547,7 +547,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "step_id": "walk",
                         "capability_id": "soridormi.walk_velocity",
                         "args": {"duration_s": 10.0},
-                        "timing": "sequential",
+                        "depends_on": [],
                         "source_goal_ids": [goal_id],
                         "reason_summary": "Execute the requested bounded walk.",
                     }
@@ -636,7 +636,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                             "source": source,
                             "recipient": recipient,
                         },
-                        "timing": "sequential",
+                        "depends_on": [],
                         "source_goal_ids": [goal_id],
                         "reason_summary": "Acquire and deliver the resource.",
                     }
@@ -700,7 +700,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                             "duration_s": 10.0,
                             "yaw_radps": 0.15,
                         },
-                        "timing": "sequential",
+                        "depends_on": [],
                         "source_goal_ids": [goal_id],
                         "reason_summary": "Execute the requested bounded walk.",
                     }
@@ -783,7 +783,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "step_id": "blink",
                         "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 2},
-                        "timing": "sequential",
+                        "depends_on": [],
                         "source_goal_ids": [goal_id],
                         "reason_summary": "Blink the requested count.",
                     }
@@ -1274,7 +1274,7 @@ def test_communication_order_preserves_gi_relation_after_exact_ga_join():
         "disposition": "mixed", "coverage": "complete", "confidence": 1,
         "goal_satisfaction": {"score": 1, "status": "exact", "satisfied_goal_ids": ["g-action", "g-answer"]},
         "steps": [{"step_id": "motion", "capability_id": "soridormi.blink_eyes",
-                   "args": {"count": 2}, "timing": "sequential", "source_goal_ids": ["g-action"]}],
+                   "args": {"count": 2}, "depends_on": [], "source_goal_ids": ["g-action"]}],
         "goal_outcomes": {
             "g-action": {"disposition": "execute", "coverage": "complete", "step_ids": ["motion"]},
             "g-answer": {"disposition": "respond", "coverage": "complete", "follows_step_ids": ["motion"]},
@@ -1314,7 +1314,7 @@ def test_compound_repetition_uses_its_own_step_and_provider_format():
             from agent.app.planner_model_contract import PlannerModelStep
             from shared.chromie_contracts.plan import PlanParameterResolution
             output.steps.append(PlannerModelStep(step_id=activity['activity_id'],
-                capability_id=activity['capability_id'], args=activity['args'], timing='sequential',
+                capability_id=activity['capability_id'], args=activity['args'], depends_on=[],
                 source_goal_ids=[goal['goal_id']], reason_summary=activity['reason_summary']))
             for parameter, span in activity['argument_sources'].items():
                 quote = resolve_user_turn_source_span(request.text, UserTurnSourceSpan.model_validate(span))

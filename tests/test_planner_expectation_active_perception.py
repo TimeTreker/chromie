@@ -35,7 +35,7 @@ def _active_perception_output(*, expected_outcome: str) -> PlannerModelOutput:
                     "step_id": "observe-cup",
                     "capability_id": "soridormi.look_direction",
                     "args": {"direction": "left"},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": [goal_id],
                     "reuse_activity_id": "",
                     "step_purpose": "acquire_information",

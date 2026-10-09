@@ -600,6 +600,7 @@ class FastPlannerResolver:
                         fast_multi_goal_contract=multi_goal_contract,
                         completed_step_evidence=completed_work_step_evidence(
                             request.context, reentry_scope=request.planner_reentry_scope),
+                        capabilities=capability_payload,
                     )
                     plan = CanonicalPlan.model_validate(normalized)
                     validate_work_reuse_selection(

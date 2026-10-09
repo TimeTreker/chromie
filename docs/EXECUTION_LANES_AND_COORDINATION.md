@@ -186,9 +186,9 @@ Activity directly without inventing a Vocal member.
 
 The referenced Canonical Plan Activity steps must already use
 `timing=parallel`. The Host cannot convert a sequential primary step
-into a parallel one. Fast Work is the one exception by contract, not repair:
-the Planner authors WorkDAG `depends_on`, and the Fast Host derives each step's
-timing and `execution_group` from those dependencies and the declared Capability
+into a parallel one. Planner Work is the one exception by contract, not repair:
+the Planner (Fast and Deep) authors WorkDAG `depends_on`, and the Host derives each
+step's timing and `execution_group` from those dependencies and the declared Capability
 resources. Runtime keeps adjacent groups apart and never adds or removes a
 dependency.
 

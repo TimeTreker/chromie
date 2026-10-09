@@ -958,6 +958,12 @@ def validate_resource_responsibility_capability_grounding(
     plan coverage explicitly; Planner does not infer missing provider contracts.
     """
 
+    step_ancestors: dict[str, set[str]] = {}
+    for model_step in output.steps:
+        step_ancestors[model_step.step_id] = set(model_step.depends_on).union(
+            *(step_ancestors.get(ref, set()) for ref in model_step.depends_on)
+        )
+
     capability_by_id = {
         " ".join(str(item.get("capability_id") or "").strip().split()): item
         for item in capabilities
@@ -1164,6 +1170,7 @@ def validate_resource_responsibility_capability_grounding(
         response_layer_delivery = False
         selected_ids: list[str] = []
 
+        provides_by_step: dict[str, set[str]] = {}
         for step in owned_steps:
             capability = capability_by_id.get(step.capability_id)
             if capability is None:
@@ -1227,18 +1234,20 @@ def validate_resource_responsibility_capability_grounding(
                             else []
                         ),
                     )
-            missing_preconditions = sorted(requires - resource_state)
+            # A precondition counts only when a dependency ancestor provides it; an
+            # independent step may start alongside its would-be provider.
+            available = set().union(
+                *(provides_by_step.get(ref, set()) for ref in step_ancestors.get(step.step_id, set()))
+            )
+            missing_preconditions = sorted(requires - available)
             if missing_preconditions:
                 raise ResourceResponsibilityCapabilityGroundingError(
                     "resource responsibility capability chain has unsatisfied "
                     f"plan_requires for goal_id={goal_id}, "
                     f"capability_id={step.capability_id}: " + ",".join(missing_preconditions)
+                    + " (each requirement must come from a step it depends_on)"
                 )
-            if requires and step.timing == "parallel":
-                raise ResourceResponsibilityCapabilityGroundingError(
-                    "resource responsibility capability with plan_requires must be "
-                    f"sequential: goal_id={goal_id}, capability_id={step.capability_id}"
-                )
+            provides_by_step[step.step_id] = set(provides)
             resource_state.update(provides)
             response_layer_delivery = response_layer_delivery or (
                 final_delivery_owner == "planner_communicative_activity"
@@ -1286,16 +1295,18 @@ def validate_resource_responsibility_capability_grounding(
         )
 
 
-def fast_activity_execution_groups(
-    activities: list[Any],
-    capabilities: list[dict[str, Any]],
+def work_execution_groups(
+    nodes: list[tuple[str, str, list[str]]],
+    capabilities: list[dict[str, Any]] | None,
 ) -> list[list[str]]:
     """Derive start-together groups from Planner-authored WorkDAG dependencies.
 
-    DAGEngine semantics, mechanically: an Activity's wave is one past its deepest
-    dependency; a wave's members start together while the declared Capability
-    contracts allow it, and a conflicting member starts the next group in list
-    order. Planner dependencies are never added or removed.
+    ``nodes`` are ``(id, capability_id, depends_on)`` in Planner order, each dependency
+    citing an earlier node. DAGEngine semantics, mechanically: a node's wave is one past
+    its deepest dependency; a wave's members start together while the declared Capability
+    contracts allow it, and a conflicting member starts the next group in list order.
+    Without Capability contracts every node is its own group (no inferred overlap).
+    Planner dependencies are never added or removed.
     """
 
     @dataclass(frozen=True)
@@ -1305,24 +1316,76 @@ def fast_activity_execution_groups(
         timing: str = "parallel"
 
     wave: dict[str, int] = {}
-    for activity in activities:
-        wave[activity.activity_id] = 1 + max(
-            (wave[ref] for ref in activity.depends_on if ref in wave), default=-1
-        )
+    for node_id, _capability_id, depends_on in nodes:
+        wave[node_id] = 1 + max((wave[ref] for ref in depends_on if ref in wave), default=-1)
+    if capabilities is None:
+        return [[node_id] for node_id, _capability, _deps in sorted(nodes, key=lambda item: wave[item[0]])]
     groups: list[list[str]] = []
     for level in sorted(set(wave.values())):
-        current: list[Any] = []
-        for activity in (item for item in activities if wave[item.activity_id] == level):
-            candidate = [*current, activity]
+        current: list[tuple[str, str, list[str]]] = []
+        for node in (item for item in nodes if wave[item[0]] == level):
+            candidate = [*current, node]
             if current and parallel_activity_contract_errors(
-                [_Concurrent(item.activity_id, item.capability_id) for item in candidate],
+                [_Concurrent(node_id, capability_id) for node_id, capability_id, _deps in candidate],
                 capabilities,
             ):
-                groups.append([item.activity_id for item in current])
-                candidate = [activity]
+                groups.append([item[0] for item in current])
+                candidate = [node]
             current = candidate
-        groups.append([item.activity_id for item in current])
+        groups.append([item[0] for item in current])
     return groups
+
+
+def fast_activity_execution_groups(
+    activities: list[Any],
+    capabilities: list[dict[str, Any]],
+) -> list[list[str]]:
+    """Execution groups for Fast Capability Activities (see ``work_execution_groups``)."""
+
+    return work_execution_groups(
+        [(item.activity_id, item.capability_id, list(item.depends_on)) for item in activities],
+        capabilities,
+    )
+
+
+def schedule_planner_steps(
+    steps: list[dict[str, Any]],
+    *,
+    capabilities: list[dict[str, Any]] | None,
+    completed_step_ids: set[str] | frozenset[str] = frozenset(),
+) -> list[dict[str, Any]]:
+    """Turn model-authored step dependencies into canonical execution order and timing.
+
+    Each step's ``depends_on`` may cite an earlier step or completed retained Work (an
+    already satisfied dependency). Steps are ordered by execution group; a group of two or
+    more starts together (``timing=parallel``). Dependencies and the group index are kept
+    in step metadata, and Runtime keeps adjacent groups apart.
+    """
+
+    seen: set[str] = set()
+    nodes: list[tuple[str, str, list[str]]] = []
+    for step in steps:
+        step_id = str(step.get("step_id") or "")
+        depends_on = [str(ref) for ref in step.get("depends_on") or []]
+        unknown = [ref for ref in depends_on if ref not in seen and ref not in completed_step_ids]
+        if unknown:
+            raise ValueError(
+                "planner depends_on must cite earlier steps or completed Work: "
+                f"{step_id} -> {','.join(unknown)}"
+            )
+        nodes.append((step_id, str(step.get("capability_id") or ""), [ref for ref in depends_on if ref in seen]))
+        seen.add(step_id)
+    groups = work_execution_groups(nodes, capabilities)
+    group_of = {node_id: index for index, group in enumerate(groups) for node_id in group}
+    scheduled: list[dict[str, Any]] = []
+    for step in steps:
+        step = dict(step)
+        depends_on = list(step.pop("depends_on", None) or [])
+        group = group_of[str(step.get("step_id") or "")]
+        step["timing"] = "parallel" if len(groups[group]) > 1 else "sequential"
+        step["metadata"] = {**dict(step.get("metadata") or {}), "depends_on": depends_on, "execution_group": group}
+        scheduled.append(step)
+    return sorted(scheduled, key=lambda item: item["metadata"]["execution_group"])
 
 
 def parallel_activity_contract_errors(
@@ -1409,9 +1472,19 @@ def parallel_plan_contract_errors(
     plan: CanonicalPlan,
     capabilities: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Validate parallel mechanics on an already materialized Canonical Plan."""
+    """Validate parallel mechanics on an already materialized Canonical Plan.
 
-    return parallel_activity_contract_errors(list(plan.steps), capabilities)
+    Each execution group is checked on its own; separate groups never overlap. A plan
+    without group metadata (Host-authored) keeps one contiguous parallel batch.
+    """
+
+    groups: dict[Any, list[Any]] = {}
+    for step in plan.steps:
+        groups.setdefault((step.metadata or {}).get("execution_group"), []).append(step)
+    return [
+        error for members in groups.values()
+        for error in parallel_activity_contract_errors(members, capabilities)
+    ]
 
 
 def retained_evidence_response_review_required(
@@ -3423,7 +3496,7 @@ def validate_planner_model_output(
                 continue
             missing_authority_fields = [
                 field_name
-                for field_name in ("step_id", "timing", "source_goal_ids")
+                for field_name in ("step_id", "depends_on", "source_goal_ids")
                 if field_name not in item
             ]
             if missing_authority_fields:

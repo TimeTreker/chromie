@@ -1,6 +1,57 @@
 # Chromie Handoff
 
-## Current delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
+## Current delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
+
+Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `ede7acc15`.
+Evidence: `.chromie/acceptance/workdag-deep-20261009/`. The expected resume revision is the
+latest commit containing this file.
+
+Changed:
+- Code: `agent/app/{planner_model_contract,planner_validation,planner_schema,planner_prompt,
+  deep_planner,fast_planner}.py`.
+- Corpora: `benchmarks/integration/workflow_scenarios/{frozen.tar.xz,manifest.json}` and
+  `benchmarks/integration/scenarios/*`, both at freeze 21. Archive sha256 `92efe58e…`.
+- Tests: the Deep, Fast and planner contract suites.
+- Docs: `docs/{work_dag,EXECUTION_LANES_AND_COORDINATION,COGNITIVE_RUNTIME_ROLLOUT,
+  HUMAN_LIKE_INTERACTION_CONTRACT,COGNITIVE_TURN_LOOP,STATUS}.md`, this file and the
+  checkpoint.
+
+Verification already run (results in the checkpoint):
+
+```bash
+# The main checkout contains .claude/worktrees/ (peer session), so its check_docs fails; gate from a clean worktree:
+git worktree add --detach <tmp>/gate-wt HEAD && (cd <tmp>/gate-wt && python scripts/check_repository_policies.py && python scripts/check_docs.py && python scripts/check_test_ownership.py && ./scripts/run_tests.sh)
+(cd <tmp>/gate-wt && python scripts/run_workflow_replay.py --workers 4 --evidence-dir <dir>)   # 6000/6000
+```
+
+Corpus migration scripts (already applied, kept for audit): `migrate_responses.py`,
+`migrate_conflicting_resource.py`, `capture_all_workflow_requests.py`, `freeze21.py`,
+`migrate_small_corpus.py`. The previous corpus is in `prev-corpus/` and `previous-*`.
+
+Pending (the Deep contrast was running at commit time; live not run):
+
+```bash
+cd /home/chromie/github/chromie
+E=.chromie/acceptance/workdag-deep-20261009
+# arms: each restarts chromie-llm first; keep chromie-agent idle and check ListAgents peers
+for arm in baseline candidate candidate_repeat; do python $E/deep_contrast.py $arm; done   # skip arms already present
+python $E/deep_adjudicate.py          # writes $E/deep_adjudication.json
+docker tag chromie-agent:latest chromie-agent:pre-workdag-deep-20261009
+docker build -f .chromie/acceptance/provider-source-branches-20261009/AgentDockerfile -t chromie-agent:workdag-deep-20261009 .
+docker tag chromie-agent:workdag-deep-20261009 chromie-agent:latest
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
+docker restart chromie-llm
+python scripts/general_ability_acceptance.py --mode live-text --goal-driven-runtime apply --execute --keep-going \
+  --runtime-identity <identity> --evidence-dir $E/live --only-case <each case in the checkpoint's Next list>
+./scripts/collect_debug_bundle.sh
+```
+
+The water scene needs `(cd ../soridormi && ./scripts/run_scenario.sh --scenario
+configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer)`.
+It was running at commit time.
+
+## Previous delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `690bee160`.
 Evidence: `.chromie/acceptance/provider-source-branches-20261009/` (README.md).

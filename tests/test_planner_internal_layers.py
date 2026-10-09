@@ -98,7 +98,7 @@ def test_common_normalization_does_not_rewrite_planner_semantics() -> None:
         "disposition": "execute",
         "coverage": "partial",
         "response_text": "original words",
-        "steps": [{"step_id": "work", "timing": "parallel"}],
+        "steps": [{"step_id": "work", "depends_on": []}],
         "parameter_resolutions": [],
         "goal_outcomes": {
             "goal": {

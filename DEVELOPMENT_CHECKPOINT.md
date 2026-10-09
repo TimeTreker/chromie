@@ -1,6 +1,84 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
+## Current delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
+
+Base: `origin/main` `ede7acc15` (Fast WorkDAG). Owner decisions on 2026-10-09:
+- Converge the Deep Planner next.
+- Ignore the "同时" chaining (model ability, LoRA later).
+
+Problem: `PlannerModelStep` is shared by Deep, multi-goal Fast and Evidence re-entry
+`new_work`, and it still carried a model-authored `timing` label. The Deep decoder also
+removed `parallel` for Capabilities not declared parallel-safe
+(`nonparallel_capability_ids`). So a Deep Plan could not state a dependency. It could only
+say "with the neighbour", and physical Work was forced sequential. This is the same
+contract defect as the Fast one, which is corrected by Charter principle 43 and the
+owner's concurrency rule.
+
+| Order | Module / owner | Actual (before) | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | Deep/multi-goal decoder contract (`planner_schema`, `PlannerModelStep`) | `timing` S/P, P removed for non-parallel Capabilities | `depends_on` WorkDAG topology | incorrect (earliest) |
+| 2 | Host materialization (`materialize_planner_output`) | passes model timing through | derive groups from dependencies and Capability resources | symptom of 1 |
+| 3 | Resource `plan_requires` check | "must be sequential" | a provides from a dependency ancestor | symptom of 1 |
+| 4 | Runtime | executes timing groups | unchanged: executes Host groups, never merges adjacent ones | correct |
+
+Repair:
+- `PlannerModelStep.depends_on` replaces `timing`. It may cite earlier steps, or completed
+  retained Work, which counts as already satisfied.
+- `materialize_planner_output(..., capabilities=)` calls
+  `planner_validation.schedule_planner_steps`. This validates references (later or unknown
+  references fail closed), applies the shared `work_execution_groups` (DAGEngine waves with
+  a resource split, the same function as Fast), and records `depends_on`/`execution_group`.
+- The resource `plan_requires` check uses dependency ancestry.
+- `parallel_plan_contract_errors` checks each `execution_group`.
+- The decoder requires `depends_on`. `nonparallel_capability_ids` is removed.
+- Prompts: the Deep and re-entry guidance now gives dependencies instead of "Physical Work
+  remains sequential".
+- Host-authored fallback Plans keep explicit timing.
+- Docs: `work_dag.md`, `EXECUTION_LANES_AND_COORDINATION.md`,
+  `COGNITIVE_RUNTIME_ROLLOUT.md`, `HUMAN_LIKE_INTERACTION_CONTRACT.md` and
+  `COGNITIVE_TURN_LOOP.md` (stale "remain sequential" text corrected).
+- Replay corpora migrated and re-frozen at revision 21:
+  - `workflow_scenarios`: 1,700 Deep, 1,800 Fast and 100 `new_work` replies migrated;
+    requests recaptured.
+  - The `plan_conflicting_resource` family (100) now expects `complete`, because
+    conflicting resources serialize instead of being rejected.
+  - `benchmarks/integration/scenarios` (5 cases).
+
+Evidence (`.chromie/acceptance/workdag-deep-20261009/`):
+- Canonical gate from a clean worktree (HEAD + this patch): policies 0, docs 0, test
+  ownership 0. `run_tests.sh` exit 0: 169 / 4,040 / 5 skips / 1,065 subtests / 20 legacy.
+- Strict replay on the exact patch: 6,000/6,000, zero model calls
+  (`strict-replay-final/`; `expected_nonexecuting_rejection` 200, `expected_rejection` 2,500,
+  `observed_expected_state` 1,800, `pass` 1,500).
+- Main-checkout pytest: only `test_documentation_authority` fails (7). The cause is the
+  peer's nested `.claude/worktrees/` checkout, not this patch.
+- Frozen native Deep contrast (`deep_contrast.py`): 56 Deep requests (7 families × 4
+  actions × 2 forms), baseline (old requests) vs candidate vs candidate_repeat. Each arm runs
+  on a fresh SGLang lifetime. **In progress at commit time; not adjudicated.**
+  - Observed so far: baseline outputs reproduce byte-identically across a restart (23/23
+    against the aborted first run).
+  - Baseline cross-field schema failures (e.g. `clarify` with steps) exist before this change.
+  - Adjudicate with `deep_adjudicate.py`.
+- Live: **not run**. The deployed Agent (`workdag-deps-20261009`) does not contain this patch.
+
+Known failures:
+1. The Planner chains "同时" Activities (owner: model ability, LoRA later).
+2. Invented clarification in walk → turn.
+3. UMI overlapping-span 503s.
+4. GA merged walk + sing.
+5. Soridormi ignores `source` and refuses when several water bottles are visible.
+6. Planner decoration.
+
+Next:
+1. Adjudicate the Deep contrast.
+2. Rebuild and deploy the Agent; tag the current image `pre-workdag-deep-20261009` as rollback.
+3. Live cohort on a fresh lifetime: the 12 rev7 cases plus `nod_and_say_hello`,
+   `walk_then_report_completion`, `multi_goal_nod_then_blink`,
+   `debug_bundle_run_15_while_singing` and `weather_then_chinese_walk_blink_song`.
+   Deep runs only on Fast escalation or continuation, so check the trace for `/deep-plan`.
+4. Collect one bundle and judge every case.
+
+## Previous delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
 
 Base: `origin/main` `690bee160`. Owner request: fix the lone-`parallel` failure. On review the
 owner set the design: Planner authors a WorkDAG, and DAGEngine semantics decide execution.

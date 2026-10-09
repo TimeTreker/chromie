@@ -87,7 +87,9 @@ class PlannerModelStep(CapabilityIdentityModel):
 
     step_id: str = Field(min_length=1, max_length=160)
     args: dict[str, Any]
-    timing: PlanTiming
+    # WorkDAG topology: earlier step_ids (or completed retained steps) that must finish
+    # first. Concurrency is the absence of a dependency; Host derives execution groups.
+    depends_on: list[str] = Field(max_length=8)
     source_goal_ids: list[str] = Field(min_length=1)
     reuse_activity_id: str = ""
     step_purpose: PlanStepPurpose = "achieve_effect"
@@ -98,6 +100,12 @@ class PlannerModelStep(CapabilityIdentityModel):
     @classmethod
     def normalize_step_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
+
+    @field_validator("depends_on", mode="before")
+    @classmethod
+    def normalize_dependencies(cls, value: Any) -> list[str]:
+        values = value if isinstance(value, list) else [] if value is None else [value]
+        return list(dict.fromkeys(normalize_whitespace(item) for item in values if normalize_whitespace(item)))
 
     @model_validator(mode="after")
     def validate_information_acquisition_expectation(self) -> "PlannerModelStep":
@@ -713,10 +721,24 @@ def materialize_planner_output(
     expected_goal_ids_for_turn: list[str],
     fast_multi_goal_contract: bool = False,
     completed_step_evidence: dict[str, dict[str, Any]] | None = None,
+    capabilities: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    """Materialize only the Host-owned CanonicalPlan envelope."""
+    """Materialize only the Host-owned CanonicalPlan envelope.
+
+    Step order and timing are Host-derived from the Planner's WorkDAG dependencies and
+    the Capability contracts (``schedule_planner_steps``); without contracts every step
+    runs alone in dependency order.
+    """
+
+    # planner_validation imports this module; import its scheduler at call time.
+    from .planner_validation import schedule_planner_steps
 
     out = model_output.model_dump(mode="python")
+    out["steps"] = schedule_planner_steps(
+        out.get("steps") or [],
+        capabilities=capabilities,
+        completed_step_ids=frozenset(completed_step_evidence or {}),
+    )
     out.pop("plan_relation", None)
     out.pop("user_confirmation_required", None)
     out["goal_outcomes"] = materialize_goal_outcomes(

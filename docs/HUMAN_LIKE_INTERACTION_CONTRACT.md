@@ -144,9 +144,9 @@ Core ability classes include:
 - **Natural uncertainty handling** that asks about the real ambiguity instead
   of producing generic missing-skill or internal-policy speech.
 - **Composable high-level action planning** for supported multi-step body
-  requests. Internal nodes of one physical WorkDAG remain sequential and
-  validated; independent Runtime Activities may overlap only when their declared
-  dependencies, provider concurrency, and resources allow it.
+  requests. WorkDAG nodes are validated; nodes without a dependency between them
+  overlap only when provider concurrency and declared resources allow it, and are
+  otherwise serialized.
 - **Truthful embodied speech** that reflects proposal, confirmation,
   execution, failure, cancellation, and provider evidence.
 - **Broad evidence coverage** that samples an ability family, not only the

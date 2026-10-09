@@ -182,7 +182,7 @@ def test_future_wait_preserves_an_independent_ready_action(tier):
         request.responsibilities.append(current.model_copy(update={'local_ref':'r2'}))
         raw=waiting_reply(request);raw['disposition']='mixed'
         raw['steps']=[{'step_id':'blink-now','capability_id':'soridormi.blink_eyes','args':{'count':3},
-            'timing':'sequential','source_goal_ids':['ready-blink'],'step_purpose':'achieve_effect'}]
+            'depends_on':[],'source_goal_ids':['ready-blink'],'step_purpose':'achieve_effect'}]
         raw['parameter_resolutions']=[{'step_id':'blink-now','parameter':'count','strategy':'user_supplied','value':3,
             'confidence':1.0,'blocking':False,'rationale':'Exact independent Goal binding.','source_goal_ids':['ready-blink']}]
         raw['goal_outcomes']['ready-blink']={'disposition':'execute','coverage':'complete','step_ids':['blink-now'],

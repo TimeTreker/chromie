@@ -226,9 +226,6 @@ class DeepPlannerResolver:
             confirmation_required_capability_ids=[
                 item["capability_id"] for item in payload if item.get("requires_confirmation")
             ],
-            nonparallel_capability_ids=[
-                item["capability_id"] for item in payload if item.get("can_run_parallel") is False
-            ],
         )
         response_schema = canonical_resource_argument_response_schema(
             response_schema,
@@ -318,6 +315,7 @@ class DeepPlannerResolver:
                         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
                         completed_step_evidence=completed_work_step_evidence(
                             context, reentry_scope=request.planner_reentry_scope),
+                        capabilities=payload,
                     )
                 )
             except (ValidationError, ValueError) as exc:

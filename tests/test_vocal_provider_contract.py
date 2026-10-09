@@ -125,7 +125,7 @@ def vocal_model_output(
                     "step_id": "vocal-step",
                     "capability_id": capability_id,
                     "args": {"text": "Hello from Chromie.", "mode": mode},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-vocal"],
                     "reason_summary": "Use the exact qualified vocal mode.",
                 }

@@ -58,11 +58,11 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "step_id": step_id,
                 "capability_id": capability_id,
                 "args": {},
-                "timing": "sequential",
+                "depends_on": step_ids[:index][-1:],
                 "source_goal_ids": [goal_id],
                 "reason_summary": "Execute one advertised resource capability.",
             }
-            for step_id, capability_id in zip(step_ids, capability_ids, strict=True)
+            for index, (step_id, capability_id) in enumerate(zip(step_ids, capability_ids, strict=True))
         ]
         return PlannerModelOutput.model_validate(
             {

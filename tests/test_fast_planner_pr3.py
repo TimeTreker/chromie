@@ -494,7 +494,6 @@ def execute_step(
         "step_id": step_id,
         "capability_id": capability_id,
         "args": args,
-        "timing": "sequential",
         "source_goal_ids": list(goal_ids),
         "reason_summary": reason,
     }
@@ -547,12 +546,17 @@ def multi_goal_plan(
     parameter_resolutions: list[dict] | None = None,
     confidence: float = 0.97,
 ) -> dict:
+    # Steps without explicit dependencies run in list order (each waits for the previous).
+    chained, previous = [], []
+    for step in steps:
+        chained.append(step if "depends_on" in step else {**step, "depends_on": list(previous)})
+        previous = [step["step_id"]]
     return {
         "disposition": disposition,
         "coverage": coverage,
         "confidence": confidence,
         "goal_summary": goal_summary,
-        "steps": steps,
+        "steps": chained,
         "escalation_reason": escalation_reason,
         "unresolved": list(unresolved or []),
         "parameter_resolutions": list(parameter_resolutions or []),
@@ -1513,14 +1517,14 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                         "step_id": "walk-step",
                         "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 15.0},
-                        "timing": "sequential",
+                        "depends_on": [],
                         "source_goal_ids": ["goal-walk"],
                     },
                     {
                         "step_id": "blink-step",
                         "capability_id": "soridormi.blink_eyes",
                         "args": {"count": 1},
-                        "timing": "sequential",
+                        "depends_on": ["walk-step"],
                         "source_goal_ids": ["goal-blink"],
                     },
                 ],
@@ -1572,7 +1576,7 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                             "step_id": "walk-step",
                             "capability_id": "soridormi.walk_forward",
                             "args": {"duration_s": 15.0},
-                            "timing": "sequential",
+                            "depends_on": [],
                             "source_goal_ids": ["goal-walk"],
                         }
                     ],
@@ -4036,7 +4040,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                             ["goal-weather"],
                             "Reuse the already-running exact lookup.",
                         ),
-                        "timing": "parallel",
                         "reuse_activity_id": "weather-provisional",
                     }
                 ],
@@ -4355,7 +4358,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_velocity",
                     "args": {"velocity": 0.1, "duration_s": 1.0},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -4427,7 +4430,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_velocity",
                     "args": {"velocity": 0.1, "duration_s": 1.0},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
@@ -4448,7 +4451,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
     def test_simple_blink_produces_complete_direct_plan(self):
-        raw = {"goal_outcomes": {'goal-blink': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['blink'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-blink'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"timing":"sequential","source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"goal_outcomes": {'goal-blink': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['blink'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-blink'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"depends_on": [],"source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨四下眼睛。", goal_ids=["goal-blink"])))
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.coverage, "complete")
@@ -4485,7 +4488,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
@@ -4753,14 +4756,14 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-walk"],
                 },
                 {
                     "step_id": "blink",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
-                    "timing": "sequential",
+                    "depends_on": ["walk"],
                     "source_goal_ids": ["goal-blink"],
                 },
             ],
@@ -4871,7 +4874,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "step_id": "walk",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 15.0},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-action"],
                     "reason_summary": "Walk for the requested duration.",
                 }
@@ -5002,7 +5005,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         primary_prompt = str(ollama.prompts[0][0])
         self.assertEqual({item.goal_id for item in resolved.goal_outcomes}, set(goal_ids))
 
-    def test_parallel_plan_without_declared_provider_support_escalates(self):
+    def test_independent_steps_without_declared_parallel_support_are_serialized(self):
         goal_ids = ["goal-walk", "goal-blink"]
         raw = multi_goal_plan(
             disposition="execute",
@@ -5017,7 +5020,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         ["goal-walk"],
                         "Walk for 15 seconds.",
                     ),
-                    "timing": "parallel",
+                    "depends_on": [],
                 },
                 {
                     **execute_step(
@@ -5027,7 +5030,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         ["goal-blink"],
                         "Blink twice.",
                     ),
-                    "timing": "parallel",
+                    "depends_on": [],
                 },
             ],
             goal_outcomes={
@@ -5048,13 +5051,10 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(
-            plan.escalation_reason,
-            "parallel_execution_contract_unavailable",
-        )
-        self.assertFalse(plan.metadata["execution_allowed"])
-        self.assertEqual(len(plan.metadata["parallel_contract_errors"]), 2)
+        # No dependency, but no declared parallel support: Runtime serializes in order.
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual([(step.step_id, step.timing, step.metadata["execution_group"]) for step in plan.steps],
+                         [("walk", "sequential", 0), ("blink", "sequential", 1)])
 
     def test_multi_goal_fast_schema_requires_complete_model_authored_plan(self):
         raw = multi_goal_plan(
@@ -5163,7 +5163,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "step_id",
                 "capability_id",
                 "args",
-                "timing",
+                "depends_on",
                 "source_goal_ids",
                 "reason_summary",
             },
@@ -6091,7 +6091,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
-    def test_single_parallel_labeled_step_requires_provider_parallel_metadata(self):
+    def test_single_independent_step_needs_no_provider_parallel_metadata(self):
         raw = multi_goal_plan(
             disposition="execute",
             coverage="complete",
@@ -6106,7 +6106,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         ["goal-walk"],
                         "Walk forward.",
                     ),
-                    "timing": "parallel",
+                    "depends_on": [],
                 }
             ],
             goal_outcomes={
@@ -6152,17 +6152,8 @@ class FastPlannerResolverTests(unittest.TestCase):
             ).resolve(run_request)
         )
 
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.escalation_reason, "parallel_execution_contract_unavailable")
-        self.assertEqual(plan.response_text, "")
-        self.assertEqual(
-            plan.metadata["parallel_contract_errors"][0]["type"],
-            "parallel_capability_not_declared_safe",
-        )
-        self.assertEqual(
-            plan.metadata["parallel_contract_errors"][0]["parallel_step_count"],
-            1,
-        )
+        self.assertEqual(plan.disposition, "execute")
+        self.assertEqual(plan.steps[0].timing, "sequential")
 
     def test_multi_goal_fast_execute_terminates_without_repair(self):
         raw = multi_goal_plan(
@@ -6328,7 +6319,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(plan.steps), 1)
 
     def test_non_common_or_non_executable_skill_escalates(self):
-        raw = {"goal_outcomes": {'goal-action': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['invented'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-action'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"timing":"sequential","source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"goal_outcomes": {'goal-action': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['invented'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-action'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"depends_on": [],"source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。", goal_ids=["goal-action"])))
         self.assertEqual(plan.disposition, "escalate")
         self.assertEqual(plan.escalation_reason, "step_not_in_executable_common_catalog")
@@ -6541,7 +6532,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
-                "timing": "sequential",
+                "depends_on": [],
                 "source_goal_ids": ["goal-blink"],
             }],
             "goal_satisfaction": {
@@ -6592,7 +6583,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "step_id": "say",
                 "capability_id": "chromie.speak",
                 "args": {"text": "A short joke."},
-                "timing": "sequential",
+                "depends_on": [],
                 "source_goal_ids": ["goal-joke"],
             }],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
@@ -6814,7 +6805,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "step_id": "blink",
                 "capability_id": "soridormi.blink_eyes",
                 "args": {"count": 2},
-                "timing": "sequential",
+                "depends_on": [],
                 "source_goal_ids": ["goal-blink"],
             }],
             "goal_satisfaction": {

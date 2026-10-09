@@ -198,7 +198,7 @@ with a fully authored `dag` argument. This is an execution boundary, not delegat
 
 A future canonical Plan representation may make WorkDAG first-class rather than nesting it under an execution Capability. That is a representation decision only; it must not change the authority rule above.
 
-### Fast Planner Work is WorkDAG topology
+### Planner Work is WorkDAG topology (Fast and Deep)
 
 Since 2026-10-09 (owner decision), each Fast Capability Activity carries `depends_on`: the
 activity_ids of earlier Activities that must finish first. There is no per-Activity
@@ -212,7 +212,15 @@ is one past its deepest dependency. A wave's members start together while the
 Capability contracts allow it; a conflicting member starts the next group in list order.
 The canonical Plan records `depends_on` and `execution_group` per step, and Runtime never
 merges adjacent groups. Physical nodes overlap when their resources do not conflict (see
-the Charter). Deep Plans keep their existing timing representation until they converge.
+the Charter).
+
+Deep, multi-goal Fast and Evidence re-entry steps (`PlannerModelStep`, including `new_work`)
+author the same `depends_on`. A step may also cite completed retained Work, which counts
+as already satisfied. The canonical materialization derives each step's timing and
+`execution_group` from the dependencies and the Capability contracts
+(`schedule_planner_steps`). A resource `plan_requires` must come from a dependency
+ancestor. Host-authored fallback Plans keep explicit timing. The replay corpora were
+migrated at freeze revision 21.
 
 ## Agent control-plane API
 

@@ -38,7 +38,7 @@ def test_planner_model_time_condition_is_materialized_with_host_plan_identity() 
                     "step_id": "step-read",
                     "capability_id": "example.safe_read",
                     "args": {},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_goal_ids": ["goal-1"],
                     "reuse_activity_id": "",
                     "reason_summary": "Start the current observable work.",

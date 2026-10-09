@@ -418,7 +418,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             goal_satisfaction={"score": 1, "status": "exact", "satisfied_goal_ids": ["goal-blink"],
                                "rationale": "Requested count is represented in the owned blink."},
             steps=[{"step_id": "blink", "capability_id": "soridormi.blink_eyes", "args": {"count": 4},
-                    "timing": "sequential", "source_goal_ids": ["goal-blink"]}])
+                    "depends_on": [], "source_goal_ids": ["goal-blink"]}])
         capabilities = [{"capability_id": "soridormi.blink_eyes", "input_schema": argument_schema}]
         planner_validation.validate_goal_binding_argument_grounding(
             output, authoritative_goals=[goal], capabilities=capabilities)
@@ -561,7 +561,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                             "step_id": "walk",
                             "capability_id": "soridormi.walk_forward",
                             "args": {"duration_s": 15},
-                            "timing": "sequential",
+                            "depends_on": [],
                             "source_goal_ids": ["goal-walk"],
                         }
                     ],
@@ -653,7 +653,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                         "step_id": "wrong-song-step",
                         "capability_id": "soridormi.walk_forward",
                         "args": {"duration_s": 15},
-                        "timing": "sequential",
+                        "depends_on": [],
                         "source_goal_ids": ["goal-song"],
                     }
                 ],
@@ -709,7 +709,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    def test_deep_schema_constrains_nonparallel_timing_and_nonexecute_confirmation(
+    def test_deep_schema_offers_dependencies_and_constrains_nonexecute_confirmation(
         self,
     ) -> None:
         schema = planner_schema.deep_plan_response_schema(
@@ -723,13 +723,11 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "additionalProperties": False,
                 }
             },
-            nonparallel_capability_ids=["soridormi.walk_forward"],
         )
+        # No timing label at all: a non-parallel Capability is serialized by Host groups.
         step_branch = schema["$defs"]["PlannerModelStep"]["oneOf"][0]
-        self.assertEqual(
-            step_branch["properties"]["timing"]["enum"],
-            ["sequential"],
-        )
+        self.assertNotIn("timing", step_branch["properties"])
+        self.assertIn("depends_on", step_branch["required"])
         confirmation_constraint = next(
             item
             for item in schema["allOf"]
@@ -798,7 +796,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             self.assertNotIn("respond", outcome["properties"]["disposition"]["enum"])
             self.assertNotIn("response_text", outcome["properties"])
 
-    def test_planner_model_output_requires_explicit_timing_for_every_step(self) -> None:
+    def test_planner_model_output_requires_explicit_dependencies_for_every_step(self) -> None:
         for step_count in (1, 2):
             steps = [
                 {
@@ -830,7 +828,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             for planner_tier in ("fast", "deep"):
                 with (
                     self.subTest(planner_tier=planner_tier, step_count=step_count),
-                    self.assertRaisesRegex(ValueError, "timing"),
+                    self.assertRaisesRegex(ValueError, "depends_on"),
                 ):
                     planner_validation.validate_planner_model_output(
                         raw,
@@ -838,15 +836,16 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                         expected_goal_ids_for_turn=["goal-blink"],
                     )
 
-            for step in steps:
-                step["timing"] = "sequential"
+            for index, step in enumerate(steps):
+                step["depends_on"] = [f"step-{index - 1}"] if index else []
             for planner_tier in ("fast", "deep"):
                 validated = planner_validation.validate_planner_model_output(
                     raw,
                     planner_tier=planner_tier,
                     expected_goal_ids_for_turn=["goal-blink"],
                 )
-                self.assertTrue(all(step.timing == "sequential" for step in validated.steps))
+                self.assertEqual([step.depends_on for step in validated.steps],
+                                 [step["depends_on"] for step in steps])
 
     def test_safe_read_parallel_timing_is_exactly_provenanced(self) -> None:
         plan = CanonicalPlan(
