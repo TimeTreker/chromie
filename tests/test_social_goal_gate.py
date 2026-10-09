@@ -282,7 +282,7 @@ async def test_mixed_greeting_and_work_plans_only_work_concurrently_with_ga() ->
                     role="capability",
                     capability_id="soridormi.blink_eyes",
                     args={"count": 1},
-                    timing="parallel",
+                    depends_on=[],
                     source_responsibility_refs=["blink"],
                 )],
                 confidence=1.0,

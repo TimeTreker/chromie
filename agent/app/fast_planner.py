@@ -52,6 +52,7 @@ from .planner_validation import (
     information_acquisition_goal_ids,
     normalize_common_planner_output,
     qualify_planner_capability_payload,
+    fast_activity_execution_groups,
     qualify_capability_catalog_for_output_mode_values,
     validate_explicit_numeric_parameter_grounding,
     validate_external_response_evidence_boundary,
@@ -262,6 +263,10 @@ class FastPlannerResolver:
                 "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,
                 "capability_detail_lookups": int(bool(loaded_ids)),
                 "mechanical_duplicate_activity_collapses": duplicate_read_repairs,
+                # Host-derived from Planner depends_on and Capability contracts.
+                "execution_groups": fast_activity_execution_groups(
+                    [item for item in output.activities if item.role == "capability"], capabilities,
+                ),
             })
             yield FastPlannerStreamTerminal(turn_id=turn_id, advance=advance)
         except Exception as exc:

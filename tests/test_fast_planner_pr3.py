@@ -1842,7 +1842,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "covered_responsibility_refs": ["sing"],
             "activities": [
-                {"timing": "sequential",
+                {"depends_on": [],
                     "activity_id": "walk_instead_of_sing",
                     "role": "capability",
                     "capability_id": "soridormi.walk_forward",
@@ -1895,7 +1895,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "covered_responsibility_refs": ["walk", "sing"],
             "activities": [
-                {"timing": "sequential",
+                {"depends_on": [],
                     "activity_id": "walk_only",
                     "role": "capability",
                     "capability_id": "soridormi.walk_forward",
@@ -1985,7 +1985,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "capability_id": "soridormi.walk_forward",
                     "args": {},
                     "source_responsibility_refs": ["walk"],
-                    "timing": "sequential",
+                    "depends_on": [],
                 }
             ],
             "continuations": [],
@@ -2064,7 +2064,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "activity_id": "blink_eyes_001", "role": "capability",
                         "capability_id": "soridormi.blink_eyes", "args": args,
                         "argument_sources": {},
-                        "source_responsibility_refs": ["r1"], "timing": "sequential",
+                        "source_responsibility_refs": ["r1"], "depends_on": [],
                     }],
                     "continuations": [], "confidence": 1.0, "unresolved": [],
                     "reason_summary": "Execute requested eye action.",
@@ -2115,7 +2115,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                             "activities": [{"role": "capability", "activity_id": "turn",
                                 "capability_id": capability["capability_id"],
                                 "args": {"duration_s": duration, "yaw_radps": yaw},
-                                "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                                "source_responsibility_refs": ["r1"], "depends_on": []}],
                             "continuations": [], "confidence": 1.0, "unresolved": [],
                             "reason_summary": "Turn as requested.",
                         })
@@ -2150,7 +2150,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "covered_responsibility_refs": ["r1"],
                         "activities": [{"role": "capability", "activity_id": "turn",
                             "capability_id": capability["capability_id"], "args": args,
-                            "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                            "source_responsibility_refs": ["r1"], "depends_on": []}],
                         "continuations": [], "confidence": 1.0, "unresolved": [],
                         "reason_summary": "Turn as requested.",
                     })
@@ -2191,7 +2191,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "covered_responsibility_refs": ["r1"],
                         "activities": [{"role": "capability", "activity_id": "action",
                             "capability_id": capability["capability_id"], "args": args,
-                            "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                            "source_responsibility_refs": ["r1"], "depends_on": []}],
                         "continuations": [], "confidence": 1.0, "unresolved": [],
                         "reason_summary": "Perform the bounded action.",
                     })
@@ -2475,7 +2475,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "covered_responsibility_refs": ["clock"],
             "activities": [
-                {"timing": "sequential",
+                {"depends_on": [],
                     "activity_id": "wrong-weather-lookup",
                     "role": "capability",
                     "capability_id": "chromie.weather.lookup",
@@ -3203,13 +3203,13 @@ class FastPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "covered_responsibility_refs": ["r1", "r2"],
             "activities": [
-                {"timing": "sequential",
+                {"depends_on": [],
                     "activity_id": "cap_walk_forward_001",
                     "role": "capability",
                     "args": {"duration_s": 10},
                     "source_responsibility_refs": ["r1"],
                 },
-                {"timing": "sequential",
+                {"depends_on": [],
                     "activity_id": "cap_blink_eyes_001",
                     "role": "capability",
                     "args": {"count": 1},
@@ -3226,14 +3226,14 @@ class FastPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "covered_responsibility_refs": ["r1", "r2"],
             "activities": [
-                {"timing": "sequential",
+                {"depends_on": [],
                     "activity_id": "walk",
                     "role": "capability",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 10},
                     "source_responsibility_refs": ["r1"],
                 },
-                {"timing": "sequential",
+                {"depends_on": [],
                     "activity_id": "blink",
                     "role": "capability",
                     "capability_id": "soridormi.blink_eyes",
@@ -3328,7 +3328,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(gap["required_for"]["minItems"], 1)
 
 
-    def test_singleton_parallel_capability_group_fails_closed_once(self):
+    def test_dependency_on_a_later_activity_fails_closed_once(self):
         initial = {
             "disposition": "execute",
             "coverage": "complete",
@@ -3339,7 +3339,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "role": "capability",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
-                    "timing": "parallel",
+                    "depends_on": ["blink-step"],
                     "source_responsibility_refs": ["walk"],
                 },
                 {
@@ -3347,7 +3347,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "role": "capability",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
-                    "timing": "sequential",
+                    "depends_on": [],
                     "source_responsibility_refs": ["blink"],
                 },
             ],
@@ -3357,7 +3357,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "reason_summary": "Perform both ordered actions.",
         }
         revised = copy.deepcopy(initial)
-        revised["activities"][0]["timing"] = "sequential"
+        revised["activities"][0]["depends_on"] = []
         run_request = _work_request(
             sid="turn-singleton-parallel-revision",
             text="Walk for one second, then blink twice.",
@@ -3387,7 +3387,31 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("singleton", advance.metadata["error"])
+        self.assertIn("depends_on must cite earlier", advance.metadata["error"])
+
+    def test_requested_sequence_is_a_dependency_and_its_own_execution_group(self):
+        plan = {
+            "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["walk", "blink"],
+            "activities": [
+                {"activity_id": "walk-step", "role": "capability", "capability_id": "soridormi.walk_forward",
+                 "args": {"duration_s": 1.0}, "depends_on": [], "source_responsibility_refs": ["walk"]},
+                {"activity_id": "blink-step", "role": "capability", "capability_id": "soridormi.blink_eyes",
+                 "args": {"count": 2}, "depends_on": ["walk-step"], "source_responsibility_refs": ["blink"]},
+            ],
+            "continuations": [], "confidence": 0.95, "unresolved": [], "reason_summary": "Walk, then blink.",
+        }
+        run_request = _work_request(
+            sid="turn-dependency-sequence", text="Walk for one second, then blink twice.",
+            responsibilities=[
+                {"local_ref": "walk", "outcome": "walk for one second", "bindings": {"duration_s": 1.0, "before": "blink"},
+                 "output_mode": "body_action", "confidence": 0.95},
+                {"local_ref": "blink", "outcome": "blink twice", "bindings": {"count": 2},
+                 "output_mode": "body_action", "confidence": 0.95},
+            ],
+        )
+        advance = asyncio.run(FastPlannerResolver(ScriptedOllama([plan]), FakeCatalog()).resolve_advance(run_request))
+        self.assertEqual(advance.disposition, "execute")
+        self.assertEqual(advance.metadata["execution_groups"], [["walk-step"], ["blink-step"]])
 
     def test_parallel_resource_conflict_fails_closed_once(self):
         initial = {
@@ -3400,7 +3424,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "role": "capability",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
-                    "timing": "parallel",
+                    "depends_on": [],
                     "source_responsibility_refs": ["walk"],
                 },
                 {
@@ -3408,7 +3432,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "role": "capability",
                     "capability_id": "soridormi.walk_velocity",
                     "args": {"vx_mps": 0.2, "duration_s": 2.0},
-                    "timing": "parallel",
+                    "depends_on": [],
                     "source_responsibility_refs": ["velocity"],
                 },
             ],
@@ -3418,8 +3442,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "reason_summary": "Perform the two motions.",
         }
         revised = copy.deepcopy(initial)
-        for activity in revised["activities"]:
-            activity["timing"] = "sequential"
+        revised["activities"][1]["depends_on"] = ["walk-step"]
         run_request = _work_request(
             sid="turn-parallel-resource-revision",
             text="Walk and use velocity control at the same time.",
@@ -3449,9 +3472,34 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertIn("parallel_resource_claim_conflict", advance.metadata["error"])
+        self.assertIn("must run parallel with", advance.metadata["error"])
 
-    def test_typed_responsibility_order_rejects_compatible_parallel_timing(self):
+    def test_independent_conflicting_activities_are_serialized_not_rejected(self):
+        plan = {
+            "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["walk", "velocity"],
+            "activities": [
+                {"activity_id": "walk-step", "role": "capability", "capability_id": "soridormi.walk_forward",
+                 "args": {"duration_s": 1.0}, "depends_on": [], "source_responsibility_refs": ["walk"]},
+                {"activity_id": "velocity-step", "role": "capability", "capability_id": "soridormi.walk_velocity",
+                 "args": {"vx_mps": 0.2, "duration_s": 2.0}, "depends_on": [], "source_responsibility_refs": ["velocity"]},
+            ],
+            "continuations": [], "confidence": 0.95, "unresolved": [], "reason_summary": "Perform the two motions.",
+        }
+        run_request = _work_request(
+            sid="turn-independent-conflict", text="Walk, and use velocity control.",
+            responsibilities=[
+                {"local_ref": "walk", "outcome": "walk for one second", "bindings": {"duration_s": 1.0},
+                 "output_mode": "body_action", "confidence": 0.95},
+                {"local_ref": "velocity", "outcome": "move at velocity for two seconds",
+                 "bindings": {"vx_mps": 0.2, "duration_s": 2.0}, "output_mode": "body_action", "confidence": 0.95},
+            ],
+        )
+        advance = asyncio.run(FastPlannerResolver(ScriptedOllama([plan]), FakeCatalog()).resolve_advance(run_request))
+        # No dependency, but the locomotion resources conflict: Runtime serializes in list order.
+        self.assertEqual(advance.disposition, "execute")
+        self.assertEqual(advance.metadata["execution_groups"], [["walk-step"], ["velocity-step"]])
+
+    def test_typed_responsibility_order_requires_a_dependency(self):
         initial = {
             "disposition": "execute",
             "coverage": "complete",
@@ -3462,7 +3510,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "role": "capability",
                     "capability_id": "soridormi.walk_forward",
                     "args": {"duration_s": 1.0},
-                    "timing": "parallel",
+                    "depends_on": [],
                     "source_responsibility_refs": ["walk"],
                 },
                 {
@@ -3470,7 +3518,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     "role": "capability",
                     "capability_id": "soridormi.blink_eyes",
                     "args": {"count": 2},
-                    "timing": "parallel",
+                    "depends_on": [],
                     "source_responsibility_refs": ["blink"],
                 },
             ],
@@ -3480,8 +3528,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "reason_summary": "Perform both actions.",
         }
         revised = copy.deepcopy(initial)
-        for activity in revised["activities"]:
-            activity["timing"] = "sequential"
+        revised["activities"][1]["depends_on"] = ["walk-step"]
         run_request = _work_request(
             sid="turn-typed-order-revision",
             text="Walk for one second, then blink twice.",
@@ -3511,7 +3558,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(advance.disposition, "unavailable")
         self.assertEqual(advance.activities, [])
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(advance.metadata["error_type"], "ValidationError")
+        self.assertIn("contradict typed Responsibility order", advance.metadata["error"])
 
     def test_daytime_weather_can_check_and_speak_in_parallel(self):
         ollama = FakeOllama(
@@ -3529,7 +3576,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                             "date": "today",
                             "period": "day",
                         },
-                        "timing": "parallel",
+                        "depends_on": [],
                         "source_responsibility_refs": ["weather"],
                         "reason_summary": "Check the requested daytime weather.",
                     },
@@ -3740,7 +3787,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "coverage": "complete",
             "covered_responsibility_refs": ["r1", "r2"],
             "activities": [
-                {"timing": "sequential",
+                {"depends_on": [],
                     "activity_id": "weather_lookup",
                     "role": "capability",
                     "capability_id": "chromie.weather.lookup",
@@ -3805,7 +3852,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                             "period": "evening",
                         },
                         "argument_sources": {"date": {"source_start_token_ref": "t0", "source_end_token_ref": "t0"}, "period": {"source_start_token_ref": "t0", "source_end_token_ref": "t0"}},
-                        "timing": "parallel",
+                        "depends_on": [],
                         "source_responsibility_refs": ["weather"],
                         "reason_summary": "Check the requested weather.",
                     },
@@ -3859,7 +3906,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                         "speech_act": "inform",
                         "source_responsibility_refs": ["weather"],
                     },
-                    {"timing": "sequential",
+                    {"depends_on": [],
                         "activity_id": "activity-weather-lookup",
                         "role": "capability",
                         "capability_id": "chromie.weather.lookup",
@@ -3958,7 +4005,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "role": "capability",
                 "capability_id": "chromie.weather.lookup",
                 "args": {"location": "重庆", "date": "today"},
-                "timing": "parallel",
+                "depends_on": [],
                 "source_responsibility_refs": ["weather"],
             }
         ]
@@ -5880,7 +5927,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 output = FastPlannerAdvanceModelOutput.model_validate({
                     "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
                     "activities": [{"activity_id": "retrieve", "role": "capability", "capability_id": capability_id,
-                                    "args": args, "argument_sources": {}, "timing": "sequential",
+                                    "args": args, "argument_sources": {}, "depends_on": [],
                                     "source_responsibility_refs": ["r1"], "reason_summary": "Retrieve the verified result."}],
                     "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Use prior evidence.",
                 })
@@ -5931,7 +5978,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 output = FastPlannerAdvanceModelOutput.model_validate({
                     "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
                     "activities": [{"activity_id": "lookup", "role": "capability", "capability_id": "chromie.weather.lookup",
-                                    "args": {"location": location}, "argument_sources": {}, "timing": "sequential",
+                                    "args": {"location": location}, "argument_sources": {}, "depends_on": [],
                                     "source_responsibility_refs": ["r1"], "reason_summary": "Resolve the forecast."}],
                     "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Retrieve evidence.",
                 })
@@ -6860,7 +6907,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                                 "resource": {"kind": "physical_object", "description": "water"},
                                 "source": {"status": "provider_resolved"},
                                 "recipient": {"description": "user"}},
-                            "argument_sources": {}, "timing": "sequential",
+                            "argument_sources": {}, "depends_on": [],
                             "source_responsibility_refs": ["r1"],
                             "reason_summary": "Ask the provider to locate and bring water."}],
             "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],

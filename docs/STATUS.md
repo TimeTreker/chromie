@@ -1,6 +1,18 @@
 # Chromie Current Status
 
-## Current delivery — Perception can ground a provider-owned resource source, 2026-10-09
+## Current delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Owner-approved WorkDAG convergence for the Fast path. A Fast Capability Activity authors `depends_on` (earlier activity_ids), not a `timing` label. Host validates references (acyclic by construction), checks typed UMI `before`/`after` as dependency paths and `parallel_with` as one execution group, and derives execution groups with DAGEngine wave semantics (dependency waves split where Capability resources conflict). Canonical steps record `depends_on`/`execution_group`; Runtime never merges adjacent groups. Charter/AGENTS corrected (owner): physical nodes run concurrently when they have no dependency and their resources do not conflict. Deep Plans unchanged. |
+| Automatic verification | Red→green regressions: execution groups (look ∥ blink, deliver ∥ blink ∥ wave, conflicting walks serialized, walk → nod with independent blink); adjacent groups kept apart in canonical steps and Runtime; later/unknown dependency fails closed; typed order/concurrency on dependencies; chained duplicate reads collapse. Strict replay 6,000/6,000 (zero model calls). Clean-worktree gate 169/4,040/5 skips/1,065 subtests/20 legacy. Frozen contrast (37 requests, fresh SGLang lifetimes) reproduces 37/37 with 0 invalid dependencies; near-tie plan flips both ways (b15 better; s12, "去那边等我" worse). |
+| Target validation | Live 12 cases (fresh lifetime): 6/12 pass. Delivery ∥ blink ran concurrently (identical start/end); walk → nod → turn, look → blink and nod → shake ran in order; no lone-parallel failure (6/16 retained plans before). Failures: "看着我三秒，同时眨两下眼睛" chained look → blink (ran both, not simultaneously; Planner semantics, unchanged by a focused rewording); invented clarification in walk → turn; UMI overlapping spans (HTTP 503) ×2; GA merged walk + sing; Soridormi could not pick among several water bottles. |
+| Deployment state | `chromie-agent:latest` = `workdag-deps-20261009` (rollback `pre-workdag-deps-20261009`). Dirty-source diagnostic identity; no release. |
+
+Evidence: `.chromie/acceptance/provider-source-branches-20261009/` (README.md); bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261009_190505.tar.gz`.
+
+## Previous delivery — Perception can ground a provider-owned resource source, 2026-10-09
 
 | Axis | Current evidence |
 | --- | --- |

@@ -8,6 +8,7 @@ planner_deep_validation; neither layer owns model invocation or Planner semantic
 from __future__ import annotations
 
 import copy
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 import re
 from typing import Any
@@ -1283,6 +1284,45 @@ def validate_resource_responsibility_capability_grounding(
         raise ResourceResponsibilityCapabilityUnavailableError(
             message + "; no supplied Capability set declares the missing resource coverage"
         )
+
+
+def fast_activity_execution_groups(
+    activities: list[Any],
+    capabilities: list[dict[str, Any]],
+) -> list[list[str]]:
+    """Derive start-together groups from Planner-authored WorkDAG dependencies.
+
+    DAGEngine semantics, mechanically: an Activity's wave is one past its deepest
+    dependency; a wave's members start together while the declared Capability
+    contracts allow it, and a conflicting member starts the next group in list
+    order. Planner dependencies are never added or removed.
+    """
+
+    @dataclass(frozen=True)
+    class _Concurrent:
+        activity_id: str
+        capability_id: str
+        timing: str = "parallel"
+
+    wave: dict[str, int] = {}
+    for activity in activities:
+        wave[activity.activity_id] = 1 + max(
+            (wave[ref] for ref in activity.depends_on if ref in wave), default=-1
+        )
+    groups: list[list[str]] = []
+    for level in sorted(set(wave.values())):
+        current: list[Any] = []
+        for activity in (item for item in activities if wave[item.activity_id] == level):
+            candidate = [*current, activity]
+            if current and parallel_activity_contract_errors(
+                [_Concurrent(item.activity_id, item.capability_id) for item in candidate],
+                capabilities,
+            ):
+                groups.append([item.activity_id for item in current])
+                candidate = [activity]
+            current = candidate
+        groups.append([item.activity_id for item in current])
+    return groups
 
 
 def parallel_activity_contract_errors(

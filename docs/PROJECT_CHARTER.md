@@ -1757,7 +1757,10 @@ be omitted when busy, unavailable or not ready and cannot stall the required voi
 Each completed member releases its own resources without waiting for the entire
 group. Preparation/release evidence is distinct from actual audio/body onset;
 hardware-clock synchronization and distributed atomic rollback are not implied.
-Physical WorkDAG nodes remain sequential.
+Physical WorkDAG nodes run concurrently when the Planner gives them no dependency on
+each other and their declared Capability concurrency and resources do not conflict
+(owner decision, 2026-10-09). Otherwise Runtime serializes them; it never adds or
+removes a Planner dependency.
 
 Existing-media playback is Activity, not Vocal. Its mixer and physical-output
 policy are separate from the semantic `chromie.voice` resource.

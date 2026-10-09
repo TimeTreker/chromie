@@ -68,6 +68,7 @@ from .planner_grounding import (
 )
 from .planner_model_contract import PlannerDTOContractError, PlannerTier
 from .planner_validation import (
+    fast_activity_execution_groups,
     information_acquisition_goal_ids,
     parallel_activity_contract_errors,
     parallel_plan_contract_errors,
@@ -580,37 +581,26 @@ def validate_fast_advance_output(
     terminal_activities = [
         item for item in output.activities if item.role in {"capability", "complete_response"}
     ]
-    parallel_batch: list[Any] = []
+    # WorkDAG topology: an Activity depends only on earlier Capability Activities, so the
+    # graph is acyclic by construction. Order and concurrency live in these edges.
+    ancestors: dict[str, set[str]] = {}
     for activity in capability_activities:
-        if activity.timing == "parallel":
-            parallel_batch.append(activity)
-            continue
-        if len(parallel_batch) == 1 and len(capability_activities) > 1:
+        if activity.activity_id in ancestors:
+            raise PlannerDTOContractError("Fast Planner activity_id must be unique: " + activity.activity_id)
+        unknown = [ref for ref in activity.depends_on if ref not in ancestors]
+        if unknown:
             raise FastAdvanceMechanicalSchedulingError(
-                "Fast Planner parallel timing must form a contiguous group of at "
-                "least two Capability Activities; singleton=" + parallel_batch[0].activity_id
+                "Fast Planner depends_on must cite earlier Capability Activities: "
+                f"{activity.activity_id} -> {','.join(unknown)}"
             )
-        parallel_batch = []
-    if len(parallel_batch) == 1 and len(capability_activities) > 1:
-        raise FastAdvanceMechanicalSchedulingError(
-            "Fast Planner parallel timing must form a contiguous group of at "
-            "least two Capability Activities; singleton=" + parallel_batch[0].activity_id
+        ancestors[activity.activity_id] = set(activity.depends_on).union(
+            *(ancestors[ref] for ref in activity.depends_on)
         )
-    parallel_errors = parallel_activity_contract_errors(
-        capability_activities,
-        capabilities,
-    )
-    if parallel_errors:
-        raise FastAdvanceMechanicalSchedulingError(
-            "Fast Planner parallel timing conflicts with the authoritative "
-            "Capability scheduling contract: "
-            + json.dumps(
-                parallel_errors,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            )
-        )
+    execution_groups = fast_activity_execution_groups(capability_activities, capabilities)
+    group_of = {
+        activity_id: index for index, group in enumerate(execution_groups) for activity_id in group
+    }
+    terminal_index = {id(activity): index for index, activity in enumerate(terminal_activities)}
     activity_indexes_by_ref: dict[str, list[int]] = {ref: [] for ref in responsibility_refs}
     terminal_by_ref: dict[str, list[Any]] = {ref: [] for ref in responsibility_refs}
     for activity_index, activity in enumerate(terminal_activities):
@@ -624,51 +614,47 @@ def validate_fast_advance_output(
         values = value if isinstance(value, list) else [value]
         return [str(item).strip() for item in values if str(item).strip() in by_ref]
 
+    def precedes(first: Any, second: Any) -> bool:
+        if first.role == "capability" and second.role == "capability":
+            return first.activity_id in ancestors[second.activity_id]
+        # Communication keeps list order with sequential timing relative to Work.
+        return (
+            terminal_index[id(first)] < terminal_index[id(second)]
+            and getattr(first, "timing", "sequential") == "sequential"
+            and getattr(second, "timing", "sequential") == "sequential"
+        )
+
+    def concurrent(first: Any, second: Any) -> bool:
+        if first.role == "capability" and second.role == "capability":
+            return group_of[first.activity_id] == group_of[second.activity_id]
+        return getattr(first, "timing", "parallel") == "parallel" and getattr(
+            second, "timing", "parallel"
+        ) == "parallel"
+
     for source_ref, source in by_ref.items():
-        for relation_name in ("before", "precedes"):
+        for relation_name, forward in (
+            ("before", True), ("precedes", True), ("after", False), ("follows", False),
+        ):
             for target_ref in sibling_refs(source.bindings.get(relation_name)):
-                if (
-                    not activity_indexes_by_ref[source_ref]
-                    or not activity_indexes_by_ref[target_ref]
-                ):
-                    continue
-                if max(activity_indexes_by_ref[source_ref]) >= min(
-                    activity_indexes_by_ref[target_ref]
-                ) or any(
-                    activity.timing != "sequential"
-                    for activity in terminal_by_ref[source_ref] + terminal_by_ref[target_ref]
+                first_ref, second_ref = (source_ref, target_ref) if forward else (target_ref, source_ref)
+                if not all(
+                    precedes(first, second)
+                    for first in terminal_by_ref[first_ref]
+                    for second in terminal_by_ref[second_ref]
                 ):
                     raise FastAdvanceMechanicalSchedulingError(
-                        "Fast Planner timing contradicts typed Responsibility order: "
-                        f"{source_ref} must precede {target_ref}"
-                    )
-        for relation_name in ("after", "follows"):
-            for target_ref in sibling_refs(source.bindings.get(relation_name)):
-                if (
-                    not activity_indexes_by_ref[source_ref]
-                    or not activity_indexes_by_ref[target_ref]
-                ):
-                    continue
-                if min(activity_indexes_by_ref[source_ref]) <= max(
-                    activity_indexes_by_ref[target_ref]
-                ) or any(
-                    activity.timing != "sequential"
-                    for activity in terminal_by_ref[source_ref] + terminal_by_ref[target_ref]
-                ):
-                    raise FastAdvanceMechanicalSchedulingError(
-                        "Fast Planner timing contradicts typed Responsibility order: "
-                        f"{source_ref} must follow {target_ref}"
+                        "Fast Planner dependencies contradict typed Responsibility order: "
+                        f"{first_ref} must precede {second_ref}"
                     )
         for target_ref in sibling_refs(source.bindings.get("parallel_with")):
-            if not terminal_by_ref[source_ref] or not terminal_by_ref[target_ref]:
-                continue
-            if any(
-                activity.timing != "parallel"
-                for activity in terminal_by_ref[source_ref] + terminal_by_ref[target_ref]
+            if not all(
+                concurrent(first, second)
+                for first in terminal_by_ref[source_ref]
+                for second in terminal_by_ref[target_ref]
             ):
                 raise FastAdvanceMechanicalSchedulingError(
-                    "Fast Planner timing contradicts typed Responsibility concurrency: "
-                    f"{source_ref} must run parallel with {target_ref}"
+                    "Fast Planner dependencies or Capability contracts contradict typed "
+                    f"Responsibility concurrency: {source_ref} must run parallel with {target_ref}"
                 )
     complete_response_activities = [
         item for item in output.activities if item.role == "complete_response"
@@ -1334,8 +1320,6 @@ def validate_work_reuse_selection(
             raise PlannerDTOContractError(f"reuse_activity_id {activity_id} changes capability_id")
         if step.args != dict(activity.get("args") or {}):
             raise PlannerDTOContractError(f"reuse_activity_id {activity_id} changes immutable args")
-        if step.timing != str(activity.get("timing") or "sequential"):
-            raise PlannerDTOContractError(f"reuse_activity_id {activity_id} changes timing")
 
     cancelled = list(output.cancel_activity_ids)
     if len(cancelled) != len(set(cancelled)):
@@ -1428,12 +1412,13 @@ def collapse_redundant_idempotent_read_activities(
 
     Only a Capability whose authoritative catalog contract is both idempotent and
     side-effect-free is eligible. Two Activities are duplicates when the same
-    Capability, Responsibility ownership and timing resolve to the same effective
-    provider arguments after declared optional defaults are applied. Argument-source
-    provenance has already been validated before this function and is not execution
-    identity: two grounded paths to the same safe read must not cause duplicate I/O.
-    Distinct effective arguments, timing, ownership, or any effectful/non-idempotent
-    Work remain untouched.
+    Capability and Responsibility ownership resolve to the same effective provider
+    arguments after declared optional defaults are applied. Argument-source provenance
+    and dependencies have already been validated before this function and are not
+    execution identity: a repeated idempotent read returns the same result whenever it
+    runs, so two paths to it must not cause duplicate I/O. Distinct effective arguments,
+    ownership, or any effectful/non-idempotent Work remain untouched. A dependency on a
+    removed duplicate names its retained twin.
     """
 
     by_id = {
@@ -1443,11 +1428,16 @@ def collapse_redundant_idempotent_read_activities(
     }
     retained: list[Any] = []
     seen: dict[str, str] = {}
+    removed: dict[str, str] = {}
     repairs: list[dict[str, Any]] = []
     for activity in output.activities:
         if activity.role != "capability":
             retained.append(activity)
             continue
+        if any(ref in removed for ref in activity.depends_on):
+            activity = activity.model_copy(update={"depends_on": list(dict.fromkeys(
+                removed.get(ref, ref) for ref in activity.depends_on
+            ))})
         definition = by_id.get(activity.capability_id) or {}
         if not (definition.get("idempotent") is True and definition.get("side_effect_free") is True):
             retained.append(activity)
@@ -1458,7 +1448,6 @@ def collapse_redundant_idempotent_read_activities(
                 "effective_args": _effective_idempotent_read_args(
                     activity.args, capability=definition
                 ),
-                "timing": activity.timing,
                 "source_responsibility_refs": sorted(activity.source_responsibility_refs),
             },
             ensure_ascii=False,
@@ -1471,6 +1460,7 @@ def collapse_redundant_idempotent_read_activities(
             seen[signature] = activity.activity_id
             retained.append(activity)
             continue
+        removed[activity.activity_id] = retained_id
         repairs.append(
             {
                 "normalization": "duplicate_idempotent_read_activity_removed",
@@ -1482,6 +1472,7 @@ def collapse_redundant_idempotent_read_activities(
         )
     if not repairs:
         return output, []
+    # depends_on cites only earlier Activities, so every dependent was remapped above.
     return output.model_copy(update={"activities": retained}), repairs
 
 

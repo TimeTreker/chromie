@@ -176,7 +176,8 @@ authority, or failure semantics become clearer. See the size-review policy in
 - Keep risky feature gates default-off and fail closed when providers are
   disabled or unavailable.
 - Preserve confirmation, monitor, cancellation, timeout, and fallback semantics.
-- Keep physical WorkDAG nodes sequential.
+- Physical WorkDAG nodes may run concurrently only when the Planner gives them no
+  dependency and their declared resources do not conflict; Runtime serializes the rest.
 - Log fallback causes; do not hide model or service failures.
 - Do not use production `assert` for runtime invariants; classify and handle
   failures according to `docs/RUNTIME_FAILURE_PATHS.md`. Stable mechanical

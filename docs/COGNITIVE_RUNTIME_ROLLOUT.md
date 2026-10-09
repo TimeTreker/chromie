@@ -175,7 +175,8 @@ The adapter assigns:
 
 - stable request IDs and idempotency information;
 - current capability versions;
-- model-authored sequential or parallel timing;
+- timing: Deep steps keep model-authored sequential/parallel timing; Fast steps
+  encode the Host-derived execution groups of Planner `depends_on` (see WorkDAG);
 - current confirmation requirements;
 - canonical-plan and Goal provenance;
 - response-composition metadata.

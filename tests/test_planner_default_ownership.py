@@ -96,7 +96,7 @@ def test_integrated_fast_validation_drops_exact_unbound_optional_default_after_g
             "argument_sources": {
                 "direction": {"source_start_token_ref": "t1", "source_end_token_ref": "t1"}
             },
-            "timing": "sequential",
+            "depends_on": [],
             "source_responsibility_refs": ["r1"],
         }],
         "continuations": [],
@@ -154,7 +154,7 @@ def test_integrated_fast_validation_preserves_schema_valid_planner_how_override(
             "argument_sources": {
                 "direction": {"source_start_token_ref": "t1", "source_end_token_ref": "t1"}
             },
-            "timing": "sequential",
+            "depends_on": [],
             "source_responsibility_refs": ["r1"],
         }],
         "continuations": [],

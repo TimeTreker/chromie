@@ -1250,10 +1250,15 @@ class CapabilityRuntime:
                             if item.metadata.get("lane_start_policy")
                             == "prepared_start"
                         }
+                        # A new Fast execution group starts after the current one finishes.
+                        execution_group = request.metadata.get("execution_group")
                         if (
                             coordination_id
                             and pending_coordination_ids
                             and coordination_id not in pending_coordination_ids
+                        ) or (
+                            pending_parallel
+                            and pending_parallel[0][0].metadata.get("execution_group") != execution_group
                         ):
                             terminal = await flush_parallel()
                             if terminal is not None:

@@ -250,7 +250,7 @@ async def test_fast_query_location_cites_span_of_own_intent_and_original_source(
             "activity_id": "query", "role": "capability",
             "capability_id": "chromie.weather.lookup", "args": {"location": location},
             "argument_sources": argument_sources,
-            "source_responsibility_refs": ["r1"], "timing": "sequential",
+            "source_responsibility_refs": ["r1"], "depends_on": [],
         }], "continuations": [], "confidence": 1.0, "unresolved": [],
         "reason_summary": "Acquire the requested information.",
     })
@@ -312,7 +312,7 @@ async def test_weather_location_context_derives_from_grounded_location(
                     "source_end_token_ref": "t1",
                 }
             },
-            "source_responsibility_refs": ["r1"], "timing": "sequential",
+            "source_responsibility_refs": ["r1"], "depends_on": [],
         }], "continuations": [], "confidence": 1.0, "unresolved": [],
         "reason_summary": "Acquire the requested information.",
     })
@@ -449,7 +449,7 @@ async def test_fast_weather_collapses_duplicate_read_after_default_cleanup() -> 
                 "role": "capability",
                 "capability_id": "chromie.weather.lookup",
                 "args": {"location": "chongqing", "date": "today", "period": "day"},
-                "timing": "sequential",
+                "depends_on": [],
                 "source_responsibility_refs": ["r1"],
             },
             {
@@ -457,7 +457,7 @@ async def test_fast_weather_collapses_duplicate_read_after_default_cleanup() -> 
                 "role": "capability",
                 "capability_id": "chromie.weather.lookup",
                 "args": {"location": "chongqing"},
-                "timing": "sequential",
+                "depends_on": [],
                 "source_responsibility_refs": ["r1"],
             },
         ],

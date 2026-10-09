@@ -1241,7 +1241,7 @@ async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
             advance = FastPlannerAdvance(turn_id=request.sid, disposition="execute", coverage="complete",
                 covered_responsibility_refs=["r1"], confidence=1, activities=[{
                     "role": "capability", "activity_id": "blink", "capability_id": "soridormi.blink_eyes",
-                    "args": {"count": 1}, "timing": "sequential", "source_responsibility_refs": ["r1"],
+                    "args": {"count": 1}, "depends_on": [], "source_responsibility_refs": ["r1"],
                 }])
             yield FastPlannerStreamTerminal(turn_id=request.sid, advance=advance)
     coordinator = GoalDrivenRuntimeCoordinator(agent_client=Agent(),

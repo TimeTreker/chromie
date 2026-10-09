@@ -1069,6 +1069,37 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             ["request-0", "request-1", "request-2"],
         )
 
+    async def test_adjacent_fast_execution_groups_do_not_merge(self) -> None:
+        events: list[tuple[str, str]] = []
+
+        class RecordingProvider(MockCapabilityProvider):
+            async def execute(self, request, definition, context):  # type: ignore[no-untyped-def]
+                events.append(("start", request.request_id))
+                await asyncio.sleep(0.02)
+                events.append(("end", request.request_id))
+                return await super().execute(request, definition, context)
+
+        registry = CapabilityRegistry()
+        for index in range(4):
+            registry.register(CapabilityDefinition(
+                capability_id=f"test.skill_{index}", provider_id="mock.body",
+                input_schema={"type": "object", "properties": {}, "additionalProperties": False},
+                exclusive_group=None,
+            ))
+        runtime = CapabilityRuntime(registry, max_concurrency=4)
+        runtime.register_provider(RecordingProvider("mock.body"))
+        await submit_and_wait_terminal(runtime, InteractionResponse(capabilities=[
+            {"request_id": f"request-{index}", "capability_id": f"test.skill_{index}", "args": {},
+             "timing": "parallel", "metadata": {"execution_group": index // 2}}
+            for index in range(4)
+        ]))
+
+        # Members of one WorkDAG wave overlap; the next wave waits for the whole first one.
+        first_wave_end = max(events.index(("end", "request-0")), events.index(("end", "request-1")))
+        second_wave_start = min(events.index(("start", "request-2")), events.index(("start", "request-3")))
+        self.assertLess(events.index(("start", "request-1")), events.index(("end", "request-0")))
+        self.assertLess(first_wave_end, second_wave_start)
+
     async def test_exclusive_group_spans_concurrent_interactions(self) -> None:
         active = 0
         peak = 0

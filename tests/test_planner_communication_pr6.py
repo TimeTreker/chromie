@@ -152,7 +152,7 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
                     role="capability",
                     capability_id="soridormi.nod_yes",
                     args={"count": 2},
-                    timing="sequential",
+                    depends_on=[],
                     source_responsibility_refs=["nod"],
                 ),
                 FastPlannerResponseNeed(

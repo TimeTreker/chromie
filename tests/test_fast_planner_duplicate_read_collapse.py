@@ -33,7 +33,7 @@ def _activity(activity_id: str, *, location: str = "Chongqing") -> dict:
                 "source_end_token_ref": "t5",
             }
         },
-        "timing": "sequential",
+        "depends_on": [],
         "source_responsibility_refs": ["r1"],
         "reason_summary": "Read weather evidence.",
     }
@@ -103,3 +103,22 @@ def test_effectful_or_non_idempotent_duplicates_are_never_collapsed() -> None:
             "second",
         ]
         assert repairs == []
+
+
+def test_chained_duplicate_read_collapses_and_dependents_follow_the_retained_read() -> None:
+    # Frozen contrast 2026-10-09: the model chained "lookup -> report" over one read.
+    other = {**_activity("speak"), "capability_id": "chromie.other", "depends_on": ["weather-report"]}
+    output = _output(
+        _activity("weather-lookup"),
+        {**_activity("weather-report"), "depends_on": ["weather-lookup"]},
+        other,
+    )
+
+    normalized, repairs = collapse_redundant_idempotent_read_activities(
+        output,
+        capabilities=[_capability()],
+    )
+
+    assert [item.activity_id for item in normalized.activities] == ["weather-lookup", "speak"]
+    assert normalized.activities[1].depends_on == ["weather-lookup"]
+    assert [item["removed_activity_id"] for item in repairs] == ["weather-report"]

@@ -613,6 +613,7 @@ class _CognitiveScenarioClient:
             return refs or list(all_refs)
 
         activities: list[Any] = []
+        dependencies = canonical_step_dependencies(plan.steps)
         for step in plan.steps:
             activities.append(
                 FastPlannerCapabilityActivity(
@@ -620,7 +621,7 @@ class _CognitiveScenarioClient:
                     activity_id=step.step_id,
                     capability_id=step.capability_id,
                     args=dict(step.args),
-                    timing=step.timing,
+                    depends_on=dependencies[step.step_id],
                     source_responsibility_refs=refs_for_goal_ids(
                         list(step.source_goal_ids)
                     ),
@@ -694,6 +695,31 @@ class _CognitiveScenarioClient:
         if not self.deep_plans:
             raise AssertionError("cognitive scenario deep-plan script exhausted")
         return CanonicalPlan.model_validate(self.deep_plans.pop(0))
+
+
+def canonical_step_dependencies(steps: list[Any]) -> dict[str, list[str]]:
+    """Express a scripted canonical step order as Fast WorkDAG dependencies.
+
+    A sequential step follows everything that ran before it; a contiguous parallel run
+    shares the dependency of the step before the run. This only re-expresses fixture
+    order; production Fast Work is authored as dependencies directly.
+    """
+
+    dependencies: dict[str, list[str]] = {}
+    previous: list[str] = []
+    run_deps: list[str] = []
+    for index, step in enumerate(steps):
+        in_run = step.timing == "parallel" and index > 0 and steps[index - 1].timing == "parallel"
+        if step.timing == "parallel":
+            if not in_run:
+                run_deps = list(previous)
+                previous = []
+            dependencies[step.step_id] = list(run_deps)
+            previous = [*previous, step.step_id]
+        else:
+            dependencies[step.step_id] = list(previous)
+            previous = [step.step_id]
+    return dependencies
 
 def _tuple_of_strings(value: Any) -> tuple[str, ...]:
     if value is None:

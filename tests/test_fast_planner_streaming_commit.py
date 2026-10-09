@@ -151,7 +151,7 @@ async def test_terminal_cannot_drop_gi_meaning_gap(gap: str, preserve_gap: bool)
     """Replay the laptop's accepted shake plan with unresolved WHAT contrasts."""
     responsibility = CognitiveResponsibilityProposal(local_ref='r1', outcome='shake head twice', output_mode='body_action', bindings={'count': 2}, confidence=0.5)
     request = CognitiveWorkRequest(sid='unresolved-shake', text='摇两下头。', language='zh-CN', responsibilities=[responsibility], meaning_uncertainties=[{"local_ref": "u1", "kind": "referent", "description": gap, "responsibility_refs": ["r1"]}], interpretation_confidence=0.5)
-    output = {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.shake_no', 'activity_id': 'act_shake_head_twice', 'args': {'count': 2}, 'timing': 'sequential', 'source_responsibility_refs': ['r1']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Execute head shake twice as requested'}
+    output = {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.shake_no', 'activity_id': 'act_shake_head_twice', 'args': {'count': 2}, 'depends_on': [], 'source_responsibility_refs': ['r1']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Execute head shake twice as requested'}
     if preserve_gap:
         output['disposition'] = 'clarify'
         output['coverage'] = 'partial'
@@ -176,7 +176,7 @@ def test_meaning_gaps_preserve_independent_terminal_work(preserve_all: bool, ind
     responsibilities = [CognitiveResponsibilityProposal(local_ref=ref, outcome=outcome, output_mode='body_action', bindings={'count': 2}, confidence=0.9) for ref, outcome in [('r1', 'shake the indicated head twice'), ('r2', 'nod twice')]]
     request = CognitiveWorkRequest(sid='mixed-meaning', text='让那个摇两下头，你点两下头。', responsibilities=responsibilities, meaning_uncertainties=[{'local_ref': f'u{i}', 'kind': 'referent', 'description': name, 'responsibility_refs': ['r1']} for i, name in enumerate(['actor', 'target_identity'])])
     gaps = [{'gap_id': f'gap-{name}', 'description': name, 'blocking': True, 'resolved': False, 'required_for': [name], 'preferred_resolution': 'ask_user', 'source_kind': 'unresolved_meaning', 'source_reference': name, 'resolution_sources_considered': ['authoritative_context']} for name in ([item.description for item in request.meaning_uncertainties] if preserve_all else ['actor'])]
-    raw = {'disposition': 'mixed', 'coverage': 'complete', 'covered_responsibility_refs': ['r1', 'r2'], 'activities': [{'activity_id': 'ask-meaning', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}, {'activity_id': 'nod', 'role': 'capability', 'capability_id': 'soridormi.nod_yes', 'args': {'count': 2}, 'timing': 'sequential', 'source_responsibility_refs': ['r2'] if independent else ['r1', 'r2']}], 'continuations': [], 'confidence': 0.9, 'unresolved': [item.description for item in request.meaning_uncertainties], 'reason_summary': 'Clarify the first request; perform the independent nod.'}
+    raw = {'disposition': 'mixed', 'coverage': 'complete', 'covered_responsibility_refs': ['r1', 'r2'], 'activities': [{'activity_id': 'ask-meaning', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}, {'activity_id': 'nod', 'role': 'capability', 'capability_id': 'soridormi.nod_yes', 'args': {'count': 2}, 'depends_on': [], 'source_responsibility_refs': ['r2'] if independent else ['r1', 'r2']}], 'continuations': [], 'confidence': 0.9, 'unresolved': [item.description for item in request.meaning_uncertainties], 'reason_summary': 'Clarify the first request; perform the independent nod.'}
     capabilities = [_nod_catalog_capability().model_dump(mode='json')]
     output = FastPlannerAdvanceModelOutput.model_validate(raw)
     if preserve_all and independent:
@@ -230,7 +230,7 @@ async def test_streamed_string_argument_mapping_preserves_source_ownership(varia
         "source_end_token_ref": "t0" if variant == "foreign_span" else selected,
     }}
     raw = {"activities": [{"role": "capability", "activity_id": "turn", "capability_id": capability.capability_id,
-        "args": {"direction": direction}, "argument_sources": sources, "timing": "sequential",
+        "args": {"direction": direction}, "argument_sources": sources, "depends_on": [],
         "source_responsibility_refs": ["turn"]}], "disposition": "execute", "coverage": "complete",
         "covered_responsibility_refs": ["turn"], "continuations": [], "confidence": 1,
         "unresolved": [], "reason_summary": "Realize the requested turn."}
@@ -285,7 +285,7 @@ async def test_nod_count_binding_evidence_wrapper_is_semantically_equal_to_scala
             "role": "capability",
             "capability_id": "soridormi.nod_yes",
             "args": {"count": 5},
-            "timing": "sequential",
+            "depends_on": [],
             "source_responsibility_refs": ["r1"],
         }],
         "continuations": [],
@@ -313,7 +313,7 @@ def _look_request() -> CognitiveWorkRequest:
     return CognitiveWorkRequest(sid='turn-stream-look', text='看着我三秒', language='zh-CN', responsibilities=[CognitiveResponsibilityProposal(local_ref='look', outcome='look at the addressee', output_mode='body_action', body_effect_family='gaze_or_orientation', bindings={'addressee': '我'}, confidence=1.0)], interpretation_confidence=1.0, context={'active_user_target': {'source': 'live_perception', 'target_ref': 'current_speaker', 'relative_direction': 'front', 'confidence': 1.0, 'evidence_refs': ['scenario:current-speaker']}})
 
 def _look_output(*, target_ref: str) -> dict[str, Any]:
-    return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['look'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.look_at_person', 'activity_id': 'look-at-speaker', 'args': {'target_ref': target_ref}, 'timing': 'sequential', 'source_responsibility_refs': ['look']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Look at the trusted current speaker target.'}
+    return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['look'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.look_at_person', 'activity_id': 'look-at-speaker', 'args': {'target_ref': target_ref}, 'depends_on': [], 'source_responsibility_refs': ['look']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Look at the trusted current speaker target.'}
 
 def _structured_resource_catalog_capability() -> CatalogCapability:
     realization = {'physical_resource_entity': {'source_entity_type': 'entity', 'planner_owned': True, 'arguments': ['resource'], 'minimum_arguments': 1, 'contract': 'Conserve the exact entity inside resource.'}, 'physical_resource_location': {'source_entity_type': 'location', 'planner_owned': True, 'arguments': ['source'], 'minimum_arguments': 1, 'contract': 'Conserve the exact location inside source.'}, 'physical_resource_distance': {'source_entity_type': 'distance', 'planner_owned': True, 'arguments': ['source'], 'minimum_arguments': 1, 'contract': 'Conserve the exact distance inside source.'}, 'physical_resource_recipient': {'source_entity_type': 'recipient', 'planner_owned': True, 'arguments': ['recipient'], 'minimum_arguments': 1, 'contract': 'Conserve the exact recipient inside recipient.'}}
@@ -360,7 +360,7 @@ def _structured_resource_request() -> CognitiveWorkRequest:
     return CognitiveWorkRequest(sid='turn-stream-resource', text='there is a bottle of milk ahead of you about 50 meters, please bring it to me', language='en-US', responsibilities=[CognitiveResponsibilityProposal(local_ref='fetch', outcome='acquire and deliver the resource', output_mode='body_action', body_effect_family='task_physical_effect', bindings={'entity': 'bottle of milk', 'location': 'ahead of you about 50 meters', 'distance': 50, 'recipient': 'me'}, confidence=1.0)], interpretation_confidence=1.0)
 
 def _structured_resource_output(*, recipient: str='me') -> dict[str, Any]:
-    return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['fetch'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.acquire_and_deliver_resource', 'activity_id': 'fetch-milk', 'args': {'resource': {'kind': 'physical_object', 'description': 'bottle of milk'}, 'source': {'status': 'known', 'description': 'ahead of you about 50 meters', 'bindings': {'distance': 50}}, 'recipient': {'description': recipient}}, 'timing': 'sequential', 'source_responsibility_refs': ['fetch']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Acquire the resource and deliver it.'}
+    return {'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['fetch'], 'activities': [{'role': 'capability', 'capability_id': 'soridormi.acquire_and_deliver_resource', 'activity_id': 'fetch-milk', 'args': {'resource': {'kind': 'physical_object', 'description': 'bottle of milk'}, 'source': {'status': 'known', 'description': 'ahead of you about 50 meters', 'bindings': {'distance': 50}}, 'recipient': {'description': recipient}}, 'depends_on': [], 'source_responsibility_refs': ['fetch']}], 'continuations': [], 'confidence': 1.0, 'unresolved': [], 'reason_summary': 'Acquire the resource and deliver it.'}
 
 
 
@@ -453,7 +453,7 @@ def _contextual_structured_resource_output() -> dict[str, Any]:
                 },
                 "recipient": {"description": "user"},
             },
-            "timing": "sequential",
+            "depends_on": [],
             "source_responsibility_refs": ["fetch"],
         }],
         "continuations": [],
@@ -652,7 +652,7 @@ async def test_fast_stream_keeps_body_capabilities_across_social_domain_labels()
             "capability_id": "soridormi.blink_eyes",
             "activity_id": "blink-twice",
             "args": {"count": 2},
-            "timing": "sequential",
+            "depends_on": [],
             "source_responsibility_refs": ["blink"],
         }],
         "continuations": [],
@@ -814,37 +814,57 @@ async def test_provider_failure_after_valid_json_still_releases_no_work():
 
 
 @pytest.mark.parametrize("parallel", [False, True])
-def test_native_work_schema_conserves_declared_parallel_permission(parallel):
+def test_native_work_schema_requires_dependencies_not_timing(parallel):
     request, responsibility = _body_request()
     capability = {**_walk_capability(), "can_run_parallel": parallel}
     schema = fast_streaming_advance_response_schema([responsibility.local_ref], responsibilities=[responsibility], capabilities=[capability])
-    output = {"disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["walk"],
-        "activities": [{"role": "capability", "activity_id": "walk", "capability_id": capability["capability_id"],
-            "args": {"duration_s": 10}, "timing": "parallel", "source_responsibility_refs": ["walk"]}],
-        "continuations": [], "confidence": 1, "unresolved": [], "reason_summary": "Direct walk."}
-    errors = list(Draft202012Validator(schema).iter_errors(output))
-    assert bool(errors) is not parallel
+    walk = {"role": "capability", "activity_id": "walk", "capability_id": capability["capability_id"],
+            "args": {"duration_s": 10}, "source_responsibility_refs": ["walk"]}
+
+    def errors(activity):
+        output = {"disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["walk"],
+            "activities": [activity], "continuations": [], "confidence": 1, "unresolved": [],
+            "reason_summary": "Direct walk."}
+        return list(Draft202012Validator(schema).iter_errors(output))
+
+    # Order and concurrency are WorkDAG dependencies, whatever the provider's parallel support.
+    assert not errors({**walk, "depends_on": []})
+    assert errors(walk)
+    assert errors({**walk, "depends_on": [], "timing": "parallel"})
 
 
 @pytest.mark.parametrize("relation", ["before", "precedes", "after", "follows", "parallel_with"])
 @pytest.mark.parametrize("list_binding", [False, True])
-def test_native_work_timing_preserves_both_ends_of_typed_source_relation(relation, list_binding):
+def test_typed_source_relation_is_checked_on_work_dependencies(relation, list_binding):
+    from agent.app.planner_fast_validation import (
+        FastAdvanceMechanicalSchedulingError, validate_fast_advance_output,
+    )
+    from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
+
     responsibilities = [CognitiveResponsibilityProposal(
-        local_ref=ref, outcome="perform bounded action for 10 seconds", output_mode="body_action", confidence=1,
-        bindings={relation: ["second"] if list_binding else "second"} if ref == "first" else {},
-    ) for ref in ("first", "second", "independent")]
-    capability = {**_walk_capability(), "can_run_parallel": True}
-    schema = fast_streaming_advance_response_schema(
-        [item.local_ref for item in responsibilities], responsibilities=responsibilities, capabilities=[capability])
-    expected = "parallel" if relation == "parallel_with" else "sequential"
-    for ref in ("first", "second", "independent"):
-        for timing in ("sequential", "parallel"):
-            act = {"role": "capability", "activity_id": ref, "capability_id": capability["capability_id"],
-                   "args": {"duration_s": 10}, "argument_sources": {"duration_s": {"source_start_token_ref": "t0", "source_end_token_ref": "t1"}},
-                   "timing": timing, "source_responsibility_refs": [ref]}
-            # Exercise the exact compiled item union, including native branches.
-            errors = list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(act))
-            assert bool(errors) == (ref != "independent" and timing != expected)
+        local_ref=ref, outcome="walk forward for ten seconds", output_mode="body_action", confidence=1,
+        bindings={"duration_s": 10, **({relation: ["second"] if list_binding else "second"} if ref == "first" else {})},
+    ) for ref in ("first", "second")]
+    request = CognitiveWorkRequest(sid="typed-relation", text="walk forward for ten seconds", language="en-US",
+        responsibilities=responsibilities, interpretation_confidence=1, context={})
+    capability = {**_walk_capability(), "can_run_parallel": True, "parallel_metadata_declared": True}
+
+    def validate(order, dependent):
+        activities = []
+        for index, ref in enumerate(order):
+            activities.append({"role": "capability", "activity_id": ref, "capability_id": capability["capability_id"],
+                "args": {"duration_s": 10}, "source_responsibility_refs": [ref],
+                "depends_on": [order[0]] if dependent and index == 1 else []})
+        output = FastPlannerAdvanceModelOutput.model_validate({"disposition": "execute", "coverage": "complete",
+            "covered_responsibility_refs": ["first", "second"], "activities": activities, "continuations": [],
+            "confidence": 1, "unresolved": [], "reason_summary": "Typed relation."})
+        validate_fast_advance_output(output, request=request, responsibilities=responsibilities, capabilities=[capability])
+
+    order = ("second", "first") if relation in {"after", "follows"} else ("first", "second")
+    ordered = relation != "parallel_with"
+    validate(order, dependent=ordered)  # the relation as dependencies (or their absence)
+    with pytest.raises(FastAdvanceMechanicalSchedulingError, match="typed Responsibility"):
+        validate(order, dependent=not ordered)
 
 
 def test_native_work_timing_keeps_escalation_when_no_provider_can_honor_concurrency():
@@ -908,7 +928,7 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
     validator = Draft202012Validator(schema["properties"]["activities"]["items"])
     body = {"role": "capability", "activity_id": "act", "capability_id": capabilities[0]["capability_id"],
         "args": {"duration_s": 10}, "argument_sources": {"duration_s": {"source_start_token_ref": "t0", "source_end_token_ref": "t1"}},
-        "timing": "sequential", "source_responsibility_refs": ["body"]}
+        "depends_on": [], "source_responsibility_refs": ["body"]}
     validator.validate(body)
     assert not validator.is_valid({**body, "source_responsibility_refs": ["voice"]})
     for candidate_mode in ["speech", "styled_speech", "recitation", "singing", "humming", "nonverbal_vocalization"]:
@@ -930,7 +950,7 @@ def test_native_advance_keeps_distinct_and_shared_vocal_mode_composition():
         capabilities=[{"capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID, "input_schema": vocal_performance_input_schema(), "can_run_parallel": True}])
     validator = Draft202012Validator(schema["properties"]["activities"]["items"])
     act = {"role": "capability", "activity_id": "voice", "capability_id": VOCAL_PERFORMANCE_CAPABILITY_ID,
-        "args": {"text": "authored performance", "mode": "singing"}, "timing": "parallel", "source_responsibility_refs": ["song1", "song2"]}
+        "args": {"text": "authored performance", "mode": "singing"}, "depends_on": [], "source_responsibility_refs": ["song1", "song2"]}
     validator.validate(act)
     assert not validator.is_valid({**act, "source_responsibility_refs": ["song1", "hum"]})
     validator.validate({**act, "args": {**act["args"], "mode": "humming"}, "source_responsibility_refs": ["hum"]})
@@ -940,7 +960,7 @@ def test_native_vocal_work_with_empty_catalog_cannot_invent_a_provider():
     source = CognitiveResponsibilityProposal(local_ref="song", outcome="sing", output_mode="singing", confidence=1)
     schema = fast_streaming_advance_response_schema([source.local_ref], responsibilities=[source], capabilities=[])
     act = {"role": "capability", "activity_id": "voice", "capability_id": "unavailable.provider",
-        "args": {"mode": "singing", "text": "performance"}, "timing": "sequential", "source_responsibility_refs": ["song"]}
+        "args": {"mode": "singing", "text": "performance"}, "depends_on": [], "source_responsibility_refs": ["song"]}
     assert not Draft202012Validator(schema["properties"]["activities"]["items"]).is_valid(act)
     Draft202012Validator(schema).validate({"activities": [], "disposition": "escalate", "coverage": "uncertain",
         "covered_responsibility_refs": ["song"], "confidence": 0.5, "continuations": ["deep_planner"],
@@ -964,7 +984,7 @@ def test_native_decision_alternatives_preserve_execution_delegation_boundary(dis
     schema = fast_streaming_advance_response_schema([source.local_ref], responsibilities=[source], capabilities=[capability])
     output = {"disposition": disposition, "coverage": coverage, "covered_responsibility_refs": [source.local_ref],
         "activities": [{"role": "capability", "activity_id": "walk", "capability_id": capability["capability_id"],
-            "args": {"duration_s": 10}, "timing": "sequential", "source_responsibility_refs": [source.local_ref]}] if work else [],
+            "args": {"duration_s": 10}, "depends_on": [], "source_responsibility_refs": [source.local_ref]}] if work else [],
         "continuations": continuations, "confidence": 1, "unresolved": [], "reason_summary": "Bounded Work decision."}
     # Exercise the native alternatives independently of the Host's conditional
     # allOf checks, which the deployed decoder does not enforce.
@@ -1010,7 +1030,7 @@ def test_fast_decoder_purpose_matches_provider_normalization(resource_contract, 
     responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome="Complete the requested work",
                                                        output_mode="body_action", confidence=1.0)
     raw = {"activities": [{"role": "capability", "capability_id": "test.provider", "activity_id": "step",
-                           "args": {}, "source_responsibility_refs": ["r1"], "timing": "sequential"}],
+                           "args": {}, "source_responsibility_refs": ["r1"], "depends_on": []}],
            "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
            "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Realize the owned effect."}
     if purpose is not None:
@@ -1131,7 +1151,7 @@ def _compound_body_case(variant: str) -> tuple[CognitiveWorkRequest, list[Catalo
         'covered_responsibility_refs': [r.local_ref for r in responsibilities],
         'activities': [{'role': 'capability', 'activity_id': aid, 'capability_id': cid,
                         'args': args, 'argument_sources': {k: span(v) for k, v in sources.items()},
-                        'source_responsibility_refs': ['r1'], 'timing': 'sequential',
+                        'source_responsibility_refs': ['r1'], 'depends_on': [],
                         'reason_summary': 'Realize the effect in the accepted source responsibility.'}
                        for aid, cid, args, sources in specs],
         'continuations': [], 'confidence': 1, 'unresolved': [], 'reason_summary': 'Complete requested work.'}
@@ -1274,7 +1294,7 @@ async def test_required_enum_source_matches_selected_value_and_original_turn(var
     raw = {'activities': [{'role': 'capability', 'activity_id': 'turn',
         'capability_id': capability.capability_id, 'args': {'direction': value},
         'argument_sources': {'direction': span(cited)} if cited else {},
-        'source_responsibility_refs': ['r1'], 'timing': 'sequential'}],
+        'source_responsibility_refs': ['r1'], 'depends_on': []}],
         'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'],
         'continuations': [], 'confidence': 1, 'unresolved': [], 'reason_summary': 'Realize owned turn.'}
     model = _StreamingModel([_wire_output(raw)])

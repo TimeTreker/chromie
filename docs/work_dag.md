@@ -198,6 +198,22 @@ with a fully authored `dag` argument. This is an execution boundary, not delegat
 
 A future canonical Plan representation may make WorkDAG first-class rather than nesting it under an execution Capability. That is a representation decision only; it must not change the authority rule above.
 
+### Fast Planner Work is WorkDAG topology
+
+Since 2026-10-09 (owner decision), each Fast Capability Activity carries `depends_on`: the
+activity_ids of earlier Activities that must finish first. There is no per-Activity
+parallel/sequential label. Requested sequence is a dependency; requested simultaneity is
+no dependency. Host validates the references, which only cite earlier Activities, so the
+graph is acyclic. It checks typed UMI `before`/`after` as dependency paths, and
+`parallel_with` as the same execution group.
+
+The Fast Host derives execution groups with DAGEngine wave semantics. An Activity's wave
+is one past its deepest dependency. A wave's members start together while the
+Capability contracts allow it; a conflicting member starts the next group in list order.
+The canonical Plan records `depends_on` and `execution_group` per step, and Runtime never
+merges adjacent groups. Physical nodes overlap when their resources do not conflict (see
+the Charter). Deep Plans keep their existing timing representation until they converge.
+
 ## Agent control-plane API
 
 The Agent exposes deterministic WorkDAG/DAGEngine endpoints:

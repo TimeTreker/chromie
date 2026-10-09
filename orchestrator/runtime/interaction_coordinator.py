@@ -616,15 +616,15 @@ class InteractionRuntimeCoordinator:
                     "Fast execution before GA completes is limited to available, "
                     "side-effect-free safe-read Capabilities"
                 )
-            if activity.timing == "parallel":
-                if not definition.can_run_parallel:
-                    raise ValueError(
-                        f"Capability {activity.capability_id!r} is not parallel-safe"
-                    )
-                if metadata.get("parallel_metadata_declared") is not True:
-                    raise ValueError(
-                        f"Capability {activity.capability_id!r} lacks parallel metadata"
-                    )
+            # WorkDAG: an independent parallel-safe read starts with the others; a
+            # dependent or non-parallel-safe read runs after what precedes it.
+            timing = (
+                "parallel"
+                if not activity.depends_on
+                and definition.can_run_parallel
+                and metadata.get("parallel_metadata_declared") is True
+                else "sequential"
+            )
             schema_errors = validate_args_for_schema(
                 activity.args,
                 definition.input_schema,
@@ -644,7 +644,7 @@ class InteractionRuntimeCoordinator:
                     capability_id=activity.capability_id,
                     capability_version=definition.version,
                     args=dict(activity.args),
-                    timing=activity.timing,
+                    timing=timing,
                     timeout_ms=definition.timeout_ms,
                     cancellable=definition.interruptible,
                     requires_confirmation=False,

@@ -2757,22 +2757,16 @@ def fast_advance_response_schema(
     }
     speech_only = {item.local_ref for item in responsibility_items if item.output_mode == "speech"}
     capability_refs = [ref for ref in refs if ref not in speech_only]
+    # Both ends of a typed requested concurrency; a Capability that cannot run in
+    # parallel cannot realize them, so the decoder leaves escalation instead.
+    concurrent_refs: set[str] = set()
+    for item in responsibility_items:
+        targets = item.bindings.get("parallel_with", [])
+        for target in targets if isinstance(targets, list) else [targets]:
+            if str(target).strip() in refs:
+                concurrent_refs.update({item.local_ref, str(target).strip()})
     vocal_modes = {item.local_ref: item.output_mode for item in responsibility_items
                    if item.output_mode in set(VOCAL_MODES) - {"speech"}}
-    # Project already-authored UMI timing onto both ends of each relation.
-    # Host validation enforces the same invariant; the decoder must not offer
-    # a contradictory label and rely on rejection after primary inference.
-    timing_choices = {ref: {"sequential", "parallel"} for ref in refs}
-    for item in responsibility_items:
-        for relation in ("before", "precedes", "after", "follows", "parallel_with"):
-            targets = item.bindings.get(relation, [])
-            targets = targets if isinstance(targets, list) else [targets]
-            for target in targets:
-                target = str(target).strip()
-                if item.local_ref in timing_choices and target in timing_choices:
-                    allowed = {"parallel" if relation == "parallel_with" else "sequential"}
-                    timing_choices[item.local_ref] &= allowed
-                    timing_choices[target] &= allowed
     covered = schema.get("properties", {}).get("covered_responsibility_refs")
     if isinstance(covered, dict):
         covered["items"] = {"type": "string", "enum": refs}
@@ -3020,7 +3014,7 @@ def fast_advance_response_schema(
         capability_properties = capability_contract.get("properties")
         if isinstance(capability_properties, dict):
             capability_required = list(capability_contract.get("required", []))
-            for field_name in ("args", "timing"):
+            for field_name in ("args", "depends_on"):
                 if field_name not in capability_required:
                     capability_required.append(field_name)
             capability_contract["required"] = capability_required
@@ -3067,15 +3061,12 @@ def fast_advance_response_schema(
                     modes = list(mode_contract.get("enum", [mode_contract["const"]]
                                  if "const" in mode_contract else VOCAL_MODES))
                 for mode in modes:
-                    timings_by_refs: dict[tuple[str, ...], list[str]] = {}
-                    for timing in ("sequential", "parallel"):
-                        if timing == "parallel" and capability.get("can_run_parallel") is False:
-                            continue
-                        compatible = tuple(ref for ref in capability_refs
-                            if timing in timing_choices[ref] and (ref not in vocal_modes or vocal_modes[ref] == mode))
-                        if compatible:
-                            timings_by_refs.setdefault(compatible, []).append(timing)
-                    for compatible, timings in timings_by_refs.items():
+                    # Order and concurrency are WorkDAG dependencies (depends_on), not a
+                    # per-Activity label; Host checks UMI before/after/parallel_with on them.
+                    compatible_refs = tuple(ref for ref in capability_refs
+                        if (ref not in vocal_modes or vocal_modes[ref] == mode)
+                        and not (ref in concurrent_refs and capability.get("can_run_parallel") is False))
+                    for compatible in ([compatible_refs] if compatible_refs else []):
                         properties = copy.deepcopy(branch_properties)
                         required = list(capability_required)
                         bound_parameters = {
@@ -3169,7 +3160,13 @@ def fast_advance_response_schema(
                                 required.append("argument_sources")
                         if mode is not None:
                             properties["args"]["properties"]["mode"] = {**mode_contract, "enum": [mode]}
-                        properties["timing"] = {"type": "string", "enum": timings}
+                        properties["depends_on"] = {
+                            "type": "array",
+                            "items": {"type": "string", "minLength": 1, "maxLength": 160},
+                            "maxItems": 8,
+                        }
+                        if "depends_on" not in required:
+                            required.append("depends_on")
                         properties["source_responsibility_refs"]["items"] = {"type": "string", "enum": list(compatible)}
                         properties["source_responsibility_refs"]["maxItems"] = len(compatible)
                         branch = {

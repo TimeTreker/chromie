@@ -285,7 +285,10 @@ def _stream_advance_from_canonical_plan(
         for ref in goal.source_responsibility_refs:
             bind(ref, goal.goal_id)
 
+    from scripts.behavior_scenarios import canonical_step_dependencies
+
     activities = []
+    dependencies = canonical_step_dependencies(plan.steps)
     for step in plan.steps:
         source_refs = [
             ref
@@ -298,7 +301,7 @@ def _stream_advance_from_canonical_plan(
                 activity_id=step.step_id,
                 capability_id=step.capability_id,
                 args=dict(step.args),
-                timing=step.timing,
+                depends_on=dependencies[step.step_id],
                 source_responsibility_refs=source_refs,
                 reason_summary=step.reason_summary,
             )
@@ -1749,7 +1752,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     role="capability",
                     capability_id="chromie.weather.lookup",
                     args={"location": "重庆", "date": "today"},
-                    timing="parallel",
+                    depends_on=[],
                     source_responsibility_refs=["weather"],
                 )
             ],
@@ -1890,7 +1893,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                         role="capability",
                         capability_id="chromie.weather.lookup",
                         args={"location": "重庆", "date": "today"},
-                        timing="parallel",
+                        depends_on=[],
                         source_responsibility_refs=["weather"],
                     )
                 ],
@@ -2031,7 +2034,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     role="capability",
                     capability_id="chromie.weather.lookup",
                     args={"location": "重庆", "date": "today"},
-                    timing="parallel",
+                    depends_on=[],
                     source_responsibility_refs=["weather"],
                 )
             ],
@@ -2197,7 +2200,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     role="capability",
                     capability_id="chromie.weather.lookup",
                     args={"location": "重庆", "date": "today"},
-                    timing="parallel",
+                    depends_on=[],
                     source_responsibility_refs=["weather"],
                 )
             ],
@@ -5119,7 +5122,7 @@ class FastInformationAcquisitionLifecycleTests(unittest.TestCase):
                     role="capability",
                     capability_id="chromie.weather.lookup",
                     args={"location": "Chongqing", "date": "today"},
-                    timing="sequential",
+                    depends_on=[],
                     step_purpose="acquire_information",
                     expected_outcome=(
                         "Fresh weather Evidence for Chongqing today is available for the answer."
@@ -5298,7 +5301,7 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
         advance = FastPlannerAdvance(turn_id="early-read", disposition="execute", coverage="complete",
             covered_responsibility_refs=["weather"], activities=[FastPlannerCapabilityActivity(
                 activity_id="read-weather", role="capability", capability_id="chromie.weather.lookup", args={"location": "重庆", "date": "today"},
-                source_responsibility_refs=["weather"], timing="sequential")], confidence=0.99)
+                source_responsibility_refs=["weather"], depends_on=[])], confidence=0.99)
 
         class Client(ScriptedClient):
             async def resolve_goal_association(self, *args, **kwargs):

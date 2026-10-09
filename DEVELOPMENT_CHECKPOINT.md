@@ -1,6 +1,66 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Perception can ground a provider-owned resource source, 2026-10-09
+## Current delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
+
+Base: `origin/main` `690bee160`. Owner request: fix the lone-`parallel` failure. On review the
+owner set the design: Planner authors a WorkDAG, and DAGEngine semantics decide execution.
+Also: "Physical WorkDAG nodes remain sequential" is wrong; actions run concurrently when their
+resources do not conflict.
+
+Observed: 6/16 retained Fast plans that used `parallel` failed Host's "contiguous group of 2
+or more" rule. This included must-pass "看着我三秒，同时眨两下眼睛", planned as [look S, blink P].
+7 plans "passed" but ran the gestures after the delivery instead of alongside it. The model
+uses P to mean "with the previous Activity"; the contract meant "every member marked".
+
+| Order | Module / owner | Actual | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | UMI | one Responsibility, no typed relation | same | correct |
+| 2 | Fast DTO/decoder contract | per-Activity timing label; groups = contiguous P | WorkDAG `depends_on` (Charter 43, work_dag.md) | incorrect (earliest) |
+| 3 | Fast Planner model | [look S, blink P] | dependencies | symptom of 2 |
+| 4 | Host | rejects the lone P; the whole turn fails | validate the DAG, derive groups | symptom |
+
+Repair:
+- `FastPlannerCapabilityActivity.depends_on` replaces `timing`.
+- The decoder requires `depends_on`. A Capability that cannot run in parallel is not offered to
+  both ends of a typed `parallel_with`, so that case escalates.
+- Host checks: dependency references, typed relations, and `fast_activity_execution_groups`
+  (DAGEngine waves with a resource split).
+- `FastPlannerAdvance.metadata.execution_groups`.
+- Canonical steps are ordered by group, with `depends_on` and `execution_group` metadata.
+- Runtime flushes on a group change, in plan validation and in execution.
+- Early safe reads are parallel only when independent and parallel-safe.
+- Reuse identity drops timing.
+- Duplicate idempotent reads collapse regardless of dependencies.
+- The prompt gives dependency guidance.
+- Fixtures: `scripts/behavior_scenarios.canonical_step_dependencies`.
+- Docs: Charter, AGENTS, work_dag, EXECUTION_LANES, COGNITIVE_RUNTIME_ROLLOUT.
+
+Evidence (`.chromie/acceptance/provider-source-branches-20261009/`):
+- Clean-worktree gate exit 0: 169/4,040/5 skips/1,065 subtests/20 legacy
+  (`run_tests_rev7_clean.log`).
+- Strict replay 6,000/6,000 (`strict-replay-rev7/`).
+- Frozen `contrast3.py`, rev7 vs rev6 on fresh lifetimes: 37/37 reproducible, 0 invalid
+  dependencies. Near-tie flips go both ways.
+- Live `live-rev7/` (12 cases, bundle `chromie_debug_bundle_20261009_190505`): 6/12 pass.
+  - Concurrent delivery ∥ blink observed.
+  - Sequences ran in order.
+  - The lone-parallel class is gone.
+- Focused rewording (`deps-focus/`) left simultaneity chained. It was rejected; prompt
+  iteration stopped.
+
+Known failures:
+1. The Planner chains Activities asked to happen together (look → blink). Both run, but not
+   together. The likely lever is UMI typed `parallel_with` or a stronger model.
+2. Invented clarification in walk → turn.
+3. UMI overlapping-span 503s.
+4. GA merged walk + sing.
+5. Soridormi ignores `source` and refuses when several water bottles are visible.
+6. Planner decoration (blink, wave) persists.
+7. Deep Plans still use timing labels.
+
+Next: owner decision on the simultaneity lever, then Deep convergence.
+
+## Previous delivery — Perception can ground a provider-owned resource source, 2026-10-09
 
 Base: `origin/main` `08f018296`. Owner-requested defect: the Planner marked the water
 `source` `known` without evidence. Owner decisions: option A (a source may cite what

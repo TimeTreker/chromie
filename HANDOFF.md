@@ -1,6 +1,46 @@
 # Chromie Handoff
 
-## Current delivery — Perception can ground a provider-owned resource source, 2026-10-09
+## Current delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
+
+Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `690bee160`.
+Evidence: `.chromie/acceptance/provider-source-branches-20261009/` (README.md).
+
+Changed:
+- Code: `shared/chromie_contracts/plan.py`, `agent/app/{planner_schema,planner_fast_validation,
+  planner_validation,planner_prompt,fast_planner}.py`, `orchestrator/runtime/{cognitive_runtime,
+  capability_runtime,interaction_coordinator}.py`, `scripts/behavior_scenarios.py`.
+- Tests: the Fast, runtime and coordinator suites.
+- Docs: `docs/PROJECT_CHARTER.md`, `AGENTS.md`, `docs/work_dag.md`,
+  `docs/EXECUTION_LANES_AND_COORDINATION.md`, `docs/COGNITIVE_RUNTIME_ROLLOUT.md`,
+  `docs/STATUS.md`, this file and the checkpoint.
+
+Verification:
+
+```bash
+python scripts/run_workflow_replay.py --workers 4 --evidence-dir <dir>       # 6000/6000
+./scripts/run_tests.sh   # run from a worktree without .claude/worktrees/ inside it; exit 0
+cd .chromie/acceptance/provider-source-branches-20261009
+./run_fresh_arms3.sh candidate_rev7_fresh candidate_rev7_fresh_repeat     # 37/37 reproducible
+(cd deps-focus && python focus.py baseline && python focus.py p1)        # rewording rejected
+```
+
+Agent and live run (rollback `chromie-agent:pre-workdag-deps-20261009` = rev6):
+
+```bash
+docker build -f .chromie/acceptance/provider-source-branches-20261009/AgentDockerfile -t chromie-agent:workdag-deps-20261009 .
+docker tag chromie-agent:workdag-deps-20261009 chromie-agent:latest
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+python scripts/capture_runtime_identity.py --allow-dirty --verify-agent-source chromie-agent   # 0b7cf09f…
+docker restart chromie-llm   # fresh lifetime before every arm and the live run
+```
+
+The live cohort is the 4 water cases plus `look_while_blinking_twice`,
+`user_probe_walk_while_singing`, `qualification_workdag_walk_blink_once`,
+`compound_walk_nod_turn`, `walk_then_turn_right`, `multi_goal_look_then_blink`,
+`nod_then_shake_head` and `multi_goal_walk_then_blink`. Results are in `live-rev7/`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261009_190505.tar.gz`.
+
+## Previous delivery — Perception can ground a provider-owned resource source, 2026-10-09
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `08f018296`.
 Evidence: `.chromie/acceptance/provider-source-branches-20261009/` (README.md lists every arm).

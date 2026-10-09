@@ -984,7 +984,12 @@ class CanonicalPlanRuntimeAdapter:
 
         parallel_batch: list[Any] = []
         for step in plan.steps:
-            if step.timing == "parallel":
+            # Adjacent Fast execution groups stay separate (no key: one contiguous batch).
+            if step.timing == "parallel" and (
+                not parallel_batch
+                or (step.metadata or {}).get("execution_group")
+                == (parallel_batch[0].metadata or {}).get("execution_group")
+            ):
                 parallel_batch.append(step)
                 continue
             errors.extend(
@@ -994,7 +999,7 @@ class CanonicalPlanRuntimeAdapter:
                     plan_step_count=len(plan.steps),
                 )
             )
-            parallel_batch = []
+            parallel_batch = [step] if step.timing == "parallel" else []
         errors.extend(
             self._parallel_errors(
                 parallel_batch,
@@ -3491,6 +3496,22 @@ class GoalDrivenRuntimeCoordinator:
             goal_id: [] for goal_id in goal_ids
         }
         steps: list[CanonicalPlanStep] = []
+        # Start-together groups come from the Fast Host (Planner depends_on + Capability
+        # contracts). Without them Runtime serializes in list order; it never infers overlap.
+        capability_ids = [
+            item.activity_id for item in advance.activities
+            if isinstance(item, FastPlannerCapabilityActivity)
+        ]
+        raw_groups = advance.metadata.get("execution_groups")
+        execution_groups = (
+            [[str(item) for item in group] for group in raw_groups]
+            if isinstance(raw_groups, list)
+            and sorted(str(item) for group in raw_groups for item in group) == sorted(capability_ids)
+            else [[activity_id] for activity_id in capability_ids]
+        )
+        group_of = {
+            activity_id: index for index, group in enumerate(execution_groups) for activity_id in group
+        }
         for activity in advance.activities:
             activity_goal_ids: list[str] = []
             for responsibility_ref in activity.source_responsibility_refs:
@@ -3505,7 +3526,11 @@ class GoalDrivenRuntimeCoordinator:
                         step_id=activity.activity_id,
                         capability_id=activity.capability_id,
                         args=dict(activity.args),
-                        timing=activity.timing,
+                        timing=(
+                            "parallel"
+                            if len(execution_groups[group_of[activity.activity_id]]) > 1
+                            else "sequential"
+                        ),
                         step_purpose=activity.step_purpose,
                         expected_outcome=activity.expected_outcome,
                         source_goal_ids=activity_goal_ids,
@@ -3516,9 +3541,13 @@ class GoalDrivenRuntimeCoordinator:
                                 activity.source_responsibility_refs
                             ),
                             "task_list_revision": 1,
+                            "depends_on": list(activity.depends_on),
+                            "execution_group": group_of[activity.activity_id],
                         },
                     )
                 )
+        # Contiguous steps per group, groups in dependency-wave order.
+        steps.sort(key=lambda step: group_of[step.step_id])
 
         outcomes_by_ref = {item.local_ref: item.outcome for item in responsibilities or []}
         def argument_source_text(span: Any, owner_refs: list[str]) -> str:
@@ -3841,7 +3870,6 @@ class GoalDrivenRuntimeCoordinator:
                 and step.args == activity.args
                 and len(step.source_goal_ids) == len(activity_goal_ids)
                 and set(step.source_goal_ids) == set(activity_goal_ids)
-                and step.timing == activity.timing
             ]
             if not candidates and activity.activity_id not in {step.reuse_activity_id for step in plan.steps}:
                 continue
@@ -3982,7 +4010,8 @@ class GoalDrivenRuntimeCoordinator:
             activity = by_id.get(step.reuse_activity_id)
             if activity is None:
                 raise ValueError("Planner reuse names unknown Work")
-            if any(getattr(step, key) != activity.get(key) for key in ("capability_id", "args", "timing")):
+            # Identity is what the Work does; its timing is derived scheduling.
+            if any(getattr(step, key) != activity.get(key) for key in ("capability_id", "args")):
                 raise ValueError("Planner reuse changes immutable Work identity")
             if set(step.source_goal_ids) != set(activity.get("source_goal_ids") or []):
                 raise ValueError("Planner reuse changes shared Work Goal ownership")

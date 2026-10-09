@@ -194,7 +194,7 @@ def work(activities):
 
 def activity(name, args, sources):
     return {"role": "capability", "activity_id": name, "capability_id": "test." + name,
-        "args": args, "argument_sources": sources, "timing": "sequential",
+        "args": args, "argument_sources": sources, "depends_on": [],
         "source_responsibility_refs": ["r1"]}
 
 
@@ -284,7 +284,7 @@ async def test_provider_resource_contract_materializes_information_acquisition_p
         # A required free-text input cites its span even when copied literally.
         "argument_sources": {"location": {"source_start_token_ref": "t4",
                                           "source_end_token_ref": "t4"}},
-        "timing": "sequential",
+        "depends_on": [],
         "source_responsibility_refs": ["r1"],
         "reason_summary": "Acquire fresh weather Evidence before answering.",
     }])
@@ -329,7 +329,7 @@ async def test_translated_required_location_must_cite_its_source_span(sources, a
     )
     raw = work([{"role": "capability", "activity_id": "weather-read",
                  "capability_id": "chromie.weather.lookup", "args": {"location": "Beijing"},
-                 "argument_sources": sources, "timing": "sequential",
+                 "argument_sources": sources, "depends_on": [],
                  "source_responsibility_refs": ["r1"],
                  "reason_summary": "Acquire fresh weather Evidence before answering."}])
     model = Model([raw])
@@ -1182,3 +1182,66 @@ async def test_situation_source_guidance_appears_only_where_it_can_apply(observe
     assert ("never retype a location" in prompt) is provider_source
     assert ("trust what you observe and cite the observation" in prompt) is expected
     assert ("observed_in_situation" in prompt) is expected
+
+
+SORIDORMI_PARALLEL = {  # live Soridormi catalog metadata, 2026-10-09
+    "look_at_person": ("soridormi.resource.body.head_pose", ["body.head_pose"]),
+    "blink_eyes": ("soridormi.resource.visual.eyes", ["visual.eyes"]),
+    "acquire_and_deliver_resource": ("soridormi.resource.body.primary_motion",
+                                     ["body.primary_motion", "world.carried_object"]),
+    "walk_forward": ("soridormi.resource.body.primary_motion", ["body.primary_motion"]),
+    "wave_hand": ("soridormi.resource.visual.arms", ["visual.arms"]),
+    "nod_yes": ("soridormi.resource.body.head_pose", ["body.head_pose"]),
+}
+
+
+def soridormi_capabilities():
+    return [{"capability_id": "soridormi." + name, "can_run_parallel": True, "parallel_metadata_declared": True,
+             "exclusive_group": group, "resource_claims": claims}
+            for name, (group, claims) in SORIDORMI_PARALLEL.items()]
+
+
+@pytest.mark.parametrize("plan, groups", [
+    # "看着我三秒，同时眨两下眼睛": no dependency, compatible resources -> together.
+    ([("look", "look_at_person", []), ("blink", "blink_eyes", [])], [["look", "blink"]]),
+    # Live 2026-10-09 lone "parallel" blink after delivery: now simply independent.
+    ([("deliver", "acquire_and_deliver_resource", []), ("blink", "blink_eyes", []), ("wave", "wave_hand", [])],
+     [["deliver", "blink", "wave"]]),
+    # Independent but both need the legs: Runtime serializes in list order.
+    ([("walk1", "walk_forward", []), ("walk2", "walk_forward", []), ("wave", "wave_hand", [])],
+     [["walk1"], ["walk2", "wave"]]),
+    # "walk, then nod" with an unrelated blink: the blink starts with the walk.
+    ([("walk", "walk_forward", []), ("nod", "nod_yes", ["walk"]), ("blink", "blink_eyes", [])],
+     [["walk", "blink"], ["nod"]]),
+])
+def test_execution_groups_follow_dependencies_then_resources(plan, groups):
+    from agent.app.planner_validation import fast_activity_execution_groups
+    from shared.chromie_contracts.plan import FastPlannerCapabilityActivity
+
+    activities = [FastPlannerCapabilityActivity(role="capability", activity_id=activity_id,
+        capability_id="soridormi." + name, depends_on=depends_on, source_responsibility_refs=["r1"])
+        for activity_id, name, depends_on in plan]
+    assert fast_activity_execution_groups(activities, soridormi_capabilities()) == groups
+
+
+def test_canonical_steps_keep_adjacent_execution_groups_apart():
+    from shared.chromie_contracts.goal import GoalAssociationResolution
+    from shared.chromie_contracts.plan import FastPlannerAdvance
+    from shared.chromie_contracts.semantic_task import SemanticGoal
+
+    owner = request_for("Walk and blink, then nod and wave.").responsibilities[0]
+    advance = FastPlannerAdvance(turn_id="t", **work([
+        activity("walk", {}, {}), activity("blink", {}, {}),
+        {**activity("nod", {}, {}), "depends_on": ["walk", "blink"]},
+        {**activity("wave", {}, {}), "depends_on": ["walk", "blink"]},
+    ]), metadata={"execution_groups": [["walk", "blink"], ["nod", "wave"]]})
+    association = GoalAssociationResolution(turn_id="t", resolution_status="resolved", confidence=1., new_goals=[
+        SemanticGoal(goal_id="g1", source_responsibility_refs=["r1"], description=owner.outcome, source_text="x"),
+    ])
+    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        advance=advance, association=association, user_text="x", responsibilities=[owner],
+    )
+    assert [(step.step_id, step.timing, step.metadata["execution_group"]) for step in plan.steps] == [
+        ("walk", "parallel", 0), ("blink", "parallel", 0), ("nod", "parallel", 1), ("wave", "parallel", 1),
+    ]
+    assert plan.steps[2].metadata["depends_on"] == ["walk", "blink"]

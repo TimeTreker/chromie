@@ -392,7 +392,17 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
             "inside args."
         ),
     )
-    timing: PlanTiming = "sequential"
+    depends_on: list[str] = Field(
+        default_factory=list,
+        max_length=8,
+        description=(
+            "WorkDAG dependency topology: activity_ids of earlier Capability Activities in "
+            "this Work that must finish before this one starts. An Activity that depends on "
+            "none of them may start together with them; Runtime overlaps independent "
+            "Activities only when their declared resources allow and otherwise serializes "
+            "them in list order, never adding or removing a dependency."
+        ),
+    )
     step_purpose: PlanStepPurpose = "achieve_effect"
     expected_outcome: str = Field(default="", max_length=500)
     source_responsibility_refs: list[str] = Field(min_length=1)
@@ -403,7 +413,7 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
 
-    @field_validator("source_responsibility_refs", mode="before")
+    @field_validator("source_responsibility_refs", "depends_on", mode="before")
     @classmethod
     def normalize_responsibility_refs(cls, value: Any) -> list[str]:
         return _normalize_ids(value)
@@ -645,8 +655,8 @@ class FastPlannerAdvance(BaseModel):
     """Fast Planner's first Activity Plan over User Meaning Interpretation evidence.
 
     User Meaning Interpretation owns contextual WHAT. This contract is the first
-    planner-owned HOW decision and may contain speaking and Capability Activities
-    with the same sequential/parallel relation. Goal Association runs independently
+    planner-owned HOW decision and may contain speaking and Capability Activities;
+    Capability order and concurrency are WorkDAG dependencies. Goal Association runs independently
     from the same UMI result; it is not a Planner continuation. Runtime safety,
     confirmation, and authorization still decide whether an Activity may start.
     """

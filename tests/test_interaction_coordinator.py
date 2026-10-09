@@ -1868,7 +1868,7 @@ class PreparedWorkTests(unittest.IsolatedAsyncioTestCase):
         for language in ("zh-CN", "en-GB", "fr-FR"):
             execution = await coordinator.start_fast_planner_capability_activities([
                 FastPlannerCapabilityActivity(activity_id="lookup", role="capability",
-                    capability_id="test.localized_lookup", args={}, timing="sequential",
+                    capability_id="test.localized_lookup", args={}, depends_on=[],
                     source_responsibility_refs=["r1"]),
             ], session_id=language, turn_id=language, language=language)
             self.assertIsNotNone(execution)
@@ -1892,7 +1892,7 @@ class PreparedWorkTests(unittest.IsolatedAsyncioTestCase):
                 metadata=metadata, requires_confirmation=confirmation))
         def activity(name, suffix=""):
             return FastPlannerCapabilityActivity(activity_id=name + suffix, role="capability", capability_id="test." + name,
-                args={}, source_responsibility_refs=["r1"], timing="sequential")
+                args={}, source_responsibility_refs=["r1"], depends_on=[])
         for blocked in ["effect", "unqualified", "confirmed"]:
             activities = [activity("safe"), activity(blocked), activity("safe", "-later")]
             eligible = await coordinator.prepare_fast_planner_capability_activities(activities, turn_id=blocked)
