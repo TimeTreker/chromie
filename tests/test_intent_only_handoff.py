@@ -17,6 +17,7 @@ from agent.app.goal_association import GoalAssociationResolver
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_contracts.plan import FastPlannerStreamFailure, FastPlannerStreamTerminal
+from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text
 
 
 EPISODES = [
@@ -159,11 +160,11 @@ class Model:
 
     async def generate_stream(self, prompt, **kwargs):
         self.packets.append((str(prompt), kwargs))
-        yield json.dumps(self.replies.pop(0))
+        yield json.dumps(declared_ability_needs(self.replies.pop(0), kwargs.get("response_format")))
 
     async def generate(self, prompt, **kwargs):
         self.packets.append((str(prompt), kwargs))
-        return self.replies.pop(0)
+        return declared_ability_needs(self.replies.pop(0), kwargs.get("response_format"))
 
 
 def request_for(text):
@@ -190,6 +191,21 @@ def work(activities):
         "covered_responsibility_refs": ["r1"], "activities": activities,
         "continuations": [], "confidence": 1.0, "unresolved": [],
         "reason_summary": "Complete requested activities in source order."}
+
+
+def need(text, closest="none", fits=False, does="No loaded Capability realizes it."):
+    return {"need": text, "closest_loaded": closest, "closest_loaded_does": does, "fits": fits}
+
+
+def escalation_outcome(reason):
+    return {"disposition": "escalate", "coverage": "uncertain", "covered_responsibility_refs": ["r1"],
+        "activities": [], "continuations": ["deep_planner"], "confidence": 0.5, "unresolved": ["r1"],
+        "reason_summary": reason}
+
+
+def need_first_shapes(schema):
+    return [shape for shape in (schema, *schema.get("oneOf", []), *schema.get("anyOf", []))
+            if isinstance(shape, dict) and "properties" in shape]
 
 
 def activity(name, args, sources):
@@ -338,39 +354,59 @@ async def test_translated_required_location_must_cite_its_source_span(sources, a
     assert isinstance(frames[0], FastPlannerStreamTerminal) is accepted, frames[0]
     # The constrained decoder itself must exclude the unspanned value, not only Host.
     decoder_schema = model.packets[0][1]["response_format"]
-    errors = list(Draft202012Validator(decoder_schema).iter_errors(raw))
+    errors = list(Draft202012Validator(decoder_schema).iter_errors(declared_ability_needs(raw, decoder_schema)))
     assert (not errors) is accepted, errors[:1]
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("fault", [None, "unknown_id", "second_lookup", "mixed_plan", "invented_quote"])
-async def test_indexed_capability_lookup_precedes_one_complete_plan(fault):
+@pytest.mark.parametrize("fault", [None, "no_match", "unloaded_cite", "second_unmet", "invented_quote"])
+async def test_unmet_need_searches_library_then_plans_once(fault):
     request = request_for("turn left by 45 degrees")
     entry = capability("turn", {"rotation_degrees": {"type": "number", "maximum": 90}}, tier="rare")
-    lookup = {"requested_capability_ids": ["test.turn"]}
+    first = {"ability_needs": [need("turn the body in place by an angle")],
+             **escalation_outcome("No loaded Capability turns the body.")}
     final = work([activity("turn", {"rotation_degrees": 45}, source_spans("turn left by 45 degrees", {"rotation_degrees": "45 degrees"}))])
-    if fault == "unknown_id":
-        lookup["requested_capability_ids"] = ["test.missing"]
-    elif fault == "second_lookup":
-        final = copy.deepcopy(lookup)
-    elif fault == "mixed_plan":
-        lookup.update(final)
+    if fault == "no_match":
+        first["ability_needs"] = [need("open the kitchen window")]
+    elif fault == "unloaded_cite":
+        first["ability_needs"] = [need("turn the body in place by an angle", "test.turn", True, "Turn in place.")]
+    elif fault == "second_unmet":
+        final = {"ability_needs": [need("turn the body in place by an angle")],
+                 **escalation_outcome("Still no fitting Capability.")}
     elif fault == "invented_quote":
         final["activities"][0]["argument_sources"]["rotation_degrees"] = {"source_start_token_ref": "t999", "source_end_token_ref": "t999"}
-    model = Model([lookup, final])
+    model = Model([first, final])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
     first_schema = model.packets[0][1]["response_format"]
-    assert first_schema["oneOf"][0]["required"] == ["requested_capability_ids"]
+    for shape in need_first_shapes(first_schema):
+        assert next(iter(shape["properties"])) == "ability_needs"
+        assert shape["properties"]["ability_needs"]["items"]["properties"]["closest_loaded"]["enum"] == ["none"]
     assert "test.turn" in model.packets[0][0]
     assert "rotation_degrees" not in model.packets[0][0]
-    if fault:
+    if fault in {"no_match", "unloaded_cite"}:
+        assert len(model.packets) == 1
+        if fault == "no_match":
+            assert isinstance(frames[0], FastPlannerStreamTerminal)
+            assert frames[0].advance.disposition == "escalate"
+            assert frames[0].advance.metadata["capability_detail_lookups"] == 0
+        else:
+            assert isinstance(frames[0], FastPlannerStreamFailure)
+        return
+    assert len(model.packets) == 2
+    assert "rotation_degrees" in model.packets[1][0]
+    assert request.text in model.packets[1][0]
+    if fault == "invented_quote":
         assert isinstance(frames[0], FastPlannerStreamFailure)
+        return
+    assert isinstance(frames[0], FastPlannerStreamTerminal)
+    metadata = frames[0].advance.metadata
+    assert metadata["semantic_result_call_count"] == 1
+    assert metadata["capability_detail_lookups"] == 1
+    assert metadata["ability_need_search"] == {"unmet_needs": ["turn the body in place by an angle"],
+                                              "loaded_capability_ids": ["test.turn"]}
+    if fault == "second_unmet":
+        assert frames[0].advance.disposition == "escalate"
     else:
-        assert isinstance(frames[0], FastPlannerStreamTerminal)
-        assert len(model.packets) == 2
-        assert "rotation_degrees" in model.packets[1][0]
-        assert request.text in model.packets[1][0]
-        assert frames[0].advance.metadata["semantic_result_call_count"] == 1
-    assert len(model.packets) <= 2
+        assert frames[0].advance.activities[0].capability_id == "test.turn"
 
 
 @pytest.mark.asyncio
@@ -448,7 +484,8 @@ async def test_planner_owns_new_future_readiness_without_gi_time_fields(fault):
         assert not plan.metadata.get("failure_class"), plan.model_dump()
         assert plan.time_conditions[0].source_quote == due
         assert plan.goal_outcomes[0].satisfaction.unmet_goal_ids == [goal_id]
-        Draft202012Validator(model.packets[0][1]["response_format"]).validate(raw)
+        schema = model.packets[0][1]["response_format"]
+        Draft202012Validator(schema).validate(declared_ability_needs(raw, schema))
 
 
 @pytest.mark.asyncio
@@ -475,6 +512,7 @@ async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp
     future, ready = [goal.goal_id for goal in association.new_goals]
     raw = json.loads(Path("benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
     raw = json.loads(json.dumps(raw).replace("${goal}", future))
+    raw.pop("ability_needs", None)  # The resolver removes the need-first prefix before DTO validation.
     raw.update(disposition="mixed", steps=[{"step_id": "blink-now", "capability_id": "test.blink",
         "args": {"count": 3}, "depends_on": [], "source_goal_ids": [ready]}])
     raw["parameter_resolutions"] = [{"step_id": "blink-now", "parameter": "count",
@@ -502,7 +540,8 @@ async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp
     if fault:
         assert not plan.steps and plan.metadata.get("failure_class"), plan.model_dump()
     else:
-        Draft202012Validator(model.packets[0][1]["response_format"]).validate(raw)
+        schema = model.packets[0][1]["response_format"]
+        Draft202012Validator(schema).validate(declared_ability_needs(raw, schema))
         assert plan.disposition == "mixed", plan.model_dump()
         assert [step.source_goal_ids for step in plan.steps] == [[ready]]
         assert [condition.goal_id for condition in plan.time_conditions] == [future]
@@ -556,16 +595,19 @@ async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp
 async def test_index_visibility_does_not_authorize_unavailable_or_locked_work(available, locked):
     entry = capability("turn", {"rotation_degrees": {"type": "number"}}, tier="rare")
     entry = entry.model_copy(update={"available": available, "prompt_tier_locked": locked})
-    final = work([activity("turn", {"rotation_degrees": 45}, source_spans("turn left by 45 degrees", {"rotation_degrees": "45 degrees"}))])
-    model = Model([{"requested_capability_ids": ["test.turn"]}, final])
+    first = {"ability_needs": [need("turn the body in place by an angle")],
+             **escalation_outcome("No loaded Capability turns the body.")}
+    model = Model([first])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(
         request_for("turn left by 45 degrees"))]
-    assert len(frames) == 1 and isinstance(frames[0], FastPlannerStreamFailure)
-    assert len(model.packets) == 2
+    assert len(model.packets) == 1
+    assert isinstance(frames[0], FastPlannerStreamTerminal)
+    assert not [item for item in frames[0].advance.activities if item.role == "capability"]
+    assert frames[0].advance.metadata["capability_detail_lookups"] == 0
 
 
 @pytest.mark.asyncio
-async def test_canonical_fast_lookup_retains_original_intent_and_one_semantic_result():
+async def test_canonical_fast_need_search_retains_original_intent_and_one_semantic_result():
     from tests.test_fast_planner_pr3 import execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
     request = request_for("turn left by 45 degrees")
     request.context["goal_association_resolution"] = {"new_goals": [{
@@ -581,18 +623,22 @@ async def test_canonical_fast_lookup_retains_original_intent_and_one_semantic_re
             "source_goal_ids":["g"],"source_quote":"45 degrees","confidence":1.,"blocking":False,
             "rationale":"Realize the exact requested rotation."}])
     raw.update(time_conditions=[], cancel_activity_ids=[])
-    lookup = {"requested_capability_ids": ["test.turn"]}
-    model = Model([lookup,raw])
+    first = {"ability_needs": [need("turn the body in place by an angle")], **raw}
+    model = Model([first, raw])
     plan = await FastPlannerResolver(model,Catalog([entry])).resolve(request)
     assert plan.disposition == "execute", plan.metadata
     assert len(model.packets) == 2
-    for packet,reply in zip(model.packets,[lookup,raw],strict=True):
-        Draft202012Validator(packet[1]["response_format"]).validate(reply)
+    for packet in model.packets:
         assert request.text in packet[0]
+        for shape in need_first_shapes(packet[1]["response_format"]):
+            assert next(iter(shape["properties"])) == "ability_needs"
+    second = model.packets[1][1]["response_format"]
+    Draft202012Validator(second).validate(declared_ability_needs(raw, second))
     assert "rotation_degrees" not in model.packets[0][0]
     assert "rotation_degrees" in model.packets[1][0]
     assert plan.metadata["capability_detail_lookups"] == 1
     assert plan.metadata["semantic_result_call_count"] == 1
+    assert plan.metadata["ability_need_search"]["loaded_capability_ids"] == ["test.turn"]
 
 
 @pytest.mark.parametrize("typed", [False, True])
@@ -891,7 +937,7 @@ def test_fast_argument_source_canonicalization_minimizes_unique_literal_only() -
 
 
 @pytest.mark.asyncio
-async def test_fast_uses_library_lookup_instead_of_substituting_unrelated_common_body_capability():
+async def test_unfit_loaded_capability_leads_to_library_search_not_substitution():
     text = "wave your hand"
     request = request_for(text)
     walk = CatalogCapability(
@@ -908,18 +954,18 @@ async def test_fast_uses_library_lookup_instead_of_substituting_unrelated_common
         effects=["physical_motion"], hints={"semantic_type": "body_action"},
         parallel_metadata_declared=True,
     )
-    model = Model([
-        {"requested_capability_ids": ["test.wave"]},
-        work([activity("wave", {}, {})]),
-    ])
+    first = {"ability_needs": [need("wave one hand", "test.walk", False, "Walk forward.")],
+             **work([activity("walk", {}, {})])}
+    model = Model([first, work([activity("wave", {}, {})])])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([walk, wave])).stream_advance(request)]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
     assert len(model.packets) == 2
     first_prompt = model.packets[0][0]
     assert "test.walk" in first_prompt and "test.wave" in first_prompt
-    assert "Never substitute an unrelated loaded Capability" in first_prompt
+    assert "closest_loaded_does" in first_prompt
     assert "test.wave" in model.packets[1][0]
     assert frames[0].advance.activities[0].capability_id == "test.wave"
+    assert frames[0].advance.metadata["ability_needs"][0]["closest_loaded"] == "test.walk"
 
 
 @pytest.mark.asyncio
@@ -1083,7 +1129,8 @@ async def test_decoder_offers_only_legal_provider_source_shapes(source, cite, de
         options=None, response_format=model.packets[0][1]["response_format"],
         stream=True, priority_step=1,
     )
-    errors = list(Draft202012Validator(native(payload["response_format"]["json_schema"]["schema"])).iter_errors(raw))
+    sent = declared_ability_needs(raw, model.packets[0][1]["response_format"])
+    errors = list(Draft202012Validator(native(payload["response_format"]["json_schema"]["schema"])).iter_errors(sent))
     assert (not errors) is decoder_ok, errors[:1]
     assert isinstance(frames[0], FastPlannerStreamTerminal) is host_ok, frames[0]
 
@@ -1245,3 +1292,72 @@ def test_canonical_steps_keep_adjacent_execution_groups_apart():
         ("walk", "parallel", 0), ("blink", "parallel", 0), ("nod", "parallel", 1), ("wave", "parallel", 1),
     ]
     assert plan.steps[2].metadata["depends_on"] == ["walk", "blink"]
+
+
+@pytest.mark.asyncio
+async def test_host_stops_reading_once_an_unmet_need_has_library_contracts():
+    request = request_for("turn left by 45 degrees")
+    entry = capability("turn", {"rotation_degrees": {"type": "number"}}, tier="rare")
+    first = json.dumps({"ability_needs": [need("turn the body in place by an angle")],
+                        **escalation_outcome("No loaded Capability turns the body.")})
+    final = work([activity("turn", {"rotation_degrees": 45}, source_spans("turn left by 45 degrees", {"rotation_degrees": "45 degrees"}))])
+    consumed, closed = [], []
+
+    class Provider:
+        def __init__(self):
+            self.packets = []
+
+        async def generate_stream(self, prompt, **kwargs):
+            self.packets.append((str(prompt), kwargs))
+            if len(self.packets) == 1:
+                try:
+                    for offset in range(0, len(first), 16):
+                        consumed.append(offset)
+                        yield first[offset:offset + 16]
+                finally:
+                    closed.append(len(first))
+            else:
+                yield json.dumps(declared_ability_needs(final, kwargs.get("response_format")))
+
+    provider = Provider()
+    frames = [frame async for frame in FastPlannerResolver(provider, Catalog([entry])).stream_advance(request)]
+    assert isinstance(frames[0], FastPlannerStreamTerminal)
+    assert len(provider.packets) == 2 and closed
+    needs_end = first.index('"disposition"')
+    assert max(consumed) < needs_end + 16 < len(first)
+
+
+@pytest.mark.asyncio
+async def test_library_contracts_unusable_for_the_turn_trigger_no_second_call():
+    text = "Tell me a short joke."
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+        UserMeaningInterpretationRequest(text=text), json.dumps(intent_result(text, output_mode="speech")),
+    )
+    request = CognitiveWorkRequest(sid="intent-handoff", text=text,
+        responsibilities=decision.responsibilities, interpretation_confidence=1.0)
+    wave = capability("wave", {}, tier="rare")
+    first = {"ability_needs": [need("wave one hand")], "disposition": "respond", "coverage": "complete",
+        "covered_responsibility_refs": ["r1"], "activities": [{"role": "complete_response", "activity_id": "joke",
+        "source_responsibility_refs": ["r1"], "timing": "sequential", "rationale": "Tell the joke."}],
+        "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Answer in speech."}
+    model = Model([first])
+    frames = [frame async for frame in FastPlannerResolver(model, Catalog([wave])).stream_advance(request)]
+    assert len(model.packets) == 1
+    assert isinstance(frames[0], FastPlannerStreamTerminal)
+    assert frames[0].advance.metadata["capability_detail_lookups"] == 0
+
+
+def test_library_search_ranks_need_wording_and_never_returns_restricted_entries():
+    from agent.app.planner_context import search_capability_library
+    clock = capability("clock", {}, tier="rare").model_copy(update={
+        "capability_id": "test.clock", "description": "Read the current local date, time and weekday."})
+    weather = capability("weather", {}, tier="rare").model_copy(update={
+        "capability_id": "test.weather", "description": "Retrieve current weather observations for a place."})
+    bow = capability("bow", {}, tier="rare").model_copy(update={"description": "Gentle head bow gesture."})
+    locked = bow.model_copy(update={"capability_id": "test.bow_locked", "prompt_tier_locked": True})
+    unavailable = bow.model_copy(update={"capability_id": "test.bow_down", "available": False})
+    entries = [weather, clock, bow, locked, unavailable]
+    assert search_capability_library(["read the current local time"], entries, loaded_ids=set())[0] == "test.clock"
+    assert search_capability_library(["perform a bow gesture"], entries, loaded_ids=set()) == ["test.bow"]
+    assert search_capability_library(["read the current local time"], entries, loaded_ids={"test.clock"})[0] != "test.clock"
+    assert search_capability_library(["open the kitchen window"], entries, loaded_ids=set()) == []

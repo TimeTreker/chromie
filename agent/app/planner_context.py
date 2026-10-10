@@ -4,6 +4,9 @@ import copy
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+import math
+import re
+from collections import Counter
 from typing import Any
 
 from pydantic import ValidationError
@@ -1309,3 +1312,53 @@ async def fast_capability_context(catalog: Any, request: CognitiveWorkRequest, l
     merged = {item.capability_id: item for item in common}
     merged.update({key: by_id[key] for key in loaded_ids if not by_id[key].prompt_tier_locked})
     return request, list(merged.values()), entries
+
+
+_LIBRARY_SEARCH_STOP_WORDS = frozenset(
+    "a an and are as at be by for from in into is it its of on one or that the this to with".split()
+)
+
+
+def _library_search_terms(text: str) -> list[str]:
+    words = re.findall(r"[a-z]+", text.lower().replace("_", " ").replace(".", " "))
+    return [word for word in words if word not in _LIBRARY_SEARCH_STOP_WORDS]
+
+
+def search_capability_library(
+    needs: list[str], entries: list[Any], *, loaded_ids: set[str], per_need: int = 3, limit: int = 8,
+) -> list[str]:
+    """Rank unloaded library contracts against the Planner's own unmet-need wording.
+
+    BM25 over each contract's ID, description and when-to-use text. Retrieval only
+    decides which contracts the Planner reads next; it never chooses what executes.
+    Restricted, unavailable and non-executable entries are never returned.
+    """
+    candidates = [
+        item for item in entries
+        if item.capability_id not in loaded_ids and item.available and item.interaction_executable
+        and not item.prompt_tier_locked and is_planner_step_capability(item.capability_id)
+    ]
+    documents = [_library_search_terms(" ".join((
+        item.capability_id, item.description or "", str((item.hints or {}).get("when_to_use") or ""),
+    ))) for item in candidates]
+    if not documents:
+        return []
+    average = sum(map(len, documents)) / len(documents) or 1.0
+    frequency = Counter(term for document in documents for term in set(document))
+    found: list[str] = []
+    for need in needs:
+        terms = _library_search_terms(need)
+        scored = []
+        for item, document in zip(candidates, documents):
+            counts = Counter(document)
+            score = sum(
+                math.log(1 + (len(documents) - frequency[term] + 0.5) / (frequency[term] + 0.5))
+                * counts[term] * 2.5 / (counts[term] + 1.5 * (0.25 + 0.75 * len(document) / average))
+                for term in terms if term in counts
+            )
+            if score > 0:
+                scored.append((-score, item.capability_id))
+        for _, capability_id in sorted(scored)[:per_need]:
+            if capability_id not in found:
+                found.append(capability_id)
+    return found[:limit]

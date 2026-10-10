@@ -165,11 +165,10 @@ class SGLangProtocolTests(unittest.TestCase):
             self.assertEqual(Draft202012Validator(native).is_valid(value), expected)
             self.assertEqual(Draft202012Validator(schema).is_valid(value), expected)
 
-    def test_readiness_and_lookup_preserve_primary_planner_decoder_contract(self) -> None:
-        from types import SimpleNamespace
+    def test_readiness_and_need_first_preserve_primary_planner_decoder_contract(self) -> None:
         from jsonschema import Draft202012Validator
         from agent.app.planner_schema import (
-            canonical_plan_response_schema, capability_lookup_response_schema,
+            canonical_plan_response_schema, need_first_response_schema,
             planner_readiness_response_schema,
         )
 
@@ -177,9 +176,8 @@ class SGLangProtocolTests(unittest.TestCase):
             planner_tier="fast", expected_goal_ids=["goal:water"],
             allowed_capability_ids=["resource.deliver"], requires_execution=True,
         )
-        schema = capability_lookup_response_schema(
-            planner_readiness_response_schema(base, ["goal:water"]),
-            [SimpleNamespace(capability_id="resource.deliver")],
+        schema = need_first_response_schema(
+            planner_readiness_response_schema(base, ["goal:water"]), ["resource.deliver"],
         )
         payload = build_sglang_chat_payload(
             model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
@@ -203,13 +201,19 @@ class SGLangProtocolTests(unittest.TestCase):
         visit(wire)
         self.assertTrue(arrays)
         self.assertTrue(all("items" in item for item in arrays))
-        for value in (
-            {"requested_capability_ids": ["resource.deliver"]},
-            {"requested_capability_ids": []},
-            {"requested_capability_ids": ["invented"]},
-        ):
-            self.assertEqual(Draft202012Validator(schema).is_valid(value),
-                             Draft202012Validator(wire).is_valid(value))
+        shapes = [shape for shape in (wire, *wire.get("oneOf", []), *wire.get("anyOf", []))
+                  if isinstance(shape, dict) and "properties" in shape]
+        self.assertTrue(shapes)
+        for shape in shapes:
+            self.assertEqual(next(iter(shape["properties"])), "ability_needs")
+            self.assertIn("ability_needs", shape["required"])
+            closest = shape["properties"]["ability_needs"]["items"]["properties"]["closest_loaded"]
+            self.assertEqual(closest["enum"], ["resource.deliver", "none"])
+        need = {"need": "bring water to the person", "closest_loaded": "resource.deliver",
+                "closest_loaded_does": "Deliver a resource", "fits": True}
+        item_schema = shapes[0]["properties"]["ability_needs"]
+        for value, expected in (([need], True), ([{**need, "closest_loaded": "invented"}], False), ([need] * 5, False)):
+            self.assertEqual(Draft202012Validator(item_schema).is_valid(value), expected)
 
     def test_compact_formatting_is_scoped_without_mutating_contract(self) -> None:
         for title in (

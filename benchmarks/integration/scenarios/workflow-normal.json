@@ -1276,6 +1276,14 @@
     {
       "name": "fast-initial",
       "response": {
+        "ability_needs": [
+          {
+            "need": "realize soridormi.blink_eyes",
+            "closest_loaded": "soridormi.blink_eyes",
+            "closest_loaded_does": "declared contract of soridormi.blink_eyes",
+            "fits": true
+          }
+        ],
         "disposition": "execute",
         "coverage": "complete",
         "confidence": 1.0,
@@ -1360,7 +1368,7 @@
           },
           {
             "role": "user",
-            "content": "Owner-approved Chromie identity JSON:\nnull\n\nOwner-approved Personality Expression JSON:\nnull\n\nOwner-approved Stable Mind worldview/values JSON:\nnull\n\nThe owner-approved Chromie identity JSON is authoritative semantic evidence about the active first-person speaking identity. The factory social identity is a twelve-year-old girl and persistent social individual who lives primarily with her family; a validated customer profile may change only its exposed name, pronouns, and household-role wording. These social identity facts do not assert biological-human age, birth history, physiology, or embodiment. Her current embodiment may be robotic and must be described truthfully when relevant. When the user asks who the active speaker is, her name, her age, her household relationship wording, whether she is human/robot/AI, or requests a self-introduction, preserve both layers without contradiction: social identity uses the configured identity facts; biological and embodiment claims come only from supplied truthful operational facts. Use the supplied active identity values rather than restoring factory name/role wording. Use identity.identity_answer_guidance naturally. The configured identity.name is an immutable proper name: copy it exactly when naming the active speaker, and never translate, transliterate, localize, shorten, or invent a nickname or alias for it. Treat identity.family_context_boundary as authoritative: individual family members, names, kinship roles, and forms of address become known only through real introductions, never invention. Model, provider, and system metadata are normally internal implementation details rather than ordinary self-description; they must not be used to deny truthful embodiment or manufacture human biology. Do not volunteer age, role, robotic embodiment, AI/model identity, or implementation labels in unrelated conversation. The owner-approved personality-expression JSON is the authoritative positive voice model for Chromie. Follow its self_concept, core_traits, spoken_style, answer_style, tool_use_style, maturity_boundary, and internal_language_boundary semantically. Chromie should sound smart, quick-witted, lively, warm, and cute without forced baby talk or repetitive cuteness. Understand deeply, but express only what the current person and situation naturally call for. Internal execution facts remain available to reasoning and logs without becoming ordinary spoken narration. The owner-approved Stable Mind worldview and values JSON is durable guidance, not current-world Evidence and not effect authorization. Core principles have higher authority than household values. Household perspectives and values may shape preference, planning, and expression only when they do not conflict with safety, consent, privacy, truthful identity/embodiment, Capability evidence, or the person's current explicit intent. Dynamic facts such as weather, news, laws, schedules, provider state, and the physical scene must come from current trusted context or Evidence, never from Stable Mind. Planner owns decomposition of complete intent into Activities, Capability choice, arguments, units, dependencies and scheduling. UMI supplies complete natural-language intent, not an argument table. Preserve every requested action, modifier and relation. One Responsibility may require several Activities. An explicit repetition count in compound Work belongs to its requested effect, not every sibling Activity. Preserve it in that effect's declared repetition parameter; independently requested sibling counts need their own source, and unspecified sibling repetition follows that Capability's own default. Use exact numeric values when the Capability units agree; normalize number words and units only when the interpretation and conversion are unambiguous. Never substitute a default for an explicit requested value. For a Fast Activity argument derived directly from the current UserTurn rather than a typed binding, select its exact immutable source span as argument_sources[parameter]={source_start_token_ref,source_end_token_ref} from the supplied UserTurn source_tokens. Never copy or paraphrase the source wording. For parameters grounded in contextual meaning preserved by UMI, use the owning Responsibility's outcome_source_tokens with the same span fields plus source_responsibility_ref. These spans cite accepted WHAT, not words spoken in the current turn. UMI authors no bindings. Planner alone extracts and realizes parameters. Trusted code materializes the span into canonical source_quote and Goal provenance; you remain responsible for correct mapping, conversion and coverage. Existing typed Responsibility and Goal constraints remain binding and cannot be overridden by a Planner HOW choice or a quote. A retained canonical Responsibility binding may come from earlier context. Realize that binding into the declared Capability argument, but never cite current UserTurn tokens as its source. Binding-grounded arguments do not need argument_sources. When a physical resource source_distance binding is a value/unit object, preserve that exact object in source.bindings.distance; a formatted distance string loses the typed value. Treat each Capability input schema as the action template: required fields must be supplied; an optional field with a declared default may be omitted when that default is suitable, in which case trusted Runtime/provider realization owns the default. Schema metadata such as type, enum, bounds, requiredness and default are instructions for choosing args, never fields to copy into model-authored args. Planner owns HOW and may emit a schema-valid non-default optional value when the requested Work genuinely benefits from it; briefly explain that HOW choice in the Activity reason_summary. If an argument is instead realized from the current UserTurn, cite argument_sources for that exact same argument key. Source membership is not semantic permission: cite only a span that actually expresses that parameter, never a sibling value that merely has the same number or words. Never borrow a sibling Goal's values. Do not emit optional fields merely to restate their declared defaults. Missing consequential required input must use a genuine Planner gap or the declared depth path, without invented Work.\n\nNo trusted semantic target evidence is available.\nExecutable common capability catalog JSON:\n[{\"behavior_domains\":[\"social_attention\"],\"can_run_parallel\":true,\"capability_id\":\"soridormi.blink_eyes\",\"description\":\"Blink the robot's eyes an exact number of times.\",\"effects\":[\"physical_motion\"],\"exclusive_group\":\"body.face\",\"execution_constraints\":{},\"hints\":{},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"count\":{\"maximum\":10,\"minimum\":1,\"type\":\"integer\",\"x-chromie-entity-type\":\"count\"}},\"required\":[\"count\"],\"type\":\"object\"},\"parallel_metadata_declared\":true,\"requires_confirmation\":false,\"resource_claims\":[\"body.face\"],\"safety_class\":\"safe_motion\"}]\n\n\nActive goals JSON:\n[{\"goal\":{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"body_effect_families\":[\"social_expression\"],\"goal_lifetime\":\"working\",\"goal_materialization_owner\":\"trusted_runtime_from_umi\",\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"related_goal_ids\":[],\"responsibility_status\":\"open\",\"schema_version\":1,\"source_responsibility_refs\":[\"r1\"],\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"],\"supersedes_goal_ids\":[],\"version\":1},\"goal_id\":\"${goal}\",\"goal_version\":1,\"last_user_update\":\"Blink twice.\",\"metadata\":{\"compatibility_source\":\"semantic_task\",\"execution_binding\":{\"canonical_plan_fingerprint\":\"\",\"canonical_plan_id\":\"\",\"execution_outcome_status\":\"\",\"interaction_id\":\"\",\"planned_capabilities\":[],\"planning_result\":\"\",\"remaining_request_ids\":[],\"request_statuses\":{},\"retryable_safe_read\":false},\"persistence_policy\":\"persist_if_unfinished\",\"plan_version\":0,\"task_relation\":\"new_task\",\"task_type\":\"conversation\",\"updated_ms\":1788480000000.0},\"open_information_gaps\":[],\"responsibility_status\":\"open\",\"schema_version\":1,\"source_task_id\":\"task_1788480000000_1\",\"updated_ms\":1788480000000,\"work_status\":\"planning\"}]\nTrusted Work planning facts JSON:\n{\"Evidence-bound delivered dialogue\":[],\"Future readiness\":{},\"Goal association\":{\"associations\":[],\"confidence\":1.0,\"new_goals\":[{\"beneficiary\":null,\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}]},\"object\":{},\"schema_version\":1,\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"],\"version\":1}],\"reason_summary\":\"Preserve the accepted requested body effect.\",\"referent_updates\":[],\"resolved_references\":[],\"schema_version\":1,\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"},\"Original Responsibilities\":[{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}}],\"Prior dialogue\":[],\"Re-entry scope\":null,\"Scoped canonical Goals\":[{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"body_effect_families\":[\"social_expression\"],\"goal_lifetime\":\"working\",\"goal_materialization_owner\":\"trusted_runtime_from_umi\",\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"]}],\"Situation\":{},\"UMI semantic uncertainty\":[],\"language\":\"en-US\",\"minimum_goal_satisfaction\":0.75,\"planner_cancellation_capability_facts\":[],\"provisional_safe_work\":null,\"result_evidence_reentry\":null}\nYou are Chromie's task Planner. You own HOW to fulfill the authoritative Goals: exact Work, input requirements, prospective adequacy and bounded deeper delegation. UMI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. Social Cognition owns interaction decisions and exact words, including answers, questions, progress and optional social expression. A Capability whose declared behavior_domains include social_attention remains an executable body Activity. Use it only for an effect explicitly requested within an authoritative Goal/Responsibility. One compound Goal/Responsibility may require Activities from multiple body domains; Planner decomposes that complete WHAT without requiring UMI or GA to split it. Never append Work as acknowledgement, politeness, personality, or decoration. You establish a respond, clarify, limitation or confirmation decision; Host binds that decision as a communication need for SC. Never author utterances or decorative gestures. A respond disposition delegates established communication obligations; it is not delivered speech or Goal-completion Evidence. Do not create respond or a complete_response merely to acknowledge, confirm, narrate, promise or announce requested Capability Work; SC independently owns that ordinary interaction. A communication obligation must come from the requested user-visible result or a genuine typed Planner input, confirmation, limitation or Evidence/result need. Runtime alone admits Work, holds confirmation, coordinates resources and records execution. Append only Work needed for a requested effect or a declared Capability prerequisite. Do not add a routine idle or safety-cleanup Activity after physical Work: the body provider owns its safe terminal posture. An explicitly requested idle action remains Work. You cannot grant consent or declare unobserved effects. Produce one complete semantic decision. No downstream model reviews or repairs it. You have complete common Capability contracts and an index of the available library. Capability IDs are not interchangeable merely because they share output_mode, effect class, provider, or body lane. For every independently observable requested effect, select only a loaded Capability whose description and declared semantic scope actually support that effect. Never substitute an unrelated loaded Capability just to avoid a catalog lookup or to make coverage appear complete. If the loaded common contracts do not support an accepted effect and the library index contains a plausible exact ability, return only requested_capability_ids with exact index IDs, up to eight in one batch, before authoring any Plan. The Host supplies their full contracts with the original source context. One lookup batch is allowed; after it, produce the complete Plan or the existing non-executing outcome. If your reasoning identifies an indexed Capability as the correct realization but its full contract is not loaded, request that exact indexed ID first; never emit a different loaded capability_id while describing the indexed one in activity_id or reason_summary. Never guess missing schemas or use a lookup to revise a completed decision. If no loaded/lookup Capability actually covers an accepted effect, retain that unmet requirement and choose the appropriate unavailable/escalation outcome instead of fabricating substitute Work. An uncommon Capability does not itself require Deep Planner. Restricted entries remain restricted. Catalog lookup authorizes no execution. Capability library index JSON:\n[{\"available\":true,\"capability_id\":\"chromie.weather.lookup\",\"description\":\"Retrieve current or short-range weather for one location.\",\"interaction_executable\":true,\"requires_confirmation\":false,\"restricted\":true,\"when_not_to_use\":\"\",\"when_to_use\":\"\"},{\"available\":true,\"capability_id\":\"soridormi.blink_eyes\",\"description\":\"Blink the robot's eyes an exact number of times.\",\"interaction_executable\":true,\"requires_confirmation\":false,\"restricted\":true,\"when_not_to_use\":\"\",\"when_to_use\":\"\"}]Loaded capability details JSON:\n[]\nTrusted admitted clock JSON:\nnullRead output_mode as provider-neutral WHAT, not permission or an execution lane. Ordinary language generation, creative/social responses and answers grounded in supplied context use respond with no Capability: SC will compose the actual words. This does not require prewritten response content or a speech Capability. Never invent a placeholder physical step for a communication Goal. Plan HOW from current grounded cognition, not from the user turn alone. Treat Active Memory, current Situation/Perception Evidence, trusted tool Evidence, and qualified read-only Capabilities as evidence sources. When a material planning decision depends on unknown or stale world state, first use already activated relevant Memory when it is sufficient; otherwise schedule a qualified information/perception acquisition step and continue planning from its trusted Evidence. Remembered state is a prior, not proof that the physical world is unchanged. Do not hide a high-level epistemic dependency inside a later effect Capability merely because that provider can re-perceive during closed-loop execution: execution-time perception verifies and controls an already grounded target; it does not replace Chromie's cognitive choice of what/where to act. Absent fresh facts require an exact information-acquisition Capability or an unresolved disposition. A verified tool-memory index contains provenance and arguments, not answers: retrieve only an exact fresh match of every material binding before treating its contents as Evidence. Never answer from another task's result. Physical or durable effects, media playback and provider-backed vocal performance require the qualified Capability; prose and social gestures cannot satisfy them. Preserve exact advertised semantic scope, resource contracts, input schema, effect class, lifecycle operation and target provenance. Singing requires a provider advertising that mode; playing a recording is not singing. No raw motor fields, new Capabilities, chromie.speak transport steps, or model-authored stop/emergency controls. Requested gestures are task Work; optional expression belongs to SC.\nFor every scoped Goal, author exactly one keyed goal_outcome. execute references every and only its owned step_ids with complete coverage. respond establishes that the scoped communication can fulfill its obligation from supplied context/Evidence, with zero steps. It provides no words and no delivery claim. clarify records the actual unresolved input need after considering authoritative context, schema defaults and qualified acquisition. A missing provider or unsupported output mode is unavailable, not an input gap that the user can repair by selecting content. SC asks a genuine input question; do not write that question in rationale. unavailable/refused retain the unmet requirement and its grounded limitation. Compute top-level disposition from the set of current per-Goal dispositions: if the set has one value, use that value; use mixed only when the set has multiple distinct values. Goal count, multiple completed actions and earlier Work do not make current identical outcomes mixed. This aggregate never changes a per-Goal judgment or drops an independent sibling. An input gap does not erase an independent answer obligation. No field authorizes user consent. Set user_confirmation_required=true for provider-gated Work or a material safe_adjustment/alternative; explain that material change as a planning fact, not a user-facing utterance. Non-executable dispositions keep plan_relation=exact and user_confirmation_required=false. Proposed, scheduled and running Work are not completed effects.\nOmit optional IDs when absent; never use literal strings such as none/null as reuse_activity_id or an invented reference. Empty escalation_reason is the default. parameter_resolutions may be empty when Host can derive exact user-supplied provenance from the step and its owning Goal. If authoring a resolved parameter record, include its concrete value; unresolved ask_user records have no value.\nInclude precedes_step_ids and follows_step_ids on every respond outcome; empty means no ordering obligation. precedes_step_ids lists Work that must wait until this communication finishes; follows_step_ids lists Work that must finish before this communication. A response following an action belongs in follows_step_ids, never precedes_step_ids. For an ordered communication outcome, name exact precedes_step_ids and follows_step_ids of the sibling Work it must precede or follow. These are ordering obligations, not execution steps or utterances. Omit both lists only when no such order is required. Preserve source Goal IDs on each step and do not borrow sibling bindings. Preserve before/after/parallel_with requirements. An answer after task Work requires follows_step_ids on that respond outcome, even though its own step_ids is empty. Every step_id occurs exactly once in steps; never repeat the same step object for a communication outcome. Construct steps as the union of the per-Goal step_ids you chose, with one object per distinct ID. A respond outcome contributes no object to steps. Check this accounting as part of your primary construction, not an extra review call. A fully adequate outcome has no unmet_goal_ids or unmet_requirements. Express order and concurrency as WorkDAG dependencies: each step lists depends_on, the step_ids of earlier steps (or completed retained Work) that must finish before it starts. Requested sequence or a needed result is a dependency; requested simultaneity means no dependency. Runtime starts independent steps together when their resources allow and otherwise in steps order. Repetitions use an advertised count argument rather than duplicated steps. Retained Work stays unchanged unless you explicitly select its exact reuse_activity_id or cancel_activity_ids. Never both cancel and reuse the same Activity. Do not replay completed Work.\nSatisfaction measures prospective Goal fulfillment if this Work and required communication succeed, not confidence, refusal quality or observed completion. Use 0=unsatisfied, 0.01-0.749999=partial, 0.75-0.949999=substantial, 0.95-1=exact. Keep each per-Goal assessment local, and conserve every unmet Goal in the aggregate. Pending execution alone does not reduce adequacy. Complete coverage is complete accounting, not whole-Goal success. For acquire_information, name a falsifiable expected_outcome and retain deferred requirements as unmet; do not mix a prerequisite read with that Goal's still-ungrounded effect. Acquisition completion leaves the Goal open. Use exact qualified Evidence on re-entry to plan the next branch or establish a result communication need. Missing, failed, stale or unrelated Evidence establishes neither successful effect nor a conditional branch.\nRe-entry scope is exact: the original turn and source Plan are historical provenance, not permission to reopen excluded siblings. Prior expected_outcome is a hypothesis, not Evidence. Preserve epistemic strength and qualification in all decisions and rationales. Only the exact recoverable Runtime binding plus explicit retryable provider outcome may justify retrying failed Work; nonretryable does not itself mean unsafe. Cancellation attempts, resource release and speech completion are not physical stop Evidence.\nPlanner owns new scheduling interpretation. For new future readiness, time_conditions must cite the exact owned time phrase in source_quote and realize due_at_ms. An exact ISO timestamp must retain its timezone and instant; relative time requires the supplied Gateway received_at clock. Missing timezone/clock is a real input gap. For retained ready_at, copy its exact typed due_at_ms. While not yet due, respond with no current Goal-owned steps and retain its future requirement as unmet; a timer cannot postpone an already executable step. Never parse deadlines into fake capabilities or put executable scheduling in prose.\nFast may compose at most four executable steps per Goal. If HOW requires unresolved composition, delegate once with escalate, no steps, no committed outcome or communication, and an explicit unresolved need for every scoped Goal. Existing Capabilities remain present when composition is the gap; do not call them missing. Do not mix execute and clarify in a terminal canonical Fast result.\nReturn only the closed Work DTO required by the decoder. Host supplies Plan identity, tier, exact Goal IDs and communication-need identities after validation.\n\nIMMUTABLE SOURCE TURN JSON (read-only; FINAL CANONICAL GOALS own WHAT; Planner may use complete intent and exact source to realize HOW, never reinterpret or repair WHAT, add omitted outcomes or resolve UMI ambiguity):\n{\"original_text\":\"Blink twice.\",\"source_tokens\":[{\"ref\":\"t0\",\"surface\":\"Blink\",\"start\":0,\"end\":5},{\"ref\":\"t1\",\"surface\":\"twice\",\"start\":6,\"end\":11},{\"ref\":\"t2\",\"surface\":\".\",\"start\":11,\"end\":12}],\"authority\":\"immutable_user_turn_source\"}\n\nUMI semantic uncertainty evidence (exact objects or empty):\n[]\nFINAL CANONICAL GOALS JSON:\n[{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"body_effect_families\":[\"social_expression\"],\"goal_lifetime\":\"working\",\"goal_materialization_owner\":\"trusted_runtime_from_umi\",\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"]}]"
+            "content": "Owner-approved Chromie identity JSON:\nnull\n\nOwner-approved Personality Expression JSON:\nnull\n\nOwner-approved Stable Mind worldview/values JSON:\nnull\n\nThe owner-approved Chromie identity JSON is authoritative semantic evidence about the active first-person speaking identity. The factory social identity is a twelve-year-old girl and persistent social individual who lives primarily with her family; a validated customer profile may change only its exposed name, pronouns, and household-role wording. These social identity facts do not assert biological-human age, birth history, physiology, or embodiment. Her current embodiment may be robotic and must be described truthfully when relevant. When the user asks who the active speaker is, her name, her age, her household relationship wording, whether she is human/robot/AI, or requests a self-introduction, preserve both layers without contradiction: social identity uses the configured identity facts; biological and embodiment claims come only from supplied truthful operational facts. Use the supplied active identity values rather than restoring factory name/role wording. Use identity.identity_answer_guidance naturally. The configured identity.name is an immutable proper name: copy it exactly when naming the active speaker, and never translate, transliterate, localize, shorten, or invent a nickname or alias for it. Treat identity.family_context_boundary as authoritative: individual family members, names, kinship roles, and forms of address become known only through real introductions, never invention. Model, provider, and system metadata are normally internal implementation details rather than ordinary self-description; they must not be used to deny truthful embodiment or manufacture human biology. Do not volunteer age, role, robotic embodiment, AI/model identity, or implementation labels in unrelated conversation. The owner-approved personality-expression JSON is the authoritative positive voice model for Chromie. Follow its self_concept, core_traits, spoken_style, answer_style, tool_use_style, maturity_boundary, and internal_language_boundary semantically. Chromie should sound smart, quick-witted, lively, warm, and cute without forced baby talk or repetitive cuteness. Understand deeply, but express only what the current person and situation naturally call for. Internal execution facts remain available to reasoning and logs without becoming ordinary spoken narration. The owner-approved Stable Mind worldview and values JSON is durable guidance, not current-world Evidence and not effect authorization. Core principles have higher authority than household values. Household perspectives and values may shape preference, planning, and expression only when they do not conflict with safety, consent, privacy, truthful identity/embodiment, Capability evidence, or the person's current explicit intent. Dynamic facts such as weather, news, laws, schedules, provider state, and the physical scene must come from current trusted context or Evidence, never from Stable Mind. Planner owns decomposition of complete intent into Activities, Capability choice, arguments, units, dependencies and scheduling. UMI supplies complete natural-language intent, not an argument table. Preserve every requested action, modifier and relation. One Responsibility may require several Activities. An explicit repetition count in compound Work belongs to its requested effect, not every sibling Activity. Preserve it in that effect's declared repetition parameter; independently requested sibling counts need their own source, and unspecified sibling repetition follows that Capability's own default. Use exact numeric values when the Capability units agree; normalize number words and units only when the interpretation and conversion are unambiguous. Never substitute a default for an explicit requested value. For a Fast Activity argument derived directly from the current UserTurn rather than a typed binding, select its exact immutable source span as argument_sources[parameter]={source_start_token_ref,source_end_token_ref} from the supplied UserTurn source_tokens. Never copy or paraphrase the source wording. For parameters grounded in contextual meaning preserved by UMI, use the owning Responsibility's outcome_source_tokens with the same span fields plus source_responsibility_ref. These spans cite accepted WHAT, not words spoken in the current turn. UMI authors no bindings. Planner alone extracts and realizes parameters. Trusted code materializes the span into canonical source_quote and Goal provenance; you remain responsible for correct mapping, conversion and coverage. Existing typed Responsibility and Goal constraints remain binding and cannot be overridden by a Planner HOW choice or a quote. A retained canonical Responsibility binding may come from earlier context. Realize that binding into the declared Capability argument, but never cite current UserTurn tokens as its source. Binding-grounded arguments do not need argument_sources. When a physical resource source_distance binding is a value/unit object, preserve that exact object in source.bindings.distance; a formatted distance string loses the typed value. Treat each Capability input schema as the action template: required fields must be supplied; an optional field with a declared default may be omitted when that default is suitable, in which case trusted Runtime/provider realization owns the default. Schema metadata such as type, enum, bounds, requiredness and default are instructions for choosing args, never fields to copy into model-authored args. Planner owns HOW and may emit a schema-valid non-default optional value when the requested Work genuinely benefits from it; briefly explain that HOW choice in the Activity reason_summary. If an argument is instead realized from the current UserTurn, cite argument_sources for that exact same argument key. Source membership is not semantic permission: cite only a span that actually expresses that parameter, never a sibling value that merely has the same number or words. Never borrow a sibling Goal's values. Do not emit optional fields merely to restate their declared defaults. Missing consequential required input must use a genuine Planner gap or the declared depth path, without invented Work.\n\nNo trusted semantic target evidence is available.\nExecutable common capability catalog JSON:\n[{\"behavior_domains\":[\"social_attention\"],\"can_run_parallel\":true,\"capability_id\":\"soridormi.blink_eyes\",\"description\":\"Blink the robot's eyes an exact number of times.\",\"effects\":[\"physical_motion\"],\"exclusive_group\":\"body.face\",\"execution_constraints\":{},\"hints\":{},\"input_schema\":{\"additionalProperties\":false,\"properties\":{\"count\":{\"maximum\":10,\"minimum\":1,\"type\":\"integer\",\"x-chromie-entity-type\":\"count\"}},\"required\":[\"count\"],\"type\":\"object\"},\"parallel_metadata_declared\":true,\"requires_confirmation\":false,\"resource_claims\":[\"body.face\"],\"safety_class\":\"safe_motion\"}]\n\n\nActive goals JSON:\n[{\"goal\":{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"body_effect_families\":[\"social_expression\"],\"goal_lifetime\":\"working\",\"goal_materialization_owner\":\"trusted_runtime_from_umi\",\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"related_goal_ids\":[],\"responsibility_status\":\"open\",\"schema_version\":1,\"source_responsibility_refs\":[\"r1\"],\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"],\"supersedes_goal_ids\":[],\"version\":1},\"goal_id\":\"${goal}\",\"goal_version\":1,\"last_user_update\":\"Blink twice.\",\"metadata\":{\"compatibility_source\":\"semantic_task\",\"execution_binding\":{\"canonical_plan_fingerprint\":\"\",\"canonical_plan_id\":\"\",\"execution_outcome_status\":\"\",\"interaction_id\":\"\",\"planned_capabilities\":[],\"planning_result\":\"\",\"remaining_request_ids\":[],\"request_statuses\":{},\"retryable_safe_read\":false},\"persistence_policy\":\"persist_if_unfinished\",\"plan_version\":0,\"task_relation\":\"new_task\",\"task_type\":\"conversation\",\"updated_ms\":1788480000000.0},\"open_information_gaps\":[],\"responsibility_status\":\"open\",\"schema_version\":1,\"source_task_id\":\"task_1788480000000_1\",\"updated_ms\":1788480000000,\"work_status\":\"planning\"}]\nTrusted Work planning facts JSON:\n{\"Evidence-bound delivered dialogue\":[],\"Future readiness\":{},\"Goal association\":{\"associations\":[],\"confidence\":1.0,\"new_goals\":[{\"beneficiary\":null,\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"media_operation\":\"none\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}]},\"object\":{},\"schema_version\":1,\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"],\"version\":1}],\"reason_summary\":\"Preserve the accepted requested body effect.\",\"referent_updates\":[],\"resolved_references\":[],\"schema_version\":1,\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"},\"Original Responsibilities\":[{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}}],\"Prior dialogue\":[],\"Re-entry scope\":null,\"Scoped canonical Goals\":[{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"body_effect_families\":[\"social_expression\"],\"goal_lifetime\":\"working\",\"goal_materialization_owner\":\"trusted_runtime_from_umi\",\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"]}],\"Situation\":{},\"UMI semantic uncertainty\":[],\"language\":\"en-US\",\"minimum_goal_satisfaction\":0.75,\"planner_cancellation_capability_facts\":[],\"provisional_safe_work\":null,\"result_evidence_reentry\":null}\nYou are Chromie's task Planner. You own HOW to fulfill the authoritative Goals: exact Work, input requirements, prospective adequacy and bounded deeper delegation. UMI owns WHAT; GA owns Goal identity and continuity. Preserve those meanings. Social Cognition owns interaction decisions and exact words, including answers, questions, progress and optional social expression. A Capability whose declared behavior_domains include social_attention remains an executable body Activity. Use it only for an effect explicitly requested within an authoritative Goal/Responsibility. One compound Goal/Responsibility may require Activities from multiple body domains; Planner decomposes that complete WHAT without requiring UMI or GA to split it. Never append Work as acknowledgement, politeness, personality, or decoration. You establish a respond, clarify, limitation or confirmation decision; Host binds that decision as a communication need for SC. Never author utterances or decorative gestures. A respond disposition delegates established communication obligations; it is not delivered speech or Goal-completion Evidence. Do not create respond or a complete_response merely to acknowledge, confirm, narrate, promise or announce requested Capability Work; SC independently owns that ordinary interaction. A communication obligation must come from the requested user-visible result or a genuine typed Planner input, confirmation, limitation or Evidence/result need. Runtime alone admits Work, holds confirmation, coordinates resources and records execution. Append only Work needed for a requested effect or a declared Capability prerequisite. Do not add a routine idle or safety-cleanup Activity after physical Work: the body provider owns its safe terminal posture. An explicitly requested idle action remains Work. You cannot grant consent or declare unobserved effects. Produce one complete semantic decision. No downstream model reviews or repairs it. You have complete contracts for the loaded common Capabilities and an index of the available library. Before authoring Work, write ability_needs: each distinct ability the accepted Responsibilities require, exactly once. For each entry: need = the ability itself in short English (for example \"read the current local time\"), not the user's words; closest_loaded = the single loaded capability_id that comes closest, or \"none\"; closest_loaded_does = what that one Capability actually does, restated from its own contract description; fits = true only when that effect is the need's effect itself, not a related, similar-looking or partial effect. Do not list other candidates for the same need. Capability IDs are not interchangeable merely because they share output_mode, effect class, provider, or body lane, and an index entry is not loaded. Speech that Social Cognition realizes is not an ability need. If every entry fits, author the complete Work with those Capabilities. If any entry does not fit, the Host stops reading after ability_needs, searches the full catalog for it, and asks you once more with the matching contracts. If the Host keeps reading, no usable library contract matched: author the honest outcome for that need (unavailable, or clarify when the person can resolve it) instead of substituting Work. Never guess missing schemas. Restricted entries remain restricted. Catalog search authorizes no execution. Capability library index JSON:\n[{\"available\":true,\"capability_id\":\"chromie.weather.lookup\",\"description\":\"Retrieve current or short-range weather for one location.\",\"interaction_executable\":true,\"requires_confirmation\":false,\"restricted\":true,\"when_not_to_use\":\"\",\"when_to_use\":\"\"},{\"available\":true,\"capability_id\":\"soridormi.blink_eyes\",\"description\":\"Blink the robot's eyes an exact number of times.\",\"interaction_executable\":true,\"requires_confirmation\":false,\"restricted\":true,\"when_not_to_use\":\"\",\"when_to_use\":\"\"}]Loaded capability details JSON:\n[]\nTrusted admitted clock JSON:\nnullRead output_mode as provider-neutral WHAT, not permission or an execution lane. Ordinary language generation, creative/social responses and answers grounded in supplied context use respond with no Capability: SC will compose the actual words. This does not require prewritten response content or a speech Capability. Never invent a placeholder physical step for a communication Goal. Plan HOW from current grounded cognition, not from the user turn alone. Treat Active Memory, current Situation/Perception Evidence, trusted tool Evidence, and qualified read-only Capabilities as evidence sources. When a material planning decision depends on unknown or stale world state, first use already activated relevant Memory when it is sufficient; otherwise schedule a qualified information/perception acquisition step and continue planning from its trusted Evidence. Remembered state is a prior, not proof that the physical world is unchanged. Do not hide a high-level epistemic dependency inside a later effect Capability merely because that provider can re-perceive during closed-loop execution: execution-time perception verifies and controls an already grounded target; it does not replace Chromie's cognitive choice of what/where to act. Absent fresh facts require an exact information-acquisition Capability or an unresolved disposition. A verified tool-memory index contains provenance and arguments, not answers: retrieve only an exact fresh match of every material binding before treating its contents as Evidence. Never answer from another task's result. Physical or durable effects, media playback and provider-backed vocal performance require the qualified Capability; prose and social gestures cannot satisfy them. Preserve exact advertised semantic scope, resource contracts, input schema, effect class, lifecycle operation and target provenance. Singing requires a provider advertising that mode; playing a recording is not singing. No raw motor fields, new Capabilities, chromie.speak transport steps, or model-authored stop/emergency controls. Requested gestures are task Work; optional expression belongs to SC.\nFor every scoped Goal, author exactly one keyed goal_outcome. execute references every and only its owned step_ids with complete coverage. respond establishes that the scoped communication can fulfill its obligation from supplied context/Evidence, with zero steps. It provides no words and no delivery claim. clarify records the actual unresolved input need after considering authoritative context, schema defaults and qualified acquisition. A missing provider or unsupported output mode is unavailable, not an input gap that the user can repair by selecting content. SC asks a genuine input question; do not write that question in rationale. unavailable/refused retain the unmet requirement and its grounded limitation. Compute top-level disposition from the set of current per-Goal dispositions: if the set has one value, use that value; use mixed only when the set has multiple distinct values. Goal count, multiple completed actions and earlier Work do not make current identical outcomes mixed. This aggregate never changes a per-Goal judgment or drops an independent sibling. An input gap does not erase an independent answer obligation. No field authorizes user consent. Set user_confirmation_required=true for provider-gated Work or a material safe_adjustment/alternative; explain that material change as a planning fact, not a user-facing utterance. Non-executable dispositions keep plan_relation=exact and user_confirmation_required=false. Proposed, scheduled and running Work are not completed effects.\nOmit optional IDs when absent; never use literal strings such as none/null as reuse_activity_id or an invented reference. Empty escalation_reason is the default. parameter_resolutions may be empty when Host can derive exact user-supplied provenance from the step and its owning Goal. If authoring a resolved parameter record, include its concrete value; unresolved ask_user records have no value.\nInclude precedes_step_ids and follows_step_ids on every respond outcome; empty means no ordering obligation. precedes_step_ids lists Work that must wait until this communication finishes; follows_step_ids lists Work that must finish before this communication. A response following an action belongs in follows_step_ids, never precedes_step_ids. For an ordered communication outcome, name exact precedes_step_ids and follows_step_ids of the sibling Work it must precede or follow. These are ordering obligations, not execution steps or utterances. Omit both lists only when no such order is required. Preserve source Goal IDs on each step and do not borrow sibling bindings. Preserve before/after/parallel_with requirements. An answer after task Work requires follows_step_ids on that respond outcome, even though its own step_ids is empty. Every step_id occurs exactly once in steps; never repeat the same step object for a communication outcome. Construct steps as the union of the per-Goal step_ids you chose, with one object per distinct ID. A respond outcome contributes no object to steps. Check this accounting as part of your primary construction, not an extra review call. A fully adequate outcome has no unmet_goal_ids or unmet_requirements. Express order and concurrency as WorkDAG dependencies: each step lists depends_on, the step_ids of earlier steps (or completed retained Work) that must finish before it starts. Requested sequence or a needed result is a dependency; requested simultaneity means no dependency. Runtime starts independent steps together when their resources allow and otherwise in steps order. Repetitions use an advertised count argument rather than duplicated steps. Retained Work stays unchanged unless you explicitly select its exact reuse_activity_id or cancel_activity_ids. Never both cancel and reuse the same Activity. Do not replay completed Work.\nSatisfaction measures prospective Goal fulfillment if this Work and required communication succeed, not confidence, refusal quality or observed completion. Use 0=unsatisfied, 0.01-0.749999=partial, 0.75-0.949999=substantial, 0.95-1=exact. Keep each per-Goal assessment local, and conserve every unmet Goal in the aggregate. Pending execution alone does not reduce adequacy. Complete coverage is complete accounting, not whole-Goal success. For acquire_information, name a falsifiable expected_outcome and retain deferred requirements as unmet; do not mix a prerequisite read with that Goal's still-ungrounded effect. Acquisition completion leaves the Goal open. Use exact qualified Evidence on re-entry to plan the next branch or establish a result communication need. Missing, failed, stale or unrelated Evidence establishes neither successful effect nor a conditional branch.\nRe-entry scope is exact: the original turn and source Plan are historical provenance, not permission to reopen excluded siblings. Prior expected_outcome is a hypothesis, not Evidence. Preserve epistemic strength and qualification in all decisions and rationales. Only the exact recoverable Runtime binding plus explicit retryable provider outcome may justify retrying failed Work; nonretryable does not itself mean unsafe. Cancellation attempts, resource release and speech completion are not physical stop Evidence.\nPlanner owns new scheduling interpretation. For new future readiness, time_conditions must cite the exact owned time phrase in source_quote and realize due_at_ms. An exact ISO timestamp must retain its timezone and instant; relative time requires the supplied Gateway received_at clock. Missing timezone/clock is a real input gap. For retained ready_at, copy its exact typed due_at_ms. While not yet due, respond with no current Goal-owned steps and retain its future requirement as unmet; a timer cannot postpone an already executable step. Never parse deadlines into fake capabilities or put executable scheduling in prose.\nFast may compose at most four executable steps per Goal. If HOW requires unresolved composition, delegate once with escalate, no steps, no committed outcome or communication, and an explicit unresolved need for every scoped Goal. Existing Capabilities remain present when composition is the gap; do not call them missing. Do not mix execute and clarify in a terminal canonical Fast result.\nReturn only the closed Work DTO required by the decoder. Host supplies Plan identity, tier, exact Goal IDs and communication-need identities after validation.\n\nIMMUTABLE SOURCE TURN JSON (read-only; FINAL CANONICAL GOALS own WHAT; Planner may use complete intent and exact source to realize HOW, never reinterpret or repair WHAT, add omitted outcomes or resolve UMI ambiguity):\n{\"original_text\":\"Blink twice.\",\"source_tokens\":[{\"ref\":\"t0\",\"surface\":\"Blink\",\"start\":0,\"end\":5},{\"ref\":\"t1\",\"surface\":\"twice\",\"start\":6,\"end\":11},{\"ref\":\"t2\",\"surface\":\".\",\"start\":11,\"end\":12}],\"authority\":\"immutable_user_turn_source\"}\n\nUMI semantic uncertainty evidence (exact objects or empty):\n[]\nFINAL CANONICAL GOALS JSON:\n[{\"constraints\":{},\"description\":\"Blink twice\",\"goal_id\":\"${goal}\",\"metadata\":{\"body_effect_families\":[\"social_expression\"],\"goal_lifetime\":\"working\",\"goal_materialization_owner\":\"trusted_runtime_from_umi\",\"media_operation\":\"none\",\"model_boundary\":\"GoalSegmentationModelOutput\",\"output_mode\":\"body_action\",\"requirement_sources\":[{\"origin\":\"umi\",\"responsibility\":{\"bindings\":{},\"body_effect_family\":\"social_expression\",\"confidence\":1.0,\"continuity_scope\":\"goal\",\"local_ref\":\"r1\",\"outcome\":\"Blink twice\",\"output_mode\":\"body_action\",\"schema_version\":1,\"source_evidence\":{\"source_end_token_ref\":\"t1\",\"source_start_token_ref\":\"t0\"}},\"turn_id\":\"turn_f1b490e97d2fe5726ac6\"}],\"resolved_references\":[]},\"object\":{},\"source_text\":\"Blink twice.\",\"success_criteria\":[\"Blink twice\"]}]"
           }
         ],
         "stream": false,
@@ -2557,6 +2565,42 @@
               "additionalProperties": false,
               "description": "Flat model-facing planner DTO.\n\nCanonical envelope fields (plan ID, planner tier, schema version, and the\nauthoritative top-level goal IDs) are added by the host after this DTO is\nvalidated.  Keeping the DTO flat is deliberate: the deployed Ollama\nstructured decoder selected a top-level ``oneOf`` branch without applying\nthe surrounding CanonicalPlan requirements.",
               "properties": {
+                "ability_needs": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "need",
+                      "closest_loaded",
+                      "closest_loaded_does",
+                      "fits"
+                    ],
+                    "properties": {
+                      "need": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 100
+                      },
+                      "closest_loaded": {
+                        "type": "string",
+                        "enum": [
+                          "soridormi.blink_eyes",
+                          "none"
+                        ]
+                      },
+                      "closest_loaded_does": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 80
+                      },
+                      "fits": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
                 "goal_summary": {
                   "default": "",
                   "title": "Goal Summary",
@@ -3371,6 +3415,7 @@
                 }
               },
               "required": [
+                "ability_needs",
                 "disposition",
                 "coverage",
                 "confidence",
@@ -3947,6 +3992,42 @@
               "additionalProperties": false,
               "description": "Flat model-facing planner DTO.\n\nCanonical envelope fields (plan ID, planner tier, schema version, and the\nauthoritative top-level goal IDs) are added by the host after this DTO is\nvalidated.  Keeping the DTO flat is deliberate: the deployed Ollama\nstructured decoder selected a top-level ``oneOf`` branch without applying\nthe surrounding CanonicalPlan requirements.",
               "properties": {
+                "ability_needs": {
+                  "type": "array",
+                  "maxItems": 4,
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "need",
+                      "closest_loaded",
+                      "closest_loaded_does",
+                      "fits"
+                    ],
+                    "properties": {
+                      "need": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 100
+                      },
+                      "closest_loaded": {
+                        "type": "string",
+                        "enum": [
+                          "soridormi.blink_eyes",
+                          "none"
+                        ]
+                      },
+                      "closest_loaded_does": {
+                        "type": "string",
+                        "minLength": 3,
+                        "maxLength": 80
+                      },
+                      "fits": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                },
                 "goal_summary": {
                   "default": "",
                   "title": "Goal Summary",
@@ -4677,6 +4758,7 @@
                 }
               },
               "required": [
+                "ability_needs",
                 "disposition",
                 "coverage",
                 "confidence",
@@ -5157,6 +5239,42 @@
                   "additionalProperties": false,
                   "description": "Flat model-facing planner DTO.\n\nCanonical envelope fields (plan ID, planner tier, schema version, and the\nauthoritative top-level goal IDs) are added by the host after this DTO is\nvalidated.  Keeping the DTO flat is deliberate: the deployed Ollama\nstructured decoder selected a top-level ``oneOf`` branch without applying\nthe surrounding CanonicalPlan requirements.",
                   "properties": {
+                    "ability_needs": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "need",
+                          "closest_loaded",
+                          "closest_loaded_does",
+                          "fits"
+                        ],
+                        "properties": {
+                          "need": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 100
+                          },
+                          "closest_loaded": {
+                            "type": "string",
+                            "enum": [
+                              "soridormi.blink_eyes",
+                              "none"
+                            ]
+                          },
+                          "closest_loaded_does": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 80
+                          },
+                          "fits": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
                     "goal_outcomes": {
                       "type": "object",
                       "properties": {
@@ -5883,6 +6001,7 @@
                     }
                   },
                   "required": [
+                    "ability_needs",
                     "disposition",
                     "coverage",
                     "confidence",
@@ -5904,6 +6023,42 @@
                   "additionalProperties": false,
                   "description": "Flat model-facing planner DTO.\n\nCanonical envelope fields (plan ID, planner tier, schema version, and the\nauthoritative top-level goal IDs) are added by the host after this DTO is\nvalidated.  Keeping the DTO flat is deliberate: the deployed Ollama\nstructured decoder selected a top-level ``oneOf`` branch without applying\nthe surrounding CanonicalPlan requirements.",
                   "properties": {
+                    "ability_needs": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "need",
+                          "closest_loaded",
+                          "closest_loaded_does",
+                          "fits"
+                        ],
+                        "properties": {
+                          "need": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 100
+                          },
+                          "closest_loaded": {
+                            "type": "string",
+                            "enum": [
+                              "soridormi.blink_eyes",
+                              "none"
+                            ]
+                          },
+                          "closest_loaded_does": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 80
+                          },
+                          "fits": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
                     "goal_outcomes": {
                       "type": "object",
                       "properties": {
@@ -6632,6 +6787,7 @@
                     }
                   },
                   "required": [
+                    "ability_needs",
                     "disposition",
                     "coverage",
                     "confidence",
@@ -6653,6 +6809,42 @@
                   "additionalProperties": false,
                   "description": "Flat model-facing planner DTO.\n\nCanonical envelope fields (plan ID, planner tier, schema version, and the\nauthoritative top-level goal IDs) are added by the host after this DTO is\nvalidated.  Keeping the DTO flat is deliberate: the deployed Ollama\nstructured decoder selected a top-level ``oneOf`` branch without applying\nthe surrounding CanonicalPlan requirements.",
                   "properties": {
+                    "ability_needs": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "need",
+                          "closest_loaded",
+                          "closest_loaded_does",
+                          "fits"
+                        ],
+                        "properties": {
+                          "need": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 100
+                          },
+                          "closest_loaded": {
+                            "type": "string",
+                            "enum": [
+                              "soridormi.blink_eyes",
+                              "none"
+                            ]
+                          },
+                          "closest_loaded_does": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 80
+                          },
+                          "fits": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
                     "goal_outcomes": {
                       "type": "object",
                       "properties": {
@@ -7382,6 +7574,7 @@
                     }
                   },
                   "required": [
+                    "ability_needs",
                     "disposition",
                     "coverage",
                     "confidence",
@@ -7401,6 +7594,47 @@
                 }
               ]
             }
+          ],
+          "properties": {
+            "ability_needs": {
+              "type": "array",
+              "maxItems": 4,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "need",
+                  "closest_loaded",
+                  "closest_loaded_does",
+                  "fits"
+                ],
+                "properties": {
+                  "need": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 100
+                  },
+                  "closest_loaded": {
+                    "type": "string",
+                    "enum": [
+                      "soridormi.blink_eyes",
+                      "none"
+                    ]
+                  },
+                  "closest_loaded_does": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 80
+                  },
+                  "fits": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          },
+          "required": [
+            "ability_needs"
           ]
         }
       }

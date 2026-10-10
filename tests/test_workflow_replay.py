@@ -305,6 +305,7 @@ def test_candidate_http_failure_has_raw_evidence_and_no_reference_fallback():
 def test_supplied_single_goal_outcome_map_must_match_admitted_goal(tier, shape):
     from agent.app.planner_validation import validate_planner_model_output
     raw = copy.deepcopy(load()['model_steps'][2]['response'])
+    raw.pop('ability_needs', None)  # The resolver removes the need-first prefix before DTO validation.
     goal = '${goal}'
     if shape == 'empty': raw['goal_outcomes'] = {}
     if shape == 'missing': raw.pop('goal_outcomes')

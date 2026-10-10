@@ -80,25 +80,24 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS
 
 
-CAPABILITY_LOOKUP_PROMPT = (
-    "You have complete common Capability contracts and an index of the available library. "
-    "Capability IDs are not interchangeable merely because they share output_mode, effect "
-    "class, provider, or body lane. For every independently observable requested effect, "
-    "select only a loaded Capability whose description and declared semantic scope actually "
-    "support that effect. Never substitute an unrelated loaded Capability just to avoid a "
-    "catalog lookup or to make coverage appear complete. If the loaded common contracts do "
-    "not support an accepted effect and the library index contains a plausible exact ability, "
-    "return only requested_capability_ids with exact index IDs, up to eight in one batch, "
-    "before authoring any Plan. The Host supplies their full contracts with the original "
-    "source context. One lookup batch is allowed; after it, produce the complete Plan or the "
-    "existing non-executing outcome. If your reasoning identifies an indexed Capability as "
-    "the correct realization but its full contract is not loaded, request that exact indexed "
-    "ID first; never emit a different loaded capability_id while describing the indexed one "
-    "in activity_id or reason_summary. Never guess missing schemas or use a lookup to revise a "
-    "completed decision. If no loaded/lookup Capability actually covers an accepted effect, "
-    "retain that unmet requirement and choose the appropriate unavailable/escalation outcome "
-    "instead of fabricating substitute Work. An uncommon Capability does not itself require "
-    "Deep Planner. Restricted entries remain restricted. Catalog lookup authorizes no execution. "
+CAPABILITY_NEED_PROMPT = (
+    "You have complete contracts for the loaded common Capabilities and an index of the "
+    "available library. Before authoring Work, write ability_needs: each distinct ability the "
+    "accepted Responsibilities require, exactly once. For each entry: need = the ability itself "
+    "in short English (for example \"read the current local time\"), not the user's words; "
+    "closest_loaded = the single loaded capability_id that comes closest, or \"none\"; "
+    "closest_loaded_does = what that one Capability actually does, restated from its own "
+    "contract description; fits = true only when that effect is the need's effect itself, not a "
+    "related, similar-looking or partial effect. Do not list other candidates for the same need. "
+    "Capability IDs are not interchangeable merely because they share output_mode, effect class, "
+    "provider, or body lane, and an index entry is not loaded. Speech that Social Cognition "
+    "realizes is not an ability need. If every entry fits, author the complete Work with those "
+    "Capabilities. If any entry does not fit, the Host stops reading after ability_needs, "
+    "searches the full catalog for it, and asks you once more with the matching contracts. If "
+    "the Host keeps reading, no usable library contract matched: author the honest outcome for "
+    "that need (unavailable, or clarify when the person can resolve it) instead of substituting "
+    "Work. Never guess missing schemas. Restricted entries remain restricted. Catalog search "
+    "authorizes no execution. "
 )
 
 EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT = (
@@ -569,7 +568,7 @@ def _canonical_work_prompt(
         )
 
     sections.append(
-        "\n" + PLANNER_WORK_AUTHORITY_PROMPT + CAPABILITY_LOOKUP_PROMPT +
+        "\n" + PLANNER_WORK_AUTHORITY_PROMPT + (CAPABILITY_NEED_PROMPT if tier == "fast" else "") +
         "Capability library index JSON:\n" + required_json(context.get("capability_index", []), None, label="Capability index") +
         "Loaded capability details JSON:\n" + json.dumps(context.get("capability_details_loaded", [])) +
         "\nTrusted admitted clock JSON:\n" + json.dumps(
@@ -985,7 +984,7 @@ def fast_advance_layered_prompt(
     rendered = (
         role_memory_context(context, role="planner") + contract + EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
         + (PROVIDER_SOURCE_PROMPT if provider_sources else "")
-        + (FAST_SITUATION_SOURCE_PROMPT if observed_sources else "") + CAPABILITY_LOOKUP_PROMPT
+        + (FAST_SITUATION_SOURCE_PROMPT if observed_sources else "") + CAPABILITY_NEED_PROMPT
         + "\nOwner-approved Chromie identity JSON:\n" + bounded_identity_json(context)
         + "\nOwner-approved Personality Expression JSON:\n" + bounded_personality_json(context)
         + "\nOwner-approved Stable Mind JSON:\n" + bounded_stable_mind_json(context)

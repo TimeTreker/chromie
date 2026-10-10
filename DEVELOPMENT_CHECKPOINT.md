@@ -1,6 +1,52 @@
 # Chromie Development Checkpoint
 
-## Current delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
+## Current delivery — Need-first Planner (stage A), 2026-10-10
+
+Base: `origin/main` `08c93650d`. The owner approved the Charter draft and its implementation
+on 2026-10-10. Stage A is this commit; stage B (Deep removal) follows on the same delivery
+line.
+
+Observed: library-only abilities are never looked up. Live, 0/10 library requests were
+correct and every one substituted a loaded skill. The model could use a loaded contract (9/10)
+but did not judge coverage correctly.
+
+| Order | Module / owner | Actual (before) | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | Planner decoder contract | lookup offered as an alternative top-level shape; the model writes a plan instead | the need-first prefix judged after a restatement | incorrect (earliest) |
+| 2 | Planner model | substitutes a loaded skill (clock → weather) | flags the unmet need | symptom of 1 |
+| 3 | Host / Agent | no search | search with the Planner's wording, one re-plan | missing |
+
+Repair (stage A):
+- `ability_needs` prefix: `PlannerAbilityNeed`, `parse_ability_needs`, `take_ability_needs`,
+  `need_first_response_schema` (every closed exposed shape).
+- Streaming early stop: `complete_ability_needs`.
+- `search_capability_library`: BM25, usable and unrestricted entries only.
+- Second pass: never stops early.
+- Non-streaming path: discards its first pass.
+- Prompt: `CAPABILITY_NEED_PROMPT`, Fast tier only.
+- Test fixtures: `declared_ability_needs`.
+- Charter: PLANNER-AUTHORITY-001, need-first amendment, principles 28, 33 and 34, role list.
+  API reference and the architecture doc updated.
+
+Evidence (`.chromie/acceptance/need-first-20261010/`):
+- Corpus freeze 22.
+- Strict replay 6,000/6,000 with zero model calls, verdicts unchanged.
+- Canonical gate in a clean worktree: see HANDOFF.
+- Design evidence: `.chromie/acceptance/skill-lookup-20261010/`.
+
+Known failures: carried forward from the previous delivery. Absent abilities still escalate
+to a failing Deep until stage B.
+
+Next (stage B):
+1. Remove the Deep Planner: the agent resolver and `/deep-plan`; the Fast `escalate` and
+   `deep_planner` continuation; orchestrator Deep paths, settings and environment
+   variables.
+2. Add an honest Fast unavailable outcome.
+3. Migrate the 20 Deep corpus families (2,000 cases).
+4. Update the remaining Deep docs (~110 mentions in 28 docs).
+5. Then deploy and run a live cohort (the skill-lookup cohort plus the standard cases).
+
+## Previous delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
 
 Base: `origin/main` `03f4e7e20`.
 

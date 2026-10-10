@@ -47,6 +47,8 @@ from .planner_grounding import (
     semantic_numeric_values,
 )
 from .planner_model_contract import (
+    ABILITY_NEED_NONE,
+    ABILITY_NEEDS_MAX,
     PlannerEvidenceReentryModelOutput,
     PlannerModelOutput,
     PlannerTier,
@@ -3444,33 +3446,45 @@ def deep_plan_response_schema(
     )
 
 
-def capability_lookup_response_schema(schema: dict[str, Any], entries: list[Any]) -> dict[str, Any]:
-    """One read-only request or one complete Plan; never both."""
-    ids = [item.capability_id for item in entries]
-    if not ids:
-        return schema
-    definitions = schema.get("$defs", {})
-    plan = {key: value for key, value in schema.items() if key != "$defs"}
-    lookup = {
-        "type": "object", "additionalProperties": False,
-        "required": ["requested_capability_ids"],
-        "properties": {"requested_capability_ids": {
-            "type": "array", "items": {"type": "string", "enum": ids},
-            "minItems": 1, "maxItems": 8, "uniqueItems": True,
-            "description": (
-                "Request full contracts for indexed abilities needed to realize accepted "
-                "Responsibilities. Use this branch instead of substituting an unrelated "
-                "already-loaded Capability."
-            ),
-        }},
+def need_first_response_schema(schema: dict[str, Any], loaded_capability_ids: list[str]) -> dict[str, Any]:
+    """Require ability_needs before Work in the object and in every exposed shape.
+
+    Native decoders follow the exposed oneOf/anyOf shapes, so each shape carries the
+    field first. closest_loaded names only Capabilities loaded for this decision.
+    """
+    needs = {
+        "type": "array", "maxItems": ABILITY_NEEDS_MAX,
+        "items": {
+            "type": "object", "additionalProperties": False,
+            "required": ["need", "closest_loaded", "closest_loaded_does", "fits"],
+            "properties": {
+                "need": {"type": "string", "minLength": 3, "maxLength": 100},
+                "closest_loaded": {"type": "string", "enum": [*dict.fromkeys(loaded_capability_ids), ABILITY_NEED_NONE]},
+                "closest_loaded_does": {"type": "string", "minLength": 3, "maxLength": 80},
+                "fits": {"type": "boolean"},
+            },
+        },
     }
-    # Put lookup first. Native constrained decoders may commit to a oneOf branch from
-    # the first emitted member; plan-first ordering previously trapped semantically
-    # correct indexed-ability reasoning inside the loaded-capability enum.
-    # Keep provider decoder selection attached to this same semantic result
-    # when adding the read-only lookup alternative.
-    return {**({"title": schema["title"]} if "title" in schema else {}),
-            "$defs": definitions, "oneOf": [lookup, plan]}
+    result = copy.deepcopy(schema)
+
+    def attach(node: Any, *, root: bool = False) -> None:
+        if isinstance(node, list):
+            for item in node:
+                attach(item)
+            return
+        if not isinstance(node, dict):
+            return
+        closed = isinstance(node.get("properties"), dict) and node.get("additionalProperties") is False
+        if root or closed:
+            node["properties"] = {"ability_needs": copy.deepcopy(needs), **node.get("properties", {})}
+            node["required"] = ["ability_needs", *[name for name in node.get("required", []) if name != "ability_needs"]]
+        # Exposed Work shapes live only under combinators, never inside property schemas.
+        for key in ("oneOf", "anyOf", "allOf", "then", "else"):
+            if key in node:
+                attach(node[key])
+
+    attach(result, root=True)
+    return result
 
 
 

@@ -331,8 +331,12 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   no Responsibility/Goal and gains no Capability Work authority, including safe reads.
   Host, Runtime, TTS, and Provider may validate, schedule,
   realize, retry delivery, or reject it but never independently rewrite its meaning.
-- **PLANNER-AUTHORITY-001** — There is one Planner authority. Fast and deep Planner are
-  cognition passes/depths of that same HOW authority. Comparing, reusing, cancelling,
+- **PLANNER-AUTHORITY-001** — There is one Planner authority and one Planner contract.
+  Planning depth comes from acquiring what is missing: library Capability contracts
+  (need-first search), Evidence (act, then re-enter), or the person's input (clarification).
+  It is never a second planner pass. A stronger model or a larger budget is a configuration
+  of the same Planner role, not another semantic owner (owner amendment 2026-10-10).
+  Comparing, reusing, cancelling,
   replacing, or supplementing existing Work are Planner operations, not a mandatory
   reconciliation stage or another semantic owner. Social Cognition owns ordinary
   communication; Planner supplies planning facts and input/confirmation needs without
@@ -743,8 +747,9 @@ Read the diagram with these boundaries:
   repairs the other's decision. The original admitted UserTurn remains read-only provenance;
   neither role can repair UMI meaning from it. Planner owns execution-input completeness,
   Capability selection and source/default strategy. It provides a grounded input or
-  confirmation need to Social Cognition when communication is required. Only genuinely
-  complex HOW uses Deep Planner.
+  confirmation need to Social Cognition when communication is required. Complex HOW is
+  staged: Planner commits what is grounded now and re-enters on Evidence or a Situation
+  change; it does not delegate to another planner.
 
 - Planner input resolution is not a second User Meaning Interpretation. Capability schemas
   constrain realization; they cannot redefine, widen, narrow, or invent what the
@@ -834,7 +839,7 @@ Read the diagram with these boundaries:
 - Trusted Capability Runtime owns the executable task set. Every canonical Goal
   has a task-list view. A shared Activity may appear in more than one Goal view,
   but the pair of runtime interaction/request IDs denotes one task and it executes
-  only once. A newer Fast/Deep Planner-authored canonical Plan revision may cause
+  only once. A newer Planner-authored canonical Plan revision may cause
   Runtime to cancel or replace only pending/cancellable Work; Runtime preserves
   completed Evidence and never silently replays completed Work. GA supplies Goal
   continuity only; Fast Planner compares that Goal with relevant Work and supplies the
@@ -922,8 +927,8 @@ A successful Chromie release lets an operator:
   packaging.
 
 The model-facing cognitive roles are separate contract/module owners inside one
-maintained `chromie-agent` service boundary. UMI, GA, Social Cognition, Fast Planner,
-Deep Planner and Reflection may have separate endpoints and failure
+maintained `chromie-agent` service boundary. UMI, GA, Social Cognition, Planner and
+Reflection may have separate endpoints and failure
 contracts without becoming one microservice per human cognitive term. The Host
 Orchestrator remains the single lifecycle/co-ordination root on the other side of
 that service boundary; module separation does not transfer semantic authority to
@@ -1249,10 +1254,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    A prohibited, unsafe, harmful, unavailable, or unconfirmed effect closes the
    affected Activity branch; it does not freeze Goal reasoning, safe information
    gathering, Social Attention, clarification, refusal, or safe alternative
-   reasoning. Basic effect and prohibition boundaries must be available without
-   requiring a full Deep-Planner round trip. Complex conflicts, uncertainty,
-   alternatives, or broader value reasoning may escalate to Deep cognition, but
-   escalation cannot weaken an already applicable safety or authorization
+   reasoning. Basic effect and prohibition boundaries must be available to the one
+   Planner pass. Complex conflicts, uncertainty, alternatives, or broader value
+   reasoning are handled by clarification, Runtime confirmation or Social Cognition's
+   response, and none of them can weaken an already applicable safety or authorization
    boundary.
 29. **Social Attention is optional decoration of a semantic primary observable
    Activity, not a Goal, execution lane, or execution modality.** The anchor says
@@ -1308,16 +1313,23 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    safety, stale-plan rejection, cancellation and Evidence authority. Concurrent
    cognition grants no permission to execute before canonical validation.
 
-   **Owner-approved Planner library amendment (2026-09-16).** Fast Planner receives
-   complete common Capability contracts and the full Capability library index,
-   including explicit availability and restriction metadata.
-   Before authoring a Plan it may request one bounded batch of exact indexed IDs
-   for their full contracts. The lookup contains no candidate Plan or Activities;
-   after the read, the original intent/context and retrieved contracts feed one
-   complete planning decision. It is not a semantic repair or review. A second
-   lookup, unknown ID, or mixed lookup/executable output rejects. An uncommon
-   Capability alone does not require Deep Planner; consequential planning complexity
-   still uses the existing depth boundary. Restricted providers stay restricted.
+   **Owner-approved need-first Planner amendment (2026-10-10; replaces the 2026-09-16
+   library lookup).** Planner receives the complete common Capability contracts, the
+   current perceived Situation and the Capability library index. Its primary output
+   begins with `ability_needs`: each distinct ability the accepted Responsibilities
+   require, once, with its single closest loaded Capability, a restatement of what that
+   Capability does taken from its own contract, and whether that effect is the needed
+   effect itself. The restatement precedes the judgment; without it the model matched
+   needs to loaded Capabilities by surface association. When every ability fits, the same
+   output continues with the complete Plan and there is no second call. When an ability
+   does not fit, the Host stops reading and the Agent searches the full catalog with the
+   Planner's own need wording. Search only decides which contracts the Planner reads
+   next: it never selects what executes, and it returns no restricted, unavailable,
+   non-executable or turn-ineligible entry. The Planner then makes one complete planning
+   decision from the original source and at most eight retrieved contracts. No Plan from
+   the first pass is used; a second search or re-plan rejects. When nothing usable
+   matches, the Host keeps reading and the Planner's own honest outcome stands instead of
+   substitute Work. Restricted providers stay restricted.
 
    At a trusted validation boundary, **proof** means only the explicitly named
    invariant checked over the primary result and its authoritative input. It does
@@ -1496,8 +1508,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    repair chain over previous model output. The stage either accepts, escalates
    once from authoritative source meaning to its designated deeper cognition,
    follows an explicitly bounded source-based transaction such as Principle 30,
-   clarifies when the user can resolve genuine ambiguity, or fails closed. Fast
-   cognition may delegate once to Deep cognition before commitment. Deep semantic
+   clarifies when the user can resolve genuine ambiguity, or fails closed. For meaning,
+   Fast cognition may delegate once to Deep cognition before commitment. The Planner has
+   no deeper-planner delegation: unresolved HOW uses the need-first library search,
+   clarification, staged Evidence re-entry, or an honest unavailable outcome. Deep semantic
    rejection is terminal for that cognition attempt; Host validation is terminal
    authority and cannot invoke another semantic planner. No later planner or
    presenter may reinterpret already committed Goal meaning. Failure evidence may
@@ -1515,6 +1529,11 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    escalation authority. Do not build confidence-review machinery merely to make a
    numeric score look consistent.
 
+   **HOW depth is acquired context (owner amendment 2026-10-10).** For planning, depth is
+   what the Planner acquires (need-first library search, Evidence re-entry, the person's
+   clarification), not a second planner. Risky or irreversible effects use Runtime
+   confirmation; independent Responsibilities are planned in one WorkDAG.
+
    **Fast-path commitment is not Deep-reviewed.** Once one Responsibility has complete
    authoritative Goal grounding and a Fast Plan names exact available Capabilities with
    schema-valid arguments, deterministic safety/authorization passes, and no confirmation
@@ -1525,8 +1544,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
    **Cognitive depth is Responsibility-local.** Independent Responsibilities in one turn
    need not share a single depth or wall-clock barrier. Once a Responsibility has canonical
-   Goal grounding, a terminal valid Fast Plan may execute while a genuinely uncertain
-   remaining Responsibility enters Deep where supported by the canonical contracts. Before
+   Goal grounding, a terminal valid Plan may execute while a genuinely uncertain
+   remaining Responsibility waits for clarification or Evidence re-entry. Before
    GA finishes, only validated side-effect-free safe reads and realized
    Communicative Acts may
    advance; effects remain gated. Do not run Deep merely to re-check work already resolved
@@ -1544,8 +1563,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    the first Work HOW owner and may author a complete Capability Activity Plan. It owns execution-input completeness and may use trusted
    context, observation/query, an allowed bounded default, or an input need expressed
    by Social Cognition without changing Responsibility meaning. Goal Association concurrently receives the
-   same UMI result and commits canonical Goal identity. HOW that exceeds the fast budget
-   may request Deep Planner. Exact Capability IDs, executable arguments, and effectful
+   same UMI result and commits canonical Goal identity. HOW that needs an uncommon
+   ability uses the need-first library search; HOW that needs information or progress uses
+   Evidence re-entry. Exact Capability IDs, executable arguments, and effectful
    actions remain canonical Planner-owned after applicable Goal grounding and are
    invalid Goal-Interpreter output. The Host may normalize representation-safe fields,
    but it must not convert Capability selection or response wording into Goal-

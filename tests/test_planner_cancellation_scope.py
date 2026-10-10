@@ -41,6 +41,11 @@ def case_request(language, control, available=True):
     return CognitiveWorkRequest.model_validate(case['input']['request']), entries
 
 
+def for_resolver(resolver, raw):
+    """A control report uses no Capability, so the need-first prefix is empty for Fast."""
+    return {'ability_needs': [], **raw} if resolver is FastPlannerResolver else raw
+
+
 def report(request):
     gid = request.planner_reentry_scope.goal_ids[0]
     evidence = request.context['trusted_goal_cancellation_evidence'][0]
@@ -78,7 +83,7 @@ def test_control_report_preserves_catalog_truth_and_unmet_effect(resolver, langu
         reminder = next(row for row in facts if row['capability_id'] == 'chromie.reminder.create')
         assert reminder['available'] is available
         assert request.context['goal_association_resolution']['new_goals'][0]['metadata']['output_mode'] == 'stateful_effect'
-        raw = report(request)
+        raw = for_resolver(resolver, report(request))
         assert not list(Draft202012Validator(call['response_format']).iter_errors(raw))
         replay = ReplayModel(json.dumps(raw))
         plan = await resolver(replay, StaticCatalog(entries)).resolve(request)
@@ -109,6 +114,7 @@ def test_control_scope_rejects_false_completion_and_execution(resolver, mutation
                 args=dict(reminder_text='call home', due_at='2026-09-03T20:00:00+08:00'),
                 source_goal_ids=[gid], timing='sequential')]
             raw['goal_outcomes'][gid]['step_ids'] = ['retry']
+        raw = for_resolver(resolver, raw)
         capture = CaptureModel(); await resolver(capture, StaticCatalog(entries)).resolve(request)
         assert list(Draft202012Validator(capture.calls[0]['response_format']).iter_errors(raw))
         replay = ReplayModel(json.dumps(raw))

@@ -1,6 +1,17 @@
 # Chromie Current Status
 
-## Current delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
+## Current delivery — Need-first Planner (stage A), 2026-10-10
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | Owner-approved Charter amendment (PLANNER-AUTHORITY-001, need-first Planner, principles 28, 33 and 34): one Planner; depth is acquired context, not a second planner. Fast Work begins with `ability_needs`: each needed ability once, its closest loaded Capability, a restatement of what that Capability does, and `fits`. On a non-fitting need the streaming Host stops reading, the Agent BM25-searches the library with the Planner's wording (usable, unrestricted entries only), and the Planner plans once more with at most eight contracts. The non-streaming path discards its first pass. With no usable match, the Planner's own outcome stands. The old `requested_capability_ids` lookup is removed. Stage B (Deep removal; honest unavailable instead of escalation) is not yet implemented, so Deep still runs on Fast escalation. |
+| Automatic verification | Focused regressions: search then one plan; no match; unloaded citation; second unmet (no second search); invented citation; locked or unavailable entries never loaded; non-streaming path; unfit loaded Capability searches instead of substituting; the Host stops reading mid-stream; turn-ineligible results trigger no second call; BM25 ranking. Corpus freeze 22 (3,300 Fast and 2,000 Deep requests recaptured; Fast outputs declare fitting needs). Strict replay 6,000/6,000 with zero model calls and freeze-21 verdicts unchanged. Canonical gate: see HANDOFF. |
+| Target validation | Pre-implementation frozen evidence only (`.chromie/acceptance/skill-lookup-20261010/`): on unseen requests the target skill was chosen 8/8 with need-first plus search (current contract 1/8). No live cohort on this code yet. |
+| Deployment state | Not deployed. `chromie-agent:latest` = `main-03f4e7e20`; `chromie-llm` = `03ad9e33` (XGrammar #652). |
+
+Evidence: `.chromie/acceptance/need-first-20261010/` (README.md).
+
+## Previous delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
 
 | Axis | Current evidence |
 | --- | --- |

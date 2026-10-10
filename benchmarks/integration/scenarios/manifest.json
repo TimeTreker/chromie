@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-09",
+  "frozen_on": "2026-10-10",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "f4f92b4e41b2fabd43cd631acd7ea8ae9192be9c6b27b3a14e72a8bcafb89910",
-    "workflow-conditional-dry.json": "c9f58b7f02e86cd879e7ffde291ce7f1ac916c7b5cd9830ed5c13ae2e0ba097e",
-    "workflow-conditional-rain.json": "a7a0633918eebab3f9c37b76ace2501ba0af136cbe4b1f6d4f957c105e12b83e",
-    "workflow-delayed.json": "0c7de9e02b382af967bcc4c4625b2ee7307098048804d7aff3050ce4a6cd23ca",
-    "workflow-normal.json": "2ffbced25fb41cd4f54e8b0fd8d34803b0d7d3b7a27d4252ea3364f7ba41a6dd"
+    "workflow-cancellation.json": "4b0cc3281b34435795b4555793c682fcdaa02e9352fd964ba7333ee0ace08fe7",
+    "workflow-conditional-dry.json": "c8549d8e798a4afdbbaa8dede0ca17c5f673cd90fb535edb2ffbab3545ebfa2c",
+    "workflow-conditional-rain.json": "d8581aab0757b20e2de46de008d851d220ba532f6c61df8fd40a3b538688e055",
+    "workflow-delayed.json": "6973fbd0cac6f1c9779a4bfc5006f6d025d405282537e1d1074dc60e163d8588",
+    "workflow-normal.json": "46f294fa9d435fed4504e0e83a269b4f13b19eb0678693a82d3ec5918f45b77d"
   },
-  "freeze_revision": 21,
-  "freeze_note": "WorkDAG dependency migration (owner decision 2026-10-09): Planner reference outputs author depends_on instead of timing (semantics-preserving) and requests are recaptured for the changed Planner prompts/schemas. Inputs, meanings, relationships, provider outcomes and assertions unchanged.",
+  "freeze_revision": 22,
+  "freeze_note": "Need-first Planner migration (owner decision 2026-10-10): requests recaptured; each recorded Fast output whose new request requires ability_needs declares every loaded Capability it uses as one fitting need. Inputs, meanings, relationships, provider outcomes and assertions unchanged.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

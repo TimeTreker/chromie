@@ -3547,8 +3547,8 @@ The individual goals remain separately tracked even when speech is consolidated.
 The model-facing Fast Planner contract carries one complete Work result: ordered
 Activities, exact Responsibility ownership, capability arguments, provenance,
 coverage and unresolved planning needs. It contains no wording, presentation frame
-or optional decoration. A single batch of library detail lookup may precede the
-complete decision; it cannot repair a completed Plan.
+or optional decoration. It begins with `ability_needs`; one need-first library search
+may precede the complete decision, and it cannot repair a completed Plan.
 
 The separate SC transaction carries exact words, truth stage, Evidence refs,
 delivery phase and optional expression bound to its immutable act. Terminal

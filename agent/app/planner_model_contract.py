@@ -45,6 +45,50 @@ except ImportError:  # pragma: no cover
 PlannerTier = Literal["fast", "deep"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
+# Need-first Planner contract (owner amendment 2026-10-10). Before Work, the Planner
+# states each needed ability once, its single closest loaded Capability, what that
+# Capability actually does (restated from its own contract) and whether that effect
+# is the need's own effect. The restatement precedes the judgment: without it the
+# model matched needs to loaded IDs by surface association.
+ABILITY_NEED_NONE = "none"
+ABILITY_NEEDS_MAX = 4
+
+
+class PlannerAbilityNeed(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    need: str = Field(min_length=3, max_length=100)
+    closest_loaded: str = Field(min_length=1, max_length=160)
+    closest_loaded_does: str = Field(min_length=3, max_length=80)
+    fits: bool
+
+    @field_validator("need", "closest_loaded", "closest_loaded_does", mode="before")
+    @classmethod
+    def normalize_need_text(cls, value: Any) -> Any:
+        return normalize_whitespace(value)
+
+    @property
+    def unmet(self) -> bool:
+        return self.closest_loaded == ABILITY_NEED_NONE or not self.fits
+
+
+def parse_ability_needs(items: Any, *, loaded_capability_ids: list[str]) -> list[PlannerAbilityNeed]:
+    if not isinstance(items, list) or len(items) > ABILITY_NEEDS_MAX:
+        raise ValueError("ability_needs must be a list of at most four abilities")
+    needs = [PlannerAbilityNeed.model_validate(item) for item in items]
+    allowed = set(loaded_capability_ids) | {ABILITY_NEED_NONE}
+    unloaded = sorted({item.closest_loaded for item in needs} - allowed)
+    if unloaded:
+        raise ValueError(f"ability_needs cites Capabilities that are not loaded: {unloaded}")
+    return needs
+
+
+def take_ability_needs(raw: dict[str, Any], *, loaded_capability_ids: list[str]) -> list[PlannerAbilityNeed]:
+    """Remove and validate the need-first prefix of one Work object."""
+    if "ability_needs" not in raw:
+        raise ValueError("Planner Work must begin with ability_needs")
+    return parse_ability_needs(raw.pop("ability_needs"), loaded_capability_ids=loaded_capability_ids)
+
 NON_PLANNER_TRANSPORT_CAPABILITY_IDS = frozenset({"chromie.speak"})
 DETERMINISTIC_CONTROL_CAPABILITY_IDS = frozenset({"soridormi.stop"})
 PLANNER_LIBRARY_INTROSPECTION_SUFFIXES = (".get_capabilities", ".skill.list")

@@ -44,6 +44,7 @@ from shared.chromie_contracts.plan import (
 )
 from shared.chromie_contracts.tool_result import canonical_value_sha256
 from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
+from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text
 
 
 def _work_facts(prompt):
@@ -84,13 +85,13 @@ class FakeOllama:
         self.prompts.append((prompt, kwargs))
         if isinstance(self.response, Exception):
             raise self.response
-        return self.response
+        return declared_ability_needs(self.response, kwargs.get("response_format"))
 
     async def generate_stream(self, prompt, **kwargs):
         self.prompts.append((prompt, kwargs))
         if isinstance(self.response, Exception):
             raise self.response
-        yield _streaming_document(self.response)
+        yield declared_ability_needs_text(_streaming_document(self.response), kwargs.get("response_format"))
 
     @staticmethod
     def _parse_json(text):
@@ -109,7 +110,7 @@ class ScriptedOllama:
         value = self.responses.pop(0)
         if isinstance(value, Exception):
             raise value
-        return value
+        return declared_ability_needs(value, kwargs.get("response_format"))
 
     async def generate_stream(self, prompt, **kwargs):
         self.prompts.append((prompt, kwargs))
@@ -118,7 +119,7 @@ class ScriptedOllama:
         value = self.responses.pop(0)
         if isinstance(value, Exception):
             raise value
-        yield _streaming_document(value)
+        yield declared_ability_needs_text(_streaming_document(value), kwargs.get("response_format"))
 
     @staticmethod
     def _parse_json(text):
@@ -1622,6 +1623,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 model = FakeOllama(raw)
                 asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
                 schema = model.prompts[0][1]["response_format"]
+                raw = declared_ability_needs(raw, schema)
                 native_union = {"$defs": schema["$defs"], "anyOf": schema["anyOf"]}
                 for contract in (schema, native_union):
                     validator = Draft202012Validator(contract)
@@ -1648,7 +1650,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     model = FakeOllama(raw)
                     plan = asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
                     schema = model.prompts[0][1]["response_format"]
-                    self.assertEqual(Draft202012Validator(schema).is_valid(raw), not bool(reason))
+                    self.assertEqual(Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema)), not bool(reason))
                     self.assertEqual(bool(plan.metadata.get("error")), bool(reason))
                     self.assertEqual(len(model.prompts), 1)
                     self.assertEqual(plan.steps, [])
@@ -1690,7 +1692,8 @@ class FastPlannerResolverTests(unittest.TestCase):
                 raw["goal_outcomes"]["goal-goodnight"]["rationale"] = "The independent greeting needs no input."
                 model = FakeOllama(raw)
                 plan = asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
-                Draft202012Validator(model.prompts[0][1]["response_format"]).validate(raw)
+                schema = model.prompts[0][1]["response_format"]
+                Draft202012Validator(schema).validate(declared_ability_needs(raw, schema))
                 self.assertNotIn("error", plan.metadata)
                 self.assertEqual(plan.disposition, "mixed")
                 self.assertEqual(plan.steps, [])
@@ -1716,7 +1719,8 @@ class FastPlannerResolverTests(unittest.TestCase):
                 self.assertTrue(all(not hasattr(item, "text") for item in advance.activities))
                 self.assertEqual(len(model.prompts), 1)
                 terminal_schema = model.prompts[0][1]["response_format"]
-                Draft202012Validator(terminal_schema).validate(terminal)
+                wire = declared_ability_needs(wire, terminal_schema)
+                Draft202012Validator(terminal_schema).validate(wire)
                 for removed in (0, 1):
                     incomplete = copy.deepcopy(wire)
                     incomplete["activities"].pop(removed)

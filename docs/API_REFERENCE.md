@@ -210,11 +210,14 @@ whether this independent selection boundary is enabled plus its model and candid
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
 Fast Planner receives full unlocked `common` contracts and an index of every
-entry, including unavailable and locked entries. Before its complete Plan it may
-request one batch of 1–8 unique indexed IDs using `requested_capability_ids`; the
-Host supplies unlocked contracts and reruns the original context once. A lookup
-contains no candidate Plan, cannot repeat, and never authorizes unavailable or
-restricted execution. Deep Planner may use the full qualified catalog. User Meaning Interpretation remains WHAT-only
+entry, including unavailable and locked entries. Its Work begins with
+`ability_needs`: each needed ability once, its closest loaded Capability, a
+restatement of what that Capability does, and `fits`. When an ability does not fit,
+the Host stops reading, searches the library with the Planner's need wording
+(BM25 over ID, description and when-to-use) and reruns the original context once
+with at most eight usable contracts. Search never returns unavailable, restricted,
+non-executable or turn-ineligible entries, and the first pass contributes no Plan.
+Deep Planner may use the full qualified catalog. User Meaning Interpretation remains WHAT-only
 and does not gain Capability-selection authority from catalog projection. Safety-locked
 entries remain visible in the full catalog but are excluded from the fast
 common prompt even when an experience overlay requests `common`. The initial
@@ -286,8 +289,9 @@ and bounded unresolved meaning. GA owns Goal relations;
 its maintained schema contains no planning-gap or resolution-policy fields.
 
 `POST /fast-advance` consumes the authoritative user turn plus contextual Responsibility
-evidence and makes one complete planning invocation, optionally preceded by the
-bounded catalog-detail lookup. Neither call receives a candidate Plan to repair. The response media type is
+evidence and makes one complete planning invocation, optionally preceded by a
+need-first pass that stops at `ability_needs` when a library search is needed.
+Neither call receives a candidate Plan to repair. The response media type is
 `application/x-ndjson`. Its ordered typed frames are:
 
 One `FastPlannerStreamTerminal` (`frame_type=terminal`) is emitted only after the

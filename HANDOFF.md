@@ -1,6 +1,36 @@
 # Chromie Handoff
 
-## Current delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
+## Current delivery — Need-first Planner (stage A), 2026-10-10
+
+Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `08c93650d`.
+Evidence: `.chromie/acceptance/need-first-20261010/` (README.md). The expected resume revision
+is the latest commit containing this file.
+
+Changed:
+- Code: `agent/app/{planner_model_contract,planner_schema,planner_context,planner_prompt,
+  fast_planner}.py`, `benchmarks/datasets/fast_planner_daily_life/qualification.py`
+  (`declared_ability_needs`).
+- Tests: the Fast, intent and replay suites.
+- Corpora: `benchmarks/integration/{workflow_scenarios,scenarios}` at freeze 22.
+- Docs: `docs/{PROJECT_CHARTER,API_REFERENCE,GOAL_DRIVEN_COGNITIVE_ARCHITECTURE,STATUS}.md`,
+  this file and the checkpoint.
+
+Verification:
+
+```bash
+python scripts/run_workflow_replay.py --workers 4 --evidence-dir <dir>       # 6000/6000, zero model calls
+# canonical gate from a clean worktree (the main checkout contains a peer's .claude/worktrees/):
+git worktree add --detach <tmp>/gate HEAD && (cd <tmp>/gate && python scripts/check_repository_policies.py && python scripts/check_docs.py && python scripts/check_test_ownership.py && ./scripts/run_tests.sh)
+```
+
+Freeze 22 was rebuilt with `.chromie/acceptance/need-first-20261010/{capture22,freeze22,
+migrate_small_corpus22}.py` (backups `previous-*`). Not deployed; live is pending stage B.
+Gate observed from a clean worktree (HEAD plus this patch): policies, docs and test ownership
+exit 0. `run_tests.sh` exit 0: 169 / 4,043 / 5 skips / 1,065 subtests / 20 legacy. Stage B is
+paused: on 2026-10-10 the owner raised value/legality deliberation (the original Deep intent),
+to be resolved before Deep is removed.
+
+## Previous delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `03f4e7e20`.
 The expected resume revision is the latest commit containing this file.

@@ -13,6 +13,7 @@ from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, 
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput, FastPlannerStreamFailure, FastPlannerStreamTerminal
 from tests.test_cognitive_runtime_pr7 import admitted_core, new_goal_association, respond_plan
+from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text
 
 class _Catalog:
 
@@ -35,6 +36,11 @@ class _StreamingModel:
         self.last_prompt = args[0]
         self.last_kwargs = kwargs
         self.calls += 1
+        whole = "".join(self.chunks)
+        adapted = declared_ability_needs_text(whole, kwargs.get("response_format"))
+        if adapted != whole:
+            yield adapted
+            return
         for chunk in self.chunks:
             yield chunk
 
@@ -80,7 +86,8 @@ def test_capability_argument_decoder_order_matches_sorted_catalog_recursively():
     assert list(arguments["properties"]) == ["zeta", "alpha"]
 
 def _valid_output() -> dict[str, Any]:
-    return {"disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["reply"],
+    # A greeting needs no Capability, so the need-first prefix is empty.
+    return {"ability_needs": [], "disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["reply"],
         "activities": [{"role": "complete_response", "activity_id": "greeting-need", "source_responsibility_refs": ["reply"],
             "timing": "parallel", "rationale": "An ordinary greeting can be returned from context."}],
         "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Establish an ordinary greeting obligation."}
@@ -90,7 +97,7 @@ def _wire_output(payload):
     return json.dumps(payload, ensure_ascii=False)
 
 
-@pytest.mark.parametrize("with_lookup", [False, True])
+@pytest.mark.parametrize("with_needs", [False, True])
 @pytest.mark.parametrize("source_kind", ["unresolved_meaning", "execution_input"])
 @pytest.mark.parametrize("sources", [
     [], ["safe_default"], ["capability_schema"], ["authoritative_context"],
@@ -98,10 +105,9 @@ def _wire_output(payload):
     ["authoritative_context", "capability_schema"],
     ["authoritative_context", "capability_schema", "trusted_observation", "trusted_query", "owner_preference", "safe_default"],
 ])
-def test_native_clarification_requires_owned_resolution_sources(source_kind, sources, with_lookup):
+def test_native_clarification_requires_owned_resolution_sources(source_kind, sources, with_needs):
     from agent.app.clients.sglang_protocol import build_sglang_chat_payload
-    from agent.app.planner_schema import capability_lookup_response_schema
-    from types import SimpleNamespace
+    from agent.app.planner_schema import need_first_response_schema
     from agent.app.inference_compute import CognitionComputeClass
     from shared.chromie_contracts.core_interpretation import UserMeaningUncertainty
     from shared.chromie_contracts.plan import PlannerInformationGap
@@ -113,8 +119,8 @@ def test_native_clarification_requires_owned_resolution_sources(source_kind, sou
         "properties": {"location": {"type": "string"}}, "required": ["location"]}}
     schema = fast_streaming_advance_response_schema(["r1"], responsibilities=[responsibility], capabilities=[capability],
         meaning_uncertainties=[uncertainty] if source_kind == "unresolved_meaning" else [])
-    if with_lookup:
-        schema = capability_lookup_response_schema(schema, [SimpleNamespace(capability_id="test.indexed")])
+    if with_needs:
+        schema = need_first_response_schema(schema, ["test.weather"])
     gap = {"gap_id": "place", "description": "Which place", "required_for": ["location"],
         "preferred_resolution": "ask_user", "source_kind": source_kind,
         "source_reference": "Which place" if source_kind == "unresolved_meaning" else "test.weather",
@@ -123,6 +129,10 @@ def test_native_clarification_requires_owned_resolution_sources(source_kind, sou
         "activities": [{"role": "clarification", "activity_id": "ask", "source_responsibility_refs": ["r1"],
                         "information_gaps": [gap]}],
         "continuations": [], "confidence": 0.9, "unresolved": ["Which place"], "reason_summary": "Missing place."}
+    need = {"need": "read the forecast for a named place", "closest_loaded": "test.weather",
+            "closest_loaded_does": "Weather lookup for a place", "fits": True}
+    if with_needs:
+        raw = {"ability_needs": [need], **raw}
     try:
         PlannerInformationGap.model_validate(gap)
         expected = True
@@ -139,9 +149,9 @@ def test_native_clarification_requires_owned_resolution_sources(source_kind, sou
         PlannerInformationGap.model_validate(gap)
         assert Draft202012Validator(schema).is_valid(raw)
         assert not Draft202012Validator(wire).is_valid(raw)
-    if with_lookup:
-        assert Draft202012Validator(wire).is_valid({"requested_capability_ids": ["test.indexed"]})
-        assert not Draft202012Validator(wire).is_valid({"requested_capability_ids": ["unknown"]})
+    if with_needs and expected:
+        assert not Draft202012Validator(wire).is_valid({**raw, "ability_needs": [{**need, "closest_loaded": "test.indexed"}]})
+        assert not Draft202012Validator(wire).is_valid({key: value for key, value in raw.items() if key != "ability_needs"})
 
 
 @pytest.mark.asyncio
@@ -239,8 +249,9 @@ async def test_streamed_string_argument_mapping_preserves_source_ownership(varia
     assert model.calls == 1
     assert len(events) == 1
     schema = model.last_kwargs["response_format"]
+    sent = declared_ability_needs(raw, schema)
     for contract in (schema, {"$defs": schema.get("$defs", {}), "oneOf": schema["oneOf"]}):
-        assert Draft202012Validator(contract).is_valid(raw) is (variant != "missing")
+        assert Draft202012Validator(contract).is_valid(sent) is (variant != "missing")
     if variant in {"missing", "foreign_span"}:
         assert isinstance(events[0], FastPlannerStreamFailure)
         assert events[0].failure_class == "fast_stream_contract_invalid"
@@ -1300,7 +1311,8 @@ async def test_required_enum_source_matches_selected_value_and_original_turn(var
     model = _StreamingModel([_wire_output(raw)])
     frames = [f async for f in FastPlannerResolver(model, _Catalog([capability])).stream_advance(request)]
     assert model.calls == 1
-    assert Draft202012Validator(model.last_kwargs['response_format']).is_valid(raw) == (
+    schema = model.last_kwargs['response_format']
+    assert Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema)) == (
         expected or variant == 'foreign_source')
     assert isinstance(frames[-1], FastPlannerStreamTerminal) == expected
     if not expected:

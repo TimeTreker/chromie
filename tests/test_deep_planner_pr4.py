@@ -26,6 +26,7 @@ from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.tool_result import canonical_value_sha256
+from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs
 
 
 class SequencedOllama:
@@ -38,7 +39,7 @@ class SequencedOllama:
         value = self.responses.pop(0)
         if isinstance(value, Exception):
             raise value
-        return value
+        return declared_ability_needs(value, kwargs.get("response_format"))
 
 
 class PlannerWorkScopeValidationTests(unittest.TestCase):
@@ -56,7 +57,7 @@ class PlannerWorkScopeValidationTests(unittest.TestCase):
         asyncio.run(DeepPlannerResolver(model, _compound_catalog()).resolve(request))
         raw["steps"][1]["source_goal_ids"] = ["foreign-goal"]
         with self.assertRaises(SchemaValidationError):
-            Draft202012Validator(model.prompts[0][1]["response_format"]).validate(raw)
+            Draft202012Validator(model.prompts[0][1]["response_format"]).validate(declared_ability_needs(raw, model.prompts[0][1]["response_format"]))
 
 
 
@@ -515,7 +516,7 @@ class CanonicalDeepPlanContractTests(unittest.TestCase):
                     run_request, raw = self.speech_outcomes(disposition, sibling)
                     model = SequencedOllama([copy.deepcopy(raw)])
                     plan = asyncio.run(DeepPlannerResolver(model, FullCatalog()).resolve(run_request))
-                    Draft202012Validator(model.prompts[0][1]["response_format"]).validate(raw)
+                    Draft202012Validator(model.prompts[0][1]["response_format"]).validate(declared_ability_needs(raw, model.prompts[0][1]["response_format"]))
                     self.assertNotIn("error", plan.metadata)
                     self.assertEqual(plan.disposition, raw["disposition"])
                     self.assertEqual(plan.steps, [])
@@ -3409,7 +3410,7 @@ class PlannerCompoundResolverRegressionTests(unittest.TestCase):
                 self.assertEqual(plan.disposition, 'execute', plan)
                 self.assertEqual(plan.steps[-1].args, {'direction': 'left', 'count': 1})
                 self.assertEqual(len(model.prompts), 1)
-                Draft202012Validator(model.prompts[0][1]['response_format']).validate(raw)
+                Draft202012Validator(model.prompts[0][1]['response_format']).validate(declared_ability_needs(raw, model.prompts[0][1]['response_format']))
 
     def test_canonical_passes_preserve_count_without_requiring_it_on_walk(self):
         from agent.app.fast_planner import FastPlannerResolver
@@ -3423,7 +3424,7 @@ class PlannerCompoundResolverRegressionTests(unittest.TestCase):
                 self.assertEqual(plan.disposition, 'execute', plan)
                 self.assertEqual([s.args for s in plan.steps], [{'duration_s': 1}, {'count': 2}])
                 self.assertEqual(len(model.prompts), 1)
-                Draft202012Validator(model.prompts[0][1]['response_format']).validate(raw)
+                Draft202012Validator(model.prompts[0][1]['response_format']).validate(declared_ability_needs(raw, model.prompts[0][1]['response_format']))
 
     def test_canonical_fast_and_deep_keep_compound_work_on_one_goal(self):
         from agent.app.fast_planner import FastPlannerResolver
@@ -3438,4 +3439,4 @@ class PlannerCompoundResolverRegressionTests(unittest.TestCase):
                 self.assertTrue(all(s.source_goal_ids == ['goal-compound'] for s in plan.steps))
                 self.assertEqual([s.args for s in plan.steps], [{'duration_s': 1}, {'count': 2}])
                 self.assertEqual(len(model.prompts), 1)
-                Draft202012Validator(model.prompts[0][1]['response_format']).validate(raw)
+                Draft202012Validator(model.prompts[0][1]['response_format']).validate(declared_ability_needs(raw, model.prompts[0][1]['response_format']))

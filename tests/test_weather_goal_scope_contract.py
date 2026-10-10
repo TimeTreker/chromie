@@ -17,7 +17,7 @@ from agent.app import goal_association_prompt as ga_prompt
 from agent.app import planner_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
 from tests.test_goal_association_pr2 import FakeOllama, create_goals, intent_goal
-from tests.test_fast_planner_pr3 import execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
+from tests.test_fast_planner_pr3 import FakeOllama as PlannerOllama, execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 
@@ -113,7 +113,7 @@ async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
     assert not canonical.object.get("bindings")
     goal_id = canonical.goal_id
     arguments = {"location": location, "date": date, "period": period}
-    planner_model = FakeOllama(multi_goal_plan(
+    planner_model = PlannerOllama(multi_goal_plan(
         disposition="execute", coverage="complete", goal_summary=text,
         steps=[execute_step("weather", "chromie.weather.lookup", arguments, [goal_id], "Acquire the forecast.")],
         goal_outcomes={goal_id: execute_outcome(goal_id, ["weather"], "Acquire before explaining.")},

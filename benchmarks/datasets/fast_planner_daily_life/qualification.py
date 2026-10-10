@@ -252,6 +252,45 @@ class CaptureModel:
             yield ""
 
 
+def _ability_need_capability_ids(schema: Any) -> list[str] | None:
+    """Loaded Capability IDs a need-first decoder accepts, or None when it requires no needs."""
+    if not isinstance(schema, dict):
+        return None
+    for shape in (schema, *[item for key in ("oneOf", "anyOf") for item in schema.get(key) or []]):
+        needs = (shape.get("properties") or {}).get("ability_needs") if isinstance(shape, dict) else None
+        if isinstance(needs, dict):
+            ids = needs["items"]["properties"]["closest_loaded"]["enum"]
+            return [item for item in ids if item != "none"]
+    return None
+
+
+def declared_ability_needs(reply: Any, response_format: Any) -> Any:
+    """Adapt a fixture authored before the need-first contract (2026-10-10).
+
+    When the decoder requires ability_needs and the fixture omits it, each loaded
+    Capability the fixture uses is declared as one fitting need. Fixtures that
+    exercise need-first carry explicit ability_needs and are returned unchanged.
+    """
+    loaded = _ability_need_capability_ids(response_format)
+    if loaded is None or not isinstance(reply, dict) or "ability_needs" in reply:
+        return reply
+    used = [item.get("capability_id") for key in ("activities", "steps")
+            for item in reply.get(key) or [] if isinstance(item, dict)]
+    needs = [{"need": f"realize {capability_id}", "closest_loaded": capability_id,
+              "closest_loaded_does": f"declared contract of {capability_id}"[:80], "fits": True}
+             for capability_id in dict.fromkeys(used) if capability_id in loaded][:4]
+    return {"ability_needs": needs, **reply}
+
+
+def declared_ability_needs_text(raw: str, response_format: Any) -> str:
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError):
+        return raw
+    adapted = declared_ability_needs(value, response_format)
+    return raw if adapted is value else json.dumps(adapted, ensure_ascii=False)
+
+
 class ReplayModel:
     def __init__(self, raw: str) -> None:
         self.raw = raw
@@ -262,11 +301,11 @@ class ReplayModel:
         value = json.loads(self.raw)
         if not isinstance(value, dict):
             raise ValueError("candidate canonical output is not an object")
-        return value
+        return declared_ability_needs(value, kwargs.get("response_format"))
 
     async def generate_stream(self, prompt: Any, **kwargs: Any) -> AsyncIterator[str]:
         self.calls += 1
-        yield self.raw
+        yield declared_ability_needs_text(self.raw, kwargs.get("response_format"))
 
 
 async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
