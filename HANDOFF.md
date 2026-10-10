@@ -1,6 +1,58 @@
 # Chromie Handoff
 
-## Current delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
+## Current delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
+
+Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `03f4e7e20`.
+The expected resume revision is the latest commit containing this file.
+
+Changed: `llm/sglang/Dockerfile` (#652 backport and regression test),
+`docs/CONFIGURATION.md`, `docs/STATUS.md`, this file and the checkpoint.
+
+The canonical gate was run from a clean worktree (HEAD plus this patch; the main checkout
+contains a peer's `.claude/worktrees/`, which breaks `check_docs`). Policies, docs and test
+ownership exit 0. `run_tests.sh` exit 0: 169 / 4,040 / 5 skips / 1,065 subtests / 20 legacy.
+
+Image and deployment (already done on this host):
+
+```bash
+docker build -t chromie-sglang:xgr652-20261010 llm/sglang          # all image-build tests pass
+docker tag chromie-sglang:gemma4-fp8 chromie-sglang:pre-xgr652-20261010   # rollback (b419ac92)
+docker tag chromie-sglang:xgr652-20261010 chromie-sglang:gemma4-fp8
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-llm
+```
+
+The Agent runs `chromie-agent:main-03f4e7e20`, clean source with a verified digest
+(rollback `chromie-agent:pre-skill-lookup-20261010`). Runtime identity `c0b5a157…` is in
+`.chromie/acceptance/skill-lookup-20261010/runtime-identity.json`. The host rebooted on
+2026-10-10, so start Soridormi first: `(cd ../soridormi && ./scripts/run_scenario.sh
+--scenario configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer)`.
+
+Evidence `.chromie/acceptance/skill-lookup-20261010/`:
+- `make_cohort.py` and `oracle.json`: the cohort, declared before inference.
+- `wrap_harness.py`: live run with Fast DTO recording, writing to `fast_requests/`.
+- `live/`, `bundle/`: live results and the debug bundle.
+- `regen.py`, `regen_host.py`: production request regeneration and Host check inside the
+  Agent container (22/22 byte-identical to live).
+- `run_arm.py`, `adjudicate.py`: arms `A_live_requests`, `B_preloaded`, `D_all_loaded`
+  (old image) and `*_xgr652` (new image).
+
+The new Deep baseline replay is `../workdag-deep-20261009/deep_baseline_xgr652`. XGrammar
+probes (`probe.py`, `hypo.py`, `count_compiled.py`, `synthetic.py`) and the test Dockerfiles
+were in the session scratch area; the README records their results.
+
+```bash
+cd .chromie/acceptance/skill-lookup-20261010
+python run_arm.py <arm> <requests.json>          # restarts chromie-llm first; keep the Agent idle
+python adjudicate.py A_xgr652 B_xgr652 D_xgr652
+python3 build_needfirst.py                        # candidate requests from frozen_first_requests.json
+python run_arm.py N1_needfirst needfirst_requests.json && python3 adjudicate_needfirst.py
+python run_arm.py N2_second second_requests.json  # second calls (built with regen2.py / jobs_second.json)
+```
+
+Live captures now need `runtime-identity-xgr652.json` (identity `e7f966c3…`). The older
+identity is bound to the replaced SGLang image, and the harness refuses it.
+
+## Previous delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `ede7acc15`.
 Evidence: `.chromie/acceptance/workdag-deep-20261009/`. The expected resume revision is the

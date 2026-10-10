@@ -1,6 +1,19 @@
 # Chromie Current Status
 
-## Current delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
+## Current delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | `llm/sglang/Dockerfile` applies the C++ part of upstream XGrammar #652 to the pinned 0.2.1 native build. FSM edges stored rule IDs as int16; Planner decoders compile to 29k–41k rules, and past 32767 a reference wraps. A cached compile then fails `grammar_functor.cc:2369` (HTTP 400 before inference); uncached, it segfaults. The image build adds a 39,900-rule regression through the patched backend. No Chromie runtime, prompt, Schema or contract change. |
+| Automatic verification | Reproduced on the upstream 0.2.1 wheel and both Chromie images. Compiled rules: 34,170 and 41,111 fail; 29,058 and 5,467 pass. Upstream #963 alone segfaults; #652 alone compiles all 25 retained failing and passing schemas. Image-build tests pass. Fresh-lifetime native replays on the new image versus the old one: 22/22 live Fast requests and 56/56 Deep requests byte-identical. 15 former HTTP 400 requests now decode. |
+| Target validation | No live cohort on the new image yet. A report-only skill-lookup cohort (22 cases, old image, clean `main` 03f4e7e20) found that the Fast library lookup never fired: 0/10 library-skill requests correct, all substituted. With the correct contract preloaded, 9/10 were Host-accepted, and on the new image 10/10 decode. |
+| Deployment state | `chromie-llm` = `chromie-sglang:gemma4-fp8` = `03ad9e33` (also tagged `xgr652-20261010`; rollback `pre-xgr652-20261010` = `b419ac92`). `chromie-agent:latest` = `main-03f4e7e20` (rollback `pre-skill-lookup-20261010`). The laptop profile image builds from the same Dockerfile but was not rebuilt or qualified. No release. |
+
+Evidence: `.chromie/acceptance/skill-lookup-20261010/` (README.md; image arms `arm_*_xgr652`);
+`.chromie/acceptance/workdag-deep-20261009/deep_baseline_xgr652`; bundle
+`/home/chromie/Downloads/chromie_debug_bundle_20261010_095029.tar.gz` (skill-lookup live).
+
+## Previous delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
 
 | Axis | Current evidence |
 | --- | --- |

@@ -1,6 +1,79 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
+## Current delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
+
+Base: `origin/main` `03f4e7e20`.
+
+Owner direction (2026-10-10, not yet implemented):
+- Remove the Deep Planner as a second planner.
+- The one Planner first lists the abilities it needs and whether loaded skills cover them.
+  If a need is uncovered, the Agent searches the catalog, loads the candidates, and the
+  Planner plans once more (at most once, with no plan in the first pass).
+- Order: fix the XGrammar failure first, then a frozen contrast of that need-first contract.
+- Charter changes (PLANNER-AUTHORITY-001, ~line 747, ~line 1312) still need explicit
+  owner approval of the drafted text.
+
+Observed failure: with library skills loaded, the decoder request failed as HTTP 400
+before inference (B 1/12; D 14/22).
+
+| Order | Module / owner | Actual | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | Planner decoder Schema (Agent) | valid JSON Schema; 34k–41k compiled rules | same | correct (large; burden noted) |
+| 2 | XGrammar 0.2.1 native compile (SGLang image) | int16 rule ID wraps past 32767 → `per_rule_fsm_hashes` check / segfault | compile | incorrect (earliest) |
+| 3 | SGLang → Agent | HTTP 400; Planner stage fails | decoded output | symptom |
+
+Repair: backport the upstream #652 C++ diff in `llm/sglang/Dockerfile`, add an image-build
+regression test, and document it in `docs/CONFIGURATION.md`. Upstream #963 (hasher order)
+is not needed and is not applied.
+
+Evidence (`.chromie/acceptance/skill-lookup-20261010/`, README.md):
+- Reproduction and isolation: probes in the scratch area, summarized in README.
+- Neutrality (fresh lifetimes, new vs old image): A 22/22 and Deep baseline 56/56
+  byte-identical; B 11/11 identical, and 1 former 400 decodes.
+- D: 14 former 400s decode, and 8 changed because the old lifetime contained failures. Host
+  check: library 9/10 correct (excluding the two UMI speech-typed celebrate cases), controls
+  6/6, absent cases still escalate to Deep (3) or are rejected (1).
+- Canonical gate: see HANDOFF.
+- No live cohort on the new image.
+
+Skill-lookup findings (report-only, old image):
+- Live: one Fast call per turn and the lookup never fired. Library requests 0/10 correct,
+  all substitutions; Chromie's speech after a substitution was misleading.
+- Deep was reached twice (backflip) and failed both times.
+
+Known failures carried forward:
+1. "同时" chaining (LoRA later).
+2. Invented clarification in walk → turn.
+3. UMI span-overlap 503s.
+4. GA merged walk + sing.
+5. Soridormi `source` and multiple-bottle refusal.
+6. Planner decoration.
+7. Library lookup never fires.
+8. Absent abilities escalate to a failing Deep.
+9. SC answered "Got it." to Chinese turns.
+10. Single-goal timed requests on streaming Fast are unverified.
+
+Need-first frozen experiment (done, report-only, new image; README "Need-first contract
+experiment"; 26 cases including 4 indirect ones):
+- The Planner's need texts are accurate, but its own `covered_by` judgment substitutes
+  (library 11/15). Do not trust model self-assessment of coverage.
+- An Agent-side check (BM25 of the Planner's need text over the catalog; a gap exists when the
+  top match is not loaded) found 15/15 library gaps with the target first, and gave 6/6
+  controls no false gap.
+- Second call with the searched contracts: target chosen in 13/13 library cases, 9/13
+  Host-accepted. The remaining rejections are pre-existing decoration or empty source refs.
+- Latency is unchanged or lower.
+- Open: a no-match need (backflip) must become an honest unavailable instead of escalating
+  to Deep; "make coffee" drifts to "acquire and deliver" (meaning).
+
+Next:
+1. Owner review of the experiment and the Charter draft. Proposed contract: needs-first
+   without `covered_by`; Agent check by search; at most one re-plan; no-match is unavailable;
+   Deep removed.
+2. Implement it with Deep removal, migrate the replay corpus, run the gate and a live cohort.
+3. Rebuild and qualify the laptop profile image.
+
+## Previous delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
 
 Base: `origin/main` `ede7acc15` (Fast WorkDAG). Owner decisions on 2026-10-09:
 - Converge the Deep Planner next.

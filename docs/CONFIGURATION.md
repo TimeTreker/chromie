@@ -1110,6 +1110,15 @@ options stay pinned. The image build checks real parser acceptance/rejection and
 reset at expression IDs 127999/128000/128001. Image labels retain source/patch
 identity. Remove this backport when a reviewed upstream runtime contains
 [XGrammar's sentinel-removing refactor](https://github.com/mlc-ai/xgrammar/commit/db4b9557a3984841ccff930333e54bc2a319068e).
+The image also applies the C++ part of upstream
+[XGrammar #652](https://github.com/mlc-ai/xgrammar/pull/652). XGrammar 0.2.1 stores FSM
+edge rule IDs as int16, while Planner decoders compile to 29k–41k rules. Past 32767, a
+rule reference wraps to another rule. A cached compile then fails
+`grammar_functor.cc:2369` (`per_rule_fsm_hashes`) as HTTP 400 before inference; an
+uncached one segfaults. The upstream 0.2.1 wheel fails the same way. The image build
+compiles a 39,900-rule decoder through the patched backend with its cache enabled. It
+checks that a declared instance is accepted and an over-length string is rejected.
+Remove this backport together with the #716 one.
 The pinned image also bounds XGrammar's retained compiler cache to 512 MiB and
 removes the backend's second unbounded strong-reference cache. Dynamic per-turn schemas
 previously accumulated until the scheduler exhausted host RAM. In-flight requests retain

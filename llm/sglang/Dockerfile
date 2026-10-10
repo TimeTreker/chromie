@@ -19,6 +19,14 @@ if source.count(before) != 1:
     raise RuntimeError('Pinned Earley sentinel changed; review the compiler backport')
 path.write_text(source.replace(before, 'kUnexpandedRuleStartSequenceId = -2;'))
 PY
+# In 0.2.1, FSM edges store rule ids as int16. Planner decoders compile to 29k-41k
+# rules; past 32767 a reference wraps to another rule, so a cached compile fails
+# grammar_functor.cc:2369 (per_rule_fsm_hashes) and an uncached one segfaults.
+# Apply only the C++ part of the upstream fix. Remove this backport when adopting
+# an upstream runtime containing mlc-ai/xgrammar#652.
+RUN git -C /tmp/xgrammar fetch --depth 2 origin da28642d8e228f11fb2292d018710466d9bb59c1 && \
+    git -C /tmp/xgrammar diff da28642d8e228f11fb2292d018710466d9bb59c1^ \
+      da28642d8e228f11fb2292d018710466d9bb59c1 -- cpp/ | git -C /tmp/xgrammar apply --verbose
 COPY test_xgrammar_parser.cc /tmp/test_xgrammar_parser.cc
 RUN cmake -S /tmp/xgrammar -B /tmp/xgrammar/build -DCMAKE_BUILD_TYPE=Release && \
     cmake --build /tmp/xgrammar/build -j 6 && \
@@ -32,7 +40,7 @@ RUN cmake -S /tmp/xgrammar -B /tmp/xgrammar/build -DCMAKE_BUILD_TYPE=Release && 
 FROM lmsysorg/sglang@sha256:59e11312666e1c5c155210ea335589b91daa0d70848521b390b93b1b1e8fb0ef
 COPY --from=xgrammar-build /tmp/xgrammar/python/xgrammar/libxgrammar_bindings.so /opt/sglang/lib/python3.12/site-packages/xgrammar/libxgrammar_bindings.so
 LABEL org.chromie.xgrammar.source="5b4e9ce9e72524037ae24ecd831b9b6604d2eb48" \
-      org.chromie.xgrammar.patch="earley-unexpanded-sentinel-minus-two"
+      org.chromie.xgrammar.patch="earley-unexpanded-sentinel-minus-two,fsm-edge-int32-rule-id-652"
 
 # The unified constructor skips the parent constructor, but inherits forward(),
 # which reads lm_head_is_tied. Preserve the exact existing GPU branch predicate.
@@ -186,5 +194,33 @@ for count in (0, 8, 16, 17, 128):
 raw = json.dumps({'text': 'left' + ' ' * 128 + 'of me'})
 if not backend.dispatch_json(json.dumps(bounded)).matcher.accept_string(raw):
     raise RuntimeError('Layout policy changed whitespace in a string value')
+backend.executor.shutdown(wait=True)
+PY
+
+# Planner-sized decoders compile past 32767 rules. Exercise the shipped native
+# library through the same patched backend, with its compiler cache enabled.
+RUN python3 - <<'PY'
+import json
+from xgrammar import TokenizerInfo
+from sglang.srt.constrained.xgrammar_backend import XGrammarGrammarBackend
+
+class Tokenizer:
+    def init_xgrammar(self):
+        return TokenizerInfo([bytes([i]) for i in range(256)], stop_token_ids=[255]), None
+
+backend = XGrammarGrammarBackend(Tokenizer(), 256)
+fields = [f'p{i}' for i in range(300)]
+schema = {'type': 'object', 'additionalProperties': False, 'required': fields,
+          'properties': {name: {'type': 'string', 'maxLength': 160} for name in fields}}
+for _ in range(2):
+    grammar = backend.dispatch_json(json.dumps(schema))
+    if not hasattr(grammar, 'matcher'):
+        raise RuntimeError('Grammar beyond 32767 rules failed to compile')
+    if not grammar.matcher.accept_string(json.dumps({name: 'x' for name in fields})):
+        raise RuntimeError('Large grammar rejected a declared instance')
+    long_value = {name: 'x' for name in fields}
+    long_value['p299'] = 'x' * 161
+    if backend.dispatch_json(json.dumps(schema)).matcher.accept_string(json.dumps(long_value)):
+        raise RuntimeError('Large grammar accepted an over-length string')
 backend.executor.shutdown(wait=True)
 PY
