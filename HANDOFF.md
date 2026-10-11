@@ -49,6 +49,17 @@ python scripts/general_ability_acceptance.py --mode live-text --scenario-root $E
 `$E/scenarios/` holds the 20 design and 16 held-out cases; `oracle.json` holds the labels
 declared on 2026-10-10.
 
+Run 1 (Agent `chromie-agent:vj-cfafb7d9b`, rollback `chromie-agent:pre-value-judgment-20261011`,
+Soridormi water scene running, LLM `03ad9e33`) stopped after 2 of 36 cases on an evidence
+lineage failure. Evidence is in `$E/run1/` (live, live.log, bundle). The fix commit changes
+only the Orchestrator and docs, so the deployed Agent image still matches; recapture the
+identity at the new revision before the full cohort. Lineage-fix verification: strict replay
+6,000/6,000 with zero model calls (`python scripts/run_workflow_replay.py --workers 8
+--evidence-dir <dir>`); gate result below.
+
+Fix gate from a clean worktree (`cfafb7d9b` plus the fix): policies, docs and test ownership exit
+0; `run_tests.sh` exit 0: 169 / 4,060 / 5 skips / 1,065 subtests / 20 legacy.
+
 ## Previous delivery — Need-first Planner (stage A), 2026-10-10
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `08c93650d`.

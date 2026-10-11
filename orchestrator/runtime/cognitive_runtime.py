@@ -230,12 +230,37 @@ def _association_semantic_lineage(
     return merge_semantic_artifact_lineage(base, refs)
 
 
+_VALUE_JUDGMENT_STEP_ANNOTATIONS = ("value_judgment", "value_confirmation_required", "value_withheld")
+
+
+def planner_authored_plan_payload(plan: CanonicalPlan) -> dict[str, Any]:
+    """The Planner-authored artifact of a Plan, without Host-owned annotations.
+
+    After the Planner, the Host may add Runtime-owned communication needs (confirmation)
+    and Value Judgment verdicts to the same Plan identity. Those are not Planner
+    authorship, so every ``planner_plan`` artifact digests this projection: the Planner's
+    original and the annotated Plan stay one artifact, and real divergence still fails.
+    """
+    payload = plan.model_dump(mode="json", exclude_none=True)
+    if "communication_needs" in payload:
+        payload["communication_needs"] = [
+            need for need in payload["communication_needs"] if need.get("owner") != "runtime"
+        ]
+    if isinstance(payload.get("metadata"), dict):
+        payload["metadata"].pop("value_judgment", None)
+    for step in payload.get("steps") or []:
+        for key in _VALUE_JUDGMENT_STEP_ANNOTATIONS:
+            if isinstance(step.get("metadata"), dict):
+                step["metadata"].pop(key, None)
+    return payload
+
+
 def _plan_semantic_lineage(
     base: SemanticArtifactLineage, plan: CanonicalPlan,
 ) -> SemanticArtifactLineage:
     return merge_semantic_artifact_lineage(
         base, semantic_artifact_ref(
-            plan, artifact_kind="planner_plan", artifact_id=plan.plan_id,
+            planner_authored_plan_payload(plan), artifact_kind="planner_plan", artifact_id=plan.plan_id,
         ),
     )
 
@@ -489,7 +514,7 @@ class CognitiveEvidenceRecorder:
             if plan is None:
                 continue
             plan_ref = pack(
-                plan,
+                planner_authored_plan_payload(plan),
                 kind="planner_plan",
                 artifact_id=plan.plan_id,
                 authority="planner",

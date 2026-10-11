@@ -397,7 +397,12 @@ history too; their Plan/Goal parent refs become mandatory when the live transpor
 carrying those refs across the execution boundary. This lineage does not make the chain serial:
 GA, Planner and SC may still run concurrently from the same accepted source. Parent refs prove
 provenance; they do not transfer authority. In particular, a Planner envelope cannot rewrite UMI
-WHAT and an SC envelope cannot authorize Work.
+WHAT and an SC envelope cannot authorize Work. A Planner Plan artifact is what the Planner
+authored: Host additions to the same Plan identity (Runtime-owned confirmation needs and Value
+Judgment verdicts on reviewed steps) are excluded from its payload and digest
+(`planner_authored_plan_payload`), and they stay on the recorded terminal Plan. The Planner's
+original and the annotated Plan are therefore one artifact, and any other divergence still
+fails the digest check.
 
 Envelope construction is trusted-code bookkeeping after the semantic decision, never a model
 output field. It must not make prompts larger merely to expose IDs/digests that the model does
