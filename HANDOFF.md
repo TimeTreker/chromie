@@ -60,8 +60,8 @@ identity at the new revision before the full cohort. Lineage-fix verification: s
 Fix gate from a clean worktree (`cfafb7d9b` plus the fix): policies, docs and test ownership exit
 0; `run_tests.sh` exit 0: 169 / 4,060 / 5 skips / 1,065 subtests / 20 legacy.
 
-Run 2 evidence: `$E/live/`, `$E/live.log`, `$E/bundle/` (incomplete: simulator crash at case 23;
-`python3 adjudicate.py live bundle 23`). SC qualification: `$E/sc_guard/` (`run_arm.py`, oracle,
+Run 2 evidence: `$E/run2/` (incomplete: simulator crash at case 23;
+`python3 adjudicate.py run2/live run2/bundle 23`). Run 3 evidence: `$E/live/`, `$E/bundle/` (cases 1-22; `python3 adjudicate.py live bundle 23`) and `$E/live_tail/`, `$E/bundle_tail/` (cases 23-36, `scenarios_tail/`). Summary: `$E/README.md`. SC qualification: `$E/sc_guard/` (`run_arm.py`, oracle,
 arms A/B). The fix commit changes the Agent (SC), so rebuild and redeploy it before run 3. Restart
 the scene with the same `run_scenario.sh` command, then `docker restart soridormi-runtime-mcp` and
 wait for "Scenario clock reset" in the runner log.
