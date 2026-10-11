@@ -1,13 +1,13 @@
 # Chromie Current Status
 
-## Current delivery — Deep Planner retired (stage B), 2026-10-11 (local branch)
+## Current delivery — Deep Planner retired (stage B), 2026-10-11
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | One Planner (PLANNER-AUTHORITY-001): Deep resolver, `/deep-plan`, escalate/continuations and three settings removed; honest `unavailable` limitation (streamed Activity, canonical per-Goal outcome); commitment bar 0.75; structural defects fail closed; need-first search covers contracts the Goal filter hid. Branch `deep-removal`, not pushed. |
+| Implementation | One Planner (PLANNER-AUTHORITY-001): Deep resolver, `/deep-plan`, escalate/continuations and three settings removed; honest `unavailable` limitation (streamed Activity, canonical per-Goal outcome); commitment bar 0.75; structural defects fail closed; need-first search covers contracts the Goal filter hid. Pushed with open items (conditional composition, multi-Responsibility mixed limitation, SC silence on a limitation). |
 | Automatic verification | Worktree suite 3,924 passed; canonical gate passed on `227aceb03`; corpus freeze 23 (`17adda34…`) strict replay 6,000/6,000 with zero model calls; behavior scenarios 15/15. |
 | Target validation | Live text + MuJoCo: library lookup 9/10 (before 0/10); simple limitation honest on the Planner side after `7eb9ee1fc`; conditional composition 0/4 and multi-Responsibility mixed limitation 0/4 (Deep failed these live before too); SC silent on 2/3 limitation results. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `stageB-7eb9ee1fc` from the worktree compose; rollback `vj-3f19ecf0d`. No release. |
+| Deployment state | `chromie-agent:latest` = the stage B image on this host; rollback `vj-3f19ecf0d`. No release. |
 
 Evidence: `.chromie/acceptance/deep-removal-20261011/` (README.md).
 

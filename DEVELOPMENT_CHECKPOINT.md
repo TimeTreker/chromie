@@ -1,8 +1,10 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Deep Planner retired (stage B), 2026-10-11 (local branch, not pushed)
+## Current delivery — Deep Planner retired (stage B), 2026-10-11
 
-Branch `deep-removal`, rebased on `5ea034e35` (Value Judgment, pushed). Owner decisions:
+Base `origin/main` `5ea034e35` (Value Judgment). Pushed as the commit series from
+`e7404c623` (developed on branch `deep-removal`); the expected resume revision is the latest commit
+containing this file. On 2026-10-11 the owner chose to push stage B with the open items below. Owner decisions:
 PLANNER-AUTHORITY-001 (one Planner) and VALUE-JUDGMENT-001 (Deep's "should I act" intent);
 the approved draft's Deep-retirement item ("Fast escalate becomes an honest unavailable outcome; migrate the Deep
 corpus families"); "OK, go on" (2026-10-11). Evidence: `.chromie/acceptance/deep-removal-20261011/` (README.md, PLAN.md).
@@ -53,8 +55,9 @@ Known open (owner decision needed before claiming parity with Deep's intended ab
 3. SC may leave a Planner limitation result need pending (silent after an acknowledgement).
 4. Speech-only deception review (from Value Judgment) is still an open owner decision.
 
-Next: owner decision on 1-3; then full 30-case cohort on the final revision; squash the WIP
-commits; push only with the owner's OK.
+Next: owner decision on 1-3 (proposal: a typed "decide after this read" requirement in the
+streamed Work decision, native enforcement of the canonical assignment branches, and an SC rule
+that a Planner limitation result is said in the same turn); then the full 30-case cohort.
 
 ## Previous delivery — Value Judgment (VALUE-JUDGMENT-001), 2026-10-11
 
