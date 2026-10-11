@@ -2112,7 +2112,7 @@ class GoalScopedLifecycleTests(unittest.TestCase):
                 "canonical_plan_fingerprint": "a" * 64,
                 "canonical_plan": {
                     "plan_id": "plan-weather",
-                    "planner_tier": "deep",
+                    "planner_tier": "fast",
                     "disposition": "execute",
                     "coverage": "complete",
                     "confidence": 0.95,

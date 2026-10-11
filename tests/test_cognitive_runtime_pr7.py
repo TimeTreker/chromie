@@ -321,14 +321,10 @@ def _stream_advance_from_canonical_plan(
         coverage=plan.coverage,
         covered_responsibility_refs=list(all_refs),
         activities=activities,
-        continuations=(
-            ["deep_planner"] if plan.disposition == "escalate" else []
-        ),
         confidence=plan.confidence,
         unresolved=list(plan.unresolved),
         reason_summary=(
-            plan.escalation_reason
-            or str(plan.metadata.get("reason") or "")
+            str(plan.metadata.get("reason") or "")
             or plan.goal_summary
             or "Fixture preserves the canonical Planner decision."
         ),
@@ -378,13 +374,12 @@ class ScriptedClient:
         *,
         association: GoalAssociationResolution,
         fast_plans: list[CanonicalPlan],
-        deep_plans: list[CanonicalPlan] | None = None,
         fast_advances: list[FastPlannerAdvance] | None = None,
     ):
         self.association = association
         self.social_requests = []
         self.social_words = {}
-        for plan in [*fast_plans, *(deep_plans or [])]:
+        for plan in fast_plans:
             for goal_id in plan.goal_ids:
                 outcome = next((item for item in plan.goal_outcomes if item.goal_id == goal_id), None)
                 words = (outcome.response_text if outcome is not None else "") or plan.response_text
@@ -392,7 +387,6 @@ class ScriptedClient:
                     self.social_words[goal_id] = words
         self.fast_plans = [work_fixture(plan) for plan in fast_plans]
         self._explicit_fast_advances = fast_advances is not None
-        self.deep_plans = [work_fixture(plan) for plan in (deep_plans or [])]
         self.fast_advances = list(
             fast_advances
             if fast_advances is not None
@@ -410,7 +404,6 @@ class ScriptedClient:
                             for ref in item.source_responsibility_refs
                         ],
                         activities=[],
-                        continuations=[],
                         confidence=0.95,
                         unresolved=["no scripted Fast decision supplied"],
                         reason_summary="No scripted Fast decision supplied.",
@@ -418,7 +411,6 @@ class ScriptedClient:
                 ]
             )
         )
-        self.deep_contexts: list[dict] = []
         self.calls: list[str] = []
 
     async def stream_fast_advance(self, *args, **kwargs):
@@ -456,11 +448,6 @@ class ScriptedClient:
         self.calls.append("fast")
         return self.fast_plans.pop(0)
 
-    async def resolve_deep_plan(self, *args, **kwargs):
-        self.calls.append("deep")
-        request = kwargs.get("request")
-        self.deep_contexts.append(dict(getattr(request, "context", {}) or {}))
-        return self.deep_plans.pop(0)
 
 def new_goal_association(goal_id: str = "goal-1", *, source_ref: str = "r1") -> GoalAssociationResolution:
     return GoalAssociationResolution(
@@ -555,7 +542,7 @@ def execute_plan(
         }
     return CanonicalPlan(
         plan_id=plan_id,
-        planner_tier="deep",
+        planner_tier="fast",
         disposition="execute",
         coverage="complete",
         confidence=0.91,
@@ -2287,24 +2274,22 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "prepared_until_canonical_validation",
         )
 
-    def test_fast_planner_complexity_disposition_skips_second_fast_plan_after_goal_binding(self):
+    def test_unavailable_decision_is_terminal_without_a_second_planner_pass(self):
+        # One Planner (PLANNER-AUTHORITY-001): a limitation is an honest terminal outcome,
+        # never a delegation to another planner.
         advance = FastPlannerAdvance(
             turn_id="turn-complex",
-            disposition="escalate",
+            disposition="unavailable",
             coverage="uncertain",
             covered_responsibility_refs=["fetch-water"],
-            activities=[
-            ],
-            continuations=["deep_planner"],
-            unresolved=["multi-step physical dependencies"],
+            activities=[],
+            unresolved=["multi-step physical dependencies beyond the four-step budget"],
             confidence=0.91,
-            reason_summary="Meaning is clear but HOW needs deeper planning.",
+            reason_summary="No supplied Capability realizes this within the step budget.",
         )
-        deep = execute_plan().model_copy(update={"planner_tier": "deep"})
         client = ScriptedClient(
-            association=body_goal_association(),
+            association=body_goal_association(source_ref="fetch-water"),
             fast_plans=[],
-            deep_plans=[deep],
             fast_advances=[advance],
         )
         runtime = FastAdvanceRuntime([blink_definition()])
@@ -2340,14 +2325,11 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "applied")
-        self.assertCountEqual(
-            client.calls[:3],
-            ["stream", "association", "deep"],
-        )
-        self.assertEqual(client.calls[3:], [])
-        self.assertIsNone(result.fast_plan)
-        self.assertEqual(result.terminal_plan.planner_tier, "deep")
-        self.assertEqual(result.metadata["fast_planner_path"], "deep_escalation")
+        self.assertCountEqual(client.calls, ["stream", "association"])
+        self.assertEqual(result.terminal_plan.disposition, "unavailable")
+        self.assertEqual(result.terminal_plan.steps, [])
+        self.assertEqual(result.interaction_response.capabilities, [])
+        self.assertEqual(result.metadata["fast_planner_path"], "terminal")
 
     def test_runtime_trace_profiles_actual_goal_driven_modules(self):
         client = ScriptedClient(
@@ -2593,7 +2575,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 coverage="uncertain",
                 covered_responsibility_refs=["restaurant"],
                 activities=[],
-                continuations=[],
                 unresolved=["no exact capability selected"],
                 confidence=0.95,
                 reason_summary="Capability availability is decided after canonical Goal binding.",
@@ -2632,7 +2613,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     coverage="uncertain",
                     covered_responsibility_refs=["r1"],
                     activities=[],
-                    continuations=[],
                     confidence=0.95,
                     unresolved=["terminal bounded limitation"],
                     reason_summary=f"Fast Planner terminal {disposition} decision.",
@@ -2890,8 +2870,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.interaction_response.capabilities, [])
         self.assertEqual(result.interaction_response.speech[0].text, "你好。")
         self.assertEqual(result.metadata["fast_planner_path"], "terminal")
-        self.assertFalse(result.metadata["deep_planner_invoked"])
-        self.assertTrue(result.metadata["deep_planner_avoided"])
 
     def test_respond_delivery_failure_cannot_complete_goal(self):
         plan = respond_plan()
@@ -3023,7 +3001,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_safe_read_preserves_model_owned_specific_pre_action_speech(self):
         plan = CanonicalPlan(
             plan_id="plan-weather",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=0.96,
@@ -3336,7 +3314,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_safe_read_may_start_silently_without_delivery_barrier(self):
         plan = CanonicalPlan(
             plan_id="plan-weather-silent",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=0.96,
@@ -3443,17 +3421,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
     def test_mixed_speech_limitations_deliver_without_capability_work(self):
-        from tests.test_deep_planner_pr4 import CanonicalDeepPlanContractTests
+        from tests.test_planner_canonical_contract import CanonicalPlanContractTests
         from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
 
         for disposition in ("clarify", "unavailable", "refused"):
             with self.subTest(disposition=disposition):
-                _, raw = CanonicalDeepPlanContractTests.speech_outcomes(disposition, sibling=True)
+                _, raw = CanonicalPlanContractTests.speech_outcomes(disposition, sibling=True)
                 plan = CanonicalPlan.model_validate(materialize_planner_output(
-                    PlannerModelOutput.model_validate(raw), planner_tier="deep",
+                    PlannerModelOutput.model_validate(raw), planner_tier="fast",
                     plan_id="mixed-speech", expected_goal_ids_for_turn=list(raw["goal_outcomes"]),
                 ))
-                work_request, _ = CanonicalDeepPlanContractTests.speech_outcomes(disposition, sibling=True)
+                work_request, _ = CanonicalPlanContractTests.speech_outcomes(disposition, sibling=True)
                 client = ScriptedClient(association=new_goal_association(), fast_plans=[])
                 coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
                     adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()), policy=CognitiveRuntimePolicy(mode="apply"))
@@ -3488,7 +3466,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_explicit_fail_closed_advisory_is_silent_and_non_executable(self):
         plan = CanonicalPlan(
             plan_id="plan-truth-rejected-silent",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="clarify",
             coverage="uncertain",
             confidence=0.0,
@@ -3522,21 +3500,23 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "not_applicable",
         )
 
-    def test_deep_failure_producers_preserve_safe_silence_and_original_error(self):
+    def test_planner_failure_producers_preserve_safe_silence_and_original_error(self):
         from agent.app.planner_fallback import (
-            materialize_deep_clarify, materialize_deep_unavailable,
+            materialize_planner_failure, materialize_planner_unavailable,
         )
         from tests.test_fast_planner_pr3 import _work_request
 
-        request = _work_request(sid="deep-failure", text="Bring that to me.")
+        request = _work_request(sid="planner-failure", text="Bring that to me.")
         feedback = [{"type": "parallel_resource_claim_conflict"}]
-        for producer in (materialize_deep_clarify, materialize_deep_unavailable):
+        for producer in (materialize_planner_failure, materialize_planner_unavailable):
             for error in (None, ValueError("original invalid output")):
+                if producer is materialize_planner_unavailable and error is not None:
+                    continue  # an honest limitation carries no error
                 with self.subTest(producer=producer.__name__, error=error):
                     plan = producer(
                         "rejected-plan", request, "original_rejection",
                         unresolved=["parallel_resource_claim_conflict"],
-                        error=error,
+                        **({"error": error} if error is not None else {}),
                         metadata={"validation_feedback": feedback, "execution_allowed": True},
                     )
                     self.assertIs(plan.metadata["execution_allowed"], False)
@@ -3556,7 +3536,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_unmarked_missing_planner_text_remains_a_contract_error(self):
         plan = CanonicalPlan(
             plan_id="plan-clarify-missing-text",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="clarify",
             coverage="uncertain",
             confidence=0.0,
@@ -3644,7 +3624,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         goal_ids = ["goal-walk", "goal-nod", "goal-turn"]
         plan = CanonicalPlan(
             plan_id="plan-walk-nod-turn",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=0.95,
@@ -3783,7 +3763,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_mixed_execute_and_clarify_preserves_coordinated_model_speech(self):
         plan = CanonicalPlan(
             plan_id="plan-mixed-execute-clarify",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="mixed",
             coverage="complete",
             confidence=0.93,
@@ -3883,7 +3863,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertFalse(coordinated.metadata["runtime_confirmation_required"])
         self.assertFalse(response.requires_confirmation)
 
-    def test_fast_terminal_multi_goal_mixed_plan_skips_deep_planner(self):
+    def test_fast_terminal_multi_goal_mixed_plan_is_terminal(self):
         fast = CanonicalPlan(
             plan_id="fast-mixed",
             planner_tier="fast",
@@ -3955,49 +3935,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(client.calls[2:], [])
         self.assertEqual(result.terminal_plan.planner_tier, "fast")
         self.assertEqual(result.metadata["fast_planner_path"], "terminal")
-        self.assertFalse(result.metadata["deep_planner_invoked"])
-        self.assertTrue(result.metadata["fast_plan_committed_without_deep"])
         self.assertEqual(result.metadata["fast_goal_outcome_count"], 2)
         self.assertEqual(result.metadata["fast_executable_step_count"], 1)
-
-    def test_semantic_escalation_records_normal_deep_invocation_reason(self):
-        fast = CanonicalPlan(
-            plan_id="fast-semantic-escalation",
-            planner_tier="fast",
-            disposition="escalate",
-            coverage="partial",
-            confidence=0.9,
-            goal_ids=["goal-1"],
-            escalation_reason="rare capability requires full planning",
-            metadata={"path_classification": "semantic_escalation"},
-        )
-        client = ScriptedClient(
-            association=body_goal_association(),
-            fast_plans=[fast],
-            deep_plans=[execute_plan()],
-        )
-        coordinator = GoalDrivenRuntimeCoordinator(
-            agent_client=client,
-            adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([blink_definition()])),
-            policy=CognitiveRuntimePolicy(
-                mode="apply"
-            ),
-        )
-
-        result = self.run_resolution(
-            coordinator, client, text="眨眼。"
-        )
-
-        self.assertEqual(result.status, "applied")
-        self.assertEqual(
-            result.metadata["deep_planner_invocation_reason"],
-            "fast_planner_advance_complexity",
-        )
-        self.assertEqual(result.metadata["stage_diagnostics"], [])
-        self.assertEqual(
-            client.deep_contexts[0]["deep_planner_invocation_reason"],
-            "fast_planner_advance_complexity",
-        )
 
     def test_fast_failure_preserves_completed_goal_association_commit_truth(self):
         committed = asyncio.Event()
@@ -4057,7 +3996,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.metadata["authoritative_goal_count"], 1)
         self.assertCountEqual(client.calls, ["stream", "association"])
 
-    def test_fast_contract_failure_does_not_invoke_deep_planner(self):
+    def test_fast_contract_failure_fails_closed(self):
         validation_feedback = [
             {
                 "type": "invalid_args",
@@ -4068,11 +4007,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         fast = CanonicalPlan(
             plan_id="fast-invalid-args",
             planner_tier="fast",
-            disposition="escalate",
+            disposition="unavailable",
             coverage="uncertain",
             confidence=0.0,
             goal_ids=["goal-1"],
-            escalation_reason="fast_planner_model_contract_failed",
             metadata={
                 "path_classification": "contract_failure",
                 "validation_feedback": validation_feedback,
@@ -4098,7 +4036,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         client = ContractFailureClient(
             association=body_goal_association(),
             fast_plans=[],
-            deep_plans=[execute_plan()],
             fast_advances=[],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -4116,19 +4053,16 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.status, "error")
         self.assertEqual(result.metadata["failure_stage"], "fast_planner_stream")
         self.assertEqual(result.metadata["fast_planner_path"], "")
-        self.assertFalse(result.metadata["deep_planner_invoked"])
 
-        self.assertEqual(client.deep_contexts, [])
 
-    def test_fast_contract_failure_stays_visible_without_deep_repair(self):
+    def test_fast_contract_failure_stays_visible_without_repair(self):
         fast = CanonicalPlan(
             plan_id="fast-contract-failure",
             planner_tier="fast",
-            disposition="escalate",
+            disposition="unavailable",
             coverage="uncertain",
             confidence=0.0,
             goal_ids=["goal-1"],
-            escalation_reason="fast_planner_model_contract_failed",
             metadata={
                 "resolver": "fast_planner",
                 "status": "escalate",
@@ -4157,7 +4091,6 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         client = ContractFailureClient(
             association=body_goal_association(),
             fast_plans=[],
-            deep_plans=[execute_plan()],
             fast_advances=[],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -4176,31 +4109,17 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.metadata["failure_stage"], "fast_planner_stream")
         self.assertEqual(result.metadata["failure_class"], "structured_output_validation")
         self.assertEqual(result.metadata["fast_planner_path"], "")
-        self.assertFalse(result.metadata["deep_planner_invoked"])
         self.assertNotIn("initial_raw_output", result.metadata)
         self.assertNotIn("repair_raw_output", result.metadata)
-        self.assertEqual(client.deep_contexts, [])
 
     def test_apply_robot_action_uses_runtime_confirmation_contract(self):
         client = ScriptedClient(
             association=body_goal_association(),
-            fast_plans=[
-                CanonicalPlan(
-                    plan_id="fast-escalate",
-                    planner_tier="fast",
-                    disposition="escalate",
-                    coverage="partial",
-                    confidence=0.9,
-                    escalation_reason="needs full planning",
-                )
-            ],
-            deep_plans=[
-                execute_plan().model_copy(
+            fast_plans=[execute_plan().model_copy(
                     update={
                         "response_text": "你愿意让我眨四下眼睛吗？如果可以，我就开始。"
                     }
-                )
-            ],
+                )],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
@@ -4258,17 +4177,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_apply_runtime_does_not_require_semantic_lane_allowlist(self):
         client = ScriptedClient(
             association=body_goal_association(),
-            fast_plans=[
-                CanonicalPlan(
-                    plan_id="fast-escalate",
-                    planner_tier="fast",
-                    disposition="escalate",
-                    coverage="partial",
-                    confidence=0.9,
-                    escalation_reason="needs full planning",
-                )
-            ],
-            deep_plans=[execute_plan()],
+            fast_plans=[execute_plan()],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
@@ -4343,7 +4252,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ],
         )
 
-    def test_runtime_conflict_fails_closed_without_host_replan(self):
+    def test_conflicting_activities_are_serialized_without_host_replan(self):
         walk = CapabilityDefinition(
             capability_id="soridormi.walk_forward",
             provider_id="soridormi.mcp",
@@ -4359,17 +4268,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             metadata={"resource_claims": ["base_motion"]},
         )
         blink = blink_definition()
-        fast = CanonicalPlan(
-            plan_id="fast-escalate",
-            planner_tier="fast",
-            disposition="escalate",
-            coverage="partial",
-            confidence=0.9,
-            escalation_reason="compound goal",
-        )
         invalid = CanonicalPlan(
-            plan_id="deep-parallel",
-            planner_tier="deep",
+            plan_id="planner-parallel",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=0.9,
@@ -4392,24 +4293,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             ],
             goal_satisfaction={"score": 1.0, "status": "exact"},
         )
-        revised = invalid.model_copy(
-            deep=True,
-            update={
-                "plan_id": "deep-sequential",
-                "steps": [
-                    invalid.steps[0].model_copy(update={"timing": "sequential"}),
-                    invalid.steps[1].model_copy(update={"timing": "sequential"}),
-                ],
-                "metadata": {
-                    "plan_relation": "alternative",
-                    "user_confirmation_required": True,
-                },
-            },
-        )
         client = ScriptedClient(
             association=body_goal_association(),
-            fast_plans=[fast],
-            deep_plans=[invalid, revised],
+            fast_plans=[invalid],
         )
         coordinator = GoalDrivenRuntimeCoordinator(
             agent_client=client,
@@ -4421,30 +4307,15 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         result = self.run_resolution(
             coordinator, client, text="边走边眨眼。"
         )
-        self.assertEqual(result.status, "error")
-        self.assertIn(
-            "runtime validation rejected terminal canonical plan",
-            result.fallback_reason,
-        )
-        self.assertEqual(len(client.deep_contexts), 1)
-        self.assertNotIn("host_replan", client.deep_contexts[0].values())
+        # The Planner authors WorkDAG dependencies, not raw timing: Activities whose
+        # resources cannot overlap are serialized by the Host, never rejected or re-planned.
+        self.assertEqual(result.status, "applied")
         self.assertEqual(
-            [step.timing for step in result.terminal_plan.steps],
-            ["parallel", "parallel"],
+            [(item.capability_id, item.timing) for item in result.interaction_response.capabilities],
+            [("soridormi.walk_forward", "sequential"), ("soridormi.blink_eyes", "sequential")],
         )
-        # Invalid Work still cannot dispatch, but terminal failure is now an
-        # explicit runtime-owned result Need. Social Cognition communicates that
-        # result instead of leaving the user with a silent failed task.
-        self.assertIsNotNone(result.interaction_response)
-        self.assertEqual(result.interaction_response.capabilities, [])
-        self.assertTrue(result.interaction_response.speech)
-        self.assertTrue(
-            result.interaction_response.speech[0].metadata.get("addressed_need_ids")
-        )
-        self.assertEqual(
-            result.interaction_response.metadata["social_cognition_resolution"]["disposition"],
-            "communicate",
-        )
+        self.assertEqual(client.calls.count("stream"), 1)
+        self.assertNotIn("fast", client.calls)
 
     def test_goal_state_is_visible_even_when_later_activity_validation_fails(self):
         applied = []
@@ -4657,7 +4528,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     def test_mixed_plan_executes_effectful_goal_and_preserves_ownership(self):
         plan = CanonicalPlan(
             plan_id="plan-mixed-runtime",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="mixed",
             coverage="complete",
             confidence=0.94,
@@ -5131,7 +5002,6 @@ class FastInformationAcquisitionLifecycleTests(unittest.TestCase):
                     reason_summary="Acquire fresh weather Evidence before answering.",
                 )
             ],
-            continuations=[],
             confidence=1.0,
             unresolved=[],
             reason_summary="Acquire the requested information first.",
@@ -5224,8 +5094,7 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
         plan = CanonicalPlan(plan_id="ga-revision-plan", planner_tier="fast", disposition="respond",
             coverage="complete", goal_ids=["goal-1"], response_text="按新的要求来。", confidence=0.98)
         contract_failure = CanonicalPlan(plan_id="ga-contract-failure", planner_tier="fast",
-            disposition="escalate", coverage="uncertain", goal_ids=["goal-1"], confidence=0.0,
-            escalation_reason="fast_planner_contract_failure",
+            disposition="unavailable", coverage="uncertain", goal_ids=["goal-1"], confidence=0.0,
             metadata={"path_classification": "contract_failure", "failure_class": "dto_contract_invalid"})
 
         class Client(ScriptedClient):

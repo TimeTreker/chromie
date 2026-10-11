@@ -61,7 +61,7 @@ def single_plan() -> CanonicalPlan:
 def two_goal_plan() -> CanonicalPlan:
     return CanonicalPlan(
         plan_id="plan-two-goals",
-        planner_tier="deep",
+        planner_tier="fast",
         disposition="execute",
         coverage="complete",
         confidence=0.93,
@@ -103,7 +103,7 @@ def two_goal_plan() -> CanonicalPlan:
 def shared_step_plan() -> CanonicalPlan:
     return CanonicalPlan(
         plan_id="plan-shared-step",
-        planner_tier="deep",
+        planner_tier="fast",
         disposition="execute",
         coverage="complete",
         confidence=0.91,
@@ -138,7 +138,7 @@ def shared_step_plan() -> CanonicalPlan:
 def mixed_plan() -> CanonicalPlan:
     return CanonicalPlan(
         plan_id="plan-mixed",
-        planner_tier="deep",
+        planner_tier="fast",
         disposition="mixed",
         coverage="complete",
         confidence=0.92,

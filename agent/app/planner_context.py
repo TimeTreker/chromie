@@ -1319,9 +1319,31 @@ _LIBRARY_SEARCH_STOP_WORDS = frozenset(
 )
 
 
+def _library_search_stem(word: str) -> str:
+    """Light English suffix folding so "sing" meets a declared "singing" mode."""
+    for suffix in ("ing", "ed", "s"):
+        if word.endswith(suffix) and not word.endswith("ss") and len(word) - len(suffix) >= 3:
+            return word[: -len(suffix)]
+    return word
+
+
 def _library_search_terms(text: str) -> list[str]:
     words = re.findall(r"[a-z]+", text.lower().replace("_", " ").replace(".", " "))
-    return [word for word in words if word not in _LIBRARY_SEARCH_STOP_WORDS]
+    return [_library_search_stem(word) for word in words if word not in _LIBRARY_SEARCH_STOP_WORDS]
+
+
+def _contract_enum_vocabulary(schema: Any, limit: int = 64) -> list[str]:
+    """String enum values a contract declares for its arguments (its own vocabulary)."""
+    found: list[str] = []
+    stack = [schema]
+    while stack and len(found) < limit:
+        node = stack.pop()
+        if isinstance(node, dict):
+            found.extend(value for value in node.get("enum") or [] if isinstance(value, str))
+            stack.extend(node.values())
+        elif isinstance(node, list):
+            stack.extend(node)
+    return found[:limit]
 
 
 def search_capability_library(
@@ -1329,7 +1351,8 @@ def search_capability_library(
 ) -> list[str]:
     """Rank unloaded library contracts against the Planner's own unmet-need wording.
 
-    BM25 over each contract's ID, description and when-to-use text. Retrieval only
+    BM25 over each contract's ID, description, when-to-use text and declared argument enum
+    values (for example a vocal provider's supported modes). Retrieval only
     decides which contracts the Planner reads next; it never chooses what executes.
     Restricted, unavailable and non-executable entries are never returned.
     """
@@ -1340,6 +1363,7 @@ def search_capability_library(
     ]
     documents = [_library_search_terms(" ".join((
         item.capability_id, item.description or "", str((item.hints or {}).get("when_to_use") or ""),
+        *_contract_enum_vocabulary(item.input_schema),
     ))) for item in candidates]
     if not documents:
         return []

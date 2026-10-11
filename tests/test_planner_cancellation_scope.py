@@ -13,12 +13,10 @@ import json
 import pytest
 from jsonschema import Draft202012Validator
 
-from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_context import planner_goal_context
-from benchmarks.datasets.fast_planner_daily_life.deep_qualification import load_cases
 from benchmarks.datasets.fast_planner_daily_life.qualification import (
-    CaptureModel, ReplayModel, StaticCatalog, materialize_catalog,
+    load_request_fixture_cases as load_cases, CaptureModel, ReplayModel, StaticCatalog, materialize_catalog,
 )
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
@@ -59,7 +57,7 @@ def report(request):
                         rationale='Control reporting does not fulfill the original effect.')
     return word_free_model_fixture(dict(disposition='respond', coverage='complete', confidence=0.99,
                 goal_summary='Report the trusted control result.', response_text=speech,
-                steps=[], auxiliary_activities=[], escalation_reason='', unresolved=[],
+                steps=[], auxiliary_activities=[], unresolved=[],
                 parameter_resolutions=[], time_conditions=[], plan_relation='exact',
                 user_confirmation_required=False, goal_satisfaction=copy.deepcopy(satisfaction),
                 goal_outcomes={gid: dict(disposition='respond', coverage='complete',
@@ -67,7 +65,7 @@ def report(request):
                     rationale='Report the exact trusted control facts.')}))
 
 
-@pytest.mark.parametrize('resolver', [FastPlannerResolver, DeepPlannerResolver])
+@pytest.mark.parametrize('resolver', [FastPlannerResolver])
 @pytest.mark.parametrize('language', ['en', 'zh'])
 @pytest.mark.parametrize('control', ['cancelled', 'released', 'not_cancelled', 'uncertain'])
 @pytest.mark.parametrize('available', [True, False])
@@ -95,7 +93,7 @@ def test_control_report_preserves_catalog_truth_and_unmet_effect(resolver, langu
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('resolver', [FastPlannerResolver, DeepPlannerResolver])
+@pytest.mark.parametrize('resolver', [FastPlannerResolver])
 @pytest.mark.parametrize('mutation', ['fake_fulfillment', 'confirmation', 'reschedule', 'extra_work'])
 def test_control_scope_rejects_false_completion_and_execution(resolver, mutation):
     async def run():

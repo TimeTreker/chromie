@@ -163,7 +163,6 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
                     },
                 },
                 fast_workflow_stage="fast_planner_goal_cancellation_reentry",
-                deep_workflow_stage="planner_deep_pass_goal_cancellation_reentry",
                 response_source="fast_planner_goal_cancellation_reentry",
             )
         )

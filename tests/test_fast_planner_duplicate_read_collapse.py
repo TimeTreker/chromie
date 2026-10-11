@@ -13,7 +13,6 @@ def _output(*activities: dict) -> FastPlannerAdvanceModelOutput:
             "coverage": "complete",
             "covered_responsibility_refs": ["r1"],
             "activities": list(activities),
-            "continuations": [],
             "confidence": 1.0,
             "unresolved": [],
             "reason_summary": "Use the trusted read capability.",

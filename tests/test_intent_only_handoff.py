@@ -188,8 +188,7 @@ def capability(name, properties, *, tier="common"):
 
 def work(activities):
     return {"disposition": "execute", "coverage": "complete",
-        "covered_responsibility_refs": ["r1"], "activities": activities,
-        "continuations": [], "confidence": 1.0, "unresolved": [],
+        "covered_responsibility_refs": ["r1"], "activities": activities, "confidence": 1.0, "unresolved": [],
         "reason_summary": "Complete requested activities in source order."}
 
 
@@ -1338,8 +1337,7 @@ async def test_library_contracts_unusable_for_the_turn_trigger_no_second_call():
     wave = capability("wave", {}, tier="rare")
     first = {"ability_needs": [need("wave one hand")], "disposition": "respond", "coverage": "complete",
         "covered_responsibility_refs": ["r1"], "activities": [{"role": "complete_response", "activity_id": "joke",
-        "source_responsibility_refs": ["r1"], "timing": "sequential", "rationale": "Tell the joke."}],
-        "continuations": [], "confidence": 1.0, "unresolved": [], "reason_summary": "Answer in speech."}
+        "source_responsibility_refs": ["r1"], "timing": "sequential", "rationale": "Tell the joke."}], "confidence": 1.0, "unresolved": [], "reason_summary": "Answer in speech."}
     model = Model([first])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([wave])).stream_advance(request)]
     assert len(model.packets) == 1

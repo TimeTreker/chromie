@@ -185,7 +185,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
 
     def test_decoder_projects_exact_same_name_speed_binding(self):
         base = canonical_plan_response_schema(
-            planner_tier="deep",
+            planner_tier="fast",
             expected_goal_ids=["goal-walk"],
             allowed_capability_ids=["soridormi.walk_forward"],
             capability_input_schemas={

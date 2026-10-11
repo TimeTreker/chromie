@@ -19,7 +19,6 @@ from agent.app.cognitive_identity import (
     owner_approved_personality_context,
     owner_approved_stable_mind_context,
 )
-from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.goal_association_contract import GoalSegmentationModelOutput
@@ -52,11 +51,6 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                         "success_criteria": [],
                     }
                 ],
-            },
-            "fast_plan_resolution": {
-                "disposition": "escalate",
-                "coverage": "uncertain",
-                "steps": [],
             },
         }
         self.request = cognitive_work_request(
@@ -168,21 +162,14 @@ class CognitiveIdentityContextTests(unittest.TestCase):
             11_264,
         )
 
-    def test_fast_and_deep_planner_prompts_share_same_identity(self) -> None:
-        fast = FastPlannerResolver(_Dummy(), _Dummy())
+    def test_planner_prompt_carries_the_owner_approved_identity(self) -> None:
+        FastPlannerResolver(_Dummy(), _Dummy())
         fast_prompt = planner_prompt.fast_plan_prompt(
             self.request,
             [],
             response_schema={},
         )
-        deep = DeepPlannerResolver(_Dummy(), _Dummy())
-        deep_prompt = planner_prompt.deep_plan_prompt(
-            self.request,
-            [],
-            response_schema={},
-            expected_goal_ids=["goal-identity"],
-        )
-        for prompt in (fast_prompt, deep_prompt):
+        for prompt in (fast_prompt,):
             self.assertIn("Owner-approved Chromie identity JSON", prompt)
             self.assertIn('"name":"Chromie"', prompt)
             self.assertIn('"age_description":"12 years old"', prompt)
@@ -200,7 +187,6 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         changed = self.request.model_copy(update={"text": "第二个问题"})
         goal = GoalAssociationResolver(_Dummy())
         fast = FastPlannerResolver(_Dummy(), _Dummy())
-        deep = DeepPlannerResolver(_Dummy(), _Dummy())
         pairs = (
             (
                 ga_prompt.layered_prompt(
@@ -219,21 +205,6 @@ class CognitiveIdentityContextTests(unittest.TestCase):
                 planner_prompt.fast_layered_prompt(self.request, [], response_schema={}),
                 planner_prompt.fast_layered_prompt(changed, [], response_schema={}),
                 planner_prompt.fast_system_prompt(),
-            ),
-            (
-                planner_prompt.deep_layered_prompt(
-                    self.request,
-                    [],
-                    response_schema={},
-                    expected_goal_ids=["goal-identity"],
-                ),
-                planner_prompt.deep_layered_prompt(
-                    changed,
-                    [],
-                    response_schema={},
-                    expected_goal_ids=["goal-identity"],
-                ),
-                planner_prompt.deep_system_prompt(),
             ),
         )
 

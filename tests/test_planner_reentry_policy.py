@@ -23,7 +23,7 @@ from agent.app.planner_prompt import (
     planner_reentry_execution_truth_projection,
     planner_reentry_source_work_projection,
 )
-from agent.app.planner_fallback import materialize_fast_escalation
+from agent.app.planner_fallback import materialize_planner_failure
 from agent.app.planner_model_contract import (
     PlannerEvidenceReentryModelOutput,
     PlannerModelOutput,
@@ -310,7 +310,7 @@ def test_fast_fail_safe_cannot_widen_typed_reentry_scope() -> None:
         context=context,
     )
 
-    fallback = materialize_fast_escalation(
+    fallback = materialize_planner_failure(
         "plan-fallback",
         request,
         "primary_semantic_validation_failed",
@@ -744,7 +744,6 @@ def test_fast_evidence_reentry_contract_is_disjoint_from_plan_envelopes() -> Non
         "confidence",
         "plan_relation",
         "user_confirmation_required",
-        "escalation_reason",
     }
     for forbidden in (
         "goal_outcomes", "steps", "disposition", "coverage",
@@ -767,7 +766,6 @@ def test_fast_evidence_reentry_contract_is_disjoint_from_plan_envelopes() -> Non
         "confidence": 1.0,
         "plan_relation": "exact",
         "user_confirmation_required": False,
-        "escalation_reason": "",
     }
     Draft202012Validator(schema).validate(valid)
     assert not Draft202012Validator(schema).is_valid({
@@ -794,7 +792,6 @@ def test_fast_evidence_reentry_lifts_to_current_planner_contract() -> None:
         "confidence": 1.0,
         "plan_relation": "exact",
         "user_confirmation_required": False,
-        "escalation_reason": "",
     })
     lifted = materialize_evidence_reentry_model_output(
         compact,
@@ -825,7 +822,7 @@ def _reentry_decision_output(status="exact", score=1.0):
             "rationale": "Fresh weather Evidence answers the current request.",
         }],
         "new_work": [], "confidence": 1.0, "plan_relation": "exact",
-        "user_confirmation_required": False, "escalation_reason": "",
+        "user_confirmation_required": False,
     }
 
 
@@ -849,7 +846,8 @@ def test_reentry_decoder_satisfaction_bands_match_dto(status, score):
 
 
 @pytest.mark.parametrize("goal_count", [1, 2])
-def test_reentry_decoder_escalation_reason_matches_actual_delegation(goal_count):
+def test_reentry_decoder_offers_no_delegation(goal_count):
+    # One Planner (PLANNER-AUTHORITY-001): re-entry decides, never delegates.
     from jsonschema import Draft202012Validator
 
     raw = _reentry_decision_output()
@@ -865,15 +863,10 @@ def test_reentry_decoder_escalation_reason_matches_actual_delegation(goal_count)
     )
     validator = Draft202012Validator(schema)
     assert validator.is_valid(raw)
-    raw["escalation_reason"] = "none"
-    assert not validator.is_valid(raw)
-    raw["escalation_reason"] = "Unresolved source Evidence needs deeper reasoning."
+    assert not validator.is_valid({**raw, "escalation_reason": "Needs deeper reasoning."})
     raw["goal_decisions"][-1].update(
         next_action="escalate", satisfaction_status="partial", satisfaction_score=0.5,
     )
-    assert validator.is_valid(raw)
-    PlannerEvidenceReentryModelOutput.model_validate(raw)
-    raw["escalation_reason"] = ""
     assert not validator.is_valid(raw)
 
 

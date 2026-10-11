@@ -15,14 +15,14 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
-from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.planner_context import completed_acquisition_goal_ids, completed_work_step_evidence
 from agent.app.planner_model_contract import PlannerModelOutput
-from benchmarks.datasets.fast_planner_daily_life.deep_qualification import load_cases
 from benchmarks.datasets.fast_planner_daily_life.qualification import (
     ReplayModel,
     StaticCatalog,
+    declared_ability_needs,
+    load_request_fixture_cases as load_cases,
     materialize_catalog,
 )
 from orchestrator.orchestrator import VoiceAssistant
@@ -172,12 +172,17 @@ def next_reply(request, rain):
 
 class CheckedReply(ReplayModel):
     async def generate(self, prompt, **kwargs):
-        value = await super().generate(prompt, **kwargs)
+        value = declared_ability_needs(await super().generate(prompt, **kwargs), kwargs["response_format"])
         Draft202012Validator(kwargs["response_format"]).validate(value)
         return value
 
 
-async def resolve(request, catalog, raw, tier="deep", *, compact=True):
+def loaded(catalog):
+    """The one Planner sees these episode Capabilities loaded (Deep's former full catalog)."""
+    return [{**item, "prompt_tier": "common"} for item in catalog]
+
+
+async def resolve(request, catalog, raw, tier="fast", *, compact=True):
     wire = word_free_model_fixture(raw)
     scope = request.planner_reentry_scope
     if tier == "fast" and compact and scope and scope.trigger in {"post_execution", "capability_result_reentry"}:
@@ -195,11 +200,9 @@ async def resolve(request, catalog, raw, tier="deep", *, compact=True):
             "new_work": wire["steps"], "confidence": wire["confidence"],
             "plan_relation": wire.get("plan_relation", "exact"),
             "user_confirmation_required": wire.get("user_confirmation_required", False),
-            "escalation_reason": wire.get("escalation_reason", ""),
         }
     model = CheckedReply(json.dumps(wire))
-    cls = FastPlannerResolver if tier == "fast" else DeepPlannerResolver
-    result = await cls(model, StaticCatalog(catalog)).resolve(request)
+    result = await FastPlannerResolver(model, StaticCatalog(loaded(catalog))).resolve(request)
     assert model.calls == 1
     return result
 
@@ -358,7 +361,7 @@ def test_completed_source_work_can_precede_a_new_answer_without_reexecution(lang
         original = copy.deepcopy(raw)
         followup, seen = await reenter(request, catalog, plan, adapter, response, bundle, raw)
         assert followup is not None and followup.speech and not followup.capabilities
-        for tier in ("fast", "deep"):
+        for tier in ("fast",):
             resolved = await resolve(seen, catalog, raw, tier)
             assert resolved.disposition == "respond", resolved.metadata
             need = resolved.communication_needs[0]
@@ -396,7 +399,7 @@ def test_unproved_prior_work_does_not_release_communication_order(fault):
             raw["goal_outcomes"][gid]["precedes_step_ids"] = [step_id]
         if fault not in {"unknown_step", "before"}:
             assert completed_work_step_evidence(context, reentry_scope=seen.planner_reentry_scope) == {}
-        for tier in ("fast", "deep"):
+        for tier in ("fast",):
             if fault in {"missing_terminal", "wrong_data", "wrong_hash"}:
                 with pytest.raises(ValueError, match="result-Evidence re-entry context does not match typed scope"):
                     await resolve(seen, catalog, raw, tier)
@@ -410,7 +413,7 @@ def test_unproved_prior_work_does_not_release_communication_order(fault):
 
 
 @pytest.mark.parametrize("language", ["en", "zh"])
-@pytest.mark.parametrize("tier", ["fast", "deep"])
+@pytest.mark.parametrize("tier", ["fast"])
 def test_partial_acquisition_is_complete_current_work(language, tier):
     async def run():
         request, catalog = scenario(language)
@@ -471,8 +474,8 @@ def test_conditional_episode_read_evidence_decision_and_terminal_delivery(langua
         ) == set(plan.goal_ids)
         assert status(manager, plan.goal_ids[0]) == "open"
         # Both depths can express the new primary decision from this exact packet.
-        deep = await resolve(seen, catalog, next_reply(request, rain), "deep")
-        assert deep.disposition == ("execute" if rain else "respond"), deep.metadata
+        replanned = await resolve(seen, catalog, next_reply(request, rain), "fast")
+        assert replanned.disposition == ("execute" if rain else "respond"), replanned.metadata
         if rain:
             assert next_response.requires_confirmation
             # Confirmation is independently enforced even if speech is omitted.
@@ -494,7 +497,7 @@ def test_conditional_episode_read_evidence_decision_and_terminal_delivery(langua
                     confirmed_request_ids={r.request_id for r in next_response.capabilities}
                 ),
             )
-            next_plan = deep.model_validate(next_response.metadata["canonical_plan"])
+            next_plan = replanned.model_validate(next_response.metadata["canonical_plan"])
             record_bundle(manager, next_response, next_plan, executed.results, request.sid)
             assert [call.capability_id for call in provider.calls] == [
                 "chromie.weather.lookup",
@@ -554,10 +557,9 @@ def test_acquisition_exception_cannot_admit_incomplete_or_effectful_work(mutatio
             raw["goal_outcomes"][gid]["step_ids"].append("create-reminder")
         else:
             raw["goal_satisfaction"] = assessment(gid)
-        for tier in ["fast", "deep"]:
-            cls = FastPlannerResolver if tier == "fast" else DeepPlannerResolver
+        for tier in ["fast"]:
             model = ReplayModel(json.dumps(raw))
-            result = await cls(model, StaticCatalog(catalog)).resolve(request.model_copy(deep=True))
+            result = await FastPlannerResolver(model, StaticCatalog(loaded(catalog))).resolve(request.model_copy(deep=True))
             assert result.disposition not in {"execute", "respond"}, (mutation, tier, result)
 
     asyncio.run(run())
@@ -603,9 +605,9 @@ def test_unqualified_acquisition_evidence_cannot_establish_either_branch(mutatio
             context["execution_outcome_bundle"]["goal_outcomes"][0]["acquisition_step_ids"] = []
         assert not completed_acquisition_goal_ids(context, reentry_scope=seen.planner_reentry_scope)
         for rain in [True, False]:
-            for tier, cls in [("fast", FastPlannerResolver), ("deep", DeepPlannerResolver)]:
+            for tier, cls in [("fast", FastPlannerResolver)]:
                 result = await cls(
-                    ReplayModel(json.dumps(next_reply(request, rain))), StaticCatalog(catalog)
+                    ReplayModel(json.dumps(next_reply(request, rain))), StaticCatalog(loaded(catalog))
                 ).resolve(seen.model_copy(deep=True))
                 assert result.disposition not in {"execute", "respond"}, (
                     mutation,
@@ -637,7 +639,6 @@ def test_reconciliation_rejects_rewritten_stage_under_same_outcome_identity():
 
 @pytest.mark.parametrize("weak_sibling", [False, True])
 def test_acquisition_does_not_waive_sibling_adequacy_or_complete_it(weak_sibling):
-    from agent.app.planner_deep_validation import deep_plan_validation_errors
     from agent.app.planner_fast_validation import qualify_fast_canonical_plan
     from shared.chromie_contracts.plan import CanonicalPlan
 
@@ -671,14 +672,6 @@ def test_acquisition_does_not_waive_sibling_adequacy_or_complete_it(weak_sibling
         else:
             raw["goal_satisfaction"]["satisfied_goal_ids"].append(sibling)
         mixed = CanonicalPlan.model_validate(raw)
-        errors = deep_plan_validation_errors(
-            mixed,
-            catalog,
-            expected_goal_ids=mixed.goal_ids,
-            authoritative_goals=[],
-            requires_execution=True,
-            min_goal_satisfaction=0.75,
-        )
         fast = qualify_fast_canonical_plan(
             mixed,
             capability_payload=catalog,
@@ -687,9 +680,8 @@ def test_acquisition_does_not_waive_sibling_adequacy_or_complete_it(weak_sibling
             evidence_reentry_goal_ids=set(),
         )
         assert fast.accepted is not weak_sibling
-        assert bool(errors) is weak_sibling
         if weak_sibling:
-            assert errors[0]["goal_id"] == sibling
+            assert sibling in fast.unresolved
             return
         runtime, provider = episode_runtime(catalog, True)
         response = await social_fixture_response(CanonicalPlanRuntimeAdapter(runtime),

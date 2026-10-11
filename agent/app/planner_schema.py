@@ -1229,6 +1229,10 @@ def fast_multi_goal_response_schema(
                     "goal_outcomes",
                 ],
             }
+            if not execute_count:
+                # No executable Goal: nothing to confirm (PlannerModelOutput rejects it too).
+                branch["properties"]["user_confirmation_required"] = {"type": "boolean", "const": False}
+                branch["required"].append("user_confirmation_required")
             assignment_branches.append(branch)
         schema.setdefault("allOf", []).append({"anyOf": assignment_branches})
         # Native decoders may ignore the cross-field intersection. Lift bounds

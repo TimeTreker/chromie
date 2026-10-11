@@ -204,7 +204,6 @@ async def _planner_evidence_reentry(
             },
         },
         fast_workflow_stage="fast_planner_evidence_reentry",
-        deep_workflow_stage="planner_deep_pass_evidence_reentry",
         response_source="fast_planner_evidence_reentry",
         repeat_check_evidence=evidence,
     )
@@ -625,7 +624,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     "time_condition": {"condition_id": "condition-reminder"},
                 },
                 fast_workflow_stage="fast_planner_time_condition_reentry",
-                deep_workflow_stage="planner_deep_pass_time_condition_reentry",
                 response_source="fast_planner_time_condition_reentry",
                 responsibilities_override=[responsibility],
             )
@@ -654,7 +652,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
         replanned = CanonicalPlan(
             plan_id="recover-deep-response",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="respond",
             coverage="complete",
             confidence=0.98,
@@ -755,7 +753,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     "cognitive_opportunity": opportunity.prompt_projection(),
                 },
                 fast_workflow_stage="fast_planner_situation_revision_reentry",
-                deep_workflow_stage="planner_deep_pass_situation_revision_reentry",
                 response_source="planner_situation_revision_reentry",
                 responsibilities_override=[responsibility],
             )

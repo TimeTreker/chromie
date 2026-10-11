@@ -992,7 +992,6 @@ async def apply_due_time_condition_opportunity(
             "cognitive_opportunity": opportunity.prompt_projection(),
         },
         fast_workflow_stage="fast_planner_time_condition_reentry",
-        deep_workflow_stage="planner_deep_pass_time_condition_reentry",
         response_source="fast_planner_time_condition_reentry",
         responsibilities_override=responsibilities,
     )

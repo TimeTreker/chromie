@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from agent.app import planner_validation
-from agent.app import planner_deep_validation
 from agent.app import planner_fast_validation
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
@@ -76,7 +75,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-    def test_typed_information_domain_qualifies_deep_planner_catalog(self) -> None:
+    def test_typed_information_domain_qualifies_planner_catalog(self) -> None:
         capabilities = [
             {
                 "capability_id": "chromie.weather.lookup",
@@ -175,7 +174,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         unavailable_schema = canonical_plan_response_schema(
-            planner_tier="deep",
             expected_goal_ids=["goal-presence"],
             allowed_capability_ids=[],
             requires_execution=True,
@@ -195,7 +193,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("response_text", unavailable_outcome["properties"])
 
         incomplete_resource_schema = canonical_plan_response_schema(
-            planner_tier="deep",
             expected_goal_ids=["goal-mug"],
             allowed_capability_ids=["soridormi.acquire_resource"],
             requires_execution=True,
@@ -218,7 +215,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
 
         mixed_schema = canonical_plan_response_schema(
-            planner_tier="deep",
             expected_goal_ids=["goal-walk", "goal-sing"],
             allowed_capability_ids=["soridormi.walk_forward"],
             requires_execution=True,
@@ -263,7 +259,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(
             any(
                 branch.get("properties", {}).get("disposition", {}).get("enum")
-                and "escalate"
+                and "unavailable"
                 in branch.get("properties", {}).get("disposition", {}).get("enum", [])
                 and "exact"
                 not in branch.get("properties", {})
@@ -290,12 +286,10 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         ]
 
         self.assertFalse(planner_validation.requires_safety_revision(feedback))
-        self.assertFalse(hasattr(planner_deep_validation, "safety_revision_contract_errors"))
         self.assertFalse(hasattr(planner_schema, "deep_safety_revision_response_schema"))
 
     def test_planner_schema_requires_confirmation_for_material_adjustment(self) -> None:
         schema = canonical_plan_response_schema(
-            planner_tier="deep",
             expected_goal_ids=["goal-walk"],
             allowed_capability_ids=["soridormi.walk_forward"],
         )
@@ -319,7 +313,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("response_text", schema["properties"])
 
         fast = canonical_plan_response_schema(
-            planner_tier="fast",
             expected_goal_ids=["goal-walk"],
             allowed_capability_ids=["soridormi.walk_forward"],
             requires_execution=True,
@@ -344,9 +337,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_planner_schema_keeps_time_conditions_and_provider_confirmation(self) -> None:
-        for planner_tier in ("fast", "deep"):
+        for planner_tier in ("fast",):
             schema = canonical_plan_response_schema(
-                planner_tier=planner_tier,
                 expected_goal_ids=["goal-reminder"],
                 allowed_capability_ids=["chromie.reminder.create"],
                 confirmation_required_capability_ids=["chromie.reminder.create"],
@@ -427,20 +419,20 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             planner_validation.validate_goal_binding_argument_grounding(
                 output, authoritative_goals=[goal], capabilities=capabilities)
 
-    def test_fast_escalation_outcome_schema_forbids_response_text(self) -> None:
+    def test_limitation_outcome_schema_forbids_response_text(self) -> None:
         schema = fast_multi_goal_response_schema(
             expected_goal_ids=["goal-wave"],
             allowed_capability_ids=[],
         )
         outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-wave"]
-        escalation = next(
+        limitation = next(
             branch["then"]
             for branch in outcome["allOf"]
             if branch.get("if", {}).get("properties", {}).get("disposition", {}).get("enum")
-            == ["escalate"]
+            == ["unavailable"]
         )
         self.assertNotIn("response_text", outcome["properties"])
-        self.assertEqual(escalation["properties"]["step_ids"]["maxItems"], 0)
+        self.assertEqual(limitation["properties"]["step_ids"]["maxItems"], 0)
 
     def test_fast_multi_goal_schema_keeps_effectful_goals_out_of_response(self) -> None:
         schema = fast_multi_goal_response_schema(
@@ -480,13 +472,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ]["enum"],
             ["complete"],
         )
-        escalation = next(
+        limitation = next(
             branch
             for branch in branches
-            if branch["properties"]["disposition"]["enum"] == ["escalate"]
+            if branch["properties"]["disposition"]["enum"] == ["unavailable"]
         )
         self.assertEqual(
-            escalation["properties"]["coverage"]["enum"],
+            limitation["properties"]["coverage"]["enum"],
             ["partial", "uncertain"],
         )
 
@@ -589,28 +581,15 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             allowed_capability_ids=["soridormi.walk_forward"],
             response_goal_ids=["goal-song"],
         )
-        deep_schema = canonical_plan_response_schema(
-            planner_tier="deep",
-            expected_goal_ids=["goal-walk", "goal-song"],
-            allowed_capability_ids=["soridormi.walk_forward"],
-            response_goal_ids=["goal-song"],
-        )
         self.assertEqual(
             fast_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
                 "disposition"
             ]["enum"],
-            ["respond", "clarify", "escalate"],
+            ["respond", "clarify", "unavailable"],
         )
-        for schema in (fast_schema, deep_schema):
-            outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-song"]
-            self.assertEqual(outcome["properties"]["step_ids"]["maxItems"], 0)
-        self.assertEqual(
-            deep_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
-                "disposition"
-            ]["enum"],
-            ["respond", "clarify", "unavailable", "refused"],
-        )
-        self.assertNotIn("response_text", deep_schema["properties"])
+        outcome = fast_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]
+        self.assertEqual(outcome["properties"]["step_ids"]["maxItems"], 0)
+        self.assertNotIn("response_text", fast_schema["properties"])
 
     def test_single_goal_fast_schema_enforces_respond_text_before_host_dto(self) -> None:
         schema = fast_multi_goal_response_schema(
@@ -684,7 +663,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             )
 
         tool_schema = canonical_plan_response_schema(
-            planner_tier="deep",
             expected_goal_ids=["goal-lookup", "goal-joke"],
             allowed_capability_ids=["chromie.weather.lookup"],
             requires_execution=True,
@@ -709,11 +687,11 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             },
         )
 
-    def test_deep_schema_offers_dependencies_and_constrains_nonexecute_confirmation(
+    def test_schema_offers_dependencies_and_constrains_nonexecute_confirmation(
         self,
     ) -> None:
-        schema = planner_schema.deep_plan_response_schema(
-            ["goal-walk"],
+        schema = planner_schema.canonical_plan_response_schema(
+            expected_goal_ids=["goal-walk"],
             allowed_capability_ids=["soridormi.walk_forward"],
             capability_input_schemas={
                 "soridormi.walk_forward": {
@@ -732,7 +710,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             item
             for item in schema["allOf"]
             if item.get("if", {}).get("properties", {}).get("disposition", {}).get("enum")
-            == ["respond", "clarify", "unavailable", "refused", "escalate"]
+            == ["respond", "clarify", "unavailable", "refused"]
         )
         self.assertEqual(
             confirmation_constraint["then"]["properties"]["user_confirmation_required"]["enum"],
@@ -774,7 +752,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_single_goal_fast_schema_requires_model_authored_outcome(self) -> None:
         schema = canonical_plan_response_schema(
-            planner_tier="fast",
             expected_goal_ids=["goal-weather"],
             allowed_capability_ids=["chromie.weather.lookup"],
         )
@@ -786,7 +763,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
 
     def test_tool_route_work_schema_excludes_speech_authority(self) -> None:
-        for tier in ("fast", "deep"):
+        for tier in ("fast",):
             schema = canonical_plan_response_schema(planner_tier=tier,
                 expected_goal_ids=["goal-weather"],
                 allowed_capability_ids=["chromie.weather.lookup"], requires_execution=True)
@@ -825,23 +802,21 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                     "satisfied_goal_ids": ["goal-blink"],
                 },
             }
-            for planner_tier in ("fast", "deep"):
+            for planner_tier in ("fast",):
                 with (
                     self.subTest(planner_tier=planner_tier, step_count=step_count),
                     self.assertRaisesRegex(ValueError, "depends_on"),
                 ):
                     planner_validation.validate_planner_model_output(
                         raw,
-                        planner_tier=planner_tier,
                         expected_goal_ids_for_turn=["goal-blink"],
                     )
 
             for index, step in enumerate(steps):
                 step["depends_on"] = [f"step-{index - 1}"] if index else []
-            for planner_tier in ("fast", "deep"):
+            for planner_tier in ("fast",):
                 validated = planner_validation.validate_planner_model_output(
                     raw,
-                    planner_tier=planner_tier,
                     expected_goal_ids_for_turn=["goal-blink"],
                 )
                 self.assertEqual([step.depends_on for step in validated.steps],
@@ -850,7 +825,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
     def test_safe_read_parallel_timing_is_exactly_provenanced(self) -> None:
         plan = CanonicalPlan(
             plan_id="plan-weather",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=1.0,
@@ -1057,7 +1032,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_deep_tool_schema_inlines_required_goal_outcome_fields(self) -> None:
         schema = canonical_plan_response_schema(
-            planner_tier="deep",
             expected_goal_ids=["goal-weather"],
             allowed_capability_ids=["chromie.weather.lookup"],
             requires_execution=True,

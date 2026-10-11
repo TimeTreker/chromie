@@ -134,6 +134,21 @@ def scenario_paths(dataset_root: Path = DATASET_ROOT) -> list[Path]:
     return sorted((dataset_root / "scenarios").glob("*/*/*.json"))
 
 
+def load_request_fixture_cases() -> list[dict[str, Any]]:
+    """Planner request fixtures (cancellation, readiness, re-entry contexts).
+
+    Authored for the retired Deep Planner (2026-10-11); kept as tier-neutral request inputs.
+    Their recorded targets describe Deep outputs and are not a Planner oracle.
+    """
+    cases = []
+    for path in sorted((DATASET_ROOT / "request_fixtures").glob("*/*/*.json")):
+        case = json.loads(path.read_text(encoding="utf-8"))
+        if path.stem != case.get("id"):
+            raise ValueError(f"{path}: request fixture id/path drift")
+        cases.append(case)
+    return cases
+
+
 def load_cases(dataset_root: Path = DATASET_ROOT) -> list[dict[str, Any]]:
     cases: list[dict[str, Any]] = []
     for path in scenario_paths(dataset_root):

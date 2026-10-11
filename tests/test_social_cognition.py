@@ -1333,7 +1333,7 @@ async def test_ordered_sc_answer_stays_between_work_steps_and_waits_for_delivery
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-    plan = CanonicalPlan(plan_id="ordered-work", planner_tier="deep", disposition="mixed", coverage="complete",
+    plan = CanonicalPlan(plan_id="ordered-work", planner_tier="fast", disposition="mixed", coverage="complete",
         goal_ids=["first", "say", "last"], steps=[
             {"step_id": "first-step", "capability_id": "soridormi.blink_eyes", "args": {"count": 1}, "source_goal_ids": ["first"]},
             {"step_id": "last-step", "capability_id": "soridormi.blink_eyes", "args": {"count": 2}, "source_goal_ids": ["last"]},

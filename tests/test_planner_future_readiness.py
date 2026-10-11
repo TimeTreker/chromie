@@ -37,7 +37,7 @@ def waiting_reply(request):
     return raw
 
 
-@pytest.mark.parametrize('tier', ['fast', 'deep'])
+@pytest.mark.parametrize('tier', ['fast'])
 @pytest.mark.parametrize('language', ['en', 'zh'])
 def test_waiting_acknowledgement_keeps_goal_open_without_provider_work(tier, language):
     async def run():
@@ -70,7 +70,7 @@ def test_waiting_acknowledgement_keeps_goal_open_without_provider_work(tier, lan
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('tier', ['fast', 'deep'])
+@pytest.mark.parametrize('tier', ['fast'])
 def test_future_goal_cannot_dispatch_even_with_exact_time_condition(tier):
     async def run():
         request,catalog=future_case()
@@ -79,18 +79,17 @@ def test_future_goal_cannot_dispatch_even_with_exact_time_condition(tier):
         raw['time_conditions']=waiting_reply(request)['time_conditions']
         # Deliberately bypass Schema in this check: the Host must reject early Work too.
         from agent.app.fast_planner import FastPlannerResolver
-        from agent.app.deep_planner import DeepPlannerResolver
         from benchmarks.datasets.fast_planner_daily_life.qualification import ReplayModel,StaticCatalog
         import json
         model=ReplayModel(json.dumps(raw))
-        cls=FastPlannerResolver if tier=='fast' else DeepPlannerResolver
+        cls=FastPlannerResolver
         plan=await cls(model,StaticCatalog(catalog)).resolve(request)
         assert not plan.steps and plan.metadata.get('failure_class'), plan
         assert model.calls==1
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('tier', ['fast', 'deep'])
+@pytest.mark.parametrize('tier', ['fast'])
 @pytest.mark.parametrize('offset', [-1, 0, 1])
 def test_exact_readiness_boundary_admits_work_only_at_or_after_due(tier, offset):
     async def run():
@@ -146,7 +145,7 @@ def test_old_future_condition_cannot_wake_cancelled_or_replaced_intention(termin
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('tier', ['fast','deep'])
+@pytest.mark.parametrize('tier', ['fast'])
 @pytest.mark.parametrize('mode', ['body_action','stateful_effect','singing','media_playback'])
 def test_future_provider_goal_waits_without_becoming_a_speech_goal(tier,mode):
     async def run():
@@ -170,7 +169,7 @@ def test_future_provider_goal_waits_without_becoming_a_speech_goal(tier,mode):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('tier', ['fast','deep'])
+@pytest.mark.parametrize('tier', ['fast'])
 def test_future_wait_preserves_an_independent_ready_action(tier):
     async def run():
         request,catalog=future_case()
@@ -199,12 +198,11 @@ def test_future_wait_preserves_an_independent_ready_action(tier):
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('tier',['fast','deep'])
+@pytest.mark.parametrize('tier',['fast'])
 def test_time_crossing_during_inference_preserves_the_primary_waiting_decision(tier):
     async def run():
         from tests.test_planner_staged_progress import CheckedReply
         from agent.app.fast_planner import FastPlannerResolver
-        from agent.app.deep_planner import DeepPlannerResolver
         from benchmarks.datasets.fast_planner_daily_life.qualification import StaticCatalog
         import json
         request,catalog=future_case();due=4092202800000
@@ -220,7 +218,7 @@ def test_time_crossing_during_inference_preserves_the_primary_waiting_decision(t
                 return answer
         model=SlowReply(json.dumps(word_free_model_fixture(waiting_reply(request))))
         with patch('agent.app.planner_context.datetime',Clock):
-            cls=FastPlannerResolver if tier=='fast' else DeepPlannerResolver
+            cls=FastPlannerResolver
             plan=await cls(model,StaticCatalog(catalog)).resolve(request)
         assert model.calls==1 and plan.disposition=='respond' and not plan.steps,plan.metadata
         assert plan.time_conditions[0].due_at_ms==due
@@ -321,14 +319,13 @@ def test_future_intention_survives_restart_and_due_host_reentry_dispatches_once(
 
 
 @pytest.mark.parametrize('invalid', ['missing_opportunity','wrong_opportunity','wrong_scope','missing_snapshot','terminal_snapshot','wrong_snapshot_identity','duplicate_snapshot'])
-@pytest.mark.parametrize('tier', ['fast','deep'])
+@pytest.mark.parametrize('tier', ['fast'])
 def test_retained_goal_wake_rejects_unproven_or_stale_identity_before_inference(invalid,tier):
     import json
     from shared.chromie_contracts.core_interpretation import PlannerReentryScope
     from shared.chromie_contracts.situation import CognitiveOpportunity
     from benchmarks.datasets.fast_planner_daily_life.qualification import ReplayModel,StaticCatalog
     from agent.app.fast_planner import FastPlannerResolver
-    from agent.app.deep_planner import DeepPlannerResolver
 
     async def run():
         request,catalog=future_case()
@@ -350,19 +347,19 @@ def test_retained_goal_wake_rejects_unproven_or_stale_identity_before_inference(
         else:context['active_goal_snapshots'].append(copy.deepcopy(snapshot))
         incoming=request.model_copy(update={'context':context,'planner_reentry_scope':scope},deep=True)
         model=ReplayModel(json.dumps(word_free_model_fixture(waiting_reply(request))))
-        resolver=(FastPlannerResolver if tier=='fast' else DeepPlannerResolver)(model,StaticCatalog(catalog))
+        resolver=(FastPlannerResolver)(model,StaticCatalog(catalog))
         with pytest.raises(ValueError):await resolver.resolve(incoming)
         assert model.calls==0
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('tier', ['fast','deep'])
+@pytest.mark.parametrize('tier', ['fast'])
 def test_primary_packet_exposes_the_same_host_clock_decision_as_validation(tier):
-    from benchmarks.datasets.fast_planner_daily_life import qualification,deep_qualification
+    from benchmarks.datasets.fast_planner_daily_life import qualification
     async def run():
-        module=qualification if tier=='fast' else deep_qualification
+        module=qualification
         case=copy.deepcopy(next(c for c in load_cases() if c['id'].endswith('34_supported_en')))
-        case['input']['runtime_variant']='canonical_primary' if tier=='fast' else 'deep_primary'
+        case['input']['runtime_variant']='canonical_primary'
         gid=case['input']['request']['context']['goal_association_resolution']['new_goals'][0]['goal_id']
         class Clock:
             offset=-1

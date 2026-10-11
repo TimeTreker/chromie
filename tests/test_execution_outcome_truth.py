@@ -55,7 +55,7 @@ def _plan(
         )
     return CanonicalPlan(
         plan_id=plan_id,
-        planner_tier="deep",
+        planner_tier="fast",
         disposition="execute",
         coverage="complete",
         confidence=0.95,

@@ -282,7 +282,6 @@ def test_situation_digest_opportunity_cannot_reenter_with_different_projection()
                 "cognitive_opportunity": mismatched.prompt_projection(),
             },
             fast_workflow_stage="fast_planner_situation_revision_reentry",
-            deep_workflow_stage="planner_deep_pass_situation_revision_reentry",
             response_source="fast_planner_situation_revision_reentry",
             responsibilities_override=[
                 CognitiveResponsibilityProposal(

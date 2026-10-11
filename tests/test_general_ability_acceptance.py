@@ -1383,7 +1383,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "speech": [{"text": "*Blinks twice* Why did the robot laugh?"}],
             },
             "cognitive_runtime": {
-                "terminal_plan": {"planner_tier": "deep"},
+                "terminal_plan": {"planner_tier": "fast"},
                 "timings_ms": {"deep_planner": 10000.0},
                 "metadata": {
                     "fast_planner_path": "contract_failure",
@@ -1442,7 +1442,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 ]
             },
             "cognitive_runtime": {
-                "terminal_plan": {"planner_tier": "deep"},
+                "terminal_plan": {"planner_tier": "fast"},
                 "timings_ms": {"deep_planner": 1000.0},
                 "metadata": {
                     "fast_planner_path": "contract_failure",

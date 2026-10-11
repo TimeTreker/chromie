@@ -206,7 +206,7 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
         )
         parent = CanonicalPlan(
             plan_id="plan-parent",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="respond",
             coverage="complete",
             confidence=0.9,

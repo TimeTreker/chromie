@@ -6,8 +6,9 @@ import unittest
 from pydantic import ValidationError
 
 from agent.app.capabilities.catalog import CatalogCapability
-from agent.app.deep_planner import DeepPlannerResolver
-from agent.app.planner_deep_validation import deep_plan_validation_errors
+from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner_fast_validation import qualify_fast_canonical_plan
+from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import (
@@ -24,7 +25,7 @@ class FakeOllama:
 
     async def generate(self, prompt, **kwargs):
         self.prompts.append(prompt)
-        return self.responses.pop(0)
+        return declared_ability_needs(self.responses.pop(0), kwargs.get("response_format"))
 
 
 class Catalog:
@@ -110,7 +111,7 @@ class GoalSatisfactionContractTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             CanonicalPlan(
                 plan_id="p",
-                planner_tier="deep",
+                planner_tier="fast",
                 disposition="execute",
                 coverage="complete",
                 confidence=0.9,
@@ -137,7 +138,7 @@ class GoalSatisfactionContractTests(unittest.TestCase):
             )
 
 
-class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
+class PlannerGoalSatisfactionTests(unittest.TestCase):
     def test_low_consequence_default_and_exact_satisfaction_are_retained(self):
         raw = {
             "goal_outcomes": {
@@ -192,7 +193,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             },
         }
         plan = asyncio.run(
-            DeepPlannerResolver(FakeOllama([raw]), Catalog()).resolve(
+            FastPlannerResolver(FakeOllama([raw]), Catalog()).resolve(
                 request("眨眨眼睛。", goal_ids=["goal-blink"])
             )
         )
@@ -245,7 +246,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
             },
         }
         plan = asyncio.run(
-            DeepPlannerResolver(FakeOllama([raw]), Catalog()).resolve(
+            FastPlannerResolver(FakeOllama([raw]), Catalog()).resolve(
                 request("往前走。", goal_ids=["goal-walk"])
             )
         )
@@ -263,8 +264,8 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                     ],
                     "unresolved": [],
                     "satisfaction": {
-                        "score": 0.8,
-                        "status": "substantial",
+                        "score": 0.6,
+                        "status": "partial",
                         "unmet_requirements": [
                             "requested repeated blinking"
                         ]
@@ -285,8 +286,8 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                 }
             ],
             "goal_satisfaction": {
-                "score": 0.8,
-                "status": "substantial",
+                "score": 0.6,
+                "status": "partial",
                 "unmet_requirements": ["requested repeated blinking"],
             },
         }
@@ -322,20 +323,18 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
         }
         ollama = FakeOllama([low, exact])
         plan = asyncio.run(
-            DeepPlannerResolver(
+            FastPlannerResolver(
                 ollama,
                 Catalog(),
-                min_goal_satisfaction=0.95,
             ).resolve(request("多眨几下眼睛。", goal_ids=["goal-blink"]))
         )
+        # Below the commitment bar the Planner itself judged the Goal unmet: an honest
+        # limitation, never a second planning pass.
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(plan.disposition, "clarify")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.steps, [])
-        self.assertEqual(plan.metadata["reason"], "deep_planner_semantic_validation_rejected")
-        self.assertEqual(
-            plan.metadata["validation_feedback"][0]["type"],
-            "goal_satisfaction_below_threshold",
-        )
+        self.assertEqual(plan.metadata["reason"], "goal_satisfaction_below_commitment")
+        self.assertEqual(plan.metadata["path_classification"], "terminal")
 
     def test_complete_accounting_can_truthfully_report_an_unsatisfied_goal(self):
         plan = CanonicalPlan.model_validate(
@@ -345,7 +344,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
                     "kind": "answer", "reference_id": "plan-failed-result",
                     "source_goal_ids": ["goal-weather"],
                     "facts": {"execution_status": "failed"}}],
-                "planner_tier": "deep",
+                "planner_tier": "fast",
                 "disposition": "respond",
                 "coverage": "complete",
                 "confidence": 1.0,
@@ -380,17 +379,15 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
 
         self.assertEqual(plan.coverage, "complete")
         self.assertEqual(plan.goal_satisfaction.status, "unsatisfied")
-        self.assertEqual(
-            deep_plan_validation_errors(
+        self.assertTrue(
+            qualify_fast_canonical_plan(
                 plan,
-                [],
-                expected_goal_ids=["goal-weather"],
+                capability_payload=[],
+                expected_goal_ids_for_turn=["goal-weather"],
                 authoritative_goals=[],
-                requires_execution=False,
-                min_goal_satisfaction=0.95,
-                allows_evidence_response=True,
-            ),
-            [],
+                evidence_reentry_goal_ids={"goal-weather"},
+                nonfulfilling_response_goal_ids={"goal-weather"},
+            ).accepted
         )
 
     def test_prompt_assigns_importance_reasoning_to_model(self):
@@ -418,7 +415,7 @@ class DeepPlannerGoalSatisfactionTests(unittest.TestCase):
         }
         ollama = FakeOllama([raw])
         asyncio.run(
-            DeepPlannerResolver(ollama, Catalog()).resolve(
+            FastPlannerResolver(ollama, Catalog()).resolve(
                 request("往前走。", goal_ids=["goal-walk"])
             )
         )

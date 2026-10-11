@@ -269,7 +269,7 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
 
     def test_deep_schema_fails_closed_without_exact_media_operation(self) -> None:
         unavailable = canonical_plan_response_schema(
-            planner_tier="deep",
+            planner_tier="fast",
             expected_goal_ids=["goal-media"],
             allowed_capability_ids=[MEDIA_CAPABILITY_IDS["pause"]],
             provider_media_goal_operations={"goal-media": "play"},
@@ -383,7 +383,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
         adapter = CanonicalPlanRuntimeAdapter(coordinator)
         plan = CanonicalPlan(
             plan_id="speech-over-media",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=1.0,
@@ -454,7 +454,7 @@ class MediaTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_body_and_exact_media_plan_needs_no_semantic_lane(self) -> None:
         plan = CanonicalPlan(
             plan_id="walk-and-media",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=1.0,
@@ -711,7 +711,7 @@ def test_planner_selects_media_operation_from_complete_intent(operation):
 @pytest.mark.parametrize("available", [[MEDIA_CAPABILITY_IDS["pause"]], ["chromie.vocal.perform"], []])
 def test_unknown_media_operation_still_requires_available_media_provider(available):
     schema = canonical_plan_response_schema(
-        planner_tier="deep", expected_goal_ids=["goal-media"],
+        planner_tier="fast", expected_goal_ids=["goal-media"],
         allowed_capability_ids=available, provider_media_goal_operations={"goal-media": "none"},
     )
     dispositions = schema["properties"]["goal_outcomes"]["properties"]["goal-media"]["properties"]["disposition"]["enum"]

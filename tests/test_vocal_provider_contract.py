@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import copy
+
 from tests.cognitive_work_test_support import ordinary_plan_schema
 
 from tests.capability_runtime_test_support import submit_and_wait_terminal
@@ -11,7 +13,8 @@ import unittest
 from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
 from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
-from agent.app.deep_planner import DeepPlannerResolver
+from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner_model_contract import ABILITY_NEED_NONE
 from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import canonical_plan_response_schema
 from agent.app.planner_validation import validate_goal_responsibility_outcomes
@@ -153,13 +156,13 @@ def _request_ids(bindings):  # type: ignore[no-untyped-def]
 
 
 class ScriptedModel:
-    def __init__(self, response: dict[str, object]) -> None:
-        self.response = response
+    def __init__(self, *responses: dict[str, object]) -> None:
+        self.responses = list(responses)
         self.calls: list[tuple[str, dict[str, object]]] = []
 
     async def generate(self, prompt: str, **kwargs: object) -> dict[str, object]:
         self.calls.append((prompt, dict(kwargs)))
-        return self.response
+        return copy.deepcopy(self.responses[min(len(self.calls), len(self.responses)) - 1])
 
 
 class RuntimeDefinitionView:
@@ -246,14 +249,23 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
                 authoritative_goals=[vocal_goal(mode="singing")],
             )
 
-    def test_deep_planner_proposes_exact_qualified_vocal_step(self) -> None:
+    def test_planner_proposes_exact_qualified_vocal_step(self) -> None:
         qualified = declaration("singing")
         registry = AgentCapabilityRegistry.from_bundles(
             [CapabilityBundle(agents=chromie_manifests(vocal_provider=qualified))]
         )
         catalog = CapabilityCatalog(registry)
-        raw = vocal_model_output().model_dump(mode="json")
-        model = ScriptedModel(raw)
+        # The vocal provider is a library Capability: the one Planner flags the unmet need,
+        # the Agent search loads it, and the second pass plans with it (need-first).
+        plan_reply = vocal_model_output().model_dump(mode="json")
+        first = {"ability_needs": [{"need": "sing a short greeting", "closest_loaded": ABILITY_NEED_NONE,
+                                    "closest_loaded_does": "nothing loaded performs vocal content",
+                                    "fits": False}], **plan_reply}
+        second = {"ability_needs": [{"need": "sing a short greeting",
+                                     "closest_loaded": VOCAL_PERFORMANCE_CAPABILITY_ID,
+                                     "closest_loaded_does": "performs exact vocal content", "fits": True}],
+                  **plan_reply}
+        model = ScriptedModel(first, second)
         request = cognitive_work_request(
             sid="vocal-planner-source-test",
             text="Sing a short greeting.",
@@ -268,7 +280,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             history=[],
         )
 
-        plan = asyncio.run(DeepPlannerResolver(model, catalog).resolve(request))
+        plan = asyncio.run(FastPlannerResolver(model, catalog).resolve(request))
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(len(plan.steps), 1)
@@ -283,20 +295,6 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             "execute",
             vocal_outcome["properties"]["disposition"]["enum"],
         )
-
-    def test_deep_schema_keeps_execution_closed_without_qualified_capability(self) -> None:
-        schema = canonical_plan_response_schema(
-            planner_tier="deep",
-            expected_goal_ids=["goal-vocal"],
-            allowed_capability_ids=[],
-            provider_vocal_goal_ids=["goal-vocal"],
-        )
-        vocal_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-vocal"]
-        self.assertEqual(
-            vocal_outcome["properties"]["disposition"]["enum"],
-            ["clarify", "unavailable", "refused"],
-        )
-        self.assertEqual(vocal_outcome["properties"]["step_ids"]["maxItems"], 0)
 
     def test_provider_vocal_goal_cannot_take_direct_chat_shortcut(self) -> None:
         provider_association = GoalAssociationResolution.model_validate(
@@ -447,7 +445,7 @@ class VocalTrustedRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_exact_identity_survives_authorization_execution_and_evidence(self) -> None:
         plan = CanonicalPlan(
             plan_id="plan-vocal-evidence",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=1.0,

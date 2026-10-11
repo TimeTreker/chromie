@@ -643,14 +643,10 @@ class _CognitiveScenarioClient:
             coverage=plan.coverage,
             covered_responsibility_refs=list(all_refs),
             activities=activities,
-            continuations=(
-                ["deep_planner"] if plan.disposition == "escalate" else []
-            ),
             confidence=plan.confidence,
             unresolved=list(plan.unresolved),
             reason_summary=(
-                plan.escalation_reason
-                or str(plan.metadata.get("reason") or "")
+                str(plan.metadata.get("reason") or "")
                 or plan.goal_summary
                 or "Retained scenario Fast decision."
             ),

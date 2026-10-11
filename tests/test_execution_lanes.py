@@ -120,7 +120,7 @@ class ExecutionLaneContractTests(unittest.TestCase):
     def _plan(self, *, timing: str = "parallel") -> CanonicalPlan:
         return CanonicalPlan(
             plan_id="lane-plan",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=0.95,
@@ -330,7 +330,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         plan = CanonicalPlan(
             plan_id="vocal-activity-lane-plan",
-            planner_tier="deep",
+            planner_tier="fast",
             disposition="execute",
             coverage="complete",
             confidence=1.0,
@@ -479,7 +479,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         responses = []
         for index, definition in enumerate(definitions):
             plan = CanonicalPlan(
-                plan_id=f"plan-{index}", planner_tier="deep", disposition="execute",
+                plan_id=f"plan-{index}", planner_tier="fast", disposition="execute",
                 coverage="complete", confidence=1.0, goal_ids=[f"goal-{index}"],
                 steps=[{
                     "step_id": "output", "capability_id": definition.capability_id,

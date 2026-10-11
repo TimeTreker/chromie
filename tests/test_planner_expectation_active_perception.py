@@ -71,7 +71,7 @@ def test_active_perception_step_is_ordinary_planner_work_with_falsifiable_expect
     )
     raw = materialize_planner_output(
         output,
-        planner_tier="deep",
+        planner_tier="fast",
         plan_id="plan-find-cup",
         expected_goal_ids_for_turn=["goal-find-cup"],
     )
@@ -95,7 +95,7 @@ def test_expected_outcome_is_not_execution_evidence_or_goal_completion() -> None
             _active_perception_output(
                 expected_outcome="A fresh camera observation identifies the referenced cup."
             ),
-            planner_tier="deep",
+            planner_tier="fast",
             plan_id="plan-find-cup",
             expected_goal_ids_for_turn=["goal-find-cup"],
         )
@@ -122,7 +122,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
             _active_perception_output(
                 expected_outcome="A fresh observation establishes whether the blue cup is visible."
             ),
-            planner_tier="deep",
+            planner_tier="fast",
             plan_id="plan-find-cup",
             expected_goal_ids_for_turn=[goal_id],
         )
@@ -208,7 +208,6 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
                 ]
             },
             fast_workflow_stage="fast_planner_observation_reentry",
-            deep_workflow_stage="planner_deep_pass_observation_reentry",
             response_source="fast_planner_observation_reentry",
             responsibilities_override=[
                 CognitiveResponsibilityProposal(

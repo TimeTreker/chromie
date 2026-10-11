@@ -251,7 +251,7 @@ async def test_fast_query_location_cites_span_of_own_intent_and_original_source(
             "capability_id": "chromie.weather.lookup", "args": {"location": location},
             "argument_sources": argument_sources,
             "source_responsibility_refs": ["r1"], "depends_on": [],
-        }], "continuations": [], "confidence": 1.0, "unresolved": [],
+        }], "confidence": 1.0, "unresolved": [],
         "reason_summary": "Acquire the requested information.",
     })
     catalog = WeatherCatalog()
@@ -313,7 +313,7 @@ async def test_weather_location_context_derives_from_grounded_location(
                 }
             },
             "source_responsibility_refs": ["r1"], "depends_on": [],
-        }], "continuations": [], "confidence": 1.0, "unresolved": [],
+        }], "confidence": 1.0, "unresolved": [],
         "reason_summary": "Acquire the requested information.",
     })
     catalog = WeatherCatalog()
@@ -461,7 +461,6 @@ async def test_fast_weather_collapses_duplicate_read_after_default_cleanup() -> 
                 "source_responsibility_refs": ["r1"],
             },
         ],
-        "continuations": [],
         "confidence": 1.0,
         "unresolved": [],
         "reason_summary": "Acquire the same weather evidence once.",

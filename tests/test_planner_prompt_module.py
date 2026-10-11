@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from agent.app import deep_planner, fast_planner, planner_prompt
+from agent.app import fast_planner, planner_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
 from agent.app.planner_context import planner_goal_context
 from benchmarks.datasets.fast_planner_daily_life.qualification import StaticCatalog
@@ -29,12 +29,11 @@ def test_planner_prompt_module_stays_projection_only() -> None:
         assert forbidden not in namespace
 
     assert planner_prompt.fast_plan_prompt.__module__ == "agent.app.planner_prompt"
-    assert planner_prompt.deep_plan_prompt.__module__ == "agent.app.planner_prompt"
     assert planner_prompt.fast_streaming_advance_system_prompt.__module__ == (
         "agent.app.planner_prompt"
     )
 
-def test_fast_and_deep_resolvers_do_not_reown_prompt_mechanics() -> None:
+def test_planner_resolver_does_not_reown_prompt_mechanics() -> None:
     for resolver, removed in (
         (
             fast_planner.FastPlannerResolver,
@@ -50,17 +49,6 @@ def test_fast_and_deep_resolvers_do_not_reown_prompt_mechanics() -> None:
                 "_layered_prompt",
                 "_system_prompt",
                 "_repair_system_prompt",
-            ),
-        ),
-        (
-            deep_planner.DeepPlannerResolver,
-            (
-                "_prompt",
-                "_layered_prompt",
-                "_prioritize_capability_contracts",
-                "_prompt_capability_contract",
-                "_system_prompt",
-                "_revision_system_prompt",
             ),
         ),
     ):
@@ -130,8 +118,6 @@ def _retained_request(*, count=1, language="en-US", detail="Explain this topic."
 
 def _render_required(request, variant):
     kwargs = {"response_schema": {}}
-    if variant.startswith("deep"):
-        kwargs["expected_goal_ids"] = list(planner_goal_context(request.context).expected_goal_ids)
     return str(getattr(planner_prompt, variant)(request, [], **kwargs))
 
 
@@ -164,7 +150,7 @@ def test_fast_catalog_is_lossless_with_transport_owned_budget(variant):
     http.assert_not_called()
 
 
-@pytest.mark.parametrize("variant", ["fast_plan_prompt", "fast_layered_prompt", "deep_plan_prompt", "deep_layered_prompt"])
+@pytest.mark.parametrize("variant", ["fast_plan_prompt", "fast_layered_prompt"])
 @pytest.mark.parametrize("language", ["en-US", "zh-CN"])
 @pytest.mark.parametrize("oversized", [False, True])
 def test_all_retained_goal_meanings_survive_large_sections(variant, language, oversized):
@@ -180,7 +166,7 @@ def test_all_retained_goal_meanings_survive_large_sections(variant, language, ov
     assert request == original
 
 
-@pytest.mark.parametrize("variant", ["fast_plan_prompt", "fast_layered_prompt", "deep_plan_prompt", "deep_layered_prompt"])
+@pytest.mark.parametrize("variant", ["fast_plan_prompt", "fast_layered_prompt"])
 @pytest.mark.parametrize("language", ["en-US", "zh-CN"])
 @pytest.mark.parametrize("offset", [-1, 0, 1])
 @pytest.mark.parametrize("goal_count", [1, 2])
@@ -199,7 +185,7 @@ def test_required_planner_sections_keep_exact_boundary_payloads(
     variant, language, offset, goal_count, field, label, fast_budget, deep_budget, is_list,
 ):
     request = _retained_request(count=goal_count, language=language)
-    budget = deep_budget if variant.startswith("deep") else fast_budget
+    budget = fast_budget
     record = {"correlation": "stable-id", "data": ""}
     payload = [record, {"correlation": "last-id"}] if is_list else record
     empty_size = len(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")))
@@ -212,9 +198,8 @@ def test_required_planner_sections_keep_exact_boundary_payloads(
 
 
 @pytest.mark.parametrize("tier,field", [
-    ("fast", "interaction_context"), ("deep", "interaction_context"),
+    ("fast", "interaction_context"),
     ("stream", "interaction_context"), ("fast", "trusted_terminal_evidence"),
-    ("deep", "trusted_terminal_evidence"),
 ])
 @pytest.mark.parametrize("language", ["en-US", "zh-CN"])
 def test_whole_request_budget_rejection_prevents_generation_and_partial_commit(tier, language, field):
@@ -238,7 +223,7 @@ def test_whole_request_budget_rejection_prevents_generation_and_partial_commit(t
             assert frames[0].failure_domain == "llm_budget"
             assert frames[0].retryable is False
         else:
-            resolver = (fast_planner.FastPlannerResolver if tier == "fast" else deep_planner.DeepPlannerResolver)(model, catalog, num_ctx=4096)
+            resolver = fast_planner.FastPlannerResolver(model, catalog, num_ctx=4096)
             result = asyncio.run(resolver.resolve(request))
             assert result.goal_ids == [f"goal-{index}" for index in range(8)]
             assert result.steps == [] and result.response_text == ""
@@ -290,9 +275,6 @@ def test_streaming_capability_applicability_and_resource_tail_are_exact():
     for key, value in capability["hints"].items():
         assert projected["hints"][key] == value
     assert projected["args_schema"] == capability["input_schema"]
-    deep = planner_prompt.prompt_capability_contract(capability)
-    assert deep["when_to_use"] == capability["hints"]["when_to_use"]
-    assert deep["when_not_to_use"] == capability["hints"]["when_not_to_use"]
 
 
 def test_fast_streaming_capability_projection_preserves_provider_defaults():
@@ -330,22 +312,22 @@ def test_delivered_evidence_keeps_late_qualifier_and_all_goal_bindings():
 
 
 @pytest.mark.parametrize("count", [1, 2])
-def test_deep_goal_snapshots_allocate_capacity_for_each_admitted_goal(count):
+def test_goal_snapshots_allocate_capacity_for_each_admitted_goal(count):
     request = _retained_request(count=count, detail="Keep this source qualification. " * 17)
     snapshots = request.context["active_goal_snapshots"]
-    prompt = _render_required(request, "deep_plan_prompt")
+    prompt = _render_required(request, "fast_plan_prompt")
     actual, _ = json.JSONDecoder().raw_decode(prompt.split("Active goals JSON:\n")[1])
     assert actual == snapshots
     if count > 1:
         assert len(json.dumps(snapshots)) > 3200
     # A larger Goal preserves every qualification within the whole request.
     oversized = _retained_request(count=1, detail="qualification " * 500)
-    prompt = _render_required(oversized, "deep_plan_prompt")
+    prompt = _render_required(oversized, "fast_plan_prompt")
     actual, _ = json.JSONDecoder().raw_decode(prompt.split("Active goals JSON:\n")[1])
     assert actual == oversized.context["active_goal_snapshots"]
 
 
-@pytest.mark.parametrize("stage", ["advance", "fast", "deep"])
+@pytest.mark.parametrize("stage", ["advance", "fast"])
 def test_planner_source_handoff_survives_transport_without_truncation(stage):
     import hashlib
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -365,10 +347,8 @@ def test_planner_source_handoff_survives_transport_without_truncation(stage):
         prompt = planner_prompt.fast_advance_layered_prompt(
             transported, responsibilities=transported.responsibilities, capabilities=[],
         )
-    elif stage == "fast":
-        prompt = planner_prompt.fast_plan_prompt(transported, [], response_schema={})
     else:
-        prompt = planner_prompt.deep_plan_prompt(transported, [], response_schema={}, expected_goal_ids=["goal-source"])
+        prompt = planner_prompt.fast_plan_prompt(transported, [], response_schema={})
     tail = str(prompt).split("IMMUTABLE SOURCE TURN JSON", 1)[1]
     header, body = tail.split("\n", 1)
     source, _ = json.JSONDecoder().raw_decode(body)

@@ -17,7 +17,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
         ):
             CanonicalPlan(
                 plan_id="under-covered",
-                planner_tier="deep",
+                planner_tier="fast",
                 disposition="execute",
                 coverage="complete",
                 confidence=1.0,
@@ -45,7 +45,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
         ):
             CanonicalPlan(
                 plan_id="foreign-satisfaction",
-                planner_tier="deep",
+                planner_tier="fast",
                 disposition="execute",
                 coverage="complete",
                 confidence=1.0,
@@ -73,7 +73,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
         ):
             CanonicalPlan(
                 plan_id="foreign-outcome-satisfaction",
-                planner_tier="deep",
+                planner_tier="fast",
                 disposition="execute",
                 coverage="complete",
                 confidence=1.0,
@@ -119,7 +119,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             CanonicalPlan(
                 plan_id="bad-top-level",
-                planner_tier="deep",
+                planner_tier="fast",
                 disposition="execute",
                 coverage="complete",
                 confidence=0.9,
@@ -153,7 +153,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             CanonicalPlan(
                 plan_id="bad-owner",
-                planner_tier="deep",
+                planner_tier="fast",
                 disposition="execute",
                 coverage="complete",
                 confidence=0.9,
@@ -181,7 +181,7 @@ class CanonicalPlanOwnershipTests(unittest.TestCase):
         with self.assertRaises(ValidationError):
             CanonicalPlan(
                 plan_id="bad-blocking-owner",
-                planner_tier="deep",
+                planner_tier="fast",
                 disposition="execute",
                 coverage="complete",
                 confidence=0.9,

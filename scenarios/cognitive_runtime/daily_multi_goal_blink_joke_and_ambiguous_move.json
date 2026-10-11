@@ -52,7 +52,7 @@
     "deep_plans": [
       {
         "plan_id": "deep-three-way",
-        "planner_tier": "deep",
+        "planner_tier": "fast",
         "disposition": "mixed",
         "coverage": "complete",
         "confidence": 0.93,
@@ -240,7 +240,7 @@
   },
   "expect": {
     "status": "applied",
-    "planner_tier": "deep",
+    "planner_tier": "fast",
     "disposition": "mixed",
     "coverage": "complete",
     "interaction_status": "ok",

@@ -60,7 +60,7 @@
     "deep_plans": [
       {
         "plan_id": "deep-qualified-media-walk",
-        "planner_tier": "deep",
+        "planner_tier": "fast",
         "disposition": "execute",
         "coverage": "complete",
         "confidence": 1.0,
@@ -246,7 +246,7 @@
   },
   "expect": {
     "status": "applied",
-    "planner_tier": "deep",
+    "planner_tier": "fast",
     "disposition": "execute",
     "coverage": "complete",
     "interaction_status": "ok",
