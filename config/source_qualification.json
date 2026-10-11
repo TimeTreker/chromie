@@ -94,7 +94,7 @@
         "tests/test_user_meaning_interpreter_llm_prompt.py",
         "tests/test_goal_association_pr2.py",
         "tests/test_fast_planner_pr3.py",
-        "tests/test_deep_planner_pr4.py",
+        "tests/test_planner_canonical_contract.py",
         "tests/test_work_dag_planning.py",
         "tests/test_work_dag_revision.py",
         "tests/test_work_dag_execution_state.py",

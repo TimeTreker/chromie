@@ -10,7 +10,7 @@ reasoning has one bounded deliberative continuation. See the
 [evidence limits](../docs/STATUS.md#social-cognition-migration).
 
 `chromie-agent` is Chromie's single model-facing cognitive service. It exposes
-separately testable User Meaning Interpretation, Goal Association, Planner fast/deep passes,
+separately testable User Meaning Interpretation, Goal Association, the Planner, Value Judgment,
 Social Cognition for shared interaction state, Reflection, capability-catalog, and WorkDAG diagnostic
 surfaces. These are module/contract boundaries inside one FastAPI service, not a
 microservice per cognitive role. The Cognitive Gateway itself remains Host-owned.
@@ -18,8 +18,8 @@ microservice per cognitive role. The Cognitive Gateway itself remains Host-owned
 The service is **not** a second orchestration runtime. The retired `AgentRuntime`,
 `InteractionRuntime`, specialized semantic Agent pipeline, `/run`, `/interaction`,
 `/agents`, independent response-authoring stage, and Tool Result Interpreter
-surfaces have been removed. SC owns Communicative Acts; Planner
-fast/deep passes receive bounded Responsibility/Goal/Work/Evidence state on initial and
+surfaces have been removed, and so has the Deep Planner (2026-10-11). SC owns Communicative Acts;
+the Planner receives bounded Responsibility/Goal/Work/Evidence state on initial and
 event-driven re-entry. Re-entry includes one immutable exact affected-Goal scope;
 unrelated sibling Work remains outside the Planner transaction; relevant sibling speech
 is read-only delivery context. Planner owns
@@ -28,7 +28,7 @@ uniquely derivable duplicate parameter provenance. The Host Orchestrator owns tu
 and the trusted asynchronous `CapabilityRuntime`; Soridormi remains an execution
 provider behind the Capability boundary.
 
-UMI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Fast/Deep results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
+UMI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Planner results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
 
 Fast and Deep admit a complete, fully bound information-acquisition stage with an
 honest partial whole-Goal score and explicit per-Goal/aggregate deferred obligations.
@@ -43,7 +43,7 @@ See the [interaction contract](../docs/HUMAN_LIKE_INTERACTION_CONTRACT.md).
 Required Planner projections preserve complete admitted Goals, bindings, Work,
 Evidence, source Plans, delivery context and capability applicability contracts.
 Existing per-section character budgets reject oversized required inputs before
-inference instead of omitting fields or entries. Complete Fast/Deep executable
+inference instead of omitting fields or entries. Complete Planner executable
 catalogs are serialized losslessly under the transport whole-request budget,
 including reserved output and safety margin, without a separate character cap.
 Streaming applies the same rule
@@ -179,7 +179,7 @@ Important endpoints include:
 - `POST /goal-association`
 - `POST /fast-advance`
 - `POST /fast-plan`
-- `POST /deep-plan`
+- `POST /value-judgment`
 - `POST /social-cognition` (shared interaction planning, including Goal-free Situation)
 - Agent Skill selection/disclosure endpoints
 - WorkDAG validate/dry-run/guarded execution/trace diagnostics
@@ -205,7 +205,7 @@ guess or announce the current time before that Evidence returns.
 
 ## WorkDAG diagnostics
 
-WorkDAG validation and explicitly gated execution remain available for engineering/control-plane diagnostics. Read-only, planning, guarded, and physical execution retain their separate authorization gates. These endpoints do not replace the canonical Fast/Deep Planner.
+WorkDAG validation and explicitly gated execution remain available for engineering/control-plane diagnostics. Read-only, planning, guarded, and physical execution retain their separate authorization gates. These endpoints do not replace the canonical Planner.
 
 ## Run locally
 

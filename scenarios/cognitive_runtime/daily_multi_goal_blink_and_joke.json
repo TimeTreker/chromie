@@ -36,83 +36,72 @@
       }
     },
     "fast_plan": {
-      "plan_id": "fast-blink-joke",
+      "plan_id": "plan-blink-joke",
       "planner_tier": "fast",
-      "disposition": "escalate",
-      "coverage": "partial",
-      "confidence": 0.9,
-      "escalation_reason": "Independent effectful and conversational goals require per-goal terminal outcomes.",
-      "communication_needs": []
-    },
-    "deep_plans": [
-      {
-        "plan_id": "deep-blink-joke",
-        "planner_tier": "fast",
-        "disposition": "mixed",
-        "coverage": "complete",
-        "confidence": 0.94,
-        "goal_ids": [
-          "goal-blink",
-          "goal-joke"
-        ],
-        "goal_summary": "Blink three times and answer with a joke.",
-        "steps": [
-          {
-            "step_id": "blink",
-            "capability_id": "soridormi.blink_eyes",
-            "args": {
-              "count": 3
-            },
-            "timing": "sequential",
-            "source_goal_ids": [
-              "goal-blink"
-            ]
-          }
-        ],
-        "goal_outcomes": [
-          {
-            "goal_id": "goal-blink",
-            "disposition": "execute",
-            "coverage": "complete",
-            "step_ids": [
-              "blink"
-            ]
+      "disposition": "mixed",
+      "coverage": "complete",
+      "confidence": 0.94,
+      "goal_ids": [
+        "goal-blink",
+        "goal-joke"
+      ],
+      "goal_summary": "Blink three times and answer with a joke.",
+      "steps": [
+        {
+          "step_id": "blink",
+          "capability_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 3
           },
-          {
-            "goal_id": "goal-joke",
-            "disposition": "respond",
-            "coverage": "complete"
-          }
-        ],
-        "goal_satisfaction": {
-          "score": 1.0,
-          "status": "exact",
-          "satisfied_goal_ids": [
-            "goal-blink",
-            "goal-joke"
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-blink"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-blink",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "blink"
           ]
         },
-        "communication_needs": [
-          {
-            "need_id": "need:18fa7b3be3412d2be0ea50fcb3130467b1b121d563edf0170c95dfcb6679a218",
-            "owner": "planner",
-            "kind": "answer",
-            "source_goal_ids": [
-              "goal-joke"
-            ],
-            "source_responsibility_refs": [],
-            "reference_id": "deep-blink-joke",
-            "facts": {
-              "disposition": "respond",
-              "unresolved": []
-            },
-            "delivery_phase": null,
-            "before_step_ids": [],
-            "after_step_ids": []
-          }
+        {
+          "goal_id": "goal-joke",
+          "disposition": "respond",
+          "coverage": "complete"
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
+          "goal-blink",
+          "goal-joke"
         ]
-      }
-    ],
+      },
+      "communication_needs": [
+        {
+          "need_id": "need:18fa7b3be3412d2be0ea50fcb3130467b1b121d563edf0170c95dfcb6679a218",
+          "owner": "planner",
+          "kind": "answer",
+          "source_goal_ids": [
+            "goal-joke"
+          ],
+          "source_responsibility_refs": [],
+          "reference_id": "plan-blink-joke",
+          "facts": {
+            "disposition": "respond",
+            "unresolved": []
+          },
+          "delivery_phase": null,
+          "before_step_ids": [],
+          "after_step_ids": []
+        }
+      ]
+    },
     "capabilities": [
       {
         "capability_id": "soridormi.blink_eyes",
@@ -139,10 +128,6 @@
     ],
     "social_cognition": {
       "fast": {
-        "activities": [],
-        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
-      },
-      "deep": {
         "activities": [
           {
             "activity_id": "scenario-immediate",
@@ -226,8 +211,7 @@
     "requires_confirmation": false,
     "calls": [
       "goal_association",
-      "fast_stream",
-      "deep_plan"
+      "fast_stream"
     ]
   },
   "general_ability": {

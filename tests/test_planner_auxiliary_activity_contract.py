@@ -136,7 +136,7 @@ class PlannerAuxiliaryActivityContractTests(unittest.TestCase):
             CanonicalPlan.model_validate(payload)
 
     def test_work_schema_has_no_auxiliary_writer(self):
-        schema = canonical_plan_response_schema(planner_tier="fast", expected_goal_ids=[], allowed_capability_ids=[])
+        schema = canonical_plan_response_schema(expected_goal_ids=[], allowed_capability_ids=[])
         self.assertNotIn("auxiliary_activities", schema["properties"])
 
     def test_social_schema_binds_auxiliary_capability_and_args(self) -> None:

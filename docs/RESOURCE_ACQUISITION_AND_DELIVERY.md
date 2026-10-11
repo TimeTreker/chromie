@@ -6,8 +6,8 @@ The provider-neutral semantic contract is implemented in
 `shared.chromie_contracts.resource` for retained typed Goals and provider contracts.
 The current UMI/GA wire preserves complete resource intention in natural language;
 GA inherits that intent and does not author `resource_responsibility` or normalized
-parameters. Fast Planner and Deep Planner
-select an exact registered capability later; neither Goal Association nor the
+parameters. The Planner
+selects an exact registered capability later; neither Goal Association nor the
 Host chooses a provider from resource kind, keywords, or hardcoded routing.
 
 The typed examples and GA authoring descriptions below document the retained
@@ -437,7 +437,8 @@ resource contract may declare `final_delivery_owner=planner_communicative_activi
 which case Host Evidence binding and Fast Planner own the final human delivery.
 
 This makes the boundary evolve naturally. If Soridormi currently advertises only
-`acquire_resource` and `deliver_resource`, Deep Planning may compose them. If a later
+`acquire_resource` and `deliver_resource`, the Planner may compose them (a resource Plan that
+leaves a coverable Goal incomplete fails closed). If a later
 Soridormi version can reliably guarantee the complete workflow and advertises
 `acquire_and_deliver_resource`, Chromie may use that one capability instead. No Goal
 schema, phrase rule, or provider-specific route needs to change.
@@ -589,8 +590,8 @@ second semantic world model. The split is:
 - Chromie owns the cognitive Situation assembled from trusted typed observations,
   relevance to current Goals, Memory activation, staleness/uncertainty, target choice
   and Planner reasoning over those facts.
-- Fast/Deep Planner consume the same bounded `Goal + Situation + Active Memory +
-  Evidence + current Work` cognitive context. They do not receive raw image streams,
+- the Planner consumes the bounded `Goal + Situation + Active Memory +
+  Evidence + current Work` cognitive context. It does not receive raw image streams,
   SLAM internals or unbounded detector output.
 - When current Situation already identifies a suitable physical resource, Planner may
   bind that perceived entity/source and Soridormi resolves only execution-local detail.

@@ -336,6 +336,11 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   (need-first search), Evidence (act, then re-enter), or the person's input (clarification).
   It is never a second planner pass. A stronger model or a larger budget is a configuration
   of the same Planner role, not another semantic owner (owner amendment 2026-10-10).
+  The Deep Planner is retired (2026-10-11). A Responsibility the Planner cannot fulfil now
+  is an honest `unavailable` outcome naming what is missing, beside its siblings' Work; a
+  structurally invalid Plan fails closed. Need-first search may load any contract the
+  Planner did not see, including one the Goal applicability filter hid, so a composition
+  such as a forecast read before a conditional action stays one Planner decision.
   Comparing, reusing, cancelling,
   replacing, or supplementing existing Work are Planner operations, not a mandatory
   reconciliation stage or another semantic owner. Social Cognition owns ordinary
@@ -360,8 +365,7 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   question that is hard to answer. It is not a reviewer of the Planner's HOW (principles 30
   and 31): the Planner's Plan stands, and Value Judgment only permits, questions or
   withholds reviewed effects. Deterministic Runtime and Soridormi safety remain the floor.
-  It carries the Deep Planner's original intent, deliberate value reasoning; retiring the
-  Deep Planner itself is the next migration step.
+  It carries the retired Deep Planner's original intent, deliberate value reasoning.
 - **MODEL-SEMANTIC-BOUNDARY-001** — A model-facing contract asks its semantic owner
   to author decisions, not protocol paperwork that trusted code can derive exactly from
   already-authoritative input. Model-owned choices include semantic Capability selection,
@@ -846,10 +850,9 @@ Read the diagram with these boundaries:
   has canonical Goal binding.
 - Canonical Goal owns **what outcome Chromie still owes persistently**.
 - Planner owns **what Work can advance those Goals now**, constrained by the currently
-  available Capability/provider contracts. Fast/deep are cognition passes of that same
-  authority: the fast pass owns ordinary input-source resolution; the deep pass is used
-  for complex HOW, not as a reviewer
-  for a missing input or as a way to make UMI choose an execution strategy.
+  available Capability/provider contracts. It owns ordinary input-source resolution and
+  complex HOW alike in one pass (one Planner authority); it is never a reviewer
+  for a missing input or a way to make UMI choose an execution strategy.
   Available Capabilities are therefore Planner input and realization constraints even
   though they are not drawn as a separate box in the expanded view.
 - A Primary Activity is a concrete semantic Work/Plan act describing **what
@@ -1682,7 +1685,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Goal Association (or the exact persisted open Goal for a trusted state wake),
    Evidence/cancellation binding, or source Plan fails closed.
    Planner decides follow-up Work, revision, input needs, waiting or no Work change;
-   complex HOW may use its deep pass. Social Cognition independently receives the
+   complex HOW acquires missing contracts, Evidence or input; there is no deeper planner pass. Social Cognition independently receives the
    bounded trusted state and owns answer, clarification, result, repair or silence.
    Neither result reviews or rewrites the other. Neither Host nor a separate Tool Result Interpreter may
    infer Goal ownership from result contents or author result meaning. A post-Evidence

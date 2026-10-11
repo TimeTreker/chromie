@@ -137,7 +137,9 @@ async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
     plan = await FastPlannerResolver(planner_model, WeatherCatalog()).resolve(request)
     assert len(planner_model.prompts) == 1
     if foreign_quote:
-        assert plan.disposition == "escalate"
+        # A source quote from another request is a grounding failure: it fails closed.
+        assert plan.disposition == "unavailable"
+        assert plan.metadata["path_classification"] == "contract_failure"
         assert not plan.steps
     else:
         assert plan.disposition == "execute", plan.metadata
@@ -191,17 +193,11 @@ def test_goal_and_planner_prompts_forbid_scope_narrowing() -> None:
         [],
         response_schema={},
     )
-    deep_prompt = planner_prompt.deep_plan_prompt(
-        request,
-        [],
-        response_schema={},
-        expected_goal_ids=["goal-weather"],
-    )
 
     assert "Compare annual weather." in goal_prompt
     assert "UMI Responsibilities own" in goal_prompt
     assert "GA is association-only" in goal_prompt
-    for prompt in (fast_prompt, deep_prompt):
+    for prompt in (fast_prompt,):
         assert "Compare annual weather." in prompt
         assert "Preserve exact advertised semantic scope" in prompt
         assert "never reinterpret or repair WHAT" in prompt

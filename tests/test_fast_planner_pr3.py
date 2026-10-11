@@ -521,9 +521,9 @@ def respond_outcome(goal_id: str, text: str, reason: str) -> dict:
     }
 
 
-def escalate_outcome(goal_id: str, reason: str) -> dict:
+def unavailable_outcome(goal_id: str, reason: str) -> dict:
     return {
-        "disposition": "escalate",
+        "disposition": "unavailable",
         "coverage": "uncertain",
         "unresolved": [reason],
         "step_ids": [],
@@ -541,7 +541,6 @@ def multi_goal_plan(
     goal_outcomes: dict[str, dict],
     goal_satisfaction: dict,
     response_text: str = "",
-    escalation_reason: str = "",
     unresolved: list[str] | None = None,
     parameter_resolutions: list[dict] | None = None,
     confidence: float = 0.97,
@@ -557,7 +556,6 @@ def multi_goal_plan(
         "confidence": confidence,
         "goal_summary": goal_summary,
         "steps": chained,
-        "escalation_reason": escalation_reason,
         "unresolved": list(unresolved or []),
         "parameter_resolutions": list(parameter_resolutions or []),
         "goal_outcomes": goal_outcomes,
@@ -771,23 +769,22 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
 
 
 class CanonicalPlanContractTests(unittest.TestCase):
-    def test_single_goal_fast_escalation_uses_advertised_per_goal_contract(self):
+    def test_single_goal_unavailable_uses_advertised_per_goal_contract(self):
         goal_id = "goal-weather"
         raw = multi_goal_plan(
-            disposition="escalate",
+            disposition="unavailable",
             coverage="partial",
             confidence=0.9,
-            goal_summary="Fresh weather evidence requires deeper planning.",
+            goal_summary="Fresh weather evidence is not available now.",
             steps=[],
             goal_outcomes={
-                goal_id: escalate_outcome(
+                goal_id: unavailable_outcome(
                     goal_id, "Fresh provider evidence is still required."
                 )
             },
             goal_satisfaction=unsatisfied_satisfaction(
                 [goal_id], "Fresh provider evidence is still required."
             ),
-            escalation_reason="fresh provider evidence requires deep planning",
             unresolved=["fresh provider evidence"],
         )
 
@@ -797,7 +794,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             expected_goal_ids_for_turn=[goal_id],
         )
 
-        self.assertEqual(output.disposition, "escalate")
+        self.assertEqual(output.disposition, "unavailable")
         self.assertEqual(set(output.goal_outcomes), {goal_id})
         self.assertEqual(output.goal_satisfaction.status, "unsatisfied")
 
@@ -990,7 +987,6 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "confidence": 1.0,
             "goal_summary": "Walk forward for fifteen seconds.",
             "steps": [],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-walk': respond_outcome('goal-walk', 'Done.', "Preserve the tested response claim.")},
@@ -1055,7 +1051,6 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "confidence": 1.0,
             "goal_summary": "Answer with current weather.",
             "steps": [],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '内乡今天有雷雨。', "Preserve the tested response claim.")},
@@ -1090,7 +1085,6 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "confidence": 1.0,
             "goal_summary": "Restate completed weather evidence.",
             "steps": [],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '现在有雷雨。', "Preserve the tested response claim.")},
@@ -1134,7 +1128,6 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "confidence": 1.0,
             "goal_summary": "Answer with current weather evidence.",
             "steps": [],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '今晚降雨概率最高约76%。', "Preserve the tested response claim.")},
@@ -1187,7 +1180,6 @@ class CanonicalPlanContractTests(unittest.TestCase):
             "confidence": 1.0,
             "goal_summary": "Answer with current weather evidence.",
             "steps": [],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '今晚降雨概率最高约76%。', "Preserve the tested response claim.")},
@@ -1236,7 +1228,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
 
     def test_partial_plan_cannot_carry_steps(self):
         with self.assertRaises(ValueError):
-            CanonicalPlan(plan_id="p", planner_tier="fast", disposition="escalate", coverage="partial", confidence=0.5, escalation_reason="compound", steps=[{"step_id":"s","capability_id":"soridormi.walk_forward","args":{"duration_s":15}}])
+            CanonicalPlan(plan_id="p", planner_tier="fast", disposition="unavailable", coverage="partial", confidence=0.5, unresolved=["compound"], steps=[{"step_id":"s","capability_id":"soridormi.walk_forward","args":{"duration_s":15}}])
 
     def test_complete_execute_requires_steps(self):
         with self.assertRaises(ValueError):
@@ -1369,7 +1361,6 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
             "confidence": 1.0,
             "goal_summary": "Report retained completion evidence.",
             "steps": [],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {
@@ -1551,7 +1542,6 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                 "goal_satisfaction": exact_satisfaction(
                     ["goal-walk", "goal-sing", "goal-blink"]
                 ),
-                "escalation_reason": "",
                 "unresolved": [],
                 "parameter_resolutions": [],
                 "plan_relation": "exact",
@@ -1597,7 +1587,6 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                     "goal_satisfaction": exact_satisfaction(
                         ["goal-walk", "goal-unowned"]
                     ),
-                    "escalation_reason": "",
                     "unresolved": [],
                     "parameter_resolutions": [],
                     "plan_relation": "exact",
@@ -1638,7 +1627,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                                 invalid["goal_outcomes"]["goal-speech"]["disposition"] = "escalate"
                             self.assertFalse(validator.is_valid(invalid))
 
-    def test_non_escalating_plan_rejects_escalation_reason(self):
+    def test_retired_escalation_reason_is_rejected(self):
         from tests.test_planner_canonical_contract import CanonicalPlanContractTests, FullCatalog
 
         for multiple in (False, True):
@@ -1649,8 +1638,8 @@ class FastPlannerResolverTests(unittest.TestCase):
                     model = FakeOllama(raw)
                     plan = asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
                     schema = model.prompts[0][1]["response_format"]
-                    self.assertEqual(Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema)), not bool(reason))
-                    self.assertEqual(bool(plan.metadata.get("error")), bool(reason))
+                    self.assertFalse(Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema)))
+                    self.assertTrue(plan.metadata.get("error"))
                     self.assertEqual(len(model.prompts), 1)
                     self.assertEqual(plan.steps, [])
 
@@ -2848,7 +2837,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "disposition",
                 "coverage",
                 "activities",
-                "continuations",
                 "confidence",
                 "unresolved",
                 "reason_summary",
@@ -2858,6 +2846,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             "FastPlannerResponseNeed",
             "FastPlannerInputNeed",
             "FastPlannerCapabilityActivity",
+            "FastPlannerUnavailableNeed",
         ):
             activity_schema = schema["$defs"][activity_contract]
             self.assertIn("role", activity_schema["required"])
@@ -2984,6 +2973,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             {
                 "#/$defs/FastPlannerInputNeed",
                 "#/$defs/FastPlannerCapabilityActivity",
+                "#/$defs/FastPlannerUnavailableNeed",
             },
         )
         capability_schema = schema["$defs"]["FastPlannerCapabilityActivity"]
@@ -3028,6 +3018,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             {
                 "#/$defs/FastPlannerInputNeed",
                 "#/$defs/FastPlannerCapabilityActivity",
+                "#/$defs/FastPlannerUnavailableNeed",
             },
         )
 
@@ -3091,6 +3082,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             activity_refs,
             [
                 "#/$defs/FastPlannerCapabilityActivity",
+                "#/$defs/FastPlannerUnavailableNeed",
                 "#/$defs/FastPlannerInputNeed",
             ],
         )
@@ -3923,21 +3915,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             "fast_stream_contract_invalid",
         )
 
-    def test_deep_planner_is_only_a_fast_activity_plan_complexity_continuation(self):
-        advance = FastPlannerAdvance.model_validate(
-            {
-                "turn_id": "turn-complex",
-                "disposition": "escalate",
-                "coverage": "uncertain",
-                "covered_responsibility_refs": ["fetch-water"],
-                "activities": [],
-                "continuations": ["deep_planner"],
-                "confidence": 0.9,
-                "unresolved": ["multi-step physical dependencies"],
-            }
-        )
-        self.assertEqual(advance.continuations, ["deep_planner"])
-
     def test_prompt_receives_goal_scoped_interaction_context(self):
         planner_request = request(
             "Walk forward for fifteen seconds.",
@@ -4060,7 +4037,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             "steps": [],
             "goal_outcomes": {'goal-walk': respond_outcome('goal-walk', 'I did it.', "Preserve the tested response claim.")},
             "goal_satisfaction": exact_satisfaction(["goal-walk"]),
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "plan_relation": "exact",
@@ -4088,9 +4064,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
-        self.assertEqual(plan.escalation_reason, "fast_planner_semantic_validation_failed")
+        self.assertEqual(plan.metadata["reason"], "fast_planner_semantic_validation_failed")
         self.assertFalse(plan.metadata["execution_allowed"])
         self.assertFalse(plan.metadata["retryable"])
         self.assertIn(
@@ -4098,7 +4074,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             plan.metadata["error"],
         )
 
-    def test_missing_resource_provider_escalates_without_hard_model_failure(self):
+    def test_missing_resource_provider_is_unavailable_without_hard_model_failure(self):
         goal_id = "goal-resource"
         reason = "Fetch and hand over the red mug."
         raw = multi_goal_plan(
@@ -4149,16 +4125,14 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(
-            plan.escalation_reason,
-            "resource_responsibility_capability_unavailable",
+        self.assertEqual(plan.disposition, "unavailable")
+        self.assertEqual(plan.metadata["reason"], "resource_responsibility_capability_unavailable",
         )
         self.assertEqual(plan.steps, [])
         self.assertTrue(plan.metadata["resource_contract_unavailable"])
         self.assertNotIn("failure_class", plan.metadata)
 
-    def test_granular_resource_catalog_escalates_to_deep_composition(self):
+    def test_incomplete_granular_resource_plan_fails_closed_without_second_pass(self):
         goal_id = "goal-resource"
         reason = "Fetch and hand over the red mug."
         raw = multi_goal_plan(
@@ -4209,10 +4183,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(
-            plan.escalation_reason,
-            "resource_responsibility_composition_required",
+        self.assertEqual(plan.disposition, "unavailable")
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
+        self.assertEqual(plan.metadata["reason"], "resource_responsibility_composition_incomplete",
         )
         self.assertEqual(plan.steps, [])
         self.assertTrue(plan.metadata["resource_composition_required"])
@@ -4352,7 +4325,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.steps, [])
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
@@ -4415,7 +4388,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ).resolve(request("Walk briefly.", goal_ids=["goal-walk"]))
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(
             plan.metadata["validation_feedback"][0]["capability_id"],
             "soridormi.walk_velocity",
@@ -4512,7 +4485,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             "confidence": 0.9,
             "goal_summary": "Clarify the requested place.",
             "steps": [],
-            "escalation_reason": "",
             "unresolved": ["location"],
             "parameter_resolutions": [],
             "goal_outcomes": {
@@ -4699,9 +4671,9 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(schema["properties"]["steps"]["maxItems"], 0)
         self.assertEqual(
             schema["properties"]["disposition"]["enum"],
-            ["respond", "clarify", "escalate"],
+            ["respond", "clarify", "unavailable"],
         )
-        self.assertIn("escalation_reason", schema["required"])
+        self.assertNotIn("escalation_reason", schema["properties"])
         self.assertIn("goal_outcomes", schema["required"])
         self.assertEqual(
             schema["properties"]["goal_outcomes"]["required"],
@@ -4742,17 +4714,17 @@ class FastPlannerResolverTests(unittest.TestCase):
         }
         repaired = {
             **multi_goal_plan(
-                disposition="escalate",
+                disposition="unavailable",
                 coverage="uncertain",
                 confidence=0.95,
                 goal_summary="Walk for one second, then blink twice.",
                 steps=[],
                 goal_outcomes={
-                    "goal-walk": escalate_outcome(
+                    "goal-walk": unavailable_outcome(
                         "goal-walk",
                         "Compound request requires deeper planning.",
                     ),
-                    "goal-blink": escalate_outcome(
+                    "goal-blink": unavailable_outcome(
                         "goal-blink",
                         "Compound request requires deeper planning.",
                     ),
@@ -4760,9 +4732,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 goal_satisfaction=unsatisfied_satisfaction(
                     ["goal-walk", "goal-blink"],
                     "Compound request requires deep multi-goal accounting.",
-                ),
-                escalation_reason=(
-                    "Compound request requires deep multi-goal accounting."
                 ),
                 unresolved=["goal-walk", "goal-blink"],
             )
@@ -4778,22 +4747,22 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
-    def test_compound_walk_and_blink_escalates_without_partial_steps(self):
+    def test_compound_walk_and_blink_unavailable_without_partial_steps(self):
         raw = multi_goal_plan(
-            disposition="escalate",
+            disposition="unavailable",
             coverage="uncertain",
             confidence=0.88,
             goal_summary="walk while blinking",
             steps=[],
             goal_outcomes={
-                "goal-walk": escalate_outcome(
+                "goal-walk": unavailable_outcome(
                     "goal-walk", "concurrency feasibility"
                 ),
-                "goal-blink": escalate_outcome(
+                "goal-blink": unavailable_outcome(
                     "goal-blink", "blink timing requires deeper planning"
                 ),
             },
@@ -4801,18 +4770,17 @@ class FastPlannerResolverTests(unittest.TestCase):
                 ["goal-walk", "goal-blink"],
                 "compound_goal_requires_full_planning",
             ),
-            escalation_reason="compound_goal_requires_full_planning",
             unresolved=["concurrency feasibility", "blink count"],
         )
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("往前走15秒，同时眨眼。", goal_ids=["goal-walk", "goal-blink"])))
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.steps, [])
         self.assertIn("concurrency feasibility", plan.unresolved)
         self.assertEqual(
             {item.disposition for item in plan.goal_outcomes},
-            {"escalate"},
+            {"unavailable"},
         )
-        self.assertEqual(plan.metadata["path_classification"], "semantic_escalation")
+        self.assertEqual(plan.metadata["path_classification"], "terminal")
 
     def test_coordinated_action_primary_plan_has_one_model_call_budget(self):
         raw = {
@@ -5029,19 +4997,18 @@ class FastPlannerResolverTests(unittest.TestCase):
 
     def test_multi_goal_fast_schema_requires_complete_model_authored_plan(self):
         raw = multi_goal_plan(
-            disposition="escalate",
+            disposition="unavailable",
             coverage="uncertain",
             confidence=0.9,
             goal_summary="Two independent goals.",
             steps=[],
             goal_outcomes={
-                "goal-a": escalate_outcome("goal-a", "Goal A needs Deep Planner."),
-                "goal-b": escalate_outcome("goal-b", "Goal B needs Deep Planner."),
+                "goal-a": unavailable_outcome("goal-a", "Goal A needs Deep Planner."),
+                "goal-b": unavailable_outcome("goal-b", "Goal B needs Deep Planner."),
             },
             goal_satisfaction=unsatisfied_satisfaction(
                 ["goal-a", "goal-b"], "Deep planning is required."
             ),
-            escalation_reason="heterogeneous multi-goal request requires deep planning",
             unresolved=["goal-a", "goal-b"],
         )
         ollama = FakeOllama(raw)
@@ -5055,7 +5022,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertEqual(schema["title"], "FastPlannerMultiGoalPlanOutput")
         self.assertIn("goal_outcomes", schema["required"])
@@ -5068,7 +5035,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertIn("mixed", schema["properties"]["disposition"]["enum"])
         self.assertIn(
-            "escalate",
+            "unavailable",
             schema["$defs"]["PlannerModelGoalOutcome"]["properties"]
             ["disposition"]["enum"],
         )
@@ -5121,13 +5088,14 @@ class FastPlannerResolverTests(unittest.TestCase):
             for branch in aggregate_branches
             if branch["properties"]["disposition"]["enum"] == ["mixed"]
         ]
-        self.assertEqual(len(mixed_branches), 2)
-        self.assertTrue(
-            all(
-                branch["properties"]["steps"]["maxItems"] == 4
-                for branch in mixed_branches
-            )
-        )
+        # Each Goal executes, responds, or is honestly unavailable: six mixed assignments.
+        self.assertEqual(len(mixed_branches), 6)
+        executing = [
+            branch for branch in mixed_branches
+            if branch["properties"]["steps"].get("maxItems", 0) > 0
+        ]
+        self.assertEqual(len(executing), 4)
+        self.assertTrue(all(branch["properties"]["steps"]["maxItems"] == 4 for branch in executing))
         self.assertEqual(
             set(schema["$defs"]["PlannerModelStep"]["required"]),
             {
@@ -5242,7 +5210,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(
@@ -5408,7 +5376,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.steps, [])
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
@@ -5789,7 +5757,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ).resolve(run_request)
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertIn(
             "parameter resolution references unknown goal IDs",
             plan.metadata["error"],
@@ -5855,7 +5823,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             FastPlannerResolver(ollama, FakeCatalog()).resolve(run_request)
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
@@ -6055,7 +6023,7 @@ class FastPlannerResolverTests(unittest.TestCase):
 
         plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.steps, [])
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
@@ -6267,7 +6235,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         first_schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
@@ -6287,11 +6255,11 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(len(plan.steps), 1)
 
-    def test_non_common_or_non_executable_skill_escalates(self):
+    def test_non_common_or_non_executable_skill_is_unavailable(self):
         raw = {"goal_outcomes": {'goal-action': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['invented'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-action'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"depends_on": [],"source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
         plan = asyncio.run(FastPlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。", goal_ids=["goal-action"])))
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.escalation_reason, "step_not_in_executable_common_catalog")
+        self.assertEqual(plan.disposition, "unavailable")
+        self.assertEqual(plan.metadata["reason"], "step_not_in_executable_common_catalog")
 
     def test_prompt_defines_complete_coverage_not_skill_matching(self):
         ollama = FakeOllama(
@@ -6578,30 +6546,29 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.steps, [])
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
-    def test_live_branch_minimal_escalation_fails_closed_under_flat_contract(self):
+    def test_live_branch_minimal_limitation_fails_closed_under_flat_contract(self):
         branch_minimal = {
             "planner_tier": "fast",
-            "disposition": "escalate",
+            "disposition": "unavailable",
             "coverage": "partial",
             "steps": [],
-            "escalation_reason": "compound request requires deep planning",
         }
         repaired = multi_goal_plan(
-            disposition="escalate",
+            disposition="unavailable",
             coverage="uncertain",
             confidence=0.9,
-            goal_summary="Two goals require Deep Planner.",
+            goal_summary="Two goals are not available now.",
             steps=[],
             goal_outcomes={
-                "goal-walk": escalate_outcome(
+                "goal-walk": unavailable_outcome(
                     "goal-walk", "The first goal requires deeper planning."
                 ),
-                "goal-blink": escalate_outcome(
+                "goal-blink": unavailable_outcome(
                     "goal-blink", "The second goal requires deeper planning."
                 ),
             },
@@ -6609,7 +6576,6 @@ class FastPlannerResolverTests(unittest.TestCase):
                 ["goal-walk", "goal-blink"],
                 "The Fast Planner cannot safely complete the plan.",
             ),
-            escalation_reason="compound request requires deep planning",
             unresolved=["goal-walk", "goal-blink"],
         )
         ollama = ScriptedOllama([branch_minimal, repaired])
@@ -6623,7 +6589,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.goal_ids, ["goal-walk", "goal-blink"])
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
@@ -6749,7 +6715,7 @@ class FastPlannerResolverTests(unittest.TestCase):
             ).resolve(request("Abstract request.", goal_ids=["goal-a", "goal-b"]))
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         self.assertEqual(plan.steps, [])
 
@@ -6792,14 +6758,14 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
 
         self.assertEqual(len(ollama.prompts), 1)
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.steps, [])
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
-    def test_model_failure_escalates_safely(self):
+    def test_model_failure_fails_closed_safely(self):
         plan = asyncio.run(FastPlannerResolver(FakeOllama(RuntimeError("offline")), FakeCatalog()).resolve(request("眨眼。")))
-        self.assertEqual(plan.disposition, "escalate")
-        self.assertEqual(plan.metadata["status"], "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
+        self.assertEqual(plan.metadata["status"], "failed")
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
 
 

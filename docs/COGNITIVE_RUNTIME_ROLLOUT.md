@@ -5,8 +5,8 @@
 **Implementation:** ownership migration exists; known contract conflicts remain in the audit.
 
 **Automatic verification:** the canonical local gate currently fails; existing source
-tests and retained scenarios cover diagnostic operation, validated apply, Fast-to-Deep
-escalation, trusted terminal host validation, atomic Goal-state application,
+tests and retained scenarios cover diagnostic operation, validated apply, honest
+Planner limitation, trusted terminal host validation, atomic Goal-state application,
 SC communication projection, fail-closed disablement, and evidence classification.
 
 **Target validation:** open. This documentation reconciliation adds no live model-stack,
@@ -118,17 +118,16 @@ The defaults are:
 ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS=300000
 ORCH_GOAL_ASSOCIATION_TIMEOUT_MS=65000
 ORCH_FAST_PLANNER_TIMEOUT_MS=65000
-ORCH_DEEP_PLANNER_TIMEOUT_MS=125000
+ORCH_DEEP_PLANNER_TIMEOUT_MS=125000  # deliberative SC/Reflection deadline (historical name)
 ```
 
 These development watchdogs bound one admitted semantic workflow while the selected
 model/profile remains unqualified; they do not replace or satisfy the stricter Charter
 latency targets for first useful speech. A target miss remains a retained failure even
-when the workflow later completes. Planner fast pass may escalate once to the deep pass
-when HOW warrants it. Either planner pass may
-regenerate once only for a mechanically malformed DTO. Deep semantic rejection is
-terminal, and Host validation cannot spend the remaining runtime budget on another
-semantic planning pass.
+when the workflow later completes. There is one Planner pass (the Deep Planner was
+retired on 2026-10-11). It may regenerate once only for a mechanically malformed DTO.
+Semantic rejection is terminal, and Host validation cannot spend the remaining runtime
+budget on another semantic planning pass.
 
 A timeout produces a structured fallback cause. It never authorizes partial
 work.
@@ -153,8 +152,8 @@ Validation includes:
 
 If one step is invalid, no effectful step is committed.
 
-The validator either accepts the terminal plan or rejects it. Deep Planner has already produced its terminal semantic plan; any permitted
-same-tier regeneration was mechanical DTO recovery only. A Host rejection therefore
+The validator either accepts the terminal plan or rejects it. The Planner has already produced its terminal semantic plan; any permitted
+regeneration was mechanical DTO recovery only. A Host rejection therefore
 fails closed, commits no Goal state, and starts no
 effect.
 
@@ -325,11 +324,11 @@ The retained `cognitive_runtime` scenario family covers:
 A complete Fast response becomes the authoritative chat interaction without an
 effectful skill.
 
-### Compound walk-and-blink runtime replan
+### Compound walk-and-blink alternative
 
-The Fast Planner escalates. The first Deep plan conflicts at the trusted runtime
-boundary. Structured feedback produces one revised Deep plan. The validated
-plan is adapted without partial execution.
+The one Planner returns a confirmed sequential alternative for a compound
+walk-and-blink request (`compound_walk_blink_alternative`). The validated plan is
+adapted without partial execution, and the spoken confirmation explains the adjustment.
 
 ### Capability-contract fail-closed boundary
 
@@ -417,7 +416,7 @@ Review:
 
 - Goal continuity before creation;
 - independent Goal segmentation;
-- Fast complete versus Deep escalation;
+- complete Plan versus honest limitation;
 - exact skills and arguments;
 - alternative/clarification behavior;
 - response Goal coverage;
@@ -485,8 +484,8 @@ Before widening the enabled provider/capability surface, review:
 
 1. Does Goal Association preserve existing Goals instead of creating duplicates?
 2. Do Fast plans apply only with complete high-confidence coverage?
-3. Do compound Goals escalate without leaking partial skills?
-4. Does Deep avoid same-tier semantic replanning and permit at most one mechanical DTO regeneration before terminal Host validation?
+3. Do compound Goals that cannot be fully planned end honestly without leaking partial skills?
+4. Does the Planner avoid semantic replanning and permit at most one mechanical DTO regeneration before terminal Host validation?
 5. Are material alternatives held for request-bound approval?
 6. Does speech match the current plan and execution state?
 7. Are all applied events recorded only after host preparation and Goal commit?
@@ -500,8 +499,8 @@ PR7 implementation is automatically verified when:
 
 - the unified pipeline supports `off`, `report_only`, and `apply`;
 - apply is lane-gated and rollback-safe;
-- Fast escalation reaches Deep once and never returns to Fast;
-- Deep performs no same-tier semantic replan; at most one mechanical DTO regeneration is allowed, and trusted runtime rejection fails closed;
+- one Planner pass decides; a limitation is honest and never delegated;
+- the Planner performs no semantic replan; at most one mechanical DTO regeneration is allowed, and trusted runtime rejection fails closed;
 - invalid or partial plans commit no effectful skill;
 - Goal-state application is atomic;
 - the SC communication projection is fingerprint-bound to the terminal Plan;

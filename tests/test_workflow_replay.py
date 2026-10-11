@@ -10,7 +10,6 @@ from jsonschema import Draft202012Validator
 
 from benchmarks.integration.model_replay import ModelReplay, ReplayMismatch
 from benchmarks.datasets.fast_planner_daily_life.qualification import ReplayModel, StaticCatalog
-from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from tests.workflow_replay_support import Episode, controlled_runtime, run_case
 from benchmarks.integration.model_replay import ReplayServer
@@ -75,7 +74,8 @@ def test_actual_changed_evidence_does_not_receive_frozen_next_plan(tmp_path):
     with pytest.raises(AssertionError):
         asyncio.run(run_case(case, tmp_path, replay))
     assert replay.errors == ['request mismatch at fast-result']
-    assert replay.position == 3
+    # gi, ga, the need-first search pass and the conditional Plan were consumed.
+    assert replay.position == 4
 
 
 @pytest.mark.parametrize('count', [None, 3])
@@ -102,9 +102,22 @@ def test_bad_effect_reply_rejected_before_provider_dispatch(count, tmp_path):
     asyncio.run(check())
 
 
-@pytest.mark.parametrize('tier', ['fast','deep'])
+class NeedFirstReplayModel(ReplayModel):
+    """The Planner first declares the forecast read it cannot see, then plans once with it."""
+
+    def __init__(self, raw, unmet_need):
+        super().__init__(json.dumps(raw))
+        self.unmet_need = unmet_need
+
+    async def generate(self, prompt, **kwargs):
+        reply = await super().generate(prompt, **kwargs)
+        if self.calls == 1:
+            reply = {'ability_needs': [self.unmet_need], **{k: v for k, v in reply.items() if k != 'ability_needs'}}
+        return reply
+
+
 @pytest.mark.parametrize('mutation', ['valid','label_only','false_completion','missing_obligation','information_quantity'])
-def test_acquisition_count_exception_requires_complete_deferred_effect(tier, mutation, tmp_path):
+def test_acquisition_count_exception_requires_complete_deferred_effect(mutation, tmp_path):
     case = load('conditional-rain')
     replay = ModelReplay(case)
     async def check():
@@ -112,7 +125,11 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(tier, mut
             episode = Episode(case, replay, server.url, tmp_path)
             await episode.begin()
             request = episode.request.model_copy(deep=True)
-            raw = replay.materialize(case['model_steps'][2]['response'])
+            search_pass, planned = case['model_steps'][2], case['model_steps'][3]
+            assert search_pass['need_search_pass'] and planned['name'] == 'fast-initial'
+            unmet = next(item for item in search_pass['response']['ability_needs'] if not item['fits'])
+            raw = replay.materialize(planned['response'])
+            raw.pop('ability_needs')
             catalog = copy.deepcopy(case['catalog'])
             gid = episode.goal
             if mutation == 'label_only':
@@ -130,16 +147,16 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(tier, mut
                 typed = {'count':{'name':'count','entity_type':'count','value':2,'confidence':1.0}}
                 request.context['goal_association_resolution']['new_goals'][0]['object'] = {'bindings':typed}
                 request.context['active_goal_snapshots'][0]['goal']['object'] = {'bindings':copy.deepcopy(typed)}
-            model = ReplayModel(json.dumps(raw))
-            resolver = FastPlannerResolver if tier == 'fast' else DeepPlannerResolver
-            result = await resolver(model, StaticCatalog(catalog)).resolve(request)
-            assert model.calls == 1
-            if mutation == 'valid' and tier == 'deep':
+            model = NeedFirstReplayModel(raw, unmet)
+            result = await FastPlannerResolver(model, StaticCatalog(catalog)).resolve(request)
+            if mutation == 'valid':
+                # The Goal filter hides the forecast read behind a body action; the Planner's
+                # own unmet need loads it, and the one Planner composes the conditional Plan.
+                assert model.calls == 2
                 assert result.disposition == 'execute', result.metadata
                 assert not result.metadata.get('failure_class')
+                assert result.metadata['ability_need_search']['loaded_capability_ids'] == ['chromie.weather.lookup']
             else:
-                # Fast's whole-Goal catalog excludes this cross-domain query;
-                # composition belongs to Deep, not a wider Fast authority.
                 assert result.metadata.get('failure_class'), result
     asyncio.run(check())
 
@@ -219,11 +236,10 @@ def test_shared_packet_parts_are_hash_checked(tmp_path):
         load_case(case)
 
 
-@pytest.mark.parametrize('role', ['umi', 'ga', 'fast', 'deep'])
+@pytest.mark.parametrize('role', ['umi', 'ga', 'fast'])
 def test_only_selected_role_receives_actual_answer_blind_packet(role, tmp_path):
     from benchmarks.integration.model_replay import load_case
-    family = 'normal_deep' if role == 'deep' else 'normal_fast'
-    case = load_case(CORPUS/f'workflow-{family}-blink-0-0.json')
+    case = load_case(CORPUS/'workflow-normal_fast-blink-0-0.json')
     case['private_adjudication'] = 'REFERENCE_AND_RUBRIC_MUST_NOT_ENTER_INFERENCE'
     step = copy.deepcopy(next(s for s in case['model_steps'] if s['role'] == role))
     step['request']['model'] = 'candidate-local'
@@ -300,9 +316,8 @@ def test_candidate_http_failure_has_raw_evidence_and_no_reference_fallback():
     assert 'response' not in replay.records[0]
 
 
-@pytest.mark.parametrize('tier', ['fast','deep'])
 @pytest.mark.parametrize('shape', ['empty','missing','foreign','complete'])
-def test_supplied_single_goal_outcome_map_must_match_admitted_goal(tier, shape):
+def test_supplied_single_goal_outcome_map_must_match_admitted_goal(shape):
     from agent.app.planner_validation import validate_planner_model_output
     raw = copy.deepcopy(load()['model_steps'][2]['response'])
     raw.pop('ability_needs', None)  # The resolver removes the need-first prefix before DTO validation.
@@ -311,8 +326,8 @@ def test_supplied_single_goal_outcome_map_must_match_admitted_goal(tier, shape):
     if shape == 'missing': raw.pop('goal_outcomes')
     if shape == 'foreign': raw['goal_outcomes'] = {'foreign':raw['goal_outcomes'][goal]}
     if shape == 'complete':
-        result = validate_planner_model_output(raw, planner_tier=tier, expected_goal_ids_for_turn=[goal])
+        result = validate_planner_model_output(raw, expected_goal_ids_for_turn=[goal])
         assert set(result.goal_outcomes) == {goal}
     else:
         with pytest.raises(ValueError,match='goal_outcomes keys must cover exactly'):
-            validate_planner_model_output(raw, planner_tier=tier, expected_goal_ids_for_turn=[goal])
+            validate_planner_model_output(raw, expected_goal_ids_for_turn=[goal])

@@ -76,7 +76,7 @@ Soridormi 负责：
 已完成的开发基础包括：
 
 - Host 驱动的 Gateway/Core/Planner 原生交互闭环；
-- Goal Association、Fast/Deep Planner（含 Communicative Activity）与统一主机协调器；
+- Goal Association、Planner、Value Judgment、Social Cognition（Communicative Activity）与统一主机协调器；
 - 公共安全配置使用统一权威 `apply` Runtime；维护的 Soridormi 启动器只是在注册可信
   body Provider 后增加其明确声明的 Capability，可执行范围由 typed Goal/Capability contract 决定；
 - 请求绑定的口头确认与拒绝；
@@ -117,11 +117,11 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 
 - **当前架构基线**：主 authority seam 已固定为 `User Meaning Interpretation →
   Responsibility evidence → Fast Planner 快速推进 →（可立即执行的安全 Activity）
-  和/或 Goal Association / Deep Planner continuation → 需要持久连续性时建立
+  和/或 Goal Association → 需要持久连续性时建立
   Canonical Goal → canonical planning → Work/Primary Activity → realization → Provider
   → Evidence`。UMI 的 Fast/Deep 只有认知深度/上下文/推理预算差异，authority 和输出
-  相同；均不得写回复文本、创建 Work/Activity、选择 lane/Capability/Plan。Fast
-  Planner 是第一个 HOW owner，但 GA 仍唯一拥有 canonical Goal continuity。
+  相同；均不得写回复文本、创建 Work/Activity、选择 lane/Capability/Plan。Planner
+  是唯一的 HOW owner（Deep Planner 已于 2026-10-11 退役），GA 仍唯一拥有 canonical Goal continuity。
 - **下一阶段设计**：Epistemic Qualification 只负责“证据是否足以建立某个事实”，
   Forward Adaptation 只允许有界的未来认知上下文；二者都不是新的 owner。在线
   Reflection 不得修改共享 Fast/Deep 策略、Stable Mind、全局 prompt/model、授权或

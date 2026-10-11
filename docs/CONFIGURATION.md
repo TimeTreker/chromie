@@ -186,8 +186,8 @@ source-controlled `assets/tts/voices` catalog before service creation.
 `en` requests to `chromie_zh` and `chromie_en`. The launcher uses one host TTS
 request for the singleton CosyVoice worker. Profiles with compact cognition enabled limit Ollama to one resident model.
 The RTX 4090 Laptop profile now selects one resident Qwen3.5-4B AWQ SGLang engine.
-UMI retains its 16K request limit, the other ordinary roles retain 32K, and Fast/Deep
-retain 49152 so complete re-entry packets requiring up to 42172 estimated tokens still
+UMI retains its 16K request limit, the other ordinary roles retain 32K, and the Planner
+and deliberative roles retain 49152 so complete re-entry packets requiring up to 42172 estimated tokens still
 fit with their unchanged output allowance and safety margin. SGLang owns three bounded
 running-request slots, priority/preemption, and one 49152-token shared cache so the normal
 post-UMI SC, GA and Fast Planner branches can be admitted together. This covers one
@@ -328,7 +328,7 @@ its current UMI stage; semantic failure otherwise fails closed as
 | `ORCH_EPISODE_LOG_PATH` | `.chromie/experience/episodes.jsonl`; stores rolling conversation-thread snapshots keyed by `conversation_id`. |
 | `ORCH_EPISODE_MAX_TURNS` | `12`; maximum recent turns retained in one episode snapshot. |
 
-The maintained factory profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Customer setup may derive `.chromie/mind/active_profile.json` through `python scripts/configure_chromie_mind.py`; the runtime prefers that validated file at next startup unless an explicit operator path overrides it. The customer contract exposes only display name, pronouns, household role, one reviewed social-style preset, bounded household worldview perspectives, and bounded household values. Core principles, safety/reflex policy, privacy, consent, authorization, embodiment truth, capabilities, providers, prompts, models, and permissions remain locked and customer-marked files that modify them fail validation. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in User Meaning Interpretation, Goal Association, Fast and Deep Planning, Planner-owned Communicative Activities, conversation, and direct fallback prompts. Planner and selective Reflection additionally receive the independent Stable Mind worldview/value projection (the Planner's projection keeps every owner-approved core principle, up to 8,000 characters); Value Judgment receives the full owner-approved Stable Mind; narrow classifiers receive only the facts relevant to their authority. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
+The maintained factory profile at `config/mind/chromie_default.json` carries the owner-approved structured self model. Customer setup may derive `.chromie/mind/active_profile.json` through `python scripts/configure_chromie_mind.py`; the runtime prefers that validated file at next startup unless an explicit operator path overrides it. The customer contract exposes only display name, pronouns, household role, one reviewed social-style preset, bounded household worldview perspectives, and bounded household values. Core principles, safety/reflex policy, privacy, consent, authorization, embodiment truth, capabilities, providers, prompts, models, and permissions remain locked and customer-marked files that modify them fail validation. Concrete name, age, pronouns, self-description, identity-answer guidance, and personality expression are configuration, not Python defaults. One configured entity owns first-person speech, perception, action, and embodiment; language and reasoning models are internal components with bounded roles. The same owner-approved identity projection is included in User Meaning Interpretation, Goal Association, Planning, Social Cognition Communicative Activities, conversation, and direct fallback prompts. Planner and selective Reflection additionally receive the independent Stable Mind worldview/value projection (the Planner's projection keeps every owner-approved core principle, up to 8,000 characters); Value Judgment receives the full owner-approved Stable Mind; narrow classifiers receive only the facts relevant to their authority. The LLM decides from meaning whether identity facts are relevant; there is no identity-question branch, fixed reply, or phrase/regex map. Core
 principles require owner approval and are not changed by experience. The
 experience journal can support future prompt, test, strategy, and long-term-goal
 tuning, but proposals are never auto-applied. See
@@ -437,7 +437,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for the single primary Agent Skill selection call; default `10000`. No model repair or reselection is performed. Explicit qualification mode raises it to `120000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
-| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association, Fast Planner, and Deep Planner; default `1`. |
+| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for Goal Association and the Planner; default `1`. |
 | `AGENT_SKILL_PROJECTION_MAX_CHARS` | Maximum UTF-8 character count for one disclosed projection; default `3000`. Oversized content is omitted, never truncated. |
 | `AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS` | Maximum aggregate disclosed projection characters for one Agent boundary; default `6000`. |
 | `AGENT_SKILL_PROJECTION_COUNT_LIMIT` | Maximum selected projections disclosed to one Agent boundary; default `4`. |
@@ -498,8 +498,9 @@ Do not commit a real execution token. Manifest strings may use required
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
 
-Ordinary semantic escalation and deep-thinking delegation are authored by the
-Goal-driven Cognitive Core and its planner models. The Host has no
+Deep-thinking delegation (Deep User Meaning Interpretation, Social Cognition's deep
+client) is authored by the Goal-driven Cognitive Core's own models; the Planner has no
+deeper pass. The Host has no
 confidence-, intent-, user-state-, or phrase-based deep-thinking policy,
 and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `TTS_FLUSH_CHARS` | Streaming direct-LLM text threshold before scheduling a sentence for TTS; common default `80`, code default `160`. |
@@ -939,28 +940,35 @@ or certificate-repair fallback.
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
 | `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the one structured streaming Fast Planner invocation. A validated presentation commit may arrive much earlier, but timeout ownership remains with the complete terminal result and the 2-second commit target is measured independently. |
-Fast/Deep depth is selected from material uncertainty, complexity, consequence, or bounded-planning failure; model self-reported confidence is telemetry and is never a standalone escalation threshold.
+There is one Planner (PLANNER-AUTHORITY-001): its depth comes from need-first library search, Evidence re-entry or clarification, never from a second planner pass. Model self-reported confidence is telemetry, never a standalone threshold. The Planner's own commitment bar is 0.75 prospective satisfaction (code constant `MINIMUM_PLAN_SATISFACTION`); a Plan below it becomes an honest limitation.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |
 | `AGENT_FAST_PLANNER_NUM_PREDICT` | `2048`; flat semantic planner-DTO JSON budget sized from live compound and multi-goal output evidence. |
 | `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
 | `ORCH_FAST_PLANNER_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around full Fast planning. |
-| `AGENT_DEEP_PLANNER_ENABLED` | `1`; exposes the full-catalog advisory Deep Planner. |
-| `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model after Fast Planner escalation. |
-| `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `120000` in maintained development modes; workflow-completion watchdog for one Deep Planner model call. |
-| `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` | `0.75`; a complete Deep plan below this prospective goal-satisfaction threshold fails closed. It is not a replan trigger. |
-| `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; bounded full-catalog planning context. Qualification mode and the architecture-validation overlay use `40960` so the retained full-catalog post-Evidence prompt plus the 4096-token structured-output reserve fits without changing the maintained interactive profile. |
-| `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; flat semantic planner-DTO JSON budget. |
-| `AGENT_DEEP_PLANNER_MAX_CAPABILITIES` | `96`; maximum full catalog entries supplied. |
-| `ORCH_DEEP_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Deep Planning remains terminal in the unified runtime. |
-| `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `125000` in maintained development modes; Host envelope around Deep planning. |
+
+The Deep Planner was retired on 2026-10-11 and `ORCH_DEEP_PLANNER_MODE`,
+`AGENT_DEEP_PLANNER_MAX_CAPABILITIES` and `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` were
+removed. The settings below keep their historical names but no longer configure a
+Planner: they configure the shared deliberative model used by Social Cognition's deep
+client, Deep User Meaning Interpretation and Reflection. Renaming them is a recorded
+follow-up.
+
+| Variable | Default or profile behavior |
+|---|---|
+| `AGENT_DEEP_PLANNER_ENABLED` | `1`; enables the deliberative clients (Social Cognition deep client, Reflection). |
+| `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. The deliberative model identity. |
+| `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `120000` in maintained development modes; workflow-completion watchdog for one deliberative model call. |
+| `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; deliberative context (Social Cognition uses the larger of this and the Planner context). Qualification mode and the architecture-validation overlay use `40960`. |
+| `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; deliberative output budget. |
+| `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `125000` in maintained development modes; Host deadline for Social Cognition, Reflection and Goal-free Situation cognition calls (the larger of this and the Planner deadline). |
 
 There is no independent response-composition or tool-result-interpretation
-model, endpoint, timeout, or profile role. Fast/Deep Planner output carries exact
-Communicative Activity wording. Host-bound terminal Capability Evidence re-enters
-Fast Planner through the existing bounded `AGENT_FAST_PLANNER_*` budget.
+model, endpoint, timeout, or profile role. Social Cognition owns Communicative Activity
+wording. Host-bound terminal Capability Evidence re-enters the Planner through the
+existing bounded `AGENT_FAST_PLANNER_*` budget.
 
-Fast and Deep Planning send an exact flat `PlannerModelOutput` schema to
+Canonical planning sends an exact flat `PlannerModelOutput`-derived schema to
 Ollama. The model does not author the canonical plan identity, schema version,
 planner tier, or authoritative top-level Goal IDs. Complete multi-goal output
 uses a `goal_outcomes` object with exactly one property per Goal Association ID;
@@ -984,7 +992,7 @@ the authoritative Goal/Evidence snapshots remain Host-owned.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` disables the Goal-driven Runtime and therefore fails closed for admitted ordinary cognition; `report_only` is diagnostic evidence-only execution when invoked explicitly; `apply` is the maintained authoritative mode. No mode falls back to a retired semantic pipeline. |
-| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | Foreground Host deadline for one admitted cognitive interaction. Maintained development modes and the code/common fallback use `300000` so an unqualified model/profile can complete one legal GA/Fast/Deep workflow; explicit qualification mode uses `900000` as an evidence-collection watchdog. Neither value is a latency pass: the 2-second Planner-commit and 3-second playback targets are measured and failed independently. When the foreground deadline cancels the pipeline, Runtime cleans up unbound provisional Fast work before propagating cancellation. Trusted Host rejection is terminal and does not reopen semantic planning. |
+| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | Foreground Host deadline for one admitted cognitive interaction. Maintained development modes and the code/common fallback use `300000` so an unqualified model/profile can complete one legal GA/Planner/Social Cognition workflow; explicit qualification mode uses `900000` as an evidence-collection watchdog. Neither value is a latency pass: the 2-second Planner-commit and 3-second playback targets are measured and failed independently. When the foreground deadline cancels the pipeline, Runtime cleans up unbound provisional Fast work before propagating cancellation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Structural SC ownership, function, delivery phase and truth-stage fields remain visible so asynchronous communication can be verified without exposing its words. Enable raw text only under an explicit privacy decision. |
 | `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal Plan, Planner response projection, latency, failure, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
@@ -1024,7 +1032,7 @@ reused by event identity/provenance rather than text matching, and no pre-Eviden
 may turn a Plan, request, or `claim_state=none` into result/completion truth.
 
 The common profile runs the unified Goal-driven Runtime in authoritative `apply` mode. The
-standalone Goal Association/Fast/Deep endpoints remain diagnostic/report-only surfaces when
+standalone Goal Association/Planner endpoints remain diagnostic/report-only surfaces when
 explicitly selected; they are not fallback semantic authorities. The Soridormi launcher
 adds a trusted body Provider, after which Planner may select its declared capabilities and
 Runtime/Soridormi still enforce physical confirmation, safety, preflight, and execution.
@@ -1136,14 +1144,15 @@ repair when a reviewed upstream image implements that constructor contract.
 The request-format candidate also makes the pinned XGrammar dispatcher honor
 `x-guidance.whitespace_flexible` per schema, retaining the complete schema as its
 cache key. The Agent adds `false` to the two GA output-contract titles and the
-Deep Planner and Agent Skill Selection output-contract titles. Deep/Skill calls
-also reproduced outside-string whitespace loops that exhausted their output budgets.
+Agent Skill Selection output-contract title (the retired Deep Planner title was the
+other one). Deep/Skill calls had reproduced outside-string whitespace loops that
+exhausted their output budgets.
 UMI and other unannotated requests retain their existing formatting. No global compact
 flag or environment variable is added. This candidate requires the full qualification
 record in the checkpoint before promotion; the earlier global compact experiment
 was rejected for UMI regressions. Remove the image patch when upstream supports this
 request annotation. Independent canonical Schema and Host constraints remain required.
-GA, canonical Fast Planner (single and multiple Goals), Deep Planner and Agent Skill Selection decoder schemas expose existing object fields and array item/cardinality constraints
+GA, canonical Planner (single and multiple Goals) and Agent Skill Selection decoder schemas expose existing object fields and array item/cardinality constraints
 as redundant single alternatives beside intersections. This preserves the full Schema
 contract while making those shapes visible to the pinned decoder; cross-item identity
 conservation still requires the original Schema clauses and deterministic Host checks.
@@ -1176,7 +1185,7 @@ removed. The SGLang adapter exposes existing intersection shapes and preserves i
 decoder-only omissions of string `pattern` and numeric `number` bounds for the pinned
 XGrammar 0.2.1 limitations. Original Schema, DTO and Host checks retain these constraints.
 SGLang streaming requests now use `x-guidance.whitespace_flexible=false`, like existing
-Deep/GA requests; string contents are unaffected. No extra model call or environment
+GA requests; string contents are unaffected. No extra model call or environment
 setting is introduced. Native structured decoding does not prove semantic correctness,
 termination, or commit/terminal consistency. The current Ollama comparison remains
 unqualified, and this changed SGLang transport has no current target-hardware proof.

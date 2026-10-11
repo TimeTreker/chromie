@@ -371,7 +371,7 @@ Trusted Capability Runtime exposes one task-list view per canonical Goal. A task
 serving multiple Goals appears in each applicable view under the same stable request
 identity and executes once. Runtime may execute independent tasks concurrently when
 declared resources and provider limits allow—for example several safe weather reads,
-or Vocal work alongside non-conflicting body work. A newer Fast/Deep
+or Vocal work alongside non-conflicting body work. A newer
 Planner-authored canonical Plan may cause Runtime to cancel or replace unfinished
 cancellable tasks, but completed Evidence remains immutable and is never converted
 into “did not happen.” GA supplies Goal continuity but never authors or selects that
@@ -743,22 +743,19 @@ it does not rewrite words or request a semantic retry. Parallel Work changes do 
 invalidate independent interpretation-time acknowledgement. Already submitted delivery
 retains its existing interruption and completion ownership.
 
-Complete bounded capability work
-belongs on the Fast path. Once that Fast work is completely grounded, exactly
-capability-bound, deterministically safe/authorized, and needs no confirmation, it may
-be committed without waiting for Deep. Deep is not a reviewer of a successful Fast
-Plan; a Fast contract/provenance failure also does not justify asking Deep to repair the
-same work. Different independent Responsibilities may progress at different depths, so a
-confirmation-free read with canonical Goal grounding and a valid Fast Plan need
-not wait for unrelated deeper thinking. Deep User Meaning Interpretation is exceptional and is
+Complete bounded capability work is committed by the one Planner. Once that work is
+completely grounded, exactly capability-bound, deterministically safe/authorized, and
+needs no confirmation, it may be committed without waiting for any review; a
+contract/provenance failure is never repaired by another planner. A
+confirmation-free read with canonical Goal grounding and a valid Plan need not wait for
+unrelated deeper thinking. Deep User Meaning Interpretation is exceptional and is
 justified by genuine consequential ambiguity in intended outcome, scope, or referent.
-Deep Planner is separately exceptional and is justified by incomplete or compound Plan
-coverage, nontrivial dependencies, material alternatives, novelty or broader planning
-context, or safety/resource reasoning. Each Fast stage may use its designated one-way
-Deep escalation only when broader reasoning inside that same authority is actually
-warranted. A purely mechanical schema/DTO failure may be regenerated once under the
-same meaning. A terminal Deep-UMI meaning rejection or Deep-Planner grounding/coverage
-rejection is not repaired by another same-tier semantic pass. A confidence number alone
+The Planner has no deeper pass (the Deep Planner was retired on 2026-10-11): it acquires
+missing contracts, Evidence or input, or reports an honest limitation. Fast UMI may use
+its designated one-way Deep escalation only when broader reasoning inside that same
+authority is actually warranted. A purely mechanical schema/DTO failure may be
+regenerated once under the same meaning. A terminal Deep-UMI meaning rejection or a
+Planner grounding/coverage rejection is not repaired by another semantic pass. A confidence number alone
 neither permits a bypass nor requires escalation, and it never authorizes an
 effect.
 

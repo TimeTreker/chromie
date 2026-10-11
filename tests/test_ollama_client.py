@@ -19,18 +19,17 @@ class OllamaClientTests(unittest.IsolatedAsyncioTestCase):
     def test_typed_planner_dto_failure_keeps_classification_through_fallbacks(self) -> None:
         from agent.app.clients.ollama_client import llm_failure_metadata
         from agent.app.planner_model_contract import PlannerDTOContractError
-        from agent.app.planner_fallback import materialize_fast_escalation, materialize_deep_clarify
+        from agent.app.planner_fallback import materialize_planner_failure
         from tests.cognitive_work_test_support import cognitive_work_request
 
         error = PlannerDTOContractError("ask_user requires blocking=true without a resolved value")
         request = cognitive_work_request(sid="contract-rejection", text="Perform the requested action.", context={})
-        for tier in ("direct", "fast", "deep"):
-            with self.subTest(tier=tier):
-                if tier == "direct":
+        for path in ("direct", "planner"):
+            with self.subTest(path=path):
+                if path == "direct":
                     metadata = llm_failure_metadata(error)
                 else:
-                    materialize = materialize_fast_escalation if tier == "fast" else materialize_deep_clarify
-                    plan = materialize("rejected-plan", request, "model_contract_failed", error=error)
+                    plan = materialize_planner_failure("rejected-plan", request, "model_contract_failed", error=error)
                     metadata = plan.metadata
                     self.assertEqual(plan.steps, [])
                     self.assertEqual(plan.response_text, "")

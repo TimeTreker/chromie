@@ -196,10 +196,11 @@ def need(text, closest="none", fits=False, does="No loaded Capability realizes i
     return {"need": text, "closest_loaded": closest, "closest_loaded_does": does, "fits": fits}
 
 
-def escalation_outcome(reason):
-    return {"disposition": "escalate", "coverage": "uncertain", "covered_responsibility_refs": ["r1"],
-        "activities": [], "continuations": ["deep_planner"], "confidence": 0.5, "unresolved": ["r1"],
-        "reason_summary": reason}
+def limitation_outcome(reason):
+    return {"disposition": "unavailable", "coverage": "uncertain", "covered_responsibility_refs": ["r1"],
+        "activities": [{"role": "unavailable", "activity_id": "limit", "source_responsibility_refs": ["r1"],
+                        "missing": [reason]}],
+        "confidence": 0.5, "unresolved": ["r1"], "reason_summary": reason}
 
 
 def need_first_shapes(schema):
@@ -362,7 +363,7 @@ async def test_unmet_need_searches_library_then_plans_once(fault):
     request = request_for("turn left by 45 degrees")
     entry = capability("turn", {"rotation_degrees": {"type": "number", "maximum": 90}}, tier="rare")
     first = {"ability_needs": [need("turn the body in place by an angle")],
-             **escalation_outcome("No loaded Capability turns the body.")}
+             **limitation_outcome("No loaded Capability turns the body.")}
     final = work([activity("turn", {"rotation_degrees": 45}, source_spans("turn left by 45 degrees", {"rotation_degrees": "45 degrees"}))])
     if fault == "no_match":
         first["ability_needs"] = [need("open the kitchen window")]
@@ -370,7 +371,7 @@ async def test_unmet_need_searches_library_then_plans_once(fault):
         first["ability_needs"] = [need("turn the body in place by an angle", "test.turn", True, "Turn in place.")]
     elif fault == "second_unmet":
         final = {"ability_needs": [need("turn the body in place by an angle")],
-                 **escalation_outcome("Still no fitting Capability.")}
+                 **limitation_outcome("Still no fitting Capability.")}
     elif fault == "invented_quote":
         final["activities"][0]["argument_sources"]["rotation_degrees"] = {"source_start_token_ref": "t999", "source_end_token_ref": "t999"}
     model = Model([first, final])
@@ -385,7 +386,7 @@ async def test_unmet_need_searches_library_then_plans_once(fault):
         assert len(model.packets) == 1
         if fault == "no_match":
             assert isinstance(frames[0], FastPlannerStreamTerminal)
-            assert frames[0].advance.disposition == "escalate"
+            assert frames[0].advance.disposition == "unavailable"
             assert frames[0].advance.metadata["capability_detail_lookups"] == 0
         else:
             assert isinstance(frames[0], FastPlannerStreamFailure)
@@ -403,7 +404,7 @@ async def test_unmet_need_searches_library_then_plans_once(fault):
     assert metadata["ability_need_search"] == {"unmet_needs": ["turn the body in place by an angle"],
                                               "loaded_capability_ids": ["test.turn"]}
     if fault == "second_unmet":
-        assert frames[0].advance.disposition == "escalate"
+        assert frames[0].advance.disposition == "unavailable"
     else:
         assert frames[0].advance.activities[0].capability_id == "test.turn"
 
@@ -488,11 +489,9 @@ async def test_planner_owns_new_future_readiness_without_gi_time_fields(fault):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("tier", ["fast", "deep"])
 @pytest.mark.parametrize("fault", [None, "early_work", "false_fulfillment", "foreign_quote", "duplicate_timer"])
-async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp_path):
+async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path):
     from pathlib import Path
-    from agent.app.deep_planner import DeepPlannerResolver
     from agent.app.planner_model_contract import PlannerModelOutput
 
     due = "2099-09-04T19:00:00+08:00"
@@ -533,8 +532,7 @@ async def test_new_future_goal_preserves_independent_ready_work(tier, fault, tmp
         raw["time_conditions"].append(copy.deepcopy(raw["time_conditions"][0]))
     raw = PlannerModelOutput.model_validate(raw).model_dump(mode="json")
     model = Model([raw])
-    resolver = FastPlannerResolver if tier == "fast" else DeepPlannerResolver
-    plan = await resolver(model, Catalog([capability("blink", {"count": {"type": "integer", "minimum": 1}})])).resolve(request)
+    plan = await FastPlannerResolver(model, Catalog([capability("blink", {"count": {"type": "integer", "minimum": 1}})])).resolve(request)
     assert len(model.packets) == 1
     if fault:
         assert not plan.steps and plan.metadata.get("failure_class"), plan.model_dump()
@@ -595,7 +593,7 @@ async def test_index_visibility_does_not_authorize_unavailable_or_locked_work(av
     entry = capability("turn", {"rotation_degrees": {"type": "number"}}, tier="rare")
     entry = entry.model_copy(update={"available": available, "prompt_tier_locked": locked})
     first = {"ability_needs": [need("turn the body in place by an angle")],
-             **escalation_outcome("No loaded Capability turns the body.")}
+             **limitation_outcome("No loaded Capability turns the body.")}
     model = Model([first])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(
         request_for("turn left by 45 degrees"))]
@@ -1298,7 +1296,7 @@ async def test_host_stops_reading_once_an_unmet_need_has_library_contracts():
     request = request_for("turn left by 45 degrees")
     entry = capability("turn", {"rotation_degrees": {"type": "number"}}, tier="rare")
     first = json.dumps({"ability_needs": [need("turn the body in place by an angle")],
-                        **escalation_outcome("No loaded Capability turns the body.")})
+                        **limitation_outcome("No loaded Capability turns the body.")})
     final = work([activity("turn", {"rotation_degrees": 45}, source_spans("turn left by 45 degrees", {"rotation_degrees": "45 degrees"}))])
     consumed, closed = [], []
 

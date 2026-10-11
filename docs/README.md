@@ -154,11 +154,9 @@ mechanical-contract owner.
 - [Capability Manifests](../capabilities/README.md)
 - [Agent Skill Packages](../agent-skills/README.md)
 - [Grounded External Information Skill](../agent-skills/grounded-external-information/SKILL.md)
-  - [Fast Planner projection](../agent-skills/grounded-external-information/projections/fast_planner.md)
-  - [Deep Planner projection](../agent-skills/grounded-external-information/projections/deep_planner.md)
+  - [Planner projection](../agent-skills/grounded-external-information/projections/fast_planner.md)
 - [Weather Information Skill](../agent-skills/weather-information/SKILL.md)
-  - [Fast Planner projection](../agent-skills/weather-information/projections/fast_planner.md)
-  - [Deep Planner projection](../agent-skills/weather-information/projections/deep_planner.md)
+  - [Planner projection](../agent-skills/weather-information/projections/fast_planner.md)
 - [Legacy Hardware Daemon](../hardware/README.md)
 - [Hardware Profiles](../HARDWARE_PROFILES.md)
 

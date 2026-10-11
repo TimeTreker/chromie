@@ -18,7 +18,7 @@ Use this split for new capabilities:
 User request
   -> Cognitive Gateway admits an immutable UserTurnEnvelope
   -> Goal Association resolves the user's responsibility and continuity
-  -> Fast or terminal Deep Planner selects an exact registered Capability
+  -> the Planner selects an exact registered Capability
   -> Trusted Capability Runtime validates and invokes the owning Provider
   -> exact result Evidence is reconciled to the source Goal and Plan
   -> Fast Planner re-enters with trusted Evidence and authors the grounded result Communicative Activity
@@ -110,7 +110,7 @@ feature.
 5. **Expose the Capability to model-owned planning.**
    - Catalog projection may present the compact semantic description and schema
      to fast User Meaning Interpretation and the canonical planners.
-   - Goal Association owns what the user means; Fast or terminal Deep Planning
+   - Goal Association owns what the user means; the Planner
      owns exact Capability selection and complete Goal coverage.
    - Review/repair stages may reject malformed or out-of-envelope proposals, but
      deterministic code must not substitute another Capability or invent user

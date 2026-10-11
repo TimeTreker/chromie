@@ -2,6 +2,8 @@
 
 Each emitted JSON is an authoritative scenario. This authoring module never runs
 inside production or strict replay, and may not infer an answer from observed behavior.
+Requests (and, since freeze 23, the need-first search pass before a conditional Plan) are
+captured from the running workflow, never authored here. There is one Planner role.
 """
 from __future__ import annotations
 
@@ -58,7 +60,7 @@ def _separate_interaction(case):
     """Freeze authored SC words beside, never inside, a Work model reply."""
     words = case.setdefault("social_cognition", {})
     for step in case["model_steps"]:
-        if step.get("role", step["name"].split("-")[0]) not in {"fast", "deep"}:
+        if step.get("role", step["name"].split("-")[0]) != "fast":
             continue
         raw = step["response"]
         if "social_fixture_text" in raw:
@@ -116,7 +118,6 @@ def _raw_reference_case(family, action, value_index, form):
         acceptable_variation='Meaning-equivalent role outputs need separately reviewed replay branches; exact text is not a model-quality oracle.')
     case['provenance'].update(authoring_method='GPT-6 Astra authored 60 contrasts; deterministic 4 actions × 5 values × 5 language forms expansion',
         independent_inference_per_case=False, training_eligible=False)
-    case['initial_planner'] = 'deep' if conditional or family in {'normal_deep','plan_missing_parameter','plan_wrong_parameter','plan_foreign_goal','plan_unknown_capability','multi_goal','multi_goal_omission','early_work'} else 'fast'
     # Use the existing provider-owned catalog, including duration semantics.
     common = json.loads((ROOT/'benchmarks/datasets/fast_planner_daily_life/catalogs/common_v1.json').read_text())['capabilities']
     case['catalog'] = [c for c in common if c['capability_id'] in {'chromie.weather.lookup','soridormi.blink_eyes','soridormi.walk_forward'}]
@@ -157,10 +158,8 @@ def _raw_reference_case(family, action, value_index, form):
     for step in case['model_steps']:
         step.pop('request', None)
         role = step['role']
-        if role in {'fast','deep'}:
+        if role == 'fast':
             source_step_name = step['name']
-            role = case['initial_planner'] if step['name'].endswith('initial') else role
-            step['name'] = role + '-' + step['name'].split('-',1)[1]
             raw = step['response']
             raw.setdefault('social_fixture_text', case.get('social_cognition', {}).get(source_step_name, ''))
             raw['goal_summary'] = 'Honor the admitted action, parameter, and any condition or readiness.'
@@ -203,7 +202,7 @@ def _raw_reference_case(family, action, value_index, form):
         raw = json.loads((SEEDS/'workflow-normal.json').read_text())['model_steps'][2]['response']
         raw['steps'][0].update(capability_id=capability,args={argument:value})
         case['model_steps'][2]['response'] = raw
-        reject(case, 'deep')
+        reject(case, 'fast')
     if family.startswith('gi_'):
         if family == 'gi_forbidden_how': responsibility['capability_id'] = capability
         if family == 'gi_duplicate_ref': gi['responsibilities'].append(copy.deepcopy(responsibility))
@@ -222,12 +221,12 @@ def _raw_reference_case(family, action, value_index, form):
         if family == 'plan_foreign_goal': raw['steps'][0]['source_goal_ids'] = ['foreign_goal']
         if family == 'plan_unknown_capability': raw['steps'][0]['capability_id'] = 'undeclared.action'
         if family == 'plan_unknown_capability': case['allow_nonexecuting_rejection'] = True
-        reject(case,'deep')
+        reject(case,'fast')
     if family == 'acquisition_false_completion':
         raw = case['model_steps'][2]['response']
         for sat in (raw['goal_satisfaction'],raw['goal_outcomes']['${goal}']['satisfaction']):
             sat.update(score=1.0, status='exact', satisfied_goal_ids=['${goal}'], unmet_goal_ids=[], unmet_requirements=[])
-        reject(case,'deep')
+        reject(case,'fast')
     if family in {'multi_goal','multi_goal_omission'}:
         second_action = 'walk' if action == 'blink' else 'blink'
         second_value = VALUES[second_action][value_index]
@@ -259,11 +258,11 @@ def _raw_reference_case(family, action, value_index, form):
         case['expected_provider_calls'].append({'capability':second_capability,'args':work['args']})
         if family == 'multi_goal_omission':
             del raw['goal_outcomes']['${goal2}']
-            reject(case,'deep')
+            reject(case,'fast')
     for index, step in enumerate(case['model_steps']):
         if step['role'] == 'umi':
             step['required_prompt_fragments'] = [case.get('followup',case['input'])['text'] if step['name'] == 'gi-cancel' else case['input']['text']]
-        elif step['role'] in {'fast','deep'}:
+        elif step['role'] == 'fast':
             step['required_prompt_fragments'] = ['${goal}'] + (['${goal2}'] if family in {'multi_goal','multi_goal_omission'} else [])
         step['fixture_kind'] = (
             'fault_injection' if case.get('expected_rejection') and index == len(case['model_steps'])-1 else
@@ -442,7 +441,7 @@ def extended_case(family, action, value_index, form):
             raw['parameter_resolutions'] = [{'step_id':step['step_id'],'parameter':name,'strategy':'user_supplied',
                 'value':number,'confidence':1.0,'blocking':False,'rationale':'Preserve the explicit action parameter.',
                 'source_goal_ids':step['source_goal_ids']} for step in raw['steps'] for name,number in step['args'].items()]
-        reject(case,'deep')
+        reject(case,'fast')
         if family == 'plan_conflicting_resource':
             case['allow_nonexecuting_rejection'] = True
             case['expected_validation_feedback'] = 'parallel_resource_claim_conflict'
@@ -455,7 +454,7 @@ def extended_case(family, action, value_index, form):
         raise ValueError(f'Unimplemented authored family: {family}')
     for index,step in enumerate(case['model_steps']):
         step.pop('request',None)
-        step['required_prompt_fragments'] = [case['followup']['text'] if step['name']=='gi-cancel' else case['input']['text']] if step['role']=='umi' else ['${goal}'] if step['role'] in {'fast','deep'} else []
+        step['required_prompt_fragments'] = [case['followup']['text'] if step['name']=='gi-cancel' else case['input']['text']] if step['role']=='umi' else ['${goal}'] if step['role'] == 'fast' else []
         step['fixture_kind'] = 'fault_injection' if case.get('expected_rejection') and index==len(case['model_steps'])-1 else 'authored_reference'
         step['training_eligible'] = False
     return _separate_interaction(case)
@@ -465,7 +464,7 @@ def reject(case, role):
     case['probe'] = case['coverage_family']
     case['expected_rejection'] = role
     if case['expected_verdict'] != 'known_contract_gap': case['expected_verdict'] = 'expected_rejection'
-    case['model_steps'] = case['model_steps'][:{'umi':1,'ga':2,'deep':3,'fast':3}[role]]
+    case['model_steps'] = case['model_steps'][:{'umi':1,'ga':2,'fast':3}[role]]
 
 
 def reference_case(family, action, value_index, form):
@@ -543,7 +542,7 @@ def _intent_reference(case):
                 g.setdefault('supersedes_goal_ids', [])
                 if mutant is not None:
                     g['bindings'] = mutant
-        elif step['role'] in {'fast','deep'}:
+        elif step['role'] == 'fast':
             # Parameter values here come from the pre-authored expected provider contract,
             # never from observed runtime output. A wrong argument conflicts with its proof.
             proofs = []

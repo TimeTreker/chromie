@@ -27,7 +27,7 @@ Planner Capability Activity
   -> bounded current state:
        Responsibility + Goal + Situation + Work + Evidence
   -> CognitiveOpportunity                               # should cognition reconsider now?
-  -> Planner fast pass / deep pass if HOW warrants it
+  -> the one Planner (PLANNER-AUTHORITY-001)
        -> 0..N new Activity changes
        -> or no new Activity
   -> Runtime validates/applies any new Work asynchronously
@@ -61,9 +61,8 @@ Planner owns:
 - exact natural wording of any Communicative Activity;
 - carrying exact Goal and Evidence provenance into the next Plan.
 
-Planner fast/deep are cognition depths of this same authority. The deep pass is
-used only for genuinely complex HOW; ordinary terminal Evidence does not create a
-second semantic owner or an automatic deep-thinking stage.
+There is one Planner pass (the Deep Planner was retired on 2026-10-11); terminal
+Evidence does not create a second semantic owner or an automatic deep-thinking stage.
 
 `CognitiveOpportunity` owns none of these decisions. It is only a bounded readiness
 carrier for a meaningful trusted state transition. Heartbeats, routine progress ticks,
@@ -110,10 +109,9 @@ result. If Planner authors new Capability Work, ordinary Capability schemas,
 authorization, confirmation, safety, privacy, resource and concurrency contracts still
 apply. An internal opportunity is never user confirmation.
 
-The re-entry tries Fast Planner first and may use the existing HOW escalation to Deep
-Planner. The terminal response candidate from either tier must preserve Evidence scope,
-epistemic strength, execution status, perspective, and sibling-Goal boundaries in that
-tier's primary result. In particular, a probability strictly between 0% and 100% cannot
+The re-entry calls the Planner once. Its terminal decision must preserve Evidence scope,
+epistemic strength, execution status, perspective, and sibling-Goal boundaries in its
+primary result. In particular, a probability strictly between 0% and 100% cannot
 support categorical “will” or “will not” wording. An exact past-tense claim for the
 scoped source-Plan effect is execution-consistent only when the trusted outcome marks
 that Goal complete and any required completion qualification is established; source-

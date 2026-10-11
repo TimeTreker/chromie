@@ -93,7 +93,6 @@ class TextScenarioCase:
     max_warm_sc_to_playback_start_ms: float = 0.0
     expected_terminal_planner_tier: str = ""
     expected_fast_planner_path: str = ""
-    expect_deep_planner_invoked: bool | None = None
     expect_no_fast_contract_failure: bool = False
     expected_observations: tuple[dict[str, Any], ...] = field(default_factory=tuple)
     expected_observation_sequence: tuple[str, ...] = field(default_factory=tuple)
@@ -997,16 +996,6 @@ def validate_live_text_result(
                 "Fast Planner path mismatch: "
                 f"expected {case.expected_fast_planner_path!r}, got {actual_path!r}"
             )
-    if case.expect_deep_planner_invoked is not None:
-        actual_invoked = bool(
-            runtime_metadata.get("deep_planner_invoked")
-            or "deep_planner" in timings
-        )
-        if actual_invoked is not case.expect_deep_planner_invoked:
-            record_internal(
-                "Deep Planner invocation mismatch: "
-                f"expected {case.expect_deep_planner_invoked}, got {actual_invoked}"
-            )
     if case.expect_no_fast_contract_failure:
         stage_diagnostics = runtime_metadata.get("stage_diagnostics")
         if not isinstance(stage_diagnostics, list):
@@ -1109,11 +1098,6 @@ def _text_scenario_case(
         expected_fast_planner_path=str(
             raw.get("expected_fast_planner_path") or ""
         ).strip(),
-        expect_deep_planner_invoked=(
-            bool(raw.get("expect_deep_planner_invoked"))
-            if "expect_deep_planner_invoked" in raw
-            else None
-        ),
         expect_no_fast_contract_failure=bool(
             raw.get("expect_no_fast_contract_failure", False)
         ),
@@ -3001,7 +2985,7 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("off", "apply"),
         default="apply",
         help=(
-            "Use Goal Association, Fast/Deep Planner-owned communication, "
+            "Use Goal Association, the Planner, Social Cognition communication, "
             "and trusted runtime adapter for live-text cases (default: apply). "
             "Select off only for an explicit diagnostic runtime-disabled run."
         ),
@@ -3046,7 +3030,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=1200.0,
         help=(
             "Outer timeout for one live case. This must exceed the complete "
-            "Goal Association + Fast/Deep Planner path."
+            "Goal Association + Planner path."
         ),
     )
     return parser

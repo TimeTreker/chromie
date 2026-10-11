@@ -231,7 +231,7 @@ The current-revision implementation/qualification axes remain separate. The 2026
 
 The broad architecture-discovery phase is closed. New work starts from the canonical
 event/readiness authority seam: User Meaning Interpretation establishes Responsibility / WHAT;
-Planner (fast or deep pass) owns HOW; Goal Association independently owns canonical Goal
+the one Planner owns HOW (PLANNER-AUTHORITY-001; the Deep Planner was retired 2026-10-11); Goal Association independently owns canonical Goal
 continuity; Trusted Capability Runtime and Providers realize Work; asynchronous Runtime
 events report what happened; Host-bound Evidence records what is true; and a meaningful
 state transition may create a bounded `CognitiveOpportunity` that re-enters the same
@@ -363,7 +363,7 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
 7. **Mechanically simplify the coordinators and stale surfaces.** **Implemented for the
    audited closure slice:** the Fast-advance subphase is a typed helper on the existing
    `CognitiveRuntime` owner, reducing the monolithic `_resolve()` transaction without a new
-   service or semantic state owner. Current docs now name Fast/Deep Planner and the native
+   service or semantic state owner. The docs then named Fast/Deep Planner and the native
    Memory owner instead of retired deepthinking/memory-agent routes; current composition-root
    metrics are factual; the docs gate rejects those stale positive claims; and the proven-dead
    top-level `memory_updates` compatibility input is removed in favor of native
@@ -377,7 +377,7 @@ baseline**, not another broad concept-expansion phase. The owner-approved order 
    `complete_response` from a substantive `provisional_response`; provisional delivery keeps
    the Responsibility open and may schedule exactly one bounded communication-only
    deliberative continuation. Deliberative cognition has no persistent truth, Goal/Work
-   mutation, or second wording authority and is not automatically Deep Planner. The same
+   mutation, or second wording authority and is not a Planner pass. The same
    Core/Planner communication authority then reconciles current meaning against actually
    delivered Interaction-Ledger speech and chooses silence, still-needed delta, `repair`, or
    retract+repair. `repair` is a Communicative Activity role/function, not `PlanDisposition`.
@@ -556,7 +556,7 @@ Implementation order:
    trust, Goal, Work, or effect authority.
 6. **Close the social feedback loop — PSM-6 source contract implemented.** Trusted social feedback may reference the exact delivered Communicative Activity IDs it reacts to and enter the same Goal-free Situation/Core path. Source adapters report observable signals only; they do not label anger/approval/rejection or prescribe behavior. Planner's Situation invocation may remain silent, follow up, or author a `repair` act that must reference an actually delivered Activity. Runtime validates that reference mechanically and never decides whether repair is socially warranted.
 7. **Form relationship experience without relationship rules — PSM-7 first source slice implemented.** Goal-free cognition may propose a bounded session-scoped `shared_experience` Memory candidate tied to exact current Situation subjects/source refs. Runtime rejects widened provenance and stores the candidate as private ephemeral Memory only. No interaction-count→friendship rule, relationship score, or model-granted public disclosure is created; future cognition interprets relationships from retained experiences.
-8. **Bound Goal-free Planner depth — PSM-8 source implemented; #42 authority corrected.** An unresolved Fast Situation decision may request one bounded Deep Planner invocation without an Activity or Memory result. That invocation uses the configured quality/deep model under the same restricted Planner authority: silence, one low-commitment Communicative Activity, and private bounded experience proposals only. It cannot create Goal/Capability Work, reinterpret a user Responsibility, or recurse into another deliberative pass. Direct slow readiness uses the same scope; complete decisions receive no second review and unavailable Deep remains quiet.
+8. **Bound Goal-free Planner depth — PSM-8 source implemented; #42 authority corrected; Deep pass retired 2026-10-11.** A Goal-free Situation decision is one restricted Planner invocation: silence, one low-commitment Communicative Activity, and private bounded experience proposals only. It cannot create Goal/Capability Work, reinterpret a user Responsibility, or recurse into another deliberative pass. Slow readiness is context, not a second planner pass; complete decisions receive no second review and an unavailable Planner remains quiet.
 9. **Retain short-lived self-directed concerns/interests — PSM-9 first source slice implemented.** The same Goal-free Core may propose bounded `self_concern|interest` session Memory with exact Situation source provenance and TTL. Runtime stores it as Chromie-owned `self_context`; it can re-enter later cognition but creates no Goal, timer, Work, Capability, authorization, or autonomous polling loop. Long-lived self-created intentions remain a separate future irreducibility question.
 10. **Qualify low-commitment self-initiative — bounded source contract implemented, target qualification open.**
    Goal-free Situation planning is a stateless Planner invocation with no Goal/Work
@@ -795,7 +795,7 @@ sequential milestone numbers. Earlier incremental work is represented by two com
   an open evidence track.
 - **Goal-driven control-plane foundation:** Cognitive Gateway admission,
   immutable turn envelopes, Core-owned User Meaning Interpretation, Goal Association,
-  Fast and Deep Planner contracts, SC-owned Communicative Activities, Trusted Capability
+  the Planner contract, SC-owned Communicative Activities, Trusted Capability
   Runtime validation, outcome evidence, and fail-closed execution.
 
 These foundations are maintained only while their automated contracts remain
@@ -834,8 +834,8 @@ Exit criteria:
 
 - `apply` is the only maintained authoritative semantic path.
 - `report_only` is observer-only and `off` is diagnostic fail-closed disablement.
-- UMI owns WHAT; Goal Association owns canonical Goal continuity; Fast/Deep Planner
-  own HOW and exact Communicative Activities.
+- UMI owns WHAT; Goal Association owns canonical Goal continuity; the Planner owns HOW;
+  Social Cognition owns exact Communicative Activities.
 - Runtime derives the execution lane mechanically from the terminal Plan and fails
   closed when that lane is unsupported or disabled.
 - Retired Agent `/run`, `/interaction`, `/agents`, CapabilityAgent, direct-LLM,
@@ -875,7 +875,7 @@ or qualify the deployed end-to-end interaction path. Current evidence is owned b
 
 Issue [#22](https://github.com/TimeTreker/chromie/issues/22) owns the append-only
 Interaction Ledger and bounded Goal-scoped Interaction Context supplied to Goal
-Association, Fast Planner, and Deep Planner. The Ledger
+Association and the Planner. The Ledger
 transports facts from existing owners; it does not replace or rewrite playback,
 auxiliary-Activity results, the canonical Plan, Goal state, static preflight
 diagnostics, or `ExecutionOutcomeBundle` evidence.
@@ -925,9 +925,9 @@ Exit criteria:
   once across their union, without a second branch-decision fact. Do not restore the
   removed coverage/resegmentation calls or allow semantic rejection to enter repair.
 - Revalidate capability IDs, argument schemas, confidence, confirmation policy,
-  resources, and effect envelopes at trusted boundaries. Fast may escalate once
-  to Deep Planner; same-tier regeneration is reserved for one mechanically malformed
-  DTO only; semantic rejection in Deep and trusted Host rejection are terminal.
+  resources, and effect envelopes at trusted boundaries. There is one Planner pass;
+  regeneration is reserved for one mechanically malformed DTO only; semantic
+  rejection and trusted Host rejection are terminal.
 - Expand general-ability scenarios rather than phrase-specific routing rules.
 
 Exit criteria:
@@ -938,7 +938,7 @@ Exit criteria:
   memory, or effects reaches Deep Thinking without an intermediate semantic
   repair model; low-confidence benign chat remains fast;
 - an effectful Goal has an owned executable step, delivered evidence for the
-  same Goal, or an explicit clarify/escalate/unavailable/refused outcome;
+  same Goal, or an explicit clarify/unavailable/refused outcome;
 - compound body requests retain ordered exact capabilities;
 - missing abilities remain honest terminal outcomes;
 - semantic outcome tests enforce the logical model-call budgets instead of an
@@ -1047,9 +1047,9 @@ runtime path.
 
 **Goal Association internal decomposition implemented further.** GA model DTO/typed representation lives in `agent/app/goal_association_contract.py`; constrained-decoder schema construction lives in `agent/app/goal_association_schema.py`; deterministic normalization, grounding/conflict, and Responsibility-conservation mechanics live in `agent/app/goal_association_validation.py`; bounded prompt projection/system-prompt construction lives in `agent/app/goal_association_prompt.py`. Candidate-aware GA directly owns both existing-Goal associations and independent new Goals in one primary result; the decoder and Host conserve every accepted UMI Responsibility exactly once across their union, and no exclusive model-authored branch discriminant may erase a mixed turn. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and canonical Goal-continuity writer. None of these mechanical layers may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle.
 
-**Planner prompt/projection decomposition implemented.** Fast and Deep Planner prompt construction, streaming presentation/truth prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` and `DeepPlannerResolver` retain the primary model invocation, bounded mechanical repair/escalation decisions, Plan return, and the single Planner HOW authority; fast/deep remain cognition depth/pass labels rather than separate planners. Each primary result owns its complete Goal coverage, evidence scope, truth strength, communicative wording, and satisfaction decision. Trusted validation cannot trigger a second same-owner model call.
+**Planner prompt/projection decomposition implemented.** Planner prompt construction, streaming presentation/truth prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` retains the primary model invocation, bounded mechanical repair decisions, Plan return, and the single Planner HOW authority (`DeepPlannerResolver` was removed on 2026-10-11). Each primary result owns its complete Goal coverage, evidence scope, truth strength, communicative wording, and satisfaction decision. Trusted validation cannot trigger a second same-owner model call.
 
-**Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained-decoder schemas, including pass-specific Fast/Deep schemas), `planner_validation.py` (shared deterministic provenance/integrity checks), `planner_fast_validation.py` (Fast primary-result/reuse/fail-safe validation mechanics), `planner_deep_validation.py` (Deep mechanical-repair/safety/diagnostic validation mechanics), and `planner_fallback.py` (mechanical materialization of an already-decided clarify/unavailable/escalate/fail-safe disposition only). The former model-assisted coverage/communication audit module and its dedicated truth-model configuration are removed under Charter principles 30–31. Fast/Deep Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics; Fast is reduced to 5 lifecycle methods and Deep to 3. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
+**Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained-decoder schemas), `planner_validation.py` (shared deterministic provenance/integrity checks), `planner_fast_validation.py` (primary-result/reuse/commitment/fail-safe validation mechanics), and `planner_fallback.py` (mechanical materialization of an already-decided unavailable limitation or fail-closed failure only; `planner_deep_validation.py` was removed with the Deep Planner). The former model-assisted coverage/communication audit module and its dedicated truth-model configuration are removed under Charter principles 30–31. Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
 
 - Decompose the Orchestrator composition root when ownership or independently
   testable boundaries improve. Review method/property/initializer size deltas;

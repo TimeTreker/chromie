@@ -54,7 +54,6 @@
   "description": "A bounded locomotion goal and a gesture goal should remain sequential and simulator-confirmed.",
   "expected_terminal_planner_tier": "fast",
   "expected_fast_planner_path": "terminal",
-  "expect_deep_planner_invoked": false,
   "expect_no_fast_contract_failure": true,
   "expected_observations": [
     {

@@ -666,6 +666,8 @@ def attach_planner_disclosure_metadata_fail_closed(
             "error": str(exc)[:500],
             "execution_allowed": False,
         }
+        # A rejected provenance join is an integrity failure, not a semantic limitation.
+        metadata.update(path_classification="contract_failure", failure_class="agent_skill_provenance_invalid")
         common = {
             "plan_id": plan.plan_id,
             "planner_tier": plan.planner_tier,

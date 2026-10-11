@@ -177,18 +177,18 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             expected_goal_ids=["goal-presence"],
             allowed_capability_ids=[],
             requires_execution=True,
-            unavailable_information_goal_ids=["goal-presence"],
+            unavailable_goal_ids=["goal-presence"],
         )
         self.assertEqual(
             unavailable_schema["properties"]["disposition"]["enum"],
-            ["unavailable", "refused"],
+            ["unavailable"],
         )
         unavailable_outcome = unavailable_schema["properties"]["goal_outcomes"]["properties"][
             "goal-presence"
         ]
         self.assertEqual(
             unavailable_outcome["properties"]["disposition"]["enum"],
-            ["unavailable", "refused"],
+            ["unavailable"],
         )
         self.assertNotIn("response_text", unavailable_outcome["properties"])
 
@@ -196,18 +196,18 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             expected_goal_ids=["goal-mug"],
             allowed_capability_ids=["soridormi.acquire_resource"],
             requires_execution=True,
-            unavailable_resource_goal_ids=["goal-mug"],
+            unavailable_goal_ids=["goal-mug"],
         )
         self.assertEqual(
             incomplete_resource_schema["properties"]["disposition"]["enum"],
-            ["unavailable", "refused"],
+            ["unavailable"],
         )
         incomplete_resource_outcome = incomplete_resource_schema["properties"]["goal_outcomes"][
             "properties"
         ]["goal-mug"]
         self.assertEqual(
             incomplete_resource_outcome["properties"]["disposition"]["enum"],
-            ["unavailable", "refused"],
+            ["unavailable"],
         )
         self.assertEqual(
             incomplete_resource_outcome["properties"]["step_ids"]["maxItems"],
@@ -218,7 +218,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             expected_goal_ids=["goal-walk", "goal-sing"],
             allowed_capability_ids=["soridormi.walk_forward"],
             requires_execution=True,
-            provider_vocal_goal_ids=["goal-sing"],
+            unavailable_goal_ids=["goal-sing"],
         )
         self.assertIn(
             "mixed",
@@ -234,18 +234,13 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             "execute",
             sing_outcome["properties"]["disposition"]["enum"],
         )
-        self.assertTrue(
-            any(
-                branch.get("properties", {}).get("disposition", {}).get("enum") == ["execute"]
-                and branch.get("properties", {}).get("step_ids", {}).get("minItems") == 1
-                for clause in walk_outcome["allOf"]
-                for branch in clause.get("anyOf", [])
-            )
-        )
+        # One decoder branch executes the walk while singing stays an honest limitation.
         self.assertTrue(
             any(
                 branch.get("properties", {}).get("disposition", {}).get("enum") == ["mixed"]
-                and branch.get("properties", {}).get("steps", {}).get("minItems") == 1
+                and branch["properties"]["steps"].get("minItems") == 1
+                and branch["properties"]["goal_outcomes"]["properties"]["goal-walk"]["properties"]["disposition"]["enum"] == ["execute"]
+                and branch["properties"]["goal_outcomes"]["properties"]["goal-sing"]["properties"]["disposition"]["enum"] == ["unavailable"]
                 for clause in mixed_schema["allOf"]
                 for branch in clause.get("anyOf", [])
             )
@@ -582,10 +577,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             response_goal_ids=["goal-song"],
         )
         self.assertEqual(
-            fast_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"][
-                "disposition"
-            ]["enum"],
-            ["respond", "clarify", "unavailable"],
+            set(fast_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]["properties"]["disposition"]["enum"]),
+            {"respond", "clarify", "unavailable"},
         )
         outcome = fast_schema["properties"]["goal_outcomes"]["properties"]["goal-song"]
         self.assertEqual(outcome["properties"]["step_ids"]["maxItems"], 0)
@@ -671,10 +664,10 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("mixed", tool_schema["properties"]["disposition"]["enum"])
         joke_outcome = tool_schema["properties"]["goal_outcomes"]["properties"]["goal-joke"]
         self.assertEqual(
-            joke_outcome["properties"]["disposition"]["enum"],
-            ["respond", "clarify", "unavailable", "refused"],
+            set(joke_outcome["properties"]["disposition"]["enum"]),
+            {"respond", "clarify", "unavailable"},
         )
-        self.assertTrue(all(branch["properties"]["step_ids"].get("maxItems") == 0 for branch in joke_outcome["oneOf"]))
+        self.assertEqual(joke_outcome["properties"]["step_ids"]["maxItems"], 0)
         self.assertEqual(
             set(joke_outcome["required"]),
             {
@@ -764,7 +757,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_tool_route_work_schema_excludes_speech_authority(self) -> None:
         for tier in ("fast",):
-            schema = canonical_plan_response_schema(planner_tier=tier,
+            schema = canonical_plan_response_schema(
                 expected_goal_ids=["goal-weather"],
                 allowed_capability_ids=["chromie.weather.lookup"], requires_execution=True)
             self.assertNotIn("response_text", schema["properties"])
@@ -1025,12 +1018,11 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
     def test_planner_prompts_preserve_requested_concurrency(self) -> None:
         from tests.cognitive_work_test_support import cognitive_work_request
         request = cognitive_work_request(text="Run the independent actions together.", context={})
-        for prompt in (planner_prompt.fast_plan_prompt(request, [], response_schema={}),
-                       planner_prompt.deep_plan_prompt(request, [], response_schema={}, expected_goal_ids=[])):
+        for prompt in (planner_prompt.fast_plan_prompt(request, [], response_schema={}),):
             self.assertIn("Preserve before/after/parallel_with requirements", prompt)
             self.assertIn("Run the independent actions together.", prompt)
 
-    def test_deep_tool_schema_inlines_required_goal_outcome_fields(self) -> None:
+    def test_tool_schema_inlines_required_goal_outcome_fields(self) -> None:
         schema = canonical_plan_response_schema(
             expected_goal_ids=["goal-weather"],
             allowed_capability_ids=["chromie.weather.lookup"],

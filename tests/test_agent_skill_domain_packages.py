@@ -30,10 +30,7 @@ except ImportError:  # pragma: no cover - repository test path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = ROOT / "agent-skills"
-ROLES = (
-    "fast_planner",
-    "deep_planner",
-)
+ROLES = ("fast_planner",)
 BASE_ID = "chromie.grounded-external-information"
 WEATHER_ID = "chromie.weather-information"
 
@@ -100,7 +97,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                 AgentSkillSelectionRequest(
                     sid="sid-physical",
                     turn_id="turn-physical",
-                    agent_role="deep_planner",
+                    agent_role="fast_planner",
                     text="Walk while blinking.",
                     language="en-US",
                     goals=[
@@ -329,7 +326,7 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
                 AgentSkillSelectionRequest(
                     sid="sid-singing",
                     turn_id="turn-singing",
-                    agent_role="deep_planner",
+                    agent_role="fast_planner",
                     text="Sing while walking.",
                     language="en-US",
                     goals=[
@@ -409,20 +406,20 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
 
     def test_grounded_method_covers_memory_fresh_lookup_clarify_and_failure(self) -> None:
         fast = self.registry.load_projection(BASE_ID, "fast_planner").content
-        deep = self.registry.load_projection(BASE_ID, "deep_planner").content
         method = self.registry.load_document(BASE_ID).content
         self.assertIn("chromie.memory.retrieve_verified_tool_result", fast)
         self.assertIn("fresh read", fast)
         self.assertIn("clarify", fast.lower())
-        self.assertIn("report the unsupported need honestly", deep.lower())
+        self.assertIn("report it unavailable", fast.lower())
+        self.assertIn("never fabricate a fallback fact", fast.lower())
+        self.assertNotIn("escalate", fast.lower())
         self.assertIn("Before evidence exists", method)
         self.assertIn("provider/network failures", method)
         self.assertIn("exact Evidence references", method)
-        self.assertNotIn("if user_text", "\n".join((fast, deep, method)))
+        self.assertNotIn("if user_text", "\n".join((fast, method)))
 
     def test_weather_method_preserves_planner_binding_and_typed_outcomes(self) -> None:
         fast = self.registry.load_projection(WEATHER_ID, "fast_planner").content
-        deep = self.registry.load_projection(WEATHER_ID, "deep_planner").content
         method = self.registry.load_document(WEATHER_ID).content
         self.assertIn("args.location", fast)
         self.assertIn("exactly equal to the canonical Goal binding", fast)
@@ -434,8 +431,8 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         self.assertNotIn("args.date", fast)
         self.assertNotIn("args.period", fast)
         self.assertIn("probability, not certainty", fast)
-        self.assertIn("argument_realization", deep)
-        self.assertIn("mismatched location", deep)
+        self.assertIn("mismatched location", fast)
+        self.assertIn("location_not_found", fast)
         self.assertIn("location_not_found", method)
         self.assertIn("no-rain/no-snow", method)
         self.assertIn("apparent temperature", method)

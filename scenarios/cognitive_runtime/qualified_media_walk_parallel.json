@@ -45,88 +45,73 @@
       }
     },
     "fast_plan": {
-      "plan_id": "fast-qualified-media-walk",
+      "plan_id": "plan-qualified-media-walk",
       "planner_tier": "fast",
-      "disposition": "escalate",
-      "coverage": "uncertain",
-      "confidence": 0.9,
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 1.0,
       "goal_ids": [
         "goal-walk",
         "goal-media"
       ],
-      "escalation_reason": "The peer media provider requires full-catalog planning.",
-      "communication_needs": []
-    },
-    "deep_plans": [
-      {
-        "plan_id": "deep-qualified-media-walk",
-        "planner_tier": "fast",
-        "disposition": "execute",
-        "coverage": "complete",
-        "confidence": 1.0,
-        "goal_ids": [
+      "goal_summary": "Walk while playing the existing fixture song through the peer media provider.",
+      "steps": [
+        {
+          "step_id": "walk-forward",
+          "capability_id": "soridormi.walk_forward",
+          "args": {
+            "duration_s": 5
+          },
+          "timing": "parallel",
+          "source_goal_ids": [
+            "goal-walk"
+          ],
+          "reason_summary": "The body provider owns walking."
+        },
+        {
+          "step_id": "play-media",
+          "capability_id": "chromie.media.play",
+          "args": {
+            "media_ref": "fixture-song",
+            "media_kind": "music"
+          },
+          "timing": "parallel",
+          "source_goal_ids": [
+            "goal-media"
+          ],
+          "reason_summary": "The peer media provider owns existing-audio playback."
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-walk",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "walk-forward"
+          ]
+        },
+        {
+          "goal_id": "goal-media",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "play-media"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
           "goal-walk",
           "goal-media"
         ],
-        "goal_summary": "Walk while playing the existing fixture song through the peer media provider.",
-        "steps": [
-          {
-            "step_id": "walk-forward",
-            "capability_id": "soridormi.walk_forward",
-            "args": {
-              "duration_s": 5
-            },
-            "timing": "parallel",
-            "source_goal_ids": [
-              "goal-walk"
-            ],
-            "reason_summary": "The body provider owns walking."
-          },
-          {
-            "step_id": "play-media",
-            "capability_id": "chromie.media.play",
-            "args": {
-              "media_ref": "fixture-song",
-              "media_kind": "music"
-            },
-            "timing": "parallel",
-            "source_goal_ids": [
-              "goal-media"
-            ],
-            "reason_summary": "The peer media provider owns existing-audio playback."
-          }
-        ],
-        "goal_outcomes": [
-          {
-            "goal_id": "goal-walk",
-            "disposition": "execute",
-            "coverage": "complete",
-            "step_ids": [
-              "walk-forward"
-            ]
-          },
-          {
-            "goal_id": "goal-media",
-            "disposition": "execute",
-            "coverage": "complete",
-            "step_ids": [
-              "play-media"
-            ]
-          }
-        ],
-        "goal_satisfaction": {
-          "score": 1.0,
-          "status": "exact",
-          "satisfied_goal_ids": [
-            "goal-walk",
-            "goal-media"
-          ],
-          "unmet_goal_ids": [],
-          "unmet_requirements": []
-        },
-        "communication_needs": []
-      }
-    ],
+        "unmet_goal_ids": [],
+        "unmet_requirements": []
+      },
+      "communication_needs": []
+    },
     "capabilities": [
       {
         "capability_id": "soridormi.walk_forward",
@@ -210,10 +195,6 @@
     ],
     "social_cognition": {
       "fast": {
-        "activities": [],
-        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
-      },
-      "deep": {
         "activities": [
           {
             "activity_id": "scenario-immediate",
@@ -312,8 +293,7 @@
     "requires_confirmation": false,
     "calls": [
       "goal_association",
-      "fast_stream",
-      "deep_plan"
+      "fast_stream"
     ]
   },
   "general_ability": {

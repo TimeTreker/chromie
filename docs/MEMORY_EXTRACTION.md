@@ -276,7 +276,7 @@ Memory Summary:
 - Open concern: avoid raw transcript injection.
 ```
 
-For Deep Planner, include richer task memory:
+For the Planner on complex Work, include richer task memory:
 
 ```text
 Extracted Conversation Context:
@@ -350,7 +350,7 @@ Memory is interpretive context, not authority.
 7. Implemented first slice: focused tests cover extracted-memory storage,
    reset and hard-idle expiry, keyed correction updates, explicit typed memory
    updates, trusted outcome memory, User Meaning Interpreter prompt sanitization,
-   conversation/Planner prompt migration, and Deep Planner Memory visibility.
+   conversation/Planner prompt migration, and Planner Memory visibility.
 8. Implemented: terminal Goal history may feed evidence-grounded local
    `experience`/`calibration` proposals without reopening or rewriting the old Goal.
    Responsibility-control actions remain open-Goal only. The Host materializes those
@@ -369,7 +369,7 @@ Memory is interpretive context, not authority.
 The first implemented slice should prove:
 
 - the next turn receives compact extracted memory for a multi-turn task;
-- raw transcript turns are not injected into Deep Planner as the normal path;
+- raw transcript turns are not injected into the Planner as the normal path;
 - fast User Meaning Interpreter receives a small memory summary, not the full chat;
 - a user correction revises the memory summary used by the next turn;
 - runtime-confirmed outcomes can update task memory;

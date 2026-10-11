@@ -68,7 +68,9 @@ from shared.chromie_contracts.plan import (
     CanonicalPlan,
     FastPlannerAdvance,
     FastPlannerCapabilityActivity,
+    FastPlannerInputNeed,
     FastPlannerResponseNeed,
+    FastPlannerUnavailableNeed,
     FastPlannerClarificationAct,
     FastPlannerCompleteResponseAct,
     FastPlannerProgressAct,
@@ -79,6 +81,7 @@ from shared.chromie_contracts.planner_response import PlannerResponseProjection
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
 from shared.chromie_contracts.semantic_task import ResponsePlan
 from agent.app.cognitive_core.user_meaning_interpreter.errors import InterpretationUnavailableError
+from agent.app.planner_validation import fast_activity_execution_groups
 from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
 from agent.app.cognitive_core.user_meaning_interpreter.schema import (
     UserMeaningInterpretationDecision,
@@ -553,7 +556,6 @@ class _CognitiveTurnScenarioRuntime:
 class _CognitiveScenarioClient:
     def __init__(self, stub: dict[str, Any]) -> None:
         self.stub = stub
-        self.deep_plans = list(stub.get("deep_plans") or [])
         self.calls: list[str] = []
 
     async def resolve_goal_association(self, *args: Any, **kwargs: Any) -> GoalAssociationResolution:
@@ -628,14 +630,35 @@ class _CognitiveScenarioClient:
                     reason_summary=step.reason_summary,
                 )
             )
+        outcomes = {item.goal_id: item for item in plan.goal_outcomes}
+        # Clarification gaps are Planner-authored facts; a fixture states them explicitly.
+        gaps_by_goal = self.stub.get("fast_information_gaps") or {}
         for need in plan.communication_needs:
-            if need.kind != "answer":
-                raise ValueError("A streamed input fixture requires an explicit qualified information gap.")
-            activities.append(FastPlannerResponseNeed(
-                activity_id=need.need_id, role="complete_response", timing="parallel",
-                source_responsibility_refs=refs_for_goal_ids(list(need.source_goal_ids)),
-                rationale="The explicit scenario Work fixture establishes this answer obligation.",
-            ))
+            if need.kind == "answer":
+                activities.append(FastPlannerResponseNeed(
+                    activity_id=need.need_id, role="complete_response", timing="parallel",
+                    source_responsibility_refs=refs_for_goal_ids(list(need.source_goal_ids)),
+                    rationale="The explicit scenario Work fixture establishes this answer obligation.",
+                ))
+                continue
+            for goal_id in need.source_goal_ids:
+                outcome = outcomes.get(goal_id)
+                if need.kind == "input" and gaps_by_goal.get(goal_id):
+                    activities.append(FastPlannerInputNeed(
+                        activity_id=f"clarify-{goal_id}", role="clarification", timing="parallel",
+                        source_responsibility_refs=refs_for_goal_ids([goal_id]),
+                        information_gaps=gaps_by_goal[goal_id],
+                    ))
+                elif need.kind == "result" and outcome is not None and outcome.disposition == "unavailable":
+                    activities.append(FastPlannerUnavailableNeed(
+                        activity_id=f"unavailable-{goal_id}", role="unavailable", timing="parallel",
+                        source_responsibility_refs=refs_for_goal_ids([goal_id]),
+                        missing=list(outcome.unresolved) or [outcome.rationale],
+                    ))
+                else:
+                    raise ValueError(
+                        "A streamed fixture needs an answer, an explicit information gap, or an unavailable outcome."
+                    )
 
         return FastPlannerAdvance(
             turn_id=str(request.sid),
@@ -650,7 +673,15 @@ class _CognitiveScenarioClient:
                 or plan.goal_summary
                 or "Retained scenario Fast decision."
             ),
-            metadata={"semantic_authority": "level_a_work_fixture"},
+            metadata={
+                "semantic_authority": "level_a_work_fixture",
+                # The Agent derives groups from depends_on and Capability contracts.
+                "execution_groups": fast_activity_execution_groups(
+                    [item for item in activities if item.role == "capability"],
+                    # Agent payloads carry provider metadata at the top level.
+                    [{**item, **(item.get("metadata") or {})} for item in self.stub.get("capabilities") or []],
+                ),
+            },
         )
 
     async def stream_fast_advance(self, *args: Any, **kwargs: Any):
@@ -684,13 +715,6 @@ class _CognitiveScenarioClient:
         del args, kwargs
         self.calls.append("fast_plan")
         return CanonicalPlan.model_validate(self.stub["fast_plan"])
-
-    async def resolve_deep_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
-        del args
-        self.calls.append("deep_plan")
-        if not self.deep_plans:
-            raise AssertionError("cognitive scenario deep-plan script exhausted")
-        return CanonicalPlan.model_validate(self.deep_plans.pop(0))
 
 
 def canonical_step_dependencies(steps: list[Any]) -> dict[str, list[str]]:
@@ -1359,10 +1383,17 @@ async def evaluate_cognitive_runtime_scenario(
     client = _CognitiveScenarioClient(stub)
     runtime = _CognitiveScenarioRuntime(list(stub.get("capabilities") or []))
     mode = str(stub.get("mode") or "report_only")
+    def record_planner_gaps(gaps_by_goal_id: dict[str, list[Any]], **_kwargs: Any) -> list[dict[str, Any]]:
+        # Level A has no conversation store; record the commit, never claim persistence.
+        return [{"operation": "planner_information_gap", "goal_id": goal_id, "applied": True,
+                 "gap_ids": [gap.gap_id for gap in gaps], "evidence": "level_a_fixture_record"}
+                for goal_id, gaps in gaps_by_goal_id.items()]
+
     coordinator = GoalDrivenRuntimeCoordinator(
         agent_client=client,
         adapter=CanonicalPlanRuntimeAdapter(runtime),
         policy=CognitiveRuntimePolicy(mode=mode),
+        planner_gap_apply=record_planner_gaps,
     )
     gateway = CognitiveGateway()
     capture = gateway.capture(

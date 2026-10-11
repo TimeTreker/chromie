@@ -110,8 +110,8 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
     async def test_fast_stream_yields_word_free_terminal_from_single_endpoint(self) -> None:
         from shared.chromie_contracts.plan import FastPlannerStreamTerminal, FastPlannerAdvance
         commit = FastPlannerStreamTerminal(turn_id="turn-fast", advance=FastPlannerAdvance(
-            turn_id="turn-fast", disposition="escalate", coverage="uncertain",
-            covered_responsibility_refs=["weather"], continuations=["deep_planner"],
+            turn_id="turn-fast", disposition="unavailable", coverage="uncertain",
+            covered_responsibility_refs=["weather"],
             confidence=0.9, unresolved=["No exact current method established."],
         ))
         session = _FakeSession(_FakeResponse(text=commit.model_dump_json() + "\n"))
@@ -139,7 +139,7 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
             )
         ]
 
-        self.assertEqual(frames[0].advance.continuations, ["deep_planner"])
+        self.assertEqual(frames[0].advance.disposition, "unavailable")
         self.assertEqual(frames[0].advance.activities, [])
         self.assertEqual(
             session.posts[0]["url"],

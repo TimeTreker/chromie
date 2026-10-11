@@ -17,8 +17,7 @@ class PlannerDisclosureTopologyTests(unittest.TestCase):
         allowed = set(AgentSkillProjectionName.__args__)
         self.assertNotIn("response_composer", allowed)
         self.assertNotIn("tool_result_interpreter", allowed)
-        self.assertIn("fast_planner", allowed)
-        self.assertIn("deep_planner", allowed)
+        self.assertEqual(allowed, {"fast_planner"})
 
     def test_disabled_disclosure_keeps_fast_planner_request_clean(self) -> None:
         registry = AgentSkillRegistry({})

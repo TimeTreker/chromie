@@ -49,7 +49,6 @@ def _execute_output(*, goal_id: str, capability_id: str, args: dict) -> dict:
         "coverage": "complete",
         "confidence": 1.0,
 
-        "escalation_reason": "",
         "unresolved": [],
         "parameter_resolutions": [],
         "plan_relation": "exact",

@@ -96,7 +96,6 @@ def _weather_output(
                     "reason_summary": "Fetch the requested weather aspects.",
                 }
             ],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": parameter_resolutions,
             "goal_outcomes": {
@@ -185,7 +184,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
 
     def test_decoder_projects_exact_same_name_speed_binding(self):
         base = canonical_plan_response_schema(
-            planner_tier="fast",
             expected_goal_ids=["goal-walk"],
             allowed_capability_ids=["soridormi.walk_forward"],
             capability_input_schemas={
@@ -493,7 +491,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "reason_summary": "Execute the requested bounded walk.",
                     }
                 ],
-                "escalation_reason": "",
                 "unresolved": [],
                 "parameter_resolutions": [],
                 "goal_outcomes": {
@@ -552,7 +549,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "reason_summary": "Execute the requested bounded walk.",
                     }
                 ],
-                "escalation_reason": "",
                 "unresolved": [],
                 "parameter_resolutions": [
                     {
@@ -641,7 +637,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "reason_summary": "Acquire and deliver the resource.",
                     }
                 ],
-                "escalation_reason": "",
                 "unresolved": [],
                 "parameter_resolutions": [],
                 "goal_outcomes": {
@@ -705,7 +700,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "reason_summary": "Execute the requested bounded walk.",
                     }
                 ],
-                "escalation_reason": "",
                 "unresolved": [],
                 "parameter_resolutions": [
                     {
@@ -788,7 +782,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "reason_summary": "Blink the requested count.",
                     }
                 ],
-                "escalation_reason": "",
                 "unresolved": [],
                 "parameter_resolutions": [
                     {
@@ -1234,7 +1227,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
             "additionalProperties": False,
         }}
         base = canonical_plan_response_schema(
-            planner_tier="fast", expected_goal_ids=[goal["goal_id"], other["goal_id"]],
+            expected_goal_ids=[goal["goal_id"], other["goal_id"]],
             allowed_capability_ids=[capability["capability_id"]],
             capability_input_schemas={capability["capability_id"]: capability["input_schema"]},
         )
@@ -1250,7 +1243,7 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
         Draft202012Validator(branch).validate(step)
 
         single_base = canonical_plan_response_schema(
-            planner_tier="fast", expected_goal_ids=[goal["goal_id"]],
+            expected_goal_ids=[goal["goal_id"]],
             allowed_capability_ids=[capability["capability_id"]],
             capability_input_schemas={capability["capability_id"]: capability["input_schema"]},
         )
@@ -1331,7 +1324,7 @@ def test_compound_repetition_uses_its_own_step_and_provider_format():
         assert actual == expected, variant
         if expected:
             validate_user_supplied_parameter_provenance(output, authoritative_goals=[goal])
-            base = canonical_plan_response_schema(planner_tier='fast', expected_goal_ids=[goal['goal_id']],
+            base = canonical_plan_response_schema(expected_goal_ids=[goal['goal_id']],
                 allowed_capability_ids=[c['capability_id'] for c in capabilities],
                 capability_input_schemas={c['capability_id']: c['input_schema'] for c in capabilities})
             schema = canonical_goal_binding_argument_response_schema(base, authoritative_goals=[goal], capabilities=capabilities)

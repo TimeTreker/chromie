@@ -288,8 +288,11 @@ python scripts/run_target_evidence_closure.py collect-social \
   --mind-profile <approved-mind-profile-revision> \
   --runtime-topology cognitive-runtime-apply \
   --effective-model fast_planner=<resolved-model> \
-  --effective-model deep_planner=<resolved-model>
+  --effective-model social_cognition_deep=<resolved-model>
 ```
+
+`social_cognition_deep` names the deliberative model (`AGENT_DEEP_PLANNER_MODEL`, a
+historical name); the Deep Planner was retired on 2026-10-11.
 
 The collector derives the complete mode/style set from the reviewed dataset,
 runs each slice independently, and assembles the qualification report. Review

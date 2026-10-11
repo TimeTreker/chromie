@@ -1,13 +1,12 @@
 {
   "schema_version": 1,
-  "id": "compound_walk_blink_deep_alternative",
+  "id": "compound_walk_blink_alternative",
   "suite": "cognitive_runtime",
   "level": "integration",
-  "description": "Fast Planning escalates a compound walk-and-blink request once; Deep Planner returns a confirmed sequential alternative before terminal Host validation, whose spoken confirmation explains the adjustment naturally without exposing runtime internals.",
+  "description": "The one Planner returns a confirmed sequential alternative for a compound walk-and-blink request before terminal Host validation; the spoken confirmation explains the adjustment naturally without exposing runtime internals.",
   "tags": [
     "pr7",
     "compound",
-    "deep-planner",
     "rollback",
     "human-like-confirmation"
   ],
@@ -32,66 +31,55 @@
       }
     },
     "fast_plan": {
-      "plan_id": "fast-compound",
+      "plan_id": "plan-sequential-alternative",
       "planner_tier": "fast",
-      "disposition": "escalate",
-      "coverage": "partial",
-      "confidence": 0.91,
-      "escalation_reason": "compound goal requires full-catalog planning",
-      "communication_needs": []
-    },
-    "deep_plans": [
-      {
-        "plan_id": "deep-sequential-alternative",
-        "planner_tier": "fast",
-        "disposition": "execute",
-        "coverage": "complete",
-        "confidence": 0.93,
-        "goal_ids": [
-          "goal-compound"
-        ],
-        "goal_summary": "Walk first, then blink as a safe alternative.",
-        "steps": [
-          {
-            "step_id": "walk",
-            "capability_id": "soridormi.walk_forward",
-            "args": {
-              "duration_s": 15
-            },
-            "timing": "sequential",
-            "source_goal_ids": [
-              "goal-compound"
-            ]
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 0.93,
+      "goal_ids": [
+        "goal-compound"
+      ],
+      "goal_summary": "Walk first, then blink as a safe alternative.",
+      "steps": [
+        {
+          "step_id": "walk",
+          "capability_id": "soridormi.walk_forward",
+          "args": {
+            "duration_s": 15
           },
-          {
-            "step_id": "blink",
-            "capability_id": "soridormi.blink_eyes",
-            "args": {
-              "count": 4
-            },
-            "timing": "sequential",
-            "source_goal_ids": [
-              "goal-compound"
-            ]
-          }
-        ],
-        "goal_satisfaction": {
-          "score": 0.86,
-          "status": "substantial",
-          "satisfied_goal_ids": [
+          "timing": "sequential",
+          "source_goal_ids": [
             "goal-compound"
-          ],
-          "unmet_requirements": [
-            "concurrent timing"
           ]
         },
-        "metadata": {
-          "plan_relation": "alternative",
-          "user_confirmation_required": true
-        },
-        "communication_needs": []
-      }
-    ],
+        {
+          "step_id": "blink",
+          "capability_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 4
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
+            "goal-compound"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 0.86,
+        "status": "substantial",
+        "satisfied_goal_ids": [
+          "goal-compound"
+        ],
+        "unmet_requirements": [
+          "concurrent timing"
+        ]
+      },
+      "metadata": {
+        "plan_relation": "alternative",
+        "user_confirmation_required": true
+      },
+      "communication_needs": []
+    },
     "capabilities": [
       {
         "capability_id": "soridormi.walk_forward",
@@ -140,10 +128,6 @@
     ],
     "social_cognition": {
       "fast": {
-        "activities": [],
-        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
-      },
-      "deep": {
         "activities": [
           {
             "activity_id": "scenario-pre_action",
@@ -198,8 +182,7 @@
     "confirmation_prompt_matches_speech": true,
     "calls": [
       "goal_association",
-      "fast_stream",
-      "deep_plan"
+      "fast_stream"
     ]
   },
   "general_ability": {
@@ -208,7 +191,7 @@
         "id": "composable_action_planning",
         "title": "Composable High-Level Action Planning",
         "general_rule": "Supported multi-step body requests should produce ordered high-level skills while preserving sequential execution and validation.",
-        "rationale": "Deep planning can safely revise unfinished compound Work.",
+        "rationale": "The Planner can safely revise unfinished compound Work.",
         "root_cause_boundaries": [
           "Cognitive Core/user meaning interpretation",
           "Agent contract",

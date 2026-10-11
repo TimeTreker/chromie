@@ -26,7 +26,7 @@ class SGLangProtocolTests(unittest.TestCase):
         from jsonschema import Draft202012Validator
 
         for title in (
-            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+            "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
         ):
             with self.subTest(title=title):
@@ -173,7 +173,7 @@ class SGLangProtocolTests(unittest.TestCase):
         )
 
         base = canonical_plan_response_schema(
-            planner_tier="fast", expected_goal_ids=["goal:water"],
+            expected_goal_ids=["goal:water"],
             allowed_capability_ids=["resource.deliver"], requires_execution=True,
         )
         schema = need_first_response_schema(
@@ -218,7 +218,7 @@ class SGLangProtocolTests(unittest.TestCase):
     def test_compact_formatting_is_scoped_without_mutating_contract(self) -> None:
         for title in (
             "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
-            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+            "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
             "CognitiveActivationDecision",
             "UserMeaningInterpretationModelOutput", "FastPlannerOutput", "OtherOutput",
@@ -235,7 +235,7 @@ class SGLangProtocolTests(unittest.TestCase):
                 expected = dict(schema)
                 if title in {
                     "GoalSegmentationModelOutput", "GoalAssociationModelOutput",
-                    "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+                    "AgentSkillSelectionModelOutput",
                     "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput", "SocialCognitionOutput",
                     "CognitiveActivationDecision",
                 }:

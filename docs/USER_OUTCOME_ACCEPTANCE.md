@@ -9,7 +9,7 @@ hardware qualification remain separate evidence steps.
 
 Chromie's primary end-to-end acceptance gate evaluates the outcome visible to
 the user rather than binding the test to today's User Meaning Interpreter, Goal
-Association, Fast Planner, Deep Planner, or Host materialization implementation.
+Association, Planner, or Host materialization implementation.
 
 A case does not pass merely because a final service returns `ok=true`. It must
 prove the requested observable behavior, truthful speech, complete LLM calls,
@@ -23,8 +23,8 @@ execution receipts, and final safety state.
   planner-path mismatches are retained as diagnostics but do not fail an
   otherwise correct user outcome.
 - `full` is an implementation qualification scope. It additionally enforces
-  expected route, terminal planner tier, Fast Planner path, Deep Planner use,
-  and contract-failure expectations.
+  expected route, terminal planner tier, Planner path, and contract-failure
+  expectations.
 
 Use `user-outcome` while cognitive internals are evolving. Use `full` only for
 an explicit component claim, such as qualifying a Fast Planner optimization.

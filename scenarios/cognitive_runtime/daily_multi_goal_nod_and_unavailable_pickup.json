@@ -36,88 +36,77 @@
       }
     },
     "fast_plan": {
-      "plan_id": "fast-nod-pickup",
+      "plan_id": "plan-nod-pickup",
       "planner_tier": "fast",
-      "disposition": "escalate",
-      "coverage": "partial",
-      "confidence": 0.88,
-      "escalation_reason": "The request combines a supported gesture with an unavailable manipulation goal.",
-      "communication_needs": []
-    },
-    "deep_plans": [
-      {
-        "plan_id": "deep-nod-pickup",
-        "planner_tier": "fast",
-        "disposition": "mixed",
-        "coverage": "complete",
-        "confidence": 0.94,
-        "goal_ids": [
-          "goal-nod",
-          "goal-pickup"
-        ],
-        "goal_summary": "Nod once and report that mug pickup is unavailable.",
-        "steps": [
-          {
-            "step_id": "nod",
-            "capability_id": "soridormi.nod_yes",
-            "args": {
-              "count": 1
-            },
-            "source_goal_ids": [
-              "goal-nod"
-            ]
-          }
-        ],
-        "goal_outcomes": [
-          {
-            "goal_id": "goal-nod",
-            "disposition": "execute",
-            "coverage": "complete",
-            "step_ids": [
-              "nod"
-            ]
+      "disposition": "mixed",
+      "coverage": "complete",
+      "confidence": 0.94,
+      "goal_ids": [
+        "goal-nod",
+        "goal-pickup"
+      ],
+      "goal_summary": "Nod once and report that mug pickup is unavailable.",
+      "steps": [
+        {
+          "step_id": "nod",
+          "capability_id": "soridormi.nod_yes",
+          "args": {
+            "count": 1
           },
-          {
-            "goal_id": "goal-pickup",
-            "disposition": "unavailable",
-            "coverage": "complete",
-            "rationale": "Manipulation is not available in the trusted capability catalog."
-          }
-        ],
-        "goal_satisfaction": {
-          "score": 0.8,
-          "status": "substantial",
-          "satisfied_goal_ids": [
+          "source_goal_ids": [
             "goal-nod"
-          ],
-          "unmet_goal_ids": [
-            "goal-pickup"
-          ],
-          "unmet_requirements": [
-            "trusted mug pickup capability"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-nod",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "nod"
           ]
         },
-        "communication_needs": [
-          {
-            "need_id": "need:a9ae145d894b566c468f91cc24285f2cd91e6aa2a277efddb01c1d1139e52d55",
-            "owner": "planner",
-            "kind": "result",
-            "source_goal_ids": [
-              "goal-pickup"
-            ],
-            "source_responsibility_refs": [],
-            "reference_id": "deep-nod-pickup",
-            "facts": {
-              "disposition": "unavailable",
-              "unresolved": []
-            },
-            "delivery_phase": null,
-            "before_step_ids": [],
-            "after_step_ids": []
-          }
+        {
+          "goal_id": "goal-pickup",
+          "disposition": "unavailable",
+          "coverage": "uncertain",
+          "rationale": "Manipulation is not available in the trusted capability catalog."
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 0.8,
+        "status": "substantial",
+        "satisfied_goal_ids": [
+          "goal-nod"
+        ],
+        "unmet_goal_ids": [
+          "goal-pickup"
+        ],
+        "unmet_requirements": [
+          "trusted mug pickup capability"
         ]
-      }
-    ],
+      },
+      "communication_needs": [
+        {
+          "need_id": "need:a9ae145d894b566c468f91cc24285f2cd91e6aa2a277efddb01c1d1139e52d55",
+          "owner": "planner",
+          "kind": "result",
+          "source_goal_ids": [
+            "goal-pickup"
+          ],
+          "source_responsibility_refs": [],
+          "reference_id": "plan-nod-pickup",
+          "facts": {
+            "disposition": "unavailable",
+            "unresolved": []
+          },
+          "delivery_phase": null,
+          "before_step_ids": [],
+          "after_step_ids": []
+        }
+      ]
+    },
     "capabilities": [
       {
         "capability_id": "soridormi.nod_yes",
@@ -144,10 +133,6 @@
     ],
     "social_cognition": {
       "fast": {
-        "activities": [],
-        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
-      },
-      "deep": {
         "activities": [
           {
             "activity_id": "scenario-immediate",
@@ -208,7 +193,7 @@
       {
         "goal_id": "goal-pickup",
         "disposition": "unavailable",
-        "coverage": "complete",
+        "coverage": "uncertain",
         "step_ids": []
       }
     ],
@@ -231,8 +216,7 @@
     "requires_confirmation": false,
     "calls": [
       "goal_association",
-      "fast_stream",
-      "deep_plan"
+      "fast_stream"
     ]
   },
   "general_ability": {

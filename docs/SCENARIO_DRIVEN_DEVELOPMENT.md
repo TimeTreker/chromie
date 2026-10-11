@@ -67,7 +67,7 @@ behavior spans several boundaries:
 - audio capture and ASR;
 - goal association;
 - multi-goal segmentation;
-- fast versus deep planning;
+- complete planning versus honest limitation;
 - capability retrieval;
 - parameter resolution;
 - validation and confirmation;
@@ -87,7 +87,7 @@ Dependency-light tests of schemas, versions, lifecycle, validation, and replay.
 ### 3.2 User Meaning Interpretation scenarios
 
 Model outputs are mocked or replayed to verify goal-preserving routing,
-coverage, escalation, and normalization.
+coverage, honest limitation, and normalization.
 
 ### 3.3 Interaction scenarios
 
@@ -125,7 +125,7 @@ Each scenario should define:
 - mocked model outputs where applicable;
 - expected goal associations;
 - expected new goals;
-- expected planner tier and escalation;
+- expected planner path and limitation;
 - expected canonical plan or information gap;
 - expected confirmation state;
 - expected skills and arguments;
@@ -187,7 +187,7 @@ Required assertions:
 
 - walking and blinking both remain in the semantic goal;
 - fast planning cannot execute only walking;
-- deep planning receives the original utterance and full candidate surface;
+- the Planner keeps the original utterance and can load any missing contract through need-first search;
 - low-consequence blink count may be model-resolved within schema;
 - unsupported concurrency produces a complete alternative;
 - a material alternative executes nothing before confirmation;

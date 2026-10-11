@@ -44,7 +44,6 @@ def test_planner_model_time_condition_is_materialized_with_host_plan_identity() 
                     "reason_summary": "Start the current observable work.",
                 }
             ],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "time_conditions": [

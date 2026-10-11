@@ -36,108 +36,97 @@
       }
     },
     "fast_plan": {
-      "plan_id": "fast-blink-move",
+      "plan_id": "plan-blink-move",
       "planner_tier": "fast",
-      "disposition": "escalate",
-      "coverage": "uncertain",
-      "confidence": 0.86,
-      "escalation_reason": "One independent goal is executable and the referential manipulation goal is unresolved.",
-      "communication_needs": []
-    },
-    "deep_plans": [
-      {
-        "plan_id": "deep-blink-move",
-        "planner_tier": "fast",
-        "disposition": "mixed",
-        "coverage": "complete",
-        "confidence": 0.92,
-        "goal_ids": [
-          "goal-blink",
+      "disposition": "mixed",
+      "coverage": "complete",
+      "confidence": 0.92,
+      "goal_ids": [
+        "goal-blink",
+        "goal-move"
+      ],
+      "goal_summary": "Blink twice and clarify the object and destination for the move request.",
+      "steps": [
+        {
+          "step_id": "blink",
+          "capability_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 2
+          },
+          "source_goal_ids": [
+            "goal-blink"
+          ]
+        }
+      ],
+      "parameter_resolutions": [
+        {
+          "step_id": "move-request",
+          "parameter": "object_and_destination",
+          "strategy": "ask_user",
+          "blocking": true,
+          "confidence": 0.98,
+          "rationale": "The object and destination are both referentially ambiguous.",
+          "source_goal_ids": [
+            "goal-move"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-blink",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "blink"
+          ]
+        },
+        {
+          "goal_id": "goal-move",
+          "disposition": "clarify",
+          "coverage": "uncertain",
+          "unresolved": [
+            "object",
+            "destination"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 0.8,
+        "status": "substantial",
+        "satisfied_goal_ids": [
+          "goal-blink"
+        ],
+        "unmet_goal_ids": [
           "goal-move"
         ],
-        "goal_summary": "Blink twice and clarify the object and destination for the move request.",
-        "steps": [
-          {
-            "step_id": "blink",
-            "capability_id": "soridormi.blink_eyes",
-            "args": {
-              "count": 2
-            },
-            "source_goal_ids": [
-              "goal-blink"
-            ]
-          }
-        ],
-        "parameter_resolutions": [
-          {
-            "step_id": "move-request",
-            "parameter": "object_and_destination",
-            "strategy": "ask_user",
-            "blocking": true,
-            "confidence": 0.98,
-            "rationale": "The object and destination are both referentially ambiguous.",
-            "source_goal_ids": [
-              "goal-move"
-            ]
-          }
-        ],
-        "goal_outcomes": [
-          {
-            "goal_id": "goal-blink",
-            "disposition": "execute",
-            "coverage": "complete",
-            "step_ids": [
-              "blink"
-            ]
-          },
-          {
-            "goal_id": "goal-move",
+        "unmet_requirements": [
+          "object reference",
+          "destination reference"
+        ]
+      },
+      "communication_needs": [
+        {
+          "need_id": "need:f65c36e7230b6ab4ee27dfa743fc1e04d7f9ea9d6dbf11976efbb269aa11dd9f",
+          "owner": "planner",
+          "kind": "input",
+          "source_goal_ids": [
+            "goal-move"
+          ],
+          "source_responsibility_refs": [],
+          "reference_id": "plan-blink-move",
+          "facts": {
             "disposition": "clarify",
-            "coverage": "uncertain",
             "unresolved": [
               "object",
               "destination"
             ]
-          }
-        ],
-        "goal_satisfaction": {
-          "score": 0.8,
-          "status": "substantial",
-          "satisfied_goal_ids": [
-            "goal-blink"
-          ],
-          "unmet_goal_ids": [
-            "goal-move"
-          ],
-          "unmet_requirements": [
-            "object reference",
-            "destination reference"
-          ]
-        },
-        "communication_needs": [
-          {
-            "need_id": "need:f65c36e7230b6ab4ee27dfa743fc1e04d7f9ea9d6dbf11976efbb269aa11dd9f",
-            "owner": "planner",
-            "kind": "input",
-            "source_goal_ids": [
-              "goal-move"
-            ],
-            "source_responsibility_refs": [],
-            "reference_id": "deep-blink-move",
-            "facts": {
-              "disposition": "clarify",
-              "unresolved": [
-                "object",
-                "destination"
-              ]
-            },
-            "delivery_phase": null,
-            "before_step_ids": [],
-            "after_step_ids": []
-          }
-        ]
-      }
-    ],
+          },
+          "delivery_phase": null,
+          "before_step_ids": [],
+          "after_step_ids": []
+        }
+      ]
+    },
     "capabilities": [
       {
         "capability_id": "soridormi.blink_eyes",
@@ -164,10 +153,6 @@
     ],
     "social_cognition": {
       "fast": {
-        "activities": [],
-        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
-      },
-      "deep": {
         "activities": [
           {
             "activity_id": "scenario-immediate",
@@ -208,7 +193,39 @@
         ],
         "reason_summary": "Exercise the authored Goal and Work transaction, including rejected Work fixtures."
       }
-    ]
+    ],
+    "fast_information_gaps": {
+      "goal-move": [
+        {
+          "gap_id": "gap-move-object",
+          "description": "Which object should be moved?",
+          "blocking": true,
+          "required_for": [
+            "object"
+          ],
+          "preferred_resolution": "ask_user",
+          "source_kind": "unresolved_meaning",
+          "source_reference": "which object the user means",
+          "resolution_sources_considered": [
+            "authoritative_context"
+          ]
+        },
+        {
+          "gap_id": "gap-move-destination",
+          "description": "Where should it go?",
+          "blocking": true,
+          "required_for": [
+            "destination"
+          ],
+          "preferred_resolution": "ask_user",
+          "source_kind": "unresolved_meaning",
+          "source_reference": "which destination the user means",
+          "resolution_sources_considered": [
+            "authoritative_context"
+          ]
+        }
+      ]
+    }
   },
   "expect": {
     "status": "applied",
@@ -252,8 +269,7 @@
     "requires_confirmation": false,
     "calls": [
       "goal_association",
-      "fast_stream",
-      "deep_plan"
+      "fast_stream"
     ]
   },
   "general_ability": {

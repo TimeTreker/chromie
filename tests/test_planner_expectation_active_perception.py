@@ -43,7 +43,6 @@ def _active_perception_output(*, expected_outcome: str) -> PlannerModelOutput:
                     "reason_summary": "Look where the referenced cup may be visible.",
                 }
             ],
-            "escalation_reason": "",
             "unresolved": [],
             "parameter_resolutions": [],
             "time_conditions": [],

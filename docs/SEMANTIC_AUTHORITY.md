@@ -12,7 +12,7 @@ UMI or reviews/repairs the other's output.
 
 The `context.semantic_authority` guard prevents a second Core or retired planner
 from acquiring the turn. Within that Core, `/social-cognition` owns interaction
-and exact input-snapshot binding. Fast/Deep Planner model DTOs contain Work and
+and exact input-snapshot binding. Planner model DTOs contain Work and
 communication Needs, with no writable utterance or social-expression fields.
 The Host joins these distinct decisions without allowing either to repair the other.
 Implementation evidence and remaining qualification gaps are owned by [STATUS](STATUS.md).
@@ -98,7 +98,7 @@ clarification selection, or `actions[]`; Goal Association owns association with 
 Goal history, while trusted lifecycle code materializes new Goal identity/fields mechanically from
 accepted UMI WHAT when no retained Goal matches. Planner owns the first Work/Activity contract,
 execution-input completeness, and
-source strategy. Fast/deep are cognition passes of that same Planner authority. That ownership cannot be used to reinterpret,
+source strategy, in one Planner pass (PLANNER-AUTHORITY-001). That ownership cannot be used to reinterpret,
 widen, narrow, or invent Responsibility meaning. No maintained `RouteDecision` or
 legacy Agent semantic compatibility surface remains on the Core path.
 
@@ -121,7 +121,7 @@ SC does not infer missing identity or audience. Ordinary turns and trusted Situa
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | User Meaning Interpretation → independent SC / Planner fast pass / Goal Association → optional Planner deep pass for complex HOW → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
+| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | User Meaning Interpretation → independent SC / Planner / Goal Association → Value Judgment for owner-listed reviewed effects → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
 | Trusted Goal-free Situation | Goal-Driven Cognitive Core; SC owns communication | authoritative, communication-only | Situation → bounded Social Cognition invocation → exact Activity → existing delivery runtime; no synthetic Goal or Capability Work | Invalid provenance/identity/repair fails before Memory or delivery; unavailable cognition remains quiet. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
@@ -144,17 +144,18 @@ Use the [acceptance claim boundaries](ACCEPTANCE.md#scope-of-validation-and-sema
 to distinguish these checks from semantic qualification, target validation and
 release readiness; model-authored coverage and satisfaction are not independent proof.
 
-Before commitment, genuinely unresolved HOW may use the designated single
-source/context-based delegation to Deep Planner. Deep receives authoritative
-Responsibilities/Goals and current context, not a Fast candidate Plan to judge or
-rewrite. A technical/contract failure or a review verdict cannot authorize that
-delegation. Deep rejection is terminal for that attempt, and a completed decision
-cannot be reopened by another model review. New authoritative Goal, Work, Evidence
+Before commitment, genuinely unresolved HOW acquires what is missing within the one
+Planner: library contracts through need-first search (one more pass with the loaded
+contracts, never a review of the first), Evidence through staged re-entry, or the
+person's input through clarification; otherwise the Planner reports an honest
+limitation. The Deep Planner delegation was retired on 2026-10-11. A rejection is
+terminal for that attempt, and a completed decision cannot be reopened by another
+model review. New authoritative Goal, Work, Evidence
 or Situation state may independently trigger the existing scoped Planner path.
 
 Structural regeneration is separate from semantic reconsideration and is permitted
-only by the particular role's existing contract. Current Fast/Deep Planner do not
-invoke same-tier repair generations. GA's separately bounded container repair must
+only by the particular role's existing contract. The Planner does not invoke
+repair generations. GA's separately bounded container repair must
 preserve every primary claim through deterministic preflight and comparison; it
 does not authorize Planner review or semantic rewriting. See the
 [turn-loop depth and repair contract](COGNITIVE_TURN_LOOP.md#30-fastdeep-escalation-is-cognition-depth-not-repair).

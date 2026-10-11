@@ -544,6 +544,22 @@ def planner_provider_media_goal_operations(
     return result
 
 
+def provider_media_goal_ids_without_capability(
+    authoritative_goals: list[dict[str, Any]],
+    loaded_capability_ids: set[str],
+) -> set[str]:
+    """Media Goals whose exact operation (any media operation when unknown) has no loaded
+    Capability. The Planner reports such a Goal unavailable; it never plays another way."""
+
+    return {
+        goal_id
+        for goal_id, operation in planner_provider_media_goal_operations(authoritative_goals).items()
+        if not loaded_capability_ids.intersection(
+            MEDIA_CAPABILITY_IDS.values() if operation == "none" else [MEDIA_CAPABILITY_IDS[operation]]
+        )
+    }
+
+
 def result_evidence_reentry_goal_ids(
     context: dict[str, Any] | None,
 ) -> set[str]:

@@ -44,7 +44,7 @@ incomplete result is a failed semantic case.
 | Dynamic response Schema: UMI `model_interpreter.py`, `goal_association_schema.py`, `planner_schema.py` | Required fields, closed vocabulary, permitted branches, supplied IDs/token references and applicable cardinalities for that exact request. | That free-text meaning follows the source, that all obligations were emitted, or that a reply answers the request. Schema descriptions instruct the model; they do not execute semantic checks. |
 | UMI DTO and source validator: `user_meaning_interpreter/schema.py`, `model_interpreter.py` | Unique refs; known, ordered, non-overlapping source spans; source provenance and result-type restrictions; parameter and relationship fields are forbidden on live UMI wire. | That a cited span entails the authored outcome, that all predicates/qualifiers were preserved, or that confidence and uncertainty judgments are correct. |
 | GA: `goal_association.py`, `goal_association_validation.py` | Exactly-once mapping of accepted Responsibility refs, inherited intent/result type, retained typed-binding conservation, identity/reference constraints and comparison of permitted lossless repairs. | Completeness of UMI against the original utterance or semantic appropriateness of every continuity association. Conserving all emitted Responsibilities cannot recover an obligation UMI never emitted. |
-| Planner: `planner_validation.py`, `planner_fast_validation.py`, `planner_deep_validation.py` | Declared Goal coverage/dispositions, output-mode and provider contracts, argument grounding, explicit numeric constraints, Evidence identity/status/scope, and typed ordering/resource/reuse restrictions. | That an arbitrary action list or communication Need realizes every obligation, or that model-authored coverage/satisfaction scores are true. |
+| Planner: `planner_validation.py`, `planner_fast_validation.py` | Declared Goal coverage/dispositions, output-mode and provider contracts, argument grounding, explicit numeric constraints, Evidence identity/status/scope, and typed ordering/resource/reuse restrictions. | That an arbitrary action list or communication Need realizes every obligation, or that model-authored coverage/satisfaction scores are true. |
 | SC: `social_cognition.py` and exact Host projection | Source/snapshot identity, supplied Need/Goal/Evidence coverage, immutable acts, permitted communication phases, expression anchors and qualified targets. | That a structurally accepted utterance is useful, sufficiently informative or socially appropriate. Actual delivery and semantic adjudication remain separate. |
 | Host and Trusted Capability Runtime | Exact identities/versions, authorization/confirmation, contract validation, lifecycle, dispatch, and retained execution/delivery facts at the exercised boundaries. | User satisfaction or world/physical truth beyond the retained provider/device evidence. An accepted Plan is not completed execution. |
 
@@ -844,13 +844,12 @@ The repository implements the accepted
 [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md).
 Its component-specific `multi_goal_daily_life` qualification uses
 `--assertion-scope full` and must prove more than 4/4 user-outcome success. The simple retained matrix must terminate with
-`planner_tier=fast`, omit Deep Planner invocation, contain no Fast
+`planner_tier=fast`, contain no Planner
 `structured_output_validation` diagnostic, preserve exact per-goal outcomes
 and skill ownership, avoid premature physical-completion speech, and finish
-Soridormi simulation in safe idle. Clean semantic-escalation scenarios must
-show empty steps and outcomes plus a specific escalation reason without
-contract repair. Technical Fast failures must remain visible even if Deep
-Planner recovers the turn.
+Soridormi simulation in safe idle. Honest-limitation scenarios must show no
+executable steps for the limited Goal plus specific `missing` facts without
+contract repair. Technical Planner failures must remain visible and fail closed.
 
 Target qualification retains at least three consecutive warm simulator runs
 and compares cognitive-runtime latency with the July 17 diagnostic baseline.

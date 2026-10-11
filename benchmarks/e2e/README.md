@@ -104,7 +104,7 @@ Qualification adapters may return `social_attention_lifecycle` inside the
 observation. Proposal, Host materialization, Provider acceptance, Provider
 completion, and safe idle are recorded as separate facts. The E2E runner reports
 their distributions but does not choose an action or change Runtime policy.
-The proposal must come from the containing Fast/Deep Planner result; this lifecycle
+The proposal must come from the containing Planner result; this lifecycle
 surface does not imply a separate Social Attention model or endpoint.
 
 Use `--cohort`, `--style`, `--mode`, `--language`, `--invariant`, and

@@ -102,7 +102,7 @@ declared output budget plus a 2048-token safety margin before inference and
 reject prompt or completion truncation as an LLM-budget failure. RTX 5090 keeps
 its declared shared Gemma4-12B SGLang profile. RTX 4090 Laptop assigns every LLM role to
 one `qwen3.5:4b` model served by its own pinned SGLang AWQ override, retains the 16K/512
-User Meaning Interpretation request budget, reserves 48K for Fast/Deep Planner, and keeps 32K for
+User Meaning Interpretation request budget, reserves 48K for the Planner and deliberative roles, and keeps 32K for
 other downstream roles. One resident engine avoids cross-role weight/context reloads while
 SGLang can run up to three requests and apply the existing compute-class priority/preemption
 contract. Its 49152-token shared cache covers one maximum-size Planner request; it does not
@@ -132,8 +132,9 @@ qualification watchdog merely because that profile was auto-detected.
 | `jetson_agx_orin` | AGX Orin | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_thor` | AGX Thor placeholder profile | `gemma4:12b` | `qwen3:4b` | 4096 |
 
-The quality model is normally used by Goal Association and Deep Planner. The fast
-model is normally used by User Meaning Interpretation, Fast Planner (including terminal
+The quality model is normally used by Goal Association and the deliberative roles
+(`AGENT_DEEP_PLANNER_MODEL`: Social Cognition's deep client, Deep UMI, Reflection). The fast
+model is normally used by User Meaning Interpretation, the Planner (including terminal
 Evidence re-entry), Task Continuity, and Social Attention unless the profile
 explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop assigns
 all of those roles to one `qwen3.5:4b` SGLang engine with three bounded running-request slots.

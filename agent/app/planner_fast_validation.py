@@ -293,7 +293,7 @@ def planner_validation_error_items(
     exc: Exception,
     *,
     raw: Any,
-    planner_tier: PlannerTier,
+    planner_tier: PlannerTier = "fast",
     expected_goal_ids_for_turn: list[str],
     include_canonical_plan_diagnostics: bool = True,
 ) -> list[dict[str, Any]]:
@@ -338,7 +338,7 @@ def planner_validation_error_json(
     exc: Exception,
     *,
     raw: Any,
-    planner_tier: PlannerTier,
+    planner_tier: PlannerTier = "fast",
     expected_goal_ids_for_turn: list[str],
     limit: int = 10000,
     include_canonical_plan_diagnostics: bool = True,

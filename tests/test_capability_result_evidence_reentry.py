@@ -67,37 +67,30 @@ async def _social_result(request, plan):
     )
 
 
-@pytest.mark.parametrize("tier,failure_kind", [
-    (tier, kind) for tier in ("fast", "deep")
-    for kind in ("returned", "raised", "goal_scope")
-] + [("fast", "invalid_model_dto")])
-def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind):
+@pytest.mark.parametrize("failure_kind", ["returned", "raised", "goal_scope", "invalid_model_dto"])
+def test_reentry_retains_failure_without_delegation_or_commit(failure_kind):
     from orchestrator.runtime.cognitive_runtime import CognitiveStageFailure
 
     goal_id = "goal-weather"
-    semantic_escalation = CanonicalPlan(
-        plan_id="needs-depth", planner_tier="fast", disposition="escalate",
+    source_plan = CanonicalPlan(
+        plan_id="weather-read", planner_tier="fast", disposition="unavailable",
         coverage="uncertain", confidence=0.0, goal_ids=[goal_id],
-        escalation_reason="source_evidence_requires_deeper_cognition",
-        metadata={"path_classification": "semantic_escalation"},
+        unresolved=["source evidence is still pending"],
+        metadata={"path_classification": "terminal"},
     )
-    failure = semantic_escalation.model_copy(update={
-        "planner_tier": tier,
-        "disposition": "escalate" if tier == "fast" else "clarify",
+    failure = source_plan.model_copy(update={
         "metadata": {"path_classification": "contract_failure",
-                     "failure_class": "required_context_over_budget" if tier == "fast" else "prompt_budget_exceeded",
-                     "failure_domain": "prompt_projection" if tier == "fast" else "llm_budget",
+                     "failure_class": "required_context_over_budget",
+                     "failure_domain": "prompt_projection",
                      "retryable": False, "execution_allowed": False},
     })
     if failure_kind == "goal_scope":
-        failure = semantic_escalation.model_copy(update={"goal_ids": ["foreign-goal"]})
+        failure = source_plan.model_copy(update={"goal_ids": ["foreign-goal"]})
     client = SimpleNamespace(
         resolve_cognitive_activation=AsyncMock(side_effect=allow_activation),
-        resolve_fast_plan=AsyncMock(return_value=semantic_escalation),
-        resolve_deep_plan=AsyncMock(return_value=failure),
+        resolve_fast_plan=AsyncMock(return_value=failure),
     )
-    selected = getattr(client, f"resolve_{tier}_plan")
-    selected.return_value = failure
+    selected = client.resolve_fast_plan
     if failure_kind == "raised":
         selected.side_effect = TimeoutError("transport deadline")
     if failure_kind == "invalid_model_dto":
@@ -115,7 +108,7 @@ def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind
                     "evidence_refs": ["weather-result"],
                 }],
                 "new_work": [], "confidence": 1.0, "plan_relation": "exact",
-                "user_confirmation_required": False, "escalation_reason": "",
+                "user_confirmation_required": False, 
             })
         model = SimpleNamespace(generate=AsyncMock(side_effect=invalid.value))
         catalog = SimpleNamespace(prompt_entries=AsyncMock(return_value=[]))
@@ -149,23 +142,21 @@ def test_reentry_retains_failure_without_delegation_or_commit(tier, failure_kind
     }[failure_kind]
     with pytest.raises(expected_error):
         asyncio.run(_planner_evidence_reentry(
-            assistant, source_response=source, canonical_plan=semantic_escalation,
+            assistant, source_response=source, canonical_plan=source_plan,
             user_request="Check the weather.", language="en-US", goal_ids=[goal_id],
             evidence=[ToolResultEvidence(evidence_id="weather-result", tool_id="chromie.weather.lookup",
                                         status="completed", data={}, output_sha256=canonical_value_sha256({}))],
             session_id="session", phase="post_execution",
         ))
+    # One Planner pass; a failure is retained and never delegated or repaired.
     assert client.resolve_fast_plan.await_count == 1
-    assert client.resolve_deep_plan.await_count == (tier == "deep")
     adapter.build_planner_owned_response.assert_not_awaited()
     stages = [call.kwargs for call in assistant.sessions.record_cognitive_stage.call_args_list]
     assert stages[-1]["status"] == "failed"
-    assert stages[-1]["stage"] == ("fast_planner_evidence_reentry" if tier == "fast" else "planner_deep_pass_evidence_reentry")
+    assert stages[-1]["stage"] == "fast_planner_evidence_reentry"
     assert stages[-1]["errors"]
     assert stages[0]["metadata"]["planner_pass"] == "fast"
     assert "wording_owner" not in stages[0]["metadata"]
-    if tier == "deep":
-        assert stages[0]["status"] == "resolved"  # Genuine source-based depth remains allowed.
 
 
 async def _planner_evidence_reentry(
@@ -578,7 +569,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         assistant.agent_client = Client()
         assistant.cognitive_runtime_policy = SimpleNamespace(
             fast_planner_timeout_ms=3000,
-            deep_planner_timeout_ms=6000,
         )
         assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=assistant.agent_client,
@@ -643,7 +633,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             "time_condition",
         )
 
-    def test_slow_situation_opportunity_enters_deep_planner_without_fast_pass(self) -> None:
+    def test_slow_situation_opportunity_reaches_the_one_planner_once(self) -> None:
         goal_id = "goal-recover"
         satisfaction = GoalSatisfactionAssessment(
             score=1.0,
@@ -651,7 +641,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             satisfied_goal_ids=[goal_id],
         )
         replanned = CanonicalPlan(
-            plan_id="recover-deep-response",
+            plan_id="recover-response",
             planner_tier="fast",
             disposition="respond",
             coverage="complete",
@@ -676,30 +666,16 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             async def resolve_social_cognition(self, session, *, request, **kwargs):
                 return await _social_result(request, replanned)
             fast_calls = 0
-            deep_calls = 0
 
             async def resolve_fast_plan(self, _session, *, request, timeout_ms):
                 self.fast_calls += 1
-                self.request = request
-                return CanonicalPlan(
-                    plan_id="activation-fast-escalation",
-                    planner_tier="fast",
-                    disposition="escalate",
-                    coverage="uncertain",
-                    confidence=0.8,
-                    goal_ids=[goal_id],
-                    escalation_reason="deeper HOW is required",
-                )
-
-            async def resolve_deep_plan(self, _session, *, request, timeout_ms):
-                self.deep_calls += 1
                 self.request = request
                 return _work_result(replanned)
 
         class Adapter(CanonicalPlanRuntimeAdapter):
             async def build_social_cognition_response(self, **_kwargs):
                 return InteractionResponse(
-                    interaction_id="recover-deep",
+                    interaction_id="recover",
                     status="ok",
                     speech=[InteractionSpeech(text="I need to revise the approach.")],
                 )
@@ -708,7 +684,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         assistant.agent_client = Client()
         assistant.cognitive_runtime_policy = SimpleNamespace(
             fast_planner_timeout_ms=3000,
-            deep_planner_timeout_ms=6000,
         )
         assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=assistant.agent_client,
@@ -760,7 +735,6 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
 
         self.assertIsNotNone(response)
         self.assertEqual(assistant.agent_client.fast_calls, 1)
-        self.assertEqual(assistant.agent_client.deep_calls, 1)
         self.assertEqual(
             assistant.agent_client.request.context["cognitive_opportunity"][
                 "recommended_cognition"

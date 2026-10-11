@@ -52,8 +52,7 @@
       "require_speech": true,
       "expect_created_goals_satisfied": true,
       "require_fast_planner_evidence_reentry": true,
-      "expect_no_fast_contract_failure": true,
-      "expect_deep_planner_invoked": false
+      "expect_no_fast_contract_failure": true
     },
     {
       "id": "rain_followup",
@@ -62,7 +61,6 @@
       "require_speech": true,
       "expect_created_goals_satisfied": true,
       "expect_no_fast_contract_failure": true,
-      "expect_deep_planner_invoked": false,
       "min_new_goal_count": 1
     }
   ],

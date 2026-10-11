@@ -65,7 +65,7 @@ voice / text / trusted interaction event
        Turn Admission -> UserTurnEnvelope
   -> Goal-Driven Cognitive Core
        Goal Association and segmentation
-       Fast / terminal Deep Planning
+       Planning (one Planner) and Value Judgment for reviewed effects
        deterministic validation and commitment
        agent, tool, memory, and embodied execution coordination
        outcome reconciliation against goal success criteria

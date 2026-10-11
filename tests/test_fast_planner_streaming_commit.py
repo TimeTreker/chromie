@@ -510,8 +510,10 @@ def test_fast_schema_forbids_false_source_span_for_inherited_source_role_binding
         source_token_refs=[item["ref"] for item in _source_tokens(request.text)],
         language=request.language,
     )
-    activity = schema["properties"]["activities"]["items"]
-    assert activity["properties"]["role"]["enum"] == ["capability"]
+    branches = schema["properties"]["activities"]["items"]["oneOf"]
+    # Complete provider-owned inputs leave Work or an honest limitation, never a clarification.
+    assert {branch["properties"]["role"]["enum"][0] for branch in branches} == {"capability", "unavailable"}
+    activity = next(branch for branch in branches if branch["properties"]["role"]["enum"] == ["capability"])
     assert "clarify" not in schema["properties"]["disposition"]["enum"]
     assert activity["properties"]["argument_sources"]["properties"] == {}
     source_bindings = activity["properties"]["args"]["properties"]["source"]["properties"]["bindings"]
@@ -872,7 +874,7 @@ def test_typed_source_relation_is_checked_on_work_dependencies(relation, list_bi
         validate(order, dependent=not ordered)
 
 
-def test_native_work_timing_keeps_escalation_when_no_provider_can_honor_concurrency():
+def test_native_work_timing_keeps_honest_limitation_when_no_provider_can_honor_concurrency():
     responsibilities = [CognitiveResponsibilityProposal(
         local_ref=ref, outcome="perform bounded action", output_mode="body_action", confidence=1,
         bindings={"parallel_with": "second"} if ref == "first" else {},
@@ -884,11 +886,13 @@ def test_native_work_timing_keeps_escalation_when_no_provider_can_honor_concurre
         act = {"role": "capability", "activity_id": "one", "capability_id": capability["capability_id"],
                "args": {"duration_s": 10}, "timing": timing, "source_responsibility_refs": ["first"]}
         assert list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(act))
-    escalation = {"activities": [], "disposition": "escalate", "coverage": "uncertain",
+    limitation = {"activities": [{"role": "unavailable", "activity_id": "limit",
+            "source_responsibility_refs": ["first", "second"],
+            "missing": ["A provider that can run both actions at the same time."]}],
+        "disposition": "unavailable", "coverage": "uncertain",
         "covered_responsibility_refs": ["first", "second"], "confidence": 1,
-        "continuations": ["deep_planner"],
-        "unresolved": ["Concurrent composition unavailable."], "reason_summary": "Requires deeper source-based planning."}
-    Draft202012Validator(schema).validate(escalation)
+        "unresolved": ["Concurrent composition unavailable."], "reason_summary": "No provider honors the concurrency."}
+    Draft202012Validator(schema).validate(limitation)
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 6])
@@ -941,10 +945,12 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
             "argument_sources": {},
             "args": {"text": "authored performance", "mode": candidate_mode}, "source_responsibility_refs": ["voice"]}
         assert validator.is_valid(vocal) == (provider_modes is not None and mode in provider_modes and candidate_mode == mode)
-    # An unavailable mode can still delegate its unresolved work without inventing another effect.
-    Draft202012Validator(schema).validate({"activities": [], "disposition": "escalate", "coverage": "uncertain",
-        "covered_responsibility_refs": ["voice", "body"], "confidence": 0.5, "continuations": ["deep_planner"],
-        "unresolved": ["Requested composition needs deeper planning."], "reason_summary": "Unresolved composition."})
+    # An unavailable mode is reported honestly without inventing another effect.
+    Draft202012Validator(schema).validate({"activities": [{"role": "unavailable", "activity_id": "limit",
+            "source_responsibility_refs": ["voice"], "missing": ["A provider for the requested vocal mode."]}],
+        "disposition": "unavailable", "coverage": "uncertain",
+        "covered_responsibility_refs": ["voice", "body"], "confidence": 0.5,
+        "unresolved": ["Requested vocal mode is unavailable."], "reason_summary": "Honest limitation."})
 
 
 def test_native_advance_keeps_distinct_and_shared_vocal_mode_composition():
@@ -967,30 +973,34 @@ def test_native_vocal_work_with_empty_catalog_cannot_invent_a_provider():
     act = {"role": "capability", "activity_id": "voice", "capability_id": "unavailable.provider",
         "args": {"mode": "singing", "text": "performance"}, "depends_on": [], "source_responsibility_refs": ["song"]}
     assert not Draft202012Validator(schema["properties"]["activities"]["items"]).is_valid(act)
-    Draft202012Validator(schema).validate({"activities": [], "disposition": "escalate", "coverage": "uncertain",
-        "covered_responsibility_refs": ["song"], "confidence": 0.5, "continuations": ["deep_planner"],
-        "unresolved": ["No qualified vocal provider."], "reason_summary": "Need source-based deeper planning."})
+    Draft202012Validator(schema).validate({"activities": [{"role": "unavailable", "activity_id": "limit",
+            "source_responsibility_refs": ["song"], "missing": ["A qualified vocal provider."]}],
+        "disposition": "unavailable", "coverage": "uncertain",
+        "covered_responsibility_refs": ["song"], "confidence": 0.5,
+        "unresolved": ["No qualified vocal provider."], "reason_summary": "Honest limitation."})
 
 
-@pytest.mark.parametrize("disposition,coverage,continuations,work,valid", [
-    ("execute", "complete", [], True, True),
-    ("execute", "partial", ["deep_planner"], True, False),
-    ("execute", "complete", ["deep_planner"], True, False),
-    ("execute", "partial", [], True, False),
-    ("mixed", "partial", [], True, False),
-    ("escalate", "uncertain", ["deep_planner"], False, True),
-    ("escalate", "partial", ["deep_planner"], True, False),
-    ("escalate", "uncertain", [], False, False),
-    ("escalate", "complete", ["deep_planner"], False, False),
+@pytest.mark.parametrize("disposition,coverage,activity,valid", [
+    ("execute", "complete", "work", True),
+    ("execute", "partial", "work", False),
+    ("mixed", "partial", "work", False),
+    ("unavailable", "uncertain", "limit", True),
+    ("unavailable", "partial", "limit", True),
+    ("unavailable", "partial", "work", False),
+    ("unavailable", "uncertain", "work", False),
+    ("unavailable", "complete", "limit", False),
 ])
-def test_native_decision_alternatives_preserve_execution_delegation_boundary(disposition, coverage, continuations, work, valid):
+def test_native_decision_alternatives_preserve_execution_limitation_boundary(disposition, coverage, activity, valid):
     request, source = _body_request()
     capability = _walk_capability()
     schema = fast_streaming_advance_response_schema([source.local_ref], responsibilities=[source], capabilities=[capability])
+    work = {"role": "capability", "activity_id": "walk", "capability_id": capability["capability_id"],
+        "args": {"duration_s": 10}, "depends_on": [], "source_responsibility_refs": [source.local_ref]}
+    limit = {"role": "unavailable", "activity_id": "limit", "source_responsibility_refs": [source.local_ref],
+        "missing": ["A provider for this action."]}
     output = {"disposition": disposition, "coverage": coverage, "covered_responsibility_refs": [source.local_ref],
-        "activities": [{"role": "capability", "activity_id": "walk", "capability_id": capability["capability_id"],
-            "args": {"duration_s": 10}, "depends_on": [], "source_responsibility_refs": [source.local_ref]}] if work else [],
-        "continuations": continuations, "confidence": 1, "unresolved": [], "reason_summary": "Bounded Work decision."}
+        "activities": [work if activity == "work" else limit],
+        "confidence": 1, "unresolved": [], "reason_summary": "Bounded Work decision."}
     # Exercise the native alternatives independently of the Host's conditional
     # allOf checks, which the deployed decoder does not enforce.
     assert Draft202012Validator({"oneOf": schema["oneOf"]}).is_valid(output) == valid

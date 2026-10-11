@@ -164,7 +164,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
         self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
-        self.assertEqual(values["ORCH_DEEP_PLANNER_MODE"], "off")
+        self.assertNotIn("ORCH_DEEP_PLANNER_MODE", values)  # one Planner (PLANNER-AUTHORITY-001)
         self.assertNotIn("ORCH_RESPONSE_COMPOSER_MODE", values)
 
     def test_runtime_ready_greeting_precedes_live_microphone_loop(self) -> None:

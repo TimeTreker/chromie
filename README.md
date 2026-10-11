@@ -27,8 +27,8 @@ experience artifacts. See
 > provider-neutral Responsibility / WHAT. The same admitted meaning can enter
 > Social Cognition, Planner and Goal Association concurrently: SC owns interaction
 > and exact Communicative Activities, Planner owns detailed HOW and Capability Work,
-> and Goal Association alone owns canonical Goal continuity. Planner has fast/deep cognition passes of the same
-> authority; deep is used only when HOW warrants broader reasoning.
+> and Goal Association alone owns canonical Goal continuity. There is one Planner: its depth comes from
+> loading missing contracts, Evidence or input, and Value Judgment gates owner-listed effects.
 >
 > Trusted Capability Runtime is asynchronous. Provider/Runtime events report what
 > happened; Host correlation and validation materialize Evidence describing what
@@ -93,7 +93,7 @@ Responsibility / WHAT
       ├───────────────────┬───────────────────────┐
       ▼                   ▼                       ▼
 Social Cognition      Planner                 Goal Association
-interaction          fast/deep HOW            Goal continuity
+interaction          one-pass HOW             Goal continuity
       │                   │                       │
       ▼                   ▼                       ▼
 Communicative Acts    Work / communication Needs   Canonical Goals
@@ -341,7 +341,7 @@ documented in
   person/event category, regex, or regression-case matches;
 - normal natural-language cognition goes through model-authored typed meaning;
   User Meaning Interpretation owns WHAT, Goal Association owns canonical Goal continuity,
-  and Fast/Deep Planner owns HOW plus every user-facing Communicative Activity;
+  the Planner owns HOW, and Social Cognition owns every user-facing Communicative Activity;
   the Host validates, schedules, and realizes those Activities without becoming
   a second response author;
 - simulation exemptions never authorize hardware;

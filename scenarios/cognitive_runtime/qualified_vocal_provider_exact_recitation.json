@@ -34,65 +34,51 @@
       }
     },
     "fast_plan": {
-      "plan_id": "fast-qualified-recitation",
+      "plan_id": "plan-qualified-recitation",
       "planner_tier": "fast",
-      "disposition": "escalate",
-      "coverage": "uncertain",
-      "confidence": 0.9,
+      "disposition": "execute",
+      "coverage": "complete",
+      "confidence": 1.0,
       "goal_ids": [
         "goal-recitation"
       ],
-      "escalation_reason": "The rare qualified vocal capability requires full-catalog planning.",
-      "communication_needs": []
-    },
-    "deep_plans": [
-      {
-        "plan_id": "deep-qualified-recitation",
-        "planner_tier": "fast",
-        "disposition": "execute",
-        "coverage": "complete",
-        "confidence": 1.0,
-        "goal_ids": [
-          "goal-recitation"
-        ],
-        "goal_summary": "Recite the authored greeting with the exact qualified provider capability.",
-        "steps": [
-          {
-            "step_id": "perform-recitation",
-            "capability_id": "chromie.vocal.perform",
-            "args": {
-              "text": "Hello from Chromie.",
-              "mode": "recitation"
-            },
-            "timing": "sequential",
-            "source_goal_ids": [
-              "goal-recitation"
-            ],
-            "reason_summary": "The declared provider supports exact recitation."
-          }
-        ],
-        "goal_outcomes": [
-          {
-            "goal_id": "goal-recitation",
-            "disposition": "execute",
-            "coverage": "complete",
-            "step_ids": [
-              "perform-recitation"
-            ]
-          }
-        ],
-        "goal_satisfaction": {
-          "score": 1.0,
-          "status": "exact",
-          "satisfied_goal_ids": [
+      "goal_summary": "Recite the authored greeting with the exact qualified provider capability.",
+      "steps": [
+        {
+          "step_id": "perform-recitation",
+          "capability_id": "chromie.vocal.perform",
+          "args": {
+            "text": "Hello from Chromie.",
+            "mode": "recitation"
+          },
+          "timing": "sequential",
+          "source_goal_ids": [
             "goal-recitation"
           ],
-          "unmet_goal_ids": [],
-          "unmet_requirements": []
-        },
-        "communication_needs": []
-      }
-    ],
+          "reason_summary": "The declared provider supports exact recitation."
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-recitation",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "perform-recitation"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 1.0,
+        "status": "exact",
+        "satisfied_goal_ids": [
+          "goal-recitation"
+        ],
+        "unmet_goal_ids": [],
+        "unmet_requirements": []
+      },
+      "communication_needs": []
+    },
     "capabilities": [
       {
         "capability_id": "chromie.vocal.perform",
@@ -143,10 +129,6 @@
     ],
     "social_cognition": {
       "fast": {
-        "activities": [],
-        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
-      },
-      "deep": {
         "activities": [
           {
             "activity_id": "scenario-immediate",
@@ -217,8 +199,7 @@
     "requires_confirmation": false,
     "calls": [
       "goal_association",
-      "fast_stream",
-      "deep_plan"
+      "fast_stream"
     ]
   },
   "general_ability": {

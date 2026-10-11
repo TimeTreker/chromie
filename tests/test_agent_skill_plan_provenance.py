@@ -110,46 +110,6 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
         self.assertNotIn("content", encoded["selected_agent_skills"][0])
         self.assertNotIn("source", encoded["selected_agent_skills"][0])
 
-    def test_deep_plan_binds_only_its_own_disclosed_method(self) -> None:
-        deep = attach_disclosure_metadata(
-            self._plan(tier="deep"),
-            self._disclosure(
-                "deep_planner",
-                skill_id="chromie.deep-method",
-                digest_char="c",
-            ),
-        )
-
-        self.assertEqual(
-            [item.agent_skill_id for item in deep.selected_agent_skills],
-            ["chromie.deep-method"],
-        )
-        self.assertEqual(
-            [item.selected_by_agent_role for item in deep.selected_agent_skills],
-            ["deep_planner"],
-        )
-
-    def test_fast_plan_rejects_deep_planner_provenance(self) -> None:
-        payload = self._plan().model_dump(mode="python")
-        payload["selected_agent_skills"] = [
-            PlanAgentSkillProvenance(
-                selection_id="selection-deep",
-                disclosure_id="disclosure-deep",
-                disclosure_digest="sha256:" + "a" * 64,
-                selected_by_agent_role="deep_planner",
-                agent_skill_id="chromie.deep-method",
-                version="1.0.0",
-                projection="deep_planner",
-                content_digest="sha256:" + "b" * 64,
-                projection_digest="sha256:" + "c" * 64,
-                relevant_goal_ids=("goal-1",),
-                selection_rationale="Deep-only method.",
-                selection_confidence=0.9,
-            ).model_dump(mode="python")
-        ]
-        with self.assertRaisesRegex(ValidationError, "planner_tier"):
-            CanonicalPlan.model_validate(payload)
-
     def test_plan_rejects_provenance_for_unknown_goal(self) -> None:
         disclosure = self._disclosure(
             "fast_planner",
@@ -171,13 +131,11 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
             disclosure,
         )
 
-        self.assertEqual(plan.disposition, "escalate")
+        self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.coverage, "uncertain")
         self.assertEqual(plan.steps, [])
-        self.assertEqual(
-            plan.escalation_reason,
-            "agent_skill_provenance_invalid",
-        )
+        self.assertEqual(plan.unresolved, ["agent_skill_provenance_invalid"])
+        self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         self.assertFalse(
             plan.metadata["agent_skill_provenance_attachment"][
                 "execution_allowed"
@@ -200,7 +158,7 @@ class AgentSkillPlanProvenanceTests(unittest.TestCase):
 
     def test_derived_goal_subset_narrows_provenance_without_inventing_goals(self) -> None:
         disclosure = self._disclosure(
-            "deep_planner",
+            "fast_planner",
             skill_id="chromie.multi-goal-method",
             goal_ids=("goal-1", "goal-2"),
         )

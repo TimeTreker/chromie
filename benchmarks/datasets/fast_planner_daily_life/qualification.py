@@ -1161,19 +1161,22 @@ def canonical_primary_result_accepted(
 ) -> bool:
     """Return whether Host accepted the model's canonical primary result.
 
-    ``authority=advisory`` is true for every Fast plan, including valid terminal
-    and semantic-escalation results, so it is not a fallback discriminator.
+    ``authority=advisory`` is true for every Plan, so it is not a fallback
+    discriminator. A terminal path is accepted, including a limitation the model
+    itself authored. A Host-materialized limitation that replaced a different raw
+    decision (for example a Plan below the commitment bar) is not.
     """
 
     if plan is None or not isinstance(raw_value, dict):
         return False
     path_classification = str(plan.metadata.get("path_classification") or "").strip()
     raw_disposition = str(raw_value.get("disposition") or "").strip()
-    return path_classification == "terminal" or (
-        path_classification == "semantic_escalation"
-        and raw_disposition == "escalate"
+    host_limitation = plan.metadata.get("status") == "unavailable" and raw_disposition != "unavailable"
+    return (
+        path_classification == "terminal"
         and not plan.metadata.get("failure_class")
         and not plan.metadata.get("error_type")
+        and not host_limitation
     )
 
 
@@ -1257,7 +1260,7 @@ async def _adjudicate_one(
             host_accepted = not fallback
             if fallback:
                 host_error = str(
-                    plan.escalation_reason or plan.metadata.get("error") or "fast planner fallback"
+                    plan.metadata.get("reason") or plan.metadata.get("error") or "fast planner fallback"
                 )
             disposition = plan.disposition
             coverage = plan.coverage
@@ -1280,20 +1283,16 @@ async def _adjudicate_one(
     finally:
         logging.getLogger("chromie.agent.fast_planner").setLevel(previous_level)
 
-    # Every accepted Fast plan is advisory because Runtime, not Planner, owns
-    # commitment.  That authority label therefore cannot distinguish a valid
-    # primary result from a fail-closed fallback.  A terminal path is an accepted
-    # primary result.  A semantic-escalation path is accepted only when the raw
-    # model itself authored the legal escalation and Host validation did not
-    # attach failure metadata.  Host-generated escalation after a rejected
-    # execute/respond result remains a failed primary result.
+    # Every accepted Plan is advisory because Runtime, not Planner, owns
+    # commitment, so that label cannot distinguish a valid primary result from a
+    # fail-closed fallback; see canonical_primary_result_accepted.
     if runtime_variant != "streaming_advance" and plan is not None:
         host_accepted = canonical_primary_result_accepted(plan, raw_value)
         host_error = (
             ""
             if host_accepted
             else str(
-                plan.escalation_reason or plan.metadata.get("error") or "fast planner fallback"
+                plan.metadata.get("reason") or plan.metadata.get("error") or "fast planner fallback"
             )
         )
     target_errors = _target_checks(

@@ -1,6 +1,6 @@
 ---
 name: qualify-chromie-semantic-transaction
-description: Qualify and improve complete Chromie semantic model-role transactions through authority audit, a coverage-designed frozen contrast corpus, target-blind inference, Schema/DTO/Host adjudication, earliest-boundary diagnosis, authorized minimal repair, focused proof, full reruns, and evidence handoff. Use whenever Codex is asked to audit, evaluate, tune, qualify, compare, or optimize User Meaning Interpretation, Goal Association, Fast/Deep Planner, Agent Skill Selection, Attention Review, Reflection, or another Chromie semantic role, prompt, context projection, Schema, DTO, Host validator, model profile, or model-facing transaction. Do not imply that the candidate model itself is an optimization target.
+description: Qualify and improve complete Chromie semantic model-role transactions through authority audit, a coverage-designed frozen contrast corpus, target-blind inference, Schema/DTO/Host adjudication, earliest-boundary diagnosis, authorized minimal repair, focused proof, full reruns, and evidence handoff. Use whenever Codex is asked to audit, evaluate, tune, qualify, compare, or optimize User Meaning Interpretation, Goal Association, the Planner, Value Judgment, Agent Skill Selection, Attention Review, Reflection, or another Chromie semantic role, prompt, context projection, Schema, DTO, Host validator, model profile, or model-facing transaction. Do not imply that the candidate model itself is an optimization target.
 ---
 
 # Qualify a Chromie Semantic Model Role
@@ -276,9 +276,9 @@ When qualifying Planner:
   response text, Evidence scope, satisfaction, unresolved material, revision
   scope, and absence of executable partial leakage.
 - Use semantic review for Plan completeness, appropriate Capability choices,
-  genuine clarification/escalation/refusal, grounded wording, and whether Deep
-  improves complex cases without inventing Work.
-- Do not let Deep recovery erase a Fast technical failure.
+  genuine clarification/limitation/refusal, grounded wording, and whether need-first
+  search loads what complex cases need without inventing Work.
+- Do not let a need-first second pass erase a technical failure of the first.
 - Do not let Fast and Deep review or semantically repair each other.
 - Prefer acceptable semantic regions plus deterministic invariants over exact
   Plan equality.

@@ -98,7 +98,7 @@ surroundings. Examples:
 - Cognitive Gateway attention/admission review;
 - Goal-Driven Cognitive Core goal interpretation and association;
 - Goal segmentation and association;
-- Fast and Deep Planner output, including exact Communicative Activities;
+- Planner output and Social Cognition Communicative Activities;
 - Activity-attached Social Attention choice;
 - MindProfile and Social Interaction Style prompt projection;
 - capability retrieval and model-facing catalog projection;
@@ -239,7 +239,7 @@ the Human-Like Interaction Contract, the Goal-driven architecture, the current
 MindProfile and Social Interaction Style, retained failures, and the exact
 capability and evidence surfaces under qualification. Generic assistant trivia,
 abstract JSON obedience, or an unrelated agent benchmark is not evidence that a
-model can act as Chromie's Goal Association, Fast/Deep Planner, or Social
+model can act as Chromie's Goal Association, Planner, or Social
 Attention owner.
 
 An LLM may generate candidate scenario variations, but generation does not make

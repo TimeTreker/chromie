@@ -736,7 +736,7 @@ def stable_plan_id(request: Any, planner_tier: PlannerTier) -> str:
 def materialize_planner_output(
     model_output: PlannerModelOutput,
     *,
-    planner_tier: PlannerTier,
+    planner_tier: PlannerTier = "fast",
     plan_id: str,
     expected_goal_ids_for_turn: list[str],
     fast_multi_goal_contract: bool = False,

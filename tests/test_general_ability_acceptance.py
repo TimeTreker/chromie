@@ -1357,7 +1357,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(case.expected_terminal_planner_tier, "fast")
         self.assertEqual(case.expected_fast_planner_path, "terminal")
-        self.assertFalse(case.expect_deep_planner_invoked)
         self.assertTrue(case.expect_no_fast_contract_failure)
 
     def test_live_validation_enforces_fast_terminal_path(self) -> None:
@@ -1383,11 +1382,10 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "speech": [{"text": "*Blinks twice* Why did the robot laugh?"}],
             },
             "cognitive_runtime": {
-                "terminal_plan": {"planner_tier": "fast"},
-                "timings_ms": {"deep_planner": 10000.0},
+                # A missing tier is still a mismatch (there is one Planner tier).
+                "terminal_plan": {},
                 "metadata": {
                     "fast_planner_path": "contract_failure",
-                    "deep_planner_invoked": True,
                     "stage_diagnostics": [
                         {
                             "stage": "fast_planner",
@@ -1402,7 +1400,6 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         self.assertTrue(any("terminal planner tier mismatch" in item for item in errors))
         self.assertTrue(any("Fast Planner path mismatch" in item for item in errors))
-        self.assertTrue(any("Deep Planner invocation mismatch" in item for item in errors))
         self.assertTrue(any("Fast Planner contract failure" in item for item in errors))
 
     def test_user_outcome_scope_retains_internal_path_mismatch_as_diagnostic(self) -> None:
@@ -1443,10 +1440,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
             },
             "cognitive_runtime": {
                 "terminal_plan": {"planner_tier": "fast"},
-                "timings_ms": {"deep_planner": 1000.0},
                 "metadata": {
                     "fast_planner_path": "contract_failure",
-                    "deep_planner_invoked": True,
                 },
             },
         }
@@ -1598,7 +1593,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
                 "goal_association": {"new_goals": []},
                 "terminal_plan": {"goal_outcomes": []},
                 "metadata": {
-                    "failure_stage": "deep_planner",
+                    "failure_stage": "fast_planner",
                     "failure_class": "structured_output_validation",
                 },
             },
@@ -1612,7 +1607,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         self.assertEqual(evaluation["axes"]["runtime_integrity"], 0)
         self.assertEqual(
             evaluation["earliest_suspect_boundary"],
-            "cognitive_runtime:deep_planner",
+            "cognitive_runtime:fast_planner",
         )
 
     def test_multi_turn_live_case_reuses_one_conversation(self) -> None:

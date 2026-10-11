@@ -153,10 +153,10 @@ Responsibility / WHAT
       │
       ├──────────────┬──────────────────────────┐
       ▼              ▼                          ▼
-Social Cognition  Goal Association      Fast Planner when WHAT
+Social Cognition  Goal Association      Planner when WHAT
 immediate social  continuity check      already contains Work
 interaction          │                         │
-      │              ├─ non_goal ──> done      ├─ complex HOW ──> Deep Planner
+      │              ├─ non_goal ──> done      ├─ unmet need ──> library search, same Planner
       │              │                         │
       │              └─ canonical Goal ────────┤
       │                                        ▼
@@ -212,10 +212,11 @@ directly. Likewise, comparing a changed Goal with already queued/running/complet
 is simply one Planner operation. **`Work Reconciliation` is not a mandatory cognitive
 stage or separate semantic authority.**
 
-Planner's fast and deep **planning** paths are two cognition depths of the same HOW
-authority. The fast pass should produce a complete detailed Plan whenever HOW is
-sufficiently clear; the deep Planner pass is reserved for genuinely complex dependencies,
-alternatives, resource, or safety reasoning. Separately, a valid provisional conversational
+There is one Planner (PLANNER-AUTHORITY-001; the Deep Planner was retired 2026-10-11). It
+produces a complete detailed Plan whenever HOW is clear. Depth comes from what it acquires:
+library contracts through need-first search, Evidence through staged re-entry, or the
+person's input through clarification. A Responsibility it cannot fulfil now is an honest
+`unavailable` outcome beside its siblings' Work. Separately, a valid provisional conversational
 Activity may keep its Responsibility open and authorize one bounded communication-only
 SC continuation. Its deeper invocation retains the communication-only contract and
 gains no Work authority; it uses the same SC communication authority. The depth label
@@ -489,9 +490,9 @@ knowledge that is not represented as an acquisition resource may remain directly
 Local/private/device/sensor state without a supplied trusted observation or Provider remains
 epistemically unknown; a generic web or weather source is not silently promoted into authority.
 
-Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Fast/Deep prompt construction, the typed streaming presentation/truth contract, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. Fast and Deep Resolver passes remain the same Planner authority at different cognition depths.
+Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Planner prompt construction, the typed streaming presentation/truth contract, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. There is one Planner resolver (PLANNER-AUTHORITY-001).
 
-The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including pass-specific Fast/Deep schemas; `planner_validation.py` owns deterministic validation shared across both passes; `planner_fast_validation.py` owns Fast reuse/fail-safe validation mechanics; `planner_deep_validation.py` owns Deep mechanical-repair/safety/diagnostic validation mechanics; and `planner_fallback.py` may only mechanically materialize a clarify/unavailable/escalate/fail-safe disposition that the enclosing Planner lifecycle has already selected. The model-assisted same-owner communication and coverage audit module is removed under Charter principles 30–31. The former `planner_contract.py` compatibility surface is also removed. Fast/Deep Resolvers retain the primary model invocation and HOW lifecycle decisions but do not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
+The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including the canonical and streamed Planner schemas; `planner_validation.py` owns deterministic validation; `planner_fast_validation.py` owns reuse, commitment and fail-safe validation mechanics; and `planner_fallback.py` may only mechanically materialize an unavailable limitation or a fail-closed failure that the enclosing Planner lifecycle has already selected. The model-assisted same-owner communication and coverage audit module is removed under Charter principles 30–31. The former `planner_contract.py` compatibility surface is also removed. The Planner resolver retains the primary model invocation and HOW lifecycle decisions but does not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
 
 ### SC consumes social facts, not task execution plumbing
 
@@ -527,16 +528,14 @@ Actual speech delivery can complete only a covered answer Need for a responding
 Goal. Progress, silence, scheduling and optional expression cannot complete an
 executable Goal or prove an external effect.
 
-### Terminal Capability Evidence re-enters Planner through Fast first
+### Terminal Capability Evidence re-enters the Planner
 
 Trusted Runtime publishes a correlated terminal event. The Host validates the
 immutable request/result join and schema, binds bounded Evidence only to the
 request's exact canonical Goal IDs, updates Goal/task state, and reactivates
-Fast Planner first. Planner decides follow-up Work, clarification, retry or a required answer/result Need. SC decides whether and how to communicate from the scoped facts. Fast may make the terminal decision
-or escalate genuinely complex HOW to Deep under the existing Planner contract; the
-terminal response from either tier must preserve evidence scope, probability strength,
-execution-status truth, and exact Goal boundaries in that tier's primary result.
-Escalation cannot bypass those contracts. SC is the distinct downstream interaction owner, not a reviewer of Planner semantics. Planner may not widen the supplied Goal set or duplicate the
+the Planner. Planner decides follow-up Work, clarification, retry, an honest limitation or a required answer/result Need. SC decides whether and how to communicate from the scoped facts. The
+Planner's terminal decision must preserve evidence scope, probability strength,
+execution-status truth, and exact Goal boundaries in its primary result. SC is the distinct downstream interaction owner, not a reviewer of Planner semantics. Planner may not widen the supplied Goal set or duplicate the
 completed execution.
 
 Result content, place names, provider fields, recency, or text similarity never
@@ -725,9 +724,8 @@ A GA `non_goal` result ends Goal-owned task continuity without fabricated Planne
 If GA later discovers additional retained-Goal relevance, GA itself may request the same
 Planner authority over the exact affected Responsibilities. Runtime validates and schedules
 that request but does not infer a Planner wake from relationship type, Goal replacement,
-or retained Work. If HOW exceeds the fast planning budget, Fast Planner may additionally request Deep
-Planner; Deep planning receives canonical Goal grounding before commitment-bearing work
-executes.
+or retained Work. The one Planner receives canonical Goal grounding before
+commitment-bearing work executes; it never requests another planner pass.
 
 An executable capability is one possible means of satisfying a responsibility.
 An Agent Skill is a reusable method that may help an Agent decide how to use one
@@ -753,8 +751,9 @@ A planner must evaluate whether the complete user goal is covered. Finding one
 matching skill is insufficient.
 
 For a request containing walking and blinking, recognizing `walk_forward` does
-not establish complete coverage. Partial coverage must escalate or clarify; it
-must never silently become execution.
+not establish complete coverage. Partial coverage must load the missing contract,
+clarify, or report the uncovered part honestly unavailable; it must never silently
+become execution.
 
 ### 3.4 Meaning before skills
 
@@ -844,7 +843,7 @@ preserves the user’s goal.
 
 One admitted turn has one maintained semantic architecture. In `apply` mode the
 Goal-Driven Cognitive Core owns the semantic path: UMI interprets WHAT, Goal
-Association owns canonical Goal continuity, and Fast/Deep Planner owns HOW and
+Association owns canonical Goal continuity, and the Planner owns HOW and
 Communicative Activities. A failure after this path starts fails closed; there is
 no retained CapabilityAgent, direct-LLM, route/intent, or emergency semantic
 fallback that can reinterpret the same turn.
@@ -1034,7 +1033,7 @@ planner tier.
   "goal_id": "goal_123",
   "goal_version": 3,
   "plan_version": 2,
-  "planner_tier": "deep",
+  "planner_tier": "fast",
   "coverage": "complete",
   "relation": "exact",
   "steps": [
@@ -1924,9 +1923,7 @@ flowchart TD
     PLAN --> PROV{"Provisional conversation?"}
     PROV -->|"yes"| DELIB["Bounded SC deliberation<br/>communication-only; no permission widening"]
     PROV -->|"no"| WORK
-    PLAN --> DEEP["Deep Planner pass<br/>same authority and admitted scope"]
     DELIB --> RECON["Delivered-claim reconciliation<br/>silence / delta / repair"]
-    DEEP --> WORK
     RECON --> WORK
     GA --> GOALS["Canonical Goals<br/>unfinished Responsibility"]
 
@@ -2088,10 +2085,9 @@ Situation digest and trusted source provenance. The opportunity carries bounded 
 subject refs, and replaying the same Situation digest creates no cognition. A stateless
 restricted Planner invocation can only remain silent or author one exact context-grounded
 low-commitment utterance, with existing private Memory proposals; its schema contains no
-Capability Work, Goal mutation, confirmation or effect authority. Fast may delegate an
-unresolved decision once with no Activity/Memory result; `slow` readiness enters Deep
-directly under the same restricted contract. Complete decisions receive no second model
-review, unavailable Deep fails quiet, and Deep cannot recurse. Every Planner scope shares
+Capability Work, Goal mutation, confirmation or effect authority. The one Planner decides
+it in one invocation (`slow` readiness is context, not another planner pass); complete
+decisions receive no second model review, and an unavailable Planner fails quiet. Every Planner scope shares
 ordinary communication authority and exact Activity/wording validation. Host checks all
 source/subject, identity, delivered-repair and Memory-candidate constraints before writing
 Memory or materializing speech. This Goal-free contract supplies no Responsibility and
@@ -2127,7 +2123,7 @@ Admitted User Turn + bounded Session Context
        |-> same Fast Planner -> remaining Activity Plan + input resolution
        |     |-> ready Capability and still-needed speaking Activities
        |     |-> user-resolvable clarification only when needed
-       |     `-> Deep Planner for unresolved planning within the admitted scope
+       |     `-> honest unavailable outcome for what it cannot do now
        `-> Goal Association -> sole canonical Goal commit/version authority
   -> bind each Activity to the applicable per-Goal Runtime task-list views
   -> deterministic validation/authorization/resource scheduling
@@ -2303,7 +2299,7 @@ this order:
 |---|---|---|
 | 0. Constitutional foundation | Cognitive constitution | Stable Chromie identity, proposal/evidence rules, and authority invariants only; any contract revision invalidates the prefix. |
 | 1. Exact identity/world projection | Identity and world-context owners | Owner-approved identity, personality, relationship, and genuine world assumptions only while their exact rendered version is unchanged. Age, relationship, locale, policy, or world updates invalidate the projection. |
-| 2. Agent operating contract | Exact prompt family | Goal Association, Fast Planner, Deep Planner, safety, truthfulness, commitment, and output responsibilities. A role or schema-contract change invalidates the prefix. |
+| 2. Agent operating contract | Exact prompt family | Goal Association, Planner, safety, truthfulness, commitment, and output responsibilities. A role or schema-contract change invalidates the prefix. |
 | 3. Exact capability contract | Capability/Agent Skill/schema owners | Bounded catalog, schema, and Agent Skill projections only while exact availability, content, ordering, and version remain unchanged. Any difference invalidates the projection. |
 | 4. Session context | Core context assembly | Conversation, active and retained Goals, the Goal-scoped Interaction Context projection, discourse state, memory indexes, scene observations, runtime state, and evidence. Always volatile. |
 | 5. Current turn | Admitted turn and current attempt | Authoritative user input, current time, temporary observations, validation feedback, and attempt-local repair state. Always last and volatile. |
@@ -2674,10 +2670,12 @@ It may:
 - prepare exact Capability Activities from the complete validated terminal result;
   contract-declared safe reads may execute before GA under Responsibility provenance,
   while other Work waits for canonical Goal binding and Runtime validation;
-- request Deep Planner when HOW exceeds the fast planning budget;
-- produce a complete direct common-skill Activity Plan without a second Fast pass;
+- declare an unmet ability first and plan once more with the library contracts the
+  search loads (need-first; no other second pass);
+- produce a complete direct common-skill Activity Plan without a second pass;
 - propose a low-consequence bounded default in canonical planning;
-- escalate.
+- report a Responsibility honestly unavailable, naming what is missing, beside its
+  siblings' Work.
 
 When UMI binds an exact repeat request to previously delivered words, that immutable
 dialogue value reaches SC as source evidence. SC owns expressing the requested
@@ -2692,12 +2690,12 @@ complete | partial | uncertain
 Only complete, high-confidence, structurally valid coverage may proceed to
 validation.
 
-A complete Fast Plan is a commit candidate, not a draft waiting for Deep approval.
+A complete Plan is a commit candidate, not a draft waiting for approval.
 When the UMI-to-GA Goal mapping, exact Capability availability, parameter schema,
 safety/authorization, and confirmation policy all pass deterministic validation, the
-runtime may dispatch that Responsibility immediately. Deep Planner is not a second
-approval gate. Conversely, a Fast contract/provenance failure stops before execution;
-it does not gain semantic legitimacy by asking Deep to repair the same malformed Plan.
+runtime may dispatch that Responsibility immediately (Value Judgment gates only the
+owner-listed reviewed effects). Conversely, a contract/provenance failure stops before
+execution; no other planner repairs the same malformed Plan.
 
 For confirmation-free `safe_read` work, Fast Planner may select the exact Capability
 and executable arguments from the bounded common catalog. Trusted Runtime starts it only
@@ -2724,66 +2722,34 @@ even if the provider schema marks that input optional with a default. This is
 provenance preservation after model-owned capability selection; conflicting,
 transformed, or differently named inputs remain Planner-owned and fail closed.
 
-For multiple authoritative Goals, Fast returns the complete Plan with an exact
+For multiple authoritative Goals, the Planner returns the complete Plan with an exact
 `goal_outcomes` entry per Goal. It can compose up to four steps per Goal; the
 pre-GA Activity result is bounded to 24 Activities. A connected intent can own
-several sequential Activities. Fast receives full common contracts plus the full
-library index and may read one bounded batch of missing contracts before its
-complete planning decision. A rare capability alone does not require Deep.
-Genuine unresolved planning can use the designated depth boundary. No candidate
-Plan is passed for review or semantic repair; Runtime retains all safety gates.
+several sequential Activities. The Planner receives full common contracts plus the full
+library index; when it declares an unmet ability, the search loads matching contracts
+it did not see (including a common contract the Goal applicability filter hid) and it
+plans once with them. Loaded contracts are composition components and are not filtered
+against the whole Goal again, so a forecast read before a conditional action is one
+Planner decision. No candidate Plan is passed for review or semantic repair; Runtime
+retains all safety gates.
 
-### 8.2 Deep Planner
+### 8.2 Honest limitation (the Deep Planner is retired)
 
-Deep denotes the depth of an independent Planner invocation. The existing restricted
-Situation schema supports Goal-free communication without acquiring Goal/Work permission;
-its one unresolved Fast delegation or direct slow invocation cannot review a completed
-decision or recurse. The following CanonicalPlan contract covers Goal-bound Work planning.
+The Deep Planner was retired on 2026-10-11 (PLANNER-AUTHORITY-001). Its only extra
+input, the full catalog, now arrives through need-first search; its original
+"should I act" intent lives in Value Judgment (VALUE-JUDGMENT-001).
 
-For Goal-bound Work planning, Deep Planner receives:
+A Responsibility the Planner cannot fulfil now is an `unavailable` outcome that names
+what is missing (streamed: an `unavailable` Activity with `missing` facts; canonical: a
+per-Goal `unavailable` outcome for up to four Goals). Siblings may still execute,
+respond or clarify in the same decision. Social Cognition words the limitation. The
+Planner's own commitment bar is 0.75 satisfaction: a Plan it judges below the bar
+becomes the same honest limitation. A structurally invalid Plan, or a resource Plan
+that leaves a coverable Goal incomplete, is a contract failure and fails closed; no
+second planner pass repairs it. A purely mechanical DTO defect may be regenerated once.
 
-- the original user turn;
-- bounded projections of model-selected Agent Skills and their provenance;
-- complete associated goal state;
-- any advisory fast-planner draft;
-- the full capability registry;
-- schemas and affordances;
-- provider, environment, resource, and safety context;
-- memory and trusted services;
-- current information gaps and confirmations.
-
-Deep Planner is exceptional. It is invoked when incomplete or compound Plan coverage,
-nontrivial dependencies, material alternatives, novelty or broader planning context,
-or safety/resource reasoning requires the wider planning boundary. Fast-Planner-to-
-Deep-Planner is one **HOW** escalation, not repair of a Fast contract/provenance
-failure, already committed Goal, or execution result. Genuine ambiguity in the
-person's intended outcome, scope, or referent belongs to Deep User Meaning Interpretation
-before planning; Deep Planner cannot reinterpret it. A Responsibility that is already
-completely and safely resolved by Fast does not enter Deep in parallel for reassurance.
-Deep Planner receives the original Goal truth, the Fast planning-escalation evidence,
-and the full planning boundary. When Deep becomes the terminal response author for a
-post-Evidence re-entry, its primary result owns the same evidence-scope, epistemic-
-strength, execution-status, and Goal-scope truth as a terminal Fast result; Host never
-adds or invokes a later wording authority.
-It may regenerate once only when its structured DTO is mechanically malformed;
-semantic grounding, coverage, confidence/satisfaction, capability, or safety
-rejection is terminal and fails closed. Model confidence alone neither grants a direct/Fast
-bypass nor replaces deterministic effect and safety validation.
-
-It may produce:
-
-- exact plan;
-- safe adjustment;
-- alternative plan;
-- partial plan requiring approval;
-- context acquisition;
-- specific clarification;
-- unavailable;
-- refused.
-
-Deep Planner and single-goal Fast Planner use the shared flat
-`PlannerModelOutput` boundary. Multi-goal Fast Planner uses the decoder-tight
-`FastPlannerMultiGoalPlanOutput` boundary. In every case, the planner model owns
+The canonical Planner uses the decoder-tight `FastPlannerModelOutput` (single Goal)
+and `FastPlannerMultiGoalPlanOutput` (several Goals) boundaries. In every case, the planner model owns
 all semantic plan fields: capability choice, arguments, ordering, the
 `steps[].source_goal_ids` ownership judgment, per-goal disposition and response
 content, coverage, and satisfaction judgments.
@@ -2796,8 +2762,7 @@ step ownership and per-goal dispositions. The Host may mechanically normalize
 those cross-references so nonexistent or stale IDs cannot discard an otherwise
 coherent plan. It cannot create a step, choose a capability, or assign an
 unowned Goal: an `execute` outcome with no model-authored owned step remains
-semantically invalid. Fast may escalate once to Deep when wider cognition is
-warranted; terminal Deep semantic invalidity fails closed. After validation, the
+semantically invalid and fails closed. After validation, the
 Host adds the canonical identity envelope and converts the goal-keyed object to
 the ordered canonical outcome list; it does not infer semantic plan content from
 the user utterance.
@@ -2806,13 +2771,10 @@ A typed effectful Goal cannot be declared satisfied merely because a planner
 returns complete coverage or response text. Before canonical planning, each
 `executable_action`, `capability_dependent`, or otherwise provider-required Goal
 must own an executable step, have delivered evidence-bound dialogue for that
-same Goal, or carry an explicit `clarify`, `escalate`, `unavailable`, or
+same Goal, or carry an explicit `clarify`, `unavailable`, or
 `refused` outcome. An unresolved effectful Goal with zero owned steps and no
-such evidence is a semantic/grounding failure: Fast may escalate once to Deep
-when wider cognition is warranted; Deep then either returns a valid plan or an
-explicit model-authored clarification/unavailable/refused outcome, otherwise it
-fails closed. Only a purely mechanical DTO/schema defect may be regenerated once
-within the same tier. The Host validates typed Goal metadata and ownership only;
+such evidence is a semantic/grounding failure and fails closed. Only a purely
+mechanical DTO/schema defect may be regenerated once. The Host validates typed Goal metadata and ownership only;
 it does not infer effect from phrases and never invokes a third semantic planning
 pass after rejecting the terminal plan.
 
@@ -2823,9 +2785,9 @@ host-owned canonical envelope.
 
 ### 8.3 No planner loop
 
-The Deep Planner does not send simple steps back to the Fast Planner.
+There is one Planner pass per decision; nothing sends steps back to another planner.
 
-Executable capabilities are leaf nodes in either planner's canonical plan and
+Executable capabilities are leaf nodes in the canonical plan and
 use canonical `capability_id`. Agent Skills are reusable planning methods and do
 not belong to a planner tier. Maintained Chromie executable contracts have no
 `skill_id` identity; provider-local wire fields are translated at their adapters
@@ -3331,8 +3293,8 @@ does not hold Work. Result-dependent words require admitted terminal Evidence.
 
 `Interaction Ledger` is the bounded, append-only journal through which Chromie
 reports her own already-performed interaction history to later cognition. Its
-model-facing audience includes User Meaning Interpretation, Goal Association, Fast
-Planner, Deep Planner, and any
+model-facing audience includes User Meaning Interpretation, Goal Association, the
+Planner, and any
 later cognitive stage that can otherwise repeat a Goal-scoped conversational or
 effectful responsibility. Runtime owners append the qualified facts. This
 architecture document is the authoritative owner of the term because the
@@ -3377,8 +3339,8 @@ or effectful delta. Scheduled speech is pending rather than heard, and a Plan or
 committed request is pending rather than complete. A later stage may repeat an
 act only when the current meaning justifies it, for example an explicit repeat,
 retry, correction, changed state, new evidence, or clarification. The Ledger is
-therefore shared state, not a source of pairwise rules such as “Deep Planner must
-not repeat Fast Planner.”
+therefore shared state, not a source of pairwise rules such as “the Planner must
+not repeat Social Cognition.”
 
 The current runtime retains at most 160 in-memory events per session and
 projects at most 48 recent relevant events into volatile Prompt Layer 4. This
@@ -3612,8 +3574,8 @@ Mind architecture:
     misunderstanding or capability failure.
 11. Social Attention and Vocal are genuine interaction progress but do not
     independently own user Goals or effect authorization.
-12. Fast and Deep planning share canonical execution contracts when planning is
-    needed; Deep does not route semantic decomposition back to Fast.
+12. One Planner owns the canonical execution contracts when planning is needed; no
+    second planner pass decomposes or repairs its decision.
 13. Uncertainty is resolved by the cheapest trustworthy means appropriate to the
     responsibility—observation, information acquisition, clarification, waiting,
     or deeper reasoning—not by a confidence threshold alone.
@@ -3733,6 +3695,8 @@ Exit criteria:
 
 ### PR4 — Terminal Deep Planner and bounded DTO regeneration
 
+Historical: the Deep Planner was retired on 2026-10-11 (section 8.2).
+
 Deliver:
 
 - full-registry deep planning;
@@ -3795,7 +3759,7 @@ Deliver:
 - staged `off`, `report_only`, and `apply` rollout;
 - lane-gated application with compatibility and fail-closed fallback policy;
 - migration from task continuity to atomic Goal continuity application;
-- trusted host terminal validation after Fast-to-Deep planning, with no Host-owned semantic replan;
+- trusted host terminal validation after planning, with no Host-owned semantic replan;
 - complete dependency-light cognitive runtime scenarios;
 - operational evidence classification and rollback;
 - live-text and MuJoCo evidence collection entry points.

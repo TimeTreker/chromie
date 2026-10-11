@@ -42,7 +42,7 @@ daily interaction
 
 Experience should improve future cognition and provider/capability engineering
 through governed offline artifacts. It must not become an online shortcut from a
-surface phrase or remembered case directly to a Capability, Plan, or Fast/Deep
+surface phrase or remembered case directly to a Capability, Plan, or cognition-depth
 decision, and it must not pretend that an unsupported physical ability already exists.
 Online Reflection is limited to bounded local advisory context; shared prompt/model/
 contract/capability changes belong here only after evidence aggregation and review.

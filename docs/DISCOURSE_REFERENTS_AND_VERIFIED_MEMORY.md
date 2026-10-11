@@ -2,8 +2,8 @@
 
 ## Status
 
-Implemented for bounded conversation state, Goal Association, Fast/Deep
-Planning, Planner-owned Communicative Activities, and host-runtime
+Implemented for bounded conversation state, Goal Association, Planning,
+Social Cognition Communicative Activities, and host-runtime
 verified-result retrieval.
 
 This design exists to prevent one task's structured evidence from silently
@@ -24,10 +24,10 @@ Chromie's cognitive stages have distinct responsibilities:
 3. **Host conversation state** validates and stores the LLM-authored typed
    referent/focus mutations, IDs, provenance, and bounded persistence. It does
    not contain phrase rules or choose a semantic referent.
-4. **Fast/Deep Planner** receives resolved Goal bindings and decides whether to
+4. **Planner** receives resolved Goal bindings and decides whether to
    retrieve one exact verified prior result or execute a fresh read.
-5. **Fast/Deep Planner** authors the exact natural pre-result Communicative
-   Activity. It may say that Chromie is checking a source or retrieving a
+5. **Social Cognition** authors the exact natural pre-result Communicative
+   Activity from the Planner's communication Need. It may say that Chromie is checking a source or retrieving a
    recently checked result, but cannot state the result before trusted Evidence.
 6. **Host Evidence binding** joins the exact request/result to its existing
    Goal and reactivates Fast Planner, which authors any still-useful grounded
@@ -262,7 +262,7 @@ This projection is deliberately narrower than raw result memory:
 If a response Goal is represented only by the verified-memory index and has no
 matching delivered evidence-bound dialogue, validation rejects a direct factual
 response. The Planner must execute exact verified-memory retrieval, perform a
-fresh read, or escalate. This preserves ordinary follow-up conversation without
+fresh read, or report an honest limitation. This preserves ordinary follow-up conversation without
 turning provenance metadata or general chat history into external-fact
 authority.
 

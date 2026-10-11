@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-10",
+  "frozen_on": "2026-10-11",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "4b0cc3281b34435795b4555793c682fcdaa02e9352fd964ba7333ee0ace08fe7",
-    "workflow-conditional-dry.json": "c8549d8e798a4afdbbaa8dede0ca17c5f673cd90fb535edb2ffbab3545ebfa2c",
-    "workflow-conditional-rain.json": "d8581aab0757b20e2de46de008d851d220ba532f6c61df8fd40a3b538688e055",
-    "workflow-delayed.json": "6973fbd0cac6f1c9779a4bfc5006f6d025d405282537e1d1074dc60e163d8588",
-    "workflow-normal.json": "46f294fa9d435fed4504e0e83a269b4f13b19eb0678693a82d3ec5918f45b77d"
+    "workflow-cancellation.json": "ca5ea9fe4e3d3b196e872130b005dc64b60f990dfdea2b6fd1445fbca8c9ce20",
+    "workflow-conditional-dry.json": "a88a5b5919e42cbaa8c8a0ead8bbbf63fa6316a8b9cca890a981d3068428704f",
+    "workflow-conditional-rain.json": "1d42ff73ee8972a6c6fc0fd4115d169d42c5c645f880d41a651be612636dd09a",
+    "workflow-delayed.json": "3d930559077a2ffd1a754d733fe6a4cd08a08890b64b5c3d886f8d869d447255",
+    "workflow-normal.json": "c199f5e48cae01a206417b84acf946dca6cf847c5ae89a82ee1812dcafc46486"
   },
-  "freeze_revision": 22,
-  "freeze_note": "Need-first Planner migration (owner decision 2026-10-10): requests recaptured; each recorded Fast output whose new request requires ability_needs declares every loaded Capability it uses as one fitting need. Inputs, meanings, relationships, provider outcomes and assertions unchanged.",
+  "freeze_revision": 23,
+  "freeze_note": "Deep Planner retirement (owner decision PLANNER-AUTHORITY-001, 2026-10-10). Every request recaptured with the one Planner. Declared fixed-part migration: initial_planner removed (deep-initial steps become fast-initial), expected_rejection deep -> fast, social_cognition keys follow the step rename, catalog prompt_tier_locked dropped (in production a locked entry never reaches the common prompt; the live catalog has these contracts common and unlocked). Planner replies drop the retired escalation_reason; fitting needs are declared as in freeze 22. When a recorded reply uses a catalog contract the first pass did not show (an information read behind a conditional body action), one need-first pass is inserted before it: it declares that ability unmet with authored need text and reports the Goal unavailable in a schema-valid reply, which the Planner discards after the library search loads the contract. Family names normal_deep and speech_deep are historical identifiers. Inputs, provider outcomes, expectations and splits otherwise unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

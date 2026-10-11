@@ -223,14 +223,14 @@ unexpected failure returns exit 1. `--workers 4` runs independent episodes in se
 processes with isolated clocks, state and loopback services; the default is one.
 Candidate mode requires one worker to preserve the selected provider concurrency.
 
-Coverage includes Fast/Deep execution, conditional acquisition and both result
-branches, retained timers/restart, cancellation, provider failure/refusal/invalid
+Coverage includes Planner execution, conditional acquisition (a need-first search pass
+loads the forecast read) and both result branches, retained timers/restart, cancellation, provider failure/refusal/invalid
 output, duplicate/stale/foreign Evidence, source mapping, forbidden model output,
 parameter and Goal conservation, new-request absolute/relative readiness, ambiguous
 time clarification, source-based deeper GI, supplied speech/mixed delivery, provider
 timeout/cancelled observations, confirmation authorization, late cancellation and
 declared resource conflicts.
-Production GI/GA/Fast/Deep clients call `/api/chat`; parsers, contract validation,
+Production GI/GA/Planner clients call `/api/chat`; parsers, contract validation,
 Runtime, result re-entry and Goal bookkeeping remain real. The driver explicitly
 supplies initial admission and role scheduling, wall time/UUIDs, provider observations
 and local speech receipts. It does not test Gateway/audio admission, native inference,
@@ -698,7 +698,7 @@ sample count. Optional Social Attention lifecycle evidence distinguishes proposa
 Host materialization, Provider acceptance/completion, and safe idle.
 
 This is a logical behavior-domain track. Its adapter must exercise the ordinary
-Fast/Deep Planner result and observe `auxiliary_activities[]`; it must not call or
+Planner result and observe `auxiliary_activities[]`; it must not call or
 emulate a separate Social Attention semantic endpoint. The benchmark `off`,
 `report_only`, and `on` values are qualification conditions implemented by candidate
 availability/execution observation, not product runtime switches.

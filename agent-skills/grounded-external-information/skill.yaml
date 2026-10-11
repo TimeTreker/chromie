@@ -6,7 +6,7 @@ description: Select only for provider-neutral Goals that require facts from an a
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
-content_digest: sha256:1b62dc131326aeeadd8343943bfd9de8b1eca99e1754cadf114a1c3f747c55b6
+content_digest: sha256:1756fd6164a119d6f24ea5527aa61aeebc82d5b5633782bab23b2223e693d0ce
 extends: []
 required_capabilities: []
 optional_capabilities:

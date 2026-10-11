@@ -518,31 +518,13 @@ class AgentSkillSelectionTests(unittest.TestCase):
         self.assertEqual(result.status, "model_unavailable")
         self.assertEqual(result.selected_agent_skills, ())
 
-    def test_projection_availability_is_structural_candidate_filter(self):
+    def test_retired_deep_planner_projection_is_not_a_package_projection(self):
+        # One Planner (PLANNER-AUTHORITY-001): a package cannot declare the retired role.
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
-            self._write_package(root, "fast-only", projections=("fast_planner",))
-            self._write_package(root, "deep-only", projections=("deep_planner",))
-            model = ScriptedModel(
-                [
-                    {
-                        "decision": "no_skill",
-                        "selected_agent_skills": [],
-                        "confidence": 0.9,
-                        "reason_summary": "No method selected.",
-                    }
-                ]
-            )
-            asyncio.run(
-                AgentSkillSelectionService(model, self._registry(root)).select(
-                    self._request(agent_role="deep_planner")
-                )
-            )
-        prompt = json.loads(model.prompts[0][0])
-        self.assertEqual(
-            [item["agent_skill_id"] for item in prompt["candidate_agent_skills"]],
-            ["chromie.deep-only"],
-        )
+            with self.assertRaisesRegex(Exception, "fast_planner"):
+                self._write_package(root, "deep-only", projections=("deep_planner",))
+                self._registry(root)
 
     def test_unknown_explicit_candidate_fails_before_model(self):
         with tempfile.TemporaryDirectory() as temp_dir:

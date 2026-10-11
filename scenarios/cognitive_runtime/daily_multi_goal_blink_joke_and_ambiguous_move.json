@@ -41,129 +41,118 @@
       }
     },
     "fast_plan": {
-      "plan_id": "fast-three-way",
+      "plan_id": "plan-three-way",
       "planner_tier": "fast",
-      "disposition": "escalate",
-      "coverage": "uncertain",
-      "confidence": 0.87,
-      "escalation_reason": "The turn contains executable, conversational, and unresolved goals.",
-      "communication_needs": []
-    },
-    "deep_plans": [
-      {
-        "plan_id": "deep-three-way",
-        "planner_tier": "fast",
-        "disposition": "mixed",
-        "coverage": "complete",
-        "confidence": 0.93,
-        "goal_ids": [
+      "disposition": "mixed",
+      "coverage": "complete",
+      "confidence": 0.93,
+      "goal_ids": [
+        "goal-blink",
+        "goal-joke",
+        "goal-put-away"
+      ],
+      "goal_summary": "Blink once, tell a joke, and clarify which object should be put away.",
+      "steps": [
+        {
+          "step_id": "blink",
+          "capability_id": "soridormi.blink_eyes",
+          "args": {
+            "count": 1
+          },
+          "source_goal_ids": [
+            "goal-blink"
+          ]
+        }
+      ],
+      "parameter_resolutions": [
+        {
+          "step_id": "put-away-request",
+          "parameter": "object",
+          "strategy": "ask_user",
+          "blocking": true,
+          "confidence": 0.99,
+          "rationale": "The object reference is unresolved.",
+          "source_goal_ids": [
+            "goal-put-away"
+          ]
+        }
+      ],
+      "goal_outcomes": [
+        {
+          "goal_id": "goal-blink",
+          "disposition": "execute",
+          "coverage": "complete",
+          "step_ids": [
+            "blink"
+          ]
+        },
+        {
+          "goal_id": "goal-joke",
+          "disposition": "respond",
+          "coverage": "complete"
+        },
+        {
+          "goal_id": "goal-put-away",
+          "disposition": "clarify",
+          "coverage": "uncertain",
+          "unresolved": [
+            "object"
+          ]
+        }
+      ],
+      "goal_satisfaction": {
+        "score": 0.8,
+        "status": "substantial",
+        "satisfied_goal_ids": [
           "goal-blink",
-          "goal-joke",
+          "goal-joke"
+        ],
+        "unmet_goal_ids": [
           "goal-put-away"
         ],
-        "goal_summary": "Blink once, tell a joke, and clarify which object should be put away.",
-        "steps": [
-          {
-            "step_id": "blink",
-            "capability_id": "soridormi.blink_eyes",
-            "args": {
-              "count": 1
-            },
-            "source_goal_ids": [
-              "goal-blink"
-            ]
-          }
-        ],
-        "parameter_resolutions": [
-          {
-            "step_id": "put-away-request",
-            "parameter": "object",
-            "strategy": "ask_user",
-            "blocking": true,
-            "confidence": 0.99,
-            "rationale": "The object reference is unresolved.",
-            "source_goal_ids": [
-              "goal-put-away"
-            ]
-          }
-        ],
-        "goal_outcomes": [
-          {
-            "goal_id": "goal-blink",
-            "disposition": "execute",
-            "coverage": "complete",
-            "step_ids": [
-              "blink"
-            ]
-          },
-          {
-            "goal_id": "goal-joke",
+        "unmet_requirements": [
+          "object reference"
+        ]
+      },
+      "communication_needs": [
+        {
+          "need_id": "need:d10333b479f9ad235c8e59bf5577efbb5631574cf37454868a00097b83b016d8",
+          "owner": "planner",
+          "kind": "answer",
+          "source_goal_ids": [
+            "goal-joke"
+          ],
+          "source_responsibility_refs": [],
+          "reference_id": "plan-three-way",
+          "facts": {
             "disposition": "respond",
-            "coverage": "complete"
+            "unresolved": []
           },
-          {
-            "goal_id": "goal-put-away",
+          "delivery_phase": null,
+          "before_step_ids": [],
+          "after_step_ids": []
+        },
+        {
+          "need_id": "need:a5ee5fde8a9ead900f916f0074ace211f82d2cadd05f6e15bd642a8bc33aee3e",
+          "owner": "planner",
+          "kind": "input",
+          "source_goal_ids": [
+            "goal-put-away"
+          ],
+          "source_responsibility_refs": [],
+          "reference_id": "plan-three-way",
+          "facts": {
             "disposition": "clarify",
-            "coverage": "uncertain",
             "unresolved": [
               "object"
             ]
-          }
-        ],
-        "goal_satisfaction": {
-          "score": 0.8,
-          "status": "substantial",
-          "satisfied_goal_ids": [
-            "goal-blink",
-            "goal-joke"
-          ],
-          "unmet_goal_ids": [
-            "goal-put-away"
-          ],
-          "unmet_requirements": [
-            "object reference"
-          ]
-        },
-        "communication_needs": [
-          {
-            "need_id": "need:d10333b479f9ad235c8e59bf5577efbb5631574cf37454868a00097b83b016d8",
-            "owner": "planner",
-            "kind": "answer",
-            "source_goal_ids": [
-              "goal-joke"
-            ],
-            "source_responsibility_refs": [],
-            "reference_id": "deep-three-way",
-            "facts": {
-              "disposition": "respond",
-              "unresolved": []
-            },
-            "delivery_phase": null,
-            "before_step_ids": [],
-            "after_step_ids": []
           },
-          {
-            "need_id": "need:a5ee5fde8a9ead900f916f0074ace211f82d2cadd05f6e15bd642a8bc33aee3e",
-            "owner": "planner",
-            "kind": "input",
-            "source_goal_ids": [
-              "goal-put-away"
-            ],
-            "source_responsibility_refs": [],
-            "reference_id": "deep-three-way",
-            "facts": {
-              "disposition": "clarify",
-              "unresolved": [
-                "object"
-              ]
-            },
-            "delivery_phase": null,
-            "before_step_ids": [],
-            "after_step_ids": []
-          }
-        ]
-      }
-    ],
+          "delivery_phase": null,
+          "before_step_ids": [],
+          "after_step_ids": []
+        }
+      ]
+    },
     "capabilities": [
       {
         "capability_id": "soridormi.blink_eyes",
@@ -190,10 +179,6 @@
     ],
     "social_cognition": {
       "fast": {
-        "activities": [],
-        "reason_summary": "Explicit Level A SC fixture; authored interaction is not proof of delivery."
-      },
-      "deep": {
         "activities": [
           {
             "activity_id": "scenario-immediate",
@@ -236,7 +221,25 @@
         ],
         "reason_summary": "Exercise the authored Goal and Work transaction, including rejected Work fixtures."
       }
-    ]
+    ],
+    "fast_information_gaps": {
+      "goal-put-away": [
+        {
+          "gap_id": "gap-put-away-object",
+          "description": "Which object should be put away?",
+          "blocking": true,
+          "required_for": [
+            "object"
+          ],
+          "preferred_resolution": "ask_user",
+          "source_kind": "unresolved_meaning",
+          "source_reference": "which object the user means",
+          "resolution_sources_considered": [
+            "authoritative_context"
+          ]
+        }
+      ]
+    }
   },
   "expect": {
     "status": "applied",
@@ -287,8 +290,7 @@
     "requires_confirmation": false,
     "calls": [
       "goal_association",
-      "fast_stream",
-      "deep_plan"
+      "fast_stream"
     ]
   },
   "general_ability": {

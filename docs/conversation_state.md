@@ -78,8 +78,8 @@ returns data only when the already-resolved Goal bindings match exactly and the
 record is fresh enough. See
 [`DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 User Meaning Interpretation remains WHAT-only and never hands planning to a separate
-deep-thinking agent. Fast and Deep Planner passes consume the same bounded
-Goal/Situation/Memory/Evidence/current-Work authorities at different cognition depths.
+deep-thinking agent. The one Planner consumes the bounded
+Goal/Situation/Memory/Evidence/current-Work authorities.
 Situation includes trusted current perception with exact source provenance; Active Memory
 is relevance-selected retained meaning. Current Goal-free perception may be maintained
 mechanically between conversational turns; unchanged sensor reads do not create turns, Goals,

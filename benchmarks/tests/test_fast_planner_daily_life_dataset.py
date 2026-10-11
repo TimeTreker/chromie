@@ -251,23 +251,28 @@ def test_canonical_adjudication_distinguishes_advisory_result_from_fallback() ->
             "path_classification": "terminal",
         },
     )
-    escalation = CanonicalPlan(
-        plan_id="plan-escalation",
+    limitation = CanonicalPlan(
+        plan_id="plan-limitation",
         planner_tier="fast",
-        disposition="escalate",
+        disposition="unavailable",
         coverage="uncertain",
         confidence=0.5,
-        escalation_reason="The common tier cannot cover the complete Goal.",
+        unresolved=["The loaded and library contracts cannot cover the complete Goal."],
         metadata={
             "authority": "advisory",
             "resolver": "fast_planner",
-            "path_classification": "semantic_escalation",
+            "path_classification": "terminal",
         },
     )
-    rejected = escalation.model_copy(
+    host_limitation = limitation.model_copy(
+        update={"metadata": {**limitation.metadata, "status": "unavailable",
+                             "reason": "per_goal_satisfaction_below_commitment"}}
+    )
+    rejected = limitation.model_copy(
         update={
             "metadata": {
-                **escalation.metadata,
+                **limitation.metadata,
+                "path_classification": "contract_failure",
                 "failure_class": "model_contract_invalid",
                 "error_type": "PlannerDTOContractError",
             }
@@ -278,13 +283,16 @@ def test_canonical_adjudication_distinguishes_advisory_result_from_fallback() ->
         terminal, {"disposition": "respond"}
     )
     assert canonical_primary_result_accepted(
-        escalation, {"disposition": "escalate"}
+        limitation, {"disposition": "unavailable"}
+    )
+    assert canonical_primary_result_accepted(
+        host_limitation, {"disposition": "unavailable"}
     )
     assert not canonical_primary_result_accepted(
-        escalation, {"disposition": "execute"}
+        host_limitation, {"disposition": "execute"}
     )
     assert not canonical_primary_result_accepted(
-        rejected, {"disposition": "escalate"}
+        rejected, {"disposition": "unavailable"}
     )
 
 

@@ -174,7 +174,7 @@ receive person input
        -> an ordinary complete response may end there
        -> an explicit provisional response may remain open and schedule one bounded
           deliberative continuation with communication-only authority
-       -> complex HOW may escalate to Deep Planner
+       -> an unmet ability loads library contracts; the same Planner plans once with them
   -> Trusted Capability Runtime validates and submits ready Work asynchronously
   -> Provider / Runtime lifecycle events report what happened
   -> Host correlation turns qualified terminal observations into Evidence
@@ -182,7 +182,7 @@ receive person input
   -> Core/Planner re-enters with Responsibility + Goal + Situation + actual Work + Evidence
        -> 0..N new Activity changes, or no new Activity
        -> reconcile against actually delivered speech when prior communication exists
-       -> deep Planner pass only when HOW genuinely warrants it
+       -> an honest unavailable outcome for what cannot be done now
   -> remain active, wait, listen, speak, act, repair, or close naturally
 ```
 
@@ -264,7 +264,7 @@ composer or execution specialist.
 |---|---|---|---|
 | Cognitive Gateway | captured turn, bounded Host context, deterministic protective controls | admitted immutable `UserTurnEnvelope` or protective outcome | user Goal, Capability, Plan, or social expression |
 | User Meaning Interpretation | admitted turn plus bounded Situation/continuity context | complete provider-neutral intentions, result types, source evidence and unresolved meaning | Capability input gaps, clarification policy, Goal continuity, or Work |
-| Planner fast pass / deep pass | UMI Responsibilities plus applicable Goal, Situation, Work, Evidence, schemas/catalog, and trusted context | complete desired `CanonicalPlan`, word-free communication Needs and Capability Work; fast/deep differ in cognition depth | canonical Goal identity, execution truth, or Host/runtime mutation |
+| Planner (one pass; PLANNER-AUTHORITY-001) | UMI Responsibilities plus applicable Goal, Situation, Work, Evidence, schemas/catalog, and trusted context | complete desired `CanonicalPlan`, word-free communication Needs, Capability Work and honest limitations | canonical Goal identity, execution truth, or Host/runtime mutation |
 | Goal Association | unchanged UMI result plus bounded retained Goals | Existing-Goal association/unassociated result, plus source-preserving updates only when an existing Goal is selected | New Goal WHAT, `requires_replan`, Work compatibility, Capability, or next action |
 | Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
 | Host Orchestrator and Trusted Capability Runtime | accepted UMI/GA semantics, validated Plan, and exact live request/version/state/resource/safety bindings | mechanical Goal materialization for GA-unassociated Responsibilities; accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | reinterpreting WHAT, deciding Goal association, semantic compatibility, or rewritten SC wording |
@@ -281,7 +281,7 @@ separate need for HOW uses the normal Planner contract.
 
 Planner context construction follows one rule: **reason from the best bounded current cognitive state already owned by Chromie before creating new Work**. Fast and Deep therefore consume the same authority classes—canonical Goals, current Situation, role-filtered Active Memory, trusted Evidence, current/recoverable Work, and the applicable Capability contracts—at different reasoning depth. Sensor providers do not own this cognitive synthesis. Raw sensor streams remain outside the Planner prompt; trusted adapters convert them into bounded source-attributed observations first. Rebuilding Situation for GA/Planner must preserve a still-valid trusted perception already attached to the current context rather than replacing it with an empty stage-local projection.
 
-Ambient perception is a separate mechanical path. Soridormi may be polled continuously or periodically at low cost; provider-owned change identity suppresses unchanged reads, and Chromie retains the newest trusted Goal-free perception as current Situation. **A sensor poll does not itself invoke UMI, GA, Planner, Social Cognition, or Memory extraction.** On the next ordinary Goal-driven turn, Fast/Deep Planner receive that bounded current Situation together with activated Memory, Evidence, canonical Goals, current Work, and Capability contracts. If that context is insufficient, Planner may author ordinary `acquire_information` Active Perception Work and re-enter on trusted results. User clarification is therefore not a substitute for perception when a safe perception Capability can resolve the information gap.
+Ambient perception is a separate mechanical path. Soridormi may be polled continuously or periodically at low cost; provider-owned change identity suppresses unchanged reads, and Chromie retains the newest trusted Goal-free perception as current Situation. **A sensor poll does not itself invoke UMI, GA, Planner, Social Cognition, or Memory extraction.** On the next ordinary Goal-driven turn, the Planner receives that bounded current Situation together with activated Memory, Evidence, canonical Goals, current Work, and Capability contracts. If that context is insufficient, Planner may author ordinary `acquire_information` Active Perception Work and re-enter on trusted results. User clarification is therefore not a substitute for perception when a safe perception Capability can resolve the information gap.
 
 The MuJoCo scene-marker adapter is the first concrete ambient scene source; real camera/person/body/environment sources still require their own trusted adapters and provenance contracts. Ambient maintenance alone is not a cognition wake and never synthesizes UMI meaning or task Work.
 
@@ -343,13 +343,13 @@ apply across these independent calls.
 
 The stage boundary remains exact. Fast User Meaning Interpretation may escalate once to Deep
 User Meaning Interpretation for genuine consequential ambiguity in the person's intended
-outcome, scope, or referent. Fast Planner may escalate once to Deep Planner for complex
-HOW, dependencies, alternatives, or safety/resource reasoning. A missing execution
-input or external result is not by itself a reason for Deep UMI, and Deep Planner cannot
+outcome, scope, or referent. The Planner has no deeper pass: complex HOW acquires missing
+contracts, Evidence or input, or ends in an honest limitation. A missing execution
+input or external result is not by itself a reason for Deep UMI, and the Planner cannot
 reinterpret Responsibility. A mechanically malformed DTO may be regenerated once under
 the same meaning and schema. A semantic/grounding/coverage failure is not repaired by
-rewriting previous model output; terminal Deep rejection fails closed or leads Planner
-to a genuine user-resolvable clarification. The Host validates and contains; it does
+rewriting previous model output; a rejected Plan fails closed, and only a genuine
+user-resolvable gap becomes a clarification. The Host validates and contains; it does
 not become a third semantic planner.
 
 GA retains the original parsed response before preprocessing. Only an existing
@@ -493,15 +493,11 @@ a Responsibility (and, when useful, a grounded semantic binding) without any Goa
 relationship or Goal ID. GA alone decides whether that Responsibility modifies or continues
 the canonical Goal and commits the resulting Goal version. The pending Activity retains whether the question came from UMI unresolved
 meaning or a Planner-owned input need; this continuity does not transfer source-policy
-ownership into UMI. Planner's deep pass is reserved for complex HOW, dependencies, alternatives,
-or consequential planning—not for asking a question the fast pass already knows it must
-ask. Fast and Deep therefore consume the same canonical Goal/Evidence projection before
-their pass-specific cognition begins. Cancellation Evidence, terminal result Evidence,
+ownership into UMI. The Planner asks a question only for a genuine input gap and
+consumes one canonical Goal/Evidence projection. Cancellation Evidence, terminal result Evidence,
 Goal response shape, and whether prior execution is still a prerequisite are projected
-once by the shared Planner context owner; the passes may differ in search depth, repair,
-and safety policy, but they may not independently reinterpret those facts. Shared
-Capability applicability and mechanical provenance normalization likewise live in the
-common Planner validation owner rather than in duplicated Fast/Deep resolver logic.
+once by the shared Planner context owner. Capability applicability and mechanical
+provenance normalization live in the common Planner validation owner.
 
 Safe, side-effect-free, schema-valid reads may start without awaiting GA once their
 Capability also explicitly declares parallel safety, needs no confirmation, and is
@@ -919,24 +915,18 @@ availability, source-effect bounds, resources, confirmation requirements, and
 forbidden low-level controls. Validation cannot invent missing meaning or
 rewrite the plan into a nearby action.
 
-Fast Planner owns complete bounded capability work. A terminal Fast Plan whose
+The Planner owns complete bounded capability work. A terminal Plan whose
 Goal grounding, exact Capability, arguments, deterministic safety/authorization, and
-confirmation policy validate may commit directly to Trusted Capability Runtime; Deep
-is not an execution prerequisite or reviewer. A Fast contract/grounding failure stops
-that path instead of being repaired by Deep. Deep Planner is invoked only for
-nontrivial dependency, material alternative, novelty/broader planning context,
-Plan-coverage difficulty, or safety/resource reasoning that truly requires wider
-cognition. Genuine ambiguity in Responsibility meaning belongs to Deep Goal
-Interpretation before planning; Deep Planner may not repair or reinterpret it.
-Independent Responsibilities may therefore be planned at different cognitive
-depths; Capability Work begins only after the selected terminal Planner result has
-canonical Goal grounding and full validation. A purely mechanical Planner DTO/schema failure may be
-regenerated once under the same semantic meaning. Fast planning-grounding/coverage
-rejection may escalate once to Deep when broader reasoning is warranted. Deep
-planning-grounding/coverage rejection is terminal for that cognition attempt and
-must not trigger another same-tier semantic pass. A confidence number alone
-neither permits a bypass nor requires escalation, and it never authorizes an
-effect.
+confirmation policy validate may commit directly to Trusted Capability Runtime
+(Value Judgment gates only owner-listed reviewed effects); no reviewer stands between.
+A contract/grounding failure stops that path and is never repaired by another planner.
+Genuine ambiguity in Responsibility meaning belongs to Deep Goal Interpretation before
+planning; the Planner may not repair or reinterpret it. Capability Work begins only
+after the terminal Planner result has canonical Goal grounding and full validation.
+A purely mechanical Planner DTO/schema failure may be regenerated once under the same
+semantic meaning; a planning-grounding/coverage rejection is terminal and must not
+trigger another semantic pass. A confidence number alone neither permits a bypass nor
+requires another pass, and it never authorizes an effect.
 
 ### 5.1 One Mind: stable cached prefix plus bounded live projections
 
@@ -984,17 +974,14 @@ The live layer is projected by responsibility:
   affected Goal subset, so whole-turn source wording cannot reintroduce a sibling. It may
   author response or genuinely new Work, but result contents cannot infer a new Goal or
   repeat the terminal Activity.
-- Fast Advance and canonical Fast/Deep Planner projections may receive scene/target
+- Fast Advance and canonical Planner projections may receive scene/target
   evidence, recent auxiliary history, primary Activity state, eligible exact social
   Capabilities, and the compact Stable Mind for their same-call optional
   `auxiliary_activities[]` decision.
-- Planner deep pass is the deliberate rich-context HOW path. When planning complexity or
-  consequence warrants escalation, it may receive broader Goal relationships,
-  relevant long-term memory, environment, capability state, trustworthy
-  evidence, alternatives, long-horizon context, and the explicit reason deeper
-  reasoning was required. Its stable Mind prefix remains the same owner-controlled
-  identity, worldview, values, style, and principles; Deep receives more *live*
-  context, not a different person.
+- Rich context reaches the one Planner as live context (Goal relationships, relevant
+  long-term memory, environment, capability state, trustworthy evidence); its stable
+  Mind prefix remains the same owner-controlled identity, worldview, values, style, and
+  principles. Deliberate "should I act" reasoning belongs to Value Judgment.
 
 Dynamic domain knowledge is not part of that stable layer. "Do not intentionally
 harm a person or perform clearly prohibited conduct" may be a concise persistent
@@ -1206,8 +1193,8 @@ later association refreshes continuity after the association already occupying t
 boundary commits. Refreshed dialogue is causally cut at the current admitted turn,
 so later speech can inform a follow-up but can never flow backward into an earlier turn.
 After canonical Goal IDs exist, Runtime projects only Interaction Ledger events
-bound to those Goals plus explicitly unbound SC Communicative Activities from the same turn. Fast
-Planner, Deep Planner, and other later cognitive stages receive the bounded
+bound to those Goals plus explicitly unbound SC Communicative Activities from the same turn. The
+Planner and other later cognitive stages receive the bounded
 Goal-scoped projection to decide the
 still-needed delta. Scheduled speech remains distinct from audible speech,
 committed work remains distinct from terminal evidence, and a speech event can
@@ -1275,7 +1262,7 @@ satisfied. Speech such as "I'm starting" requires committed execution state;
 planning output alone is insufficient.
 
 Pre-execution speech is never execution evidence and never closes an effectful
-goal. Fast or Deep Planning may carry a prospective `response_text` alongside
+goal. Planning may carry a prospective `response_text` alongside
 executable steps when that text represents a still-needed conversational delta.
 When a structurally valid Fast Plan escalates for a separate validation defect, the
 source-authored candidate may be retained only as an undelivered advisory to Deep
@@ -1566,7 +1553,7 @@ Failures remain attributed to their earliest responsible boundary:
 
 - Gateway/admission;
 - goal association;
-- Fast or Deep planning;
+- Planning;
 - deterministic validation or authorization;
 - Agent/tool/provider execution;
 - outcome correlation and reconciliation;

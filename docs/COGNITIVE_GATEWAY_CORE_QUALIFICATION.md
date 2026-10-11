@@ -113,8 +113,8 @@ Gateway. Qualification requires:
 - endpoint-reported source identity and the same runtime-identity digest;
 - explicit safe idle before the request and after cancellation.
 
-The retained case does not require a particular planner tier. A model-authored
-Fast escalation may use Deep Planning, but a malformed Fast object cannot be
+The retained case does not require a particular planner path. A model-authored
+limitation is honest, but a malformed Planner object cannot be
 silently compiled into an action by the Host. Numeric parameter provenance is
 validated as either a verbatim authoritative Goal span or that same span
 qualified by one declared source Goal ID. Repair diagnostics keep `step_id` and

@@ -21,7 +21,6 @@ from unittest.mock import patch
 from agent.app.clients.ollama_client import OllamaClient
 from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
 from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
-from agent.app.deep_planner import DeepPlannerResolver
 from agent.app.fast_planner import FastPlannerResolver
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.settings import AgentServiceSettings
@@ -107,10 +106,7 @@ class Episode(PlannerActivationFixture):
         def model(role):
             return OllamaClient(base_url=url, model='fixture-'+role, purpose=role, timeout_ms=timeout_ms, service_settings=settings)
         self.ga = GoalAssociationResolver(model('ga'), num_ctx=131072, num_predict=2048)
-        self.planners = {
-            'fast': FastPlannerResolver(model('fast'), StaticCatalog(self.catalog), num_ctx=131072, num_predict=2048),
-            'deep': DeepPlannerResolver(model('deep'), StaticCatalog(self.catalog), num_ctx=131072, num_predict=2048),
-        }
+        self.planner = FastPlannerResolver(model('fast'), StaticCatalog(self.catalog), num_ctx=131072, num_predict=2048)
         definitions = [CapabilityDefinition(capability_id=c['capability_id'], provider_id='workflow-fixture',
             input_schema=c['input_schema'], output_schema=case['provider_schemas'][c['capability_id']],
             requires_confirmation=c.get('requires_confirmation', False),
@@ -135,28 +131,25 @@ class Episode(PlannerActivationFixture):
 
     async def resolve_fast_plan(self, _session, *, request, timeout_ms):
         self.last_request = request
-        return await self.plan(request, 'fast')
+        return await self.plan(request)
 
-    async def resolve_deep_plan(self, _session, *, request, timeout_ms):
-        self.last_request = request
-        return await self.plan(request, 'deep')
-
-    async def plan(self, request, tier):
-        self.boundary = tier
-        step_name = self.replay.steps[self.replay.position]["name"]
-        result = await self.planners[tier].resolve(request)
+    async def plan(self, request):
+        self.boundary = 'fast'
+        result = await self.planner.resolve(request)
+        # The last consumed reply authored this Plan; an earlier need-first pass may precede it.
+        step_name = self.replay.steps[self.replay.position - 1]["name"]
         self.social_words[result.plan_id] = self.case.get("social_cognition", {}).get(step_name, "Fixture response.")
         if result.metadata.get('failure_class'):
             self.contract_failure = result.metadata
-            raise AssertionError(f'{tier} contract failure: {result.metadata}')
-        self.events.append({'boundary':tier, 'disposition':result.disposition, 'goal_ids':result.goal_ids, 'validation_feedback':result.metadata.get('validation_feedback',[])})
+            raise AssertionError(f'fast contract failure: {result.metadata}')
+        self.events.append({'boundary':'fast', 'disposition':result.disposition, 'goal_ids':result.goal_ids, 'validation_feedback':result.metadata.get('validation_feedback',[])})
         return result
 
     def host(self, request):
         host = VoiceAssistant.__new__(VoiceAssistant)
         host.agent_client = self
         host.conversation_state = self.manager
-        host.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=self.model_timeout_ms, deep_planner_timeout_ms=self.model_timeout_ms)
+        host.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=self.model_timeout_ms)
         host.cognitive_runtime = GoalDrivenRuntimeCoordinator(agent_client=self, adapter=self.adapter, policy=CognitiveRuntimePolicy(mode='apply'))
         host.session_log = lambda *a, **kw: self.events.append({'host_log': str(a), 'fields': str(kw)})
         host.build_context = lambda _sid: copy.deepcopy(request.context)
@@ -200,7 +193,7 @@ class Episode(PlannerActivationFixture):
         request.context['goal_association_resolution'] = association.model_dump(mode='json')
         request.context['active_goal_snapshots'] = self.manager.active_goal_snapshots()
         self.request = request
-        plan = await self.plan(request, self.case['initial_planner'])
+        plan = await self.plan(request)
         if self.case.get('expected_ready_at'):
             from datetime import datetime
             assert len(plan.time_conditions) == 1

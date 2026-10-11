@@ -4,7 +4,7 @@ Status: Required method for qualifying a complete Chromie semantic-model-role
 transaction and optimizing only its evidenced defective owner
 
 Audience: project owners, coding agents, prompt reviewers, benchmark authors, and
-operators qualifying User Meaning Interpretation, Goal Association, Fast/Deep Planner, or
+operators qualifying User Meaning Interpretation, Goal Association, the Planner, or
 another bounded LLM authority
 
 Owner: Chromie model-role qualification methodology. The component prompt, DTO,
@@ -509,7 +509,10 @@ The retained corpora are:
 - [User Meaning Interpretation Daily-Life Dataset](../benchmarks/datasets/goal_interpretation_daily_life/README.md)
 - [Goal Association Daily-Life Corpus](../benchmarks/datasets/goal_association_daily_life/README.md)
 
-## 7. Applying the method to Fast and Deep Planner
+## 7. Applying the method to the Planner
+
+The Deep Planner was retired on 2026-10-11 (PLANNER-AUTHORITY-001); its corpus families
+now qualify the one Planner.
 
 **Migration boundary:** the [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
 is implemented: Planner owns Work and SC owns ordinary communication. Retained
@@ -566,9 +569,9 @@ Use semantic review for:
 
 - whether the Plan completely and naturally realizes the Goals;
 - whether chosen Capabilities and arguments are appropriate alternatives;
-- whether clarification, escalation, refusal, or unavailability is genuinely needed;
+- whether clarification, refusal, or an honest limitation is genuinely needed;
 - whether communication Needs preserve established facts and unresolved obligations;
-- whether Deep reasoning improves a complex case without inventing work.
+- whether need-first search loads the missing contract for a complex case without inventing work.
 
 ### 7.3 Suggested frozen contrast families
 
@@ -587,10 +590,11 @@ Fast Planner should cover at least:
 - SC optional expression that cannot replace requested Planner Work;
 - cancellation/supersession containment.
 
-Deep Planner should cover at least:
+The Planner corpus should also cover (the former Deep families):
 
 - compound or constrained multi-Goal Work;
-- Fast semantic escalation with no leaked executable partial result;
+- an honest per-Goal limitation beside sibling Work, with no leaked executable partial result;
+- conditional composition that loads a hidden contract through need-first search;
 - blocked, degraded, failed, or unsafe Situation re-entry;
 - plan revision after new Evidence or changed Goal truth;
 - capability/resource/concurrency conflict and complete alternative;
@@ -600,17 +604,16 @@ Deep Planner should cover at least:
 - complex Agent Skill composition;
 - cases where no change or no safe Plan is the correct result.
 
-Create one independently reviewable scenario file per case and keep Fast/Deep contrast
-sets together across the same semantic seed. Qualify Fast first because it is the common
-path and shares prompt/contract material with Deep. After Deep changes, rerun both Fast
-and Deep cohorts.
+Create one independently reviewable scenario file per case and keep contrast sets
+together across the same semantic seed. After any Planner prompt or contract change,
+rerun the complete Planner cohort.
 
 ### 7.4 Planner-specific failure traps
 
 - A valid JSON Plan with missing Goal coverage is a hard contract failure.
 - A correct Capability with guessed consequential arguments is not a semantic pass.
-- Deep recovery does not erase a technical Fast failure.
-- Fast/Deep may not judge or repair each other's meaning.
+- A need-first second pass does not erase a technical failure of the first.
+- No later model may judge or repair the Planner's meaning.
 - There is no generic Planner retry permission for malformed or semantic output.
   Only the role-specific declared lossless DTO-repair path may repair structure;
   it cannot choose new Work.
@@ -641,7 +644,7 @@ The project owner can start a Planner-prompt session with:
 
 ```text
 Follow docs/LLM_PROMPT_QUALIFICATION_METHOD.md as the binding method.
-Qualify the complete Fast Planner transaction first, then Deep Planner, while
+Qualify the complete Planner transaction, including its need-first pass, while
 preserving one Planner HOW authority. Optimize a prompt only when the earliest
 evidenced defect is prompt-owned. Reconstruct the real production input/prompt/Schema/Host
 transaction before editing. Create a frozen bilingual daily-life contrast corpus
@@ -659,7 +662,7 @@ evidence ceiling in the Issue and delivery handoff.
 Before implementation, the new session must report:
 
 - Planner authority and non-authority;
-- exact Fast/Deep invocation variants;
+- exact Planner invocation variants (streamed, canonical, need-first second pass);
 - proposed corpus matrix and split policy;
 - deterministic and semantic adjudication dimensions;
 - expected evidence level;

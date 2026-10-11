@@ -135,7 +135,6 @@ def test_weather_skill_defers_temporal_mapping_to_selected_capability_contract()
     for path in (
         "agent-skills/weather-information/SKILL.md",
         "agent-skills/weather-information/projections/fast_planner.md",
-        "agent-skills/weather-information/projections/deep_planner.md",
     ):
         text = _text(path)
         assert "argument_realization" in text

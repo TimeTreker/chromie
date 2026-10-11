@@ -3077,7 +3077,7 @@ def qualify_planner_capability_payload(
 def planner_contract_diagnostics(
     raw: Any,
     *,
-    planner_tier: PlannerTier,
+    planner_tier: PlannerTier = "fast",
     expected_goal_ids_for_turn: list[str],
 ) -> list[dict[str, Any]]:
     """Collect independent planner-contract defects without short-circuiting.
@@ -3410,7 +3410,7 @@ def planner_contract_diagnostics(
 def validate_planner_model_output(
     raw: dict[str, Any],
     *,
-    planner_tier: PlannerTier,
+    planner_tier: PlannerTier = "fast",
     expected_goal_ids_for_turn: list[str],
 ) -> PlannerModelOutput:
     """Validate the semantic DTO and reject conflicting legacy goal echoes."""

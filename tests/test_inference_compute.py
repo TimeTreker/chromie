@@ -46,8 +46,13 @@ class InferenceComputePolicyTests(unittest.TestCase):
             CognitionComputeClass.CONTINUITY,
         )
         self.assertEqual(
-            compute_class_for_purpose("deep_planner"),
+            compute_class_for_purpose("situational_deliberative_cognition"),
             CognitionComputeClass.DELIBERATIVE,
+        )
+        # The retired Deep Planner purpose has no class of its own any more.
+        self.assertEqual(
+            compute_class_for_purpose("deep_planner"),
+            CognitionComputeClass.INTERACTIVE,
         )
         self.assertEqual(
             compute_class_for_purpose("reflection"),

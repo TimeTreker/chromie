@@ -289,12 +289,15 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             VOCAL_PERFORMANCE_CAPABILITY_ID,
         )
         self.assertEqual(plan.steps[0].args["mode"], "singing")
-        schema = ordinary_plan_schema(model.calls[0][1]["response_format"])
-        vocal_outcome = schema["properties"]["goal_outcomes"]["properties"]["goal-vocal"]
-        self.assertIn(
-            "execute",
-            vocal_outcome["properties"]["disposition"]["enum"],
+        # Before the search loads the provider the Goal can only be reported unavailable;
+        # the second pass, with the provider loaded, may execute it.
+        first_pass, second_pass = (
+            ordinary_plan_schema(call[1]["response_format"])["properties"]["goal_outcomes"]
+            ["properties"]["goal-vocal"]["properties"]["disposition"]["enum"]
+            for call in model.calls
         )
+        self.assertNotIn("execute", first_pass)
+        self.assertIn("execute", second_pass)
 
     def test_provider_vocal_goal_cannot_take_direct_chat_shortcut(self) -> None:
         provider_association = GoalAssociationResolution.model_validate(

@@ -12,7 +12,7 @@ from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
 from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
 from agent.app.goal_association_contract import GoalAssociationModelGoal
-from agent.app.planner_context import planner_provider_media_goal_operations
+from agent.app.planner_context import planner_provider_media_goal_operations, provider_media_goal_ids_without_capability
 from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import canonical_plan_response_schema
 from agent.app.planner_validation import validate_goal_responsibility_outcomes
@@ -267,12 +267,14 @@ class MediaDeclarationAndPlannerTests(unittest.TestCase):
                 authoritative_goals=[media_goal("play")],
             )
 
-    def test_deep_schema_fails_closed_without_exact_media_operation(self) -> None:
+    def test_schema_fails_closed_without_exact_media_operation(self) -> None:
+        loaded = {MEDIA_CAPABILITY_IDS["pause"]}
+        missing = provider_media_goal_ids_without_capability([media_goal("play")], loaded)
+        self.assertEqual(missing, {"goal-media"})
         unavailable = canonical_plan_response_schema(
-            planner_tier="fast",
             expected_goal_ids=["goal-media"],
-            allowed_capability_ids=[MEDIA_CAPABILITY_IDS["pause"]],
-            provider_media_goal_operations={"goal-media": "play"},
+            allowed_capability_ids=sorted(loaded),
+            unavailable_goal_ids=sorted(missing),
         )
         outcome = unavailable["properties"]["goal_outcomes"]["properties"]["goal-media"]
         self.assertNotIn("execute", outcome["properties"]["disposition"]["enum"])
@@ -710,12 +712,15 @@ def test_planner_selects_media_operation_from_complete_intent(operation):
 
 @pytest.mark.parametrize("available", [[MEDIA_CAPABILITY_IDS["pause"]], ["chromie.vocal.perform"], []])
 def test_unknown_media_operation_still_requires_available_media_provider(available):
+    goal = media_goal("play")
+    goal["metadata"].pop("media_operation")
+    missing = provider_media_goal_ids_without_capability([goal], set(available))
+    assert (missing == {"goal-media"}) == (MEDIA_CAPABILITY_IDS["pause"] not in available)
     schema = canonical_plan_response_schema(
-        planner_tier="fast", expected_goal_ids=["goal-media"],
-        allowed_capability_ids=available, provider_media_goal_operations={"goal-media": "none"},
+        expected_goal_ids=["goal-media"], allowed_capability_ids=available,
+        unavailable_goal_ids=sorted(missing),
     )
     dispositions = schema["properties"]["goal_outcomes"]["properties"]["goal-media"]["properties"]["disposition"]["enum"]
-    assert "respond" not in dispositions
     assert ("execute" in dispositions) == (MEDIA_CAPABILITY_IDS["pause"] in available)
 
 

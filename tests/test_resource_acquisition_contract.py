@@ -72,7 +72,6 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "goal_summary": "Fetch and deliver the red mug.",
 
                 "steps": steps,
-                "escalation_reason": "",
                 "unresolved": [],
                 "parameter_resolutions": [],
                 "goal_outcomes": {

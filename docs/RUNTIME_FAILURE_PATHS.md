@@ -20,7 +20,7 @@ This Issue does not convert every broad catch into an error log. It classifies
 why a boundary catches broadly and changes only handlers that were silent,
 ambiguous, or dependent on `assert` for a required invariant.
 
-Deep Planner failure materializers always set `execution_allowed=False` on empty
+Planner failure materializers (`materialize_planner_failure`, `materialize_planner_unavailable`) always set `execution_allowed=False` on empty
 rejected/unavailable Plans and retain the original error and validation feedback.
 The existing Runtime adapter recognizes this as silent non-executable containment;
 it must not invent response text or replace the original failure with a missing-text
@@ -67,10 +67,9 @@ True overflow retains
 `prompt_budget_exceeded` in `llm_budget` and fails before generation. Independently
 bounded owners elsewhere still use `required_json` and retain
 `required_context_over_budget` in `prompt_projection`; they never shorten a required
-payload. Fast/Deep failures remain non-retryable and authorize no execution.
-Canonical Fast uses `contract_failure` containment, so Host cannot invoke Deep to
-repair a technical failure. Deep returns an empty rejected Plan, without invented
-clarification speech. Streaming returns a typed `before_commit` failure.
+payload. Planner failures remain non-retryable and authorize no execution.
+Canonical planning uses `contract_failure` containment: an empty rejected Plan, without
+invented clarification speech, and no other planner repairs it. Streaming returns a typed `before_commit` failure.
 
 Fast's native argument contract requires a source span for a required, unbound
 string enum when none of its choices could be a literal copy from an owning
@@ -82,10 +81,10 @@ the selected span against the immutable input and its owning Responsibility.
 
 This includes rejected Fast Evidence re-entry DTOs, semantic-validation failures,
 and authoritative-grounding mismatches: an exception is not a model-authored
-request for depth. Keep the original failure and zero new Work; only a valid
-semantic delegation can invoke Deep. Compact re-entry projects the existing
+request for depth. Keep the original failure and zero new Work; there is no deeper
+planner to invoke. Compact re-entry projects the existing
 satisfaction bands from their shared contract into its primary prompt and full
-Schema, and exposes actual escalation/no-escalation alternatives to the decoder.
+Schema, and exposes the actual limitation/no-limitation alternatives to the decoder.
 Fractional score bounds stay in full Schema/DTO validation because the deployed
 native float-range compiler rejects some valid interior values. Native acceptance
 therefore remains insufficient evidence of score/status consistency.
@@ -155,10 +154,9 @@ UMI timing relations and provider compatibility before generation. Provider-requ
 vocal sources may bind only the qualified vocal provider with the exact UMI-authored
 supported mode; unavailable/empty catalogs cannot substitute another provider.
 Streaming decision-state alternatives also expose existing execution/delegation
-invariants: execute/respond/mixed have complete accounting, normal outcomes have
-no continuation, and escalation has one Deep continuation and no new Capability
-commitment. Already-committed Work and later Evidence-triggered re-entry are
-unchanged; this does not restrict Deep to execution failures. Full conditional
+invariants: execute/respond/mixed have complete accounting, and an unavailable
+decision carries only `unavailable` Activities and no new Capability commitment.
+Already-committed Work and later Evidence-triggered re-entry are unchanged. Full conditional
 Schema and DTO/Host validation remain independent. Expanding whole
 Fast Work assignments into native branches was rejected after production-schema
 compiler/contrast failures; the retained projection does not select an assignment
@@ -230,8 +228,8 @@ delivery as completion evidence. A body receipt does not enter that join.
 
 The same containment applies to result, provider, time and Situation re-entry:
 returned technical failures and thrown call errors are retained as failed workflow
-stages before adaptation or commitment. A Fast technical failure cannot invoke
-Deep. Genuine semantic escalation still receives its one designated depth pass.
+stages before adaptation or commitment. A technical failure invokes no other
+planner; a genuine limitation is an honest `unavailable` outcome.
 Acceptance inspects these retained failed stages even when the initial turn's
 detached dispatch was already applied; it stops the cohort and marks coverage
 incomplete. Redacted error prose is not interpreted as semantic evidence.
@@ -242,7 +240,7 @@ called, and no partial Plan, Goal outcome or presentation is committed.
 ### evidence failure
 
 `PlannerDTOContractError` preserves the existing `structured_output_validation` /
-`model_contract` classification through Fast/Deep fallback materialization using
+`model_contract` classification through Planner failure materialization using
 the runtime's typed exception metadata protocol. It remains non-retryable at that
 boundary, with `architecture_attribution=not_evaluated`: locating a rejected DTO
 does not identify whether its cause is Schema, context or model inference. Unknown

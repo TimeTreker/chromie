@@ -547,6 +547,7 @@ def canonical_plan_response_schema(
     response_goal_ids: list[str] | None = None,
     nonfulfilling_response_goal_ids: list[str] | None = None,
     confirmation_required_capability_ids: list[str] | None = None,
+    unavailable_goal_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
@@ -569,6 +570,7 @@ def canonical_plan_response_schema(
         response_goal_ids=response_goal_ids,
         nonfulfilling_response_goal_ids=nonfulfilling_response_goal_ids,
         confirmation_required_capability_ids=(confirmation_required_capability_ids),
+        unavailable_goal_ids=unavailable_goal_ids,
     )
     schema["title"] = "FastPlannerModelOutput"
     return schema
@@ -585,6 +587,7 @@ def fast_multi_goal_response_schema(
     nonfulfilling_response_goal_ids: list[str] | None = None,
     effectful_goal_ids: list[str] | None = None,
     confirmation_required_capability_ids: list[str] | None = None,
+    unavailable_goal_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return a decoder-tight, model-authored multi-goal plan schema.
 
@@ -641,6 +644,9 @@ def fast_multi_goal_response_schema(
     response_goal_set = set(response_goal_ids or []).intersection(allowed_goals)
     cancellation_goal_set = set(nonfulfilling_response_goal_ids or []).intersection(allowed_goals)
     effectful_goal_set = set(effectful_goal_ids or []).intersection(allowed_goals)
+    # Goals whose information or resource provider is absent from the supplied contracts
+    # can only be an honest limitation (the former Deep decoder guarantee).
+    unavailable_goal_set = set(unavailable_goal_ids or []).intersection(allowed_goals)
 
     def bound_text(
         owner: dict[str, Any],
@@ -1102,11 +1108,13 @@ def fast_multi_goal_response_schema(
         # Planner keeps the former Deep mixed outcome); bounded so the space stays small.
         per_goal_limitation = ("unavailable",) if len(allowed_goals) <= 4 else ()
         assignment_choices = [
-            (("respond", "clarify")
-             if goal_id in response_goal_set
-             else ("execute",)
-             if goal_id in effectful_goal_set
-             else (("execute",) if requires_execution else ("execute", "respond")))
+            ("unavailable",)
+            if goal_id in unavailable_goal_set
+            else (("respond", "clarify")
+                  if goal_id in response_goal_set
+                  else ("execute",)
+                  if goal_id in effectful_goal_set
+                  else (("execute",) if requires_execution else ("execute", "respond")))
             + per_goal_limitation
             for goal_id in allowed_goals
         ]
@@ -1115,6 +1123,9 @@ def fast_multi_goal_response_schema(
         assignments.append(tuple("unavailable" for _ in allowed_goals))
         for assignment in dict.fromkeys(assignments):
             assignment_set = set(assignment)
+            if any(goal_id in unavailable_goal_set and disposition != "unavailable"
+                   for goal_id, disposition in zip(allowed_goals, assignment, strict=True)):
+                continue
             if "clarify" in assignment_set and "execute" in assignment_set:
                 continue
             if "clarify" in assignment_set and "unavailable" in assignment_set:

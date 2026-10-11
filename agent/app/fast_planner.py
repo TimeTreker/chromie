@@ -41,6 +41,8 @@ from .planner_schema import (
     fast_streaming_advance_response_schema,
 )
 from .planner_context import (
+    planner_provider_vocal_goal_ids,
+    provider_media_goal_ids_without_capability,
     completed_acquisition_goal_ids,
     completed_work_step_evidence,
     trusted_target_prompt_context,
@@ -53,6 +55,8 @@ from .planner_context import (
     situation_source_observations,
 )
 from .planner_validation import (
+    information_goal_ids_without_declared_provider,
+    resource_goal_ids_without_complete_provider_contract,
     information_acquisition_goal_ids,
     normalize_common_planner_output,
     qualify_planner_capability_payload,
@@ -80,9 +84,11 @@ from .planner_fast_validation import (
 from .planner_fallback import materialize_planner_failure, materialize_planner_unavailable
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
     from chromie_contracts.user_turn import user_turn_source_tokens
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+    from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
     from shared.chromie_contracts.user_turn import user_turn_source_tokens
 
 try:
@@ -217,13 +223,19 @@ class FastPlannerResolver:
                 current, catalog, entries = await fast_capability_context(self.catalog, request, loaded_ids)
                 current.context["planner_target_evidence_context"] = trusted_target_prompt_context(current.context)
                 output_modes = {item.output_mode for item in responsibilities}
-                capabilities = [fast_capability_payload(item, include_side_effect_free=True)
+                projected = [fast_capability_payload(item, include_side_effect_free=True)
                     for item in catalog if item.available and item.interaction_executable
                     and is_planner_step_capability(item.capability_id)]
                 capabilities = qualify_capability_catalog_for_output_mode_values(
-                    capabilities,
+                    projected,
                     output_modes=output_modes,
                 )
+                # Contracts the Planner requested through need-first search are components
+                # of its HOW (for example the forecast read before a conditional action);
+                # they are not filtered against the Responsibility's own output mode.
+                qualified_ids = {item["capability_id"] for item in capabilities}
+                capabilities += [item for item in projected if item["capability_id"] in loaded_ids
+                                 and item["capability_id"] not in qualified_ids]
                 if len(capabilities) > self.max_capabilities + len(loaded_ids):
                     raise PlannerDTOContractError("Common capability contracts exceed the configured context budget")
                 loaded_capability_ids = [item["capability_id"] for item in capabilities]
@@ -259,14 +271,14 @@ class FastPlannerResolver:
                         needs_seen = True
                         first_needs = parse_ability_needs(prefix, loaded_capability_ids=loaded_capability_ids)
                         unmet = [item.need for item in first_needs if item.unmet]
+                        # Search everything the Planner did not see, including a common
+                        # contract the Responsibility's output mode filtered out.
                         found = search_capability_library(
-                            unmet, entries, loaded_ids={item.capability_id for item in catalog}) if unmet else []
+                            unmet, entries, loaded_ids=set(loaded_capability_ids)) if unmet else []
                         by_id = {item.capability_id: item for item in entries}
-                        usable = qualify_capability_catalog_for_output_mode_values(
-                            [fast_capability_payload(by_id[key], include_side_effect_free=True) for key in found],
-                            output_modes=output_modes,
-                        )
-                        searched = [item["capability_id"] for item in usable]
+                        # A speech-only turn cannot author a Capability Activity, so nothing loads.
+                        can_work = any(item.output_mode != "speech" for item in responsibilities)
+                        searched = [key for key in found if key in by_id] if can_work else []
                         if searched:
                             # Stop reading: no Plan from this pass is used.
                             break
@@ -406,6 +418,12 @@ class FastPlannerResolver:
             authoritative_goals=authoritative_goals,
             retained_capability_ids=retained_capability_ids,
         )
+        # Need-first contracts the Planner requested are composition components and are
+        # not filtered against the whole Goal (the former Deep composition rule).
+        qualified_ids = {item["capability_id"] for item in capability_payload}
+        capability_payload += [item for item in projected_payload
+                               if item["capability_id"] in set(loaded_capability_ids)
+                               and item["capability_id"] not in qualified_ids]
         multi_goal_contract = len(expected_goal_ids_for_turn) > 1
         evidence_reentry = bool(
             request.planner_reentry_scope is not None
@@ -448,6 +466,28 @@ class FastPlannerResolver:
                 if multi_goal_contract
                 else "FastPlannerModelOutput"
             )
+            unavailable_information = information_goal_ids_without_declared_provider(
+                capability_payload, authoritative_goals=authoritative_goals,
+            ) - reporting_goal_ids
+            unavailable_resource = resource_goal_ids_without_complete_provider_contract(
+                capability_payload, authoritative_goals=authoritative_goals,
+            ) - reporting_goal_ids
+            if request.context.get("verified_tool_memory_index"):
+                # A fresh exact memory entry may satisfy an information Goal through its
+                # original provider contract; Planner and Evidence validation decide.
+                unavailable_resource -= unavailable_information
+                unavailable_information = set()
+            loaded_ids = {item["capability_id"] for item in capability_payload}
+            unavailable_vocal = (
+                planner_provider_vocal_goal_ids(authoritative_goals) - reporting_goal_ids
+                if VOCAL_PERFORMANCE_CAPABILITY_ID not in loaded_ids else set()
+            )
+            unavailable_media = provider_media_goal_ids_without_capability(
+                authoritative_goals, loaded_ids,
+            ) - reporting_goal_ids
+            unavailable_goal_ids = sorted(
+                unavailable_information | unavailable_resource | unavailable_vocal | unavailable_media
+            )
             response_schema = (
                 fast_multi_goal_response_schema(
                     expected_goal_ids=expected_goal_ids_for_turn,
@@ -468,6 +508,7 @@ class FastPlannerResolver:
                         for item in capability_payload
                         if item.get("requires_confirmation")
                     ],
+                    unavailable_goal_ids=unavailable_goal_ids,
                 )
                 if multi_goal_contract
                 else canonical_plan_response_schema(
@@ -486,6 +527,7 @@ class FastPlannerResolver:
                         for item in capability_payload
                         if item.get("requires_confirmation")
                     ],
+                    unavailable_goal_ids=unavailable_goal_ids,
                 )
             )
             response_schema = canonical_resource_argument_response_schema(
@@ -589,14 +631,11 @@ class FastPlannerResolver:
                     unmet = [item.need for item in needs if item.unmet]
                     found = search_capability_library(
                         unmet, indexed_catalog,
-                        loaded_ids={item.capability_id for item in selected_catalog},
+                        loaded_ids={item["capability_id"] for item in capability_payload},
                     ) if unmet and not loaded_capability_ids else []
                     by_id = {item.capability_id: item for item in indexed_catalog}
-                    usable = qualify_planner_capability_payload(
-                        [fast_capability_payload(by_id[key]) for key in found],
-                        authoritative_goals=authoritative_goals,
-                        retained_capability_ids=retained_capability_ids,
-                    ) if found else []
+                    usable = [fast_capability_payload(by_id[key]) for key in found
+                              if key in by_id] if found and not response_only else []
                     if usable:
                         # No Plan from this pass is used; plan once with the found contracts.
                         searched = await self._resolve(
@@ -723,20 +762,23 @@ class FastPlannerResolver:
                 if capability_errors:
                     raise CapabilityArgumentValidationError(capability_errors)
         except ResourceResponsibilityRequiresCompositionError as exc:
-                logger.info(
-                    "fast_planner_resource_composition_required sid=%s error=%s",
+                # The catalog could cover the Goal by composition, but this Plan does not.
+                # That is a Planner defect, not a limitation to report; no second Planner pass.
+                logger.warning(
+                    "fast_planner_resource_composition_incomplete sid=%s error=%s",
                     request.sid,
                     exc,
                 )
-                return materialize_planner_unavailable(
+                return materialize_planner_failure(
                     plan_id,
                     request,
-                    "resource_responsibility_composition_required",
+                    "resource_responsibility_composition_incomplete",
                     unresolved=[str(exc)],
                     metadata={
                         "execution_allowed": False,
                         "resource_composition_required": True,
                     },
+                    error=exc,
                 )
         except Exception as exc:
                 failure = (

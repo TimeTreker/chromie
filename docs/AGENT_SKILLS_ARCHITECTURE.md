@@ -17,7 +17,7 @@ planning, capability execution, and evidence
   location/time/aspect scope, weather memory matching, lookup planning, and
   result interpretation. It declares the grounded method as its parent.
 
-Both packages expose Planner projections for Fast Planner and Deep Planner.
+Both packages expose one Planner projection (`fast_planner`; the Deep Planner projection was retired with the Deep Planner on 2026-10-11).
 Parent metadata informs model-authored composition; the Host does not
 automatically select a parent or domain Skill. Neither package registers or
 executes a Capability. Goal Association does not load domain Agent Skills: its
@@ -106,10 +106,8 @@ Examples include:
 
 - Goal Association: resolve discourse and Goal relationships without Agent Skill
   disclosure;
-- Fast Planner: produce a complete low-latency Plan, exact Communicative
-  Activities, and evidence-bound follow-up when confidence is high;
-- Deep Planner: reason over broader context and alternatives, including exact
-  communicative wording when escalation is necessary.
+- Planner: produce a complete low-latency Plan, word-free communication Needs,
+  evidence-bound follow-up, or an honest limitation naming what is missing.
 
 An Agent is not defined merely by a prompt file. It is defined by its semantic
 responsibility, context boundary, typed output, and place in the cognitive loop.
@@ -278,8 +276,8 @@ through the existing authority path.
 
 ### One semantic authority per turn
 
-Agent Skills do not create sub-planners that compete with Goal Association,
-Fast Planner, or Deep Planner.
+Agent Skills do not create sub-planners that compete with Goal Association or
+the Planner.
 
 A “weather skill” must not independently resolve `那边`, select an old Goal,
 query memory, execute a provider, and compose final speech behind the canonical
@@ -296,7 +294,7 @@ A weather Skill may expose:
 
 | Agent | Projection |
 |---|---|
-| Fast/Deep Planner | Evidence strategy, capability options, freshness, alternatives, failure recovery, exact pre/post-evidence wording, and result relevance |
+| Planner | Evidence strategy, capability options, freshness, alternatives, failure recovery, exact pre/post-evidence wording, and result relevance |
 
 Goal Association intentionally has no Agent Skill projection. Stable semantic
 representation rules such as typed location/time/resource bindings belong to the
@@ -334,8 +332,8 @@ Goal Association result; retained Goals remain available to Goal Association
 for model-authored continuity, but an unrelated terminal Goal cannot contribute
 planner Skill provenance to a new Plan. Exact provenance validation remains
 strict. If the HTTP planner boundary cannot attach a disclosure to the returned
-Plan, it returns a structured non-executable escalation or unavailable Plan
-instead of an unhandled service error.
+Plan, it returns a structured non-executable contract-failure Plan
+(`path_classification=contract_failure`) instead of an unhandled service error.
 
 ### Evidence and provenance
 
@@ -379,7 +377,6 @@ agent-skills/
     projections/
       goal_association.md
       fast_planner.md
-      deep_planner.md
     references/
     examples/
   weather-information/
@@ -388,7 +385,6 @@ agent-skills/
     projections/
       goal_association.md
       fast_planner.md
-      deep_planner.md
     references/
     examples/
 ```
@@ -417,7 +413,6 @@ applicable_information_domains:
   - weather_forecast
 projections:
   fast_planner: projections/fast_planner.md
-  deep_planner: projections/deep_planner.md
 ```
 
 This is now the implemented `skill.yaml` schema. `schema_version`, both
@@ -566,7 +561,7 @@ A cognitive trace should eventually record:
       "version": "1.0.0",
       "projection": "planner",
       "digest": "sha256:...",
-      "selected_by": "deep_planner",
+      "selected_by": "fast_planner",
       "goal_ids": ["goal_weather_neixiang"]
     }
   ]

@@ -6,7 +6,7 @@ description: Select for weather Goals involving location and time scope, rain, p
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
-content_digest: sha256:a8ae09ce0e066aace20b329ac932c9a26e6a68f2c4f6e8741d0a38d96c43dad1
+content_digest: sha256:a42d23d62f1e1f539e573f0ea1b7bfc46d660594eae7d5bbbce5d7d531c51c57
 extends:
   - chromie.grounded-external-information
 required_capabilities:

@@ -26,7 +26,7 @@ Runtime retains validated pre-GA preparation, admits only contract-declared safe
 
 - ASR converts complete PCM utterances to final text.
 - User Meaning Interpretation produces typed WHAT-only goal interpretation decisions and Responsibility candidates.
-- Agent exposes schema-constrained Goal Association, Fast/Deep Work Planning and
+- Agent exposes schema-constrained Goal Association, Work Planning, Value Judgment and
   Social Cognition. SC owns exact Communicative Activity wording and optional
   social expression. Terminal Evidence currently re-enters Planner before SC
   expresses established Needs; independent Goal-bound SC reactivation remains open.
@@ -84,8 +84,8 @@ microphone -> host VAD -> ASR -> Cognitive Gateway
   -> User Meaning Interpretation: complete intent + result type + source evidence + unresolved meaning
   -> same UMI result, concurrent fan-out
        |-> SC: complete interaction + optional expression -> validated delivery
-       |-> Fast Planner: input resolution + exact Capability Work + communication Needs
-       |     `-> Deep Planner only when HOW exceeds the Fast budget
+       |-> Planner: input resolution + exact Capability Work + communication Needs
+       |     `-> unmet ability: need-first library search, one more pass with loaded contracts
        `-> Goal Association: sole canonical Goal commit/version authority
   -> SC acts may include optional auxiliary social expression
   -> bind Activities into one Runtime task-list view per Goal
@@ -129,7 +129,7 @@ SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
 ```
 
 The maintained Host path uses the typed User Meaning Interpretation, Goal Association,
-Fast/Deep Planner, and Trusted Capability Runtime contracts directly. A retired
+the Planner, Value Judgment, and Trusted Capability Runtime contracts directly. A retired
 Agent interaction endpoint is not a semantic rollback surface.
 
 Use `ORCH_ENABLE_SORIDORMI_CAPABILITIES=0` for speech-only rollout. Named body skills
@@ -402,7 +402,7 @@ terminal behavior. Finished sessions also write `session_workflow` and
 `session_workflow_graph` events plus paired JSON/Markdown reports under
 `.chromie/evidence/cognitive-runtime/session-workflows/`. The reports show the
 ASR, Cognitive Gateway, Goal-Driven Cognitive Core, Goal Association,
-Fast/Deep Planner, canonical validation/rejection, Planner communication
+Planner, Value Judgment, canonical validation/rejection, Planner communication
 validation, Trusted
 Capability Runtime, TTS, playback, per-stage input/output, diagnostics, and
 timing observed for that SID. They state whether validation blocked requested
