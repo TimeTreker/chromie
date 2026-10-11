@@ -1098,12 +1098,16 @@ def fast_multi_goal_response_schema(
     # response schema.
     assignment_branches: list[dict[str, Any]] = []
     if 1 <= len(allowed_goals) <= 6:
+        # One Goal may be unavailable while its siblings execute or are answered (the one
+        # Planner keeps the former Deep mixed outcome); bounded so the space stays small.
+        per_goal_limitation = ("unavailable",) if len(allowed_goals) <= 4 else ()
         assignment_choices = [
-            ("respond", "clarify")
-            if goal_id in response_goal_set
-            else ("execute",)
-            if goal_id in effectful_goal_set
-            else (("execute",) if requires_execution else ("execute", "respond"))
+            (("respond", "clarify")
+             if goal_id in response_goal_set
+             else ("execute",)
+             if goal_id in effectful_goal_set
+             else (("execute",) if requires_execution else ("execute", "respond")))
+            + per_goal_limitation
             for goal_id in allowed_goals
         ]
         assignments = list(product(*assignment_choices))
@@ -1112,6 +1116,8 @@ def fast_multi_goal_response_schema(
         for assignment in dict.fromkeys(assignments):
             assignment_set = set(assignment)
             if "clarify" in assignment_set and "execute" in assignment_set:
+                continue
+            if "clarify" in assignment_set and "unavailable" in assignment_set:
                 continue
             if requires_execution and assignment_set == {"respond"}:
                 continue
@@ -1976,10 +1982,20 @@ def fast_advance_response_schema(
             gaps["maxItems"] = min(
                 int(gaps.get("maxItems", 8)), max(1, len(unresolved_meaning))
             )
+    unavailable_contract = definitions.get("FastPlannerUnavailableNeed")
+    if isinstance(unavailable_contract, dict):
+        missing = unavailable_contract.get("properties", {}).get("missing")
+        if isinstance(missing, dict):
+            missing["items"] = {"type": "string", "minLength": 1, "maxLength": 240}
+            missing["description"] = (
+                "What Chromie lacks for this Responsibility now, such as a Capability that the "
+                "loaded and library contracts do not provide. Facts, never wording."
+            )
     for contract_name in (
         "FastPlannerResponseNeed",
         "FastPlannerInputNeed",
         "FastPlannerCapabilityActivity",
+        "FastPlannerUnavailableNeed",
     ):
         contract = definitions.get(contract_name)
         if not isinstance(contract, dict):
@@ -2013,6 +2029,7 @@ def fast_advance_response_schema(
     if isinstance(activity_items, dict) and responsibility_items:
         allowed_activity_contracts = [
             "FastPlannerCapabilityActivity",
+            "FastPlannerUnavailableNeed",
         ]
         if not provider_owned_inputs_complete:
             allowed_activity_contracts.append("FastPlannerInputNeed")

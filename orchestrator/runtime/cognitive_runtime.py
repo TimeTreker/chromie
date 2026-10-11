@@ -3667,7 +3667,8 @@ class GoalDrivenRuntimeCoordinator:
         needs: list[SocialCommunicationNeed] = []
         capability_indexes = [index for index, item in enumerate(advance.activities) if item.role == "capability"]
         for index, activity in enumerate(advance.activities):
-            if activity.role == "capability":
+            # An unavailable Goal's result need is bound from its outcome below.
+            if activity.role in {"capability", "unavailable"}:
                 continue
             activity_goal_ids = list(dict.fromkeys(goal_id for ref in activity.source_responsibility_refs
                                                    for goal_id in refs_to_goals[ref]))
@@ -3702,6 +3703,11 @@ class GoalDrivenRuntimeCoordinator:
                 activity
                 for activity in goal_activities
                 if activity.role == "complete_response"
+            ]
+            limitations = [
+                activity
+                for activity in goal_activities
+                if activity.role == "unavailable"
             ]
             if goal_steps:
                 acquisition_steps = [
@@ -3771,6 +3777,18 @@ class GoalDrivenRuntimeCoordinator:
                         coverage="complete",
                         satisfaction=satisfaction,
                         rationale="No Capability Evidence is required for this Goal.",
+                    )
+                )
+            elif limitations:
+                outcomes.append(
+                    UnavailableGoalPlanOutcome(
+                        goal_id=goal_id,
+                        disposition="unavailable",
+                        coverage="uncertain",
+                        unresolved=list(dict.fromkeys(
+                            item for activity in limitations for item in activity.missing
+                        )),
+                        rationale="The Planner found no currently available way to satisfy this Goal.",
                     )
                 )
             elif advance.disposition == "unavailable":

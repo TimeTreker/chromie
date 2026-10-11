@@ -3513,12 +3513,7 @@ def validate_planner_model_output(
                 raise ValueError("fast clarification aggregate must preserve independent responses")
             if output.steps:
                 raise ValueError("fast clarification must not carry steps")
-        elif "unavailable" in outcome_dispositions:
-            if outcome_dispositions != {"unavailable"}:
-                raise ValueError(
-                    "an unavailable plan must not mix unavailable outcomes "
-                    "with execute or respond outcomes"
-                )
+        elif outcome_dispositions == {"unavailable"}:
             if output.disposition != "unavailable":
                 raise ValueError(
                     "all-unavailable goal outcomes require top-level disposition=unavailable"
@@ -3531,10 +3526,20 @@ def validate_planner_model_output(
                 raise ValueError("an unavailable plan cannot claim exact goal satisfaction")
         elif output.disposition == "unavailable":
             raise ValueError("an unavailable plan requires one unavailable outcome per goal")
-        if output.disposition == "mixed" and outcome_dispositions not in (
-            {"execute", "respond"}, {"respond", "clarify"},
+        if output.disposition == "mixed" and not (
+            outcome_dispositions in ({"execute", "respond"}, {"respond", "clarify"})
+            or ("unavailable" in outcome_dispositions
+                and outcome_dispositions - {"unavailable"} <= {"execute", "respond"}
+                and len(outcome_dispositions) > 1)
         ):
-            raise ValueError("fast mixed output requires independent execute/respond or respond/clarify goals")
+            raise ValueError(
+                "mixed output requires independent execute/respond, respond/clarify, or an "
+                "unavailable Goal beside executed or answered siblings"
+            )
+        if "unavailable" in outcome_dispositions and output.goal_satisfaction is not None and (
+            output.goal_satisfaction.status == "exact"
+        ):
+            raise ValueError("a plan with an unavailable Goal cannot claim exact goal satisfaction")
     for goal_id, outcome in output.goal_outcomes.items():
         if len(expected_goal_id_set) > 1 or output.disposition == "unavailable":
             if outcome.satisfaction is None:

@@ -618,8 +618,35 @@ class FastPlannerInputNeed(BaseModel):
     information_gaps: list[PlannerInformationGap] = Field(min_length=1, max_length=8)
 
 
+class FastPlannerUnavailableNeed(BaseModel):
+    """A Responsibility Chromie cannot fulfil now; SC says so honestly.
+
+    The Planner names what is missing (for example a Capability the loaded and library
+    contracts do not provide); it never authors the words. Sibling Responsibilities in the
+    same decision may still execute or be answered (one Planner, PLANNER-AUTHORITY-001).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    role: Literal["unavailable"]
+    activity_id: str = Field(min_length=1, max_length=160)
+    source_responsibility_refs: list[str] = Field(min_length=1)
+    timing: PlanTiming = "parallel"
+    missing: list[str] = Field(min_length=1, max_length=4)
+
+    @field_validator("missing", mode="before")
+    @classmethod
+    def normalize_missing(cls, value: Any) -> list[str]:
+        items = value if isinstance(value, list) else [value]
+        return [text for item in items if (text := normalize_whitespace(item))]
+
+
 FastPlannerActivity = Annotated[
-    Union[FastPlannerResponseNeed, FastPlannerInputNeed, FastPlannerCapabilityActivity],
+    Union[
+        FastPlannerResponseNeed,
+        FastPlannerInputNeed,
+        FastPlannerCapabilityActivity,
+        FastPlannerUnavailableNeed,
+    ],
     Field(discriminator="role"),
 ]
 
@@ -693,10 +720,15 @@ class FastPlannerAdvance(BaseModel):
         authored_activity_roles = {item.role for item in self.activities}
         if self.disposition == "execute" and "capability" not in authored_activity_roles:
             raise ValueError("executable Fast Planner disposition requires a Capability Activity")
-        if self.disposition == "mixed" and "capability" not in authored_activity_roles and not {
-            "complete_response", "clarification"
-        }.issubset(authored_activity_roles):
-            raise ValueError("mixed Fast Planner requires Capability work or independent response and clarification")
+        if self.disposition == "mixed" and "capability" not in authored_activity_roles and len(
+            authored_activity_roles.intersection({"complete_response", "clarification", "unavailable"})
+        ) < 2:
+            raise ValueError(
+                "mixed Fast Planner requires Capability work or two independent "
+                "response/clarification/unavailable outcomes"
+            )
+        if self.disposition == "unavailable" and authored_activity_roles - {"unavailable"}:
+            raise ValueError("an unavailable Fast Planner decision carries only unavailable Activities")
         if self.disposition == "respond" and not any(
             item.role == "complete_response" for item in self.activities
         ):
@@ -731,9 +763,9 @@ class FastPlannerAdvance(BaseModel):
                 activity_roles_by_ref.setdefault(responsibility_ref, set()).add(activity.role)
         for responsibility_ref, roles in activity_roles_by_ref.items():
             terminal_roles = roles.intersection(
-                {"capability", "complete_response", "clarification"}
+                {"capability", "complete_response", "clarification", "unavailable"}
             )
-            if "clarification" in terminal_roles and len(terminal_roles) > 1:
+            if terminal_roles.intersection({"clarification", "unavailable"}) and len(terminal_roles) > 1:
                 raise ValueError(
                     "one Responsibility cannot have conflicting terminal Fast "
                     f"Planner Activities: {responsibility_ref}={sorted(terminal_roles)}"
