@@ -37,14 +37,36 @@ Evidence (`.chromie/acceptance/need-first-20261010/`):
 Known failures: carried forward from the previous delivery. Absent abilities still escalate
 to a failing Deep until stage B.
 
-Next (stage B):
-1. Remove the Deep Planner: the agent resolver and `/deep-plan`; the Fast `escalate` and
-   `deep_planner` continuation; orchestrator Deep paths, settings and environment
-   variables.
-2. Add an honest Fast unavailable outcome.
-3. Migrate the 20 Deep corpus families (2,000 cases).
-4. Update the remaining Deep docs (~110 mentions in 28 docs).
-5. Then deploy and run a live cohort (the skill-lookup cohort plus the standard cases).
+Value judgment (owner decisions, 2026-10-10; evidence `.chromie/acceptance/value-judgment-20261010/`,
+README.md and VALUE_JUDGMENT_DRAFT.md):
+- The Deep Planner's original intent was deliberate value reasoning ("should I do this?"),
+  not harder planning.
+- Live, the current system applied no values. Executed: design set 3 of 8, held-out 5 of 7
+  "decline" cases (neighbor's parcel, medicine for a 3-year-old, sister's diary, tripping the
+  brother, and others).
+- A separate value-judgment call, v2 prompt (affected and concern before the decision), on
+  unseen requests: 11/11 risky stopped, 2/5 over-cautious asks, 1.5 s. Merging a value_check
+  into the Planner output stopped only 5/11 and took 12-15 s.
+- The owner decided:
+  1. Value judgment v2 carries the Deep intent.
+  2. It triggers only on fetching/moving objects, walking, or approaching/touching people;
+     never on greetings, chat, information or expressive gestures.
+  3. Polite decline with a reason and a safe alternative; ask only when one easy question
+     settles it.
+  4. Add property, privacy and law principles to the Stable Mind.
+  5. The Planner keeps the full Stable Mind.
+- Awaiting owner confirmation of the draft: principle wording (plus optional
+  protect_children), the value-review Capability list, and the VALUE-JUDGMENT-001 Charter
+  text.
+
+Next, in order, after that confirmation:
+1. Stable Mind 0.9.0.
+2. Charter and docs.
+3. Agent value-judgment module.
+4. Orchestrator trigger, effect gating and SC ask/decline.
+5. Stage B Deep removal: Fast escalate becomes an honest unavailable outcome; migrate the 20
+   Deep corpus families (2,000 cases); update about 110 Deep mentions in 28 docs.
+6. Gate; then live cohorts (value 36, skill lookup, standard).
 
 ## Previous delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
 

@@ -27,8 +27,21 @@ Freeze 22 was rebuilt with `.chromie/acceptance/need-first-20261010/{capture22,f
 migrate_small_corpus22}.py` (backups `previous-*`). Not deployed; live is pending stage B.
 Gate observed from a clean worktree (HEAD plus this patch): policies, docs and test ownership
 exit 0. `run_tests.sh` exit 0: 169 / 4,043 / 5 skips / 1,065 subtests / 20 legacy. Stage B is
-paused: on 2026-10-10 the owner raised value/legality deliberation (the original Deep intent),
-to be resolved before Deep is removed.
+paused: on 2026-10-10 the owner raised value/legality deliberation (the original Deep intent);
+see the checkpoint for the decisions.
+
+Deployed on this host after commit: `chromie-agent:stageA-78fb2b871` (rollback
+`chromie-agent:pre-need-first-20261010`), runtime identity `a4d72438…`
+(`.chromie/acceptance/value-judgment-20261010/runtime-identity.json`), and `chromie-llm`
+`03ad9e33`. The Soridormi water scene must be started after a reboot.
+
+Value-judgment evidence: `.chromie/acceptance/value-judgment-20261010/`.
+- Draft: `VALUE_JUDGMENT_DRAFT.md`, awaiting owner confirmation.
+- Prompts: `value_judgment.py`, `_v2.py`, `_v3.py`; merged-into-Planner variant
+  `build_merged.py`.
+- Cohorts: `scenarios/` (20) and `scenarios_heldout/` (16); labels in `oracle.json`.
+- Live bundles: `chromie_debug_bundle_20261010_175400` and `chromie_debug_bundle_20261010_183134`.
+- Scoring: `python3 score_all.py` from that directory.
 
 ## Previous delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
 
