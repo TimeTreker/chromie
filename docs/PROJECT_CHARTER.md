@@ -354,8 +354,9 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   expressive gestures). Its output states who is affected and the concern before the
   decision. Effects of reviewed Capabilities wait for its verdict. On ask they need the
   person's confirmation, and Social Cognition asks the one question that settles the
-  concern. On decline, or when the judgment fails or is unavailable, they never start, and
-  Social Cognition declines politely with the reason. Polite decline is preferred over a
+  concern. On decline, or when the judgment fails or is unavailable, they never start on any
+  Runtime path, Social Cognition declines politely with the reason in the same turn, and the
+  decline never wakes the Planner to work around it. Polite decline is preferred over a
   question that is hard to answer. It is not a reviewer of the Planner's HOW (principles 30
   and 31): the Planner's Plan stands, and Value Judgment only permits, questions or
   withholds reviewed effects. Deterministic Runtime and Soridormi safety remain the floor.

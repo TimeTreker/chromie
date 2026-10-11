@@ -2325,7 +2325,13 @@ class CapabilityRuntime:
                 + ",".join(personal_voice_request_ids)
             )
         prepared_indices: dict[str, list[int]] = {}
+        # A value-withheld effect never joins a prepared or provider-local group: it
+        # runs alone so the pre-start refusal in _run_one applies on every path.
+        withheld = {index for index, (request, _) in enumerate(items)
+                    if request.metadata.get("value_withheld")}
         for index, (request, _) in enumerate(items):
+            if index in withheld:
+                continue
             if request.metadata.get("lane_start_policy") == "prepared_start":
                 identity = str(request.metadata.get("coordination_id") or "").strip()
                 if not identity:
@@ -2334,7 +2340,7 @@ class CapabilityRuntime:
         prepared_members = {index for indices in prepared_indices.values() for index in indices}
         grouped_indices: dict[tuple[str, str], list[int]] = {}
         for index, (request, definition) in enumerate(items):
-            if index in prepared_members:
+            if index in prepared_members or index in withheld:
                 continue
             provider = self._providers[definition.provider_id]
             group_key = self._provider_group_key(request, definition)

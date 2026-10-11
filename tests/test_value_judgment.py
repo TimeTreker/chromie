@@ -198,6 +198,11 @@ def test_full_turn_value_verdict_gates_only_the_reviewed_effect(verdict, confirm
     assert bool(confirmation) is confirm
     if confirm:
         assert confirmation[0].facts["value_question"]["concern"] == "harm_risk"
+    declined = [need for need in needs if need.owner == "runtime" and need.kind == "result"]
+    assert bool(declined) is withheld
+    if withheld:
+        assert declined[0].facts["withheld_capability_ids"] == ["soridormi.walk_forward"]
+        assert declined[0].facts["value_declined"]["decision"] == "decline"
     # Live 2026-10-11 (h_ask_phone_zh): the annotated Plan must archive as the Planner's artifact.
     from orchestrator.runtime.cognitive_runtime import CognitiveEvidenceRecorder
     packets = CognitiveEvidenceRecorder.semantic_artifact_packets(result, sid="sid-vj")
@@ -211,3 +216,33 @@ def test_full_turn_without_reviewed_capability_never_calls_value_judgment():
     assert result.status == "applied" and "value_judgment" not in client.calls
     (walk,) = result.interaction_response.capabilities
     assert not walk.requires_confirmation and "value_withheld" not in walk.metadata
+
+
+def test_withheld_effect_never_joins_a_provider_local_body_group():
+    # Live 2026-10-11 (h_no_coworker_lunch_en): a declined delivery ran inside the compiled
+    # Soridormi body group, which bypassed the single-request pre-start refusal.
+    from tests.test_execution_lanes import _GroupedBodyProvider, _definition
+
+    async def run():
+        registry = CapabilityRegistry()
+        for capability_id, group in (("soridormi.deliver", "hands"), ("soridormi.blink", "eyes"),
+                                     ("soridormi.attend", "head")):
+            registry.register(_definition(capability_id, group=group, resources=[group]))
+        provider = _GroupedBodyProvider()
+        runtime = CapabilityRuntime(registry, max_concurrency=3)
+        runtime.register_provider(provider)
+        verdict = {"decision": "decline", "reason": "That lunch belongs to someone else."}
+        response = InteractionResponse(interaction_id="vj-group", capabilities=[
+            {"request_id": "deliver", "capability_id": "soridormi.deliver", "timing": "parallel",
+             "metadata": {"value_withheld": True, "value_judgment": verdict}},
+            {"request_id": "blink", "capability_id": "soridormi.blink", "timing": "parallel"},
+            {"request_id": "attend", "capability_id": "soridormi.attend", "timing": "parallel"},
+        ])
+        return provider, await submit_and_wait_terminal(runtime, response)
+
+    provider, terminal = asyncio.run(run())
+    assert provider.group_calls == [["blink", "attend"]]
+    assert "deliver" not in [request.request_id for request in provider.calls]
+    by_id = {result.request_id: result for result in terminal.results}
+    assert by_id["deliver"].status == "refused" and by_id["deliver"].reason_code == "value_judgment_declined"
+    assert by_id["blink"].status == by_id["attend"].status == "completed"

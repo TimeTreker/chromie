@@ -5857,6 +5857,20 @@ class GoalDrivenRuntimeCoordinator:
                     metadata={"semantic_owner": "value_judgment", "communication_authority": False},
                 )
                 terminal_plan = apply_value_judgment(terminal_plan, reviewed_ids, value_judgment)
+                withheld_steps = [step for step in terminal_plan.steps if step.metadata.get("value_withheld")]
+                if withheld_steps:
+                    # Chromie's decline is known before dispatch: SC says it now, and the
+                    # refused result never wakes the Planner to work around it.
+                    terminal_plan = CanonicalPlan.model_validate({**terminal_plan.model_dump(),
+                        "communication_needs": [*terminal_plan.communication_needs, SocialCommunicationNeed(
+                            need_id=communication_need_id(terminal_plan.plan_id, "value_declined"),
+                            owner="runtime", kind="result", reference_id=terminal_plan.plan_id,
+                            source_goal_ids=list(dict.fromkeys(
+                                goal_id for step in withheld_steps for goal_id in step.source_goal_ids)),
+                            delivery_phase="immediate",
+                            facts={"value_declined": withheld_steps[0].metadata["value_judgment"],
+                                   "withheld_capability_ids": [step.capability_id for step in withheld_steps]},
+                        )]})
             confirmation_steps = [step for step in terminal_plan.steps
                 if not step.metadata.get("value_withheld")
                 and (self.adapter.interaction_runtime.capability_definition(step.capability_id).requires_confirmation

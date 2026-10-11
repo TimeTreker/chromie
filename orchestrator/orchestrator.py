@@ -6260,6 +6260,9 @@ class VoiceAssistant:
                 continue
             if item.evidence_id in planner_handled_incremental_evidence:
                 continue
+            if item.reason_code == "value_judgment_declined":
+                # Declined by Value Judgment and already communicated; never re-planned.
+                continue
             observation = item.observation
             observation_data = (
                 dict(observation.data)

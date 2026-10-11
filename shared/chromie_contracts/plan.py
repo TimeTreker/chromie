@@ -1419,7 +1419,9 @@ class CanonicalPlan(BaseModel):
         if len(need_ids) != len(set(need_ids)):
             raise ValueError("canonical communication needs must have unique identities")
         for need in self.communication_needs:
-            if need.owner not in {"planner", "runtime"} or (need.owner == "runtime" and need.kind != "confirmation") or need.reference_id != self.plan_id:
+            # Runtime-owned needs are Host facts about this Plan: a confirmation hold, or a
+            # Value Judgment decline result (VALUE-JUDGMENT-001).
+            if need.owner not in {"planner", "runtime"} or (need.owner == "runtime" and need.kind not in {"confirmation", "result"}) or need.reference_id != self.plan_id:
                 raise ValueError("canonical communication need must bind its exact Planner decision")
             positions = {step.step_id: index for index, step in enumerate(self.steps)}
             if set(need.before_step_ids + need.after_step_ids) - set(positions):

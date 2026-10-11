@@ -741,6 +741,19 @@ def validate_social_cognition_output(
         raise ValueError(
             "fresh addressed turn without pending or delivered reply requires acknowledgement"
         )
+    # Acts that already exist (pending or delivered) and the needs they addressed then.
+    previous_need_bindings: dict[str, set[str]] = {}
+    for key in ("events", "already_spoken", "pending_speech"):
+        for row in request.context.get("interaction_context", {}).get(key, []):
+            metadata = row.get("metadata", {})
+            for identity in metadata.get("communicative_activity_ids") or []:
+                addressed = metadata.get("addressed_need_ids")
+                if isinstance(addressed, list):
+                    previous_need_bindings.setdefault(identity, set()).update(
+                        need_id for need_id in addressed if isinstance(need_id, str)
+                    )
+                else:
+                    previous_need_bindings.setdefault(identity, set())
     if _terminal_work_failure_requires_result_update(request):
         required_failure_need_ids = _terminal_failure_need_ids(request)
         if output.disposition != "communicate" or any(
@@ -750,18 +763,6 @@ def validate_social_cognition_output(
             raise ValueError(
                 "terminal requested-Work failure result need must be communicated and covered"
             )
-        previous_need_bindings: dict[str, set[str]] = {}
-        for key in ("events", "already_spoken", "pending_speech"):
-            for row in request.context.get("interaction_context", {}).get(key, []):
-                metadata = row.get("metadata", {})
-                for identity in metadata.get("communicative_activity_ids") or []:
-                    addressed = metadata.get("addressed_need_ids")
-                    if isinstance(addressed, list):
-                        previous_need_bindings.setdefault(identity, set()).update(
-                            need_id for need_id in addressed if isinstance(need_id, str)
-                        )
-                    else:
-                        previous_need_bindings.setdefault(identity, set())
         for act in output.activities:
             newly_addressed = required_failure_need_ids.intersection(act.addressed_need_ids)
             if newly_addressed and act.activity_id in previous_need_bindings and not newly_addressed.issubset(
@@ -834,6 +835,11 @@ def validate_social_cognition_output(
                 raise ValueError("communication omitted its required Responsibility binding")
             if need.kind in {"input", "confirmation"} and act.function != "ask":
                 raise ValueError("an input or confirmation need requires a question")
+            if (need.kind in {"input", "confirmation"} and act.activity_id in previous_need_bindings
+                    and need_id not in previous_need_bindings[act.activity_id]):
+                # Live 2026-10-11 (h_ask_wallet_en): an earlier "Okay." was relabelled as the
+                # confirmation question. A question is asked after its need exists.
+                raise ValueError("a prior communicative act cannot answer a later input or confirmation need")
 
 
 def _social_plan_facts(value: Any) -> Any:
@@ -1058,6 +1064,32 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
     )
 
 
+VALUE_QUESTION_GUARD = (
+    " A confirmation need whose facts carry value_question needs a new short question, asked "
+    "now, about the one fact its concern and reason name, such as whose it is or whether "
+    "someone agreed. An acknowledgement, or a question about where something is, does not ask it."
+)
+VALUE_DECLINE_GUARD = (
+    " A result need whose facts carry value_declined is Chromie's own decision not to do that "
+    "part: say so in first person, politely, with its reason in your own words; offer a safe "
+    "alternative only when one is natural; never call it a system, technical or permission failure."
+)
+
+
+def _social_value_judgment_guard(request: SocialCognitionRequest) -> str:
+    """Guidance present only when Value Judgment facts are (VALUE-JUDGMENT-001)."""
+
+    facts = [need.facts for need in request.communication_needs if isinstance(need.facts, dict)]
+    asks = any(item.get("value_question") for item in facts)
+    declines = any(item.get("value_declined") for item in facts)
+    if not (asks or declines):
+        return ""
+    return (
+        "\nValue Judgment guard: Chromie's own conscience paused part of this Work."
+        + (VALUE_QUESTION_GUARD if asks else "") + (VALUE_DECLINE_GUARD if declines else "") + "\n"
+    )
+
+
 def social_cognition_prompt(
     request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, num_ctx: int,
 ) -> str:
@@ -1161,7 +1193,8 @@ class SocialCognitionResolver:
             prompt + "\nRequired output contract JSON:\n" + required_json(
                 schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
             ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT
-            + _social_current_turn_output_guard(request), system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
+            + _social_current_turn_output_guard(request) + _social_value_judgment_guard(request),
+            system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
                 "This is the sole deeper pass; decide communicate or silence now." if deep else ""
             ),
             options={"temperature": 0, "top_p": 0.9, "num_ctx": self.num_ctx,

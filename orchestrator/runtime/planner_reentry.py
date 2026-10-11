@@ -228,6 +228,10 @@ def terminal_evidence_relevance(
         for item in goal_bindings
         if str(item.get("goal_id") or "").strip()
     }
+    if evidence.reason_code == "value_judgment_declined":
+        # Value Judgment decided not to act and SC already declined; a re-plan would
+        # route around that authority (VALUE-JUDGMENT-001).
+        return False, "value_judgment_declined"
     if not evidence.source_goal_ids:
         return False, "source_goal_binding_missing"
     for goal_id in evidence.source_goal_ids:

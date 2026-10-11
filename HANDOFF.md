@@ -60,6 +60,18 @@ identity at the new revision before the full cohort. Lineage-fix verification: s
 Fix gate from a clean worktree (`cfafb7d9b` plus the fix): policies, docs and test ownership exit
 0; `run_tests.sh` exit 0: 169 / 4,060 / 5 skips / 1,065 subtests / 20 legacy.
 
+Run 2 evidence: `$E/live/`, `$E/live.log`, `$E/bundle/` (incomplete: simulator crash at case 23;
+`python3 adjudicate.py live bundle 23`). SC qualification: `$E/sc_guard/` (`run_arm.py`, oracle,
+arms A/B). The fix commit changes the Agent (SC), so rebuild and redeploy it before run 3. Restart
+the scene with the same `run_scenario.sh` command, then `docker restart soridormi-runtime-mcp` and
+wait for "Scenario clock reset" in the runner log.
+
+Run 2 fix gate from a clean worktree (`38a5d2160` plus the fix): policies, docs and test ownership
+exit 0; `run_tests.sh` exit 0: 169 / 4,063 / 5 skips / 1,065 subtests / 20 legacy.
+
+Stage B (Deep Planner removal) is in progress on branch `deep-removal` (worktree under the session
+scratchpad; plan in `.chromie/acceptance/deep-removal-20261011/PLAN.md`). Its WIP commit is local only.
+
 ## Previous delivery — Need-first Planner (stage A), 2026-10-10
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `08c93650d`.

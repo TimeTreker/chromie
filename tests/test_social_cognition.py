@@ -2582,3 +2582,38 @@ def test_social_projection_keeps_one_exact_memory_mirror_and_preserves_distinct_
     else:
         assert projected["session_memory"]["recent_tool_evidence"] == older
     assert context == original
+
+
+def test_value_question_needs_a_new_question_and_guard_only_with_value_facts():
+    # Live 2026-10-11 (h_ask_wallet_en): SC relabelled its earlier "Okay." as the value
+    # confirmation question; v_ask_bag_zh asked where the bag was instead of whose it was.
+    from agent.app.social_cognition import (
+        VALUE_QUESTION_GUARD, social_cognition_prompt, validate_social_cognition_output,
+    )
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    verdict = {"affected": "owner_unknown", "concern": "others_property", "decision": "ask",
+               "reason": "Chromie does not know whose wallet it is."}
+    need = SocialCommunicationNeed(
+        need_id="need:confirm", owner="runtime", kind="confirmation", source_goal_ids=["goal:1"],
+        reference_id="plan:1", delivery_phase="pre_action",
+        facts={"provider_confirmation_steps": [], "value_question": verdict},
+    )
+    spoken = {"interaction_context": {"already_spoken": [{
+        "text": "Okay.", "metadata": {"communicative_activity_ids": ["ack"], "addressed_need_ids": []}}]}}
+    current = request(communication_needs=[need], context={**request().context, **spoken})
+    old_ack = response(activity_id="ack", text="Okay.", function="ask", addressed_need_ids=[need.need_id])
+    old_ack["need_outcomes"] = {need.need_id: "covered"}
+    with pytest.raises(ValueError, match="prior communicative act cannot answer"):
+        validate_social_cognition_output(SocialCognitionOutput.model_validate(old_ack), current, [])
+    question = response(activity_id="ask-owner", text="Is that wallet yours?", function="ask",
+                        addressed_need_ids=[need.need_id])
+    question["need_outcomes"] = {need.need_id: "covered"}
+    validate_social_cognition_output(SocialCognitionOutput.model_validate(question), current, [])
+
+    from agent.app.social_cognition import _social_value_judgment_guard
+    assert VALUE_QUESTION_GUARD in _social_value_judgment_guard(current)
+    plain = need.model_copy(update={"facts": {"provider_confirmation_steps": []}})
+    assert _social_value_judgment_guard(request(communication_needs=[plain])) == ""
+    assert "Value Judgment guard" not in social_cognition_prompt(request(), [], num_ctx=4096)

@@ -338,6 +338,17 @@ def test_terminal_evidence_relevance_rejects_superseded_plan() -> None:
     ) == (False, "canonical_plan_superseded")
 
 
+def test_value_declined_evidence_never_authorizes_a_replan() -> None:
+    # Live 2026-10-11 (h_no_shower_zh): after a value decline the Planner re-planned and
+    # asked for "another way", routing around Value Judgment (VALUE-JUDGMENT-001).
+    evidence = _evidence().model_copy(update={"status": "refused", "reason_code": "value_judgment_declined"})
+    assert terminal_evidence_relevance(
+        source_response=_response(),
+        evidence=evidence,
+        goal_bindings=_current_binding(),
+    ) == (False, "value_judgment_declined")
+
+
 def test_planner_reentry_selects_only_goal_bound_responsibility() -> None:
     responsibilities = planner_reentry_responsibilities(
         source_response=_response(),
