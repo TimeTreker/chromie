@@ -80,6 +80,11 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS
 
 
+# Owner decision 2026-10-10 (option A): the Planner reasons with the full Stable Mind,
+# including every core principle. The full owner-approved projection is about 5.5k
+# characters; the default bound kept only four principles.
+PLANNER_STABLE_MIND_MAX_CHARS = 8000
+
 CAPABILITY_NEED_PROMPT = (
     "You have complete contracts for the loaded common Capabilities and an index of the "
     "available library. Before authoring Work, write ability_needs: each distinct ability the "
@@ -478,7 +483,7 @@ def _canonical_work_prompt(
     sections = [
         "Owner-approved Chromie identity JSON:\n" + bounded_identity_json(context) + "\n\n",
         "Owner-approved Personality Expression JSON:\n" + bounded_personality_json(context) + "\n\n",
-        "Owner-approved Stable Mind worldview/values JSON:\n" + bounded_stable_mind_json(context) + "\n\n",
+        "Owner-approved Stable Mind worldview/values JSON:\n" + bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS) + "\n\n",
         IDENTITY_SEMANTIC_CONTRACT, PERSONALITY_SEMANTIC_CONTRACT, STABLE_MIND_SEMANTIC_CONTRACT,
         EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
         agent_skill_prompt_section(context, agent_role=tier + "_planner"),
@@ -987,7 +992,7 @@ def fast_advance_layered_prompt(
         + (FAST_SITUATION_SOURCE_PROMPT if observed_sources else "") + CAPABILITY_NEED_PROMPT
         + "\nOwner-approved Chromie identity JSON:\n" + bounded_identity_json(context)
         + "\nOwner-approved Personality Expression JSON:\n" + bounded_personality_json(context)
-        + "\nOwner-approved Stable Mind JSON:\n" + bounded_stable_mind_json(context)
+        + "\nOwner-approved Stable Mind JSON:\n" + bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS)
         + "\n" + IDENTITY_SEMANTIC_CONTRACT + PERSONALITY_SEMANTIC_CONTRACT + STABLE_MIND_SEMANTIC_CONTRACT
         + agent_skill_prompt_section(context, agent_role="fast_planner")
         + trusted_target_evidence_prompt_section(context)
@@ -1204,7 +1209,7 @@ def fast_layered_prompt(
         "Owner-approved Personality Expression JSON:\n"
         f"{bounded_personality_json(context)}\n\n"
         "Owner-approved Stable Mind worldview/values JSON:\n"
-        f"{bounded_stable_mind_json(context)}\n\n"
+        f"{bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS)}\n\n"
     )
     capability_contract = (
         agent_skill_prompt_section(context, agent_role="fast_planner")
@@ -1264,7 +1269,7 @@ def deep_layered_prompt(
         "Owner-approved Personality Expression JSON:\n"
         f"{bounded_personality_json(context)}\n\n"
         "Owner-approved Stable Mind worldview/values JSON:\n"
-        f"{bounded_stable_mind_json(context)}\n\n"
+        f"{bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS)}\n\n"
     )
     capability_contract = (
         agent_skill_prompt_section(context, agent_role="deep_planner")

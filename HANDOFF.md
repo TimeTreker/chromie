@@ -1,6 +1,55 @@
 # Chromie Handoff
 
-## Current delivery — Need-first Planner (stage A), 2026-10-10
+## Current delivery — Value Judgment (VALUE-JUDGMENT-001), 2026-10-11
+
+Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `1b7afb9ff`. The
+expected resume revision is the latest commit containing this file. Evidence:
+`.chromie/acceptance/value-judgment-impl-20261011/` (design evidence in
+`.chromie/acceptance/value-judgment-20261010/`).
+
+Changed:
+- Code: `agent/app/{value_judgment,main,inference_compute,planner_prompt}.py`,
+  `shared/chromie_contracts/value_judgment.py`, `orchestrator/clients/agent_client.py`,
+  `orchestrator/orchestrator.py`, `orchestrator/runtime/{cognitive_runtime,capability_runtime}.py`.
+- Config: `config/mind/chromie_default.json` (0.9.0), `capabilities/value_review.json`,
+  `config/runtime_exception_boundaries.json`.
+- Tests: `tests/test_value_judgment.py`, `tests/test_mind_profile.py`,
+  `tests/test_cognitive_identity_context.py`.
+- Docs: `docs/{PROJECT_CHARTER,API_REFERENCE,CONFIGURATION,STATUS}.md`, this file and the
+  checkpoint.
+
+Verification:
+
+```bash
+python -m pytest -q tests/test_value_judgment.py tests/test_mind_profile.py tests/test_cognitive_identity_context.py
+# canonical gate from a clean worktree (the main checkout contains a peer's .claude/worktrees/):
+git worktree add --detach <tmp>/gate HEAD && (cd <tmp>/gate && python scripts/check_repository_policies.py && python scripts/check_docs.py && python scripts/check_test_ownership.py && ./scripts/run_tests.sh)
+```
+
+Gate observed from a clean worktree (HEAD `1b7afb9ff` plus this patch): policies, docs and
+test ownership exit 0. `run_tests.sh` exit 0: 169 / 4,060 / 5 skips / 1,065 subtests / 20
+legacy. Strict replay is unaffected: the replay harness runs with an empty value-review list,
+and neither the SC prompt nor any corpus request changed.
+
+Deploy and live cohort (after this commit; the water scene must be running):
+
+```bash
+docker tag chromie-agent:latest chromie-agent:pre-value-judgment-20261011     # rollback = stageA-78fb2b871
+docker build -q -f .chromie/acceptance/provider-source-branches-20261009/AgentDockerfile -t chromie-agent:vj-$(git rev-parse --short HEAD) .
+docker tag chromie-agent:vj-$(git rev-parse --short HEAD) chromie-agent:latest
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent --output .chromie/acceptance/value-judgment-impl-20261011/runtime-identity.json
+docker restart chromie-llm     # fresh SGLang lifetime before the cohort
+E=.chromie/acceptance/value-judgment-impl-20261011
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root $E/scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity $E/runtime-identity.json --evidence-dir $E/live
+./scripts/collect_debug_bundle.sh      # once, after the cohort; copy into $E/bundle
+(cd $E && python3 adjudicate.py live bundle)
+```
+
+`$E/scenarios/` holds the 20 design and 16 held-out cases; `oracle.json` holds the labels
+declared on 2026-10-10.
+
+## Previous delivery — Need-first Planner (stage A), 2026-10-10
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `08c93650d`.
 Evidence: `.chromie/acceptance/need-first-20261010/` (README.md). The expected resume revision
@@ -36,7 +85,7 @@ Deployed on this host after commit: `chromie-agent:stageA-78fb2b871` (rollback
 `03ad9e33`. The Soridormi water scene must be started after a reboot.
 
 Value-judgment evidence: `.chromie/acceptance/value-judgment-20261010/`.
-- Draft: `VALUE_JUDGMENT_DRAFT.md`, awaiting owner confirmation.
+- Draft: `VALUE_JUDGMENT_DRAFT.md`, treated as approved on 2026-10-11.
 - Prompts: `value_judgment.py`, `_v2.py`, `_v3.py`; merged-into-Planner variant
   `build_merged.py`.
 - Cohorts: `scenarios/` (20) and `scenarios_heldout/` (16); labels in `oracle.json`.

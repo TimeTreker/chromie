@@ -3014,6 +3014,30 @@ class CapabilityRuntime:
                         },
                     )
                 )
+            elif request.metadata.get("value_withheld"):
+                # Value Judgment declined (or could not judge) this effect; the provider
+                # never starts. Social Cognition explains the refusal from its reason.
+                verdict = request.metadata.get("value_judgment") or {}
+                finished_at = datetime.now(timezone.utc)
+                prestart_result = CapabilityResult(
+                    request_id=request.request_id,
+                    capability_id=request.capability_id,
+                    capability_version=definition.version,
+                    status="refused",
+                    provider_id=definition.provider_id,
+                    reason_code="value_judgment_declined",
+                    message=str(verdict.get("reason") or "Value Judgment withheld this effect."),
+                    output={"value_judgment": verdict},
+                    trace_id=trace.trace_id,
+                    started_at=trace.started_at,
+                    finished_at=finished_at,
+                )
+                trace.status = "refused"
+                trace.finished_at = finished_at
+                trace.events.append(CapabilityTraceEvent(
+                    type="refused", message=prestart_result.message,
+                    data={"reason_code": "value_judgment_declined"},
+                ))
             else:
                 task = asyncio.create_task(invoke())
                 self._active[active_key] = (task, request, definition, context)
@@ -3023,7 +3047,7 @@ class CapabilityRuntime:
                 interaction_id=interaction_id,
                 request=request,
                 definition=definition,
-                event_type="cancelled",
+                event_type="refused" if prestart_result.status == "refused" else "cancelled",
                 message=prestart_result.message or None,
                 result=prestart_result,
             )

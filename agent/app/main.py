@@ -86,11 +86,14 @@ from .fast_planner import FastPlannerResolver
 from .social_cognition import SocialCognitionResolver
 from .deep_planner import DeepPlannerResolver
 from .reflection import ReflectionResolver
+from .value_judgment import ValueJudgmentResolver
 try:
     from chromie_contracts.reflection import ReflectionRequest
+    from chromie_contracts.value_judgment import ValueJudgmentResult
     from chromie_contracts.social_cognition import SocialCognitionRequest
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.reflection import ReflectionRequest
+    from shared.chromie_contracts.value_judgment import ValueJudgmentResult
     from shared.chromie_contracts.social_cognition import SocialCognitionRequest
 from .schema import HealthResponse
 from .cognitive_core.user_meaning_interpreter import (
@@ -411,6 +414,23 @@ deep_planner_resolver = (
     if deep_planner_client is not None
     else None
 )
+# Value Judgment shares the Fast Planner's model service and deadline: one short call that
+# gates value-reviewed effects (owner amendment 2026-10-10).
+value_judgment_client = (
+    build_model_client(
+        model=settings.fast_planner_model,
+        timeout_ms=settings.fast_planner_timeout_ms,
+        purpose="value_judgment",
+        service_settings=settings,
+    )
+    if settings.use_llm and settings.fast_planner_enabled
+    else None
+)
+value_judgment_resolver = (
+    ValueJudgmentResolver(value_judgment_client, num_ctx=settings.fast_planner_num_ctx)
+    if value_judgment_client is not None
+    else None
+)
 reflection_client = (
     build_model_client(
         model=settings.deep_planner_model,
@@ -671,6 +691,13 @@ async def resolve_social_cognition(request: SocialCognitionRequest):
         raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/value-judgment", response_model=ValueJudgmentResult)
+async def resolve_value_judgment(request: CognitiveWorkRequest):
+    if value_judgment_resolver is None:
+        raise HTTPException(status_code=503, detail="Value Judgment is disabled")
+    return await value_judgment_resolver.resolve(request)
 
 
 @app.post("/reflection")

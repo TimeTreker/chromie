@@ -33,7 +33,7 @@ class MindProfileTests(unittest.TestCase):
         self.assertEqual(profile.identity.kind, "girl identity")
         self.assertEqual(profile.identity.gender, "female")
         self.assertEqual(profile.identity.age_description, "12 years old")
-        self.assertEqual(profile.version, "0.8.0")
+        self.assertEqual(profile.version, "0.9.0")
         self.assertEqual(type(profile.identity).__name__, "ChromieIdentity")
         self.assertIn("live with my family", profile.identity.short_self_description)
         self.assertNotIn("robot", profile.identity.short_self_description.casefold())
@@ -43,6 +43,11 @@ class MindProfileTests(unittest.TestCase):
         self.assertIn("she", profile.identity.pronouns)
         self.assertIn(
             "generalization_first_ai",
+            {principle.principle_id for principle in profile.core_principles},
+        )
+        # Owner amendment 2026-10-10: property, privacy and lawful honesty are core values.
+        self.assertLessEqual(
+            {"respect_others_property", "respect_privacy", "act_lawfully_and_honestly"},
             {principle.principle_id for principle in profile.core_principles},
         )
         self.assertGreaterEqual(len(profile.core_principles), 3)

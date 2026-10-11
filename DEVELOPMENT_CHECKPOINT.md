@@ -1,6 +1,59 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Need-first Planner (stage A), 2026-10-10
+## Current delivery — Value Judgment (VALUE-JUDGMENT-001), 2026-10-11
+
+Base: `origin/main` `1b7afb9ff`. On 2026-10-11 the owner said "go on with the unfinished",
+which this delivery treats as approval of `VALUE_JUDGMENT_DRAFT.md`. `protect_children` stays
+out because the owner left it optional and undecided.
+
+Observed (live, 2026-10-10): Chromie applied no values. 3 of 8 design-set and 5 of 7 held-out
+"decline" cases executed (neighbor's parcel, medicine for a 3-year-old, sister's diary,
+tripping the brother, and others). The Planner prompt had the Stable Mind, but its
+projection kept only 4 of 10 principles and the Planner did not use them.
+
+| Order | Module / owner | Actual (before) | Expected | Verdict |
+|---|---|---|---|---|
+| 1 | Stable Mind (owner config) | no property, privacy or law principle | owner-approved principles | missing (contributing) |
+| 2 | Planner prompt projection | 2,600-character bound kept 4 principles | full projection (owner decision A) | incorrect |
+| 3 | Planner (HOW authority) | plans the effect; no "should I act" decision | plans HOW only (P30/31) | correct by contract |
+| 4 | Value authority | none (the Deep Planner's original intent was never built) | one "should I act" judgment before effects | missing (earliest) |
+| 5 | Runtime dispatch | starts the effect | waits for proceed; refuses on decline | symptom of 4 |
+
+Repair:
+- `config/mind/chromie_default.json` 0.9.0: three high-priority, owner-approval principles.
+- `agent/app/planner_prompt.py`: `PLANNER_STABLE_MIND_MAX_CHARS = 8000` for every Planner
+  projection.
+- New contract `shared/chromie_contracts/value_judgment.py`. New resolver
+  `agent/app/value_judgment.py` (v2 prompt, fail closed). New endpoint `POST /value-judgment`
+  (INTERACTIVE compute class).
+- New owner list `capabilities/value_review.json`, loaded by the Orchestrator into
+  `CognitiveRuntimePolicy.value_review_capability_ids`.
+- `cognitive_runtime.py`: one call after the final Plan, before confirmation.
+  `apply_value_judgment` annotates only the reviewed steps (ask → Runtime confirmation plus
+  `value_question`; decline/failed → `value_withheld`). The adapter never offers a withheld
+  step for confirmation.
+- `capability_runtime.py`: a withheld request is refused before provider start
+  (`value_judgment_declined`, with the verdict reason as the message).
+- Charter VALUE-JUDGMENT-001; API reference; configuration; two fail-closed handlers
+  classified in `config/runtime_exception_boundaries.json`.
+
+Workflow after the fix (walk, fetch or touch request): UMI → GA → Planner (unchanged) → Host
+validation → **Value Judgment** (one call, reviewed Capabilities only) → confirmation /
+dispatch → Runtime (withheld effects refused before start) → Evidence → SC words the
+question or the refusal. Turns without a reviewed Capability (greetings, chat, information,
+expressive gestures) make no extra call.
+
+Not changed: the SC prompt, pending live evidence of how SC words a value refusal or
+question. Changing it requires a strict-replay re-freeze, because every SC request embeds the
+system prompt.
+
+Evidence: `tests/test_value_judgment.py` (16 passed). Canonical gate: see HANDOFF. Live
+cohort (36 cases, labels declared 2026-10-10): pending deployment.
+
+Known gaps: the replay corpus has no value-gate coverage (empty review list); the Deep
+Planner still runs on Fast escalation (stage B next).
+
+## Previous delivery — Need-first Planner (stage A), 2026-10-10
 
 Base: `origin/main` `08c93650d`. The owner approved the Charter draft and its implementation
 on 2026-10-10. Stage A is this commit; stage B (Deep removal) follows on the same delivery
@@ -55,9 +108,7 @@ README.md and VALUE_JUDGMENT_DRAFT.md):
      settles it.
   4. Add property, privacy and law principles to the Stable Mind.
   5. The Planner keeps the full Stable Mind.
-- Awaiting owner confirmation of the draft: principle wording (plus optional
-  protect_children), the value-review Capability list, and the VALUE-JUDGMENT-001 Charter
-  text.
+- The draft was treated as approved on 2026-10-11 (see the current delivery).
 
 Next, in order, after that confirmation:
 1. Stable Mind 0.9.0.

@@ -25,6 +25,7 @@ from shared.chromie_contracts.plan import (
 )
 from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
+from shared.chromie_contracts.value_judgment import ValueJudgmentResult
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
@@ -254,6 +255,38 @@ class AgentClient:
             runtime_tracer.merge_fragment_from_metadata(result.metadata)
             span.set_attribute("disposition", result.disposition)
             span.set_attribute("step_count", len(result.steps))
+            return result
+
+    async def resolve_value_judgment(
+        self,
+        session: aiohttp.ClientSession,
+        *,
+        request: CognitiveWorkRequest,
+        timeout_ms: int | None = None,
+    ) -> ValueJudgmentResult:
+        """Ask whether Chromie should act on this turn; never how (owner amendment 2026-10-10)."""
+        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE,
+            operation="resolve_value_judgment",
+            kind="tool_call",
+            attributes={"endpoint": "/value-judgment", "timeout_ms": effective_timeout_ms},
+        ) as span:
+            req = request.model_copy(update={"context": runtime_tracer.inject_carrier(request.context)})
+            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
+            async with session.post(
+                f"{self.base_url}/value-judgment",
+                json=req.model_dump(mode="json"),
+                timeout=timeout,
+            ) as resp:
+                body = await resp.text()
+                span.set_attribute("http_status", resp.status)
+                if resp.status != 200:
+                    raise RuntimeError(
+                        f"Agent value-judgment endpoint returned HTTP {resp.status}: {body[:500]}"
+                    )
+                result = ValueJudgmentResult.model_validate_json(body)
+            span.set_attribute("status", result.status)
             return result
 
     async def resolve_deep_plan(

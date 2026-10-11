@@ -43,6 +43,7 @@ from shared.chromie_contracts.interaction import (
     validate_output_schema_declaration,
 )
 from shared.chromie_contracts.reflection import ReflectionResolution
+from shared.chromie_contracts.value_judgment import ValueJudgmentResult
 from shared.chromie_contracts.semantic_artifact import (
     SemanticArtifactKind,
     SemanticArtifactLineage,
@@ -151,6 +152,40 @@ class CognitiveRuntimePolicy:
     goal_association_timeout_ms: int = 3500
     fast_planner_timeout_ms: int = 3000
     deep_planner_timeout_ms: int = 10000
+    # Capabilities whose effects need a Value Judgment proceed verdict before dispatch
+    # (owner-editable capabilities/value_review.json). Empty means no value gate.
+    value_review_capability_ids: frozenset[str] = frozenset()
+
+
+def apply_value_judgment(
+    plan: CanonicalPlan, reviewed_ids: set[str], result: ValueJudgmentResult,
+) -> CanonicalPlan:
+    """Annotate value-reviewed steps with the verdict; the Planner's Plan itself stands.
+
+    proceed leaves the effects free; ask makes them need the person's confirmation; decline
+    or a failed judgment withholds them, so Runtime refuses them before provider start.
+    """
+    judgment = result.judgment
+    verdict = {
+        "status": result.status,
+        "decision": judgment.decision if judgment is not None else "decline",
+        "concern": judgment.concern if judgment is not None else "none",
+        "affected": judgment.affected if judgment is not None else "nobody_else",
+        "reason": judgment.reason if judgment is not None else "Chromie could not judge this request safely right now.",
+        "failure_class": result.failure_class,
+    }
+    steps = []
+    for step in plan.steps:
+        metadata = dict(step.metadata)
+        if step.capability_id in reviewed_ids:
+            metadata["value_judgment"] = verdict
+            if verdict["decision"] == "ask":
+                metadata["value_confirmation_required"] = True
+            elif verdict["decision"] == "decline":
+                metadata["value_withheld"] = True
+        steps.append(step.model_copy(update={"metadata": metadata}))
+    return CanonicalPlan.model_validate({**plan.model_dump(), "steps": [step.model_dump() for step in steps],
+        "metadata": {**plan.metadata, "value_judgment": {**verdict, "reviewed_capability_ids": sorted(reviewed_ids)}}})
 
 
 def _core_semantic_lineage(
@@ -271,6 +306,8 @@ class CognitiveAgentClient(Protocol):
     async def resolve_fast_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
     async def resolve_deep_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
+
+    async def resolve_value_judgment(self, session: Any, **kwargs: Any) -> ValueJudgmentResult: ...
 
     async def resolve_reflection(
         self, session: Any, **kwargs: Any
@@ -1723,7 +1760,9 @@ class CanonicalPlanRuntimeAdapter:
         if not alternative:
             for step in plan.steps:
                 definition = self.interaction_runtime.capability_definition(step.capability_id)
-                if definition.requires_confirmation:
+                if step.metadata.get("value_withheld"):
+                    continue
+                if definition.requires_confirmation or step.metadata.get("value_confirmation_required"):
                     confirmation_goal_ids.update(step.source_goal_ids)
 
         response_plan = planner_response.response_plan
@@ -2321,7 +2360,10 @@ class CanonicalPlanRuntimeAdapter:
                     timing="parallel" if safe_read_parallel else step.timing,
                     timeout_ms=definition.timeout_ms,
                     cancellable=definition.interruptible,
-                    requires_confirmation=(bool(definition.requires_confirmation) or alternative),
+                    # A value-withheld effect is refused before start, never offered for confirmation.
+                    requires_confirmation=not step.metadata.get("value_withheld") and (
+                        bool(definition.requires_confirmation) or alternative
+                        or bool(step.metadata.get("value_confirmation_required"))),
                     idempotency_key=f"{plan.plan_id}:{step.step_id}:{fingerprint[:16]}",
                     committed_output_schema_sha256=output_schema_sha256(definition.output_schema),
                     committed_completion_evidence_sha256=(
@@ -3076,6 +3118,19 @@ class GoalDrivenRuntimeCoordinator:
                 exc,
             )
             return
+
+    async def _resolve_value_judgment(
+        self, session: Any, request: CognitiveWorkRequest,
+    ) -> ValueJudgmentResult:
+        try:
+            return await self.agent_client.resolve_value_judgment(
+                session, request=request, timeout_ms=self.policy.fast_planner_timeout_ms,
+            )
+        except Exception as exc:  # noqa: BLE001 - a failed judgment withholds reviewed effects
+            logger.warning("value_judgment_unavailable sid=%s error_type=%s error=%s",
+                           request.sid, type(exc).__name__, str(exc)[:300])
+            return ValueJudgmentResult(status="failed", failure_class="value_judgment_unavailable",
+                                       reason=str(exc)[:500])
 
     async def _observe_workflow_stage(
         self,
@@ -5761,15 +5816,36 @@ class GoalDrivenRuntimeCoordinator:
                 fast_planner_path = "terminal"
 
             await self.adapter.interaction_runtime.ensure_capability_definitions([step.capability_id for step in terminal_plan.steps])
+            # Value Judgment (owner amendment 2026-10-10): whether Chromie should act, never how.
+            # It runs once, only when the final Plan uses a value-reviewed Capability. Its
+            # verdict permits, questions or withholds those effects; the Plan itself stands.
+            value_judgment: ValueJudgmentResult | None = None
+            reviewed_ids = {step.capability_id for step in terminal_plan.steps} & self.policy.value_review_capability_ids
+            if reviewed_ids and self.policy.mode == "apply":
+                value_judgment = await self._observe_workflow_stage(
+                    sid=sid,
+                    stage="value_judgment",
+                    input_payload={"user_text": text, "reviewed_capability_ids": sorted(reviewed_ids)},
+                    operation=self._resolve_value_judgment(
+                        session, work_request.model_copy(update={"context": planning_context})
+                    ),
+                    metadata={"semantic_owner": "value_judgment", "communication_authority": False},
+                )
+                terminal_plan = apply_value_judgment(terminal_plan, reviewed_ids, value_judgment)
             confirmation_steps = [step for step in terminal_plan.steps
-                if self.adapter.interaction_runtime.capability_definition(step.capability_id).requires_confirmation]
+                if not step.metadata.get("value_withheld")
+                and (self.adapter.interaction_runtime.capability_definition(step.capability_id).requires_confirmation
+                     or step.metadata.get("value_confirmation_required"))]
+            value_question = next((step.metadata["value_judgment"] for step in confirmation_steps
+                if step.metadata.get("value_confirmation_required")), None)
             if confirmation_steps and not any(need.kind == "confirmation" for need in terminal_plan.communication_needs):
                 terminal_plan = CanonicalPlan.model_validate({**terminal_plan.model_dump(),
                     "communication_needs": [*terminal_plan.communication_needs, SocialCommunicationNeed(
                         need_id=communication_need_id(terminal_plan.plan_id, "confirmation"), owner="runtime", kind="confirmation",
                         reference_id=terminal_plan.plan_id, source_goal_ids=list(dict.fromkeys(
                             goal_id for step in confirmation_steps for goal_id in step.source_goal_ids)),
-                        delivery_phase="pre_action", facts={"provider_confirmation_steps": [step.model_dump(mode="json") for step in confirmation_steps]},
+                        delivery_phase="pre_action", facts={"provider_confirmation_steps": [step.model_dump(mode="json") for step in confirmation_steps],
+                            **({"value_question": value_question} if value_question else {})},
                     )]})
             known_work_ids = {item["activity_id"] for item in planning_context.get("existing_work_activities", [])}
             if set(terminal_plan.cancel_activity_ids) - known_work_ids:

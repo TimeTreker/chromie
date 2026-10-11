@@ -283,3 +283,15 @@ class CognitiveIdentityContextTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_planner_projection_keeps_every_owner_approved_core_principle() -> None:
+    """Owner decision 2026-10-10 (option A): the Planner reasons with the full Stable Mind."""
+    from shared.chromie_contracts.mind import default_mind_profile
+    from agent.app.cognitive_identity import bounded_stable_mind_json
+
+    mind = default_mind_profile().model_dump(mode="json")
+    projected = json.loads(bounded_stable_mind_json(
+        {"mind": mind}, max_chars=planner_prompt.PLANNER_STABLE_MIND_MAX_CHARS))
+    assert [item["principle_id"] for item in projected["core_principles"]] == [
+        item["principle_id"] for item in mind["core_principles"]]

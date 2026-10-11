@@ -164,6 +164,10 @@ from shared.chromie_contracts.interaction import (
     CapabilityResult,
 )
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from shared.chromie_contracts.value_judgment import (
+    VALUE_REVIEW_RELATIVE_PATH,
+    load_value_review_capability_ids,
+)
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
     SocialCommunicationNeed,
@@ -481,6 +485,9 @@ class VoiceAssistant:
             goal_association_timeout_ms=self.goal_association_timeout_ms,
             fast_planner_timeout_ms=self.fast_planner_timeout_ms,
             deep_planner_timeout_ms=self.deep_planner_timeout_ms,
+            value_review_capability_ids=load_value_review_capability_ids(
+                PROJECT_ROOT / VALUE_REVIEW_RELATIVE_PATH
+            ),
         )
         self.cognitive_evidence = CognitiveEvidenceRecorder(
             self.cognitive_evidence_path,

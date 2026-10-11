@@ -307,6 +307,21 @@
       ]
     },
     {
+      "path": "agent/app/value_judgment.py",
+      "symbol": "ValueJudgmentResolver.resolve",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "agent",
+      "contract": "Contain inference/validation failures as a failed Value Judgment (status=failed, classified failure_class) that withholds every value-reviewed effect; never authorizes Work. Regression: tests/test_value_judgment.py.",
+      "review_status": "reviewed",
+      "body_sha256": "d0135b9c82699ddd255d9e0ad5c6b02ba45e68604df31a8f57c218ac52b3b71c",
+      "failure_signals": [
+        "diagnostic",
+        "return",
+        "state_update"
+      ]
+    },
+    {
       "path": "agent/app/work_dag/service.py",
       "symbol": "DAGEngineService._execute_tracked",
       "ordinal": 1,
@@ -1104,6 +1119,20 @@
       "body_sha256": "999b78b48326401ec07eb3affa0de11d012371df36960cb639109b3579322b61",
       "failure_signals": [
         "raise"
+      ]
+    },
+    {
+      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "symbol": "GoalDrivenRuntimeCoordinator._resolve_value_judgment",
+      "ordinal": 1,
+      "classification": "fail_closed_boundary",
+      "owner": "orchestrator",
+      "contract": "Contain an unreachable or invalid Value Judgment endpoint as failed value_judgment_unavailable with a warning; reviewed effects are withheld and refused before provider start. Regression: tests/test_value_judgment.py.",
+      "review_status": "reviewed",
+      "body_sha256": "0dd5d167163bad67fc5689d7912c454a92b00b84f0db2a6182dab9b5efc2ec7e",
+      "failure_signals": [
+        "diagnostic",
+        "return"
       ]
     },
     {

@@ -343,6 +343,24 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   authoring a competing reply. UMI, GA, Social Cognition and Reflection keep their
   distinct semantic responsibilities; depth never
   transfers ownership or reopens an already-complete decision.
+- **VALUE-JUDGMENT-001** (owner amendment 2026-10-10) — Value Judgment is Chromie's
+  conscience and a distinct authority. It answers only whether Chromie should act:
+  proceed, ask, or decline with a reason. It never decides how, never selects or edits
+  Capabilities, and never writes what Chromie says. Its inputs are the person's words, the
+  accepted Responsibilities, the established Situation, and the full owner-approved Stable
+  Mind. It runs once per turn, and only when the final Plan would use a Capability on the
+  owner-editable value-review list (`capabilities/value_review.json`: fetching or moving
+  objects, walking, approaching or touching people; never greetings, chat, information or
+  expressive gestures). Its output states who is affected and the concern before the
+  decision. Effects of reviewed Capabilities wait for its verdict. On ask they need the
+  person's confirmation, and Social Cognition asks the one question that settles the
+  concern. On decline, or when the judgment fails or is unavailable, they never start, and
+  Social Cognition declines politely with the reason. Polite decline is preferred over a
+  question that is hard to answer. It is not a reviewer of the Planner's HOW (principles 30
+  and 31): the Planner's Plan stands, and Value Judgment only permits, questions or
+  withholds reviewed effects. Deterministic Runtime and Soridormi safety remain the floor.
+  It carries the Deep Planner's original intent, deliberate value reasoning; retiring the
+  Deep Planner itself is the next migration step.
 - **MODEL-SEMANTIC-BOUNDARY-001** — A model-facing contract asks its semantic owner
   to author decisions, not protocol paperwork that trusted code can derive exactly from
   already-authoritative input. Model-owned choices include semantic Capability selection,
@@ -1532,7 +1550,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    **HOW depth is acquired context (owner amendment 2026-10-10).** For planning, depth is
    what the Planner acquires (need-first library search, Evidence re-entry, the person's
    clarification), not a second planner. Risky or irreversible effects use Runtime
-   confirmation; independent Responsibilities are planned in one WorkDAG.
+   confirmation; whether Chromie should act at all is VALUE-JUDGMENT-001, not planning
+   depth; independent Responsibilities are planned in one WorkDAG.
 
    **Fast-path commitment is not Deep-reviewed.** Once one Responsibility has complete
    authoritative Goal grounding and a Fast Plan names exact available Capabilities with
