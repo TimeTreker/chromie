@@ -271,7 +271,6 @@ class CognitionSettings:
     enable_soridormi_capabilities: bool
     fast_planner_mode: str
     fast_planner_timeout_ms: int
-    deep_planner_mode: str
     deep_planner_timeout_ms: int
     goal_association_mode: str
     goal_association_timeout_ms: int
@@ -588,12 +587,6 @@ class HostSettingsSnapshot:
                 ),
                 fast_planner_timeout_ms=_int(
                     values, "ORCH_FAST_PLANNER_TIMEOUT_MS", 65000, minimum=100
-                ),
-                deep_planner_mode=_choice(
-                    values,
-                    "ORCH_DEEP_PLANNER_MODE",
-                    "off",
-                    {"off", "report_only"},
                 ),
                 deep_planner_timeout_ms=_int(
                     values, "ORCH_DEEP_PLANNER_TIMEOUT_MS", 125000, minimum=100

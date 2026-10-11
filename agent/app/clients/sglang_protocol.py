@@ -137,7 +137,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
         if schema.get("title") == "FastPlannerWorkAdvanceOutput":
             _stream_decoder_constraints(schema)
         if schema.get("title") in {
-            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+            "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
             "FastPlannerWorkAdvanceOutput", "FastPlannerEvidenceReentryOutput",
             "SocialCognitionOutput",
@@ -149,7 +149,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
             _share_stream_source_spans(schema)
         if schema.get("title") in {
             "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
-            "DeepPlannerModelOutput", "AgentSkillSelectionModelOutput",
+            "AgentSkillSelectionModelOutput",
             "FastPlannerModelOutput", "FastPlannerMultiGoalPlanOutput",
             "FastPlannerWorkAdvanceOutput", "FastPlannerEvidenceReentryOutput", "SocialCognitionOutput",
             "CognitiveActivationDecision",

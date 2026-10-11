@@ -41,8 +41,6 @@ class HealthResponse(BaseModel):
     cognitive_activation_model: str | None = None
     fast_planner_enabled: bool = False
     fast_planner_model: str | None = None
-    deep_planner_enabled: bool = False
-    deep_planner_model: str | None = None
 
 
 def detect_language(text: str) -> str:

@@ -841,21 +841,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "Fast Planner must close semantics in one primary result rather than invoke a same-owner reviewer or repair generation",
         ),
-        "agent/app/deep_planner.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "deep_planner.evidence_response.truth_check",
-                "_qualify_evidence_response_truth",
-                "review_coordinated_action_plan_coverage",
-                "truth_ollama",
-                "truth_num_ctx",
-                "deep_planner.revision",
-                "deep_contract_revision_response_schema",
-                "deep_safety_revision_response_schema",
-                "max_contract_repairs",
-            ),
-            "Deep Planner must close semantics in one primary result rather than invoke a same-owner reviewer or repair generation",
-        ),
         "agent/app/planner_model_contract.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
@@ -905,16 +890,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ("restore_required_capability_args_from_responsibilities",),
             "Host validation must not author omitted Planner Capability arguments",
         ),
-        "agent/app/planner_deep_validation.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "initial_safety_feedback",
-                "normalize_mixed_goal_outcome_accounting",
-                "deep_validation_error_items",
-                "safety_revision_contract_errors",
-            ),
-            "Deep validation must reject invalid primary results without consuming Fast candidate semantics or preparing same-tier revision feedback",
-        ),
         "orchestrator/runtime/cognitive_runtime.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
@@ -922,13 +897,15 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 'deep_context["fast_plan_resolution"]',
                 'deep_context["runtime_validator_feedback"]',
                 'deep_context["fast_planner_advance"]',
+                "resolve_deep_plan",
+                "deep_planner_invocation_reason",
             ),
-            "Deep Planner may receive the escalation reason but not a Fast candidate Plan or validator repair feedback as semantic authority",
+            "One Planner (PLANNER-AUTHORITY-001): no second planner pass receives or re-plans a Planner decision",
         ),
         "agent/app/agent_skills/disclosure.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             ("inherited_plan_agent_skill_provenance",),
-            "Deep Planner provenance must describe methods disclosed to its own primary invocation, not inherited Fast candidate influence",
+            "Planner provenance must describe methods disclosed to its own primary invocation, not inherited candidate influence",
         ),
         "shared/chromie_contracts/plan.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -1789,7 +1766,6 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         "agent/app/agents/capability.py",
         "agent/app/agents/deepthinking.py",
         "agent/app/fast_planner.py",
-        "agent/app/deep_planner.py",
         "agent/app/planner_contract.py",
     )
     for relative in canonical_runtime_files:
@@ -1816,11 +1792,6 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         "agent/app/fast_planner.py": (
             "FINAL ALLOWED EXECUTABLE SKILL IDS",
             "exact supplied skill IDs",
-            "Skills are plan leaves",
-        ),
-        "agent/app/deep_planner.py": (
-            "step_id, skill_id",
-            "FINAL ALLOWED EXECUTABLE SKILL IDS",
             "Skills are plan leaves",
         ),
         "agent/app/agents/deepthinking.py": (

@@ -288,26 +288,6 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_DEEP_PLANNER_MAX_CAPABILITIES",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
       "key": "AGENT_DEEP_PLANNER_MODEL",
       "owners": [
         ".env.common",
@@ -2450,15 +2430,6 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_DEEP_PLANNER_MODE",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
       "boolean": false,
       "category": "acceptance_override",
       "key": "ORCH_DEEP_PLANNER_TIMEOUT_MS",
@@ -4061,12 +4032,12 @@
     "category_counts": {
       "acceptance_override": 34,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 133,
+      "profile_constant": 132,
       "public_choice": 9,
-      "service_internal": 211
+      "service_internal": 209
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 387
+    "total_keys": 384
   }
 }

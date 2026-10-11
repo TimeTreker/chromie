@@ -289,43 +289,6 @@ class AgentClient:
             span.set_attribute("status", result.status)
             return result
 
-    async def resolve_deep_plan(
-        self,
-        session: aiohttp.ClientSession,
-        *,
-        request: CognitiveWorkRequest,
-        timeout_ms: int | None = None,
-    ) -> CanonicalPlan:
-        effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
-        async with runtime_tracer.span(
-            module=self.TRACE_MODULE,
-            operation="resolve_deep_plan",
-            kind="tool_call",
-            attributes={"endpoint": "/deep-plan", "timeout_ms": effective_timeout_ms},
-        ) as span:
-            req = request.model_copy(
-                update={
-                    "context": runtime_tracer.inject_carrier(request.context),
-                }
-            )
-            timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
-            async with session.post(
-                f"{self.base_url}/deep-plan",
-                json=req.model_dump(mode="json"),
-                timeout=timeout,
-            ) as resp:
-                body = await resp.text()
-                span.set_attribute("http_status", resp.status)
-                if resp.status != 200:
-                    raise RuntimeError(
-                        f"Agent deep-plan endpoint returned HTTP {resp.status}: {body[:500]}"
-                    )
-                result = CanonicalPlan.model_validate_json(body)
-            runtime_tracer.merge_fragment_from_metadata(result.metadata)
-            span.set_attribute("disposition", result.disposition)
-            span.set_attribute("step_count", len(result.steps))
-            return result
-
     async def resolve_social_cognition(
         self, session: aiohttp.ClientSession, *, request: SocialCognitionRequest,
         timeout_ms: int | None = None,

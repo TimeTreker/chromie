@@ -471,22 +471,22 @@ def planner_reentry_execution_truth_projection(
 
 def _canonical_work_prompt(
     request: CognitiveWorkRequest, capabilities: list[dict[str, Any]], *,
-    tier: str, goal_context: PlannerGoalContext | None = None,
+    goal_context: PlannerGoalContext | None = None,
     include_capability_catalog: bool = True, minimum_goal_satisfaction: float = 0.75,
 ) -> str:
     """Project complete Work facts once; SC receives its own interaction context."""
     context = request.context
     goals = goal_context or planner_goal_context(context, reentry_scope=request.planner_reentry_scope)
     scope = list(goals.expected_goal_ids)
-    catalog_label = "Executable common capability catalog JSON" if tier == "fast" else "Executable capability catalog JSON"
-    catalog = capabilities if tier == "fast" else [prompt_capability_contract(item) for item in capabilities]
+    catalog_label = "Executable common capability catalog JSON"
+    catalog = capabilities
     sections = [
         "Owner-approved Chromie identity JSON:\n" + bounded_identity_json(context) + "\n\n",
         "Owner-approved Personality Expression JSON:\n" + bounded_personality_json(context) + "\n\n",
         "Owner-approved Stable Mind worldview/values JSON:\n" + bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS) + "\n\n",
         IDENTITY_SEMANTIC_CONTRACT, PERSONALITY_SEMANTIC_CONTRACT, STABLE_MIND_SEMANTIC_CONTRACT,
         EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
-        agent_skill_prompt_section(context, agent_role=tier + "_planner"),
+        agent_skill_prompt_section(context, agent_role="fast_planner"),
         trusted_target_evidence_prompt_section(context),
     ]
     if include_capability_catalog:
@@ -553,7 +553,7 @@ def _canonical_work_prompt(
         "provisional_safe_work",
     )})
     sections.append("Trusted Work planning facts JSON:\n" + required_json(
-        projections, None, label=tier + " Planner complete Work facts",
+        projections, None, label="fast Planner complete Work facts",
     ))
     if request.planner_reentry_scope:
         sections.append(
@@ -573,7 +573,7 @@ def _canonical_work_prompt(
         )
 
     sections.append(
-        "\n" + PLANNER_WORK_AUTHORITY_PROMPT + (CAPABILITY_NEED_PROMPT if tier == "fast" else "") +
+        "\n" + PLANNER_WORK_AUTHORITY_PROMPT + CAPABILITY_NEED_PROMPT +
         "Capability library index JSON:\n" + required_json(context.get("capability_index", []), None, label="Capability index") +
         "Loaded capability details JSON:\n" + json.dumps(context.get("capability_details_loaded", [])) +
         "\nTrusted admitted clock JSON:\n" + json.dumps(
@@ -625,7 +625,7 @@ def _canonical_work_prompt(
         "user-facing utterance. Non-executable dispositions keep plan_relation=exact and "
         "user_confirmation_required=false. Proposed, scheduled and running Work are not completed effects.\n"
         "Omit optional IDs when absent; never use literal strings such as none/null as "
-        "reuse_activity_id or an invented reference. Empty escalation_reason is the default. "
+        "reuse_activity_id or an invented reference. "
         "parameter_resolutions may be empty when Host can derive exact user-supplied "
         "provenance from the step and its owning Goal. If authoring a resolved parameter "
         "record, include its concrete value; unresolved ask_user records have no value.\n"
@@ -677,15 +677,12 @@ def _canonical_work_prompt(
         "a timer cannot postpone an already executable step. Never parse deadlines into fake "
         "capabilities or put executable scheduling in prose.\n"
         + (
-            "Fast may compose at most four executable steps per Goal. If HOW requires unresolved "
-            "composition, delegate once with escalate, no steps, no committed outcome or "
-            "communication, and an explicit unresolved need for every scoped Goal. Existing "
-            "Capabilities remain present when composition is the gap; do not call them missing. "
-            "Do not mix execute and clarify in a terminal canonical Fast result.\n"
-            if tier == "fast" else
-            "This is the sole Deep decision. Compose at most four exact steps per Goal when "
-            "supported; do not escalate or request another model review. Unresolved input, "
-            "unavailable scope or refused Work stays unmet.\n"
+            "Compose at most four executable steps per Goal. When no supplied Capability can "
+            "realize HOW, or it needs more than four steps, choose unavailable for every scoped "
+            "Goal: no steps, an explicit unresolved need naming what is missing, and the Goal "
+            "stays unmet. Existing Capabilities remain present when composition is the gap; do "
+            "not call them missing. This is the one Planner decision; nothing re-plans it. "
+            "Do not mix execute and clarify in a terminal canonical result.\n"
         )
         + "Return only the closed Work DTO required by the decoder. Host supplies Plan identity, "
         "tier, exact Goal IDs and communication-need identities after validation.\n\n"
@@ -795,12 +792,10 @@ def fast_evidence_reentry_prompt(
         "author it only in new_work and never replay a completed source Activity; each new_work "
         "step lists depends_on, the earlier new_work steps or completed Work it must wait for "
         "(none means it may start with the others). clarify is "
-        "only for a real user-resolvable blocker; unavailable/refused are terminal limitations; "
-        "escalate delegates unresolved HOW without Work. SC owns all user-facing wording. "
+        "only for a real user-resolvable blocker; unavailable/refused are terminal limitations. "
+        "SC owns all user-facing wording. "
         "satisfaction_score/status assess how fully the selected next action covers the Goal; "
         f"the score must lie in the selected status band: {score_bands}. "
-        "Use an empty escalation_reason unless at least one Goal actually chooses escalate; "
-        "an escalation needs a nonblank reason and no new_work. "
         "pending execution alone does not lower prospective adequacy. Preserve uncertainty and "
         "epistemic strength from Evidence. Historical source Work and execution facts are input "
         "provenance only, never examples of the output shape. plan_relation normally stays exact; "
@@ -858,7 +853,7 @@ def fast_plan_prompt(
     request: CognitiveWorkRequest, capabilities: list[dict[str, Any]], *,
     response_schema: dict[str, Any], goal_context: PlannerGoalContext | None = None,
 ) -> str:
-    return _canonical_work_prompt(request, capabilities, tier="fast", goal_context=goal_context)
+    return _canonical_work_prompt(request, capabilities, goal_context=goal_context)
 
 
 def fast_advance_layered_prompt(
@@ -897,7 +892,7 @@ def fast_advance_layered_prompt(
         "several necessary Activities may share that ref to realize its complete outcome. "
         "Do not add a response for Work whose result is not available yet. The top disposition is "
         "execute for capability-only Work, respond for response-only Work, clarify for input-only "
-        "needs, mixed when distinct Responsibilities require different roles, or escalate. "
+        "needs, mixed when distinct Responsibilities require different roles, or unavailable. "
         "complete_response establishes a context-grounded speech obligation, never delivered speech; "
         "include its rationale. clarification supplies typed information_gaps, never wording. "
         "Ordinary requested speech admits complete_response; a mixed-mode other Responsibility may include it alongside Capability Work only when the source Responsibility itself explicitly contains a communicative result. Never add complete_response just to acknowledge, confirm, narrate or announce a physical Work sequence; SC decides that interaction independently. Information acquisition, "
@@ -906,7 +901,7 @@ def fast_advance_layered_prompt(
         "Match each whole requested outcome against Capability semantic_scope, effects and "
         "resource_contract; select only a complete realization with valid arguments. "
         "A prerequisite is not fulfillment. If several steps are needed "
-        "compose them within the Fast budget or delegate once to Deep before dispatch; "
+        "compose them within the four-step budget or report unavailable before dispatch; "
         "never mark a partial first action as complete or leave intended later Work only in reason_summary. "
         "Preserve every numeric and named binding through declared argument_realization; "
         "repetition requires a supported count argument. A required non-numeric string may "
@@ -948,8 +943,8 @@ def fast_advance_layered_prompt(
         "their resources allow and otherwise in list order. Communication Needs use "
         "timing=sequential for their order relative to Work. Preserve requested speech "
         "order even though SC realizes it later. Execute only direct, fully grounded Work within "
-        "Fast budget; unsupported capability or unresolved composition delegates once to Deep "
-        "with escalate, deep_planner continuation and no Activities. No same-decision reviewer. "
+        "four-step budget; when no loaded or library Capability can realize a Responsibility, "
+        "report unavailable with no Activities and keep it unmet. No same-decision reviewer. "
         "Runtime retains authorization, confirmation, resource safety and delivery authority. "
         "Planning or satisfaction is prospective, never proof of execution or delivery."
     )
@@ -1238,122 +1233,4 @@ def fast_layered_prompt(
 
 
 def fast_system_prompt() -> str:
-    return PLANNER_WORK_AUTHORITY_PROMPT + "This is Fast planning; delegate unresolved HOW once. Return only the complete Work DTO."
-
-
-def deep_plan_prompt(
-    request: CognitiveWorkRequest, capabilities: list[dict[str, Any]], *,
-    response_schema: dict[str, Any], expected_goal_ids: list[str],
-    include_capability_catalog: bool = True, minimum_goal_satisfaction: float = 0.75,
-    goal_context: PlannerGoalContext | None = None,
-) -> str:
-    return _canonical_work_prompt(request, capabilities, tier="deep", goal_context=goal_context,
-                                  include_capability_catalog=include_capability_catalog,
-                                  minimum_goal_satisfaction=minimum_goal_satisfaction)
-
-
-def deep_layered_prompt(
-    request: CognitiveWorkRequest,
-    capabilities: list[dict[str, Any]],
-    *,
-    response_schema: dict[str, Any],
-    expected_goal_ids: list[str],
-    minimum_goal_satisfaction: float = 0.75,
-    goal_context: PlannerGoalContext | None = None,
-) -> LayeredPrompt:
-    context = request.context if isinstance(request.context, dict) else {}
-    prompt_capabilities = [prompt_capability_contract(item) for item in capabilities]
-    identity_world = (
-        "Owner-approved Chromie identity JSON:\n"
-        f"{bounded_identity_json(context)}\n\n"
-        "Owner-approved Personality Expression JSON:\n"
-        f"{bounded_personality_json(context)}\n\n"
-        "Owner-approved Stable Mind worldview/values JSON:\n"
-        f"{bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS)}\n\n"
-    )
-    capability_contract = (
-        agent_skill_prompt_section(context, agent_role="deep_planner")
-        + trusted_target_evidence_prompt_section(context)
-        + "Executable capability catalog JSON:\n"
-        + json.dumps(prompt_capabilities, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        + "\n\n"
-    )
-    rendered = role_memory_context(context, role="planner") + deep_plan_prompt(
-        request,
-        capabilities,
-        response_schema=response_schema,
-        expected_goal_ids=expected_goal_ids,
-        minimum_goal_satisfaction=minimum_goal_satisfaction,
-        goal_context=goal_context,
-    )
-    return LayeredPrompt.promote(
-        rendered,
-        identity_world=(identity_world,),
-        operating_contract=(
-            IDENTITY_SEMANTIC_CONTRACT,
-            PERSONALITY_SEMANTIC_CONTRACT,
-            STABLE_MIND_SEMANTIC_CONTRACT,
-            EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT,
-        ),
-        capability_contract=(capability_contract,),
-    )
-
-
-def prompt_capability_contract(
-    capability: dict[str, Any],
-) -> dict[str, Any]:
-    """Project the full executable catalog without duplicate provider prose.
-
-    Deep Planner still receives every current capability's exact argument
-    schema and safety/resource contract. Provider hints duplicate most of
-    that data and previously pushed later capabilities beyond the bounded
-    catalog serialization, making the advertised "full catalog" false in
-    deployed prompts.
-    """
-
-    projected = {
-        key: capability.get(key)
-        for key in (
-            "capability_id",
-            "description",
-            "input_schema",
-            "requires_confirmation",
-            "effects",
-            "safety_class",
-            "can_run_parallel",
-            "parallel_metadata_declared",
-            "exclusive_group",
-            "resource_claims",
-        )
-    }
-    hints = capability.get("hints")
-    if isinstance(hints, dict):
-        semantic_scope = hints.get("semantic_scope")
-        if semantic_scope:
-            projected["semantic_scope"] = semantic_scope
-        argument_realization = hints.get("argument_realization")
-        if argument_realization:
-            projected["argument_realization"] = argument_realization
-        resource_contract = hints.get("resource_contract")
-        if resource_contract:
-            projected["resource_contract"] = resource_contract
-        when_to_use = str(hints.get("when_to_use") or "")
-        if when_to_use and when_to_use != str(capability.get("description") or "").strip():
-            projected["when_to_use"] = when_to_use
-        when_not_to_use = str(hints.get("when_not_to_use") or "")
-        if when_not_to_use:
-            projected["when_not_to_use"] = when_not_to_use
-    constraints = capability.get("execution_constraints")
-    if isinstance(constraints, dict):
-        retained_constraints = {
-            key: constraints[key]
-            for key in ("locomotion_envelope", "parallel_allowed_with_lanes")
-            if constraints.get(key)
-        }
-        if retained_constraints:
-            projected["execution_constraints"] = retained_constraints
-    return projected
-
-
-def deep_system_prompt() -> str:
-    return PLANNER_WORK_AUTHORITY_PROMPT + "This is the sole Deep decision; never recurse or return to Fast. Return only the complete Work DTO."
+    return PLANNER_WORK_AUTHORITY_PROMPT + "This is the one Planner decision; report a limitation honestly. Return only the complete Work DTO."

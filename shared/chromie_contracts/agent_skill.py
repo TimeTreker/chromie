@@ -10,10 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 AgentSkillAuthority = Literal["agent_method_only"]
 AgentSkillExecutionAuthority = Literal["none"]
-AgentSkillProjectionName = Literal[
-    "fast_planner",
-    "deep_planner",
-]
+AgentSkillProjectionName = Literal["fast_planner"]
 AgentSkillSelectionDecision = Literal["select_skills", "no_skill"]
 AgentSkillApplicableOutputMode = Literal[
     "speech",
@@ -573,7 +570,7 @@ class PlanAgentSkillProvenance(BaseModel):
 
     @model_validator(mode="after")
     def validate_planner_projection(self) -> "PlanAgentSkillProvenance":
-        if self.selected_by_agent_role not in {"fast_planner", "deep_planner"}:
+        if self.selected_by_agent_role != "fast_planner":
             raise ValueError("Canonical Plan provenance may be selected only by a planner")
         if self.projection != self.selected_by_agent_role:
             raise ValueError("Plan Agent Skill projection must match the selecting planner role")

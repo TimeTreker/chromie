@@ -28,7 +28,6 @@ applicable_output_modes: []
 applicable_information_domains: []
 projections:
   fast_planner: projections/fast_planner.md
-  deep_planner: projections/deep_planner.md
 ```
 
 Only declared projections that actually exist are required. Projection paths

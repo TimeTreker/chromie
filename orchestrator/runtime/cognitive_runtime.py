@@ -151,6 +151,8 @@ class CognitiveRuntimePolicy:
     mode: CognitiveRuntimeMode = "off"
     goal_association_timeout_ms: int = 3500
     fast_planner_timeout_ms: int = 3000
+    # Deliberative deadline for Social Cognition and Reflection; the name predates the
+    # retired Deep Planner (2026-10-11).
     deep_planner_timeout_ms: int = 10000
     # Capabilities whose effects need a Value Judgment proceed verdict before dispatch
     # (owner-editable capabilities/value_review.json). Empty means no value gate.
@@ -329,8 +331,6 @@ class CognitiveAgentClient(Protocol):
     ) -> AsyncIterator[FastPlannerStreamFrame]: ...
 
     async def resolve_fast_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
-
-    async def resolve_deep_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
     async def resolve_value_judgment(self, session: Any, **kwargs: Any) -> ValueJudgmentResult: ...
 
@@ -666,15 +666,8 @@ class CognitiveEvidenceRecorder:
             and len(resolution.fast_plan.goal_ids) > 1
         ):
             self.counters["fast_terminal_multi_goal"] += 1
-        if fast_path == "semantic_escalation":
-            self.counters["fast_semantic_escalation"] += 1
         if fast_path == "contract_failure":
             self.counters["fast_contract_failure"] += 1
-        if bool(resolution.metadata.get("deep_planner_invoked")):
-            reason = str(resolution.metadata.get("deep_planner_invocation_reason") or "unknown")
-            self.counters[f"deep_planner_invoked:{reason}"] += 1
-        elif fast_path == "terminal":
-            self.counters["deep_planner_avoided"] += 1
         self.counters["turns"] += 1
         total_ms = float(resolution.timings_ms.get("total", 0.0))
         self.total_latency_ms += total_ms
@@ -2539,7 +2532,8 @@ class CanonicalPlanRuntimeAdapter:
             capabilities=capabilities,
             requires_confirmation=any(item.requires_confirmation for item in capabilities),
             reason=(
-                plan.escalation_reason if plan.disposition in {"unavailable", "refused"} else None
+                str(plan.metadata.get("reason") or "") or None
+                if plan.disposition in {"unavailable", "refused"} else None
             ),
             metadata=metadata,
         )
@@ -3085,8 +3079,6 @@ class GoalDrivenRuntimeCoordinator:
         if status:
             return status
         disposition = str(getattr(output, "disposition", "") or "").strip()
-        if disposition == "escalate":
-            return "escalated"
         return "accepted"
 
     @staticmethod
@@ -3531,10 +3523,6 @@ class GoalDrivenRuntimeCoordinator:
     ) -> CanonicalPlan:
         """Bind Fast Planner's first Activity Plan to GA's canonical Goals."""
 
-        if advance.disposition == "escalate":
-            raise ValueError(
-                "escalating Fast Planner advance cannot become a terminal canonical Plan"
-            )
         refs_to_goals = cls._goal_ids_by_responsibility(association)
         missing_refs = sorted(
             set(advance.covered_responsibility_refs) - set(refs_to_goals)
@@ -4289,12 +4277,10 @@ class GoalDrivenRuntimeCoordinator:
         if plan is None:
             return ""
         value = str(plan.metadata.get("path_classification") or "").strip()
-        if value in {"terminal", "semantic_escalation", "contract_failure"}:
+        if value in {"terminal", "contract_failure"}:
             return value
         if plan.metadata.get("failure_class"):
             return "contract_failure"
-        if plan.disposition == "escalate":
-            return "semantic_escalation"
         return "terminal"
 
     async def _resolve_and_commit_goal_association(
@@ -4757,8 +4743,6 @@ class GoalDrivenRuntimeCoordinator:
         goal_state_commit_stage = ""
         stage_diagnostics: list[dict[str, Any]] = []
         fast_planner_path = ""
-        deep_planner_invocation_reasons: list[str] = []
-        needs_deep_planner = False
         association_task: asyncio.Task[_GoalAssociationStageResult] | None = None
         umi_planning_task: asyncio.Task[None] | None = None
         umi_planning_superseded = False
@@ -4788,9 +4772,6 @@ class GoalDrivenRuntimeCoordinator:
         work_reconciliation_activity_count = 0
 
         def path_metadata() -> dict[str, Any]:
-            first_deep_reason = (
-                deep_planner_invocation_reasons[0] if deep_planner_invocation_reasons else ""
-            )
             return {
                 "social_cognition_started": state_social_task is not None,
                 "model_driven_cognitive_orchestration": True,
@@ -4805,34 +4786,7 @@ class GoalDrivenRuntimeCoordinator:
                     if fast_advance is not None
                     else None
                 ),
-                "fast_planner_advance_continuations": (
-                    list(fast_advance.continuations) if fast_advance is not None else []
-                ),
                 "fast_planner_path": fast_planner_path,
-                "deep_planner_invoked": bool(deep_planner_invocation_reasons),
-                "deep_planner_invocation_reason": first_deep_reason,
-                "deep_planner_invocation_reasons": list(deep_planner_invocation_reasons),
-                "deep_planner_avoided": bool(
-                    fast_planner_path
-                    in {
-                        "terminal",
-                        "direct_vocal_output",
-                        "terminal_missing_ability",
-                        "contract_failure",
-                    }
-                    and not deep_planner_invocation_reasons
-                ),
-                "fast_plan_committed_without_deep": bool(
-                    fast_plan is not None
-                    and fast_plan.planner_tier == "fast"
-                    and fast_plan.disposition != "escalate"
-                    and fast_planner_path
-                    in {
-                        "terminal",
-                        "direct_vocal_output",
-                    }
-                    and not deep_planner_invocation_reasons
-                ),
                 "terminal_planner_tier": (
                     terminal_plan.planner_tier if terminal_plan is not None else ""
                 ),
@@ -5108,7 +5062,7 @@ class GoalDrivenRuntimeCoordinator:
                 plan_context: dict[str, Any],
                 plan_history: list[dict[str, Any]],
             ) -> None:
-                nonlocal fast_advance, needs_deep_planner
+                nonlocal fast_advance
                 nonlocal fast_communicative_realization_status
                 nonlocal ready_fast_capability_execution, ready_fast_capability_status
                 planner_started = time.perf_counter()
@@ -5161,7 +5115,6 @@ class GoalDrivenRuntimeCoordinator:
                             eligible, session_id=sid, turn_id=turn_id, language=language,
                         )
                         ready_fast_capability_status = "safe_reads_dispatched_before_goal_binding"
-                needs_deep_planner = "deep_planner" in fast_advance.continuations
 
             if speculative_work_request is not None:
                 umi_planning_task = asyncio.create_task(
@@ -5413,8 +5366,7 @@ class GoalDrivenRuntimeCoordinator:
                     association_stage.planning_task, return_exceptions=True
                 )
                 ga_failed = isinstance(ga_result, BaseException) or (
-                    ga_result.disposition == "escalate"
-                    and self._fast_plan_path(ga_result) == "contract_failure"
+                    self._fast_plan_path(ga_result) == "contract_failure"
                 )
                 if not ga_failed:
                     if not umi_planning_task.done():
@@ -5706,43 +5658,7 @@ class GoalDrivenRuntimeCoordinator:
                     },
                 )
 
-            if association_stage.planning_task is not None:
-                needs_deep_planner = False
-            if needs_deep_planner:
-                deep_reason = "fast_planner_advance_complexity"
-                deep_planner_invocation_reasons.append(deep_reason)
-                deep_context = dict(planning_context)
-                deep_context["deep_planner_invocation_reason"] = deep_reason
-                stage = time.perf_counter()
-                terminal_plan = await self._observe_workflow_stage(
-                    sid=sid,
-                    stage="deep_planner",
-                    input_payload={
-                        "user_text": text,
-                        "goal_association": association,
-                        "invocation_reason": deep_reason,
-                    },
-                    operation=self.agent_client.resolve_deep_plan(
-                        session,
-                        request=work_request.model_copy(
-                            update={
-                                "context": deep_context,
-                                "history": history,
-                            }
-                        ),
-                        timeout_ms=self.policy.deep_planner_timeout_ms,
-                    ),
-                )
-                timings["deep_planner"] = (
-                    time.perf_counter() - stage
-                ) * 1000.0
-                fast_planner_path = "deep_escalation"
-                deep_failure = self._optional_stage_failure_metadata(
-                    "deep_planner", terminal_plan.metadata
-                )
-                if deep_failure is not None:
-                    raise CognitiveStageFailure("deep_planner", deep_failure)
-            elif canonical_fast_revision_reason:
+            if canonical_fast_revision_reason:
                 # GA explicitly requested another Planner decision after continuity.
                 # Runtime supplies current Goal/Work/Evidence state but does not infer
                 # that a Goal update, retained Activity, scope change, or field equality
@@ -5783,52 +5699,18 @@ class GoalDrivenRuntimeCoordinator:
                     stage_diagnostics.append(fast_failure)
                 terminal_plan = fast_plan
                 fast_planner_path = self._fast_plan_path(fast_plan)
-                if fast_plan.disposition == "escalate":
-                    if fast_planner_path == "contract_failure":
-                        fast_failure = self._optional_stage_failure_metadata(
-                            "fast_planner", fast_plan.metadata
-                        ) or self._stage_failure_metadata(
-                            "fast_planner",
-                            fast_plan.metadata,
-                            default_failure_class=(
-                                fast_plan.escalation_reason
-                                or "fast_planner_contract_failure"
-                            ),
-                        )
-                        raise CognitiveStageFailure("fast_planner", fast_failure)
-
-                    deep_reason = "semantic_escalation"
-                    deep_planner_invocation_reasons.append(deep_reason)
-                    deep_context = dict(planning_context)
-                    deep_context["deep_planner_invocation_reason"] = deep_reason
-                    stage = time.perf_counter()
-                    terminal_plan = await self._observe_workflow_stage(
-                        sid=sid,
-                        stage="deep_planner",
-                        input_payload={
-                            "user_text": text,
-                            "goal_association": association,
-                            "invocation_reason": deep_reason,
-                        },
-                        operation=self.agent_client.resolve_deep_plan(
-                            session,
-                            request=work_request.model_copy(
-                                update={
-                                    "context": deep_context,
-                                    "history": history,
-                                }
-                            ),
-                            timeout_ms=self.policy.deep_planner_timeout_ms,
+                if fast_planner_path == "contract_failure":
+                    # A rejected Planner result fails closed; nothing re-plans it.
+                    fast_failure = self._optional_stage_failure_metadata(
+                        "fast_planner", fast_plan.metadata
+                    ) or self._stage_failure_metadata(
+                        "fast_planner",
+                        fast_plan.metadata,
+                        default_failure_class=str(
+                            fast_plan.metadata.get("reason") or "fast_planner_contract_failure"
                         ),
                     )
-                    timings["deep_planner"] = (
-                        time.perf_counter() - stage
-                    ) * 1000.0
-                    deep_failure = self._optional_stage_failure_metadata(
-                        "deep_planner", terminal_plan.metadata
-                    )
-                    if deep_failure is not None:
-                        raise CognitiveStageFailure("deep_planner", deep_failure)
+                    raise CognitiveStageFailure("fast_planner", fast_failure)
             else:
                 fast_plan = self._canonical_plan_from_fast_advance(
                     advance=fast_advance,
@@ -5923,9 +5805,8 @@ class GoalDrivenRuntimeCoordinator:
                     metadata={"dispatch_allowed": False},
                 )
             if runtime_errors:
-                # Fast may delegate unresolved meaning once to Deep. Each depth
-                # authors one primary result; the Host validates authority and
-                # runtime contracts without becoming another semantic planner.
+                # The Planner authors one primary result; the Host validates authority
+                # and runtime contracts without becoming another semantic planner.
                 raise ValueError(
                     "runtime validation rejected terminal canonical plan: "
                     + json.dumps(runtime_errors, ensure_ascii=False)

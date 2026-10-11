@@ -573,7 +573,7 @@ def plan_agent_skill_provenance_from_disclosure(
 ) -> tuple[PlanAgentSkillProvenance, ...]:
     """Project loaded planner methods into content-free Canonical Plan provenance."""
 
-    if resolution.agent_role not in {"fast_planner", "deep_planner"}:
+    if resolution.agent_role != "fast_planner":
         return ()
     return tuple(
         PlanAgentSkillProvenance(
@@ -677,12 +677,6 @@ def attach_planner_disclosure_metadata_fail_closed(
             "unresolved": ["agent_skill_provenance_invalid"],
             "metadata": metadata,
         }
-        if plan.planner_tier == "fast":
-            return CanonicalPlan(
-                disposition="escalate",
-                escalation_reason="agent_skill_provenance_invalid",
-                **common,
-            )
         return CanonicalPlan(
             disposition="unavailable",
             **common,

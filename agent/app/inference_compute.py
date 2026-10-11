@@ -47,7 +47,6 @@ _PURPOSE_COMPUTE_CLASS: dict[str, CognitionComputeClass] = {
     "goal_association": CognitionComputeClass.CONTINUITY,
     "user_meaning_interpreter_deep": CognitionComputeClass.INTERPRETATION,
     "situational_deliberative_cognition": CognitionComputeClass.DELIBERATIVE,
-    "deep_planner": CognitionComputeClass.DELIBERATIVE,
     "reflection": CognitionComputeClass.BACKGROUND,
     "startup_warm": CognitionComputeClass.BACKGROUND,
 }

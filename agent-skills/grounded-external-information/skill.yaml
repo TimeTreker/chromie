@@ -6,7 +6,7 @@ description: Select only for provider-neutral Goals that require facts from an a
 authority: agent_method_only
 execution_authority: none
 owner_approved: true
-content_digest: sha256:9b6ede7a8fa98696f326d1125469dcc4e856fd4d95488a2f3759bffb7f56b763
+content_digest: sha256:1b62dc131326aeeadd8343943bfd9de8b1eca99e1754cadf114a1c3f747c55b6
 extends: []
 required_capabilities: []
 optional_capabilities:
@@ -20,4 +20,3 @@ applicable_information_domains:
   - external_grounded_information
 projections:
   fast_planner: projections/fast_planner.md
-  deep_planner: projections/deep_planner.md

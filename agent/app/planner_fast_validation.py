@@ -364,7 +364,14 @@ class FastPlanQualification:
     reason: str = ""
     unresolved: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
-    path_classification: str = "semantic_escalation"
+    # contract_failure fails closed; limitation is the Planner's own judgment that the
+    # Goal cannot be met with this Plan, materialized as an honest unavailable outcome.
+    path_classification: str = "contract_failure"
+
+
+# The one Planner commits a Plan at the substantial band or above (the former Deep
+# acceptance bar); below it the Planner itself judged the Goal unmet.
+MINIMUM_PLAN_SATISFACTION = 0.75
 
 
 def qualify_fast_canonical_plan(
@@ -393,6 +400,7 @@ def qualify_fast_canonical_plan(
         *,
         unresolved: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
+        limitation: bool = False,
     ) -> FastPlanQualification:
         return FastPlanQualification(
             accepted=False,
@@ -400,6 +408,7 @@ def qualify_fast_canonical_plan(
             reason=reason,
             unresolved=tuple(unresolved or []),
             metadata={**(metadata or {}), **counts},
+            path_classification="limitation" if limitation else "contract_failure",
         )
 
     if expected_goal_ids_for_turn and set(plan.goal_ids) != set(expected_goal_ids_for_turn):
@@ -424,21 +433,23 @@ def qualify_fast_canonical_plan(
         requires_execution = False
     if (
         requires_execution
-        and plan.disposition not in {"escalate", "clarify", "unavailable", "refused"}
+        and plan.disposition not in {"clarify", "unavailable", "refused"}
         and not plan.steps
     ):
         return reject(
             "canonical_goal_requires_executable_step",
             metadata={"proposed_disposition": plan.disposition},
+            limitation=True,
         )
-    if plan.disposition == "escalate":
+    if plan.disposition == "unavailable":
         metadata = dict(plan.metadata)
         metadata.update(
             {
                 "resolver": "fast_planner",
-                "status": "escalate",
+                "status": "unavailable",
                 "authority": "advisory",
-                "path_classification": "semantic_escalation",
+                "execution_allowed": False,
+                "path_classification": "terminal",
                 "common_capability_count": len(capability_payload),
                 "contract_schema": contract_schema,
                 "canonical_contract": "CanonicalPlan",
@@ -465,11 +476,9 @@ def qualify_fast_canonical_plan(
                 "proposed_coverage": plan.coverage,
                 "proposed_confidence": plan.confidence,
             },
+            limitation=True,
         )
-    plan_relation = str(plan.metadata.get("plan_relation") or "exact")
-    minimum_satisfaction = (
-        0.75 if plan_relation in {"safe_adjustment", "alternative"} else 0.95
-    )
+    minimum_satisfaction = MINIMUM_PLAN_SATISFACTION
     acquisition_goals = information_acquisition_goal_ids(plan, capability_payload)
     control_response_goals = {
         outcome.goal_id for outcome in plan.goal_outcomes
@@ -495,7 +504,7 @@ def qualify_fast_canonical_plan(
         and not control_response_goals
     ):
         return reject(
-            "goal_satisfaction_not_exact",
+            "goal_satisfaction_below_commitment",
             unresolved=list(plan.unresolved),
             metadata={
                 "proposed_goal_satisfaction": (
@@ -504,24 +513,28 @@ def qualify_fast_canonical_plan(
                     else None
                 )
             },
+            limitation=plan.goal_satisfaction is not None,
         )
-    incomplete_outcomes = [
+    missing_outcome_satisfaction = [
+        outcome.goal_id for outcome in plan.goal_outcomes if outcome.satisfaction is None
+        and (outcome.disposition not in achieving_dispositions
+             or (outcome.goal_id not in acquisition_goals and outcome.goal_id not in control_response_goals))
+    ]
+    if missing_outcome_satisfaction:
+        return reject("per_goal_satisfaction_missing", unresolved=missing_outcome_satisfaction)
+    inadequate_outcomes = [
         outcome.goal_id
         for outcome in achieving_outcomes
         if outcome.goal_id not in acquisition_goals
         and outcome.goal_id not in control_response_goals
-        and (outcome.satisfaction is None or outcome.satisfaction.score < minimum_satisfaction)
+        and outcome.satisfaction is not None
+        and outcome.satisfaction.score < minimum_satisfaction
     ]
-    incomplete_outcomes.extend(
-        outcome.goal_id
-        for outcome in plan.goal_outcomes
-        if outcome.disposition not in achieving_dispositions
-        and outcome.satisfaction is None
-    )
-    if incomplete_outcomes:
+    if inadequate_outcomes:
         return reject(
-            "per_goal_satisfaction_not_exact",
-            unresolved=incomplete_outcomes,
+            "per_goal_satisfaction_below_commitment",
+            unresolved=inadequate_outcomes,
+            limitation=True,
         )
     for step in plan.steps:
         if allowed.get(step.capability_id) is None:
@@ -1328,8 +1341,6 @@ def validate_work_reuse_selection(
         raise PlannerDTOContractError("cancellation must cite supplied Runtime Activity IDs")
     if set(cancelled).intersection(cited):
         raise PlannerDTOContractError("one Activity cannot be both reused and cancelled")
-    if output.disposition == "escalate" and cancelled:
-        raise PlannerDTOContractError("an escalating Planner cannot cancel Work")
     # Omission is NO_CHANGE. The Planner may reuse a subset and add Work;
     # cancellation is a separate explicit decision, never inferred from a new Plan.
 

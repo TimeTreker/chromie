@@ -1,8 +1,8 @@
-"""Deterministic Planner validation shared by Fast and Deep passes.
+"""Deterministic Planner validation.
 
-This module owns cross-pass contract, grounding, provenance, and integrity mechanics only.
-Pass-specific qualification/repair mechanics live in planner_fast_validation and
-planner_deep_validation; neither layer owns model invocation or Planner semantics.
+This module owns contract, grounding, provenance, and integrity mechanics only.
+Qualification/repair mechanics live in planner_fast_validation; neither layer owns
+model invocation or Planner semantics.
 """
 
 from __future__ import annotations
@@ -322,15 +322,10 @@ def validate_goal_responsibility_outcomes(
         outcome = output.goal_outcomes.get(goal_id)
         if outcome is None:
             raise ValueError(f"vocal_output goal requires an explicit outcome: {goal_id}")
-        allowed_dispositions = (
-            {"escalate"} if output.disposition == "escalate"
-            else {"respond", "clarify", "unavailable", "refused"}
-        )
-        if outcome.disposition not in allowed_dispositions:
+        if outcome.disposition not in {"respond", "clarify", "unavailable", "refused"}:
             raise ValueError(
                 "speech goal requires a response, clarification, unavailable, or refusal "
-                "outcome, or escalation in a whole-plan Fast escalation, "
-                f"with no executable step: {goal_id}"
+                f"outcome with no executable step: {goal_id}"
             )
     for goal_id in sorted(provider_vocal_goal_ids):
         outcome = output.goal_outcomes.get(goal_id)
@@ -453,7 +448,6 @@ def validate_goal_responsibility_outcomes(
     # effectful Goal without inferring effect from user wording.
     terminal_block_dispositions = {
         "clarify",
-        "escalate",
         "unavailable",
         "refused",
     }
@@ -469,7 +463,7 @@ def validate_goal_responsibility_outcomes(
             continue
         raise ValueError(
             "unresolved effectful goal requires an executable step or explicit "
-            "clarify/escalate/unavailable/refused evidence: " + goal_id
+            "clarify/unavailable/refused evidence: " + goal_id
         )
 
 
@@ -3225,41 +3219,38 @@ def planner_contract_diagnostics(
     expected_goal_ids = list(dict.fromkeys(expected_goal_ids_for_turn))
     expected_goal_set = set(expected_goal_ids)
     multi_goal_fast = planner_tier == "fast" and len(expected_goal_set) > 1
-    fast_escalation = planner_tier == "fast" and disposition == "escalate"
+    whole_plan_limitation = disposition == "unavailable"
 
-    if (multi_goal_fast or fast_escalation) and "goal_outcomes" not in raw:
+    if (multi_goal_fast or whole_plan_limitation) and "goal_outcomes" not in raw:
         add(
             ["goal_outcomes"],
-            "fast multi-goal or escalation output requires an explicit goal_outcomes object",
+            "multi-goal or unavailable output requires an explicit goal_outcomes object",
             value=None,
             error_type="missing",
         )
-    if fast_escalation:
+    if whole_plan_limitation:
         if coverage not in {"partial", "uncertain"}:
             add(
                 ["coverage"],
-                "fast semantic escalation requires partial or uncertain coverage",
+                "an unavailable plan requires partial or uncertain coverage",
                 value=coverage,
             )
         satisfaction = raw.get("goal_satisfaction")
         if not isinstance(satisfaction, dict):
             add(
                 ["goal_satisfaction"],
-                "fast escalation requires model-authored goal_satisfaction",
+                "an unavailable plan requires model-authored goal_satisfaction",
                 value=satisfaction,
             )
         elif satisfaction.get("status") == "exact":
             add(
                 ["goal_satisfaction", "status"],
-                "fast semantic escalation cannot claim exact goal satisfaction",
+                "an unavailable plan cannot claim exact goal satisfaction",
                 value=satisfaction.get("status"),
             )
     if isinstance(outcomes, dict):
         outcome_goal_set = set(outcomes)
-        require_complete_outcome_map = not fast_escalation or multi_goal_fast
-        if fast_escalation:
-            require_complete_outcome_map = True
-        if require_complete_outcome_map and outcome_goal_set != expected_goal_set:
+        if outcome_goal_set != expected_goal_set:
             add(
                 ["goal_outcomes"],
                 ("goal_outcomes keys must cover exactly the authoritative Goal Association IDs"),
@@ -3288,18 +3279,7 @@ def planner_contract_diagnostics(
                 if " ".join(str(item or "").strip().split())
             ]
             outcome_dispositions.add(str(outcome_disposition or ""))
-            allowed_outcome_dispositions = (
-                {"execute", "respond", "clarify", "escalate"}
-                if planner_tier == "fast"
-                else {
-                    "execute",
-                    "respond",
-                    "clarify",
-                    "unavailable",
-                    "refused",
-                }
-            )
-            if outcome_disposition not in allowed_outcome_dispositions:
+            if outcome_disposition not in {"execute", "respond", "clarify", "unavailable", "refused"}:
                 add(
                     ["goal_outcomes", goal_id, "disposition"],
                     f"{planner_tier} goal outcome requires one legal explicit disposition",
@@ -3332,28 +3312,6 @@ def planner_contract_diagnostics(
                         ["goal_outcomes", goal_id, "step_ids"],
                         "respond goal outcome must not reference steps",
                         value=normalized_outcome_step_ids,
-                    )
-            elif outcome_disposition == "escalate":
-                if outcome_coverage not in {"partial", "uncertain"}:
-                    add(
-                        ["goal_outcomes", goal_id, "coverage"],
-                        "escalate goal outcome requires partial or uncertain coverage",
-                        value=outcome_coverage,
-                    )
-                if normalized_outcome_step_ids:
-                    add(
-                        ["goal_outcomes", goal_id, "step_ids"],
-                        "escalate goal outcome must not reference steps",
-                        value=normalized_outcome_step_ids,
-                    )
-                if (
-                    not outcome.get("unresolved")
-                    and not str(outcome.get("rationale") or "").strip()
-                ):
-                    add(
-                        ["goal_outcomes", goal_id],
-                        "escalate goal outcome requires an unresolved need or rationale",
-                        value=outcome,
                     )
             elif outcome_disposition == "clarify":
                 if outcome_coverage not in {"partial", "uncertain"}:
@@ -3437,13 +3395,6 @@ def planner_contract_diagnostics(
             value=outcomes,
         )
 
-    if planner_tier == "deep" and disposition == "escalate":
-        add(
-            ["disposition"],
-            "deep plans cannot return to the fast planner",
-            value=disposition,
-        )
-
     unique: list[dict[str, Any]] = []
     seen: set[tuple[str, tuple[str | int, ...]]] = set()
     for item in diagnostics:
@@ -3504,12 +3455,7 @@ def validate_planner_model_output(
                     f"planner step {index} requires explicit model-authored authority fields: "
                     + ",".join(missing_authority_fields)
                 )
-    allowed_dispositions = (
-        {"respond", "execute", "mixed", "clarify", "escalate"}
-        if planner_tier == "fast"
-        else {"respond", "execute", "mixed", "clarify", "unavailable", "refused"}
-    )
-    if output.disposition not in allowed_dispositions:
+    if output.disposition not in {"respond", "execute", "mixed", "clarify", "unavailable"}:
         raise ValueError(
             f"disposition={output.disposition!r} is not valid for planner_tier={planner_tier}"
         )
@@ -3528,19 +3474,14 @@ def validate_planner_model_output(
                 + ",".join(missing_envelope_fields)
             )
     if (
-        planner_tier == "fast"
-        and (len(expected_goal_id_set) > 1 or output.disposition == "escalate")
+        (len(expected_goal_id_set) > 1 or output.disposition == "unavailable")
         and not goal_outcomes_were_supplied
     ):
         raise ValueError(
-            "fast multi-goal or escalation output requires an explicit goal_outcomes object"
+            "multi-goal or unavailable output requires an explicit goal_outcomes object"
         )
-    if planner_tier == "fast":
-        if output.disposition == "escalate":
-            if output.coverage not in {"partial", "uncertain"}:
-                raise ValueError("fast semantic escalation requires partial or uncertain coverage")
-        elif output.escalation_reason:
-            raise ValueError("non-escalating fast plans require empty escalation_reason")
+    if output.disposition == "unavailable" and output.coverage not in {"partial", "uncertain"}:
+        raise ValueError("an unavailable plan requires partial or uncertain coverage")
     if (
         len(expected_goal_id_set) > 1
         and output.disposition in {"execute", "respond", "mixed"}
@@ -3554,12 +3495,12 @@ def validate_planner_model_output(
         raise ValueError(
             "goal_outcomes keys must cover exactly the authoritative Goal Association IDs"
         )
-    if planner_tier == "fast" and output.goal_outcomes:
+    if output.goal_outcomes:
         outcome_dispositions = {outcome.disposition for outcome in output.goal_outcomes.values()}
-        unsupported = outcome_dispositions - {"execute", "respond", "clarify", "escalate"}
+        unsupported = outcome_dispositions - {"execute", "respond", "clarify", "unavailable"}
         if unsupported:
             raise ValueError(
-                "fast goal outcomes may only execute, respond, clarify, or escalate: "
+                "goal outcomes may only execute, respond, clarify, or be unavailable: "
                 + ",".join(sorted(unsupported))
             )
         if "clarify" in outcome_dispositions:
@@ -3572,34 +3513,30 @@ def validate_planner_model_output(
                 raise ValueError("fast clarification aggregate must preserve independent responses")
             if output.steps:
                 raise ValueError("fast clarification must not carry steps")
-        elif "escalate" in outcome_dispositions:
-            if outcome_dispositions != {"escalate"}:
+        elif "unavailable" in outcome_dispositions:
+            if outcome_dispositions != {"unavailable"}:
                 raise ValueError(
-                    "fast semantic escalation must not mix escalate outcomes "
+                    "an unavailable plan must not mix unavailable outcomes "
                     "with execute or respond outcomes"
                 )
-            if output.disposition != "escalate":
+            if output.disposition != "unavailable":
                 raise ValueError(
-                    "all-escalate goal outcomes require top-level disposition=escalate"
+                    "all-unavailable goal outcomes require top-level disposition=unavailable"
                 )
             if output.steps:
-                raise ValueError("fast semantic escalation must not carry steps")
+                raise ValueError("an unavailable plan must not carry steps")
             if output.goal_satisfaction is None:
-                raise ValueError(
-                    "fast semantic escalation requires model-authored goal_satisfaction"
-                )
+                raise ValueError("an unavailable plan requires model-authored goal_satisfaction")
             if output.goal_satisfaction.status == "exact":
-                raise ValueError("fast semantic escalation cannot claim exact goal satisfaction")
-        elif output.disposition == "escalate":
-            raise ValueError("multi-goal fast escalation requires one escalate outcome per goal")
+                raise ValueError("an unavailable plan cannot claim exact goal satisfaction")
+        elif output.disposition == "unavailable":
+            raise ValueError("an unavailable plan requires one unavailable outcome per goal")
         if output.disposition == "mixed" and outcome_dispositions not in (
             {"execute", "respond"}, {"respond", "clarify"},
         ):
             raise ValueError("fast mixed output requires independent execute/respond or respond/clarify goals")
     for goal_id, outcome in output.goal_outcomes.items():
-        if planner_tier == "fast" and (
-            len(expected_goal_id_set) > 1 or output.disposition == "escalate"
-        ):
+        if len(expected_goal_id_set) > 1 or output.disposition == "unavailable":
             if outcome.satisfaction is None:
                 raise ValueError("fast outcomes require model-authored satisfaction")
         referenced_goal_ids = {

@@ -84,7 +84,6 @@ except ImportError:  # pragma: no cover
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
 from .social_cognition import SocialCognitionResolver
-from .deep_planner import DeepPlannerResolver
 from .reflection import ReflectionResolver
 from .value_judgment import ValueJudgmentResolver
 try:
@@ -393,27 +392,6 @@ social_cognition_resolver = (
     if social_cognition_client is not None
     else None
 )
-deep_planner_client = (
-    build_model_client(
-        model=settings.deep_planner_model,
-        timeout_ms=settings.deep_planner_timeout_ms,
-        purpose="deep_planner",
-        service_settings=settings,
-    )
-    if settings.use_llm and settings.deep_planner_enabled
-    else None
-)
-deep_planner_resolver = (
-    DeepPlannerResolver(
-        deep_planner_client, capability_catalog,
-        num_ctx=settings.deep_planner_num_ctx,
-        num_predict=settings.deep_planner_num_predict,
-        max_capabilities=settings.deep_planner_max_capabilities,
-        min_goal_satisfaction=settings.deep_planner_min_goal_satisfaction,
-    )
-    if deep_planner_client is not None
-    else None
-)
 # Value Judgment shares the Fast Planner's model service and deadline: one short call that
 # gates value-reviewed effects (owner amendment 2026-10-10).
 value_judgment_client = (
@@ -546,8 +524,6 @@ async def health() -> HealthResponse:
         ),
         fast_planner_enabled=fast_planner_resolver is not None,
         fast_planner_model=(settings.fast_planner_model if fast_planner_resolver is not None else None),
-        deep_planner_enabled=deep_planner_resolver is not None,
-        deep_planner_model=(settings.deep_planner_model if deep_planner_resolver is not None else None),
     )
 
 
@@ -664,21 +640,6 @@ async def resolve_fast_plan(request: CognitiveWorkRequest):
     )
     result = await fast_planner_resolver.resolve(prepared)
     return attach_planner_disclosure_metadata_fail_closed(result, disclosure)
-
-
-@app.post("/deep-plan")
-async def resolve_deep_plan(request: CognitiveWorkRequest):
-    if deep_planner_resolver is None:
-        raise HTTPException(status_code=503, detail="Deep planner is disabled")
-    prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
-        request,
-        "deep_planner",
-    )
-    result = await deep_planner_resolver.resolve(prepared)
-    return attach_planner_disclosure_metadata_fail_closed(
-        result,
-        disclosure,
-    )
 
 
 @app.post("/social-cognition")

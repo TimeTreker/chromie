@@ -77,7 +77,7 @@ from .planner_fast_validation import (
     validate_fast_advance_output,
     validate_work_reuse_selection,
 )
-from .planner_fallback import materialize_fast_escalation
+from .planner_fallback import materialize_planner_failure, materialize_planner_unavailable
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
     from chromie_contracts.user_turn import user_turn_source_tokens
@@ -471,7 +471,6 @@ class FastPlannerResolver:
                 )
                 if multi_goal_contract
                 else canonical_plan_response_schema(
-                    planner_tier="fast",
                     expected_goal_ids=expected_goal_ids_for_turn,
                     allowed_capability_ids=[item["capability_id"] for item in capability_payload],
                     capability_input_schemas={
@@ -729,12 +728,11 @@ class FastPlannerResolver:
                     request.sid,
                     exc,
                 )
-                return materialize_fast_escalation(
+                return materialize_planner_unavailable(
                     plan_id,
                     request,
                     "resource_responsibility_composition_required",
                     unresolved=[str(exc)],
-                    path_classification="semantic_escalation",
                     metadata={
                         "execution_allowed": False,
                         "resource_composition_required": True,
@@ -759,22 +757,20 @@ class FastPlannerResolver:
                     failure["retryable"],
                 )
                 if isinstance(exc, RequiredPromptProjectionError):
-                    return materialize_fast_escalation(
+                    return materialize_planner_failure(
                         plan_id,
                         request,
                         "fast_planner_required_context_over_budget",
-                        path_classification="contract_failure",
                         metadata=failure,
                     )
                 if isinstance(
                     exc, ResourceResponsibilityCapabilityUnavailableError
                 ):
-                    return materialize_fast_escalation(
+                    return materialize_planner_unavailable(
                         plan_id,
                         request,
                         "resource_responsibility_capability_unavailable",
                         unresolved=[str(exc)],
-                        path_classification="semantic_escalation",
                         metadata={
                             "execution_allowed": False,
                             "resource_contract_unavailable": True,
@@ -801,7 +797,7 @@ class FastPlannerResolver:
                     and not mechanical_contract_error
                     and not authoritative_grounding_failure
                 )
-                return materialize_fast_escalation(
+                return materialize_planner_failure(
                     plan_id,
                     request,
                     (
@@ -814,10 +810,8 @@ class FastPlannerResolver:
                         else "fast_planner_unavailable"
                     ),
                     error=exc,
-                    # A rejected model result is not a model-authored request
-                    # for depth. Preserve the failure instead of asking Deep to
-                    # repair contradictory or ungrounded output.
-                    path_classification="contract_failure",
+                    # A rejected model result fails closed; no other model call
+                    # repairs contradictory or ungrounded output.
                     metadata={
                         "contract_schema": contract_schema,
                         "canonical_contract": "CanonicalPlan",
@@ -850,14 +844,21 @@ class FastPlannerResolver:
                 nonfulfilling_response_goal_ids=reporting_goal_ids,
             )
         if not qualification.accepted:
-            return materialize_fast_escalation(
+            if qualification.path_classification == "limitation":
+                return materialize_planner_unavailable(
+                    plan.plan_id,
+                    request,
+                    qualification.reason,
+                    unresolved=list(qualification.unresolved),
+                    metadata=qualification.metadata,
+                )
+            return materialize_planner_failure(
                     plan.plan_id,
                     request,
                     qualification.reason,
                     response_text=plan.response_text,
                     unresolved=list(qualification.unresolved),
                     metadata=qualification.metadata,
-                    path_classification=qualification.path_classification,
                 )
         validated = qualification.plan
         if parameter_provenance_repairs:

@@ -249,7 +249,6 @@ class VoiceAssistant:
         )
         self.fast_planner_mode = cognition_settings.fast_planner_mode
         self.fast_planner_timeout_ms = cognition_settings.fast_planner_timeout_ms
-        self.deep_planner_mode = cognition_settings.deep_planner_mode
         self.deep_planner_timeout_ms = cognition_settings.deep_planner_timeout_ms
         self.goal_association_mode = cognition_settings.goal_association_mode
         self.goal_association_timeout_ms = (
@@ -2818,9 +2817,6 @@ class VoiceAssistant:
                             fast_workflow_stage=(
                                 "fast_planner_goal_cancellation_reentry"
                             ),
-                            deep_workflow_stage=(
-                                "planner_deep_pass_goal_cancellation_reentry"
-                            ),
                             response_source=(
                                 "fast_planner_goal_cancellation_reentry"
                             ),
@@ -2969,9 +2965,6 @@ class VoiceAssistant:
                                 },
                                 fast_workflow_stage=(
                                     "fast_planner_goal_cancellation_reentry"
-                                ),
-                                deep_workflow_stage=(
-                                    "planner_deep_pass_goal_cancellation_reentry"
                                 ),
                                 response_source=(
                                     "fast_planner_goal_cancellation_reentry"
@@ -5131,7 +5124,6 @@ class VoiceAssistant:
                 **extra_context,
             },
             fast_workflow_stage="fast_planner_evidence_reentry",
-            deep_workflow_stage="planner_deep_pass_evidence_reentry",
             response_source="fast_planner_evidence_reentry",
             repeat_check_evidence=[bounded_evidence],
             repeat_check_context=extra_context,
@@ -5271,7 +5263,6 @@ class VoiceAssistant:
                 "cognitive_opportunity": opportunity.prompt_projection(),
             },
             fast_workflow_stage="fast_planner_situation_revision_reentry",
-            deep_workflow_stage="planner_deep_pass_situation_revision_reentry",
             response_source="fast_planner_situation_revision_reentry",
         )
         if planner_response is None:
@@ -5386,7 +5377,6 @@ class VoiceAssistant:
                     "cognitive_opportunity": opportunity.prompt_projection(),
                 },
                 fast_workflow_stage="fast_planner_restored_provider_state_reentry",
-                deep_workflow_stage="planner_deep_pass_restored_provider_state_reentry",
                 response_source="fast_planner_restored_provider_state_reentry",
                 responsibilities_override=responsibilities,
             )
@@ -5470,7 +5460,6 @@ class VoiceAssistant:
         phase: str,
         context_updates: dict[str, Any],
         fast_workflow_stage: str,
-        deep_workflow_stage: str,
         response_source: str,
         responsibilities_override: list[CognitiveResponsibilityProposal] | None = None,
         parent_interaction_id: str | None = None,
@@ -5899,7 +5888,7 @@ class VoiceAssistant:
             "evidence_refs": normalized_evidence_refs,
             "phase": phase,
         }
-        async def resolve_reentry_plan(tier, operation, workflow_stage, stage_metadata):
+        async def resolve_reentry_plan(operation, workflow_stage, stage_metadata):
             started_ms = now_ms()
             result = None
             try:
@@ -5907,10 +5896,7 @@ class VoiceAssistant:
                 failure = self.cognitive_runtime._optional_stage_failure_metadata(
                     workflow_stage, result.metadata,
                 )
-                if (
-                    tier == "fast"
-                    and self.cognitive_runtime._fast_plan_path(result) == "contract_failure"
-                ) or (tier == "deep" and failure is not None):
+                if self.cognitive_runtime._fast_plan_path(result) == "contract_failure":
                     raise CognitiveStageFailure(
                         workflow_stage,
                         failure or self.cognitive_runtime._stage_failure_metadata(
@@ -5937,32 +5923,16 @@ class VoiceAssistant:
             )
             return result
 
-        # Activation decides whether Planner should run; Fast Planner owns the first
-        # HOW pass and may itself request Deep. Runtime never selects reasoning depth
-        # from event type or a Host-authored readiness mode.
+        # Activation decides whether Planner should run; the one Planner owns HOW and
+        # nothing re-plans its decision. Runtime never selects reasoning depth from
+        # event type or a Host-authored readiness mode.
         replanned: CanonicalPlan | None = await resolve_reentry_plan(
-            "fast", self.agent_client.resolve_fast_plan(
+            self.agent_client.resolve_fast_plan(
                 session, request=request,
                 timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
             ), fast_workflow_stage, {"planner_pass": "fast"},
         )
 
-        if replanned.disposition == "escalate":
-            deep_call = getattr(self.agent_client, "resolve_deep_plan", None)
-            if not callable(deep_call):
-                self.session_log(
-                    session_id,
-                    "planner_state_reentry_deep_unavailable: phase=%s",
-                    phase,
-                )
-                return None
-            replanned = await resolve_reentry_plan(
-                "deep", deep_call(
-                    session, request=request,
-                    timeout_ms=self.cognitive_runtime_policy.deep_planner_timeout_ms,
-                ), deep_workflow_stage,
-                {"planner_pass": "deep", "activation_owner": "planner"},
-            )
         if replanned is None:
             return None
         if (
@@ -6376,7 +6346,6 @@ class VoiceAssistant:
                     **extra_context,
                 },
                 fast_workflow_stage="fast_planner_evidence_reentry",
-                deep_workflow_stage="planner_deep_pass_evidence_reentry",
                 response_source="fast_planner_evidence_reentry",
                 repeat_check_evidence=evidence,
                 repeat_check_context=extra_context,

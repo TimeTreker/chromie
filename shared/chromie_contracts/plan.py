@@ -94,12 +94,12 @@ def validate_communicative_activity_identity(
 
 
 PlanCoverage = Literal["complete", "partial", "uncertain"]
-PlannerTier = Literal["fast", "deep"]
+# One Planner (PLANNER-AUTHORITY-001); the tier field names it for evidence and fingerprints.
+PlannerTier = Literal["fast"]
 PlanDisposition = Literal[
     "respond",
     "execute",
     "mixed",
-    "escalate",
     "clarify",
     "unavailable",
     "refused",
@@ -107,7 +107,6 @@ PlanDisposition = Literal[
 GoalOutcomeDisposition = Literal[
     "respond",
     "execute",
-    "escalate",
     "clarify",
     "unavailable",
     "refused",
@@ -146,7 +145,6 @@ ParameterResolutionStrategy = Literal[
     "unresolvable",
 ]
 GoalSatisfactionStatus = Literal["exact", "substantial", "partial", "unsatisfied"]
-FastPlannerContinuation = Literal["deep_planner"]
 FastCommunicativeActRole = Literal[
     "complete_response",
     "progress",
@@ -670,7 +668,6 @@ class FastPlannerAdvance(BaseModel):
     coverage: PlanCoverage
     covered_responsibility_refs: list[str] = Field(default_factory=list)
     activities: list[FastPlannerActivity] = Field(default_factory=list, max_length=24)
-    continuations: list[FastPlannerContinuation] = Field(default_factory=list)
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     unresolved: list[str] = Field(default_factory=list)
     reason_summary: str = ""
@@ -681,7 +678,7 @@ class FastPlannerAdvance(BaseModel):
     def normalize_advance_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
 
-    @field_validator("covered_responsibility_refs", "continuations", "unresolved", mode="before")
+    @field_validator("covered_responsibility_refs", "unresolved", mode="before")
     @classmethod
     def normalize_advance_lists(cls, value: Any) -> list[str]:
         return _normalize_ids(value)
@@ -693,10 +690,6 @@ class FastPlannerAdvance(BaseModel):
 
     @model_validator(mode="after")
     def validate_advance_contract(self) -> "FastPlannerAdvance":
-        if self.disposition == "escalate" and "deep_planner" not in self.continuations:
-            raise ValueError("Fast Planner escalation requires Deep Planner continuation")
-        if "deep_planner" in self.continuations and self.disposition != "escalate":
-            raise ValueError("Deep Planner continuation requires disposition=escalate")
         authored_activity_roles = {item.role for item in self.activities}
         if self.disposition == "execute" and "capability" not in authored_activity_roles:
             raise ValueError("executable Fast Planner disposition requires a Capability Activity")
@@ -712,19 +705,13 @@ class FastPlannerAdvance(BaseModel):
             item.role == "clarification" for item in self.activities
         ):
             raise ValueError("clarify disposition requires a clarification Activity")
-        if self.disposition == "escalate" and any(
-            item.role == "capability" for item in self.activities
-        ):
-            raise ValueError("escalating Fast Planner output must not carry Capability Activities")
         if self.coverage != "complete" and self.disposition not in {
             "clarify",
-            "escalate",
             "unavailable",
             "refused",
         }:
             raise ValueError(
-                "non-complete Fast Planner output must clarify, escalate, report "
-                "unavailable, or refuse"
+                "non-complete Fast Planner output must clarify, report unavailable, or refuse"
             )
         activity_ids = [item.activity_id for item in self.activities]
         if len(activity_ids) != len(set(activity_ids)):
@@ -769,14 +756,11 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     coverage: PlanCoverage
     covered_responsibility_refs: list[str]
     activities: list[FastPlannerActivity]
-    # Python callers may omit the empty list in deterministic fixtures. The
-    # model-facing JSON schema still requires the primary Planner to emit it.
-    continuations: list[FastPlannerContinuation]
     confidence: float = Field(ge=0.0, le=1.0)
     unresolved: list[str]
     reason_summary: str
 
-    @field_validator("covered_responsibility_refs", "continuations", "unresolved", mode="before")
+    @field_validator("covered_responsibility_refs", "unresolved", mode="before")
     @classmethod
     def normalize_output_lists(cls, value: Any) -> list[str]:
         return _normalize_ids(value)
@@ -995,7 +979,7 @@ def validate_goal_satisfaction_conservation(
     for goal_id, disposition, satisfaction in outcomes:
         if satisfaction is not None:
             unmet.update(satisfaction.unmet_goal_ids)
-        if disposition not in {"clarify", "unavailable", "refused", "escalate"}:
+        if disposition not in {"clarify", "unavailable", "refused"}:
             continue
         unmet.add(goal_id)
         if satisfaction is not None and (
@@ -1137,33 +1121,6 @@ class RespondGoalPlanOutcome(_GoalPlanOutcomeBase):
         return _normalize_ids(value)
 
 
-class EscalateGoalPlanOutcome(_GoalPlanOutcomeBase):
-    """Fast-tier decision that delegates one goal to Deep Planner.
-
-    This is a planner judgment, not an execution result.  It keeps semantic
-    escalation attached to the exact authoritative goal instead of forcing the
-    host to invent or discard per-goal meaning while converting model output
-    into a CanonicalPlan.
-    """
-
-    disposition: Literal["escalate"]
-    coverage: Literal["partial", "uncertain"]
-    step_ids: list[str] = Field(default_factory=list, max_length=0)
-
-    @field_validator("step_ids", mode="before")
-    @classmethod
-    def normalize_step_ids(cls, value: Any) -> list[str]:
-        return _normalize_ids(value)
-
-    @model_validator(mode="after")
-    def validate_escalation(self) -> "EscalateGoalPlanOutcome":
-        if self.response_text:
-            raise ValueError("escalate goal outcomes must not claim a user-facing answer")
-        if not self.unresolved and not self.rationale:
-            raise ValueError("escalate goal outcomes require an unresolved need or rationale")
-        return self
-
-
 class ClarifyGoalPlanOutcome(_GoalPlanOutcomeBase):
     disposition: Literal["clarify"]
     coverage: Literal["partial", "uncertain"]
@@ -1205,7 +1162,6 @@ GoalPlanOutcome = Annotated[
     Union[
         ExecuteGoalPlanOutcome,
         RespondGoalPlanOutcome,
-        EscalateGoalPlanOutcome,
         ClarifyGoalPlanOutcome,
         UnavailableGoalPlanOutcome,
         RefusedGoalPlanOutcome,
@@ -1239,7 +1195,6 @@ class CanonicalPlan(BaseModel):
         default_factory=list,
         max_length=3,
     )
-    escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
     time_conditions: list[PlannedGoalTimeCondition] = Field(default_factory=list, max_length=16)
@@ -1248,7 +1203,7 @@ class CanonicalPlan(BaseModel):
     selected_agent_skills: list[PlanAgentSkillProvenance] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("plan_id", "goal_summary", "response_text", "escalation_reason", mode="before")
+    @field_validator("plan_id", "goal_summary", "response_text", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
@@ -1294,7 +1249,6 @@ class CanonicalPlan(BaseModel):
         path_classification = self.metadata.get("path_classification")
         if path_classification in {
             "terminal",
-            "semantic_escalation",
             "contract_failure",
         }:
             allowed_metadata["path_classification"] = path_classification
@@ -1349,30 +1303,13 @@ class CanonicalPlan(BaseModel):
             step.reuse_activity_id for step in self.steps if step.reuse_activity_id
         ):
             raise ValueError("one Activity cannot be both reused and cancelled")
-        if self.disposition == "escalate" and self.cancel_activity_ids:
-            raise ValueError("an escalating Plan cannot cancel Work")
         if self.coverage != "complete":
             if self.steps:
                 raise ValueError("non-complete plans must not carry executable steps")
-            if self.planner_tier == "fast":
-                if self.disposition not in {
-                    "escalate",
-                    "clarify",
-                    "unavailable",
-                    "refused",
-                }:
-                    raise ValueError(
-                        "partial or uncertain fast plans must clarify, escalate, "
-                        "report unavailable, or refuse"
-                    )
-                if self.disposition == "escalate" and not self.escalation_reason:
-                    raise ValueError("escalating plans require escalation_reason")
-            elif self.disposition not in {"clarify", "unavailable", "refused"}:
+            if self.disposition not in {"clarify", "unavailable", "refused"}:
                 raise ValueError(
-                    "non-complete deep plans must clarify, report unavailable, or refuse"
+                    "partial or uncertain plans must clarify, report unavailable, or refuse"
                 )
-        if self.planner_tier == "deep" and self.disposition == "escalate":
-            raise ValueError("deep plans cannot return to the fast planner")
         if self.disposition == "execute" and not self.steps:
             raise ValueError("execute disposition requires at least one step")
         if self.disposition == "mixed" and not self.steps:
@@ -1430,8 +1367,6 @@ class CanonicalPlan(BaseModel):
                 raise ValueError("communication order contradicts Work step order")
             if not need.source_goal_ids or not set(need.source_goal_ids).issubset(goal_id_set):
                 raise ValueError("canonical communication need requires exact known Goal scope")
-        if self.disposition == "escalate" and self.communication_needs:
-            raise ValueError("an unresolved Planner decision cannot commit communication needs")
         condition_ids = [item.condition_id for item in self.time_conditions]
         if len(condition_ids) != len(set(condition_ids)):
             raise ValueError("time condition IDs must be unique")
@@ -1494,9 +1429,7 @@ class CanonicalPlan(BaseModel):
             raise ValueError(
                 "Canonical Plan Agent Skill provenance must be unique per Skill and planner role"
             )
-        allowed_roles = (
-            {"fast_planner"} if self.planner_tier == "fast" else {"fast_planner", "deep_planner"}
-        )
+        allowed_roles = {"fast_planner"}
         for item in self.selected_agent_skills:
             if item.selected_by_agent_role not in allowed_roles:
                 raise ValueError(
@@ -1581,8 +1514,6 @@ class CanonicalPlan(BaseModel):
                 [(item.goal_id, item.disposition, item.satisfaction) for item in self.goal_outcomes],
                 self.goal_satisfaction,
             )
-            if self.planner_tier == "deep" and "escalate" in outcome_dispositions:
-                raise ValueError("deep plans cannot contain escalate goal outcomes")
             nonexecuting_time_goals = {
                 item.goal_id
                 for item in self.time_conditions
@@ -1658,13 +1589,6 @@ class CanonicalPlan(BaseModel):
             dispositions = {item.disposition for item in self.goal_outcomes}
             if self.steps and "execute" not in dispositions:
                 raise ValueError("mixed plans with steps require an executable goal outcome")
-            if self.planner_tier == "fast":
-                unsupported = dispositions - {"execute", "respond", "clarify"}
-                if unsupported:
-                    raise ValueError(
-                        "fast mixed plans may contain only execute, respond, and "
-                        "clarify outcomes: " + ",".join(sorted(unsupported))
-                    )
         return self
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from .clients.ollama_client import OllamaGenerationError, llm_failure_metadata
+from .clients.ollama_client import llm_failure_metadata
 from .planner_context import planner_goal_context
 try:
     from chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -30,7 +30,17 @@ def _request_goal_ids(request: CognitiveWorkRequest) -> list[str]:
 
 
 
-def materialize_fast_escalation(
+def _failure_detail(error: Exception | None) -> dict[str, Any]:
+    if error is None:
+        return {}
+    return {
+        "error_type": type(error).__name__,
+        "error": str(error)[:300],
+        **llm_failure_metadata(error),
+    }
+
+
+def materialize_planner_failure(
     plan_id: str,
     request: CognitiveWorkRequest,
     reason: str,
@@ -39,131 +49,78 @@ def materialize_fast_escalation(
     unresolved: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
     error: Exception | None = None,
-    path_classification: str = "semantic_escalation",
 ) -> CanonicalPlan:
+    """A rejected or unavailable Planner result: it fails closed and is never repaired.
+
+    The Orchestrator stops the Planner path on ``path_classification=contract_failure``;
+    no other model call re-plans the same decision (principles 30 and 31).
+    """
+
     detail = dict(metadata or {})
     detail.update(
         {
             "resolver": "fast_planner",
-            "status": "escalate",
+            "status": "failed",
             "authority": "advisory",
-            "path_classification": path_classification,
+            "path_classification": "contract_failure",
+            "execution_allowed": False,
+            "retryable": False,
+            "reason": reason,
+            **_failure_detail(error),
         }
     )
-    if error is not None:
-        detail.update(
-            {
-                "error_type": type(error).__name__,
-                "error": str(error)[:300],
-                **llm_failure_metadata(error),
-            }
-        )
-    if path_classification == "contract_failure":
-        detail.update(execution_allowed=False, retryable=False)
     retained_progress = " ".join(str(response_text or "").strip().split())
     if retained_progress:
         detail["retained_progress_response_text"] = {
             "status": "undelivered_advisory",
             "reason": reason,
         }
+    detail.setdefault("failure_class", reason)
     return CanonicalPlan(
         plan_id=plan_id,
         planner_tier="fast",
-        disposition="escalate",
+        disposition="unavailable",
         coverage="uncertain",
         confidence=0.0,
         goal_ids=_request_goal_ids(request),
         goal_summary=request.text,
         response_text=retained_progress,
         steps=[],
-        escalation_reason=reason,
         unresolved=list(unresolved or []),
         metadata=detail,
     )
 
-def materialize_deep_unavailable(
+
+def materialize_planner_unavailable(
     plan_id: str,
     request: CognitiveWorkRequest,
     reason: str,
     *,
     unresolved: list[str] | None = None,
     metadata: dict[str, Any] | None = None,
-    error: Exception | None = None,
-    attempts: int = 1,
 ) -> CanonicalPlan:
-    """Return a terminal capability limitation without asking a fake question.
+    """Return a terminal limitation without asking a fake question.
 
-    Missing provider ability is not user-semantic ambiguity. Additional user
-    detail cannot create an absent Capability, so Deep Planning reports the
-    limitation and authors only honest conversational next steps.
+    Missing provider ability, or a plan the Planner itself judged inadequate, is not
+    user-semantic ambiguity; additional user detail cannot create an absent
+    Capability. The Goal stays unmet and Social Cognition says so honestly.
     """
 
     detail = dict(metadata or {})
     detail.update(
         {
-            "resolver": "deep_planner",
+            "resolver": "fast_planner",
             "status": "unavailable",
             "authority": "advisory",
+            "path_classification": "terminal",
             "execution_allowed": False,
-            "attempt_count": attempts,
             "reason": reason,
         }
     )
-    if error is not None:
-        detail.update(
-            {
-                "error_type": type(error).__name__,
-                "error": str(error)[:300],
-                **llm_failure_metadata(error),
-            }
-        )
     return CanonicalPlan(
         plan_id=plan_id,
-        planner_tier="deep",
+        planner_tier="fast",
         disposition="unavailable",
-        coverage="uncertain",
-        confidence=0.0,
-        goal_summary=request.text,
-        goal_ids=_request_goal_ids(request),
-        response_text="",
-        steps=[],
-        unresolved=list(unresolved or []),
-        metadata=detail,
-    )
-
-def materialize_deep_clarify(
-    plan_id: str,
-    request: CognitiveWorkRequest,
-    reason: str,
-    *,
-    unresolved: list[str] | None = None,
-    metadata: dict[str, Any] | None = None,
-    error: Exception | None = None,
-    attempts: int = 1,
-) -> CanonicalPlan:
-    detail = dict(metadata or {})
-    detail.update(
-        {
-            "resolver": "deep_planner",
-            "status": "clarify",
-            "authority": "advisory",
-            "execution_allowed": False,
-            "attempt_count": attempts,
-            "reason": reason,
-        }
-    )
-    if error is not None:
-        detail.update(
-            {
-                "error_type": type(error).__name__,
-                "error": str(error)[:300],
-                **llm_failure_metadata(error),
-            }
-        )
-    return CanonicalPlan(
-        plan_id=plan_id,
-        planner_tier="deep",
-        disposition="clarify",
         coverage="uncertain",
         confidence=0.0,
         goal_summary=request.text,

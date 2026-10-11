@@ -143,42 +143,14 @@
       ]
     },
     {
-      "path": "agent/app/deep_planner.py",
-      "symbol": "DeepPlannerResolver._resolve",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain inference/validation failures without authorizing unvalidated Work. Reject oversized required context before inference with zero attempts, exact Goal scope and an empty non-executable Plan; preserve projection diagnostics. Issue #50 regression: tests/test_planner_prompt_module.py.",
-      "review_status": "reviewed",
-      "body_sha256": "3e17670d13483e5e4cdfd2c9c1f16c54e46444627e7372c4177c251e460c9bcc",
-      "failure_signals": [
-        "diagnostic",
-        "return",
-        "state_update"
-      ]
-    },
-    {
-      "path": "agent/app/deep_planner.py",
-      "symbol": "DeepPlannerResolver.resolve",
-      "ordinal": 1,
-      "classification": "fail_closed_boundary",
-      "owner": "agent",
-      "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
-      "review_status": "reviewed",
-      "body_sha256": "a203b6cdc88beffddf0506313fabfcd97b29168194221a176495afb9970c67fa",
-      "failure_signals": [
-        "bare_reraise"
-      ]
-    },
-    {
       "path": "agent/app/fast_planner.py",
       "symbol": "FastPlannerResolver._resolve",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
-      "contract": "Contain inference and validation failures as contract_failure without authorizing Work or asking Deep to repair rejected output. Preserve valid semantic delegation. Required-context overflow retains zero attempts and exact Goal scope. Regressions: tests/test_capability_result_evidence_reentry.py and tests/test_fast_planner_pr3.py.",
+      "contract": "Contain inference/validation failures as a fail-closed contract failure (path_classification=contract_failure) or, for a capability the turn cannot use, an honest unavailable outcome; never authorizes unvalidated Work and nothing re-plans the decision.",
       "review_status": "reviewed",
-      "body_sha256": "834ab6ba49ced6991a181ee26a98a6d85dae43ba4a0fad030c5d90644e76006b",
+      "body_sha256": "a93d5a0e18b6cc81202b3015694b9d90c953701bffb61d4a7dd8f3457ae68cd2",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -767,7 +739,7 @@
       "owner": "orchestrator",
       "contract": "Contain Host commit/cancellation failure, retain diagnostics and failure state, and authorize no unvalidated work. Preserve the admitted source envelope so operational fallback honors an existing protective silence constraint.",
       "review_status": "reviewed",
-      "body_sha256": "09e59917d8b83c97f130616ac3498de14f0c7503acc81b26c688ab2d5c23be58",
+      "body_sha256": "6a61fb4948868619d3b05a5e683c2e8f0e1d9a35ccb0157bda15a3a9b7644f05",
       "failure_signals": [
         "diagnostic",
         "return",

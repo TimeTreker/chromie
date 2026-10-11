@@ -42,7 +42,7 @@ except ImportError:  # pragma: no cover
         validate_goal_satisfaction_conservation,
     )
 
-PlannerTier = Literal["fast", "deep"]
+PlannerTier = Literal["fast"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
 # Need-first Planner contract (owner amendment 2026-10-10). Before Work, the Planner
@@ -222,7 +222,7 @@ class PlannerModelGoalOutcome(BaseModel):
 
     @model_validator(mode="after")
     def validate_outcome_shape(self) -> "PlannerModelGoalOutcome":
-        if self.disposition in {"execute", "escalate"} and (self.precedes_step_ids or self.follows_step_ids):
+        if self.disposition == "execute" and (self.precedes_step_ids or self.follows_step_ids):
             raise ValueError("only communication outcomes may order a communication need")
         if self.disposition == "execute":
             if self.coverage != "complete" or not self.step_ids:
@@ -236,13 +236,6 @@ class PlannerModelGoalOutcome(BaseModel):
                 raise ValueError("respond goal outcome must not reference steps")
             if self.unresolved:
                 raise ValueError("respond goal outcome must not retain unresolved work")
-        elif self.disposition == "escalate":
-            if self.coverage not in {"partial", "uncertain"}:
-                raise ValueError("escalate goal outcome requires partial or uncertain coverage")
-            if self.step_ids:
-                raise ValueError("escalate goal outcome must not reference steps")
-            if not self.unresolved and not self.rationale.strip():
-                raise ValueError("escalate goal outcome requires an unresolved need or rationale")
         elif self.disposition == "clarify":
             if self.coverage not in {"partial", "uncertain"}:
                 raise ValueError("clarify goal outcome requires partial or uncertain coverage")
@@ -292,7 +285,6 @@ class PlannerModelOutput(BaseModel):
     goal_summary: str = ""
     steps: list[PlannerModelStep] = Field(default_factory=list)
     cancel_activity_ids: list[str] = Field(default_factory=list, max_length=32)
-    escalation_reason: str = ""
     unresolved: list[str] = Field(default_factory=list)
     parameter_resolutions: list[PlanParameterResolution] = Field(default_factory=list)
     time_conditions: list[PlannerModelTimeCondition] = Field(
@@ -336,8 +328,6 @@ class PlannerModelOutput(BaseModel):
                     raise ValueError("mixed output without steps cannot authorize or schedule Work")
         if self.disposition not in {"execute", "mixed"} and self.steps:
             raise ValueError(f"{self.disposition} planner output must not carry executable steps")
-        if self.disposition == "escalate" and not self.escalation_reason.strip():
-            raise ValueError("escalate planner output requires escalation_reason")
         if self.disposition in {"execute", "respond", "mixed"}:
             if self.coverage != "complete":
                 raise ValueError(
@@ -460,13 +450,13 @@ class PlannerEvidenceReentryGoalDecision(BaseModel):
             raise ValueError("post-execution respond requires trusted Evidence refs")
         if self.next_action in {"respond", "execute"} and self.unresolved_needs:
             raise ValueError("complete re-entry action cannot retain unresolved needs")
-        if self.next_action in {"clarify", "escalate"} and not (
+        if self.next_action == "clarify" and not (
             self.unresolved_needs or self.unmet_requirements or self.rationale
         ):
             raise ValueError(
-                "clarify/escalate re-entry requires a concrete unresolved need or rationale"
+                "clarify re-entry requires a concrete unresolved need or rationale"
             )
-        if self.next_action in {"clarify", "unavailable", "refused", "escalate"}:
+        if self.next_action in {"clarify", "unavailable", "refused"}:
             if self.satisfaction_status == "exact":
                 raise ValueError("noncompletion re-entry action cannot claim exact satisfaction")
         return self
@@ -487,12 +477,6 @@ class PlannerEvidenceReentryModelOutput(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     plan_relation: PlannerPlanRelation
     user_confirmation_required: bool
-    escalation_reason: str = Field(default="", max_length=600)
-
-    @field_validator("escalation_reason", mode="before")
-    @classmethod
-    def normalize_reentry_escalation(cls, value: Any) -> str:
-        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_reentry_shape(self) -> "PlannerEvidenceReentryModelOutput":
@@ -507,13 +491,6 @@ class PlannerEvidenceReentryModelOutput(BaseModel):
             )
         if any(item.next_action != "execute" for item in self.goal_decisions) and authored - executing:
             raise ValueError("non-execute re-entry Goal cannot own new Work")
-        if any(item.next_action == "escalate" for item in self.goal_decisions):
-            if self.new_work:
-                raise ValueError("escalating re-entry cannot also author new Work")
-            if not self.escalation_reason:
-                raise ValueError("escalating re-entry requires escalation_reason")
-        elif self.escalation_reason:
-            raise ValueError("escalation_reason is valid only when a Goal escalates")
         if self.plan_relation in {"safe_adjustment", "alternative"}:
             if not self.user_confirmation_required:
                 raise ValueError("adjusted/alternative re-entry requires user confirmation")
@@ -733,7 +710,6 @@ def materialize_evidence_reentry_model_output(
         "goal_summary": "",
         "steps": [item.model_dump(mode="python") for item in output.new_work],
         "cancel_activity_ids": [],
-        "escalation_reason": output.escalation_reason,
         "unresolved": unresolved,
         "parameter_resolutions": [],
         "time_conditions": [],

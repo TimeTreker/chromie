@@ -333,6 +333,8 @@ class Settings(BaseModel):
     fast_planner_max_capabilities: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_MAX_CAPABILITIES", "24")), ge=1, le=64
     )
+    # The deliberative model service shared by Social Cognition's deep path and Reflection.
+    # Its names predate the retired Deep Planner (2026-10-11); renaming them is a follow-up.
     deep_planner_enabled: bool = Field(
         default_factory=lambda: os.getenv("AGENT_DEEP_PLANNER_ENABLED", "1").strip().lower()
         not in {"0", "false", "no", "off"}
@@ -347,10 +349,6 @@ class Settings(BaseModel):
     deep_planner_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_NUM_PREDICT", "1024")), ge=256, le=8192
     )
-    deep_planner_max_capabilities: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_MAX_CAPABILITIES", "96")), ge=1, le=256
-    )
-    deep_planner_min_goal_satisfaction: float = Field(default_factory=lambda: float(os.getenv("AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION", "0.75")), ge=0.0, le=1.0)
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     ollama_fallback_url: str = Field(default_factory=lambda: os.getenv("OLLAMA_URL", "http://chromie-llm:11434"))
     ollama_fallback_model: str = Field(default_factory=lambda: os.getenv("OLLAMA_MODEL", "qwen3:4b"))

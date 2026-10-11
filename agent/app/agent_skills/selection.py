@@ -36,7 +36,6 @@ logger = logging.getLogger("chromie.agent.agent_skills.selection")
 
 _ROLE_LABELS: dict[AgentSkillProjectionName, str] = {
     "fast_planner": "Fast Planner Agent",
-    "deep_planner": "Deep Planner Agent",
 }
 
 
