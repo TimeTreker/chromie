@@ -989,6 +989,11 @@ def test_native_vocal_work_with_empty_catalog_cannot_invent_a_provider():
     ("unavailable", "partial", "work", False),
     ("unavailable", "uncertain", "work", False),
     ("unavailable", "complete", "limit", False),
+    # Live 2026-10-11: a lone limitation labelled mixed, and a limitation used as a note
+    # beside the Responsibility's own Work, passed the decoder and failed the contract.
+    ("mixed", "complete", "limit", False),
+    ("execute", "complete", "work+limit", False),
+    ("mixed", "complete", "work+limit", False),
 ])
 def test_native_decision_alternatives_preserve_execution_limitation_boundary(disposition, coverage, activity, valid):
     request, source = _body_request()
@@ -999,7 +1004,7 @@ def test_native_decision_alternatives_preserve_execution_limitation_boundary(dis
     limit = {"role": "unavailable", "activity_id": "limit", "source_responsibility_refs": [source.local_ref],
         "missing": ["A provider for this action."]}
     output = {"disposition": disposition, "coverage": coverage, "covered_responsibility_refs": [source.local_ref],
-        "activities": [work if activity == "work" else limit],
+        "activities": {"work": [work], "limit": [limit], "work+limit": [work, limit]}[activity],
         "confidence": 1, "unresolved": [], "reason_summary": "Bounded Work decision."}
     # Exercise the native alternatives independently of the Host's conditional
     # allOf checks, which the deployed decoder does not enforce.

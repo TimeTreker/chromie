@@ -2465,6 +2465,16 @@ def fast_streaming_advance_response_schema(
         properties["disposition"] = {"type": "string", "enum": [disposition]}
         if disposition in {"execute", "mixed", "respond"}:
             properties["coverage"] = {"type": "string", "enum": ["complete"]}
+            # Every Work state carries an Activity, and mixed always combines at least two.
+            properties["activities"]["minItems"] = 2 if disposition == "mixed" else 1
+        if disposition != "unavailable" and len(responsibility_refs) == 1:
+            # With one Responsibility a limitation is the whole decision: an unavailable
+            # Activity beside its own Work or response is a contract error (live 2026-10-11).
+            items = properties["activities"]["items"]
+            kept = [item for item in items.get("oneOf", [items])
+                    if item.get("properties", {}).get("role", {}).get("enum") != ["unavailable"]]
+            if kept and len(kept) != len(items.get("oneOf", [items])):
+                properties["activities"]["items"] = {"oneOf": kept}
         if disposition == "unavailable":
             properties["coverage"] = {"type": "string", "enum": ["partial", "uncertain"]}
             items = properties["activities"]["items"]
