@@ -76,8 +76,6 @@ class PlannerResponseProjection(BaseModel):
                 raise ValueError("SC response must preserve the canonical communication obligations")
             if plan.plan_id not in request.source_refs or request.context.get("canonical_plan_resolution") != plan.prompt_projection():
                 raise ValueError("SC response must read the exact immutable Work decision")
-        if plan.disposition == "escalate":
-            raise ValueError("planner response projection requires a terminal canonical plan")
         if self.canonical_plan_id != plan.plan_id:
             raise ValueError("canonical_plan_id must match the embedded immutable plan")
         expected_fingerprint = canonical_plan_fingerprint(plan)
