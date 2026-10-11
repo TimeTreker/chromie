@@ -1,6 +1,40 @@
 # Chromie Handoff
 
-## Current delivery — Value Judgment (VALUE-JUDGMENT-001), 2026-10-11
+## Current delivery — Deep Planner retired (stage B), 2026-10-11 (local branch, not pushed)
+
+Worktree `/tmp/claude-1000/-home-chromie-github-chromie/e21d98fd-a592-451c-b8b4-95a68a5e25c7/scratchpad/stageb`,
+branch `deep-removal` (WIP commits on `5ea034e35`). Evidence: `.chromie/acceptance/deep-removal-20261011/` in the main checkout
+(README.md, PLAN.md, `capture23.py`, `freeze23.py`, `make_cohort_b.py`, `oracle.json`,
+`AgentDockerfile`, live runs and bundles).
+
+Live state on this host: `chromie-agent:latest` = `stageB-7eb9ee1fc`, created from the worktree
+compose (mounts `agent-skills/` and `capabilities/` from the worktree; env from the worktree's
+generated `.env.runtime`, `CHROMIE_OPERATOR_MODE=voice_mujoco`). Rollback: `chromie-agent:vj-3f19ecf0d`
+with the main-checkout compose. `chromie-llm` `03ad9e33` unchanged.
+
+```bash
+# rollback to the pushed main (Value Judgment)
+cd /home/chromie/github/chromie && docker tag chromie-agent:vj-3f19ecf0d chromie-agent:latest
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# rebuild/deploy the branch (from the worktree root)
+docker build -q -f .chromie/acceptance/deep-removal-20261011/AgentDockerfile -t chromie-agent:stageB-$(git rev-parse --short=9 HEAD) .
+docker compose -p chromie --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
+# corpus freeze 23 (only if a Planner/UMI/GA request changes): restore freeze 22, then
+PYTHONPATH=.:.chromie/acceptance/deep-removal-20261011 python3 .chromie/acceptance/deep-removal-20261011/capture23.py benchmarks/integration/workflow_scenarios
+PYTHONPATH=.:.chromie/acceptance/deep-removal-20261011 python3 .chromie/acceptance/deep-removal-20261011/freeze23.py small && PYTHONPATH=.:.chromie/acceptance/deep-removal-20261011 python3 .chromie/acceptance/deep-removal-20261011/freeze23.py large
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir <new dir>
+# live cohort (water scene running; restart chromie-llm first; Soridormi runner crashes ~25 min in)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/deep-removal-20261011/scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity .chromie/acceptance/deep-removal-20261011/runtime-identity.json --evidence-dir .chromie/acceptance/deep-removal-20261011/<run>
+./scripts/collect_debug_bundle.sh   # once per run
+```
+
+Gate: passed on `227aceb03` and on the refreeze commit `8165314a8` (pytest 3,758, benchmarks 169, legacy 20). For later revisions run
+`./scripts/run_tests.sh` from the worktree (the result of the last run is in the README).
+Known failures and open decisions: see the checkpoint (conditional composition 0/4,
+multi-Responsibility mixed limitation 0/4, SC silence on a limitation, speech-only deception).
+
+## Previous delivery — Value Judgment (VALUE-JUDGMENT-001), 2026-10-11
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `1b7afb9ff`. The
 expected resume revision is the latest commit containing this file. Evidence:

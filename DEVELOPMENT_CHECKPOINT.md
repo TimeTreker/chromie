@@ -1,6 +1,62 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Value Judgment (VALUE-JUDGMENT-001), 2026-10-11
+## Current delivery — Deep Planner retired (stage B), 2026-10-11 (local branch, not pushed)
+
+Branch `deep-removal`, rebased on `5ea034e35` (Value Judgment, pushed). Owner decisions:
+PLANNER-AUTHORITY-001 (one Planner) and VALUE-JUDGMENT-001 (Deep's "should I act" intent);
+the approved draft's Deep-retirement item ("Fast escalate becomes an honest unavailable outcome; migrate the Deep
+corpus families"); "OK, go on" (2026-10-11). Evidence: `.chromie/acceptance/deep-removal-20261011/` (README.md, PLAN.md).
+
+Observed before: the Deep Planner failed its own output contract in every recent live call (6/6,
+then 2/2 in the value and skill-lookup cohorts); Fast escalated to it for compound, conditional,
+limitation and resource-composition turns.
+
+| Order | Module / owner | Before | After |
+|---|---|---|---|
+| 1 | Planner (one authority) | Fast escalates; Deep re-plans with the full catalog | one pass; unmet ability → need-first search loads any unseen contract (also a common one the Goal filter hid) → one more pass |
+| 2 | Planner limitation | `escalate` + `escalation_reason` | streamed `unavailable` Activity (`missing`), canonical per-Goal `unavailable` (≤ 4 Goals) |
+| 3 | Planner commitment | Fast 0.95 (Deep as backstop), Deep 0.75 | 0.75; below it → honest limitation; structural defects fail closed |
+| 4 | Host | Deep branches, `/deep-plan` | contract failure raises regardless of disposition; no second planner |
+| 5 | SC | words limitation results | unchanged |
+
+Implemented: retire Deep (resolver, endpoint, schemas, prompts, validation module, Agent Skill
+projection, three settings); limitation contract; provider decoder constraints ported
+(information/resource/vocal/media → `unavailable` until a search loads a provider); resource
+composition incompleteness and rejected skill provenance fail closed; need-first composition rule;
+tests and behavior scenarios migrated; docs (Charter, architecture, turn loop, configuration, API,
+and others). Live fix `7eb9ee1fc`: limitation prompts made consistent, conditional rule added to
+the streamed prompt, streamed decoder tightened (see README).
+
+Corpus freeze 23: recaptured from freeze 22 on `7eb9ee1fc`; 300 need-first passes inserted;
+archive `17adda34…`; strict replay 6,000/6,000, zero model calls, counts unchanged. 200 cases of
+`plan_unknown_capability`/`plan_unknown_argument` now fail closed instead of a Host-made question
+(intended; recorded in the freeze note).
+
+Verification: worktree suite 3,924 passed (on `5299d9cc4`); canonical gate passed on `227aceb03`;
+gate passed again on the refreeze commit `8165314a8` (pytest 3,758, benchmarks 169, legacy 20).
+
+Live (Agent `chromie-agent:stageB-*`, worktree compose mounts; see README for every case):
+- Run 1 `227aceb03`, 30 cases (22 valid + 8 rerun on a fresh scene after the known Soridormi
+  runner crash): library lookup 9/10 (before need-first 0/10); common 5/6; absent 0/4;
+  conditional 0/4; mixed 0/4. Failure clusters A/B/C traced to the stage B prompt/decoder contract.
+- Focused rerun `7eb9ee1fc`, 13 cases: simple limitation fixed on the Planner side (backflip x2,
+  coffee_en, turn_en); conditional composition 0/4; multi-Responsibility mixed limitation 0/4;
+  coffee_zh new DTO error (duplicate InformationGap IDs); SC left the limitation result need
+  pending in 2/3 unavailable turns (the person heard only "Got it.").
+
+Known open (owner decision needed before claiming parity with Deep's intended abilities):
+1. Conditional composition: the streamed Work decision has no typed way to say "decide this
+   action after the read", so the model schedules the action and Host correctly rejects it.
+2. Multi-Responsibility mixed limitation: streamed omits the impossible sibling's Activity;
+   the GA-requested canonical revision writes top-level coverage `partial` (assignment branches
+   sit under `allOf`, which the native decoder does not enforce).
+3. SC may leave a Planner limitation result need pending (silent after an acknowledgement).
+4. Speech-only deception review (from Value Judgment) is still an open owner decision.
+
+Next: owner decision on 1-3; then full 30-case cohort on the final revision; squash the WIP
+commits; push only with the owner's OK.
+
+## Previous delivery — Value Judgment (VALUE-JUDGMENT-001), 2026-10-11
 
 Base: `origin/main` `1b7afb9ff`. On 2026-10-11 the owner said "go on with the unfinished",
 which this delivery treats as approval of `VALUE_JUDGMENT_DRAFT.md`. `protect_children` stays
