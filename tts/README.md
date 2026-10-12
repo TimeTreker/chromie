@@ -74,12 +74,15 @@ serialized synthesis request. CosyVoice may still grow chunks within that
 request, but a previous utterance cannot make the next request start with an
 enlarged chunk. An invalid initial chunk size prevents readiness.
 
-Native generation paths still need warming. Normal startup performs one
-no-playback synthesis for each committed
-profile (`chromie_zh`, `chromie_en`, and `chromie_mixed`) before the microphone
-opens. Warming only `speaker_id=default` with a Chinese language hint primes the
-Chinese profile but leaves the first English or mixed request cold under shared
-GPU load.
+Native generation paths still need warming, and the worker owns it: after
+preparing conditioning, each worker runs one no-playback synthesis per committed
+profile (`chromie_zh`, `chromie_en`, and `chromie_mixed`, each in its own language)
+before it reports ready, and again after any restart. Health
+`provider_health.ready` is true only when the worker has reported ready and warm,
+so the launcher and the Host wait for it instead of warming TTS themselves (a
+first English reply once took 7.7 s while health already answered). Warming only
+`speaker_id=default` with a Chinese language hint would leave English and mixed
+requests cold.
 The supervised voice-acceptance runner independently performs a retained
 no-playback warm-up for the effective `TTS_SPEAKER_ID` after service readiness
 and before starting its microphone-owning Orchestrator. This keeps acceptance
@@ -96,8 +99,9 @@ its token stream, skips further acoustic work, joins its token thread, and
 clears request state before the worker can be reused. Cancelled audio is
 discarded. The parent clears the signal only before sending the next request,
 so cancellation before generation starts cannot be lost. If cleanup exceeds
-the drain bound, the existing fail-closed restart still applies; such a request
-can still pay a model cold-reload cost.
+the drain bound, the existing fail-closed restart still applies; the restarted
+worker reloads and warms before it is ready again, so the next request waits for
+that instead of meeting a cold voice.
 
 OuteTTS owns mutable llama.cpp/DAC state in restartable worker processes and may
 use more than one worker on a high-memory diagnostic profile. Qwen3-TTS returns

@@ -833,6 +833,52 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertEqual(truth["goal_outcomes"][0]["status"], "failed")
         self.assertNotIn("speech", truth)
 
+    def test_a_failed_reentry_tells_the_person_instead_of_ending_silently(self) -> None:
+        """Live 2026-10-12: three re-entries were rejected after the Work finished or
+        failed, and the person heard only "Got it."."""
+        from orchestrator.runtime.cognitive_runtime import CognitiveStageFailure
+
+        goal_id = "goal-motion"
+        plan = CanonicalPlan(
+            plan_id="motion-plan", planner_tier="fast", disposition="execute", coverage="complete",
+            confidence=0.98, goal_ids=[goal_id],
+            steps=[CanonicalPlanStep(step_id="move", capability_id="soridormi.motion.walk",
+                                     args={"duration_s": 1}, source_goal_ids=[goal_id])],
+        )
+        bundle = ExecutionOutcomeBundle(
+            outcome_id="outcome-motion", turn_id="turn-motion", interaction_id="interaction-motion",
+            canonical_plan_id=plan.plan_id, canonical_plan_fingerprint=canonical_plan_fingerprint(plan),
+            canonical_goal_ids=[goal_id], aggregate_status="failed",
+            evidence=[ExecutionEvidence(
+                evidence_id="motion-failed", request_id="request-motion", step_id="move",
+                capability_id="soridormi.motion.walk", source_goal_ids=[goal_id], status="failed",
+                reported_status="failed", reason_code="provider_failed")],
+            goal_outcomes=[GoalExecutionOutcome(
+                goal_id=goal_id, status="failed", step_ids=["move"], evidence_ids=["motion-failed"],
+                unresolved_step_ids=["move"], reason_codes=["provider_failed"])],
+        )
+        source = InteractionResponse(interaction_id="interaction-motion", status="ok", metadata={
+            "language": "zh-CN",
+            "user_turn_envelope": {"normalized_input": {"text": "往前走一下", "language": "zh-CN"}},
+        })
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.session_log = lambda *_args, **_kwargs: None
+
+        def respond_with(error):
+            async def reenter(**_kwargs):
+                raise error
+            assistant._planner_state_reentry_response = reenter
+            return asyncio.run(assistant._plan_evidence_bound_capability_result_response(
+                source_response=source, bundle=bundle, plan=plan, session_id="session"))
+
+        rejected = CognitiveStageFailure("fast_planner_evidence_reentry", {
+            "failure_class": "structured_output_validation", "error": "lacks verified completed Work"})
+        response = respond_with(rejected)
+        self.assertEqual([item.text for item in response.speech], ["我这边刚才出了点问题，没能把这件事完成。"])
+        self.assertEqual(response.metadata["effect_execution"], "not_authorized")
+        self.assertEqual(response.metadata["semantic_failure_stage"], "fast_planner_evidence_reentry")
+        self.assertIsNone(respond_with(RuntimeError("not a cognition stage failure")))
+
     def test_aggregate_reentry_excludes_already_consumed_sibling_evidence_and_goal(self) -> None:
         first_goal = "goal-walk"
         second_goal = "goal-blink"
@@ -1119,3 +1165,19 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(context["goal_ids"], [goal_id])
                 self.assertEqual(context["already_spoken"][0]["text"], "A joke.")
                 self.assertEqual(list(assistant.agent_client.request.planner_reentry_scope.goal_ids), [goal_id])
+
+
+@pytest.mark.asyncio
+async def test_agent_session_releases_idle_connections_before_the_agent_closes_them() -> None:
+    """Live 2026-10-12: a Value Judgment request reused a pooled socket the Agent's
+    uvicorn had closed after its 5 s keep-alive (ServerDisconnectedError), and the
+    harmless request was declined as unjudgeable."""
+    from uvicorn.config import Config
+
+    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant.http_session = None
+    session = await assistant.get_http_session()
+    try:
+        assert session.connector._keepalive_timeout < Config("app.main:app").timeout_keep_alive
+    finally:
+        await session.close()

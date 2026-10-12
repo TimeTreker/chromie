@@ -454,11 +454,11 @@ class CapabilityCatalog:
                             confirmation_contract.get("required", False),
                         )
                     )
-                    requires_confirmation = (
-                        provider_requires_confirmation
-                        or safety_class in {"physical_motion", "safety_critical"}
-                        or "physical_motion" in effects
-                    )
+                    # Confirmation is the provider's declaration, exactly as the Trusted
+                    # Capability Runtime enforces it. An Agent-only "every motion confirms"
+                    # rule made the canonical Planner demand a confirmation Runtime never
+                    # asks for (live 2026-10-12: "nod once" failed confirmation_need_missing).
+                    requires_confirmation = provider_requires_confirmation
                     upstream_metadata = item.get("metadata")
                     if not isinstance(upstream_metadata, dict):
                         upstream_metadata = {}

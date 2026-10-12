@@ -95,6 +95,15 @@ def _capability_acquires_information(capability: dict[str, Any]) -> bool:
     )
 
 
+def capability_ids_acquiring_information(capabilities: list[dict[str, Any]]) -> list[str]:
+    """Capabilities whose steps this admission accepts as information acquisition."""
+    return [
+        str(item.get("capability_id") or "")
+        for item in capabilities
+        if isinstance(item, dict) and item.get("capability_id") and _capability_acquires_information(item)
+    ]
+
+
 def information_acquisition_goal_ids(
     plan: CanonicalPlan, capabilities: list[dict[str, Any]]
 ) -> set[str]:

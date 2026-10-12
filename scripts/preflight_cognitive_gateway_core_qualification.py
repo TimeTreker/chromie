@@ -415,11 +415,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--tts-readiness-timeout-s",
         type=float,
-        default=float(os.getenv("TTS_COSYVOICE_WARMUP_TIMEOUT_SEC", "300")),
+        default=300.0,
     )
     parser.add_argument(
         "--tts-probe-text",
-        default=os.getenv("TTS_COSYVOICE_EN_WARMUP_TEXT", "Hello."),
+        default="Hello.",
     )
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     return parser

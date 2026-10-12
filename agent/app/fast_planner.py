@@ -39,6 +39,7 @@ from .planner_schema import (
     fast_evidence_reentry_response_schema,
     fast_multi_goal_response_schema,
     fast_streaming_advance_response_schema,
+    native_goal_outcome_branches,
 )
 from .planner_context import (
     planner_provider_vocal_goal_ids,
@@ -55,6 +56,7 @@ from .planner_context import (
     situation_source_observations,
 )
 from .planner_validation import (
+    capability_ids_acquiring_information,
     information_goal_ids_without_declared_provider,
     resource_goal_ids_without_complete_provider_contract,
     information_acquisition_goal_ids,
@@ -77,7 +79,9 @@ from .planner_fast_validation import (
     qualify_fast_canonical_plan,
     canonicalize_fast_argument_source_spans,
     collapse_redundant_idempotent_read_activities,
+    drop_repeated_identical_activities,
     normalize_fast_capability_activity_purpose,
+    project_responsibility_decisions,
     validate_fast_advance_output,
     validate_work_reuse_selection,
 )
@@ -290,6 +294,15 @@ class FastPlannerResolver:
                 Draft202012Validator(schema).validate(raw)
                 final_needs = take_ability_needs(raw, loaded_capability_ids=loaded_capability_ids)
                 output = FastPlannerAdvanceModelOutput.model_validate(raw)
+                output, repeated_activity_repairs = drop_repeated_identical_activities(output)
+                if repeated_activity_repairs:
+                    logger.info("fast_planner_repeated_activity_removed sid=%s repairs=%s",
+                                request.sid, bounded_json(repeated_activity_repairs, 1000))
+                authored_decisions = {ref: item.model_dump() for ref, item in output.responsibility_decisions.items()}
+                output = project_responsibility_decisions(
+                    output, responsibility_refs=[item.local_ref for item in responsibilities],
+                    speech_refs={item.local_ref for item in responsibilities if item.output_mode == "speech"},
+                )
                 output = normalize_fast_capability_activity_purpose(
                     output, capabilities=capabilities
                 )
@@ -316,8 +329,10 @@ class FastPlannerResolver:
                 break
             else:
                 raise PlannerDTOContractError("Capability search budget exhausted before a Plan")
-            advance = FastPlannerAdvance(turn_id=turn_id, **output.model_dump(), metadata={
+            advance = FastPlannerAdvance(turn_id=turn_id, **output.model_dump(exclude={"responsibility_decisions"}), metadata={
                 "semantic_authority": "fast_planner_model", "phase": "responsibility_work_plan",
+                "responsibility_decisions": authored_decisions,
+                **({"repeated_activity_normalization": repeated_activity_repairs} if repeated_activity_repairs else {}),
                 "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,
                 **ability_need_metadata(first_needs or final_needs, unmet if loaded_ids else [], loaded_ids),
                 "final_ability_needs": [item.model_dump() for item in final_needs],
@@ -459,6 +474,13 @@ class FastPlannerResolver:
                     for item in capability_payload
                 },
                 allow_new_work=allow_reentry_work,
+                information_capability_ids=capability_ids_acquiring_information(capability_payload),
+                completed_evidence_refs=[
+                    str(item.get("evidence_id") or "")
+                    for item in completed_work_step_evidence(
+                        request.context, reentry_scope=request.planner_reentry_scope,
+                    ).values()
+                ],
             )
         else:
             contract_schema = (
@@ -509,6 +531,7 @@ class FastPlannerResolver:
                         if item.get("requires_confirmation")
                     ],
                     unavailable_goal_ids=unavailable_goal_ids,
+                    information_capability_ids=capability_ids_acquiring_information(capability_payload),
                 )
                 if multi_goal_contract
                 else canonical_plan_response_schema(
@@ -528,6 +551,7 @@ class FastPlannerResolver:
                         if item.get("requires_confirmation")
                     ],
                     unavailable_goal_ids=unavailable_goal_ids,
+                    information_capability_ids=capability_ids_acquiring_information(capability_payload),
                 )
             )
             response_schema = canonical_resource_argument_response_schema(
@@ -559,7 +583,8 @@ class FastPlannerResolver:
                     ],
                 )
             response_schema = need_first_response_schema(
-                response_schema, [item["capability_id"] for item in capability_payload]
+                native_goal_outcome_branches(response_schema),
+                [item["capability_id"] for item in capability_payload],
             )
         options = {
             "temperature": 0,

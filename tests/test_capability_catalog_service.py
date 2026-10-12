@@ -703,7 +703,8 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(weather.can_run_parallel)
         self.assertTrue(weather.parallel_metadata_declared)
 
-    async def test_physical_live_skill_requires_confirmation_despite_sim_exemption(self) -> None:
+    async def test_live_skill_confirmation_is_the_provider_declaration(self) -> None:
+        # The Agent plans with the same confirmation authority Runtime enforces.
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())
 
         result = await catalog.search(
@@ -716,7 +717,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
             item for item in result.matches
             if item.capability_id == "soridormi.nod_yes"
         )
-        self.assertTrue(nod.requires_confirmation)
+        self.assertFalse(nod.requires_confirmation)
 
     async def test_chinese_head_shake_query_returns_live_skill_context_without_rule_match(self) -> None:
         catalog = CapabilityCatalog(_registry(), live_invoker=_Invoker())

@@ -961,3 +961,110 @@ def test_fast_evidence_reentry_prompt_is_bounded_and_has_no_old_output_template(
     assert '"planned_satisfaction"' not in facts
     assert '"goal_satisfaction"' not in facts
     assert '"respond"' not in facts
+
+
+def test_reentry_new_work_purpose_is_its_providers() -> None:
+    """Live 2026-10-12 (cond_sunny_wave_en): re-entry decided a wave as an information
+    read, which the step contract then rejected; the decoder now offers each provider's purpose."""
+    from jsonschema import Draft202012Validator
+
+    from agent.app.planner_validation import capability_ids_acquiring_information
+
+    catalog = [
+        {"capability_id": "soridormi.wave_hand", "effects": ["physical_motion"],
+         "safety_class": "physical_motion", "input_schema": {"type": "object", "properties": {}}},
+        {"capability_id": "chromie.weather.lookup", "effects": ["read_only"], "safety_class": "safe_read",
+         "hints": {"resource_contract": {"provider_role": "acquire_information"}},
+         "input_schema": {"type": "object", "properties": {"location": {"type": "string"}}}},
+    ]
+    schema = fast_evidence_reentry_response_schema(
+        expected_goal_ids=["goal-wave"], evidence_refs=["evidence-weather"],
+        allowed_capability_ids=[item["capability_id"] for item in catalog],
+        capability_input_schemas={item["capability_id"]: item["input_schema"] for item in catalog},
+        information_capability_ids=capability_ids_acquiring_information(catalog),
+    )
+    validator = Draft202012Validator(schema)
+
+    def output(step):
+        return {
+            "goal_decisions": [{
+                "goal_id": "goal-wave", "next_action": "execute",
+                "satisfaction_status": "unsatisfied", "satisfaction_score": 0.0,
+                "evidence_refs": ["evidence-weather"], "rationale": "Tomorrow is sunny, so wave.",
+            }],
+            "new_work": [{"step_id": "act_wave_final", "args": {}, "depends_on": [],
+                          "source_goal_ids": ["goal-wave"], **step}],
+            "confidence": 1.0, "plan_relation": "exact", "user_confirmation_required": False,
+        }
+
+    live = output({"capability_id": "soridormi.wave_hand", "step_purpose": "acquire_information"})
+    assert not validator.is_valid(live)
+    assert validator.is_valid(output({"capability_id": "soridormi.wave_hand", "step_purpose": "achieve_effect"}))
+    read = {"capability_id": "chromie.weather.lookup", "args": {"location": "Shanghai"},
+            "step_purpose": "acquire_information"}
+    assert not validator.is_valid(output(read))
+    assert validator.is_valid(output({**read, "expected_outcome": "Tomorrow's Shanghai forecast."}))
+
+
+def test_reentry_decoder_offers_only_actions_the_host_accepts() -> None:
+    """Live 2026-10-12: a timed-out read was "responded" (Host requires completed
+    Evidence), and a clarify came as a safe_adjustment without Work (DTO requires Work);
+    both were rejected and the person heard nothing."""
+    from jsonschema import Draft202012Validator
+
+    wave = {"type": "object", "properties": {}, "additionalProperties": False}
+
+    def schema(completed):
+        return Draft202012Validator(fast_evidence_reentry_response_schema(
+            expected_goal_ids=["goal-rain"], evidence_refs=["evidence-weather"],
+            allowed_capability_ids=["test.nod"], capability_input_schemas={"test.nod": wave},
+            completed_evidence_refs=completed))
+
+    def output(action, *, work=(), relation="exact", confirm=False, status="unsatisfied", score=0.0):
+        return {"goal_decisions": [{"goal_id": "goal-rain", "next_action": action,
+                                    "satisfaction_status": status, "satisfaction_score": score,
+                                    "evidence_refs": ["evidence-weather"], "rationale": "From the read."}],
+                "new_work": list(work), "confidence": 1.0, "plan_relation": relation,
+                "user_confirmation_required": confirm}
+
+    timed_out, completed = schema([]), schema(["evidence-weather"])
+    assert not timed_out.is_valid(output("respond"))
+    assert timed_out.is_valid(output("unavailable"))
+    assert completed.is_valid(output("respond", status="exact", score=1.0))
+    assert not completed.is_valid(output("clarify", relation="safe_adjustment", confirm=True))
+    assert not completed.is_valid(output("clarify", confirm=True))
+    nod = {"step_id": "nod", "capability_id": "test.nod", "args": {}, "depends_on": ["evidence-weather"],
+           "source_goal_ids": ["goal-rain"]}
+    assert completed.is_valid(output("execute", work=[nod]))
+    assert completed.is_valid(output("execute", work=[nod], relation="alternative", confirm=True))
+    assert not completed.is_valid(output("execute", work=[nod], relation="alternative"))
+
+
+def test_completed_work_may_be_cited_by_its_evidence_ref() -> None:
+    """Live 2026-10-12 (cond_sunny_wave_en): the re-entry wave depended on the read's
+    evidence_ref, the identifier its prompt shows for completed Work."""
+    from agent.app.planner_model_contract import materialize_planner_output
+
+    completed = {"weather-read": {"step_id": "weather-read", "evidence_id": "evidence-weather",
+                                  "source_goal_ids": ["goal-wave"]}}
+    compact = PlannerEvidenceReentryModelOutput.model_validate({
+        "goal_decisions": [{
+            "goal_id": "goal-wave", "next_action": "execute", "satisfaction_status": "unsatisfied",
+            "satisfaction_score": 0.0, "evidence_refs": ["evidence-weather"],
+            "rationale": "Tomorrow is sunny, so wave."}],
+        "new_work": [{"step_id": "wave", "capability_id": "test.wave", "args": {},
+                      "depends_on": ["evidence-weather"], "source_goal_ids": ["goal-wave"]}],
+        "confidence": 1.0, "plan_relation": "exact", "user_confirmation_required": False,
+    })
+    lifted = PlannerModelOutput.model_validate(materialize_evidence_reentry_model_output(
+        compact, expected_goal_ids_for_turn=["goal-wave"], allowed_evidence_refs={"evidence-weather"},
+        completed_step_evidence=completed))
+
+    def plan(evidence):
+        return materialize_planner_output(lifted, planner_tier="fast", plan_id="plan-wave",
+                                          expected_goal_ids_for_turn=["goal-wave"],
+                                          completed_step_evidence=evidence)
+
+    assert [step["step_id"] for step in plan(completed)["steps"]] == ["wave"]
+    with pytest.raises(ValueError, match="must cite earlier steps or completed Work"):
+        plan({})

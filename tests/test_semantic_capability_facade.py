@@ -207,3 +207,40 @@ class SemanticCapabilityFacadeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(left_default["yaw_radps"], 0.12)
         self.assertEqual(left_reversed["yaw_radps"], -0.12)
         self.assertEqual({"direction": "left"}, {"direction": "left"})
+
+    async def test_grouped_body_members_reach_the_compiler_as_provider_args(self) -> None:
+        """Live 2026-10-12 (lib_curve_walk): a curve run beside a blink went through the
+        group compiler with semantic ``direction``; Soridormi rejected it as unknown."""
+        from orchestrator.runtime.capability_runtime import CapabilityExecutionContext
+        from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityTrace
+
+        blink = {
+            **turn_skill(), "skill_id": "blink_eyes", "metadata": {},
+            "parameters_schema": {"type": "object", "properties": {
+                "count": {"type": "number", "minimum": 1, "maximum": 6}},
+                "additionalProperties": False},
+        }
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [turn_skill(), blink])
+        invoker = _ExecutionInvoker()
+        items = []
+        for request_id, capability_id, args in (
+            ("turn", "soridormi.turn_in_place", {"direction": "left", "duration_s": 3.0}),
+            ("blink", "soridormi.blink_eyes", {}),
+        ):
+            definition = registry.get(capability_id)
+            request = CapabilityRequest(request_id=request_id, capability_id=capability_id, args=args)
+            context = CapabilityExecutionContext(
+                interaction_id="grouped-turn",
+                trace=CapabilityTrace(interaction_id="grouped-turn", request_id=request_id,
+                                      provider_id="soridormi.mcp", capability_id=capability_id),
+            )
+            items.append((request, definition, context))
+
+        await SoridormiCapabilityProvider(invoker).execute_group(items)
+
+        compile_args = next(args for tool, args, _ in invoker.calls if tool.startswith("soridormi.activity."))
+        members = {member["member_id"]: member["parameters"] for member in compile_args["members"]}
+        self.assertEqual(members, {"turn": {"duration_s": 3.0, "yaw_radps": 0.12}, "blink": {}})
+        realization = next(event for event in items[0][2].trace.events if event.type == "provider_realization")
+        self.assertEqual(realization.data["provider_args"], {"duration_s": 3.0, "yaw_radps": 0.12})

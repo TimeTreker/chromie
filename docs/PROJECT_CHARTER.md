@@ -356,7 +356,11 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   Mind. It runs once per turn, and only when the final Plan would use a Capability on the
   owner-editable value-review list (`capabilities/value_review.json`: fetching or moving
   objects, walking, approaching or touching people; never greetings, chat, information or
-  expressive gestures). Its output states who is affected and the concern before the
+  expressive gestures), or realizes speech that UMI marked `value_review` (owner choice B,
+  2026-10-12: the request asks Chromie to tell someone something untrue as if true, or to
+  deceive or manipulate a person, including by pretending). UMI's mark is a fact about WHAT
+  is asked, not a verdict; such speech requests the Planner, and Social Cognition may only
+  acknowledge it neutrally until the verdict. Its output states who is affected and the concern before the
   decision. Effects of reviewed Capabilities wait for its verdict. On ask they need the
   person's confirmation, and Social Cognition asks the one question that settles the
   concern. On decline, or when the judgment fails or is unavailable, they never start on any
@@ -364,7 +368,9 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   decline never wakes the Planner to work around it. Polite decline is preferred over a
   question that is hard to answer. It is not a reviewer of the Planner's HOW (principles 30
   and 31): the Planner's Plan stands, and Value Judgment only permits, questions or
-  withholds reviewed effects. Deterministic Runtime and Soridormi safety remain the floor.
+  withholds reviewed effects; for marked speech, ask or decline withholds the answer and the
+  Goal ends like a limitation (decline) or waits for the person (ask). Deterministic Runtime and
+  Soridormi safety remain the floor.
   It carries the retired Deep Planner's original intent, deliberate value reasoning.
 - **MODEL-SEMANTIC-BOUNDARY-001** — A model-facing contract asks its semantic owner
   to author decisions, not protocol paperwork that trusted code can derive exactly from

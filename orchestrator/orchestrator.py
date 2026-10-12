@@ -218,6 +218,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger("chromie-orchestrator")
 
+# Below uvicorn's default 5 s ``timeout_keep_alive`` used by the Agent service.
+AGENT_HTTP_IDLE_KEEPALIVE_S = 3.0
+
+
 class VoiceAssistant:
     def __init__(self):
         # Parse the maintained Host configuration surface exactly once. Runtime
@@ -961,7 +965,12 @@ class VoiceAssistant:
 
     async def get_http_session(self) -> aiohttp.ClientSession:
         if self.http_session is None or self.http_session.closed:
-            connector = aiohttp.TCPConnector(limit=20, limit_per_host=10, keepalive_timeout=60, enable_cleanup_closed=True)
+            # Release an idle connection before the services close it: uvicorn's default
+            # keep-alive is 5 s, and reusing a socket the Agent just closed failed a Value
+            # Judgment with ServerDisconnectedError (live 2026-10-12).
+            connector = aiohttp.TCPConnector(limit=20, limit_per_host=10,
+                                             keepalive_timeout=AGENT_HTTP_IDLE_KEEPALIVE_S,
+                                             enable_cleanup_closed=True)
             timeout = aiohttp.ClientTimeout(total=None, connect=10, sock_connect=10, sock_read=None)
             self.http_session = aiohttp.ClientSession(connector=connector, timeout=timeout)
         return self.http_session
@@ -6370,7 +6379,18 @@ class VoiceAssistant:
                 type(exc).__name__,
                 exc,
             )
-            return None
+            if not isinstance(exc, CognitiveStageFailure):
+                return None
+            # The Planner could not decide what follows this Work. Say so with the
+            # operational notice instead of ending silently (live 2026-10-12: three
+            # failed re-entries left the person with only "Got it.").
+            return self._cognitive_core_exception_safe_response(
+                user_request,
+                context={"user_turn_envelope": envelope},
+                failure_stage=exc.stage,
+                failure_class=str(exc.failure_metadata.get("failure_class") or ""),
+                failure_error=str(exc),
+            )
 
     def _launch_interaction(
         self,
@@ -7762,7 +7782,10 @@ class VoiceAssistant:
 
         await self._build_runtime_ready_greeting_coordinator().announce()
 
-    async def run(self):
+    async def wait_for_interaction_services(
+        self, *, require_asr: bool = True, deadline_s: float | None = None,
+    ) -> ServiceReadinessGate:
+        """Interact only once every service reports it can serve a turn (TTS: warm)."""
         gate = ServiceReadinessGate(
             asr_url=self.asr_url,
             tts_url=self.tts_url,
@@ -7773,7 +7796,11 @@ class VoiceAssistant:
             agent_url=self.agent_url,
             enable_agent=self.enable_agent,
         )
-        self.asr_ws = await gate.wait_until_ready()
+        gate.asr_ws = await gate.wait_until_ready(require_asr=require_asr, deadline_s=deadline_s)
+        return gate
+
+    async def run(self):
+        self.asr_ws = (await self.wait_for_interaction_services()).asr_ws
         self.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
         if any(
             uses_followed_system_default(self, kind)

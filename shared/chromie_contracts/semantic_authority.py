@@ -17,6 +17,8 @@ PLANNER_WORK_AUTHORITY_PROMPT = (
     "One compound Goal/Responsibility may require Activities from multiple body domains; "
     "Planner decomposes that complete WHAT without requiring UMI or GA to split it. "
     "Never append Work as acknowledgement, politeness, personality, or decoration. "
+    "Concurrency metadata such as can_run_parallel or parallel_safe_with says only what "
+    "may run together; it never makes an Activity requested. "
     "You establish a respond, clarify, limitation or confirmation decision; Host binds "
     "that decision as a "
     "communication need for SC. Never author utterances or decorative gestures. "

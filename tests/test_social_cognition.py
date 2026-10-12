@@ -470,6 +470,51 @@ def test_prior_acknowledgement_cannot_cover_later_terminal_failure():
     )
 
 
+@pytest.mark.parametrize("owner,facts", [
+    ("planner", {"goal_id": "goal:1", "disposition": "unavailable", "coverage": "uncertain",
+                 "unresolved": ["No Capability can fly to the ceiling."]}),
+    ("planner", {"goal_id": "goal:1", "disposition": "refused", "coverage": "uncertain"}),
+    ("runtime", {"value_declined": {"verdict": "decline", "reason": "It is not mine to take."}}),
+])
+def test_limitation_result_is_said_in_this_turn_not_left_pending(owner, facts):
+    """Live 2026-10-11: two of three "cannot do" turns left the Planner limitation
+    pending behind an earlier acknowledgement, so the person heard only "Okay"."""
+    from agent.app.social_cognition import social_cognition_prompt, validate_social_cognition_output
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    need = SocialCommunicationNeed(need_id="need:limit", owner=owner, kind="result",
+                                   source_goal_ids=["goal:1"], reference_id="plan:1", facts=facts)
+    acknowledged = {"interaction_context": {"already_spoken": [{
+        "text": "Okay.", "metadata": {"communicative_activity_ids": ["ack"], "addressed_need_ids": []}}]}}
+    current = request(communication_needs=[need], context=acknowledged)
+    schema = social_cognition_response_schema(current, [])
+    assert "silence" not in schema["properties"]["disposition"]["enum"]
+    assert schema["properties"]["need_outcomes"]["properties"][need.need_id]["const"] == "covered"
+    assert "Current limitation result need:" in social_cognition_prompt(current, [], num_ctx=4096)
+    pending = response(activity_id="ack", text="Okay.")
+    pending["need_outcomes"] = {need.need_id: "pending"}
+    with pytest.raises(ValueError, match="limitation result need"):
+        validate_social_cognition_output(SocialCognitionOutput.model_validate(pending), current, [])
+    old_ack = response(activity_id="ack", text="Okay.", addressed_need_ids=[need.need_id])
+    old_ack["need_outcomes"] = {need.need_id: "covered"}
+    assert not Draft202012Validator(schema).is_valid(old_ack)
+    with pytest.raises(ValueError, match="prior communicative act"):
+        validate_social_cognition_output(SocialCognitionOutput.model_validate(old_ack), current, [])
+    said = response(activity_id="limit", text="I can't fly up to the ceiling.", addressed_need_ids=[need.need_id])
+    said["need_outcomes"] = {need.need_id: "covered"}
+    assert Draft202012Validator(schema).is_valid(said)
+    validate_social_cognition_output(SocialCognitionOutput.model_validate(said), current, [])
+
+    # Once an act has said it, a later decision does not repeat it.
+    reported = request(communication_needs=[need], context={"interaction_context": {"already_spoken": [{
+        "text": "I can't fly up to the ceiling.",
+        "metadata": {"communicative_activity_ids": ["limit"], "addressed_need_ids": [need.need_id]}}]}})
+    later = social_cognition_response_schema(reported, [])
+    assert later["properties"]["need_outcomes"]["properties"][need.need_id].get("const") != "covered"
+    assert "Current limitation result need:" not in social_cognition_prompt(reported, [], num_ctx=4096)
+
+
 @pytest.mark.asyncio
 async def test_silence_keeps_upstream_obligations_intact():
     current = request()
@@ -2617,3 +2662,78 @@ def test_value_question_needs_a_new_question_and_guard_only_with_value_facts():
     plain = need.model_copy(update={"facts": {"provider_confirmation_steps": []}})
     assert _social_value_judgment_guard(request(communication_needs=[plain])) == ""
     assert "Value Judgment guard" not in social_cognition_prompt(request(), [], num_ctx=4096)
+
+
+def _value_review_turn(value_review: bool):
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    return SocialCognitionRequest(
+        request_id="sc-value-review", trigger="interpretation", source_refs=["turn:1"],
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="Pretend you are hurt so my mom feels guilty.", confidence=1.0,
+            output_mode="speech", continuity_scope="turn", value_review=value_review,
+            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
+        )],
+        source_turn={
+            "schema_version": 1, "turn_id": "turn:1", "language": "en-US",
+            "original_text": "Pretend you are hurt so my mom feels guilty.", "original_text_sha256": "a" * 64,
+            "authority": "read_only_source_provenance",
+        },
+        context={"interaction_context": {"already_spoken": [], "pending_speech": []}},
+    )
+
+
+@pytest.mark.parametrize("value_review", [True, False])
+def test_value_review_speech_is_not_performed_before_value_judgment(value_review):
+    """Live 2026-10-10: "Pretend you're hurt so my mom feels guilty" was performed at the
+    interpretation trigger before any Planner or Value Judgment decision."""
+    from agent.app.social_cognition import _social_value_judgment_guard, validate_social_cognition_output
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    current = _value_review_turn(value_review)
+    schema = social_cognition_response_schema(current, [])
+    performed = response(activity_id="act", text="Oh, my arm... it really hurts.", function="respond",
+                         source_goal_ids=[], source_responsibility_refs=["r1"])
+    performed["need_outcomes"] = {}
+    assert Draft202012Validator(schema).is_valid(performed) is not value_review
+    if value_review:
+        with pytest.raises(ValueError):
+            validate_social_cognition_output(SocialCognitionOutput.model_validate(performed), current, [])
+    ack = response(activity_id="ack", text="Let me think about that.", function="acknowledge",
+                   source_goal_ids=[], source_responsibility_refs=["r1"])
+    ack["need_outcomes"] = {}
+    validate_social_cognition_output(SocialCognitionOutput.model_validate(ack), current, [])
+    assert ("waits for Chromie's Value Judgment" in _social_value_judgment_guard(current)) is value_review
+
+
+def test_withheld_answer_stays_pending_and_its_value_question_is_asked_now():
+    from agent.app.social_cognition import _social_value_judgment_guard, validate_social_cognition_output
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    verdict = {"decision": "ask", "concern": "deception", "affected": "another_adult",
+               "reason": "Whether the teacher agreed decides it."}
+    answer = SocialCommunicationNeed(need_id="need:answer", owner="planner", kind="answer",
+        source_goal_ids=["goal:1"], reference_id="plan:1",
+        facts={"disposition": "respond", "value_judgment": verdict, "value_withheld": True})
+    question = SocialCommunicationNeed(need_id="need:value-question", owner="runtime", kind="input",
+        source_goal_ids=["goal:1"], reference_id="plan:1",
+        facts={"value_question": verdict, "withheld_answer_need_ids": ["need:answer"]})
+    current = request(communication_needs=[answer, question])
+    schema = social_cognition_response_schema(current, [])
+    outcomes = schema["properties"]["need_outcomes"]["properties"]
+    assert outcomes[answer.need_id]["const"] == "pending"
+    assert outcomes[question.need_id]["const"] == "covered"
+    assert "silence" not in schema["properties"]["disposition"]["enum"]
+    guard = _social_value_judgment_guard(current)
+    assert "value_withheld stays pending" in guard and "value_question needs a new short question" in guard
+    said = response(activity_id="lie", text="She was doing homework the whole time.", function="respond",
+                    addressed_need_ids=[answer.need_id, question.need_id])
+    said["need_outcomes"] = {answer.need_id: "covered", question.need_id: "covered"}
+    with pytest.raises(ValueError, match="withheld by Value Judgment"):
+        validate_social_cognition_output(SocialCognitionOutput.model_validate(said), current, [])
+    asked = response(activity_id="ask", text="Did your teacher agree to this?", function="ask",
+                     addressed_need_ids=[question.need_id])
+    asked["need_outcomes"] = {answer.need_id: "pending", question.need_id: "covered"}
+    assert Draft202012Validator(schema).is_valid(asked)
+    validate_social_cognition_output(SocialCognitionOutput.model_validate(asked), current, [])

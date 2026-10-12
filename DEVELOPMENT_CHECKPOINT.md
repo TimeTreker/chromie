@@ -1,6 +1,186 @@
 # Chromie Development Checkpoint
 
-## Current delivery — Deep Planner retired (stage B), 2026-10-11
+## Current work — Planner limitation contracts (items 1-4) and run-1/2/3 repairs, 2026-10-12
+
+Branch `planner-limitation-contracts` from `origin/main` `41570d182`, delivered to `origin/main` with the
+owner's approval (commit and push after live results); the expected resume revision is the latest commit
+containing this file. Owner approvals (2026-10-12): "1 agree", "2. agree", "3. agree"; item 4 (speech-only
+deception) "need to be judged" — design proposal pending owner choice. Evidence:
+`.chromie/acceptance/planner-limitation-20261012/`.
+
+| Item | Observed (live 2026-10-11) | Earliest wrong boundary | Change |
+|---|---|---|---|
+| 1 Conditional composition | 0/4: the read and the dependent action were planned together; Host rejected acquisition + deferred effect for one Goal | streamed Work contract had no typed "decide after this read" | an `acquire_information` Capability Activity for a non-information Responsibility requires `deferred_requirement` (facts); with one Responsibility the decoder offers acquisition-only and effect-only states; the re-entry Goal carries it as `unmet_requirements` |
+| 2 Mixed limitation | 0/4: streamed omitted the impossible sibling; canonical wrote top coverage `partial` | streamed had no per-Responsibility decision; canonical per-Goal shape lived in ignored `allOf` | streamed `responsibility_decisions` decided first (work/answer/clarify/unavailable+missing); a limitation is a decision, not a model Activity; uniform disposition states admit only their decision; mismatch fails closed. Canonical Goal outcomes are native per-disposition branches. The top-level aggregate stays model-authored and fails closed (no Host rewrite: existing contract tests and Charter principles 30/31) |
+| 3 SC silence | 2/3 limitation turns: only "Got it."; need left `pending` | SC must-cover rule covered only runtime failures | one shared predicate (`unsaid_limitation_need_ids`): Planner `unavailable`/`refused` results and runtime `value_declined` needs must be covered by a new verbal act now (no silence; an earlier act cannot cover it); not repeated once said; protective silence honored |
+
+Residual (reported, not hidden): native enforcement of the canonical top-level aggregate would need
+whole-object decoder copies (each canonical branch copy roughly doubles the decoder), so it stays a
+fail-closed Host check. The workflow corpus exercises only the canonical Planner path, not streamed decisions.
+
+Verification on the working tree (clean worktree, diff applied):
+- Focused: affected Planner suites 421 passed; SC and SC-adjacent 1,104 passed.
+- Level A: multi_goal_daily_life 10/10, truthful_embodied_speech 6/6, composable_action_planning 5/5.
+- Corpus freeze 24 from freeze 23 (`capture24.py`, `freeze24.py`): 6,000/6,000 captured, no fixed-part
+  migration, no reply changed (only 5,600 Planner requests), archive `4edf2a83…`, 46 artifacts (12 new);
+  strict replay 6,000/6,000, zero model calls, counts unchanged (2,700 / 1,800 / 1,500).
+- Canonical gate `./scripts/run_tests.sh`: passed (pytest 3,763 + 5 skipped, benchmarks 169, legacy 20).
+- Live: not run. Requires deploying the Agent and the SGLang leak fix (below); owner OK pending.
+
+Also found 2026-10-12 — the "~25 min Soridormi crash" is host OOM: SGLang's reasoner-wrapped grammar cache
+kept every per-turn Planner grammar (~2.4 GB each); every simulator death sits within seconds of the kernel
+killing `sglang::schedul` at 107-116 GB. Fix on branch `sglang-grammar-retention` (worktree
+`scratchpad/sglang-fix`; image `chromie-sglang:grammar-retention`, not deployed); Soridormi runner stall
+tolerance on Soridormi branch `scenario-control-stall` (not committed).
+
+Owner reply 2026-10-12 "agree 2 A 3 agree": deploy approved; item 4 option A (Planner flags an answer
+for Value Judgment); commit and push after live results. The LLM redeploy was still refused by the
+session's automatic permission check ("Production Deploy"), so nothing was deployed; the owner runs it.
+
+Item 4: the option A hold conflicted with turn-local continuity (7 of 8 live turn-scope speech
+Responsibilities are also routed to the Planner); the owner then chose B ("B, deployed LLM and go
+on", 2026-10-12) and deployed the LLM fix (verified: scheduler RSS plateaus near 10.4 GB over nine
+fresh Planner schemas instead of growing 2.4 GB each). Implemented B:
+- UMI states `value_review` on every speech Responsibility (fact about WHAT, not a verdict); a
+  marked Responsibility requests the Planner (Runtime completes that prerequisite).
+- Value Judgment reviews the answer needs and steps realizing marked speech: decline withholds the
+  answer, adds `value_declined`, Goal refused; ask withholds it, adds a Runtime `input` need with
+  `value_question`, Goal waits. The archived Planner artifact excludes these annotations.
+- SC never covers a withheld answer, must say the value question now, and may only acknowledge a
+  marked Responsibility until a reviewed need exists. Unmarked speech stays immediate (the four
+  turn-local continuity tests pass unchanged).
+- Fixtures: four UMI behavior scenarios and the Goal-interpretation daily-life targets (204 speech
+  items, none deceptive) declare `value_review: false`; dataset digest refreshed.
+- Freeze 25 from freeze 24 (`capture25.py`, `freeze25.py`): declared migration of 400 UMI speech
+  replies (88 distinct "please say X" lines) to `value_review: false`, no other reply change;
+  archive `dba21734…`; strict replay 6,000/6,000, zero model calls, counts unchanged.
+- Gate on the full working tree (clean worktree): passed (pytest 3,779, benchmarks 169, legacy 20).
+  Level A: truthful_embodied_speech 6/6, human_like_cognitive_continuity 4/4,
+  tool_and_conversation_lane_discipline 9/9, speech_identity_latency 4/4, multi_goal_daily_life
+  10/10, composable_action_planning 5/5, robust_intent_understanding 8/8.
+- Agent image `chromie-agent:planlim-wt-20261012` built from the gated tree; deploying it was refused
+  by the session permission check, so the owner runs the deploy. Live cohort declared before
+  inference: `.chromie/acceptance/planner-limitation-20261012/scenarios` (35 = stage B 30 + 3
+  deception + 2 controls), `oracle.json`, `make_cohort_c.py`.
+
+Live run 1 (owner-deployed `chromie-agent:planlim-wt-20261012`, 35 cases, one bundle; full judgment
+in `.chromie/acceptance/planner-limitation-20261012/README.md`): mechanical 21/35. Simple limitations
+now said in the same turn 4/4 (stage B 1/3); conditional 1 pass + 1 partial of 4 (stage B 0/4);
+value-reviewed speech: harmless play answered immediately, "pretend you're hurt" no longer performed,
+Value Judgment declined the teacher lie. Three failure clusters were mine and are fixed (regressions fail
+without them): A the Host terminal check ignored `unavailable` (all four mixed cases had correct Planner
+decisions); G ordinary speech could be decided `unavailable` (joke contradiction, celebrate_zh,
+pretend_hurt bypassing Value Judgment); I the declined Goal was marked refused before dispatch, so the
+decline was dropped as a stale commit. Pre-existing, not fixed here: TTS cold start, duplicate read
+emission, argument span grounding, numeric provenance missing from the wire schema, canonical omission
+of a required confirmation (`nod_yes` requires it in the live catalog), partial Planner scope with GA
+Goals for unplanned Responsibilities, re-entry step purpose, curve_walk provider contract; the item 1
+single-Responsibility stage split can coerce a dependent action into a second read (documented).
+Gate after fixes: pytest 3,782, benchmarks 169, legacy 20; strict replay 6,000/6,000 unchanged.
+
+Owner reply after run 1 (2026-10-12): the image was deployed, but "fix the problems you found out first,
+then test" — all nine pre-existing items, plus TTS readiness ("chromie should wait all service ready
+before process request and user interact"). Implemented at each earliest boundary (detail and
+regression names in the evidence README, "Owner list after run 1"):
+1. Readiness: interaction starts only after TTS returns first audio within the playback-start budget
+   (`ServiceReadinessGate`; voice run and live harness).
+2. A repeated identical Activity is one Activity (logged); a conflicting repeat fails closed.
+3. Outcome source tokens are namespaced `<ref>.tN`, so they never collide with user-turn `tN`.
+4. The streamed decoder keeps integral number bounds (XGrammar exact; fractional/exclusive still
+   stripped); Soridormi nod/shake accept one cycle (`scenario-control-stall`, uncommitted).
+5. Agent catalog confirmation is the provider declaration, as Runtime already used.
+6. When GA's Goals exceed the first Planner scope, Runtime plans once over GA's Goal refs.
+7. Canonical and re-entry steps offer only their provider's purpose; a read requires `expected_outcome`.
+8. Grouped Soridormi body activities realize the semantic facade like single steps (curve_walk
+   `direction`); the Planner authority says concurrency metadata never makes an Activity requested
+   (the extra blink; prompt only, so its evidence is live).
+9. A single Responsibility's `work` decision names `step_purpose` before any Activity; the decoder
+   offers only that stage and the Host rejects a mismatch (the coerced second read).
+Not fixed here: run-1 cond_sunny_wave_zh dropped "tomorrow" and got no final words; lib_celebrate_en is
+read as speech by UMI.
+
+Freeze 26 (`capture26.py`, `freeze26.py`): every request recaptured, no reply re-authored (the declared
+stage migration touched none: the corpus is canonical-path), 6,000/6,000, archive `e8f7f805…`.
+Checks on the full working tree (clean worktree, diff applied): canonical gate passed (pytest 3,791 +
+5 skipped, benchmarks 169, legacy 20); strict replay 6,000/6,000, zero model calls, counts unchanged
+(2,700 / 1,800 / 1,500; `strict-replay-freeze26/`); Level A 46/46 over composable_action_planning,
+multi_goal_daily_life, truthful_embodied_speech, robust_intent_understanding,
+human_like_cognitive_continuity, tool_and_conversation_lane_discipline, speech_identity_latency
+(`level-a-run1-repairs/`). Soridormi: 107 tests passed in the sim container.
+
+Live run 2 (owner-deployed `chromie-agent:planlim-wt3-20261012`, MCP restarted; full judgment in the
+evidence README, `run2/`): mechanical 26/35 (run 1: 21/35). Now pass: backflip_en spoken (readiness),
+curve_walk_en without the extra blink, mix_nod_fly x2, pretend_hurt and teacher_homework declined by
+Value Judgment and spoken, joke, sick_excuse planned over both Goals. Failure clusters by earliest
+boundary:
+- Decoder offered outputs Host must reject: mixed wave+coffee (coffee decided unavailable, then given a
+  clarification; whole turn rejected); re-entry respond over a timed-out read; re-entry clarify sent as
+  `safe_adjustment` without Work; re-entry `depends_on` citing the read's evidence_ref, which its prompt
+  shows for completed Work.
+- After a failed re-entry the person heard nothing (`retain_evidence_no_speech`).
+- Not changed here (model/UMI/external, reported): UMI split curve_walk_zh into two Responsibilities and
+  overlapped spans in cond_rain_nod_en (503); celebrate read as speech x2; "make coffee" planned as
+  fetch; weather API timeout (8 s); cond_sunny_wave_zh read omitted `date` (answered today); SC sometimes
+  acknowledges a zh turn in English ("Got it.", also in run 1).
+
+Owner, on readiness (2026-10-12): "tts server can set its state ready when it warms up, then the health
+check is the real ready state". Run-2 repairs:
+- TTS owns readiness: each CosyVoice worker warms every committed voice before `ready` (also after a
+  restart); health `provider_health.ready` = ready message received and warm. The Orchestrator gate and
+  the live harness wait for it and never synthesize; the launcher's CosyVoice warm-up and its four
+  variables are removed (configuration keys 384 → 380). Found while testing: health used to say ready
+  while a worker was still loading.
+- Mixed streamed turns: with two Responsibilities each state fixes both decisions and offers an
+  Activity role only to the Responsibility whose decision it realizes; with three, one state per set of
+  `unavailable` Responsibilities. Identical Activity branches are shared on the wire, so the two-ref
+  grammar compiles in 1.06 s (before 1.1 s; unshared 2.7 s).
+- Re-entry decoder: respond cites completed Evidence only; respond/execute keep no unresolved needs;
+  without new Work the relation is exact and unconfirmed. Completed Work may be cited by step_id or
+  evidence_ref (scheduler and prompt).
+- A failed re-entry speaks the existing Host operational failure notice instead of silence.
+Each has a regression that fails without it; XGrammar (SGLang image) rejects every live shape.
+
+Freeze 27 (`capture27.py`, `freeze27.py`): 6,000/6,000 recaptured, no reply migrated, archive
+`ae3af4ea…`. Clean-worktree gate passed (pytest 3,799 + 5 skipped, benchmarks 169, legacy 20); strict
+replay 6,000/6,000, zero model calls, counts unchanged (`strict-replay-freeze27/`); Level A 46/46
+(`level-a-run2-repairs/`). Images from that worktree: `chromie-agent:planlim-wt4-20261012` (118 files
+match, `807cc483…`), `chromie-tts:selfwarm-20261012` (thin layer `TTSDockerfile`, 7 files match).
+
+Run 3 (both images deployed; the first deploy leaked the shell's host proxy into the containers and
+was redone without it): mechanical 28/35, judged 25/35; TTS reported ready only after warming (zh 1.17 s,
+en 0.55 s, mixed 0.86 s) and the first English reply was spoken. Host-side repairs after run 3 (Agent image
+unchanged): the "optional cognition after a delivered interaction" containment applies only when the
+delivered act answered every speech Responsibility (an acknowledgement before a value review had hidden a
+failed re-plan); the Orchestrator keeps idle Agent connections 3 s, below uvicorn's 5 s (a stale socket
+had failed a Value Judgment). The deployed SGLang grammar-retention fix joins the tree.
+
+Final checks on the full tree (clean worktree `scratchpad/gate7`): canonical gate passed (pytest 3,801 + 5
+skipped, benchmarks 169, legacy 20); strict replay 6,000/6,000, zero model calls, counts unchanged
+(`strict-replay-final/`). Soridormi `ci_static_check.sh` passed (179 + 92).
+
+Run 4 on the final tree (same images; `run4/`): mechanical 27/35, judged 26/35. Value-reviewed speech 5/5
+(all three deception requests declined by Value Judgment and the decline spoken); limitations said in the
+same turn; mixed nod+fly 2/2; curve walk 2/2; the person hears a failure notice instead of silence.
+
+Open, with earliest boundary (evidence README, runs 2-4):
+- Conditional composition (item 1) stays 0-2 of 4 live: whichever stage the decision fixes (read or act),
+  the model then authors the other stage's Activities (chained duplicate reads, or actions depending on a
+  missing read) and Host rejects the turn. Owner decision needed: keep stage-separated Plans (then the
+  decision needs a clearer field, e.g. the settled condition before the stage), or let one Plan carry the
+  dependent action as Work Runtime holds until re-entry decides it (a contract and Runtime change).
+- SC: silence after a conditional result (twice), an English or technical reply to a Chinese turn,
+  answer-like content in a pre-review acknowledgement, a fabricated time after UMI marked "现在几点" as speech.
+- Planner semantics: "make coffee" planned as fetch; unrequested look_at_person/stand_idle/blink beside
+  requested gestures; Chinese weather reads omit `date`.
+- UMI: "celebrate with me" as speech; occasional split/overlap of one conditional (503).
+- Canonical decoder: sorted keys let `coverage` precede `disposition`, so a background re-plan produced
+  `respond` with partial coverage (contained, but counted hard by the harness).
+- Runtime: two optional SC body expressions from one provider are refused (`coordination_unsupported`).
+- Deploy: run Compose with the proxy variables unset (HANDOFF).
+
+Next: owner decision on conditional composition; then the SC/UMI items in their own qualification loops.
+
+## Previous delivery — Deep Planner retired (stage B), 2026-10-11
 
 Base `origin/main` `5ea034e35` (Value Judgment). Pushed as the commit series from
 `e7404c623` (developed on branch `deep-removal`); the expected resume revision is the latest commit

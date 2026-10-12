@@ -967,6 +967,13 @@ async def run_check(
             )
 
         health_start = time.perf_counter()
+        # Like the production Host, interact only once every service can serve the turn
+        # (live 2026-10-12: a cold TTS cancelled the first reply).
+        wait_for_services = getattr(assistant, "wait_for_interaction_services", None)
+        if wait_for_services is not None:
+            gate = await wait_for_services(require_asr=False, deadline_s=180.0)
+            timings_ms["service_readiness_ms"] = (time.perf_counter() - health_start) * 1000.0
+            _write_json(evidence_dir / "tts_readiness.json", gate.tts_provider_health)
         session = await assistant.get_http_session()
         agent_health = await assistant.agent_client.health(session)
         timings_ms["health_ms"] = (time.perf_counter() - health_start) * 1000.0

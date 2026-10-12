@@ -754,6 +754,7 @@ class OllamaUserMeaningInterpreter:
             "cognitive_requests",
         ]
         item = schema["$defs"]["CognitiveResponsibilityProposal"]
+        base_item_value_review_description = item["properties"]["value_review"]["description"]
         fields = (
             "local_ref",
             "output_mode",
@@ -816,6 +817,14 @@ class OllamaUserMeaningInterpreter:
             "description": item["properties"]["continuity_scope"]["description"],
         }
         speech_item["properties"]["body_effect_family"] = {"type": "null"}
+        # Whether the requested speech would deceive is part of WHAT is asked; stating it
+        # here, before any reply, lets Value Judgment decide before Chromie says it.
+        speech_item["properties"] = {
+            **{key: value for key, value in speech_item["properties"].items() if key not in {"confidence", "source_evidence"}},
+            "value_review": {"type": "boolean", "description": base_item_value_review_description},
+            **{key: speech_item["properties"][key] for key in ("confidence", "source_evidence")},
+        }
+        speech_item["required"] = [*speech_item.get("required", []), "value_review"]
         body_item = copy.deepcopy(base_item)
         body_item["properties"]["output_mode"] = {
             "type": "string", "const": "body_action",
@@ -959,9 +968,9 @@ class OllamaUserMeaningInterpreter:
         proposals = parsed.get("responsibilities")
         fields = {
             "local_ref", "outcome", "output_mode", "body_effect_family", "continuity_scope",
-            "confidence", "source_evidence",
+            "value_review", "confidence", "source_evidence",
         }
-        required_fields = fields - {"body_effect_family"}
+        required_fields = fields - {"body_effect_family", "value_review"}
         for item in proposals if isinstance(proposals, list) else []:
             if not isinstance(item, dict):
                 continue  # Closed DTO handles malformed objects.
@@ -981,6 +990,8 @@ class OllamaUserMeaningInterpreter:
                     raise ValueError("UMI body_action Responsibility requires body_effect_family")
                 if item["output_mode"] != "body_action" and item.get("body_effect_family") is not None:
                     raise ValueError("UMI body_effect_family is valid only for body_action")
+                if item["output_mode"] == "speech" and not isinstance(item.get("value_review"), bool):
+                    raise ValueError("UMI speech Responsibility must state value_review")
             for name in ("local_ref", "outcome", "output_mode"):
                 if not isinstance(item[name], str) or not item[name].strip():
                     raise ValueError(f"User Meaning Interpretation requires authored {name}")

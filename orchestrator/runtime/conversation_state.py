@@ -4279,6 +4279,15 @@ class ConversationStateManager:
             disposition = str(item.get("disposition") or "").strip().lower()
             if goal_id and disposition:
                 outcomes[goal_id] = dict(item)
+        # A Value Judgment that withheld a Goal's answer is that Goal's speech outcome:
+        # decline ends it refused, ask leaves it waiting for the person (choice A).
+        verdict = (plan.get("metadata") or {}).get("value_judgment") if isinstance(plan.get("metadata"), dict) else None
+        if isinstance(verdict, dict) and verdict.get("decision") in {"ask", "decline"}:
+            withheld_disposition = "clarify" if verdict["decision"] == "ask" else "value_declined"
+            for goal_id in verdict.get("withheld_answer_goal_ids") or []:
+                if goal_id in outcomes and outcomes[goal_id].get("disposition") == "respond":
+                    outcomes[goal_id] = {**outcomes[goal_id], "disposition": withheld_disposition,
+                                         "value_withheld": True}
 
         # Single-disposition plans may omit per-goal outcomes. Preserve their
         # exact structured disposition without inferring anything from speech.
@@ -4344,7 +4353,9 @@ class ConversationStateManager:
                         if str(item).strip()
                     ][:4]
                 item_changed = True
-            elif disposition in {"unavailable", "refused"}:
+            elif disposition in {"unavailable", "refused", "value_declined"}:
+                # value_declined: Chromie's Value Judgment withheld this Goal's answer. Like a
+                # limitation it ends the Goal without a pre-dispatch responsibility change.
                 context["status"] = "refused"
                 context["commitment_state"] = "failed"
                 context["plan_status"] = disposition

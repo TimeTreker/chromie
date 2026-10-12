@@ -167,8 +167,8 @@ read-only deployment preflight. It requires:
   Soridormi checkout;
 - a healthy Chromie Agent that loaded the Soridormi capability source;
 - a complete no-playback synthesis from the generated environment's selected
-  TTS endpoint and speaker, with non-empty PCM inside the existing
-  `TTS_COSYVOICE_WARMUP_TIMEOUT_SEC` readiness budget;
+  TTS endpoint and speaker, with non-empty PCM inside the preflight's
+  `--tts-readiness-timeout-s` budget (default 300 s);
 - the running Soridormi endpoint to report `sim`, no active task, no emergency
   stop, no fallen state, and `safe_idle=true`;
 - `robot.get_status` to report its own source/provider revision;

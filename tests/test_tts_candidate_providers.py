@@ -35,6 +35,16 @@ from provider import (  # noqa: E402
 from streaming_worker import StreamingProcessWorker  # noqa: E402
 
 
+def warming_fixture_target(connection: Connection, *, cancellation_event=None) -> None:
+    time.sleep(0.5)  # loading and warming: the process is alive but not ready
+    connection.send({"type": "ready", "warmed": True, "warmup_seconds": {"default": 0.5}})
+    while True:
+        payload = connection.recv()
+        if payload.get("type") == "shutdown":
+            connection.send({"type": "stopped"})
+            return
+
+
 def stream_fixture_target(connection: Connection, *, cancellation_event=None) -> None:
     connection.send({"type": "ready", "fixture": True})
     while True:
@@ -95,6 +105,7 @@ class FakeStreamingWorker:
     failure_restart_count = 0
     cancellation_mode = "bounded_drain_then_restart_worker"
     worker_warmed = True
+    declares_warmup = False
     ready_payload = {"fixture": True}
 
     async def start(self) -> None:
@@ -304,6 +315,38 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(worker.failure_restart_count, 1)
         finally:
             await worker.stop()
+
+    async def test_self_warming_worker_is_ready_only_once_warm(self) -> None:
+        """Live 2026-10-12: TTS answered health while its first English synthesis took
+        7.7 s. A worker that warms itself reports ready only after warming, even after a
+        restart; a worker that declares nothing keeps the previous meaning."""
+        for target, warmed in ((warming_fixture_target, True), (stream_fixture_target, False)):
+            with self.subTest(warms_itself=warmed):
+                worker = StreamingProcessWorker(
+                    target, name="candidate-test-readiness-worker", startup_timeout_s=5.0)
+                provider = WorkerBackedCandidateProvider(
+                    capabilities=fixture_capabilities(), worker=worker, speakers=["default"])
+                self.assertIs((await provider.health())["ready"], False)
+                starting = asyncio.create_task(worker.start())
+                await asyncio.sleep(0.2)
+                if warmed:
+                    self.assertTrue(worker.is_alive)
+                    self.assertIs((await provider.health())["ready"], False)
+                await starting
+                try:
+                    health = await provider.health()
+                    self.assertIs(health["ready"], True)
+                    self.assertIs(health["worker_warmed"], warmed)
+                finally:
+                    await worker.stop()
+                self.assertIs((await provider.health())["ready"], False)
+
+    def test_cosyvoice_warmup_text_follows_each_voice_language(self) -> None:
+        cosy = load_provider_impl("tts_candidates/cosyvoice/provider_impl.py", "cosy_warmup_text")
+        voice = partial(SimpleNamespace, speaker_id="v", text="", wav_path=Path("v.wav"))
+        self.assertEqual(cosy.warmup_text(voice(languages=("zh",))), "你好。")
+        self.assertEqual(cosy.warmup_text(voice(languages=("en",))), "Hello.")
+        self.assertEqual(cosy.warmup_text(voice(languages=("zh", "en", "mixed"))), "你好，Hello.")
 
     async def test_streaming_worker_uses_cold_timeout_until_first_completion(self) -> None:
         worker = StreamingProcessWorker(
@@ -756,17 +799,25 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
 
                     self.assertEqual(set(prepared), set(voices.profiles))
                     self.assertEqual(released, [True])
-                    self.assertEqual(initial_hops, [25] * len(requests))
                     profile_count = len(voices.profiles)
-                    self.assertEqual(events[profile_count][0], "send")
-                    self.assertEqual(events[profile_count][1]["type"], "ready")
+                    self.assertEqual(initial_hops, [25] * (profile_count + len(requests)))
+                    # Each voice is warmed by one no-playback synthesis before readiness.
+                    ready = events[2 * profile_count]
+                    self.assertEqual(ready[0], "send")
+                    self.assertEqual(ready[1]["type"], "ready")
+                    self.assertIs(ready[1]["warmed"], True)
+                    self.assertEqual(set(ready[1]["warmup_seconds"]), set(voices.profiles))
                     self.assertEqual(
                         sum(e[0] == "prepare" for e in events), profile_count
                     )
                     self.assertEqual(
                         [e[1:] for e in events if e[0] == "infer"],
-                        [(text, expected) for text, _speaker, expected in requests],
+                        [(cosy.warmup_text(profile), profile.speaker_id)
+                         for profile in voices.profiles.values()]
+                        + [(text, expected) for text, _speaker, expected in requests],
                     )
+                    sent = [e[1] for e in events if e[0] == "send"]
+                    self.assertEqual(sum(item["type"] == "complete" for item in sent), len(requests))
                     completed = [
                         e[1]["provider_metadata"] for e in events
                         if e[0] == "send" and e[1]["type"] == "complete"

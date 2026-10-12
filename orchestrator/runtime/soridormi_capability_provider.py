@@ -492,16 +492,44 @@ class SoridormiCapabilityProvider:
         )
 
         members: list[dict[str, Any]] = []
-        for request, definition, _ in items:
+        for request, definition, context in items:
             upstream_skill_id = str(
                 definition.metadata.get("upstream_skill_id")
                 or request.capability_id.removeprefix("soridormi.")
             )
+            # Same trusted realization as a single step: Soridormi compiles
+            # provider-local args, never the semantic facade (live 2026-10-12:
+            # a grouped curve_walk sent semantic ``direction`` and failed).
+            semantic_facade = definition.metadata.get("semantic_facade")
+            try:
+                provider_args = realize_semantic_capability_args(
+                    request.args,
+                    facade=semantic_facade,
+                    provider_input_schema=definition.metadata.get("provider_input_schema")
+                    or definition.input_schema,
+                    capability_id=request.capability_id,
+                )
+            except ValueError as exc:
+                return self._group_terminal_results(
+                    items,
+                    status="failed",
+                    reason_code="semantic_realization_failed",
+                    message=f"{request.capability_id}: {exc}",
+                )
+            if semantic_facade:
+                context.trace.events.append(CapabilityTraceEvent(
+                    type="provider_realization",
+                    data={
+                        "semantic_args": dict(request.args),
+                        "provider_args": dict(provider_args),
+                        "semantic_facade_applied": True,
+                    },
+                ))
             members.append(
                 {
                     "member_id": request.request_id,
                     "skill_id": upstream_skill_id,
-                    "parameters": dict(request.args),
+                    "parameters": provider_args,
                     "optional": self._optional_auxiliary_member(request),
                 }
             )

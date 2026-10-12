@@ -44,6 +44,11 @@ def source_span(text, excerpt):
     }
 
 
+def outcome_span(span, ref):
+    """An outcome span in its Responsibility's token namespace ("r1.t0", ...)."""
+    return {key: f"{ref}.{value}" for key, value in span.items()}
+
+
 def source_spans(text, values):
     return {name: source_span(text, excerpt) for name, excerpt in values.items()}
 
@@ -82,6 +87,27 @@ def test_complete_intent_needs_no_capability_fields(text):
     assert decision.responsibilities[0].outcome == text
     assert not decision.responsibilities[0].bindings
     assert not decision.meaning_uncertainties
+
+
+@pytest.mark.parametrize("value_review", [True, False, None])
+def test_umi_speech_states_value_review(value_review):
+    """Owner choice B (2026-10-12): UMI records whether requested speech would deceive."""
+    text = "Tell my teacher I was ill."
+    request = UserMeaningInterpretationRequest(text=text)
+    schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
+    result = intent_result(text, "speech")
+    item = result["responsibilities"][0]
+    item["continuity_scope"] = "turn"
+    item.pop("body_effect_family", None)
+    if value_review is not None:
+        item["value_review"] = value_review
+    assert Draft202012Validator(schema).is_valid(result) is (value_review is not None)
+    if value_review is None:
+        with pytest.raises(ValueError, match="value_review"):
+            OllamaUserMeaningInterpreter._validate_interpretation_content(request, json.dumps(result), response_schema=schema)
+        return
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(request, json.dumps(result), response_schema=schema)
+    assert decision.responsibilities[0].value_review is value_review
 
 
 @pytest.mark.parametrize("name,value", [
@@ -187,9 +213,15 @@ def capability(name, properties, *, tier="common"):
 
 
 def work(activities):
-    return {"disposition": "execute", "coverage": "complete",
+    return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
+        "disposition": "execute", "coverage": "complete",
         "covered_responsibility_refs": ["r1"], "activities": activities, "confidence": 1.0, "unresolved": [],
         "reason_summary": "Complete requested activities in source order."}
+
+
+def host_work(activities):
+    """The Host-side advance: Responsibility decisions are model output, not advance fields."""
+    return {key: value for key, value in work(activities).items() if key != "responsibility_decisions"}
 
 
 def need(text, closest="none", fits=False, does="No loaded Capability realizes it."):
@@ -664,7 +696,7 @@ def test_fast_quote_binding_includes_exact_retained_goal_owner(foreign):
     association = GoalAssociationResolution(turn_id="t",resolution_status="resolved",confidence=1.,
         associations=[{"association_id":"a","relationship":"continue","source_responsibility_refs":["r1"],
                        "target_goal_ids":["retained"],"confidence":1.}])
-    advance = FastPlannerAdvance(turn_id="t",**work([activity("nod",{"count":2},source_spans("Nod twice", {"count":"twice"}))]))
+    advance = FastPlannerAdvance(turn_id="t",**host_work([activity("nod",{"count":2},source_spans("Nod twice", {"count":"twice"}))]))
     kwargs = dict(advance=advance,association=association,user_text="Nod twice",
         retained_goals=[{"goal_id":"retained","goal":{
             "goal_id":"other" if foreign else "retained","description":"Nod twice"}}])
@@ -984,11 +1016,13 @@ async def test_planner_cites_contextual_source_without_umi_bindings(text, outcom
         "semantic_type": "body_action", "semantic_scope": {"source_resolution": "provider_owned"},
         "resource_contract": {"provider_owns": ["source_resolution", "perception"]},
     }})
-    citation = {**source_span(outcome, place), "source_responsibility_ref": "r1"}
+    # Outcome tokens live in their Responsibility's namespace ("r1.t0", ...).
+    citation = {**{key: "r1." + ref for key, ref in source_span(outcome, place).items()},
+                "source_responsibility_ref": "r1"}
     if fault == "unknown_owner":
         citation["source_responsibility_ref"] = "r2"
     if fault == "unknown_token":
-        citation["source_end_token_ref"] = "t999"
+        citation["source_end_token_ref"] = "r1.t999"
     sources = {} if fault == "missing_citation" else {"source": citation}
     # The place is cited, never retyped: trusted code keeps the exact quote.
     raw = work([activity("deliver", {"source": {"status": "known"}}, sources)])
@@ -1027,9 +1061,9 @@ def test_canonical_binding_rejects_context_citation_from_sibling_requirement():
     from shared.chromie_contracts.semantic_task import SemanticGoal
     first = CognitiveResponsibilityProposal(local_ref="r1", outcome="Bring milk", confidence=1.)
     sibling = CognitiveResponsibilityProposal(local_ref="r2", outcome="Visit the living room", confidence=1.)
-    advance = FastPlannerAdvance(turn_id="t", **work([
+    advance = FastPlannerAdvance(turn_id="t", **host_work([
         activity("deliver", {"source": {"status": "provider_resolved", "description": "living room"}}, {
-            "source": {**source_span(sibling.outcome, "living room"), "source_responsibility_ref": "r2"},
+            "source": {**outcome_span(source_span(sibling.outcome, "living room"), "r2"), "source_responsibility_ref": "r2"},
         }),
     ]))
     association = GoalAssociationResolution(turn_id="t", resolution_status="resolved", confidence=1., new_goals=[
@@ -1103,7 +1137,7 @@ async def test_decoder_offers_only_legal_provider_source_shapes(source, cite, de
     request.responsibilities[0] = request.responsibilities[0].model_copy(update={"outcome": outcome})
     request.context["situation"] = observed_scene()
     citation = (
-        {**source_span(outcome, "front table about 50 meters away"), "source_responsibility_ref": "r1"}
+        {**outcome_span(source_span(outcome, "front table about 50 meters away"), "r1"), "source_responsibility_ref": "r1"}
         if cite == "span" else {"situation_interpretation_ref": cite} if cite else None
     )
     raw = work([activity("deliver", {"source": source}, {"source": citation} if citation else {})])
@@ -1139,7 +1173,7 @@ def test_situation_cited_source_is_recorded_as_observed_context():
     from shared.chromie_contracts.semantic_task import SemanticGoal
     from agent.app.planner_validation import validate_user_supplied_parameter_provenance
     owner = CognitiveResponsibilityProposal(local_ref="r1", outcome="Bring me some water", confidence=1.)
-    advance = FastPlannerAdvance(turn_id="t", **work([activity(
+    advance = FastPlannerAdvance(turn_id="t", **host_work([activity(
         "deliver", {"source": {"status": "known", "description": "4.039 meters behind Chromie"}},
         {"source": {"situation_interpretation_ref": SEEN_WATER}},
     )]))
@@ -1274,7 +1308,7 @@ def test_canonical_steps_keep_adjacent_execution_groups_apart():
     from shared.chromie_contracts.semantic_task import SemanticGoal
 
     owner = request_for("Walk and blink, then nod and wave.").responsibilities[0]
-    advance = FastPlannerAdvance(turn_id="t", **work([
+    advance = FastPlannerAdvance(turn_id="t", **host_work([
         activity("walk", {}, {}), activity("blink", {}, {}),
         {**activity("nod", {}, {}), "depends_on": ["walk", "blink"]},
         {**activity("wave", {}, {}), "depends_on": ["walk", "blink"]},
@@ -1357,3 +1391,59 @@ def test_library_search_ranks_need_wording_and_never_returns_restricted_entries(
     assert search_capability_library(["perform a bow gesture"], entries, loaded_ids=set()) == ["test.bow"]
     assert search_capability_library(["read the current local time"], entries, loaded_ids={"test.clock"})[0] != "test.clock"
     assert search_capability_library(["open the kitchen window"], entries, loaded_ids=set()) == []
+
+
+@pytest.mark.asyncio
+async def test_conditional_action_reads_first_and_names_its_deferred_decision():
+    """Live 2026-10-11: "nod twice if it rains" scheduled the nod beside the forecast read.
+
+    The search loads the read the Goal filter hid; with one Responsibility the decoder
+    offers acquisition and effect stages separately, and the read names the decision its
+    result settles. Host keeps the Goal open with that typed requirement.
+    """
+    from agent.app.capabilities.local import chromie_capability_bundle
+
+    text = "If it's going to rain in Shanghai today, nod twice."
+    request = request_for(text)
+    tool = next(t for a in chromie_capability_bundle().agents for t in a.tools if t.name == "chromie.weather.lookup")
+    weather = CatalogCapability(capability_id=tool.name, agent_id="chromie.weather", description=tool.description,
+        input_schema=tool.input_schema, output_schema=tool.output_schema, available=True,
+        interaction_executable=True, hints=tool.llm_hints, prompt_tier="common")
+    nod = capability("nod", {"count": {"type": "integer"}})
+    first = {"ability_needs": [need("read the rain forecast for Shanghai today")],
+             **limitation_outcome("No loaded contract reads the forecast.")}
+    read = {"role": "capability", "capability_id": "chromie.weather.lookup", "activity_id": "read",
+            "args": {"location": "Shanghai"}, "argument_sources": source_spans(text, {"location": "Shanghai"}),
+            "depends_on": [], "step_purpose": "acquire_information", "source_responsibility_refs": ["r1"]}
+    decided = {**read, "deferred_requirement": "Nod twice only if the Shanghai forecast says rain today."}
+    nod_after = {"role": "capability", "capability_id": "test.nod", "activity_id": "nod", "args": {"count": 2},
+                 "argument_sources": source_spans(text, {"count": "twice"}), "depends_on": ["read"],
+                 "step_purpose": "achieve_effect", "source_responsibility_refs": ["r1"]}
+    model = Model([first, {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
+                                                  "Retrieve weather for a named place.")],
+                           **work([decided])}])
+    frames = [frame async for frame in FastPlannerResolver(model, Catalog([nod, weather])).stream_advance(request)]
+    second = model.packets[1][1]["response_format"]
+    loaded_needs = {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
+                                           "Retrieve weather for a named place.")]}
+    reading = {"r1": {"decision": "work", "missing": [], "step_purpose": "acquire_information"}}
+
+    def staged(activities):
+        return {**work(activities), "responsibility_decisions": reading}
+
+    assert not Draft202012Validator(second).is_valid({**loaded_needs, **staged([read, nod_after])})
+    assert not Draft202012Validator(second).is_valid({**loaded_needs, **staged([read])})
+    assert Draft202012Validator(second).is_valid({**loaded_needs, **staged([decided])})
+    # The stage is decided before any Activity (live 2026-10-12).
+    assert not Draft202012Validator(second).is_valid({**loaded_needs, **work([decided])})
+    assert isinstance(frames[0], FastPlannerStreamTerminal), frames[0]
+    ga_reply = {"new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
+                "cognitive_requests": [], "referent_updates": [], "resolved_references": [], "confidence": 1.0,
+                "reason_summary": "New intent."}
+    association = await GoalAssociationResolver(Model([ga_reply])).resolve(request)
+    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        advance=frames[0].advance, association=association, user_text=request.text,
+    )
+    assert [step.capability_id for step in plan.steps] == ["chromie.weather.lookup"]
+    outcome = plan.goal_outcomes[0]
+    assert outcome.satisfaction.unmet_requirements == ["Nod twice only if the Shanghai forecast says rain today."]

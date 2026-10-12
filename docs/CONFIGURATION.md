@@ -446,7 +446,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_NUM_PREDICT` | Structured output budget for selection and one repair; default `512`. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live Provider named capabilities through the trusted manifest transport; default `30`. |
 | `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
-| `capabilities/value_review.json` (file, not an env variable) | Owner-editable list of Capability IDs whose effects need a Value Judgment `proceed` verdict before dispatch (VALUE-JUDGMENT-001). The Orchestrator loads it at startup from the repository root; an invalid file fails startup. It keys on the Capability the Planner chose, never on the person's words. Current list: object fetch/move, walking, and `look_at_person`/`hug_gesture`. An empty policy list (test harnesses, replay corpora) means no value gate. |
+| `capabilities/value_review.json` (file, not an env variable) | Owner-editable list of Capability IDs whose effects need a Value Judgment `proceed` verdict before dispatch (VALUE-JUDGMENT-001). The Orchestrator loads it at startup from the repository root; an invalid file fails startup. It keys on the Capability the Planner chose, never on the person's words. Current list: object fetch/move, walking, and `look_at_person`/`hug_gesture`. An empty policy list (test harnesses, replay corpora) means no value gate for Capabilities; speech UMI marks `value_review` is reviewed independently of this list. |
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum model-neutral catalog preview attached at the native interaction boundary; default `8`. It does not rank user language. |
 | `AGENT_WEATHER_ENABLED` | Enable the read-only weather lookup handled by `tool_agent`; default `1`. |
@@ -683,9 +683,7 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `COSYVOICE3_SOURCE_REVISION`, `COSYVOICE3_MODEL_ID`, `COSYVOICE3_MODEL_REVISION` | Immutable default runtime and model locks. |
 | `COSYVOICE3_FP16` | Load the default model in half precision; default `1`. |
 | `COSYVOICE3_PROMPT_PREFIX` | Trusted prompt prefix prepended before the exact reference transcript. |
-| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget; default `1200` for the large offline model load. |
-| `TTS_COSYVOICE_WARMUP_TIMEOUT_SEC` | `300`; per-profile no-playback synthesis budget used before microphone startup. |
-| `TTS_COSYVOICE_ZH_WARMUP_TEXT`, `TTS_COSYVOICE_EN_WARMUP_TEXT`, `TTS_COSYVOICE_MIXED_WARMUP_TEXT` | Short startup probes that explicitly prime every committed CosyVoice language/reference profile. |
+| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget; default `1200` for the large offline model load. A CosyVoice worker warms every committed voice inside this budget before it reports ready, so TTS health `provider_health.ready` means warm; the launcher and the Host wait for it and do not warm TTS themselves. |
 | `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Bounded drain before fail-closed worker restart after cancellation; default `3` seconds. |
 | `ORCH_TTS_CONCURRENCY` | `1` for the singleton CosyVoice worker. |
 | `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default; use one compact resident Ollama model while CosyVoice shares the GPU. |

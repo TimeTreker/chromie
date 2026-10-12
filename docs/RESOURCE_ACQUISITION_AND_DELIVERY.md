@@ -206,7 +206,9 @@ complete WHAT. UMI does not author `bindings` or a structured resource/parameter
 
 Planner extracts Capability parameters from that complete requirement. For Fast arguments,
 current-turn token spans cite original speech; contextual spans name the owning
-`source_responsibility_ref` and exact accepted outcome tokens. Host materializes the exact
+`source_responsibility_ref` and exact accepted outcome tokens, which are named in that
+Responsibility's own namespace (`r1.t0`, ...) so they cannot be confused with current-turn
+`t0`. Host materializes the exact
 quote and binds it only to that Responsibility's canonical Goal. It cannot invent facts,
 borrow a sibling's requirement or pretend contextual words were spoken in the current turn.
 A reported place is a cited clue for an unbound provider-owned source (see below), not

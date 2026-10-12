@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 from datetime import datetime
-from itertools import product
+from itertools import combinations, product
 from typing import Any
 
 try:
@@ -13,6 +13,7 @@ try:
         VOCAL_PERFORMANCE_CAPABILITY_ID,
     )
     from chromie_contracts.plan import (
+        responsibility_outcome_source_tokens,
         FastPlannerAdvanceModelOutput,
         GOAL_SATISFACTION_SCORE_BANDS,
     )
@@ -24,6 +25,7 @@ except ImportError:  # pragma: no cover
         VOCAL_PERFORMANCE_CAPABILITY_ID,
     )
     from shared.chromie_contracts.plan import (
+        responsibility_outcome_source_tokens,
         FastPlannerAdvanceModelOutput,
         GOAL_SATISFACTION_SCORE_BANDS,
     )
@@ -438,6 +440,8 @@ def fast_evidence_reentry_response_schema(
     allowed_capability_ids: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None = None,
     allow_new_work: bool = True,
+    information_capability_ids: list[str] | None = None,
+    completed_evidence_refs: list[str] | None = None,
 ) -> dict[str, Any]:
     """Compact decoder contract for trusted Fast Planner Evidence re-entry.
 
@@ -502,6 +506,7 @@ def fast_evidence_reentry_response_schema(
             step_schema,
             allowed_capabilities=allowed_capabilities,
             capability_input_schemas=capability_input_schemas,
+            information_capability_ids=information_capability_ids,
         )
 
     # Compile the existing DTO invariants into complete native alternatives.
@@ -511,29 +516,70 @@ def fast_evidence_reentry_response_schema(
     decision_base = copy.deepcopy(definitions["PlannerEvidenceReentryGoalDecision"])
     allowed_actions = decision_base["properties"]["next_action"]["enum"]
 
+    # A respond cites only completed Evidence, which Host proves before any answer
+    # (live 2026-10-12: a timed-out read was "responded" and rejected, then silence).
+    # Without that list (no proof supplied) every scoped Evidence ref stays citable.
+    completed = (list(evidence) if completed_evidence_refs is None
+                 else [ref for ref in dict.fromkeys(completed_evidence_refs) if ref in evidence])
+
     def decision_branches(actions: list[str]) -> dict[str, Any]:
         branches = []
         for status, (minimum, maximum) in GOAL_SATISFACTION_SCORE_BANDS.items():
             permitted = [
                 action for action in actions
-                if status != "exact" or action in {"respond", "execute"}
+                if (status != "exact" or action in {"respond", "execute"})
+                and (action != "respond" or completed)
             ]
-            if not permitted:
-                continue
-            branch = copy.deepcopy(decision_base)
-            fields = branch["properties"]
-            fields["next_action"]["enum"] = permitted
-            fields["satisfaction_status"]["enum"] = [status]
-            # Keep fractional bands in full Schema validation. The serving
-            # decoder's float-range compiler loses valid interior values (for
-            # example 0.5 in [0.01, 0.749999]); its native range stays [0, 1].
-            fields["satisfaction_score"]["allOf"] = [
-                {"minimum": minimum, "maximum": maximum}
-            ]
-            branches.append(branch)
+            groups = [[action] for action in ("respond", "execute") if action in permitted]
+            if rest := [action for action in permitted if action not in {"respond", "execute"}]:
+                groups.append(rest)
+            for group in groups:
+                branch = copy.deepcopy(decision_base)
+                fields = branch["properties"]
+                fields["next_action"]["enum"] = group
+                fields["satisfaction_status"]["enum"] = [status]
+                # Keep fractional bands in full Schema validation. The serving
+                # decoder's float-range compiler loses valid interior values (for
+                # example 0.5 in [0.01, 0.749999]); its native range stays [0, 1].
+                fields["satisfaction_score"]["allOf"] = [
+                    {"minimum": minimum, "maximum": maximum}
+                ]
+                if group[0] in {"respond", "execute"}:
+                    fields["unresolved_needs"]["maxItems"] = 0
+                if group == ["respond"]:
+                    fields["evidence_refs"]["items"]["enum"] = completed
+                    fields["evidence_refs"].update(minItems=1, maxItems=len(completed))
+                    branch["required"] = [*branch["required"], "evidence_refs"]
+                branches.append(branch)
         return {"anyOf": branches}
 
     definitions["PlannerEvidenceReentryGoalDecision"] = decision_branches(allowed_actions)
+    # Without new Work nothing is adjusted or confirmed; adjusted or alternative Work is
+    # confirmed. States keep that DTO rule native (live 2026-10-12: a clarify was sent
+    # as a safe_adjustment with no Work and rejected).
+    definitions["PlannerEvidenceReentryGoalDecisionWithoutWork"] = decision_branches(
+        [action for action in allowed_actions if action != "execute"])
+    states = []
+    for relation, confirmation, with_work in (
+        (["exact"], [False], False),
+        (["exact"], [False, True], True),
+        (["safe_adjustment", "alternative"], [True], True),
+    ):
+        if with_work and not allow_new_work:
+            continue
+        state = {key: copy.deepcopy(value) for key, value in schema.items()
+                 if key in {"type", "properties", "required", "additionalProperties"}}
+        fields = state["properties"]
+        fields["plan_relation"] = {"type": "string", "enum": relation}
+        fields["user_confirmation_required"] = {"type": "boolean", "enum": confirmation}
+        if with_work:
+            fields["new_work"]["minItems"] = 1
+        else:
+            fields["new_work"]["maxItems"] = 0
+            fields["goal_decisions"]["items"] = {
+                "$ref": "#/$defs/PlannerEvidenceReentryGoalDecisionWithoutWork"}
+        states.append(state)
+    schema["oneOf"] = states
     return schema
 
 
@@ -548,6 +594,7 @@ def canonical_plan_response_schema(
     nonfulfilling_response_goal_ids: list[str] | None = None,
     confirmation_required_capability_ids: list[str] | None = None,
     unavailable_goal_ids: list[str] | None = None,
+    information_capability_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return one flat, constrained model-output schema for a planner request.
 
@@ -571,9 +618,71 @@ def canonical_plan_response_schema(
         nonfulfilling_response_goal_ids=nonfulfilling_response_goal_ids,
         confirmation_required_capability_ids=(confirmation_required_capability_ids),
         unavailable_goal_ids=unavailable_goal_ids,
+        information_capability_ids=information_capability_ids,
     )
     schema["title"] = "FastPlannerModelOutput"
     return schema
+
+
+def native_goal_outcome_branches(schema: dict[str, Any]) -> dict[str, Any]:
+    """Final decoder pass: each Goal outcome becomes per-disposition native branches.
+
+    Applied after every canonical schema refinement, so each branch carries the final
+    per-Goal enums and bounds. Validation semantics are unchanged.
+    """
+    result = copy.deepcopy(schema)
+    shapes = [result, *[item for key in ("oneOf", "anyOf") for item in result.get(key) or []
+                        if isinstance(item, dict)]]
+    for shape in shapes:
+        outcomes = (shape.get("properties") or {}).get("goal_outcomes")
+        goals = outcomes.get("properties") if isinstance(outcomes, dict) else None
+        if not isinstance(goals, dict):
+            continue
+        for goal_id, outcome in list(goals.items()):
+            if isinstance(outcome, dict) and isinstance(outcome.get("properties"), dict):
+                description = outcome.get("description")
+                goals[goal_id] = _goal_outcome_disposition_branches(outcome)
+                if description:
+                    goals[goal_id]["description"] = description
+    return result
+
+
+def _goal_outcome_disposition_branches(outcome: dict[str, Any]) -> dict[str, Any]:
+    """Expose one Goal outcome's per-disposition shape natively (``validate_outcome_shape``).
+
+    Native decoders ignore the conditional ``allOf``; live 2026-10-11 an execute outcome
+    carried communication ordering and failed the DTO. Each branch fixes the disposition
+    and the fields that disposition allows; the model still chooses the disposition.
+    """
+    properties = outcome.get("properties")
+    disposition = properties.get("disposition") if isinstance(properties, dict) else None
+    choices = disposition.get("enum") if isinstance(disposition, dict) else None
+    if not isinstance(choices, list) or not choices:
+        return outcome
+    base = {key: value for key, value in outcome.items() if key not in {"allOf", "oneOf", "anyOf"}}
+    branches = []
+    for choice in choices:
+        branch = copy.deepcopy(base)
+        fields = branch["properties"]
+        fields["disposition"] = {"type": "string", "enum": [choice]}
+        terminal = choice in {"execute", "respond"}
+        fields["coverage"] = {"type": "string", "enum": ["complete"] if terminal else ["partial", "uncertain"]}
+        if isinstance(fields.get("step_ids"), dict):
+            if choice == "execute":
+                fields["step_ids"]["minItems"] = max(1, int(fields["step_ids"].get("minItems", 0)))
+            else:
+                fields["step_ids"]["maxItems"] = 0
+        if isinstance(fields.get("unresolved"), dict):
+            if terminal:
+                fields["unresolved"]["maxItems"] = 0
+            elif choice == "clarify":
+                fields["unresolved"]["minItems"] = 1
+        if choice != "respond":
+            for name in ("precedes_step_ids", "follows_step_ids"):
+                if isinstance(fields.get(name), dict):
+                    fields[name]["maxItems"] = 0
+        branches.append(branch)
+    return {"oneOf": branches} if len(branches) > 1 else branches[0]
 
 
 def fast_multi_goal_response_schema(
@@ -588,6 +697,7 @@ def fast_multi_goal_response_schema(
     effectful_goal_ids: list[str] | None = None,
     confirmation_required_capability_ids: list[str] | None = None,
     unavailable_goal_ids: list[str] | None = None,
+    information_capability_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Return a decoder-tight, model-authored multi-goal plan schema.
 
@@ -915,6 +1025,7 @@ def fast_multi_goal_response_schema(
             step_schema,
             allowed_capabilities=allowed_capabilities,
             capability_input_schemas=capability_input_schemas,
+            information_capability_ids=information_capability_ids,
         )
 
     def strict_satisfaction_schema(
@@ -1416,8 +1527,15 @@ def _constrain_planner_step_args(
     *,
     allowed_capabilities: list[str],
     capability_input_schemas: dict[str, dict[str, Any]] | None,
+    information_capability_ids: list[str] | None = None,
 ) -> None:
-    """Bind each model-selected capability to its exact provider arg schema."""
+    """Bind each model-selected capability to its exact provider arg schema.
+
+    With ``information_capability_ids`` the step purpose is also the provider's:
+    only an information-acquiring Capability may be ``acquire_information``, and
+    then with the expected Evidence the step contract requires (live 2026-10-12:
+    a re-entry wave decided as a read failed DTO validation).
+    """
 
     if not capability_input_schemas:
         return
@@ -1425,6 +1543,7 @@ def _constrain_planner_step_args(
     if not isinstance(base_properties, dict):
         return
     required = [str(item) for item in step_schema.get("required", []) if str(item).strip()]
+    readers = None if information_capability_ids is None else set(information_capability_ids)
     branches: list[dict[str, Any]] = []
     for capability_id in allowed_capabilities:
         input_schema = capability_input_schemas.get(capability_id)
@@ -1436,14 +1555,31 @@ def _constrain_planner_step_args(
             "enum": [capability_id],
         }
         properties["args"] = copy.deepcopy(input_schema)
-        branches.append(
-            {
-                "type": "object",
-                "properties": properties,
-                "required": required,
-                "additionalProperties": False,
-            }
+        purposes = (
+            [None] if readers is None
+            else ["achieve_effect", "acquire_information"] if capability_id in readers
+            else ["achieve_effect"]
         )
+        for purpose in purposes:
+            branch_properties = copy.deepcopy(properties)
+            branch_required = list(required)
+            if purpose is not None and "step_purpose" in branch_properties:
+                branch_properties["step_purpose"] = {"type": "string", "enum": [purpose]}
+            if purpose == "acquire_information" and "expected_outcome" in branch_properties:
+                # An omitted purpose is achieve_effect, so a read states both fields.
+                branch_properties["expected_outcome"] = {
+                    **branch_properties["expected_outcome"], "minLength": 1,
+                }
+                branch_required += [name for name in ("step_purpose", "expected_outcome")
+                                    if name not in branch_required]
+            branches.append(
+                {
+                    "type": "object",
+                    "properties": branch_properties,
+                    "required": branch_required,
+                    "additionalProperties": False,
+                }
+            )
     if branches:
         step_schema["oneOf"] = branches
 
@@ -2042,9 +2178,9 @@ def fast_advance_response_schema(
             }
     activity_items = activities_schema.get("items") if isinstance(activities_schema, dict) else None
     if isinstance(activity_items, dict) and responsibility_items:
+        # A limitation is a Responsibility decision (responsibility_decisions), not an Activity.
         allowed_activity_contracts = [
             "FastPlannerCapabilityActivity",
-            "FastPlannerUnavailableNeed",
         ]
         if not provider_owned_inputs_complete:
             allowed_activity_contracts.append("FastPlannerInputNeed")
@@ -2066,6 +2202,50 @@ def fast_advance_response_schema(
                     for role_name, ref in mapping.items()
                     if ref.rsplit("/", 1)[-1] in allowed_activity_contracts
                 }
+    decisions_schema = top_properties.get("responsibility_decisions")
+    if isinstance(decisions_schema, dict):
+        offered = (
+            {item.get("$ref", "").rsplit("/", 1)[-1] for item in activity_items.get("oneOf", [])}
+            if isinstance(activity_items, dict) and responsibility_items else
+            {"FastPlannerCapabilityActivity", "FastPlannerResponseNeed", "FastPlannerInputNeed"}
+        )
+        has_capabilities = bool([item for item in (capabilities or []) if isinstance(item, dict)])
+        limitation = {
+            "type": "object", "additionalProperties": False, "required": ["decision", "missing"],
+            "properties": {
+                "decision": {"type": "string", "enum": ["unavailable"]},
+                "missing": {"type": "array", "minItems": 1, "maxItems": 4,
+                            "items": {"type": "string", "minLength": 1, "maxLength": 240}},
+            },
+        }
+        per_ref: dict[str, Any] = {}
+        for ref in refs:
+            choices = []
+            if "FastPlannerCapabilityActivity" in offered and has_capabilities and ref in capability_refs:
+                choices.append("work")
+            if "FastPlannerResponseNeed" in offered and (not responsibility_items or ref in ordinary_speech_refs):
+                choices.append("answer")
+            if "FastPlannerInputNeed" in offered:
+                choices.append("clarify")
+            answered = {
+                "type": "object", "additionalProperties": False, "required": ["decision", "missing"],
+                "properties": {"decision": {"type": "string", "enum": choices},
+                               "missing": {"type": "array", "maxItems": 0}},
+            }
+            # Ordinary speech needs no Capability: SC can always say what Chromie knows,
+            # does not know, or will not say (live 2026-10-12: a joke was "unavailable").
+            branches = ([answered] if ref in speech_only and "answer" in choices
+                        else [limitation] if not choices else [answered, limitation])
+            per_ref[ref] = copy.deepcopy(branches[0]) if len(branches) == 1 else {"oneOf": copy.deepcopy(branches)}
+        decisions_schema.clear()
+        decisions_schema.update({
+            "type": "object", "additionalProperties": False, "properties": per_ref, "required": list(refs),
+            "description": "Decide every Responsibility first: work, answer, clarify, or unavailable "
+                           "with the facts it is missing. Activities then realize these decisions.",
+        })
+        if "responsibility_decisions" not in schema.setdefault("required", []):
+            schema["required"].insert(schema["required"].index("activities")
+                                      if "activities" in schema["required"] else 0, "responsibility_decisions")
     capability_contract = definitions.get("FastPlannerCapabilityActivity")
     allowed_capabilities = [
         item
@@ -2207,7 +2387,8 @@ def fast_advance_response_schema(
                                     }, "required": [*branch["required"], "source_responsibility_ref"]}
                                     for item in responsibility_items if item.local_ref in compatible
                                     for branch in user_turn_source_span_schema(
-                                        [token["ref"] for token in user_turn_source_tokens(item.outcome)]
+                                        [token["ref"] for token in responsibility_outcome_source_tokens(
+                                            item.local_ref, item.outcome)]
                                     )["oneOf"]
                                 ],
                             ]}
@@ -2235,6 +2416,17 @@ def fast_advance_response_schema(
                             required.append("depends_on")
                         properties["source_responsibility_refs"]["items"] = {"type": "string", "enum": list(compatible)}
                         properties["source_responsibility_refs"]["maxItems"] = len(compatible)
+                        if fast_capability_acquires_information(capability):
+                            # A read for a non-information outcome always leaves a decision for
+                            # the re-entry (for example a conditional action); state it typed.
+                            properties["deferred_requirement"] = {
+                                "type": "string", "minLength": 1, "maxLength": 240,
+                            }
+                            if any(item.output_mode != "information" for item in responsibility_items
+                                   if item.local_ref in compatible) and "deferred_requirement" not in required:
+                                required.append("deferred_requirement")
+                        else:
+                            properties.pop("deferred_requirement", None)
                         branch = {
                             "type": "object",
                             "properties": properties,
@@ -2268,11 +2460,12 @@ def fast_advance_response_schema(
         # No catalog provider cannot become an invented vocal provider.
         activity_items["oneOf"] = [branch for branch in activity_items.get("oneOf", [])
             if branch.get("$ref") != "#/$defs/FastPlannerCapabilityActivity"]
-    # Decide local Work before its redundant aggregate disposition.
+    # Decide every Responsibility, then its local Work, before the redundant aggregate.
     properties = schema["properties"]
+    first = [name for name in ("responsibility_decisions", "activities") if name in properties]
     schema["properties"] = {
-        "activities": properties["activities"],
-        **{key: value for key, value in properties.items() if key != "activities"},
+        **{name: properties[name] for name in first},
+        **{key: value for key, value in properties.items() if key not in first},
     }
     return schema
 
@@ -2465,28 +2658,182 @@ def fast_streaming_advance_response_schema(
         properties["disposition"] = {"type": "string", "enum": [disposition]}
         if disposition in {"execute", "mixed", "respond"}:
             properties["coverage"] = {"type": "string", "enum": ["complete"]}
-            # Every Work state carries an Activity, and mixed always combines at least two.
-            properties["activities"]["minItems"] = 2 if disposition == "mixed" else 1
-        if disposition != "unavailable" and len(responsibility_refs) == 1:
-            # With one Responsibility a limitation is the whole decision: an unavailable
-            # Activity beside its own Work or response is a contract error (live 2026-10-11).
-            items = properties["activities"]["items"]
-            kept = [item for item in items.get("oneOf", [items])
-                    if item.get("properties", {}).get("role", {}).get("enum") != ["unavailable"]]
-            if kept and len(kept) != len(items.get("oneOf", [items])):
-                properties["activities"]["items"] = {"oneOf": kept}
+            # Every Work state carries at least one Activity (limitations are decisions).
+            properties["activities"]["minItems"] = 1
         if disposition == "unavailable":
+            # Every Responsibility is a limitation: its facts live in its decision.
             properties["coverage"] = {"type": "string", "enum": ["partial", "uncertain"]}
-            items = properties["activities"]["items"]
-            alternatives = [item for item in items.get("oneOf", [items])
-                if item.get("properties", {}).get("role", {}).get("enum") != ["capability"]]
-            if alternatives:
-                properties["activities"]["items"] = {"oneOf": alternatives}
-            else:
-                properties["activities"]["maxItems"] = 0
-        states.append(state)
+            properties["activities"]["maxItems"] = 0
+        if not _restrict_state_decisions(properties, disposition, responsibility_refs):
+            continue
+        if disposition == "mixed":
+            states.extend(_mixed_limitation_states(state, responsibility_refs))
+            continue
+        states.extend(_single_goal_stage_states(state, disposition, responsibility_refs))
     compiled["oneOf"] = states
+    # The aggregate admits each stage's decided purpose; every state keeps its own exact.
+    for ref in responsibility_refs:
+        purposes = sorted({
+            purpose for state in states
+            for purpose in ((_decision_contract(state, ref) or {}).get("properties", {})
+                            .get("step_purpose", {}).get("enum") or [])
+        })
+        aggregate = compiled["properties"].get("responsibility_decisions", {}).get("properties", {}).get(ref)
+        for branch in (aggregate.get("oneOf", [aggregate]) if purposes and isinstance(aggregate, dict) else []):
+            if "work" in branch["properties"]["decision"]["enum"]:
+                branch["properties"]["step_purpose"] = {"type": "string", "enum": purposes}
     return compiled
+
+
+_STATE_DECISION = {"execute": "work", "respond": "answer", "clarify": "clarify", "unavailable": "unavailable"}
+
+
+def _restrict_state_decisions(
+    properties: dict[str, Any], disposition: str, responsibility_refs: list[str],
+) -> bool:
+    """A uniform disposition state admits only that decision for every Responsibility.
+
+    The decisions precede the disposition, so the decoder keeps only states their
+    choices allow; ``mixed`` needs two Responsibilities. Returns False for a state no
+    decision space can reach. Host validation still rejects any remaining mismatch.
+    """
+    decisions = properties.get("responsibility_decisions")
+    per_ref = decisions.get("properties") if isinstance(decisions, dict) else None
+    if not isinstance(per_ref, dict):
+        return True
+    if disposition == "mixed":
+        return len(responsibility_refs) > 1
+    wanted = _STATE_DECISION.get(disposition)
+    for ref, choice in list(per_ref.items()):
+        kept = []
+        for branch in choice.get("oneOf", [choice]):
+            allowed = branch.get("properties", {}).get("decision", {}).get("enum") or []
+            if wanted in allowed:
+                narrowed = copy.deepcopy(branch)
+                narrowed["properties"]["decision"] = {"type": "string", "enum": [wanted]}
+                kept.append(narrowed)
+        if not kept:
+            return False
+        per_ref[ref] = kept[0]
+    return True
+
+
+MIXED_DECISION_STATE_MAX_REFS = 2
+MIXED_LIMITATION_STATE_MAX_REFS = 3
+_DECISION_ROLES = {"work": {"capability", "complete_response"}, "answer": {"complete_response"},
+                   "clarify": {"clarification"}, "unavailable": set()}
+
+
+def _mixed_limitation_states(state: dict[str, Any], responsibility_refs: list[str]) -> list[dict[str, Any]]:
+    """A mixed decision is made before Activities, which then serve only what it decided.
+
+    With two Responsibilities each state fixes both decisions, and an Activity role is
+    offered only for the Responsibility whose decision it realizes; with three, one
+    state per set of ``unavailable`` Responsibilities keeps Activities off them. Live
+    2026-10-12 (wave + coffee): coffee was decided unavailable, then given a
+    clarification, and Host rejected the whole turn. Larger turns keep one mixed state
+    and Host keeps the same checks.
+    """
+    per_ref = state["properties"].get("responsibility_decisions", {}).get("properties", {})
+    if len(responsibility_refs) > MIXED_LIMITATION_STATE_MAX_REFS or not per_ref:
+        return [state]
+
+    def offered(ref: str) -> dict[str, dict[str, Any]]:
+        by_decision: dict[str, dict[str, Any]] = {}
+        choice = per_ref[ref]
+        for branch in choice.get("oneOf", [choice]):
+            for decision in branch.get("properties", {}).get("decision", {}).get("enum") or []:
+                narrowed = copy.deepcopy(branch)
+                narrowed["properties"]["decision"] = {"type": "string", "enum": [decision]}
+                by_decision[decision] = narrowed
+        return by_decision
+
+    choices = {ref: offered(ref) for ref in responsibility_refs}
+    if len(responsibility_refs) <= MIXED_DECISION_STATE_MAX_REFS:
+        assignments = [dict(zip(responsibility_refs, picked))
+                       for picked in product(*(list(choices[ref]) for ref in responsibility_refs))
+                       if len(set(picked)) > 1]
+    else:
+        assignments = [{ref: ("unavailable" if ref in limited else None) for ref in responsibility_refs}
+                       for size in range(len(responsibility_refs))
+                       for limited in combinations(responsibility_refs, size)]
+
+    states = []
+    for assignment in assignments:
+        decided = {}
+        for ref, decision in assignment.items():
+            options = ({decision: choices[ref][decision]} if decision in choices[ref] else {}) if decision else {
+                key: value for key, value in choices[ref].items() if key != "unavailable"}
+            if not options:
+                break
+            values = list(options.values())
+            decided[ref] = values[0] if len(values) == 1 else {"oneOf": values}
+        else:
+            stage = copy.deepcopy(state)
+            stage["properties"]["responsibility_decisions"]["properties"] = decided
+            items = stage["properties"]["activities"]["items"]
+            kept_items = []
+            for item in items.get("oneOf", [items]):
+                role = (item.get("properties", {}).get("role", {}).get("enum") or [""])[0]
+                refs = item.get("properties", {}).get("source_responsibility_refs", {}).get("items", {})
+                allowed = [ref for ref in refs.get("enum", responsibility_refs)
+                           if assignment[ref] != "unavailable"
+                           and (assignment[ref] is None or role in _DECISION_ROLES[assignment[ref]])]
+                if not allowed:
+                    continue
+                if "enum" in refs:
+                    refs["enum"] = allowed
+                    item["properties"]["source_responsibility_refs"]["maxItems"] = len(allowed)
+                kept_items.append(item)
+            if kept_items:
+                stage["properties"]["activities"]["items"] = {"oneOf": kept_items}
+                states.append(stage)
+    return states
+
+
+def _single_goal_stage_states(
+    state: dict[str, Any], disposition: str, responsibility_refs: list[str],
+) -> list[dict[str, Any]]:
+    """With one Responsibility, Work either acquires information or achieves effects.
+
+    Host rejects acquisition and a deferred effect for the same Goal in one Plan
+    (``validate_acquisition_stage_isolation``); with one Responsibility every Activity
+    serves that Goal, so the decoder offers the two stages separately. A conditional
+    action therefore reads first and decides on re-entry (live 2026-10-11). The work
+    decision names the stage before any Activity; a stage chosen by the first Activity
+    forced an intended wave into a second read (live 2026-10-12).
+    """
+    if disposition not in {"execute", "mixed"} or len(responsibility_refs) != 1:
+        return [state]
+    items = state["properties"]["activities"]["items"]
+    branches = items.get("oneOf", [items])
+
+    def purpose(item: dict[str, Any]) -> str:
+        if item.get("properties", {}).get("role", {}).get("enum") != ["capability"]:
+            return ""
+        return (item["properties"].get("step_purpose", {}).get("enum") or [""])[0]
+
+    purposes = {purpose(item) for item in branches} - {""}
+    if len(purposes) < 2:
+        return [state]
+    stages = []
+    for kept_purpose in sorted(purposes):
+        stage = copy.deepcopy(state)
+        stage["properties"]["activities"]["items"] = {"oneOf": [
+            copy.deepcopy(item) for item in branches if purpose(item) in {"", kept_purpose}
+        ]}
+        decision = _decision_contract(stage, responsibility_refs[0])
+        if decision is not None:
+            decision["properties"]["step_purpose"] = {"type": "string", "enum": [kept_purpose]}
+            decision["required"] = [*decision["required"], "step_purpose"]
+        stages.append(stage)
+    return stages
+
+
+def _decision_contract(schema: dict[str, Any], ref: str) -> dict[str, Any] | None:
+    per_ref = schema["properties"].get("responsibility_decisions", {}).get("properties", {})
+    decision = per_ref.get(ref)
+    return decision if isinstance(decision, dict) and "properties" in decision else None
 
 
 def need_first_response_schema(schema: dict[str, Any], loaded_capability_ids: list[str]) -> dict[str, Any]:

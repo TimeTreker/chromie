@@ -61,13 +61,21 @@ def _stream_decoder_constraints(node: Any) -> None:
             # the canonical schema still validates membership in any order.
             # This constrains generation, never fills or repairs model output.
             node["prefixItems"] = [item["contains"] for item in node.pop("allOf")]
-        # XGrammar 0.2.1 miscompiles string regexes and number bounds. These
-        # remain in the original schema and deterministic validation.
+        # XGrammar 0.2.1 miscompiles string regexes and fractional number bounds
+        # (it rejected 248 of 2,232 valid values over the live catalog's ranges).
+        # Integral bounds are exact (0 of 747), so the decoder keeps them: a provider
+        # minimum such as count>=2 is then decoder-tight (live 2026-10-12). Everything
+        # stripped remains in the original schema and deterministic validation.
         if node.get("type") == "string":
             node.pop("pattern", None)
         if node.get("type") == "number":
-            for key in ("minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum"):
+            for key in ("exclusiveMinimum", "exclusiveMaximum"):
                 node.pop(key, None)
+            for key in ("minimum", "maximum"):
+                bound = node.get(key)
+                if not (isinstance(bound, (int, float)) and not isinstance(bound, bool)
+                        and float(bound).is_integer()):
+                    node.pop(key, None)
         for value in node.values():
             _stream_decoder_constraints(value)
     elif isinstance(node, list):
@@ -102,6 +110,35 @@ def _share_stream_source_spans(schema: dict[str, Any]) -> None:
                 visit(value)
 
     visit(schema)
+
+
+def _share_stream_activity_branches(schema: dict[str, Any]) -> None:
+    """Compile each distinct Activity branch once across decision states.
+
+    Decision states repeat the same Capability branches; XGrammar compiles every inline
+    copy, so a two-Responsibility turn's grammar took 2.7 s instead of 1.1 s. Identical
+    branches become one shared definition; the decoded language is unchanged.
+    """
+    definitions = schema.setdefault("$defs", {})
+    known: dict[str, str] = {}
+    for state in schema.get("oneOf") or []:
+        items = state.get("properties", {}).get("activities", {}).get("items") if isinstance(state, dict) else None
+        if not isinstance(items, dict) or not isinstance(items.get("oneOf"), list):
+            continue
+        shared = []
+        for branch in items["oneOf"]:
+            if not isinstance(branch, dict) or "$ref" in branch:
+                shared.append(branch)
+                continue
+            encoded = json.dumps(branch, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            if encoded not in known:
+                key = f"FastActivityBranch{len(known)}"
+                while key in definitions:
+                    key += "_"
+                definitions[key] = branch
+                known[encoded] = key
+            shared.append({"$ref": f"#/$defs/{known[encoded]}"})
+        items["oneOf"] = shared
 
 
 def _bound_ga_ownership_rows(schema: dict[str, Any]) -> None:
@@ -147,6 +184,7 @@ def _openai_response_format(response_format: Any) -> dict[str, Any] | None:
             expose_intersection_shapes(schema)
         if schema.get("title") == "FastPlannerWorkAdvanceOutput":
             _share_stream_source_spans(schema)
+            _share_stream_activity_branches(schema)
         if schema.get("title") in {
             "GoalAssociationModelOutput", "GoalSegmentationModelOutput",
             "AgentSkillSelectionModelOutput",

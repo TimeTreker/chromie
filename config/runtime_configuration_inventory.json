@@ -3540,23 +3540,6 @@
     {
       "boolean": false,
       "category": "profile_constant",
-      "key": "TTS_COSYVOICE_EN_WARMUP_TEXT",
-      "owners": [
-        ".env.common",
-        "scripts/preflight_cognitive_gateway_core_qualification.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "TTS_COSYVOICE_MIXED_WARMUP_TEXT",
-      "owners": [
-        ".env.common"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
       "key": "TTS_COSYVOICE_OLLAMA_MODEL",
       "owners": [
         ".env.common",
@@ -3570,23 +3553,6 @@
       "owners": [
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "TTS_COSYVOICE_WARMUP_TIMEOUT_SEC",
-      "owners": [
-        ".env.common",
-        "scripts/preflight_cognitive_gateway_core_qualification.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "TTS_COSYVOICE_ZH_WARMUP_TEXT",
-      "owners": [
-        ".env.common"
       ]
     },
     {
@@ -4032,12 +3998,12 @@
     "category_counts": {
       "acceptance_override": 34,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 132,
+      "profile_constant": 128,
       "public_choice": 9,
       "service_internal": 209
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 384
+    "total_keys": 380
   }
 }

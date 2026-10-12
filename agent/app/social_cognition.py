@@ -24,6 +24,7 @@ try:
     from chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
     from chromie_contracts.social_cognition import (
         SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
+        must_say_now_need_ids, value_review_responsibility_refs, value_withheld_need_ids,
     )
     from chromie_contracts.text import normalize_whitespace
     from chromie_contracts.user_turn import user_turn_prohibits_speech
@@ -31,6 +32,7 @@ except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
     from shared.chromie_contracts.social_cognition import (
         SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
+        must_say_now_need_ids, value_review_responsibility_refs, value_withheld_need_ids,
     )
     from shared.chromie_contracts.text import normalize_whitespace
     from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
@@ -239,7 +241,7 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
     known: dict[str, set[str]] = {}
     known_need_bindings: dict[str, set[str]] = {}
     prior_ids: set[str] = set()
-    terminal_failure_need_ids = _terminal_failure_need_ids(request)
+    terminal_failure_need_ids = _result_needs_said_now(request)
     context = request.context.get("interaction_context", {})
     for key in (
         "events", "already_spoken", "pending_speech", "prior_delivered_speech"
@@ -314,7 +316,7 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
             if terminal_failure_need_ids and not terminal_failure_need_ids.issubset(
                 known_need_bindings.get(identity, set())
             ):
-                continue  # An earlier act cannot report a failure that happened later.
+                continue  # An earlier act cannot report a later failure or limitation.
             text = next(iter(messages))
             text_contract = branch["properties"]["text"]
             if ("const" in text_contract and text_contract["const"] != text) or not (
@@ -365,6 +367,18 @@ def _terminal_failure_need_ids(request: SocialCognitionRequest) -> set[str]:
         and need.facts.get("status") == "failed"
         and need.facts.get("required_result_update") is True
     }
+
+
+def _result_needs_said_now(request: SocialCognitionRequest) -> set[str]:
+    """Result needs a new verbal act must cover in this turn.
+
+    A terminal Work failure, a Planner limitation, or Chromie's own value decline
+    each finish what the person asked for; none may be left pending behind an
+    earlier acknowledgement.
+    """
+
+    failures = set() if user_turn_prohibits_speech(request.context.get("user_turn_envelope")) else _terminal_failure_need_ids(request)
+    return failures | must_say_now_need_ids(request)
 
 
 def _terminal_work_failure_requires_result_update(
@@ -441,15 +455,21 @@ def social_cognition_response_schema(
             "if": {"properties": {"disposition": {"enum": ["communicate", "silence"]}}},
             "then": {"properties": {"need_outcomes": {"required": need_ids}}},
         })
-    for need_id in required_failure_need_ids:
+    for need_id in [*required_failure_need_ids, *sorted(must_say_now_need_ids(request))]:
         schema["properties"]["need_outcomes"]["properties"][need_id] = {
             "type": "string", "const": "covered",
+        }
+    for need_id in sorted(value_withheld_need_ids(request)):
+        # Value Judgment withheld this answer: it is not said this turn.
+        schema["properties"]["need_outcomes"]["properties"][need_id] = {
+            "type": "string", "const": "pending",
         }
     if deep:
         schema["properties"]["disposition"]["enum"] = ["communicate", "silence"]
     if (
         _fresh_addressed_turn_requires_acknowledgement(request)
         or _terminal_work_failure_requires_result_update(request)
+        or must_say_now_need_ids(request)
     ):
         schema["properties"]["disposition"]["enum"] = [
             value
@@ -620,10 +640,12 @@ def social_cognition_response_schema(
         # Ordinary speech can be answered directly.  Non-speech task content has
         # no established result yet, so it may only receive a pre-evidence
         # acknowledgement/nonverbal act until Planner/Evidence establishes facts.
+        # Speech UMI marked value_review waits for Value Judgment; the rest is immediate.
+        routed = value_review_responsibility_refs(request)
         direct_speech_refs = sorted(
             item.local_ref
             for item in request.responsibilities
-            if item.output_mode == "speech"
+            if item.output_mode == "speech" and item.local_ref not in routed
         )
         task_refs = sorted(
             item.local_ref
@@ -754,14 +776,20 @@ def validate_social_cognition_output(
                     )
                 else:
                     previous_need_bindings.setdefault(identity, set())
-    if _terminal_work_failure_requires_result_update(request):
-        required_failure_need_ids = _terminal_failure_need_ids(request)
+    if any(output.need_outcomes.get(need_id) == "covered" for need_id in value_withheld_need_ids(request)):
+        raise ValueError("an answer withheld by Value Judgment cannot be said")
+    reviewed_refs = value_review_responsibility_refs(request)
+    if any(act.function not in {"acknowledge", "nonverbal"} and not act.addressed_need_ids
+           and set(act.source_responsibility_refs) & reviewed_refs for act in output.activities):
+        raise ValueError("speech marked value_review is said only through a reviewed communication need")
+    required_failure_need_ids = _result_needs_said_now(request)
+    if required_failure_need_ids:
         if output.disposition != "communicate" or any(
             output.need_outcomes.get(need_id) != "covered"
             for need_id in required_failure_need_ids
         ):
             raise ValueError(
-                "terminal requested-Work failure result need must be communicated and covered"
+                "terminal requested-Work failure or limitation result need must be communicated and covered"
             )
         for act in output.activities:
             newly_addressed = required_failure_need_ids.intersection(act.addressed_need_ids)
@@ -769,7 +797,7 @@ def validate_social_cognition_output(
                 previous_need_bindings[act.activity_id]
             ):
                 raise ValueError(
-                    "a prior communicative act cannot cover a later terminal Work failure"
+                    "a prior communicative act cannot cover a later terminal Work failure or limitation"
                 )
     allowed = {item["capability_id"]: item for item in candidates}
     scopes = {
@@ -784,7 +812,7 @@ def validate_social_cognition_output(
                 item.local_ref
                 for item in request.responsibilities
                 if item.output_mode == "speech"
-            }
+            } - value_review_responsibility_refs(request)
             task_refs = {
                 item.local_ref
                 for item in request.responsibilities
@@ -1064,10 +1092,27 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
     )
 
 
+LIMITATION_RESULT_NOTICE = (
+    "\nCurrent limitation result need: part of this request will not be done (a Planner "
+    "result whose facts.disposition is unavailable or refused, or Chromie's own value_declined "
+    "decision). Say it now in a new verbal act that covers that need, using only its facts for "
+    "what is missing or why; an earlier acknowledgement does not say it, and it is never left "
+    "pending.\n"
+)
+
+
 VALUE_QUESTION_GUARD = (
-    " A confirmation need whose facts carry value_question needs a new short question, asked "
+    " A confirmation or input need whose facts carry value_question needs a new short question, asked "
     "now, about the one fact its concern and reason name, such as whose it is or whether "
     "someone agreed. An acknowledgement, or a question about where something is, does not ask it."
+)
+VALUE_REVIEW_WAIT_GUARD = (
+    " A Responsibility marked value_review waits for Chromie's Value Judgment: you may only "
+    "acknowledge neutrally now; do not perform, give, agree to or refuse what it asks yet."
+)
+VALUE_WITHHELD_GUARD = (
+    " An answer need whose facts carry value_withheld stays pending: do not give that answer or "
+    "any part of it, not even as a joke or an example."
 )
 VALUE_DECLINE_GUARD = (
     " A result need whose facts carry value_declined is Chromie's own decision not to do that "
@@ -1082,11 +1127,14 @@ def _social_value_judgment_guard(request: SocialCognitionRequest) -> str:
     facts = [need.facts for need in request.communication_needs if isinstance(need.facts, dict)]
     asks = any(item.get("value_question") for item in facts)
     declines = any(item.get("value_declined") for item in facts)
-    if not (asks or declines):
+    withheld = any(item.get("value_withheld") is True for item in facts)
+    waiting = bool(value_review_responsibility_refs(request)) and not request.communication_needs
+    if not (asks or declines or withheld or waiting):
         return ""
     return (
         "\nValue Judgment guard: Chromie's own conscience paused part of this Work."
-        + (VALUE_QUESTION_GUARD if asks else "") + (VALUE_DECLINE_GUARD if declines else "") + "\n"
+        + (VALUE_QUESTION_GUARD if asks else "") + (VALUE_DECLINE_GUARD if declines else "")
+        + (VALUE_WITHHELD_GUARD if withheld else "") + (VALUE_REVIEW_WAIT_GUARD if waiting else "") + "\n"
     )
 
 
@@ -1127,6 +1175,8 @@ def social_cognition_prompt(
                 "do not ask them to repeat or rephrase the request."
             )
         terminal_result_notice += "\n"
+    if must_say_now_need_ids(request):
+        terminal_result_notice += LIMITATION_RESULT_NOTICE
     packet = {
         "interaction_context": interaction,
         "request": payload,

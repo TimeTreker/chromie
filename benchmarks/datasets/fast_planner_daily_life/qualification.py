@@ -279,13 +279,101 @@ def _ability_need_capability_ids(schema: Any) -> list[str] | None:
     return None
 
 
+def _responsibility_decision_refs(schema: Any) -> list[str] | None:
+    """Responsibility refs a streamed decoder requires decisions for, or None."""
+    if not isinstance(schema, dict):
+        return None
+    for shape in (schema, *[item for key in ("oneOf", "anyOf") for item in schema.get(key) or []]):
+        decisions = (shape.get("properties") or {}).get("responsibility_decisions") if isinstance(shape, dict) else None
+        if isinstance(decisions, dict) and isinstance(decisions.get("properties"), dict):
+            return list(decisions["properties"])
+    return None
+
+
+def _decided_stage_purposes(schema: Any) -> dict[str, dict[str, str]]:
+    """Per ref, the decided stage purpose under which a decoder offers each Capability."""
+    stages: dict[str, dict[str, str]] = {}
+    for shape in (schema.get("oneOf") or []) if isinstance(schema, dict) else []:
+        properties = shape.get("properties") or {} if isinstance(shape, dict) else {}
+        decisions = (properties.get("responsibility_decisions") or {}).get("properties") or {}
+        items = (properties.get("activities") or {}).get("items") or {}
+        for ref, decision in decisions.items():
+            purpose = ((decision.get("properties") or {}).get("step_purpose") or {}).get("enum") or []
+            if len(purpose) != 1:
+                continue
+            for branch in items.get("oneOf", [items]):
+                branch_properties = branch.get("properties") or {}
+                if (branch_properties.get("role") or {}).get("enum") == ["capability"]:
+                    for capability_id in (branch_properties.get("capability_id") or {}).get("enum") or []:
+                        stages.setdefault(ref, {})[capability_id] = purpose[0]
+    return stages
+
+
+def declared_decision_stage(reply: Any, response_format: Any) -> Any:
+    """Adapt a streamed fixture authored before decided stages (2026-10-12).
+
+    A single Responsibility's work decision now names its Activities' purpose first.
+    That purpose is fixed by each provider, so it is read from the fixture's own
+    Activities; Activities of both purposes leave the decision undecided (still invalid).
+    """
+    stages = _decided_stage_purposes(response_format)
+    decisions = reply.get("responsibility_decisions") if isinstance(reply, dict) else None
+    if not stages or not isinstance(decisions, dict):
+        return reply
+    declared = {}
+    for ref, decision in decisions.items():
+        purposes = {stages.get(ref, {}).get(activity.get("capability_id"))
+                    for activity in reply.get("activities") or []
+                    if isinstance(activity, dict) and activity.get("role") == "capability"
+                    and ref in (activity.get("source_responsibility_refs") or [])}
+        if (ref in stages and isinstance(decision, dict) and decision.get("decision") == "work"
+                and "step_purpose" not in decision and len(purposes) == 1 and None not in purposes):
+            decision = {**decision, "step_purpose": next(iter(purposes))}
+        declared[ref] = decision
+    return {**reply, "responsibility_decisions": declared}
+
+
+def declared_responsibility_decisions(reply: Any, response_format: Any) -> Any:
+    """Adapt a streamed fixture authored before Responsibility decisions (2026-10-12).
+
+    Each Responsibility's decision is read from the fixture's own Activities; a former
+    ``unavailable`` Activity becomes that Responsibility's unavailable decision and its
+    missing facts. A ref the fixture never realized is left undecided (still invalid).
+    Fixtures that author decisions keep them, given only their decided stage.
+    """
+    refs = _responsibility_decision_refs(response_format)
+    if refs is None or not isinstance(reply, dict):
+        return reply
+    if "responsibility_decisions" in reply:
+        return declared_decision_stage(reply, response_format)
+    role_decision = {"capability": "work", "complete_response": "answer", "clarification": "clarify"}
+    activities, decisions = [], {}
+    for activity in reply.get("activities") or []:
+        if isinstance(activity, dict) and activity.get("role") == "unavailable":
+            for ref in activity.get("source_responsibility_refs") or []:
+                decisions[ref] = {"decision": "unavailable", "missing": list(activity.get("missing") or [])}
+            continue
+        activities.append(activity)
+    for activity in activities:
+        decision = role_decision.get(activity.get("role")) if isinstance(activity, dict) else None
+        for ref in (activity.get("source_responsibility_refs") or []) if decision else []:
+            decisions.setdefault(ref, {"decision": decision, "missing": []})
+    ordered = {ref: decisions[ref] for ref in refs if ref in decisions}
+    rest = {key: value for key, value in reply.items() if key not in {"ability_needs", "activities"}}
+    head = {"ability_needs": reply["ability_needs"]} if "ability_needs" in reply else {}
+    return declared_decision_stage(
+        {**head, "responsibility_decisions": ordered, "activities": activities, **rest}, response_format)
+
+
 def declared_ability_needs(reply: Any, response_format: Any) -> Any:
     """Adapt a fixture authored before the need-first contract (2026-10-10).
 
     When the decoder requires ability_needs and the fixture omits it, each loaded
     Capability the fixture uses is declared as one fitting need. Fixtures that
     exercise need-first carry explicit ability_needs and are returned unchanged.
+    Streamed fixtures are also given their Responsibility decisions.
     """
+    reply = declared_responsibility_decisions(reply, response_format)
     loaded = _ability_need_capability_ids(response_format)
     if loaded is None or not isinstance(reply, dict) or "ability_needs" in reply:
         return reply

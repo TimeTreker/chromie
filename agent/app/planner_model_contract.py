@@ -754,10 +754,14 @@ def materialize_planner_output(
     from .planner_validation import schedule_planner_steps
 
     out = model_output.model_dump(mode="python")
+    # Completed Work is cited by its step_id or the evidence_ref that projections show
+    # (live 2026-10-12: a re-entry wave cited the read's evidence and was rejected).
+    completed = completed_step_evidence or {}
     out["steps"] = schedule_planner_steps(
         out.get("steps") or [],
         capabilities=capabilities,
-        completed_step_ids=frozenset(completed_step_evidence or {}),
+        completed_step_ids=frozenset(completed) | {
+            str(item.get("evidence_id")) for item in completed.values() if item.get("evidence_id")},
     )
     out.pop("plan_relation", None)
     out.pop("user_confirmation_required", None)

@@ -246,3 +246,123 @@ def test_withheld_effect_never_joins_a_provider_local_body_group():
     by_id = {result.request_id: result for result in terminal.results}
     assert by_id["deliver"].status == "refused" and by_id["deliver"].reason_code == "value_judgment_declined"
     assert by_id["blink"].status == by_id["attend"].status == "completed"
+
+
+def speech_turn(verdict, *, value_review=True):
+    """Turn-local speech UMI marked value_review (owner choice B, 2026-10-12)."""
+    from orchestrator.runtime.cognitive_runtime import (
+        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+    from tests.test_cognitive_runtime_pr7 import FakeRuntime, ScriptedClient, admitted_core, body_goal_association
+
+    class Client(ScriptedClient):
+        async def resolve_value_judgment(self, session, *, request, **kwargs):
+            self.calls.append("value_judgment")
+            self.value_requests.append(request)
+            if isinstance(verdict, Exception):
+                raise verdict
+            return verdict
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            # A compliant SC: says every need except an answer Value Judgment withheld.
+            withheld = {need.need_id for need in request.communication_needs if need.facts.get("value_withheld")}
+            resolution = await super().resolve_social_cognition(session, request=request.model_copy(update={
+                "communication_needs": [need for need in request.communication_needs if need.need_id not in withheld]}),
+                **kwargs)
+            return resolution.model_copy(update={"request_id": request.request_id,
+                "snapshot_digest": request.snapshot_digest(),
+                "need_outcomes": {**resolution.need_outcomes, **{key: "pending" for key in withheld}}})
+
+    text = "When the teacher comes, tell her I was doing homework the whole time."
+    answer = CanonicalPlan(plan_id="plan-say", planner_tier="fast", disposition="respond", coverage="complete",
+        confidence=0.95, goal_ids=["goal-1"], goal_summary="answer the request", steps=[],
+        goal_outcomes=[{"goal_id": "goal-1", "disposition": "respond", "coverage": "complete"}],
+        communication_needs=[{"need_id": "need-answer", "owner": "planner", "kind": "answer",
+                              "source_goal_ids": ["goal-1"], "reference_id": "plan-say",
+                              "facts": {"goal_id": "goal-1", "disposition": "respond"}}],
+        goal_satisfaction={"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-1"]})
+    client = Client(association=body_goal_association(), fast_plans=[answer])
+    client.value_requests = []
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=client, adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([])),
+        policy=CognitiveRuntimePolicy(mode="apply"))
+    core, envelope = admitted_core(text, sid="sid-say", language="en-US", responsibilities=[{
+        "local_ref": "r1", "outcome": text, "output_mode": "speech", "continuity_scope": "turn",
+        "value_review": value_review, "confidence": 1.0}])
+    result = asyncio.run(coordinator.resolve(object(), text=text, sid="sid-say", core_interpretation=core,
+        context={"history": [], "active_goal_snapshots": [], "mind": default_mind_profile().prompt_context()},
+        history=[], language="en-US", turn_envelope=envelope))
+    return client, result
+
+
+def test_value_review_speech_requests_the_planner_before_any_answer():
+    from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
+
+    flagged = CognitiveWorkRequest(sid="vj", text="Tell my teacher I was ill.", language="en-US",
+        interpretation_confidence=1.0, responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="tell the teacher I was ill", output_mode="speech",
+            continuity_scope="turn", value_review=True, confidence=1.0)])
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(flagged, "planner") == ["r1"]
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(flagged, "goal_association") == ["r1"]
+    plain = flagged.model_copy(update={"responsibilities": [
+        flagged.responsibilities[0].model_copy(update={"value_review": False})]})
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(plain, "planner") == []
+    with pytest.raises(ValueError, match="speech Responsibility only"):
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="limp", output_mode="body_action",
+                                        body_effect_family="task_physical_effect", value_review=True)
+
+
+@pytest.mark.parametrize("verdict,withheld,extra_kind", [
+    (judged("proceed"), False, None),
+    (judged("ask", "deception", "another_adult"), True, "input"),
+    (judged("decline", "deception", "another_adult"), True, "result"),
+    (RuntimeError("agent down"), True, "result"),
+])
+def test_value_review_speech_is_judged_before_social_cognition_says_it(verdict, withheld, extra_kind):
+    client, result = speech_turn(verdict)
+    assert result.status == "applied", result.fallback_reason
+    assert client.calls.count("value_judgment") == 1
+    plan = result.terminal_plan
+    (answer,) = [need for need in plan.communication_needs if need.kind == "answer"]
+    assert bool(answer.facts.get("value_withheld")) is withheld
+    runtime_needs = [need for need in plan.communication_needs if need.owner == "runtime"]
+    assert [need.kind for need in runtime_needs] == ([extra_kind] if extra_kind else [])
+    if extra_kind:
+        facts = runtime_needs[0].facts
+        assert facts["withheld_answer_need_ids"] == [answer.need_id]
+        assert ("value_question" if extra_kind == "input" else "value_declined") in facts
+        assert plan.metadata["value_judgment"]["withheld_answer_goal_ids"] == ["goal-1"]
+    from orchestrator.runtime.cognitive_runtime import CognitiveEvidenceRecorder
+    packets = CognitiveEvidenceRecorder.semantic_artifact_packets(result, sid="sid-say")
+    (plan_packet,) = [packet for packet in packets if packet.ref.artifact_kind == "planner_plan"]
+    assert all("value_withheld" not in need["facts"] and "value_judgment" not in need["facts"]
+               for need in plan_packet.payload["communication_needs"])
+
+
+def test_unmarked_speech_never_calls_value_judgment():
+    client, result = speech_turn(RuntimeError("must not be called"), value_review=False)
+    assert "value_judgment" not in client.calls
+
+
+@pytest.mark.parametrize("decision,expected", [("decline", "value_declined"), ("ask", "clarify"), ("proceed", "respond")])
+def test_withheld_answer_sets_its_goal_outcome(decision, expected):
+    from orchestrator.runtime.conversation_state import ConversationStateManager
+
+    plan = {"goal_outcomes": [{"goal_id": "goal-1", "disposition": "respond"}, {"goal_id": "goal-2", "disposition": "respond"}],
+            "metadata": {"value_judgment": {"decision": decision, "withheld_answer_goal_ids": ["goal-1"]}}}
+    outcomes = ConversationStateManager._canonical_goal_outcomes({"canonical_plan": plan})
+    assert outcomes["goal-1"]["disposition"] == expected
+    assert outcomes["goal-2"]["disposition"] == "respond"
+
+
+def test_value_declined_goal_ends_like_a_limitation_without_a_semantic_version_bump():
+    """Live 2026-10-12 (vs_teacher_homework_zh): marking the declined Goal refused changed its
+    semantic version before dispatch, so the decline was dropped as a stale submission."""
+    from orchestrator.runtime.conversation_state import ConversationStateManager
+
+    manager = ConversationStateManager(base_conversation_id="vj-goal")
+    manager._task_contexts.append({"task_id": "goal-1", "status": "planning", "goal_version": 1})
+    before = manager._semantic_goal_from_context(manager._task_contexts[-1]).model_dump(mode="json")
+    manager._record_nonexecuting_goal_outcomes({"goal-1": {"goal_id": "goal-1", "disposition": "value_declined"}})
+    context = manager._task_contexts[-1]
+    assert (context["status"], context["commitment_state"], context["plan_status"]) == ("refused", "failed", "value_declined")
+    assert manager._semantic_goal_from_context(context).model_dump(mode="json") == before

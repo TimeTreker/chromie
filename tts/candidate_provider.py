@@ -41,7 +41,11 @@ class WorkerBackedCandidateProvider(TTSProvider):
 
     async def health(self) -> dict[str, Any]:
         return {
-            "ready": self._worker.is_alive,
+            # Ready means a request now meets its first-audio budget: the worker has
+            # sent ``ready`` (not merely spawned), and a self-warming worker has warmed,
+            # including after any restart.
+            "ready": self._worker.is_alive and bool(self._worker.ready_payload) and (
+                self._worker.worker_warmed or not self._worker.declares_warmup),
             "worker_process_alive": self._worker.is_alive,
             "worker_warmed": self._worker.worker_warmed,
             "worker_restart_count": self._worker.restart_count,

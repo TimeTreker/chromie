@@ -1,6 +1,83 @@
 # Chromie Handoff
 
-## Current delivery — Deep Planner retired (stage B), 2026-10-11
+## Current work — Planner limitation contracts, 2026-10-12
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`, base `origin/main`
+`41570d182`, delivered to `origin/main`; the expected resume revision is the latest commit containing this
+file. Soridormi's nod/shake minimum and runner stall tolerance are delivered on Soridormi `main`. Evidence: `.chromie/acceptance/planner-limitation-20261012/`
+(`capture24.py`, `freeze24.py`, `capture24/`, `strict-replay-freeze24/`). The large corpus case files
+are extracted from `benchmarks/integration/workflow_scenarios/frozen.tar.xz` (freeze 24, `4edf2a83…`).
+
+Live state on this host is unchanged: `chromie-agent:latest` = stage B `41570d182`, `chromie-llm`
+image `03ad9e33` (has the grammar-retention leak; its scheduler RSS grows ~2.4 GB per new Planner
+schema, so restart it before any long cohort). Fixed LLM image built, not deployed:
+`chromie-sglang:grammar-retention` (branch `sglang-grammar-retention`, worktree `scratchpad/sglang-fix`).
+
+```bash
+# deploy the LLM fix (owner OK required; idle service)
+docker tag chromie-sglang:gemma4-fp8 chromie-sglang:gemma4-fp8-pre-retention
+docker tag chromie-sglang:grammar-retention chromie-sglang:gemma4-fp8
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-llm
+# gate from a clean worktree (the main checkout holds a peer worktree under .claude/worktrees that breaks check_docs)
+git worktree add --detach <dir> HEAD && (cd <dir>/benchmarks/integration/workflow_scenarios && tar -xJf frozen.tar.xz --exclude=manifest.json) && (cd <dir> && ./scripts/run_tests.sh)
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir <new dir>
+```
+
+Live run 1 is judged in the evidence README. The owner deployed the LLM fix and
+`chromie-agent:planlim-wt2-20261012` (run-1 fixes A/G/I), then asked for the nine pre-existing items
+to be fixed before testing; those repairs are in the tree (README "Owner list after run 1"), with
+freeze 26 (`capture26.py`, `freeze26.py`, archive `e8f7f805…`). The large corpus case files are
+extracted from `frozen.tar.xz` (freeze 26).
+
+Gate on the full working tree (clean worktree `scratchpad/gate5`, diff applied): pytest 3,791 + 5
+skipped, benchmarks 169, legacy 20; strict replay 6,000/6,000 with zero model calls
+(`strict-replay-freeze26/`); Level A 46/46 (`level-a-run1-repairs/`).
+
+Run 2 (`chromie-agent:planlim-wt3-20261012`) is judged in the evidence README (`run2/`); the run-2
+repairs and freeze 27 (`capture27.py`, `freeze27.py`, archive `ae3af4ea…`) are in the tree. Gate on the
+full working tree (clean worktree `scratchpad/gate6`): pytest 3,799 + 5 skipped, benchmarks 169,
+legacy 20; strict replay 6,000/6,000, zero model calls (`strict-replay-freeze27/`); Level A 46/46.
+
+Images built from that worktree, sources verified byte for byte: `chromie-agent:planlim-wt4-20261012`
+(`sha256:17668723…`, 118 files, digest `807cc483d4d03d35`) and `chromie-tts:selfwarm-20261012`
+(`sha256:41ce0994…`, thin layer over `chromie-tts:latest` = `c544a0d0…`, built from
+`.chromie/acceptance/planner-limitation-20261012/TTSDockerfile`). Soridormi nod/shake minimum and the
+runner stall tolerance stay uncommitted on Soridormi branch `scenario-control-stall` (MCP bind-mounts it).
+
+```bash
+# owner: deploy (rollbacks: chromie-agent:stageB-41570d182, chromie-tts:pre-selfwarm-20261012)
+docker tag chromie-agent:planlim-wt4-20261012 chromie-agent:latest
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+docker tag chromie-tts:latest chromie-tts:pre-selfwarm-20261012
+docker tag chromie-tts:selfwarm-20261012 chromie-tts:latest
+docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-tts
+```
+
+Deploy pitfall (2026-10-12): Compose interpolates `${HTTP_PROXY:-}` from the deploying shell before
+`--env-file`. A shell with `HTTP_PROXY=http://127.0.0.1:7897` gives containers a proxy on their own
+loopback: TTS crash-looped (`huggingface_hub` re-raises ProxyError instead of using the local cache) and
+the Agent's weather lookups were refused. Run Compose with `env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy
+-u https_proxy`; containers reach open-meteo directly.
+
+Live state on this host (owner-deployed): `chromie-agent:latest` = `chromie-agent:planlim-wt4-20261012`,
+`chromie-tts:latest` = `chromie-tts:selfwarm-20261012` (rollback `chromie-tts:pre-selfwarm-20261012`),
+`chromie-llm` = the grammar-retention image, Soridormi MCP restarted on the working tree. Runs 3 and 4
+(`run3/`, `run4/`) are judged in the evidence README; run 4 is on the delivered tree (host code from the
+checkout, same images). Final gate on the full tree (`scratchpad/gate7`): pytest 3,801 + 5 skipped,
+benchmarks 169, legacy 20; strict replay 6,000/6,000 (`strict-replay-final/`). Corpus freeze 27
+(`frozen.tar.xz` archive `ae3af4ea…`); re-extract after pulling as in the previous delivery.
+
+```bash
+# resume: rerun the declared 35-case cohort on the deployed images (one invocation, one bundle)
+D=.chromie/acceptance/planner-limitation-20261012
+python scripts/capture_runtime_identity.py --orchestrator-env .chromie/voice-runtime/orchestrator.env --allow-dirty --output $D/runN/runtime-identity.json
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root $D/scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity $D/runN/runtime-identity.json --evidence-dir $D/runN/live
+./scripts/collect_debug_bundle.sh
+```
+
+Next: the owner decides conditional composition (DEVELOPMENT_CHECKPOINT "Open").
+
+## Previous delivery — Deep Planner retired (stage B), 2026-10-11
 
 Checkout `/home/chromie/github/chromie`, branch `main`, base `origin/main` `5ea034e35`; the
 expected resume revision is the latest commit containing this file (developed in a temporary

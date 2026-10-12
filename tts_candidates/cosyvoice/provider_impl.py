@@ -172,6 +172,15 @@ def _enable_native_cancellation(native_model: Any, cancellation_event: Any, torc
     native_model.token2wav = token2wav
 
 
+WARMUP_TEXT = {"zh": "你好。", "en": "Hello.", "mixed": "你好，Hello."}
+
+
+def warmup_text(profile: VoiceProfile) -> str:
+    """One short sentence in the voice's own language; a multi-language voice gets mixed."""
+    languages = tuple(profile.languages)
+    return WARMUP_TEXT[languages[0]] if len(languages) == 1 and languages[0] in WARMUP_TEXT else WARMUP_TEXT["mixed"]
+
+
 def worker_target(connection: Connection, *, cancellation_event: Any = None) -> None:
     try:
         import torch
@@ -229,9 +238,32 @@ def worker_target(connection: Connection, *, cancellation_event: Any = None) -> 
         # with a cached speaker ID; retaining its CUDA arena competes with
         # cognition and acoustic generation on the shared GPU.
         model.frontend.speech_tokenizer_session = None
+        # The worker owns its readiness: each voice's native generation path is
+        # initialized by one no-playback synthesis before ``ready``, including after a
+        # restart, so health ``ready`` means warm (live 2026-10-12: a first English
+        # reply took 7.7 s and was not played).
+        warmup_seconds = {}
+        for profile in voices.profiles.values():
+            model.model.token_hop_len = initial_token_hop_len
+            warm_started = time.perf_counter()
+            produced = False
+            for output in model.inference_zero_shot(
+                warmup_text(profile),
+                prompt_prefix + "<|endofprompt|>" + profile.text,
+                str(profile.wav_path),
+                zero_shot_spk_id=profile.speaker_id,
+                stream=True,
+            ):
+                produced = produced or bool(tensor_pcm16(output["tts_speech"]))
+            if not produced:
+                raise RuntimeError(f"CosyVoice warm-up produced no audio: {profile.speaker_id}")
+            warmup_seconds[profile.speaker_id] = round(time.perf_counter() - warm_started, 3)
+        model.model.token_hop_len = initial_token_hop_len
         connection.send(
             {
                 "type": "ready",
+                "warmed": True,
+                "warmup_seconds": warmup_seconds,
                 "model_id": model_id,
                 "model_revision": model_revision,
                 "voice_catalog_revision": voices.revision,

@@ -409,3 +409,71 @@ def test_social_expression_schema_keeps_capability_args_in_disjoint_branches() -
     }
     assert validator.is_valid({**base, "args": {"side": "right"}})
     assert not validator.is_valid({**base, "args": {"count": 2}})
+
+
+@pytest.mark.asyncio
+async def test_goal_scope_beyond_the_first_plan_is_planned_once_over_ga_goals() -> None:
+    """Live 2026-10-12 (vs_sick_excuse_en): UMI routed only r1 to the Planner, GA made Goals
+    for r1 and r2, and the turn failed on r2's Goal having no Planner decision."""
+    calls: list[str] = []
+
+    class Agent:
+        async def resolve_goal_association(self, session, **kwargs):
+            del session, kwargs
+            calls.append("ga")
+            return GoalAssociationResolution(
+                turn_id="turn-scope", resolution_status="resolved",
+                new_goals=[SemanticGoal(goal_id=f"goal-{ref}", source_responsibility_refs=[ref],
+                                        description=ref, source_text=ref, metadata={"output_mode": "speech"})
+                           for ref in ("r1", "r2")],
+                confidence=1.0, reason_summary="Both Responsibilities are Goal-owned.",
+            )
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            del session, kwargs
+            needs = list(request.communication_needs)
+            return SocialCognitionResolution(
+                request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
+                disposition="communicate", reason_summary="Reply.",
+                need_outcomes={need.need_id: "covered" for need in needs},
+                activities=[{"activity_id": f"say-{index}", "text": "Okay.", "function": "respond" if needs else "acknowledge",
+                             "truth_stage": "context_grounded", "source_goal_ids": need.source_goal_ids,
+                             "source_responsibility_refs": need.source_responsibility_refs,
+                             "addressed_need_ids": [need.need_id]} for index, need in enumerate(needs)]
+                or [{"activity_id": "ack", "text": "Okay.", "function": "acknowledge", "truth_stage": "context_grounded"}],
+            )
+
+        async def stream_fast_advance(self, session, *, request, **kwargs):
+            del session, kwargs
+            refs = [item.local_ref for item in request.responsibilities]
+            calls.append("planner:" + ",".join(refs))
+            yield FastPlannerStreamTerminal(turn_id=request.sid, advance=FastPlannerAdvance(
+                turn_id=request.sid, disposition="respond", coverage="complete", covered_responsibility_refs=refs,
+                activities=[{"role": "complete_response", "activity_id": f"answer-{ref}", "source_responsibility_refs": [ref],
+                             "rationale": "Answer.", "timing": "parallel"} for ref in refs],
+                confidence=1.0, reason_summary="Answer both."))
+
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(), adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()),
+        policy=CognitiveRuntimePolicy(mode="apply"), goal_state_apply=lambda *args, **kwargs: [],
+    )
+    core, envelope = admitted_core(
+        "Tell my teacher I was sick. I just didn't want to go.", sid="scope", language="en-US",
+        responsibilities=[
+            {"local_ref": "r1", "outcome": "tell my teacher I was sick", "output_mode": "speech",
+             "continuity_scope": "turn", "confidence": 1.0},
+            {"local_ref": "r2", "outcome": "I just didn't want to go", "output_mode": "speech",
+             "continuity_scope": "turn", "confidence": 1.0},
+        ],
+        cognitive_requests=[
+            {"authority": "goal_association", "responsibility_refs": ["r1", "r2"], "reason_summary": "Continuity."},
+            {"authority": "planner", "responsibility_refs": ["r1"], "reason_summary": "HOW."},
+        ],
+    )
+    result = await coordinator.resolve(
+        object(), text="Tell my teacher I was sick. I just didn't want to go.", sid="scope",
+        core_interpretation=core, turn_envelope=envelope, context={"history": []}, history=[], language="en-US",
+    )
+    assert result.status == "applied", result.fallback_reason
+    assert calls.count("planner:r1") == 1 and "planner:r1,r2" in calls
+    assert {item.goal_id for item in result.terminal_plan.goal_outcomes} == {"goal-r1", "goal-r2"}

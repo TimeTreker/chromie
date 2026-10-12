@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tests.cognitive_work_test_support import ordinary_plan_schema
+from tests.cognitive_work_test_support import goal_outcome_branch, ordinary_plan_schema
 
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
@@ -2836,6 +2836,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                 "covered_responsibility_refs",
                 "disposition",
                 "coverage",
+                "responsibility_decisions",
                 "activities",
                 "confidence",
                 "unresolved",
@@ -2973,7 +2974,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             {
                 "#/$defs/FastPlannerInputNeed",
                 "#/$defs/FastPlannerCapabilityActivity",
-                "#/$defs/FastPlannerUnavailableNeed",
             },
         )
         capability_schema = schema["$defs"]["FastPlannerCapabilityActivity"]
@@ -3018,7 +3018,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             {
                 "#/$defs/FastPlannerInputNeed",
                 "#/$defs/FastPlannerCapabilityActivity",
-                "#/$defs/FastPlannerUnavailableNeed",
             },
         )
 
@@ -3082,7 +3081,6 @@ class FastPlannerResolverTests(unittest.TestCase):
             activity_refs,
             [
                 "#/$defs/FastPlannerCapabilityActivity",
-                "#/$defs/FastPlannerUnavailableNeed",
                 "#/$defs/FastPlannerInputNeed",
             ],
         )
@@ -5040,9 +5038,9 @@ class FastPlannerResolverTests(unittest.TestCase):
             ["disposition"]["enum"],
         )
         self.assertEqual(schema["properties"]["steps"]["maxItems"], 8)
-        goal_a_outcome = schema["properties"]["goal_outcomes"]["properties"][
-            "goal-a"
-        ]
+        goal_a_outcome = goal_outcome_branch(
+            schema["properties"]["goal_outcomes"]["properties"]["goal-a"], "execute"
+        )
         goal_a_satisfaction = goal_a_outcome["properties"]["satisfaction"][
             "anyOf"
         ][0]
@@ -5864,6 +5862,7 @@ class FastPlannerResolverTests(unittest.TestCase):
                     context={"verified_tool_memory_index": index},
                 )
                 output = FastPlannerAdvanceModelOutput.model_validate({
+                    "responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
                     "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
                     "activities": [{"activity_id": "retrieve", "role": "capability", "capability_id": capability_id,
                                     "args": args, "argument_sources": {}, "depends_on": [],
@@ -6145,6 +6144,47 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertFalse(plan.metadata["host_semantic_compilation"])
         self.assertEqual(plan.metadata["path_classification"], "terminal")
         self.assertEqual(len(ollama.prompts), 1)
+
+    def test_execute_beside_an_unavailable_sibling_is_one_mixed_decision(self):
+        """Live 2026-10-11 ("nod once, then fly"): the model wrote top-level coverage
+        partial for a mixed result and put communication ordering on the execute
+        outcome; both passed the native decoder and failed the DTO."""
+        blink = execute_outcome("goal-blink", ["blink"], "The blink step covers the blink goal.")
+        fly = unavailable_outcome("goal-fly", "No Capability can fly to the ceiling.")
+        satisfaction = {"score": 0.5, "status": "partial", "satisfied_goal_ids": ["goal-blink"],
+                        "unmet_goal_ids": ["goal-fly"], "unmet_requirements": ["fly to the ceiling"],
+                        "rationale": "Blinking is planned; flying is unavailable."}
+
+        def resolve(coverage):
+            raw = multi_goal_plan(
+                disposition="mixed", coverage=coverage, confidence=0.95,
+                goal_summary="Blink twice; flying is unavailable.",
+                steps=[execute_step("blink", "soridormi.blink_eyes", {"count": 2}, ["goal-blink"], "Blink twice.")],
+                goal_outcomes={"goal-blink": blink, "goal-fly": fly},
+                goal_satisfaction=satisfaction,
+            )
+            ollama = FakeOllama(raw)
+            plan = asyncio.run(FastPlannerResolver(ollama, FakeCatalog()).resolve(
+                request("Blink twice, then fly up to the ceiling.", goal_ids=["goal-blink", "goal-fly"])))
+            return raw, ollama, plan
+
+        raw, ollama, plan = resolve("complete")
+        self.assertEqual(plan.disposition, "mixed", plan.metadata)
+        self.assertEqual(plan.coverage, "complete")
+        self.assertEqual([step.capability_id for step in plan.steps], ["soridormi.blink_eyes"])
+        self.assertEqual({item.goal_id: item.disposition for item in plan.goal_outcomes},
+                         {"goal-blink": "execute", "goal-fly": "unavailable"})
+        schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
+        wire = declared_ability_needs({**raw, "goal_outcomes": {
+            "goal-blink": {**blink, "precedes_step_ids": ["blink"]}, "goal-fly": fly}}, schema)
+        errors = Draft202012Validator(schema["properties"]["goal_outcomes"]).iter_errors(wire["goal_outcomes"])
+        self.assertTrue(list(errors), "an execute outcome cannot order communication natively")
+
+        # The top-level aggregate stays a model-authored judgment: a contradicting one
+        # fails closed and is never rewritten by the Host.
+        _raw, partial_ollama, failed = resolve("partial")
+        self.assertEqual(failed.metadata["path_classification"], "contract_failure")
+        self.assertEqual(len(partial_ollama.prompts), 1)
 
     def test_multi_goal_fast_mixed_terminates_without_deep_planning(self):
         raw = multi_goal_plan(
@@ -6828,6 +6868,7 @@ class FastPlannerResolverTests(unittest.TestCase):
         )
         self.assertNotIn("clarify", schema["properties"]["disposition"]["enum"])
         raw = {
+            "responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
             "activities": [{"role": "capability", "capability_id": capability["capability_id"],
                             "activity_id": "acquire-water", "args": {
                                 "resource": {"kind": "physical_object", "description": "water"},

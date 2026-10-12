@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from .core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
 from .interaction import reject_forbidden_low_level_fields
 from .semantic_artifact import SemanticArtifactLineage, semantic_artifact_ref
+from .user_turn import user_turn_prohibits_speech
 from .plan import (
     AuxiliaryPlanActivity, CommunicativeTruthStage, FastProgressKind, SocialCommunicationNeed,
     validate_communicative_activity_identity,
@@ -201,6 +202,63 @@ class SocialCognitionOutput(BaseModel):
         return self
 
 
+def previously_addressed_need_ids(context: Any) -> set[str]:
+    """Needs that an earlier pending or delivered communicative act already addressed."""
+
+    interaction = context.get("interaction_context") if isinstance(context, dict) else None
+    addressed: set[str] = set()
+    for key in ("events", "already_spoken", "pending_speech", "prior_delivered_speech"):
+        for row in (interaction or {}).get(key, []) if isinstance(interaction, dict) else []:
+            metadata = row.get("metadata") if isinstance(row, dict) else None
+            for source in (metadata, row):
+                ids = source.get("addressed_need_ids") if isinstance(source, dict) else None
+                if isinstance(ids, list):
+                    addressed.update(item for item in ids if isinstance(item, str))
+    return addressed
+
+
+def must_say_now_need_ids(request: "SocialCognitionRequest") -> set[str]:
+    """Limitations and value questions Social Cognition must say in this turn.
+
+    A Planner result whose Goal is unavailable or refused, Chromie's own value
+    decline, or the value question that replaces a withheld answer is the reply the
+    person is waiting for: leaving it pending left them with only an acknowledgement
+    (live 2026-10-11). A need an earlier act already said is not repeated, and a
+    protective silence request is honored.
+    """
+
+    if user_turn_prohibits_speech(request.context.get("user_turn_envelope")):
+        return set()
+    said = previously_addressed_need_ids(request.context)
+    return {
+        need.need_id for need in request.communication_needs
+        if need.kind == "result" and need.need_id not in said and (
+            (need.owner == "planner" and need.facts.get("disposition") in {"unavailable", "refused"})
+            or (need.owner == "runtime" and bool(need.facts.get("value_declined")))
+        )
+    } | {
+        need.need_id for need in request.communication_needs
+        if need.kind == "input" and need.owner == "runtime" and need.need_id not in said
+        and bool(need.facts.get("value_question"))
+    }
+
+
+def value_withheld_need_ids(request: "SocialCognitionRequest") -> set[str]:
+    """Answers Chromie's Value Judgment withheld: they are not said this turn."""
+
+    return {need.need_id for need in request.communication_needs if need.facts.get("value_withheld") is True}
+
+
+def value_review_responsibility_refs(request: "SocialCognitionRequest") -> set[str]:
+    """Speech UMI marked value_review: answered only after Value Judgment.
+
+    Live 2026-10-10: a requested pretense was performed at the interpretation trigger
+    before any Planner or Value Judgment decision. Unmarked speech stays immediate.
+    """
+
+    return {item.local_ref for item in request.responsibilities if item.value_review}
+
+
 class SocialCognitionResolution(SocialCognitionOutput):
     request_id: str
     snapshot_digest: str = Field(min_length=64, max_length=64)
@@ -237,6 +295,18 @@ class SocialCognitionResolution(SocialCognitionOutput):
             or any(self.need_outcomes.get(need_id) != "covered" for need_id in required_failure_need_ids)
         ):
             raise ValueError("terminal Work failure result update must be communicated and covered")
+        limitation_need_ids = must_say_now_need_ids(request)
+        if limitation_need_ids and (
+            self.disposition != "communicate"
+            or any(self.need_outcomes.get(need_id) != "covered" for need_id in limitation_need_ids)
+        ):
+            raise ValueError("a limitation or declined result must be said and covered in this turn")
+        if any(self.need_outcomes.get(need_id) == "covered" for need_id in value_withheld_need_ids(request)):
+            raise ValueError("an answer withheld by Value Judgment cannot be said")
+        reviewed_refs = value_review_responsibility_refs(request)
+        if any(act.function not in {"acknowledge", "nonverbal"} and not act.addressed_need_ids
+               and set(act.source_responsibility_refs) & reviewed_refs for act in self.activities):
+            raise ValueError("speech marked value_review is said only through a reviewed communication need")
         for need_id, outcome in self.need_outcomes.items():
             if outcome == "covered" and not any(
                 need_id in act.addressed_need_ids and act.text.strip() for act in self.activities
@@ -266,7 +336,7 @@ class SocialCognitionResolution(SocialCognitionOutput):
                     if item.continuity_scope == "turn"
                 }
                 cited_refs = set(act.source_responsibility_refs)
-                if not cited_refs or not cited_refs.issubset(turn_local_refs):
+                if not cited_refs or not cited_refs.issubset(turn_local_refs - value_review_responsibility_refs(request)):
                     raise ValueError(
                         "interpretation-triggered respond/ask cannot fulfill an unestablished "
                         "Work communication need unless it cites only turn-local "

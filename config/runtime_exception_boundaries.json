@@ -533,7 +533,7 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "a60c93e77f60d60363c6eef8d64bafac2c6b13deb9aaf41994d3c0a7b5e808ab",
+      "body_sha256": "ce2b1b9b0b7604380ef2d03dfe835f75a1f62ac40b1df2ded4090e40114b791c",
       "failure_signals": [
         "diagnostic",
         "return"
@@ -822,9 +822,10 @@
       "owner": "orchestrator",
       "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
       "review_status": "reviewed",
-      "body_sha256": "ee996a2d77d2fddf1450795f788672f6e4cc068156f0760239f70000f50cb6a1",
+      "body_sha256": "e492f9363a1a5970c67ede4c2182f5289227c786f2fe1c4e7effb81bdf39b5e8",
       "failure_signals": [
-        "diagnostic"
+        "diagnostic",
+        "raise"
       ]
     },
     {

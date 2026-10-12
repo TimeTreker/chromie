@@ -73,6 +73,11 @@ class StreamingProcessWorker:
         return self._worker_warmed
 
     @property
+    def declares_warmup(self) -> bool:
+        """The started worker reports whether it warmed itself before ``ready``."""
+        return "warmed" in self.ready_payload
+
+    @property
     def cancellation_mode(self) -> str:
         if self._cancel_drain_timeout_s > 0:
             if self._cancellation_event is not None:
@@ -306,6 +311,9 @@ class StreamingProcessWorker:
                     detail = message.get("message") if isinstance(message, dict) else message
                     raise RuntimeError(f"{self._name} failed to start: {detail}")
                 self.ready_payload = dict(message)
+                # A worker that warms itself before ``ready`` says so; others warm on
+                # their first completed synthesis.
+                self._worker_warmed = message.get("warmed") is True
                 return
             if not process.is_alive():
                 self._terminate_sync()

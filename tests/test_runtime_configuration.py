@@ -440,16 +440,15 @@ class RuntimeConfigurationTests(unittest.TestCase):
             launcher,
         )
         self.assertIn("show_shared_gpu_startup_diagnostics", launcher)
+        # CosyVoice warms its own voices before reporting ready; the launcher waits for
+        # that health, after freeing shared-GPU runners, and never warms it (2026-10-12).
         self.assertLess(
             launcher.index('  reset_ollama_before_tts_warmup\nfi'),
-            launcher.index('  COSYVOICE_WARMUP_TIMEOUT_SEC='),
+            launcher.index('wait_for_ws_health 127.0.0.1 "$TTS_READY_PORT" tts'),
         )
-        self.assertIn("TTS_COSYVOICE_ZH_WARMUP_TEXT", launcher)
-        self.assertIn("TTS_COSYVOICE_EN_WARMUP_TEXT", launcher)
-        self.assertIn("TTS_COSYVOICE_MIXED_WARMUP_TEXT", launcher)
-        self.assertIn('"$TTS_READY_LABEL" chromie_zh zh', launcher)
-        self.assertIn('"$TTS_READY_LABEL" chromie_en en', launcher)
-        self.assertIn('"$TTS_READY_LABEL" chromie_mixed mixed', launcher)
+        self.assertNotIn("COSYVOICE_WARMUP", launcher)
+        self.assertNotIn('"$TTS_READY_LABEL" chromie_en en', launcher)
+        self.assertIn('if "ready" in provider_health and provider_health.get("ready") is not True', launcher)
         self.assertIn('"speaker_id": speaker_id', launcher)
         self.assertIn('"language_hint": language_hint', launcher)
         self.assertIn("fun-cosyvoice3-0.5b", launcher)
@@ -459,13 +458,12 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("--profile tts-evaluation", services)
         self.assertIn('TTS_URL="${TTS_URL:-ws://127.0.0.1:5000}"', orchestrator)
         self.assertEqual(_common_env()["TTS_COSYVOICE_OLLAMA_MODEL"], "qwen3:4b")
-        self.assertEqual(_common_env()["TTS_COSYVOICE_WARMUP_TIMEOUT_SEC"], "300")
         candidate_server = (ROOT / "tts" / "candidate_server.py").read_text(encoding="utf-8")
         cosy_provider = (ROOT / "tts_candidates" / "cosyvoice" / "provider_impl.py").read_text(encoding="utf-8")
         self.assertIn('time.tzset()', candidate_server)
         self.assertIn('torch.OutOfMemoryError', cosy_provider)
         self.assertIn('os._exit(70)', cosy_provider)
-        self.assertEqual(_common_env()["TTS_COSYVOICE_EN_WARMUP_TEXT"], "Hello.")
+        self.assertNotIn("TTS_COSYVOICE_EN_WARMUP_TEXT", _common_env())
 
         verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(
             encoding="utf-8"

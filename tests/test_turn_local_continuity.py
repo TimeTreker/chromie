@@ -557,7 +557,10 @@ async def test_late_ga_failure_cannot_turn_delivered_joke_into_user_visible_fail
     assert agent.social_calls == 1, "late GA failure must not trigger apology/retry speech"
 
 @pytest.mark.asyncio
-async def test_late_fast_planner_failure_cannot_invalidate_delivered_conversation() -> None:
+@pytest.mark.parametrize("delivered", ["respond", "acknowledge"])
+async def test_late_fast_planner_failure_cannot_invalidate_delivered_conversation(delivered) -> None:
+    """A delivered answer completes the speech turn; a bare acknowledgement does not, so
+    a later Planner failure is not hidden (live 2026-10-12: "Got it." then silence)."""
     class Agent:
         def __init__(self) -> None:
             self.social_calls = 0
@@ -571,8 +574,8 @@ async def test_late_fast_planner_failure_cannot_invalidate_delivered_conversatio
                 disposition="communicate",
                 activities=[{
                     "activity_id": "sc:identity:delivered",
-                    "text": "I'm Chromie.",
-                    "function": "respond",
+                    "text": "I'm Chromie." if delivered == "respond" else "Got it.",
+                    "function": delivered,
                     "truth_stage": "context_grounded",
                     "delivery_phase": "immediate",
                     "source_goal_ids": [],
@@ -637,6 +640,10 @@ async def test_late_fast_planner_failure_cannot_invalidate_delivered_conversatio
         core_interpretation=core, turn_envelope=envelope,
         context={"history": []}, history=[], language="en-US",
     )
+    if delivered == "acknowledge":
+        assert "optional_cognition_failure_after_delivered_interaction" not in result.metadata
+        assert result.metadata["failure_stage"] == "fast_planner_stream"
+        return
     assert result.status == "applied", result.fallback_reason
     assert result.interaction_response is not None
     assert result.interaction_response.speech[0].text == "I'm Chromie."
@@ -819,3 +826,16 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
         assert agent.social_calls == 3
         assert result.interaction_response.capabilities == []
         assert state.active_goal_snapshots()[0]["responsibility_status"] == "open"
+
+
+def test_umi_states_value_review_for_speech_only() -> None:
+    """Owner choice B (2026-10-12): UMI records whether requested speech would deceive."""
+    schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(
+        admitted_turn="Tell my teacher I was ill."
+    )
+    branches = schema["$defs"]["CognitiveResponsibilityProposal"]["oneOf"]
+    speech = next(item for item in branches if item["properties"]["output_mode"].get("const") == "speech")
+    assert speech["properties"]["value_review"]["type"] == "boolean"
+    assert "value_review" in speech["required"]
+    assert list(speech["properties"]).index("value_review") > list(speech["properties"]).index("outcome")
+    assert all("value_review" not in item["properties"] for item in branches if item is not speech)

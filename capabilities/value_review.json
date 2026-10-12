@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "source": "chromie-owner-preset",
-  "description": "Owner-editable list of Capabilities whose use needs a Value Judgment proceed verdict before any effect starts: fetching or moving objects, walking, and approaching or touching people (owner decision 2026-10-10). Speech, information reads and expressive gestures are not reviewed.",
+  "description": "Owner-editable list of Capabilities whose use needs a Value Judgment proceed verdict before any effect starts: fetching or moving objects, walking, and approaching or touching people (owner decision 2026-10-10). Information reads and expressive gestures are not reviewed; speech is reviewed only when User Meaning Interpretation marks it value_review (owner decision 2026-10-12), independently of this list.",
   "capability_ids": [
     "soridormi.acquire_and_deliver_resource",
     "soridormi.acquire_resource",

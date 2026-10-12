@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import copy
 
-from tests.cognitive_work_test_support import ordinary_plan_schema
+from tests.cognitive_work_test_support import goal_outcome_dispositions, ordinary_plan_schema
 
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 
@@ -292,8 +292,8 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
         # Before the search loads the provider the Goal can only be reported unavailable;
         # the second pass, with the provider loaded, may execute it.
         first_pass, second_pass = (
-            ordinary_plan_schema(call[1]["response_format"])["properties"]["goal_outcomes"]
-            ["properties"]["goal-vocal"]["properties"]["disposition"]["enum"]
+            goal_outcome_dispositions(ordinary_plan_schema(call[1]["response_format"])
+                                      ["properties"]["goal_outcomes"]["properties"]["goal-vocal"])
             for call in model.calls
         )
         self.assertNotIn("execute", first_pass)

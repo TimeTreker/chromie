@@ -28,7 +28,8 @@
             "source_start_token_ref": "t6",
             "source_end_token_ref": "t23"
           },
-          "continuity_scope": "turn"
+          "continuity_scope": "turn",
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],

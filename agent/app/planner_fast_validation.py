@@ -26,6 +26,8 @@ try:
         user_turn_source_span_contains,
     )
     from chromie_contracts.plan import (
+        argument_source_span,
+        FastPlannerUnavailableNeed,
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
         FastPlannerResponsibilityArgumentSource,
@@ -45,6 +47,8 @@ except ImportError:  # pragma: no cover
         user_turn_source_span_contains,
     )
     from shared.chromie_contracts.plan import (
+        argument_source_span,
+        FastPlannerUnavailableNeed,
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
         FastPlannerResponsibilityArgumentSource,
@@ -121,6 +125,60 @@ def fast_capability_acquires_information(definition: dict[str, Any]) -> bool:
     )
 
 
+DECISION_ACTIVITY_ROLE = {"work": "capability", "answer": "complete_response", "clarify": "clarification"}
+DECISION_DISPOSITION = {"work": "execute", "answer": "respond", "clarify": "clarify", "unavailable": "unavailable"}
+
+
+def project_responsibility_decisions(
+    output: FastPlannerAdvanceModelOutput,
+    *,
+    responsibility_refs: list[str],
+    speech_refs: set[str] | frozenset[str] = frozenset(),
+) -> FastPlannerAdvanceModelOutput:
+    """Bind each Responsibility decision to its Activities; nothing is rewritten.
+
+    The Planner decides every Responsibility first (live 2026-10-11: an impossible
+    sibling was left only in ``unresolved``). An unavailable decision carries its
+    missing facts and becomes the Host-side unavailable Activity the model no longer
+    authors; any other decision must be realized by its own Activity. The authored
+    aggregate disposition must equal the one these decisions imply; a contradiction
+    fails closed instead of being replaced.
+    """
+
+    decisions = output.responsibility_decisions
+    if not decisions:
+        return output
+    if set(decisions) != set(responsibility_refs):
+        raise PlannerDTOContractError("Fast Planner must decide every Responsibility exactly once")
+    roles: dict[str, set[str]] = {}
+    for activity in output.activities:
+        for ref in activity.source_responsibility_refs:
+            roles.setdefault(ref, set()).add(activity.role)
+    activities = list(output.activities)
+    for ref in responsibility_refs:
+        item = decisions[ref]
+        own = roles.get(ref, set())
+        if item.decision == "unavailable":
+            if ref in speech_refs:
+                raise PlannerDTOContractError(f"ordinary speech is answered, not declared unavailable: {ref}")
+            if own - {"unavailable"}:
+                raise PlannerDTOContractError(
+                    f"an unavailable Responsibility cannot also carry Work or a response: {ref}")
+            if "unavailable" not in own:
+                activities.append(FastPlannerUnavailableNeed(
+                    role="unavailable", activity_id=f"unavailable-{ref}",
+                    source_responsibility_refs=[ref], missing=list(item.missing)))
+        elif DECISION_ACTIVITY_ROLE[item.decision] not in own:
+            raise PlannerDTOContractError(
+                f"Responsibility {ref} was decided {item.decision} without its Activity")
+    kinds = {decisions[ref].decision for ref in responsibility_refs}
+    implied = DECISION_DISPOSITION[next(iter(kinds))] if len(kinds) == 1 else "mixed"
+    if output.disposition != implied:
+        raise PlannerDTOContractError(
+            f"Fast Planner disposition {output.disposition} contradicts its Responsibility decisions ({implied})")
+    return output.model_copy(update={"activities": activities})
+
+
 def normalize_fast_capability_activity_purpose(
     output: FastPlannerAdvanceModelOutput,
     *,
@@ -173,7 +231,19 @@ def normalize_fast_capability_activity_purpose(
                 "Fast Planner marked a Capability as information acquisition without "
                 "a provider-declared acquisition contract: " + activity.capability_id
             )
+        elif activity.deferred_requirement:
+            # Only a read leaves a decision for re-entry; an effect never carries one.
+            raise PlannerDTOContractError(
+                "Fast Planner put a deferred requirement on a non-acquisition Capability: "
+                + activity.capability_id
+            )
         activities.append(activity)
+    for ref, decision in output.responsibility_decisions.items():
+        realized = {activity.step_purpose for activity in activities
+                    if getattr(activity, "role", "") == "capability" and ref in activity.source_responsibility_refs}
+        if decision.step_purpose is not None and realized - {decision.step_purpose}:
+            raise PlannerDTOContractError(
+                f"Fast Planner decided {decision.step_purpose} Work for {ref} but realized {sorted(realized)}")
     return output.model_copy(update={"activities": activities}) if changed else output
 
 
@@ -725,7 +795,9 @@ def validate_fast_advance_output(
                 + ",".join(str(value) for value in missing_numbers)
             )
     if output.disposition in {"execute", "respond", "clarify", "mixed"}:
-        terminal_roles = {"capability", "complete_response", "clarification"}
+        # A Host-bound limitation is its Responsibility's terminal outcome beside a
+        # sibling's Work (live 2026-10-12: "wave, then make coffee" was rejected).
+        terminal_roles = {"capability", "complete_response", "clarification", "unavailable"}
         terminal_refs = {
             source_ref
             for activity in output.activities
@@ -953,7 +1025,7 @@ def validate_fast_advance_output(
                     )
                 source_text = by_ref[span.source_responsibility_ref].outcome
             try:
-                quote = resolve_user_turn_source_span(source_text, span)
+                quote = resolve_user_turn_source_span(source_text, argument_source_span(span))
                 cited_quotes[parameter] = quote
             except ValueError as exc:
                 raise AuthoritativeGroundingValidationError(
@@ -1414,6 +1486,33 @@ def _effective_idempotent_read_args(
     return effective
 
 
+def drop_repeated_identical_activities(
+    output: FastPlannerAdvanceModelOutput,
+) -> tuple[FastPlannerAdvanceModelOutput, list[dict[str, Any]]]:
+    """An Activity listed twice, identical down to its activity_id, is one Activity.
+
+    Live 2026-10-12 (ctl_weather_zh): the decoder repeated a complete weather read with
+    the same activity_id and the turn failed closed. The identity already names one
+    Activity, so the repeat is transport repetition, not a second decision. One
+    activity_id with different content still fails closed in validation.
+    """
+
+    retained: list[Any] = []
+    seen: set[str] = set()
+    repairs: list[dict[str, Any]] = []
+    for activity in output.activities:
+        encoded = json.dumps(activity.model_dump(mode="json"), ensure_ascii=False, sort_keys=True)
+        if encoded in seen:
+            repairs.append({"normalization": "repeated_identical_activity_removed",
+                            "activity_id": activity.activity_id})
+            continue
+        seen.add(encoded)
+        retained.append(activity)
+    if not repairs:
+        return output, []
+    return output.model_copy(update={"activities": retained}), repairs
+
+
 def collapse_redundant_idempotent_read_activities(
     output: FastPlannerAdvanceModelOutput,
     *,
@@ -1507,10 +1606,12 @@ def canonicalize_fast_argument_source_spans(
             contextual = isinstance(span, FastPlannerResponsibilityArgumentSource)
             span_source = outcomes[span.source_responsibility_ref] if contextual else source
             narrowed_span = canonical_literal_user_turn_source_span(
-                span_source, span, activity.args.get(parameter)
+                span_source, argument_source_span(span), activity.args.get(parameter)
             )
+            prefix = f"{span.source_responsibility_ref}." if contextual else ""
             narrowed[parameter] = (FastPlannerResponsibilityArgumentSource(
-                **narrowed_span.model_dump(exclude={"source_responsibility_ref"}),
+                source_start_token_ref=prefix + narrowed_span.source_start_token_ref,
+                source_end_token_ref=prefix + narrowed_span.source_end_token_ref,
                 source_responsibility_ref=span.source_responsibility_ref,
             ) if contextual else narrowed_span)
         activities.append(activity.model_copy(update={"argument_sources": narrowed}))

@@ -70,14 +70,14 @@ try:
         CognitiveWorkRequest,
     )
     from chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
-    from chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS
+    from chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS, responsibility_outcome_source_tokens
 except ImportError:  # pragma: no cover - repository development path
     from shared.chromie_contracts.core_interpretation import (
         CognitiveResponsibilityProposal,
         CognitiveWorkRequest,
     )
     from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
-    from shared.chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS
+    from shared.chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS, responsibility_outcome_source_tokens
 
 
 # Owner decision 2026-10-10 (option A): the Planner reasons with the full Stable Mind,
@@ -792,7 +792,7 @@ def fast_evidence_reentry_prompt(
         "is sufficient and no new Work is needed; cite the exact evidence_refs and put nothing "
         "in new_work for that Goal. next_action=execute means genuinely new Work is required; "
         "author it only in new_work and never replay a completed source Activity; each new_work "
-        "step lists depends_on, the earlier new_work steps or completed Work it must wait for "
+        "step lists depends_on, the earlier new_work steps or completed Work (its step_id or evidence_ref) it must wait for "
         "(none means it may start with the others). clarify is "
         "only for a real user-resolvable blocker; unavailable/refused are terminal limitations. "
         "SC owns all user-facing wording. "
@@ -895,12 +895,17 @@ def fast_advance_layered_prompt(
         "Do not add a response for Work whose result is not available yet. The top disposition is "
         "execute for capability-only Work, respond for response-only Work, clarify for input-only "
         "needs, mixed when distinct Responsibilities require different roles, or unavailable. "
-        "A Responsibility that no loaded or library Capability can realize now gets exactly one "
-        "unavailable Activity naming what is missing. That Activity is its whole outcome: never "
-        "beside the same Responsibility's Capability Work or response, never a note about "
-        "defaults or assumptions, and never replaced by listing the ref in unresolved. When "
-        "another Responsibility still executes or is answered the top disposition is mixed; when "
-        "every Responsibility is unavailable it is unavailable with coverage uncertain. "
+        "Decide every Responsibility first in responsibility_decisions: work, answer, clarify, or "
+        "unavailable. When a single Responsibility's work decision offers step_purpose, it is the "
+        "purpose of all of its Activities now: acquire_information when this Work only reads what "
+        "decides or forms the rest, otherwise achieve_effect. Choose unavailable only for a Responsibility that no loaded or library "
+        "Capability can realize now; name what is missing there (facts, never wording) and give "
+        "it no Activities. Every other decision is realized by that Responsibility's own "
+        "Activities; defaults or assumptions are never a limitation. Ordinary speech (a joke, "
+        "chat, an answer, a message) needs no Capability: answer it, even when the true answer "
+        "is that Chromie does not know or cannot do it. A requested value outside a Capability's "
+        "declared bounds means that Capability cannot realize it: never round or clamp it into "
+        "range; choose another Capability or decide unavailable with the bound as what is missing. "
         "complete_response establishes a context-grounded speech obligation, never delivered speech; "
         "include its rationale. clarification supplies typed information_gaps, never wording. "
         "Ordinary requested speech admits complete_response; a mixed-mode other Responsibility may include it alongside Capability Work only when the source Responsibility itself explicitly contains a communicative result. Never add complete_response just to acknowledge, confirm, narrate or announce a physical Work sequence; SC decides that interaction independently. Information acquisition, "
@@ -910,8 +915,9 @@ def fast_advance_layered_prompt(
         "resource_contract; select only a complete realization with valid arguments. "
         "A prerequisite is not fulfillment. When an action depends on information that must be "
         "acquired first (for example act only if rain is forecast), plan only that "
-        "acquire_information Work now and no dependent action; the trusted result re-enters and "
-        "the action is decided from it. If several steps are needed "
+        "acquire_information Work now, put the decision its result settles in "
+        "deferred_requirement (facts, never wording), and schedule no dependent action; the "
+        "trusted result re-enters and the action is decided from it. If several steps are needed "
         "compose them within the four-step budget or report unavailable before dispatch; "
         "never mark a partial first action as complete or leave intended later Work only in reason_summary. "
         "Preserve every numeric and named binding through declared argument_realization; "
@@ -955,14 +961,14 @@ def fast_advance_layered_prompt(
         "timing=sequential for their order relative to Work. Preserve requested speech "
         "order even though SC realizes it later. Execute only direct, fully grounded Work within "
         "four-step budget; when no loaded or library Capability can realize a Responsibility, "
-        "give it one unavailable Activity and keep it unmet. No same-decision reviewer. "
+        "decide it unavailable with what is missing and keep it unmet. No same-decision reviewer. "
         "Runtime retains authorization, confirmation, resource safety and delivery authority. "
         "Planning or satisfaction is prospective, never proof of execution or delivery."
     )
     facts = {
         "responsibilities": [
             {**item.model_dump(mode="json", exclude_defaults=True),
-             "outcome_source_tokens": user_turn_source_tokens(item.outcome)}
+             "outcome_source_tokens": responsibility_outcome_source_tokens(item.local_ref, item.outcome)}
             for item in responsibilities
         ],
         "meaning_uncertainties": [

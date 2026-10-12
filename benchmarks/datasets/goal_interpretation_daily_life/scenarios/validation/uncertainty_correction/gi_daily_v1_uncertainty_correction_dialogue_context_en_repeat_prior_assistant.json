@@ -35,7 +35,8 @@
             "source_start_token_ref": "t0",
             "source_end_token_ref": "t4"
           },
-          "continuity_scope": "turn"
+          "continuity_scope": "turn",
+          "value_review": false
         }
       ],
       "meaning_uncertainties": [],

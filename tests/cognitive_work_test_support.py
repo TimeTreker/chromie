@@ -106,3 +106,15 @@ def ordinary_plan_schema(schema):
     if "anyOf" in schema and any(name.startswith("Waiting") for name in schema.get("$defs", {})):
         return {**schema["anyOf"][0], "$defs": schema["$defs"]}
     return schema
+
+
+def goal_outcome_branch(outcome, disposition=None):
+    """One per-disposition native branch of a Goal outcome (the first when unspecified)."""
+    branches = outcome.get("oneOf", [outcome])
+    if disposition is None:
+        return branches[0]
+    return next(item for item in branches if item["properties"]["disposition"]["enum"] == [disposition])
+
+
+def goal_outcome_dispositions(outcome):
+    return [value for item in outcome.get("oneOf", [outcome]) for value in item["properties"]["disposition"]["enum"]]

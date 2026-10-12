@@ -10,7 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from .text import normalize_whitespace
 from .agent_skill import PlanAgentSkillProvenance
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
-from .user_turn import UserTurnSourceSpan
+from .user_turn import UserTurnSourceSpan, user_turn_source_tokens
 from .semantic_task import (
     InformationGap,
     InformationGapResolutionSource,
@@ -342,6 +342,31 @@ class FastPlannerResponsibilityArgumentSource(UserTurnSourceSpan):
 
     source_responsibility_ref: str = Field(min_length=1, max_length=80)
 
+    @model_validator(mode="after")
+    def validate_outcome_token_namespace(self) -> "FastPlannerResponsibilityArgumentSource":
+        # Outcome tokens are named "<ref>.t<n>" so they can never be mistaken for the
+        # user turn's "t<n>" (live 2026-10-12: user-turn t6 resolved inside r1's outcome).
+        prefix = self.source_responsibility_ref + "."
+        if not (self.source_start_token_ref.startswith(prefix) and self.source_end_token_ref.startswith(prefix)):
+            raise ValueError("an outcome span cites its own Responsibility's outcome tokens")
+        return self
+
+    def local_span(self) -> UserTurnSourceSpan:
+        """The same span over the outcome text's own token names."""
+        size = len(self.source_responsibility_ref) + 1
+        return UserTurnSourceSpan(source_start_token_ref=self.source_start_token_ref[size:],
+                                  source_end_token_ref=self.source_end_token_ref[size:])
+
+
+def responsibility_outcome_source_tokens(local_ref: str, outcome: str) -> list[dict[str, Any]]:
+    """Outcome tokens in the Responsibility's own namespace ("r1.t0", ...)."""
+    return [{**token, "ref": f"{local_ref}.{token['ref']}"} for token in user_turn_source_tokens(outcome)]
+
+
+def argument_source_span(span: Any) -> Any:
+    """The span to resolve against its own source text."""
+    return span.local_span() if isinstance(span, FastPlannerResponsibilityArgumentSource) else span
+
 
 class FastPlannerSituationArgumentSource(BaseModel):
     """Planner-selected current Situation observation that grounds a provider source.
@@ -403,10 +428,19 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     )
     step_purpose: PlanStepPurpose = "achieve_effect"
     expected_outcome: str = Field(default="", max_length=500)
+    deferred_requirement: str = Field(
+        default="",
+        max_length=240,
+        description=(
+            "For acquire_information only: the decision this Responsibility still owes once "
+            "the trusted result re-enters, for example whether to perform a conditional "
+            "action. Facts, never wording; no dependent action is scheduled now."
+        ),
+    )
     source_responsibility_refs: list[str] = Field(min_length=1)
     reason_summary: str = ""
 
-    @field_validator("activity_id", "reason_summary", "expected_outcome", mode="before")
+    @field_validator("activity_id", "reason_summary", "expected_outcome", "deferred_requirement", mode="before")
     @classmethod
     def normalize_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
@@ -420,6 +454,7 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
     @classmethod
     def reject_low_level_args(cls, value: dict[str, Any]) -> dict[str, Any]:
         return reject_forbidden_low_level_fields(value)
+
 
 
 
@@ -773,6 +808,36 @@ class FastPlannerAdvance(BaseModel):
         return self
 
 
+class FastPlannerResponsibilityDecision(BaseModel):
+    """The Planner's decision for one Responsibility, made before its Activities.
+
+    Every Responsibility gets one entry, so none can be forgotten. A Responsibility
+    Chromie cannot fulfil now names what is missing here (facts, never wording).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    decision: Literal["work", "answer", "clarify", "unavailable"]
+    missing: list[str] = Field(default_factory=list, max_length=4)
+    # One Responsibility's work states its Activities' purpose before them, so the
+    # decoder never forces an intended effect into a read (live 2026-10-12).
+    step_purpose: PlanStepPurpose | None = None
+
+    @field_validator("missing", mode="before")
+    @classmethod
+    def normalize_missing(cls, value: Any) -> list[str]:
+        items = value if isinstance(value, list) else [value]
+        return [text for item in items if (text := normalize_whitespace(item))]
+
+    @model_validator(mode="after")
+    def missing_names_a_limitation(self) -> "FastPlannerResponsibilityDecision":
+        if (self.decision == "unavailable") != bool(self.missing):
+            raise ValueError("only an unavailable decision names what is missing, and it must")
+        if self.step_purpose is not None and self.decision != "work":
+            raise ValueError("only a work decision states its Activities' step_purpose")
+        return self
+
+
 class FastPlannerAdvanceModelOutput(BaseModel):
     """Schema-constrained model payload before host-owned turn identity is attached.
 
@@ -787,6 +852,7 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     disposition: PlanDisposition
     coverage: PlanCoverage
     covered_responsibility_refs: list[str]
+    responsibility_decisions: dict[str, FastPlannerResponsibilityDecision] = Field(default_factory=dict)
     activities: list[FastPlannerActivity]
     confidence: float = Field(ge=0.0, le=1.0)
     unresolved: list[str]
@@ -1388,9 +1454,11 @@ class CanonicalPlan(BaseModel):
         if len(need_ids) != len(set(need_ids)):
             raise ValueError("canonical communication needs must have unique identities")
         for need in self.communication_needs:
-            # Runtime-owned needs are Host facts about this Plan: a confirmation hold, or a
-            # Value Judgment decline result (VALUE-JUDGMENT-001).
-            if need.owner not in {"planner", "runtime"} or (need.owner == "runtime" and need.kind not in {"confirmation", "result"}) or need.reference_id != self.plan_id:
+            # Runtime-owned needs are Host facts about this Plan: a confirmation hold, a Value
+            # Judgment decline result (VALUE-JUDGMENT-001), or the Value Judgment question that
+            # replaces a withheld answer.
+            runtime_kinds = {"confirmation", "result"} | ({"input"} if need.facts.get("value_question") else set())
+            if need.owner not in {"planner", "runtime"} or (need.owner == "runtime" and need.kind not in runtime_kinds) or need.reference_id != self.plan_id:
                 raise ValueError("canonical communication need must bind its exact Planner decision")
             positions = {step.step_id: index for index, step in enumerate(self.steps)}
             if set(need.before_step_ids + need.after_step_ids) - set(positions):

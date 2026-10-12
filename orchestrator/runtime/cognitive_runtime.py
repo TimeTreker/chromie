@@ -56,6 +56,7 @@ from shared.chromie_contracts.semantic_artifact import (
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.plan import (
+    argument_source_span,
     communication_need_id,
     AuxiliaryPlanActivity,
     SocialCommunicationNeed,
@@ -161,11 +162,16 @@ class CognitiveRuntimePolicy:
 
 def apply_value_judgment(
     plan: CanonicalPlan, reviewed_ids: set[str], result: ValueJudgmentResult,
+    reviewed_need_ids: set[str] | frozenset[str] = frozenset(),
+    reviewed_step_ids: set[str] | frozenset[str] = frozenset(),
 ) -> CanonicalPlan:
-    """Annotate value-reviewed steps with the verdict; the Planner's Plan itself stands.
+    """Annotate value-reviewed steps and answers with the verdict; the Plan itself stands.
 
     proceed leaves the effects free; ask makes them need the person's confirmation; decline
     or a failed judgment withholds them, so Runtime refuses them before provider start.
+    Speech UMI marked value_review (owner choice B, 2026-10-12) is reviewed through the
+    answers and steps realizing it: ask or decline withholds such an answer this turn, so
+    Social Cognition may not say it.
     """
     judgment = result.judgment
     verdict = {
@@ -179,15 +185,32 @@ def apply_value_judgment(
     steps = []
     for step in plan.steps:
         metadata = dict(step.metadata)
-        if step.capability_id in reviewed_ids:
+        if step.capability_id in reviewed_ids or step.step_id in reviewed_step_ids:
             metadata["value_judgment"] = verdict
             if verdict["decision"] == "ask":
                 metadata["value_confirmation_required"] = True
             elif verdict["decision"] == "decline":
                 metadata["value_withheld"] = True
         steps.append(step.model_copy(update={"metadata": metadata}))
+    needs = []
+    withheld_goal_ids: list[str] = []
+    for need in plan.communication_needs:
+        if need.need_id in reviewed_need_ids:
+            facts = {**need.facts, "value_judgment": verdict}
+            if verdict["decision"] in {"ask", "decline"}:
+                facts["value_withheld"] = True
+                withheld_goal_ids.extend(need.source_goal_ids)
+            need = need.model_copy(update={"facts": facts})
+        needs.append(need)
+    answer_verdict = {
+        "reviewed_answer_need_ids": sorted(reviewed_need_ids),
+        "withheld_answer_goal_ids": list(dict.fromkeys(withheld_goal_ids)),
+    } if reviewed_need_ids else {}
     return CanonicalPlan.model_validate({**plan.model_dump(), "steps": [step.model_dump() for step in steps],
-        "metadata": {**plan.metadata, "value_judgment": {**verdict, "reviewed_capability_ids": sorted(reviewed_ids)}}})
+        "communication_needs": [need.model_dump() for need in needs],
+        "metadata": {**plan.metadata, "value_judgment": {
+            **verdict, "reviewed_capability_ids": sorted(reviewed_ids | {
+                step.capability_id for step in plan.steps if step.step_id in reviewed_step_ids}), **answer_verdict}}})
 
 
 def _core_semantic_lineage(
@@ -233,6 +256,7 @@ def _association_semantic_lineage(
 
 
 _VALUE_JUDGMENT_STEP_ANNOTATIONS = ("value_judgment", "value_confirmation_required", "value_withheld")
+_VALUE_JUDGMENT_NEED_ANNOTATIONS = ("value_judgment", "value_withheld")
 
 
 def planner_authored_plan_payload(plan: CanonicalPlan) -> dict[str, Any]:
@@ -248,6 +272,10 @@ def planner_authored_plan_payload(plan: CanonicalPlan) -> dict[str, Any]:
         payload["communication_needs"] = [
             need for need in payload["communication_needs"] if need.get("owner") != "runtime"
         ]
+        for need in payload["communication_needs"]:
+            for key in _VALUE_JUDGMENT_NEED_ANNOTATIONS:
+                if isinstance(need.get("facts"), dict):
+                    need["facts"].pop(key, None)
     if isinstance(payload.get("metadata"), dict):
         payload["metadata"].pop("value_judgment", None)
     for step in payload.get("steps") or []:
@@ -3346,15 +3374,20 @@ class GoalDrivenRuntimeCoordinator:
 
         known = [item.local_ref for item in request.responsibilities]
         known_set = set(known)
+        # UMI's value_review speech also requests the Planner (its contract): Value
+        # Judgment reviews the Planner-established answer before anything is said.
+        reviewed = {item.local_ref for item in request.responsibilities if item.value_review}
         activation = next(
             (item for item in request.cognitive_requests if item.authority == authority),
             None,
         )
         if activation is None:
-            if authority == "goal_association" and any(
+            if authority == "goal_association" and (reviewed or any(
                 item.authority == "planner" for item in request.cognitive_requests
-            ):
+            )):
                 return known
+            if authority == "planner" and reviewed:
+                return [ref for ref in known if ref in reviewed]
             return []
         unknown = set(activation.responsibility_refs) - known_set
         if unknown:
@@ -3362,7 +3395,7 @@ class GoalDrivenRuntimeCoordinator:
                 f"cognitive activation authority={authority} references unknown Responsibilities: "
                 + ",".join(sorted(unknown))
             )
-        selected = set(activation.responsibility_refs)
+        selected = set(activation.responsibility_refs) | (reviewed if authority == "planner" else set())
         return [ref for ref in known if ref in selected]
 
     @staticmethod
@@ -3642,7 +3675,7 @@ class GoalDrivenRuntimeCoordinator:
                 step_id=activity.activity_id, parameter=parameter,
                 strategy="semantic_realization", value=activity.args[parameter],
                 source_quote=resolve_user_turn_source_span(
-                    argument_source_text(span, activity.source_responsibility_refs), span,
+                    argument_source_text(span, activity.source_responsibility_refs), argument_source_span(span),
                 ),
                 confidence=advance.confidence,
                 source_goal_ids=list(dict.fromkeys(
@@ -3716,12 +3749,19 @@ class GoalDrivenRuntimeCoordinator:
                     and step.step_purpose == "acquire_information"
                 ]
                 if acquisition_steps:
+                    # The Planner's typed deferred requirement names what the re-entry
+                    # still owes (for example a conditional action); otherwise the answer.
+                    deferred = list(dict.fromkeys(
+                        activity.deferred_requirement for activity in goal_activities
+                        if isinstance(activity, FastPlannerCapabilityActivity)
+                        and activity.deferred_requirement
+                    ))
                     satisfaction = GoalSatisfactionAssessment(
                         score=min(0.5, advance.confidence),
                         status="partial",
                         satisfied_goal_ids=[],
                         unmet_goal_ids=[goal_id],
-                        unmet_requirements=[
+                        unmet_requirements=deferred or [
                             "Interpret the acquired Evidence and complete the remaining "
                             "user-facing information obligation."
                         ],
@@ -5347,9 +5387,6 @@ class GoalDrivenRuntimeCoordinator:
             work_request = self._subset_work_request(
                 post_ga_request, goal_responsibility_refs
             )
-            planner_scope_changed_after_ga = bool(speculative_ref_set) and (
-                speculative_ref_set != goal_responsibility_refs
-            )
 
             ga_planner_requested = any(
                 item.authority == "planner" for item in association.cognitive_requests
@@ -5439,6 +5476,18 @@ class GoalDrivenRuntimeCoordinator:
                             else {"error_type": type(umi_result).__name__, "error": str(umi_result)},
                             default_failure_class="first_plan_failed",
                         ))
+            uncovered_goal_refs = sorted(goal_responsibility_refs - speculative_ref_set) if speculative_ref_set else []
+            if fast_advance is not None and association_stage.planning_task is None and uncovered_goal_refs:
+                # GA made Goals for Responsibilities the speculative Planner never saw, and one
+                # Plan must bind every Goal (live 2026-10-12: the turn failed on a Goal without a
+                # decision). Plan once over exactly GA's Goal-owned scope; non-Goal refs stay out.
+                logger.info("fast_planner_scope_extended_to_ga_goals sid=%s uncovered=%s",
+                            sid, ",".join(uncovered_goal_refs))
+                fast_advance = None
+                await plan_current_responsibilities(
+                    self._subset_work_request(post_ga_request, goal_responsibility_refs),
+                    planning_context, history,
+                )
             if (
                 fast_advance is None
                 and association_stage.planning_task is None
@@ -5742,23 +5791,37 @@ class GoalDrivenRuntimeCoordinator:
 
             await self.adapter.interaction_runtime.ensure_capability_definitions([step.capability_id for step in terminal_plan.steps])
             # Value Judgment (owner amendment 2026-10-10): whether Chromie should act, never how.
-            # It runs once, only when the final Plan uses a value-reviewed Capability. Its
-            # verdict permits, questions or withholds those effects; the Plan itself stands.
+            # It runs once, only when the final Plan uses a value-reviewed Capability or realizes
+            # speech UMI marked value_review (choice B, 2026-10-12). Its verdict permits,
+            # questions or withholds those effects; the Plan itself stands.
             value_judgment: ValueJudgmentResult | None = None
             reviewed_ids = {step.capability_id for step in terminal_plan.steps} & self.policy.value_review_capability_ids
-            if reviewed_ids and self.policy.mode == "apply":
+            flagged_refs = {item.local_ref for item in work_request.responsibilities if item.value_review}
+            flagged_goals = {goal_id for ref, goal_ids in self._goal_ids_by_responsibility(association).items()
+                             if ref in flagged_refs for goal_id in goal_ids} if flagged_refs else set()
+            reviewed_need_ids = {need.need_id for need in terminal_plan.communication_needs
+                                 if need.kind == "answer" and (set(need.source_responsibility_refs) & flagged_refs
+                                                               or set(need.source_goal_ids) & flagged_goals)}
+            reviewed_step_ids = {step.step_id for step in terminal_plan.steps if set(step.source_goal_ids) & flagged_goals}
+            if (reviewed_ids or reviewed_need_ids or reviewed_step_ids) and self.policy.mode == "apply":
                 value_judgment = await self._observe_workflow_stage(
                     sid=sid,
                     stage="value_judgment",
-                    input_payload={"user_text": text, "reviewed_capability_ids": sorted(reviewed_ids)},
+                    input_payload={"user_text": text, "reviewed_capability_ids": sorted(reviewed_ids),
+                                   "reviewed_answer_need_ids": sorted(reviewed_need_ids),
+                                   "value_review_responsibility_refs": sorted(flagged_refs)},
                     operation=self._resolve_value_judgment(
                         session, work_request.model_copy(update={"context": planning_context})
                     ),
                     metadata={"semantic_owner": "value_judgment", "communication_authority": False},
                 )
-                terminal_plan = apply_value_judgment(terminal_plan, reviewed_ids, value_judgment)
+                terminal_plan = apply_value_judgment(
+                    terminal_plan, reviewed_ids, value_judgment, reviewed_need_ids, reviewed_step_ids)
                 withheld_steps = [step for step in terminal_plan.steps if step.metadata.get("value_withheld")]
-                if withheld_steps:
+                withheld_answers = [need for need in terminal_plan.communication_needs if need.facts.get("value_withheld")]
+                verdict = (withheld_steps[0].metadata["value_judgment"] if withheld_steps
+                           else withheld_answers[0].facts["value_judgment"] if withheld_answers else {})
+                if withheld_steps or (withheld_answers and verdict["decision"] == "decline"):
                     # Chromie's decline is known before dispatch: SC says it now, and the
                     # refused result never wakes the Planner to work around it.
                     terminal_plan = CanonicalPlan.model_validate({**terminal_plan.model_dump(),
@@ -5766,10 +5829,24 @@ class GoalDrivenRuntimeCoordinator:
                             need_id=communication_need_id(terminal_plan.plan_id, "value_declined"),
                             owner="runtime", kind="result", reference_id=terminal_plan.plan_id,
                             source_goal_ids=list(dict.fromkeys(
-                                goal_id for step in withheld_steps for goal_id in step.source_goal_ids)),
+                                [*(goal_id for step in withheld_steps for goal_id in step.source_goal_ids),
+                                 *(goal_id for need in withheld_answers for goal_id in need.source_goal_ids)])),
                             delivery_phase="immediate",
-                            facts={"value_declined": withheld_steps[0].metadata["value_judgment"],
-                                   "withheld_capability_ids": [step.capability_id for step in withheld_steps]},
+                            facts={"value_declined": verdict,
+                                   "withheld_capability_ids": [step.capability_id for step in withheld_steps],
+                                   "withheld_answer_need_ids": [need.need_id for need in withheld_answers]},
+                        )]})
+                elif withheld_answers:
+                    # The answer waits on one fact; SC asks it now instead of answering.
+                    terminal_plan = CanonicalPlan.model_validate({**terminal_plan.model_dump(),
+                        "communication_needs": [*terminal_plan.communication_needs, SocialCommunicationNeed(
+                            need_id=communication_need_id(terminal_plan.plan_id, "value_question"),
+                            owner="runtime", kind="input", reference_id=terminal_plan.plan_id,
+                            source_goal_ids=list(dict.fromkeys(
+                                goal_id for need in withheld_answers for goal_id in need.source_goal_ids)),
+                            delivery_phase="immediate",
+                            facts={"value_question": verdict,
+                                   "withheld_answer_need_ids": [need.need_id for need in withheld_answers]},
                         )]})
             confirmation_steps = [step for step in terminal_plan.steps
                 if not step.metadata.get("value_withheld")
@@ -6067,8 +6144,19 @@ class GoalDrivenRuntimeCoordinator:
                 and interaction.metadata.get("presentation_already_dispatched") is True
                 and any(speech.text.strip() for speech in interaction.speech)
             )
+            # Only speech that answered every Responsibility completes the turn; an
+            # acknowledgement does not (live 2026-10-12: "Got it." before a value review,
+            # then a failed Plan was suppressed and the person heard nothing more).
+            resolution = (interaction.metadata.get("social_cognition_resolution")
+                          if interaction is not None else None) or {}
+            answered_refs = {
+                str(ref)
+                for activity in resolution.get("activities") or []
+                if isinstance(activity, dict) and activity.get("function") not in {"acknowledge", "nonverbal"}
+                for ref in activity.get("source_responsibility_refs") or []
+            }
             conversational_only = bool(work_request.responsibilities) and all(
-                item.output_mode == "speech"
+                item.output_mode == "speech" and item.local_ref in answered_refs
                 for item in work_request.responsibilities
             )
             if delivered_current_interaction and conversational_only and interaction is not None:

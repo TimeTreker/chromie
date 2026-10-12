@@ -87,7 +87,8 @@ def test_capability_argument_decoder_order_matches_sorted_catalog_recursively():
 
 def _valid_output() -> dict[str, Any]:
     # A greeting needs no Capability, so the need-first prefix is empty.
-    return {"ability_needs": [], "disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["reply"],
+    return {"ability_needs": [], "responsibility_decisions": {"reply": {"decision": "answer", "missing": []}},
+        "disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["reply"],
         "activities": [{"role": "complete_response", "activity_id": "greeting-need", "source_responsibility_refs": ["reply"],
             "timing": "parallel", "rationale": "An ordinary greeting can be returned from context."}], "confidence": 1.0, "unresolved": [], "reason_summary": "Establish an ordinary greeting obligation."}
 
@@ -124,7 +125,8 @@ def test_native_clarification_requires_owned_resolution_sources(source_kind, sou
         "preferred_resolution": "ask_user", "source_kind": source_kind,
         "source_reference": "Which place" if source_kind == "unresolved_meaning" else "test.weather",
         "resolution_sources_considered": sources}
-    raw = {"disposition": "clarify", "coverage": "partial", "covered_responsibility_refs": ["r1"],
+    raw = {"responsibility_decisions": {"r1": {"decision": "clarify", "missing": []}},
+        "disposition": "clarify", "coverage": "partial", "covered_responsibility_refs": ["r1"],
         "activities": [{"role": "clarification", "activity_id": "ask", "source_responsibility_refs": ["r1"],
                         "information_gaps": [gap]}], "confidence": 0.9, "unresolved": ["Which place"], "reason_summary": "Missing place."}
     need = {"need": "read the forecast for a named place", "closest_loaded": "test.weather",
@@ -184,7 +186,7 @@ def test_meaning_gaps_preserve_independent_terminal_work(preserve_all: bool, ind
     responsibilities = [CognitiveResponsibilityProposal(local_ref=ref, outcome=outcome, output_mode='body_action', bindings={'count': 2}, confidence=0.9) for ref, outcome in [('r1', 'shake the indicated head twice'), ('r2', 'nod twice')]]
     request = CognitiveWorkRequest(sid='mixed-meaning', text='让那个摇两下头，你点两下头。', responsibilities=responsibilities, meaning_uncertainties=[{'local_ref': f'u{i}', 'kind': 'referent', 'description': name, 'responsibility_refs': ['r1']} for i, name in enumerate(['actor', 'target_identity'])])
     gaps = [{'gap_id': f'gap-{name}', 'description': name, 'blocking': True, 'resolved': False, 'required_for': [name], 'preferred_resolution': 'ask_user', 'source_kind': 'unresolved_meaning', 'source_reference': name, 'resolution_sources_considered': ['authoritative_context']} for name in ([item.description for item in request.meaning_uncertainties] if preserve_all else ['actor'])]
-    raw = {'disposition': 'mixed', 'coverage': 'complete', 'covered_responsibility_refs': ['r1', 'r2'], 'activities': [{'activity_id': 'ask-meaning', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}, {'activity_id': 'nod', 'role': 'capability', 'capability_id': 'soridormi.nod_yes', 'args': {'count': 2}, 'depends_on': [], 'source_responsibility_refs': ['r2'] if independent else ['r1', 'r2']}], 'confidence': 0.9, 'unresolved': [item.description for item in request.meaning_uncertainties], 'reason_summary': 'Clarify the first request; perform the independent nod.'}
+    raw = {'responsibility_decisions': {'r1': {'decision': 'clarify', 'missing': []}, 'r2': {'decision': 'work', 'missing': []}}, 'disposition': 'mixed', 'coverage': 'complete', 'covered_responsibility_refs': ['r1', 'r2'], 'activities': [{'activity_id': 'ask-meaning', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': gaps}, {'activity_id': 'nod', 'role': 'capability', 'capability_id': 'soridormi.nod_yes', 'args': {'count': 2}, 'depends_on': [], 'source_responsibility_refs': ['r2'] if independent else ['r1', 'r2']}], 'confidence': 0.9, 'unresolved': [item.description for item in request.meaning_uncertainties], 'reason_summary': 'Clarify the first request; perform the independent nod.'}
     capabilities = [_nod_catalog_capability().model_dump(mode='json')]
     output = FastPlannerAdvanceModelOutput.model_validate(raw)
     if preserve_all and independent:
@@ -442,6 +444,7 @@ def _contextual_structured_resource_request() -> CognitiveWorkRequest:
 
 def _contextual_structured_resource_output() -> dict[str, Any]:
     return {
+        "responsibility_decisions": {"fetch": {"decision": "work", "missing": []}},
         "disposition": "execute",
         "coverage": "complete",
         "covered_responsibility_refs": ["fetch"],
@@ -510,9 +513,12 @@ def test_fast_schema_forbids_false_source_span_for_inherited_source_role_binding
         source_token_refs=[item["ref"] for item in _source_tokens(request.text)],
         language=request.language,
     )
-    branches = schema["properties"]["activities"]["items"]["oneOf"]
+    items = schema["properties"]["activities"]["items"]
+    branches = items.get("oneOf", [items])
     # Complete provider-owned inputs leave Work or an honest limitation, never a clarification.
-    assert {branch["properties"]["role"]["enum"][0] for branch in branches} == {"capability", "unavailable"}
+    assert {branch["properties"]["role"]["enum"][0] for branch in branches} == {"capability"}
+    decision = schema["properties"]["responsibility_decisions"]["properties"]["fetch"]
+    assert {value for branch in decision["oneOf"] for value in branch["properties"]["decision"]["enum"]} == {"work", "unavailable"}
     activity = next(branch for branch in branches if branch["properties"]["role"]["enum"] == ["capability"])
     assert "clarify" not in schema["properties"]["disposition"]["enum"]
     assert activity["properties"]["argument_sources"]["properties"] == {}
@@ -830,7 +836,8 @@ def test_native_work_schema_requires_dependencies_not_timing(parallel):
             "args": {"duration_s": 10}, "source_responsibility_refs": ["walk"]}
 
     def errors(activity):
-        output = {"disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["walk"],
+        output = {"responsibility_decisions": {"walk": {"decision": "work", "missing": []}},
+            "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["walk"],
             "activities": [activity], "confidence": 1, "unresolved": [],
             "reason_summary": "Direct walk."}
         return list(Draft202012Validator(schema).iter_errors(output))
@@ -886,10 +893,11 @@ def test_native_work_timing_keeps_honest_limitation_when_no_provider_can_honor_c
         act = {"role": "capability", "activity_id": "one", "capability_id": capability["capability_id"],
                "args": {"duration_s": 10}, "timing": timing, "source_responsibility_refs": ["first"]}
         assert list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(act))
-    limitation = {"activities": [{"role": "unavailable", "activity_id": "limit",
-            "source_responsibility_refs": ["first", "second"],
-            "missing": ["A provider that can run both actions at the same time."]}],
-        "disposition": "unavailable", "coverage": "uncertain",
+    missing = ["A provider that can run both actions at the same time."]
+    limitation = {"responsibility_decisions": {
+            "first": {"decision": "unavailable", "missing": missing},
+            "second": {"decision": "unavailable", "missing": missing}},
+        "activities": [], "disposition": "unavailable", "coverage": "uncertain",
         "covered_responsibility_refs": ["first", "second"], "confidence": 1,
         "unresolved": ["Concurrent composition unavailable."], "reason_summary": "No provider honors the concurrency."}
     Draft202012Validator(schema).validate(limitation)
@@ -945,12 +953,17 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
             "argument_sources": {},
             "args": {"text": "authored performance", "mode": candidate_mode}, "source_responsibility_refs": ["voice"]}
         assert validator.is_valid(vocal) == (provider_modes is not None and mode in provider_modes and candidate_mode == mode)
-    # An unavailable mode is reported honestly without inventing another effect.
-    Draft202012Validator(schema).validate({"activities": [{"role": "unavailable", "activity_id": "limit",
-            "source_responsibility_refs": ["voice"], "missing": ["A provider for the requested vocal mode."]}],
-        "disposition": "unavailable", "coverage": "uncertain",
+    # An unavailable mode is reported honestly without inventing another effect; the
+    # limitation is the voice Responsibility's decision, beside the body's own Work.
+    honest = {"responsibility_decisions": {
+            "voice": {"decision": "unavailable", "missing": ["A provider for the requested vocal mode."]},
+            "body": {"decision": "work", "missing": []}},
+        "activities": [body], "disposition": "mixed", "coverage": "complete",
         "covered_responsibility_refs": ["voice", "body"], "confidence": 0.5,
-        "unresolved": ["Requested vocal mode is unavailable."], "reason_summary": "Honest limitation."})
+        "unresolved": ["Requested vocal mode is unavailable."], "reason_summary": "Honest limitation."}
+    Draft202012Validator(schema).validate(honest)
+    assert not validator.is_valid({"role": "unavailable", "activity_id": "limit",
+        "source_responsibility_refs": ["voice"], "missing": ["A provider for the requested vocal mode."]})
 
 
 def test_native_advance_keeps_distinct_and_shared_vocal_mode_composition():
@@ -973,9 +986,9 @@ def test_native_vocal_work_with_empty_catalog_cannot_invent_a_provider():
     act = {"role": "capability", "activity_id": "voice", "capability_id": "unavailable.provider",
         "args": {"mode": "singing", "text": "performance"}, "depends_on": [], "source_responsibility_refs": ["song"]}
     assert not Draft202012Validator(schema["properties"]["activities"]["items"]).is_valid(act)
-    Draft202012Validator(schema).validate({"activities": [{"role": "unavailable", "activity_id": "limit",
-            "source_responsibility_refs": ["song"], "missing": ["A qualified vocal provider."]}],
-        "disposition": "unavailable", "coverage": "uncertain",
+    Draft202012Validator(schema).validate({
+        "responsibility_decisions": {"song": {"decision": "unavailable", "missing": ["A qualified vocal provider."]}},
+        "activities": [], "disposition": "unavailable", "coverage": "uncertain",
         "covered_responsibility_refs": ["song"], "confidence": 0.5,
         "unresolved": ["No qualified vocal provider."], "reason_summary": "Honest limitation."})
 
@@ -1001,10 +1014,13 @@ def test_native_decision_alternatives_preserve_execution_limitation_boundary(dis
     schema = fast_streaming_advance_response_schema([source.local_ref], responsibilities=[source], capabilities=[capability])
     work = {"role": "capability", "activity_id": "walk", "capability_id": capability["capability_id"],
         "args": {"duration_s": 10}, "depends_on": [], "source_responsibility_refs": [source.local_ref]}
-    limit = {"role": "unavailable", "activity_id": "limit", "source_responsibility_refs": [source.local_ref],
-        "missing": ["A provider for this action."]}
-    output = {"disposition": disposition, "coverage": coverage, "covered_responsibility_refs": [source.local_ref],
-        "activities": {"work": [work], "limit": [limit], "work+limit": [work, limit]}[activity],
+    # A limitation is the Responsibility's decision; "work+limit" keeps Work beside it.
+    decision, activities = {"work": ("work", [work]), "limit": ("unavailable", []),
+                            "work+limit": ("unavailable", [work])}[activity]
+    output = {"responsibility_decisions": {source.local_ref: {
+            "decision": decision, "missing": ["A provider for this action."] if decision == "unavailable" else []}},
+        "disposition": disposition, "coverage": coverage, "covered_responsibility_refs": [source.local_ref],
+        "activities": activities,
         "confidence": 1, "unresolved": [], "reason_summary": "Bounded Work decision."}
     # Exercise the native alternatives independently of the Host's conditional
     # allOf checks, which the deployed decoder does not enforce.
@@ -1049,7 +1065,8 @@ def test_fast_decoder_purpose_matches_provider_normalization(resource_contract, 
                   location: {"resource_contract": resource_contract}}
     responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome="Complete the requested work",
                                                        output_mode="body_action", confidence=1.0)
-    raw = {"activities": [{"role": "capability", "capability_id": "test.provider", "activity_id": "step",
+    raw = {"responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
+           "activities": [{"role": "capability", "capability_id": "test.provider", "activity_id": "step",
                            "args": {}, "source_responsibility_refs": ["r1"], "depends_on": []}],
            "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"], "confidence": 1.0, "unresolved": [], "reason_summary": "Realize the owned effect."}
     if purpose is not None:
@@ -1061,6 +1078,11 @@ def test_fast_decoder_purpose_matches_provider_normalization(resource_contract, 
     except PlannerDTOContractError:
         expected = False
     schema = fast_streaming_advance_response_schema(["r1"], responsibilities=[responsibility], capabilities=[definition])
+    if expected and normalize_fast_capability_activity_purpose(
+            output, capabilities=[definition]).activities[0].step_purpose == "acquire_information":
+        # A read for a body outcome must state the decision its result settles.
+        assert not Draft202012Validator(schema).is_valid(raw)
+        raw["activities"][0]["deferred_requirement"] = "Decide the effect from the result."
     assert Draft202012Validator(schema).is_valid(raw) == expected
 
 
@@ -1323,3 +1345,234 @@ async def test_required_enum_source_matches_selected_value_and_original_turn(var
     assert isinstance(frames[-1], FastPlannerStreamTerminal) == expected
     if not expected:
         assert frames[-1].failure_stage == 'before_commit'
+
+
+@pytest.mark.asyncio
+async def test_work_beside_an_impossible_sibling_is_one_mixed_decision() -> None:
+    """Live 2026-10-12 ("wave at me, then make me a cup of coffee"): the model decided
+    work + unavailable correctly and the Host rejected the impossible sibling as having
+    no terminal Activity."""
+    responsibilities = [
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="walk forward for ten seconds", output_mode="body_action",
+                                        bindings={"duration_s": 10}, confidence=0.99),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="make me a cup of coffee", output_mode="body_action",
+                                        confidence=0.99),
+    ]
+    request = CognitiveWorkRequest(sid="turn-mixed-limit", text="向前走十秒，然后帮我做一杯咖啡", language="zh-CN",
+                                   responsibilities=responsibilities, interpretation_confidence=0.99, context={})
+    decision = {
+        "responsibility_decisions": {"r1": {"decision": "work", "missing": []},
+                                     "r2": {"decision": "unavailable", "missing": ["a capability to brew coffee"]}},
+        "activities": [{"role": "capability", "capability_id": "soridormi.walk_forward", "activity_id": "act_walk",
+                        "args": {"duration_s": 10}, "argument_sources": {},
+                        "depends_on": [], "source_responsibility_refs": ["r1"]}],
+        "disposition": "mixed", "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"],
+        "confidence": 1.0, "unresolved": [], "reason_summary": "Walk; coffee is not possible.",
+    }
+    model = _StreamingModel([_wire_output(decision)])
+    frames = [frame async for frame in FastPlannerResolver(model, _Catalog([_walk_catalog_capability()])).stream_advance(request)]
+    assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+    advance = frames[-1].advance
+    assert advance.disposition == "mixed"
+    assert [(item.role, item.source_responsibility_refs) for item in advance.activities] == [
+        ("capability", ["r1"]), ("unavailable", ["r2"])]
+
+
+@pytest.mark.asyncio
+async def test_ordinary_speech_is_answered_never_declared_unavailable() -> None:
+    """Live 2026-10-12 ("tell me a joke"): SC told the joke, then the Planner decided the
+    joke unavailable and SC had to say it could not tell jokes."""
+    request = _request()
+    schema = fast_streaming_advance_response_schema(["reply"], responsibilities=request.responsibilities, capabilities=[])
+    decision = schema["properties"]["responsibility_decisions"]["properties"]["reply"]
+    assert [branch["properties"]["decision"]["enum"] for branch in decision.get("oneOf", [decision])] == [["answer", "clarify"]]
+    assert "unavailable" not in [state["properties"]["disposition"]["enum"][0] for state in schema["oneOf"]]
+    limited = {"responsibility_decisions": {"reply": {"decision": "unavailable", "missing": ["a joke capability"]}},
+               "activities": [], "disposition": "unavailable", "coverage": "uncertain",
+               "covered_responsibility_refs": ["reply"], "confidence": 1.0, "unresolved": [], "reason_summary": "No jokes."}
+    frames = [frame async for frame in FastPlannerResolver(_StreamingModel([_wire_output(limited)]), _Catalog()).stream_advance(request)]
+    assert isinstance(frames[-1], FastPlannerStreamFailure)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("variant", ["identical", "conflicting"])
+async def test_an_activity_listed_twice_is_one_activity(variant) -> None:
+    """Live 2026-10-12 (ctl_weather_zh): the decoder repeated a complete read with the same
+    activity_id; one identity is one Activity, while conflicting content still fails closed."""
+    request, _source = _body_request()
+    walk = {"role": "capability", "capability_id": "soridormi.walk_forward", "activity_id": "act_walk",
+            "args": {"duration_s": 10}, "argument_sources": {}, "depends_on": [], "source_responsibility_refs": ["walk"]}
+    repeat = walk if variant == "identical" else {**walk, "args": {"duration_s": 5}}
+    decision = {"responsibility_decisions": {"walk": {"decision": "work", "missing": []}},
+                "activities": [walk, repeat], "disposition": "execute", "coverage": "complete",
+                "covered_responsibility_refs": ["walk"], "confidence": 1.0, "unresolved": [], "reason_summary": "Walk."}
+    frames = [frame async for frame in FastPlannerResolver(
+        _StreamingModel([_wire_output(decision)]), _Catalog([_walk_catalog_capability()])).stream_advance(request)]
+    if variant == "identical":
+        assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
+        assert [item.activity_id for item in frames[-1].advance.activities] == ["act_walk"]
+        assert frames[-1].advance.metadata["repeated_activity_normalization"][0]["activity_id"] == "act_walk"
+    else:
+        assert isinstance(frames[-1], FastPlannerStreamFailure)
+
+
+def test_outcome_spans_cannot_reuse_user_turn_token_names():
+    """Live 2026-10-12 (cond_rain_nod_en): the model cited user-turn t6 ("Shanghai") tagged
+    with r1, and the Host resolved t6 inside UMI's reordered outcome, where it is "rain"."""
+    from shared.chromie_contracts.plan import FastPlannerResponsibilityArgumentSource
+    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+
+    text = "If it's going to rain in Shanghai today, nod twice."
+    outcome = "nod twice if it's going to rain in Shanghai today"
+    responsibility = CognitiveResponsibilityProposal(local_ref="r1", outcome=outcome, output_mode="information", confidence=1)
+    capability = {"capability_id": "test.weather", "input_schema": {"type": "object",
+        "properties": {"location": {"type": "string"}}, "required": ["location"], "additionalProperties": False},
+        "hints": {"resource_contract": {"provider_role": "acquire_information"}}}
+    schema = fast_streaming_advance_response_schema(
+        ["r1"], responsibilities=[responsibility], capabilities=[capability],
+        source_token_refs=[token["ref"] for token in user_turn_source_tokens(text)], original_user_text=text)
+    items = schema["properties"]["activities"]["items"]
+    branch = next(item for item in items.get("oneOf", [items]) if item["properties"]["role"]["enum"] == ["capability"])
+    location = Draft202012Validator(branch["properties"]["argument_sources"]["properties"]["location"])
+    assert location.is_valid({"source_start_token_ref": "t6", "source_end_token_ref": "t6"})
+    assert not location.is_valid({"source_start_token_ref": "t6", "source_end_token_ref": "t6", "source_responsibility_ref": "r1"})
+    assert location.is_valid({"source_start_token_ref": "r1.t8", "source_end_token_ref": "r1.t8", "source_responsibility_ref": "r1"})
+    with pytest.raises(ValueError):
+        FastPlannerResponsibilityArgumentSource(source_start_token_ref="t6", source_end_token_ref="t6", source_responsibility_ref="r1")
+
+
+def test_decoder_keeps_exact_integral_bounds_and_strips_fractional_ones():
+    """Live 2026-10-12 (mix_nod_fly): count=1 against a provider minimum of 2 passed the
+    decoder because every number bound was stripped; XGrammar is exact for integral bounds."""
+    from agent.app.clients.sglang_protocol import _stream_decoder_constraints
+
+    node = {"type": "object", "properties": {
+        "count": {"type": "number", "minimum": 2, "maximum": 8},
+        "speed": {"type": "number", "minimum": 0.05, "maximum": 0.5},
+        "duration_s": {"type": "number", "minimum": 1.0, "maximum": 10.0, "exclusiveMaximum": 11}}}
+    _stream_decoder_constraints(node)
+    properties = node["properties"]
+    assert properties["count"] == {"type": "number", "minimum": 2, "maximum": 8}
+    assert properties["speed"] == {"type": "number"}
+    assert properties["duration_s"] == {"type": "number", "minimum": 1.0, "maximum": 10.0}
+
+
+def test_one_responsibility_decides_its_stage_before_any_activity():
+    """Live 2026-10-12 (cond_sunny_wave_en): after the read, the model began act_wave_0
+    but the stage chosen by its first Activity offered only reads, so the wave became a
+    second weather lookup. The work decision now names the stage before any Activity."""
+    from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
+
+    from agent.app.planner_fast_validation import normalize_fast_capability_activity_purpose
+
+    responsibility = CognitiveResponsibilityProposal(
+        local_ref="r1", outcome="wave your hand if it will be sunny in Beijing tomorrow",
+        output_mode="body_action", confidence=1.0)
+    weather = {"capability_id": "test.weather", "input_schema": {"type": "object", "properties": {},
+               "additionalProperties": False},
+               "hints": {"resource_contract": {"provider_role": "acquire_information"}}}
+    wave = {"capability_id": "test.wave", "input_schema": {"type": "object", "properties": {},
+            "additionalProperties": False}, "effects": ["physical_motion"]}
+    schema = fast_streaming_advance_response_schema(
+        ["r1"], responsibilities=[responsibility], capabilities=[weather, wave])
+    validator = Draft202012Validator(schema)
+
+    def activity(capability_id, activity_id, purpose, **extra):
+        return {"role": "capability", "capability_id": capability_id, "activity_id": activity_id,
+                "args": {}, "depends_on": [], "source_responsibility_refs": ["r1"],
+                "step_purpose": purpose, **extra}
+
+    read = activity("test.weather", "act_weather_0", "acquire_information",
+                    expected_outcome="tomorrow's Beijing forecast",
+                    deferred_requirement="wave only if tomorrow is sunny in Beijing")
+
+    def output(decision, activities):
+        return {"responsibility_decisions": {"r1": decision}, "activities": activities,
+                "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+                "confidence": 1.0, "unresolved": [], "reason_summary": "Read the forecast first."}
+
+    live = output({"decision": "work", "missing": []}, [read, {**read, "activity_id": "act_wave_0"}])
+    assert not validator.is_valid(live)
+    reading = {"decision": "work", "missing": [], "step_purpose": "acquire_information"}
+    assert validator.is_valid(output(reading, [read])), sorted(e.message[:200] for e in validator.iter_errors(output(reading, [read])))
+    wave_now = activity("test.wave", "act_wave_0", "achieve_effect")
+    assert not validator.is_valid(output(reading, [read, wave_now]))
+    acting = {"decision": "work", "missing": [], "step_purpose": "achieve_effect"}
+    assert validator.is_valid(output(acting, [wave_now]))
+    assert not validator.is_valid(output(acting, [read]))
+
+    contradicted = FastPlannerAdvanceModelOutput.model_validate(output(reading, [wave_now]))
+    with pytest.raises(PlannerDTOContractError, match="decided acquire_information"):
+        normalize_fast_capability_activity_purpose(contradicted, capabilities=[weather, wave])
+
+
+def test_a_mixed_limitation_gets_no_activity():
+    """Live 2026-10-12 (wave at me, then make me coffee): coffee was decided unavailable,
+    then also given a clarification Activity; Host rejected the whole turn, wave included."""
+    responsibilities = [
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="wave at me", output_mode="body_action", confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="make me a cup of coffee", output_mode="body_action",
+                                        confidence=1.0),
+    ]
+    wave = {"capability_id": "test.wave", "input_schema": {"type": "object", "properties": {},
+            "additionalProperties": False}, "effects": ["physical_motion"]}
+    schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=responsibilities, capabilities=[wave])
+    validator = Draft202012Validator(schema)
+    waving = {"role": "capability", "capability_id": "test.wave", "activity_id": "act_wave", "args": {},
+              "depends_on": [], "source_responsibility_refs": ["r1"]}
+    asking = {"role": "clarification", "activity_id": "clarify_coffee", "source_responsibility_refs": ["r2"],
+              "information_gaps": []}
+
+    def output(activities):
+        return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []},
+                                             "r2": {"decision": "unavailable", "missing": ["a coffee machine"]}},
+                "activities": activities, "disposition": "mixed", "coverage": "complete",
+                "covered_responsibility_refs": ["r1", "r2"], "confidence": 1.0, "unresolved": [],
+                "reason_summary": "Wave; coffee is not possible."}
+
+    assert validator.is_valid(output([waving]))
+    assert not validator.is_valid(output([waving, asking]))
+    # Nor can a started clarification be pushed onto the wave: r1 decided work.
+    assert not validator.is_valid(output([waving, {**asking, "source_responsibility_refs": ["r1"]}]))
+    mixed = [state for state in schema["oneOf"] if state["properties"]["disposition"]["enum"] == ["mixed"]]
+    assert len(mixed) == 6  # every non-uniform pair of {work, clarify, unavailable}
+
+
+def test_decision_states_share_each_activity_branch_on_the_wire():
+    """Two-Responsibility decision states repeat Activity branches; compiled inline they
+    took 2.7 s of grammar compilation instead of 1.1 s. Sharing keeps the language."""
+    from agent.app.clients.sglang_protocol import _openai_response_format
+
+    responsibilities = [
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="wave at me", output_mode="body_action", confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="nod twice", output_mode="body_action", confidence=1.0),
+    ]
+    capabilities = [{"capability_id": f"test.{name}", "effects": ["physical_motion"],
+                     "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}}
+                    for name in ("wave", "nod")]
+    schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=responsibilities,
+                                                    capabilities=capabilities)
+    wire = _openai_response_format(schema)["json_schema"]["schema"]
+    inline = sum(len(state["properties"]["activities"]["items"]["oneOf"]) for state in schema["oneOf"])
+    shared = [key for key in wire["$defs"] if key.startswith("FastActivityBranch")]
+    assert 0 < len(shared) < inline
+    assert all("$ref" in branch for state in wire["oneOf"]
+               for branch in state["properties"]["activities"]["items"]["oneOf"])
+
+    def act(name, ref):
+        return {"role": "capability", "capability_id": f"test.{name}", "activity_id": name, "args": {},
+                "depends_on": [], "source_responsibility_refs": [ref]}
+
+    def output(decisions, activities, disposition):
+        return {"responsibility_decisions": decisions, "activities": activities, "disposition": disposition,
+                "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"], "confidence": 1.0,
+                "unresolved": [], "reason_summary": "x"}
+
+    work = {"decision": "work", "missing": []}
+    limited = {"decision": "unavailable", "missing": ["x"]}
+    samples = [output({"r1": work, "r2": work}, [act("wave", "r1"), act("nod", "r2")], "execute"),
+               output({"r1": work, "r2": limited}, [act("wave", "r1")], "mixed"),
+               output({"r1": work, "r2": limited}, [act("wave", "r1"), act("nod", "r2")], "mixed")]
+    for sample in samples:
+        assert Draft202012Validator(wire).is_valid(sample) == Draft202012Validator(schema).is_valid(sample)
+    assert [Draft202012Validator(wire).is_valid(sample) for sample in samples] == [True, True, False]

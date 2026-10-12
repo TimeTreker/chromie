@@ -450,7 +450,8 @@ provider-neutral. For example, a turning Capability presented to the Core should
 `direction=left|right` plus any human-meaningful angle/speed/duration over exposing
 `yaw_rad` whose sign depends on a particular robot frame. The owning provider/adapter can
 then realize `left` as positive or negative yaw according to its qualified frame without
-changing Goal meaning or Planner reasoning.
+changing Goal meaning or Planner reasoning. Every provider call realizes the facade,
+including members compiled together as one body activity.
 
 The same rule applies to axis names, joint IDs, actuator ranges, device coordinates,
 calibration offsets, transport fields, and backend-specific enums. Canonical semantic units

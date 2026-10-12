@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-11",
+  "frozen_on": "2026-10-12",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "21b3ca5030b6a796be3acf051d1408c2c5fb69c73d91a73e13064c69d88c19e8",
-    "workflow-conditional-dry.json": "f222925248243fc5a8fbab3d994649c1f3895df65b114294fd98973091364f75",
-    "workflow-conditional-rain.json": "9f16a648780b952ab3de9b86d5ac9339260c86afaa1604afb7a2fdd4fec85359",
-    "workflow-delayed.json": "c2b0edf4e4d69c974eff4bba16ac854d1f19a681b40db46c246ac103e981c642",
-    "workflow-normal.json": "62977d07f8280c4f86418cb56f51f65df94b7d57fe7de852e6cf5910fcf920fd"
+    "workflow-cancellation.json": "f1dbe3eedb359bdc316572c1e735393ad1db27f2a188252bcb59764b15f788c8",
+    "workflow-conditional-dry.json": "a64365ff0c4a3b9d7af39b17eca7249f9cb8708464a20d851e6062977c3ec7c9",
+    "workflow-conditional-rain.json": "4b599895a67903610ecfb3f7b0ec15b1871fc9c0ec4e05596a5219ea9f5531c6",
+    "workflow-delayed.json": "8398d7d416bc6aa1d5c15fc6a9014be1e9c99a9fdc29fca6240aba5ad0c45f99",
+    "workflow-normal.json": "29a71805d5f4f4bdd9fb7446744ac306ef4deaf29cd48fe7afb8bb9893049de2"
   },
-  "freeze_revision": 23,
-  "freeze_note": "Deep Planner retirement (owner decision PLANNER-AUTHORITY-001, 2026-10-10). Every request recaptured with the one Planner. Declared fixed-part migration: initial_planner removed (deep-initial steps become fast-initial), expected_rejection deep -> fast, social_cognition keys follow the step rename, catalog prompt_tier_locked dropped (in production a locked entry never reaches the common prompt; the live catalog has these contracts common and unlocked). Planner replies drop the retired escalation_reason; fitting needs are declared as in freeze 22. When a recorded reply uses a catalog contract the first pass did not show (an information read behind a conditional body action), one need-first pass is inserted before it: it declares that ability unmet with authored need text and reports the Goal unavailable in a schema-valid reply, which the Planner discards after the library search loads the contract. Family names normal_deep and speech_deep are historical identifiers. Inputs, provider outcomes, expectations and splits otherwise unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 27,
+  "freeze_note": "Run-2 repairs (2026-10-12). Every request recaptured: the re-entry decoder offers only what Host accepts (respond cites completed Evidence; no new Work means exact and unconfirmed); completed Work may be cited by step_id or evidence_ref; mixed streamed turns fix each decision before Activities; identical Activity branches are shared on the wire. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

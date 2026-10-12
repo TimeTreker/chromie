@@ -709,28 +709,9 @@ else
   wait_for_tcp 127.0.0.1 11434 300 "Ollama"
 fi
 
-if [ "$TTS_BACKEND" = "cosyvoice3" ]; then
-  # CosyVoice lazily initializes language/reference-specific inference paths.
-  # Warming only speaker=default with a Chinese hint primes chromie_zh but leaves
-  # the first real English and mixed requests cold. Prime every committed voice
-  # before User Meaning Interpretation/Orchestrator starts accepting microphone turns.
-  COSYVOICE_WARMUP_TIMEOUT_SEC="${TTS_COSYVOICE_WARMUP_TIMEOUT_SEC:-300}"
-  COSYVOICE_ZH_WARMUP_TEXT="${TTS_COSYVOICE_ZH_WARMUP_TEXT:-你好。}"
-  COSYVOICE_EN_WARMUP_TEXT="${TTS_COSYVOICE_EN_WARMUP_TEXT:-Hello.}"
-  COSYVOICE_MIXED_WARMUP_TEXT="${TTS_COSYVOICE_MIXED_WARMUP_TEXT:-你好，Hello.}"
-  warm_tts_candidate \
-    127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
-    "$COSYVOICE_ZH_WARMUP_TEXT" "$COSYVOICE_WARMUP_TIMEOUT_SEC" \
-    "$TTS_READY_LABEL" chromie_zh zh
-  warm_tts_candidate \
-    127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
-    "$COSYVOICE_EN_WARMUP_TEXT" "$COSYVOICE_WARMUP_TIMEOUT_SEC" \
-    "$TTS_READY_LABEL" chromie_en en
-  warm_tts_candidate \
-    127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
-    "$COSYVOICE_MIXED_WARMUP_TEXT" "$COSYVOICE_WARMUP_TIMEOUT_SEC" \
-    "$TTS_READY_LABEL" chromie_mixed mixed
-elif [ "$TTS_BACKEND" = "qwen3" ]; then
+# CosyVoice workers warm every committed voice before reporting ready (also after a
+# restart), so the health wait above already means warm; the Host does not warm it.
+if [ "$TTS_BACKEND" = "qwen3" ]; then
   QWEN3_TTS_WARMUP_TEXT="${QWEN3_TTS_WARMUP_TEXT:-你好，我是 Chromie。语音系统已经准备好了。}"
   warm_tts_candidate \
     127.0.0.1 "$TTS_READY_PORT" "$TTS_EXPECTED_PROVIDER" \
