@@ -133,52 +133,155 @@ path.write_text(source)
 PY
 
 # Dynamic turn/Goal schemas must not accumulate for the lifetime of the server.
-# The compiler owns bounded reusable grammars; a second strong-reference cache
-# would retain evicted grammars indefinitely. Active requests keep their own refs.
-# Remove when the pinned upstream exposes and enforces this two-layer bound.
+# The scheduler talks to whatever create_grammar_backend() returns; with a
+# reasoning parser that is ReasonerGrammarBackend wrapping XGrammar, so the
+# retention bound belongs to BaseGrammarBackend, which every backend inherits.
+# A grammar is retained only once its exact key recurs (one-off Planner schemas
+# never are), least recently used first out, within an estimated-byte budget.
+# XGrammar's per-grammar estimate exceeds measured resident growth, so the budget
+# is conservative. The compiler keeps its own 512 MiB budget. Active requests keep
+# their own refs. Remove when the pinned upstream enforces an equivalent bound.
 RUN python3 - <<'PY'
 from pathlib import Path
 
-path = Path('/sgl-workspace/sglang/python/sglang/srt/constrained/xgrammar_backend.py')
+root = Path('/sgl-workspace/sglang/python/sglang/srt/constrained')
+path = root / 'xgrammar_backend.py'
 source = path.read_text()
 before = '        self.grammar_compiler = GrammarCompiler(tokenizer_info=tokenizer_info)\n'
-after = '''        self.grammar_compiler = GrammarCompiler(
+after = """        self.grammar_compiler = GrammarCompiler(
             tokenizer_info=tokenizer_info, cache_limit_bytes=512 * 1024 * 1024
         )
-'''
-marker = '    def dispatch_json(self, key_string: str) -> BaseGrammarObject:\n'
-method = '''    def set_cache(self, key, value):
-        # GrammarCompiler reuses compiled grammars within its byte budget.
-        # BaseGrammarBackend.cache must not keep a second unbounded owner.
-        return None
+"""
+if source.count(before) != 1:
+    raise RuntimeError('Pinned grammar compiler changed; review memory bounds before building')
+path.write_text(source.replace(before, after))
 
-'''
-if source.count(before) != 1 or source.count(marker) != 1:
-    raise RuntimeError('Pinned grammar cache ownership changed; review memory bounds before building')
-path.write_text(source.replace(before, after).replace(marker, method + marker))
+path = root / 'base_grammar_backend.py'
+source = path.read_text()
+edits = [
+    ('from concurrent.futures import Future, ThreadPoolExecutor\n',
+     'import hashlib\nfrom collections import OrderedDict\nfrom concurrent.futures import Future, ThreadPoolExecutor\n'),
+    ('class BaseGrammarBackend:\n    _enable_strict_thinking: bool = False\n',
+     """def _estimated_grammar_bytes(value) -> int:
+    grammar = getattr(value, 'grammar', None) or value
+    if isinstance(grammar, InvalidGrammarObject):
+        return 0
+    size = getattr(getattr(grammar, 'ctx', None), 'memory_size_bytes', None)
+    return size if isinstance(size, int) and size >= 0 else -1
 
-# Exercise the actual patched backend, not a duplicate cache implementation.
+
+class BaseGrammarBackend:
+    _enable_strict_thinking: bool = False
+    RETAINED_GRAMMAR_BYTES = 4 * 1024 * 1024 * 1024
+    RETAINED_GRAMMAR_ENTRIES = 64
+    SEEN_GRAMMAR_KEYS = 4096
+"""),
+    ('        self.cache: Dict[Tuple[str, str], BaseGrammarObject] = {}\n',
+     """        self.cache: OrderedDict[Tuple[str, str], BaseGrammarObject] = OrderedDict()
+        self.cache_bytes: Dict[Tuple[str, str], int] = {}
+        self.seen_grammar_keys: OrderedDict[bytes, None] = OrderedDict()
+"""),
+    ('        value = self.cache.get(key)\n        if value:\n',
+     '        value = self.cache.get(key)\n        if value:\n            self.cache.move_to_end(key)\n'),
+    ('    def set_cache(self, key: Tuple[str, str], value: BaseGrammarObject):\n        self.cache[key] = value\n\n    def reset(self):\n        self.cache.clear()\n',
+     """    def set_cache(self, key: Tuple[str, str], value: BaseGrammarObject):
+        digest = hashlib.sha256('\\0'.join(key).encode('utf-8', 'surrogatepass')).digest()
+        if digest not in self.seen_grammar_keys:
+            self.seen_grammar_keys[digest] = None
+            while len(self.seen_grammar_keys) > self.SEEN_GRAMMAR_KEYS:
+                self.seen_grammar_keys.popitem(last=False)
+            return
+        self.seen_grammar_keys.move_to_end(digest)
+        size = _estimated_grammar_bytes(value)
+        if size < 0 or size > self.RETAINED_GRAMMAR_BYTES:
+            return
+        self.cache.pop(key, None)
+        self.cache[key] = value
+        self.cache_bytes[key] = size
+        while (
+            len(self.cache) > self.RETAINED_GRAMMAR_ENTRIES
+            or sum(self.cache_bytes.values()) > self.RETAINED_GRAMMAR_BYTES
+        ):
+            evicted, _ = self.cache.popitem(last=False)
+            del self.cache_bytes[evicted]
+
+    def reset(self):
+        self.cache.clear()
+        self.cache_bytes.clear()
+        self.seen_grammar_keys.clear()
+"""),
+]
+for before, after in edits:
+    if source.count(before) != 1:
+        raise RuntimeError('Pinned grammar cache ownership changed; review memory bounds before building')
+    source = source.replace(before, after)
+path.write_text(source)
+
+# Exercise the composition the scheduler uses: Reasoner over XGrammar, through
+# the same compile, cache and copy calls GrammarManager makes.
 import json
 from xgrammar import TokenizerInfo
+from sglang.srt.constrained.base_grammar_backend import BaseGrammarBackend
+from sglang.srt.constrained.reasoner_grammar_backend import ReasonerGrammarBackend
 from sglang.srt.constrained.xgrammar_backend import XGrammarGrammarBackend
 
 class Tokenizer:
     def init_xgrammar(self):
         return TokenizerInfo([bytes([i]) for i in range(256)], stop_token_ids=[255]), None
 
+    def encode(self, text, add_special_tokens=False):
+        return list(text.encode())
+
+class Detector:
+    think_end_token = '</think>'
+    think_excluded_tokens = []
+
+class Parser:
+    detector = Detector()
+
 backend = XGrammarGrammarBackend(Tokenizer(), 256)
 if backend.grammar_compiler.cache_limit_bytes != 512 * 1024 * 1024:
     raise RuntimeError('Compiler cache budget was not applied')
+served = ReasonerGrammarBackend(backend, Parser(), Tokenizer())
+
+def request(key):
+    value, hit = served.get_cached_or_future_value(key, False)
+    if hit:
+        return value, True
+    value = value.result()
+    served.set_cache(key, value.copy())
+    return value, False
+
+def accepts(value, text):
+    return value.grammar.matcher.accept_string(text)
+
 for i in range(64):
-    key = json.dumps({'type': 'string', 'enum': [f'value-{i}']})
-    grammar = backend.dispatch_json(key)
-    if not grammar.matcher.accept_string(json.dumps(f'value-{i}')):
+    key = ('json', json.dumps({'type': 'string', 'enum': [f'value-{i}']}))
+    grammar, hit = request(key)
+    if hit or not accepts(grammar, json.dumps(f'value-{i}')):
         raise RuntimeError('Bounded grammar rejected its declared value')
-    if backend.dispatch_json(key).matcher.accept_string(json.dumps('unlisted')):
+    if accepts(request(key)[0].copy(), json.dumps('unlisted')):
         raise RuntimeError('Bounded grammar accepted an undeclared value')
-    backend.set_cache(('json', key), grammar)
-if backend.cache:
-    raise RuntimeError('Backend retained a second unbounded grammar cache')
+if served.cache.keys() != {('json', json.dumps({'type': 'string', 'enum': [f'value-{i}']})) for i in range(64)}:
+    raise RuntimeError('Recurring grammars were not retained by the served backend')
+one_off = ('json', json.dumps({'type': 'string', 'enum': ['one-off']}))
+request(one_off)
+if one_off in served.cache or len(served.cache) > BaseGrammarBackend.RETAINED_GRAMMAR_ENTRIES:
+    raise RuntimeError('Served backend retained a one-off grammar or exceeded its entry bound')
+recurring = ('json', json.dumps({'type': 'string', 'enum': ['value-63']}))
+if not request(recurring)[1] or not accepts(request(recurring)[0], json.dumps('value-63')):
+    raise RuntimeError('A retained recurring grammar was not reused')
+largest = max(served.cache_bytes.values())
+if largest <= 0:
+    raise RuntimeError('XGrammar no longer reports compiled grammar size; review the byte budget')
+served.RETAINED_GRAMMAR_BYTES = largest * 2
+for i in range(4):
+    key = ('json', json.dumps({'type': 'integer', 'enum': [i]}))
+    request(key)
+    request(key)
+if sum(served.cache_bytes.values()) > served.RETAINED_GRAMMAR_BYTES or len(served.cache) >= 64:
+    raise RuntimeError('Served backend exceeded its estimated-byte budget')
+served.executor.shutdown(wait=True)
 
 # Exercise normal JSON dispatch through the same backend used by live UMI.
 # Layout bounds must never limit whitespace inside a semantic string value.

@@ -1129,14 +1129,25 @@ compiles a 39,900-rule decoder through the patched backend with its cache enable
 checks that a declared instance is accepted and an over-length string is rejected.
 Remove this backport together with the #716 one.
 The pinned image also bounds XGrammar's retained compiler cache to 512 MiB and
-removes the backend's second unbounded strong-reference cache. Dynamic per-turn schemas
-previously accumulated until the scheduler exhausted host RAM. In-flight requests retain
-their grammars, so this is a retained-cache budget, not a hard cap on total process or
-peak compilation memory. The same bound applies to both maintained SGLang profiles;
-model weights, context/KV budgets and request concurrency remain profile-owned. The
-image build exercises the real backend with distinct valid/invalid grammars. Remove
-this patch when a reviewed upstream image enforces both cache ownership bounds; no
-new environment variable or runtime behavior mode is introduced.
+bounds the scheduler's backend grammar cache. That bound lives on SGLang's
+`BaseGrammarBackend` because the scheduler uses the backend returned by
+`create_grammar_backend()`; with `--reasoning-parser` that is a
+`ReasonerGrammarBackend` wrapping XGrammar. An earlier override on the inner XGrammar
+backend was never reached, so every distinct per-turn Planner schema stayed resident
+(about 2.4 GB each). After 18-36 minutes of live use the host ran out of RAM, the kernel
+killed the SGLang scheduler, and the memory pressure also stalled the Soridormi
+simulator. The backend now retains a grammar only after its exact key recurs, so a
+one-off Planner schema is never kept and recurring stage schemas still hit. Retention
+is least recently used first out, at most 64 grammars within 4 GiB of XGrammar's
+estimated size. That estimate exceeds the measured resident growth, so the budget is
+conservative. In-flight requests retain their grammars, so this is a retained-cache
+budget, not a hard cap on total process or peak compilation memory. The same bound
+applies to both maintained SGLang profiles; model weights, context/KV budgets and
+request concurrency remain profile-owned. The image build drives the reasoner-wrapped
+composition through the scheduler's compile, cache and copy calls: one-off grammars
+are not retained, recurring ones are reused, and the byte budget evicts. Remove this
+patch when a reviewed upstream image enforces both cache ownership bounds; no new
+environment variable or runtime behavior mode is introduced.
 
 Its Dockerfile fixes a reproduced missing `lm_head_is_tied` initialization in the
 unified Gemma constructor, preserving the existing GPU branch predicate. Remove the
