@@ -178,7 +178,28 @@ Open, with earliest boundary (evidence README, runs 2-4):
 - Runtime: two optional SC body expressions from one provider are refused (`coordination_unsupported`).
 - Deploy: run Compose with the proxy variables unset (HANDOFF).
 
-Next: owner decision on conditional composition; then the SC/UMI items in their own qualification loops.
+Owner decision on conditional composition (2026-10-12): "B. go on" — one Plan carries the read and the
+dependent action; Runtime holds the action and the evidence re-entry decides it. Implemented:
+- Contract: with a read on offer, every streamed effect Activity states `deferred` (decoder-required); a
+  deferred effect waits only on reads of its own Responsibility. CanonicalPlan gains typed
+  `deferred_steps` (never executable, `validate_deferred_steps`); executable steps per Goal still either
+  acquire or achieve. Charter staged-progress rule (#51) and API reference updated.
+- Host: deferred Activities join no execution group, are never dispatched early, become
+  `deferred_steps`; the re-entry projection carries them and the re-entry prompt says to perform one via
+  `new_work` only when the Evidence settles its condition in favour.
+- Removed the single-Responsibility stage split and the decision-level `step_purpose`.
+- Focused live run on the first B image (`focused-b/`): 0/4, but the model wrote read + deferred action in
+  all four. Follow-up repairs (not yet live-tested): uniform decision states offer only their roles (a
+  clarification was added beside `work`); re-entry satisfaction is prospective and, outside reporting,
+  respond is offered only at substantial/exact (an execute scored 0.0 became a silent limitation Plan);
+  SC never receives a Capability the current or source Plan selected or deferred (SC "performed" the
+  held wave as decoration); only result-producing Work defers speech and a paired gesture waits with its
+  deferred speech (the orphaned gesture made the Runtime reject the whole reply).
+- Freeze 29 (`capture29.py`, `freeze29.py`, archive `e2f282fb…`; freeze 28 before it). Strict replay
+  6,000/6,000, zero model calls. Level A 46/46. Canonical gate (clean worktree `scratchpad/gate10`): pytest 3,805 + 5 skipped, benchmarks 169, legacy 20.
+
+Next: build the Agent image from this revision; the owner deploys it; rerun the four conditional cases,
+then the full 35-case cohort, one bundle, judge every case. The SC/UMI items stay open as listed above.
 
 ## Previous delivery — Deep Planner retired (stage B), 2026-10-11
 

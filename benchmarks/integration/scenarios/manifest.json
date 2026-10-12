@@ -7,12 +7,12 @@
   "model_ability_evaluated": false,
   "case_sha256": {
     "workflow-cancellation.json": "f1dbe3eedb359bdc316572c1e735393ad1db27f2a188252bcb59764b15f788c8",
-    "workflow-conditional-dry.json": "a64365ff0c4a3b9d7af39b17eca7249f9cb8708464a20d851e6062977c3ec7c9",
-    "workflow-conditional-rain.json": "4b599895a67903610ecfb3f7b0ec15b1871fc9c0ec4e05596a5219ea9f5531c6",
-    "workflow-delayed.json": "8398d7d416bc6aa1d5c15fc6a9014be1e9c99a9fdc29fca6240aba5ad0c45f99",
+    "workflow-conditional-dry.json": "0141005fd077d0614e3d55c4adca5ad3c1fb9285e64038160d952592d9c07e96",
+    "workflow-conditional-rain.json": "a5acdde9348fe97deb987e99c1636931ffd3863c8eb6488334305b9534fa0690",
+    "workflow-delayed.json": "0f2631bb3bde6a5f996ce3dfbeaa3e9e8bfb31a5d40fa3ae5a5f8398961c2a3a",
     "workflow-normal.json": "29a71805d5f4f4bdd9fb7446744ac306ef4deaf29cd48fe7afb8bb9893049de2"
   },
-  "freeze_revision": 27,
-  "freeze_note": "Run-2 repairs (2026-10-12). Every request recaptured: the re-entry decoder offers only what Host accepts (respond cites completed Evidence; no new Work means exact and unconfirmed); completed Work may be cited by step_id or evidence_ref; mixed streamed turns fix each decision before Activities; identical Activity branches are shared on the wire. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 29,
+  "freeze_note": "Option-B live follow-ups (2026-10-12). Every request recaptured: uniform streamed decision states offer only their decision's roles; outside reporting the re-entry decoder offers respond only at substantial or exact and the re-entry prompt states prospective satisfaction; SC never receives a Capability the current or source Plan selected or deferred as an optional expression. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

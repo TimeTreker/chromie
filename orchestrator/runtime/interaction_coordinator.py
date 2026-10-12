@@ -1031,10 +1031,25 @@ class InteractionRuntimeCoordinator:
                 and set(speech.metadata.get("truth_stages") or [])
                 == {"context_grounded"}
             )
-        ] if prepared.capabilities else []
+        ] if any(request.metadata.get("execution_role") != "social_decoration"
+                 for request in prepared.capabilities) else []
+        # An optional gesture that starts with deferred wording leaves with it; alone it
+        # is an incomplete start-together group (live 2026-10-12: the Runtime rejected
+        # the whole re-entry submission and nothing was done or said).
+        deferred_coordination = {
+            str(speech.metadata.get("coordination_id"))
+            for speech in prepared.speech
+            if speech.id in set(deferred_speech_ids) and speech.metadata.get("coordination_id")
+        }
         runtime_response = prepared.model_copy(
             deep=True,
             update={
+                "capabilities": [
+                    request
+                    for request in prepared.capabilities
+                    if not (request.metadata.get("execution_role") == "social_decoration"
+                            and str(request.metadata.get("coordination_id")) in deferred_coordination)
+                ],
                 "speech": [
                     speech
                     for speech in prepared.speech

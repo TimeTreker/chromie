@@ -1397,9 +1397,10 @@ def test_library_search_ranks_need_wording_and_never_returns_restricted_entries(
 async def test_conditional_action_reads_first_and_names_its_deferred_decision():
     """Live 2026-10-11: "nod twice if it rains" scheduled the nod beside the forecast read.
 
-    The search loads the read the Goal filter hid; with one Responsibility the decoder
-    offers acquisition and effect stages separately, and the read names the decision its
-    result settles. Host keeps the Goal open with that typed requirement.
+    The search loads the read the Goal filter hid. Owner choice B (2026-10-12): the same
+    Plan carries the read (naming the decision its result settles) and the nod, deferred
+    on that read; Host keeps only the read executable and the Goal open, and the nod
+    waits in deferred_steps for the evidence re-entry.
     """
     from agent.app.capabilities.local import chromie_capability_bundle
 
@@ -1418,24 +1419,19 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
     decided = {**read, "deferred_requirement": "Nod twice only if the Shanghai forecast says rain today."}
     nod_after = {"role": "capability", "capability_id": "test.nod", "activity_id": "nod", "args": {"count": 2},
                  "argument_sources": source_spans(text, {"count": "twice"}), "depends_on": ["read"],
-                 "step_purpose": "achieve_effect", "source_responsibility_refs": ["r1"]}
+                 "step_purpose": "achieve_effect", "deferred": True, "source_responsibility_refs": ["r1"]}
     model = Model([first, {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
                                                   "Retrieve weather for a named place.")],
-                           **work([decided])}])
+                           **work([decided, nod_after])}])
     frames = [frame async for frame in FastPlannerResolver(model, Catalog([nod, weather])).stream_advance(request)]
     second = model.packets[1][1]["response_format"]
     loaded_needs = {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
                                            "Retrieve weather for a named place.")]}
-    reading = {"r1": {"decision": "work", "missing": [], "step_purpose": "acquire_information"}}
-
-    def staged(activities):
-        return {**work(activities), "responsibility_decisions": reading}
-
-    assert not Draft202012Validator(second).is_valid({**loaded_needs, **staged([read, nod_after])})
-    assert not Draft202012Validator(second).is_valid({**loaded_needs, **staged([read])})
-    assert Draft202012Validator(second).is_valid({**loaded_needs, **staged([decided])})
-    # The stage is decided before any Activity (live 2026-10-12).
-    assert not Draft202012Validator(second).is_valid({**loaded_needs, **work([decided])})
+    assert Draft202012Validator(second).is_valid({**loaded_needs, **work([decided, nod_after])})
+    assert not Draft202012Validator(second).is_valid({**loaded_needs, **work([read, nod_after])}), \
+        "the read names the decision its result settles"
+    undeclared = {key: value for key, value in nod_after.items() if key != "deferred"}
+    assert not Draft202012Validator(second).is_valid({**loaded_needs, **work([decided, undeclared])})
     assert isinstance(frames[0], FastPlannerStreamTerminal), frames[0]
     ga_reply = {"new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}],
                 "cognitive_requests": [], "referent_updates": [], "resolved_references": [], "confidence": 1.0,
@@ -1445,5 +1441,7 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
         advance=frames[0].advance, association=association, user_text=request.text,
     )
     assert [step.capability_id for step in plan.steps] == ["chromie.weather.lookup"]
+    assert [(step.capability_id, step.args, step.metadata["depends_on"]) for step in plan.deferred_steps] == [
+        ("test.nod", {"count": 2}, ["read"])]
     outcome = plan.goal_outcomes[0]
     assert outcome.satisfaction.unmet_requirements == ["Nod twice only if the Shanghai forecast says rain today."]

@@ -2737,3 +2737,16 @@ def test_withheld_answer_stays_pending_and_its_value_question_is_asked_now():
     asked["need_outcomes"] = {answer.need_id: "pending", question.need_id: "covered"}
     assert Draft202012Validator(schema).is_valid(asked)
     validate_social_cognition_output(SocialCognitionOutput.model_validate(asked), current, [])
+
+
+def test_optional_expression_never_performs_planner_work():
+    """Live 2026-10-12 (B): after a re-entry limitation, SC "performed" the held wave as a
+    social decoration. Capabilities the Planner selected or held are not SC candidates."""
+    from agent.app.social_cognition import planner_work_capability_ids
+
+    context = {
+        "canonical_plan_resolution": {"steps": [{"capability_id": "chromie.weather.lookup"}], "deferred_steps": []},
+        "source_canonical_plan": {"steps": [], "deferred_steps": [{"capability_id": "soridormi.wave_hand"}]},
+    }
+    assert planner_work_capability_ids(context) == {"chromie.weather.lookup", "soridormi.wave_hand"}
+    assert planner_work_capability_ids({}) == set()

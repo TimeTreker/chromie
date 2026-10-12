@@ -3597,11 +3597,12 @@ class GoalDrivenRuntimeCoordinator:
             goal_id: [] for goal_id in goal_ids
         }
         steps: list[CanonicalPlanStep] = []
+        deferred_steps: list[CanonicalPlanStep] = []
         # Start-together groups come from the Fast Host (Planner depends_on + Capability
         # contracts). Without them Runtime serializes in list order; it never infers overlap.
         capability_ids = [
             item.activity_id for item in advance.activities
-            if isinstance(item, FastPlannerCapabilityActivity)
+            if isinstance(item, FastPlannerCapabilityActivity) and not item.deferred
         ]
         raw_groups = advance.metadata.get("execution_groups")
         execution_groups = (
@@ -3621,7 +3622,20 @@ class GoalDrivenRuntimeCoordinator:
                         activity_goal_ids.append(goal_id)
             for goal_id in activity_goal_ids:
                 activities_by_goal[goal_id].append(activity)
-            if isinstance(activity, FastPlannerCapabilityActivity):
+            if isinstance(activity, FastPlannerCapabilityActivity) and activity.deferred:
+                # Held for the evidence re-entry (owner choice B): never an executable step.
+                deferred_steps.append(CanonicalPlanStep(
+                    step_id=activity.activity_id, capability_id=activity.capability_id,
+                    args=dict(activity.args), step_purpose="achieve_effect",
+                    source_goal_ids=activity_goal_ids, reason_summary=activity.reason_summary,
+                    metadata={
+                        "fast_activity_id": activity.activity_id,
+                        "source_responsibility_refs": list(activity.source_responsibility_refs),
+                        "depends_on": list(activity.depends_on),
+                        "deferred": True,
+                    },
+                ))
+            elif isinstance(activity, FastPlannerCapabilityActivity):
                 steps.append(
                     CanonicalPlanStep(
                         step_id=activity.activity_id,
@@ -3934,6 +3948,7 @@ class GoalDrivenRuntimeCoordinator:
             communication_needs=needs,
             parameter_resolutions=parameter_resolutions,
             steps=steps,
+            deferred_steps=deferred_steps,
             unresolved=(
                 unresolved
                 if disposition in {"clarify", "mixed", "unavailable", "refused"}
@@ -5161,7 +5176,8 @@ class GoalDrivenRuntimeCoordinator:
                     "fast_planner_activity_plan"
                 ]
                 ready_fast_capability_status = "prepared_until_canonical_validation"
-                capability_activities = [item for item in fast_advance.activities if isinstance(item, FastPlannerCapabilityActivity)]
+                capability_activities = [item for item in fast_advance.activities
+                                         if isinstance(item, FastPlannerCapabilityActivity) and not item.deferred]
                 if self.policy.mode == "apply" and capability_activities and not goal_planning_started() and not any(
                     item.role != "capability" and item.timing == "sequential" for item in fast_advance.activities
                 ):

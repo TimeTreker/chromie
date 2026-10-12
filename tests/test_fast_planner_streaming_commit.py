@@ -1457,10 +1457,11 @@ def test_decoder_keeps_exact_integral_bounds_and_strips_fractional_ones():
     assert properties["duration_s"] == {"type": "number", "minimum": 1.0, "maximum": 10.0}
 
 
-def test_one_responsibility_decides_its_stage_before_any_activity():
-    """Live 2026-10-12 (cond_sunny_wave_en): after the read, the model began act_wave_0
-    but the stage chosen by its first Activity offered only reads, so the wave became a
-    second weather lookup. The work decision now names the stage before any Activity."""
+def test_a_conditional_plans_its_read_and_holds_the_action():
+    """Live 2026-10-12, runs 1-4: "wave if it will be sunny tomorrow" was forced into one
+    stage, and the model then wrote the other stage's Activities (a wave as a second read,
+    or a wave depending on a missing read). Owner choice B: one Plan carries the read and
+    the dependent action, which is deferred until the re-entry decides it."""
     from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput
 
     from agent.app.planner_fast_validation import normalize_fast_capability_activity_purpose
@@ -1476,34 +1477,39 @@ def test_one_responsibility_decides_its_stage_before_any_activity():
     schema = fast_streaming_advance_response_schema(
         ["r1"], responsibilities=[responsibility], capabilities=[weather, wave])
     validator = Draft202012Validator(schema)
+    read = {"role": "capability", "capability_id": "test.weather", "activity_id": "act_weather",
+            "args": {}, "depends_on": [], "source_responsibility_refs": ["r1"],
+            "step_purpose": "acquire_information", "expected_outcome": "tomorrow's Beijing forecast",
+            "deferred_requirement": "wave only if tomorrow is sunny in Beijing"}
+    held = {"role": "capability", "capability_id": "test.wave", "activity_id": "act_wave", "args": {},
+            "depends_on": ["act_weather"], "source_responsibility_refs": ["r1"], "deferred": True}
 
-    def activity(capability_id, activity_id, purpose, **extra):
-        return {"role": "capability", "capability_id": capability_id, "activity_id": activity_id,
-                "args": {}, "depends_on": [], "source_responsibility_refs": ["r1"],
-                "step_purpose": purpose, **extra}
+    def output(activities):
+        return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
+                "activities": activities, "disposition": "execute", "coverage": "complete",
+                "covered_responsibility_refs": ["r1"], "confidence": 1.0, "unresolved": [],
+                "reason_summary": "Read the forecast; the wave waits on it."}
 
-    read = activity("test.weather", "act_weather_0", "acquire_information",
-                    expected_outcome="tomorrow's Beijing forecast",
-                    deferred_requirement="wave only if tomorrow is sunny in Beijing")
+    assert validator.is_valid(output([read, held]))
+    # Live 2026-10-12 (B): the wait was also modelled as a clarification of the same work.
+    waiting = {"role": "clarification", "activity_id": "wait_weather", "source_responsibility_refs": ["r1"],
+               "information_gaps": [{"gap_id": "weather", "description": "The forecast decides the wave.",
+                                     "required_for": ["condition"], "preferred_resolution": "ask_user",
+                                     "source_kind": "execution_input"}]}
+    assert not validator.is_valid(output([read, held, waiting]))
+    undeclared = {key: value for key, value in held.items() if key != "deferred"}
+    assert not validator.is_valid(output([read, undeclared])), "every effect states deferred"
 
-    def output(decision, activities):
-        return {"responsibility_decisions": {"r1": decision}, "activities": activities,
-                "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"],
-                "confidence": 1.0, "unresolved": [], "reason_summary": "Read the forecast first."}
+    def host(activities):
+        return normalize_fast_capability_activity_purpose(
+            FastPlannerAdvanceModelOutput.model_validate(output(activities)), capabilities=[weather, wave])
 
-    live = output({"decision": "work", "missing": []}, [read, {**read, "activity_id": "act_wave_0"}])
-    assert not validator.is_valid(live)
-    reading = {"decision": "work", "missing": [], "step_purpose": "acquire_information"}
-    assert validator.is_valid(output(reading, [read])), sorted(e.message[:200] for e in validator.iter_errors(output(reading, [read])))
-    wave_now = activity("test.wave", "act_wave_0", "achieve_effect")
-    assert not validator.is_valid(output(reading, [read, wave_now]))
-    acting = {"decision": "work", "missing": [], "step_purpose": "achieve_effect"}
-    assert validator.is_valid(output(acting, [wave_now]))
-    assert not validator.is_valid(output(acting, [read]))
-
-    contradicted = FastPlannerAdvanceModelOutput.model_validate(output(reading, [wave_now]))
-    with pytest.raises(PlannerDTOContractError, match="decided acquire_information"):
-        normalize_fast_capability_activity_purpose(contradicted, capabilities=[weather, wave])
+    assert [item.deferred for item in host([read, held]).activities] == [False, True]
+    with pytest.raises(PlannerDTOContractError, match="waits on a read"):
+        host([read, {**held, "depends_on": []}])
+    with pytest.raises(PlannerDTOContractError, match="waits only on reads"):
+        host([read, {**held, "activity_id": "act_wave_now", "deferred": False, "depends_on": []},
+              {**held, "depends_on": ["act_wave_now"]}])
 
 
 def test_a_mixed_limitation_gets_no_activity():

@@ -1192,6 +1192,22 @@ def social_cognition_prompt(
     )
 
 
+def planner_work_capability_ids(context: dict[str, Any]) -> set[str]:
+    """Capabilities the Planner selected or held for this Work (current and source Plan).
+
+    An optional expression never performs or duplicates Planner Work (live 2026-10-12:
+    after a re-entry limitation, SC "performed" the held wave as social decoration).
+    """
+    found: set[str] = set()
+    for key in ("canonical_plan_resolution", "source_canonical_plan"):
+        plan = context.get(key)
+        if isinstance(plan, dict):
+            for field in ("steps", "deferred_steps"):
+                found.update(str(step.get("capability_id") or "") for step in plan.get(field) or []
+                             if isinstance(step, dict))
+    return found - {""}
+
+
 class SocialCognitionResolver:
     def __init__(
         self, model: OllamaClient, catalog: CapabilityCatalog, *,
@@ -1210,7 +1226,8 @@ class SocialCognitionResolver:
         request = request.model_copy(deep=True)
         digest = request.snapshot_digest()
         entries = await self.catalog.prompt_entries(scope="all", refresh=False)
-        candidates = auxiliary_social_capability_payloads(entries)
+        candidates = [item for item in auxiliary_social_capability_payloads(entries)
+                      if item["capability_id"] not in planner_work_capability_ids(request.context)]
         prompt = social_cognition_prompt(request, candidates, num_ctx=self.num_ctx)
         # Runtime/Opportunity never chooses Social Cognition depth. Start with the
         # primary SC authority; that model may request its one deeper pass by returning

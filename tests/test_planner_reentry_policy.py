@@ -1068,3 +1068,51 @@ def test_completed_work_may_be_cited_by_its_evidence_ref() -> None:
     assert [step["step_id"] for step in plan(completed)["steps"]] == ["wave"]
     with pytest.raises(ValueError, match="must cite earlier steps or completed Work"):
         plan({})
+
+
+def test_reentry_sees_the_action_the_source_plan_held_for_it() -> None:
+    """Owner choice B (2026-10-12): the source Plan's deferred step reaches the re-entry,
+    which decides it from the trusted result; executable steps stay as before."""
+    from shared.chromie_contracts.plan import CanonicalPlanStep, validate_deferred_steps
+
+    read = CanonicalPlanStep(step_id="read", capability_id="chromie.weather.lookup", args={"location": "Shanghai"},
+                             source_goal_ids=["goal-nod"], step_purpose="acquire_information",
+                             expected_outcome="Shanghai rain forecast")
+    nod = CanonicalPlanStep(step_id="nod", capability_id="test.nod", args={"count": 2},
+                            source_goal_ids=["goal-nod"], metadata={"depends_on": ["read"], "deferred": True})
+    plan = {"plan_id": "plan-nod", "goal_ids": ["goal-nod"], "steps": [read.model_dump()],
+            "deferred_steps": [nod.model_dump()]}
+    projected = planner_reentry_source_work_projection(plan, goal_ids={"goal-nod"})
+    assert [step["step_id"] for step in projected["steps"]] == ["read"]
+    assert projected["deferred_steps"] == [{"step_id": "nod", "capability_id": "test.nod", "args": {"count": 2},
+                                            "source_goal_ids": ["goal-nod"], "depends_on": ["read"]}]
+    assert "deferred_steps" not in planner_reentry_source_work_projection(
+        {**plan, "deferred_steps": []}, goal_ids={"goal-nod"})
+
+    validate_deferred_steps([read], [nod])
+    wave = read.model_copy(update={"step_id": "wave", "capability_id": "test.wave", "step_purpose": "achieve_effect"})
+    for steps, held, reason in (
+        ([read, wave], nod.model_copy(update={"metadata": {"depends_on": ["wave"]}}), "acquisition"),
+        ([read], nod.model_copy(update={"metadata": {}}), "waits on acquisition"),
+        ([read], nod.model_copy(update={"source_goal_ids": ["goal-other"]}), "own Goal"),
+    ):
+        with pytest.raises(ValueError, match=reason):
+            validate_deferred_steps(steps, [held])
+
+
+def test_a_reentry_answer_outside_reporting_is_a_committed_answer() -> None:
+    """Live 2026-10-12: the re-entry answered "no rain, so no nod" scored unsatisfied 0.0;
+    Host turned it into a limitation by the commitment rule. Outside reporting, respond is
+    offered only at substantial or exact; a lower score is unavailable's decision."""
+    from jsonschema import Draft202012Validator
+
+    def schema(commitment):
+        return Draft202012Validator(fast_evidence_reentry_response_schema(
+            expected_goal_ids=["goal-weather"], evidence_refs=["evidence-weather"],
+            allowed_capability_ids=[], allow_new_work=False,
+            completed_evidence_refs=["evidence-weather"], respond_requires_commitment=commitment))
+
+    low, exact = _reentry_decision_output("unsatisfied", 0.0), _reentry_decision_output("exact", 1.0)
+    assert schema(False).is_valid(low)
+    assert not schema(True).is_valid(low)
+    assert schema(True).is_valid(exact)

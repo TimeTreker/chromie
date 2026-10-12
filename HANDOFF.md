@@ -75,7 +75,20 @@ python scripts/general_ability_acceptance.py --mode live-text --scenario-root $D
 ./scripts/collect_debug_bundle.sh
 ```
 
-Next: the owner decides conditional composition (DEVELOPMENT_CHECKPOINT "Open").
+Option B (owner, 2026-10-12) is in this revision (see DEVELOPMENT_CHECKPOINT). Live state: the owner
+deployed `chromie-agent:option-b-20261012` (first B image, before the follow-up repairs; rollback
+`chromie-agent:pre-option-b-20261012`). The follow-up repairs are not in any image yet. Corpus freeze 29
+(`frozen.tar.xz` archive `e2f282fb…`).
+
+```bash
+# resume: build the Agent image from a clean worktree of this revision, then (owner) deploy without proxies
+git worktree add --detach <dir> HEAD && cd <dir> && docker build -f /home/chromie/github/chromie/.chromie/acceptance/deep-removal-20261011/AgentDockerfile -t chromie-agent:option-b2 .
+docker tag chromie-agent:option-b2 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/planner-limitation-20261012/scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live --only-case cond_rain_nod_en --only-case cond_rain_nod_zh --only-case cond_sunny_wave_en --only-case cond_sunny_wave_zh
+```
+
+Next: deploy the follow-up image, rerun the conditional cases and then the full cohort.
 
 ## Previous delivery — Deep Planner retired (stage B), 2026-10-11
 

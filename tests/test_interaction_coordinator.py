@@ -1836,6 +1836,41 @@ class InteractionRuntimeCoordinatorTests(unittest.IsolatedAsyncioTestCase):
         execution = await coordinator.wait_dispatch(dispatch)
         self.assertEqual(execution.status, "completed")
 
+    async def test_a_start_together_gesture_stays_with_its_speech(self) -> None:
+        """Live 2026-10-12: an SC reply plus its paired gesture was the whole response; the
+        speech was deferred as result wording, the gesture was submitted alone as a broken
+        start-together group, and the Runtime rejected everything."""
+        pair = {"coordination_id": "sc:pair", "lane_start_policy": "prepared_start"}
+
+        def gesture():
+            return CapabilityRequest(request_id="gesture", capability_id="test.gesture", args={},
+                                     timing="parallel", metadata={**pair, "execution_role": "social_decoration"})
+
+        def reply():
+            return {"id": "reply", "text": "It is sunny, so here is a wave!", "timing": "after_capabilities",
+                    "metadata": {**pair, "execution_lane": "vocal"}}
+
+        for work in ([], [CapabilityRequest(request_id="work", capability_id="chromie.speak",
+                                            args={"text": "Working."}, metadata={"source_goal_ids": ["goal"]})]):
+            coordinator = InteractionRuntimeCoordinator(
+                lambda _args: {"scheduled": True, "playback_started": True})
+            speak = coordinator.registry.get("chromie.speak")
+            coordinator.registry.register(speak.model_copy(update={
+                "capability_id": "test.gesture", "input_schema": {"type": "object"},
+                "exclusive_group": None, "metadata": {}}))
+            response = InteractionResponse(
+                interaction_id=f"pair-{len(work)}", capabilities=[*work, gesture()], speech=[reply()],
+                metadata={"cognitive_runtime_apply": True, "canonical_plan": {"plan_id": "plan-pair"}})
+            dispatch = await coordinator.submit_response(response, session_id=f"sid-pair-{len(work)}")
+            submitted = [item.request_id for item in dispatch.runtime_response.capabilities]
+            if work:  # result wording waits for Evidence, and its gesture leaves with it
+                self.assertEqual(dispatch.runtime_response.speech, [])
+                self.assertEqual(submitted, ["work"])
+            else:  # decoration is not result-producing Work, so nothing is deferred
+                self.assertEqual([item.id for item in dispatch.runtime_response.speech], ["reply"])
+                self.assertEqual(submitted, ["gesture"])
+            await coordinator.wait_dispatch(dispatch)  # terminal, never a rejected submission
+
 
 
 if __name__ == "__main__":

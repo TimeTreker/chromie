@@ -339,7 +339,8 @@ class FastPlannerResolver:
                 "mechanical_duplicate_activity_collapses": duplicate_read_repairs,
                 # Host-derived from Planner depends_on and Capability contracts.
                 "execution_groups": fast_activity_execution_groups(
-                    [item for item in output.activities if item.role == "capability"], capabilities,
+                    [item for item in output.activities if item.role == "capability" and not item.deferred],
+                    capabilities,
                 ),
             })
             yield FastPlannerStreamTerminal(turn_id=turn_id, advance=advance)
@@ -481,6 +482,7 @@ class FastPlannerResolver:
                         request.context, reentry_scope=request.planner_reentry_scope,
                     ).values()
                 ],
+                respond_requires_commitment=not (reporting_goal_ids & set(expected_goal_ids_for_turn)),
             )
         else:
             contract_schema = (

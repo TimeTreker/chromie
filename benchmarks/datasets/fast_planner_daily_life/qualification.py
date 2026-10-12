@@ -290,47 +290,43 @@ def _responsibility_decision_refs(schema: Any) -> list[str] | None:
     return None
 
 
-def _decided_stage_purposes(schema: Any) -> dict[str, dict[str, str]]:
-    """Per ref, the decided stage purpose under which a decoder offers each Capability."""
-    stages: dict[str, dict[str, str]] = {}
-    for shape in (schema.get("oneOf") or []) if isinstance(schema, dict) else []:
-        properties = shape.get("properties") or {} if isinstance(shape, dict) else {}
-        decisions = (properties.get("responsibility_decisions") or {}).get("properties") or {}
-        items = (properties.get("activities") or {}).get("items") or {}
-        for ref, decision in decisions.items():
-            purpose = ((decision.get("properties") or {}).get("step_purpose") or {}).get("enum") or []
-            if len(purpose) != 1:
-                continue
-            for branch in items.get("oneOf", [items]):
-                branch_properties = branch.get("properties") or {}
-                if (branch_properties.get("role") or {}).get("enum") == ["capability"]:
-                    for capability_id in (branch_properties.get("capability_id") or {}).get("enum") or []:
-                        stages.setdefault(ref, {})[capability_id] = purpose[0]
-    return stages
+def _effect_capability_ids(schema: Any) -> set[str]:
+    """Capabilities whose streamed Activity states ``deferred`` (effects, owner choice B)."""
+    found: set[str] = set()
+
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if (isinstance(properties, dict) and "deferred" in properties
+                    and (properties.get("role") or {}).get("enum") == ["capability"]):
+                found.update((properties.get("capability_id") or {}).get("enum") or [])
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema)
+    return found
 
 
-def declared_decision_stage(reply: Any, response_format: Any) -> Any:
-    """Adapt a streamed fixture authored before decided stages (2026-10-12).
+def declared_deferred_effects(reply: Any, response_format: Any) -> Any:
+    """Adapt a streamed fixture authored before deferred effects (2026-10-12).
 
-    A single Responsibility's work decision now names its Activities' purpose first.
-    That purpose is fixed by each provider, so it is read from the fixture's own
-    Activities; Activities of both purposes leave the decision undecided (still invalid).
+    Every effect Activity now states ``deferred``. Nothing was deferred before, so a
+    fixture's effect Activity without the field declares ``deferred: false``.
     """
-    stages = _decided_stage_purposes(response_format)
-    decisions = reply.get("responsibility_decisions") if isinstance(reply, dict) else None
-    if not stages or not isinstance(decisions, dict):
+    effects = _effect_capability_ids(response_format)
+    if not effects or not isinstance(reply, dict) or not isinstance(reply.get("activities"), list):
         return reply
-    declared = {}
-    for ref, decision in decisions.items():
-        purposes = {stages.get(ref, {}).get(activity.get("capability_id"))
-                    for activity in reply.get("activities") or []
-                    if isinstance(activity, dict) and activity.get("role") == "capability"
-                    and ref in (activity.get("source_responsibility_refs") or [])}
-        if (ref in stages and isinstance(decision, dict) and decision.get("decision") == "work"
-                and "step_purpose" not in decision and len(purposes) == 1 and None not in purposes):
-            decision = {**decision, "step_purpose": next(iter(purposes))}
-        declared[ref] = decision
-    return {**reply, "responsibility_decisions": declared}
+    activities = [
+        {**activity, "deferred": False}
+        if isinstance(activity, dict) and activity.get("role") == "capability"
+        and activity.get("capability_id") in effects and "deferred" not in activity
+        else activity
+        for activity in reply["activities"]
+    ]
+    return {**reply, "activities": activities}
 
 
 def declared_responsibility_decisions(reply: Any, response_format: Any) -> Any:
@@ -339,13 +335,13 @@ def declared_responsibility_decisions(reply: Any, response_format: Any) -> Any:
     Each Responsibility's decision is read from the fixture's own Activities; a former
     ``unavailable`` Activity becomes that Responsibility's unavailable decision and its
     missing facts. A ref the fixture never realized is left undecided (still invalid).
-    Fixtures that author decisions keep them, given only their decided stage.
+    Fixtures that author decisions keep them; effect Activities declare ``deferred``.
     """
     refs = _responsibility_decision_refs(response_format)
     if refs is None or not isinstance(reply, dict):
         return reply
     if "responsibility_decisions" in reply:
-        return declared_decision_stage(reply, response_format)
+        return declared_deferred_effects(reply, response_format)
     role_decision = {"capability": "work", "complete_response": "answer", "clarification": "clarify"}
     activities, decisions = [], {}
     for activity in reply.get("activities") or []:
@@ -361,7 +357,7 @@ def declared_responsibility_decisions(reply: Any, response_format: Any) -> Any:
     ordered = {ref: decisions[ref] for ref in refs if ref in decisions}
     rest = {key: value for key, value in reply.items() if key not in {"ability_needs", "activities"}}
     head = {"ability_needs": reply["ability_needs"]} if "ability_needs" in reply else {}
-    return declared_decision_stage(
+    return declared_deferred_effects(
         {**head, "responsibility_decisions": ordered, "activities": activities, **rest}, response_format)
 
 

@@ -232,19 +232,37 @@ def normalize_fast_capability_activity_purpose(
                 "a provider-declared acquisition contract: " + activity.capability_id
             )
         elif activity.deferred_requirement:
-            # Only a read leaves a decision for re-entry; an effect never carries one.
+            # Only a read leaves a decision for re-entry; an effect waits on it (deferred).
             raise PlannerDTOContractError(
                 "Fast Planner put a deferred requirement on a non-acquisition Capability: "
                 + activity.capability_id
             )
         activities.append(activity)
-    for ref, decision in output.responsibility_decisions.items():
-        realized = {activity.step_purpose for activity in activities
-                    if getattr(activity, "role", "") == "capability" and ref in activity.source_responsibility_refs}
-        if decision.step_purpose is not None and realized - {decision.step_purpose}:
-            raise PlannerDTOContractError(
-                f"Fast Planner decided {decision.step_purpose} Work for {ref} but realized {sorted(realized)}")
+    validate_deferred_activities(activities)
     return output.model_copy(update={"activities": activities}) if changed else output
+
+
+def validate_deferred_activities(activities: list[Any]) -> None:
+    """A deferred effect waits only on reads of its own Responsibility (owner choice B).
+
+    The model plans "read, then act on the result" in one Plan; the effect is held, never
+    started, and the evidence re-entry decides it. Nothing is rewritten here.
+    """
+    by_id = {activity.activity_id: activity for activity in activities
+             if getattr(activity, "role", "") == "capability"}
+    for activity in by_id.values():
+        if not activity.deferred:
+            continue
+        if activity.step_purpose != "achieve_effect" or not activity.depends_on:
+            raise PlannerDTOContractError(
+                "a deferred Activity is an effect that waits on a read: " + activity.activity_id)
+        for ref in activity.depends_on:
+            read = by_id.get(ref)
+            if (read is None or read.step_purpose != "acquire_information" or read.deferred
+                    or not set(activity.source_responsibility_refs) <= set(read.source_responsibility_refs)):
+                raise PlannerDTOContractError(
+                    "a deferred Activity waits only on reads of its own Responsibility: "
+                    f"{activity.activity_id} -> {ref}")
 
 
 def _contains_exact_material_value(container: Any, expected: Any) -> bool:
@@ -679,7 +697,9 @@ def validate_fast_advance_output(
         ancestors[activity.activity_id] = set(activity.depends_on).union(
             *(ancestors[ref] for ref in activity.depends_on)
         )
-    execution_groups = fast_activity_execution_groups(capability_activities, capabilities)
+    # Deferred effects are held, never started, so they join no execution group.
+    execution_groups = fast_activity_execution_groups(
+        [item for item in capability_activities if not item.deferred], capabilities)
     group_of = {
         activity_id: index for index, group in enumerate(execution_groups) for activity_id in group
     }
@@ -709,7 +729,7 @@ def validate_fast_advance_output(
 
     def concurrent(first: Any, second: Any) -> bool:
         if first.role == "capability" and second.role == "capability":
-            return group_of[first.activity_id] == group_of[second.activity_id]
+            return group_of.get(first.activity_id, -1) == group_of.get(second.activity_id, -2)
         return getattr(first, "timing", "parallel") == "parallel" and getattr(
             second, "timing", "parallel"
         ) == "parallel"

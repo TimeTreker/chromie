@@ -824,8 +824,10 @@ Read the diagram with these boundaries:
   Owner-approved staged progress (2026-09-12, #51): complete current acquisition
   Work may have honest partial whole-Goal satisfaction. Both per-Goal and aggregate
   assessments retain deferred obligations; ordinary achieving siblings retain their
-  own admission requirements. A Goal's acquisition and deferred effect belong to
-  separate Plans. Completed acquisition establishes Work/Evidence, not Goal completion.
+  own admission requirements. A Goal's acquisition may carry its dependent effect in the
+  same Plan only as a deferred step (owner choice B, 2026-10-12): Runtime never starts it,
+  and the evidence re-entry decides it; executable steps for one Goal still either acquire
+  or achieve. Completed acquisition establishes Work/Evidence, not Goal completion.
   Schema must retain declared acquisition candidates even when they cannot realize
   the deferred effect's repetition. Count/numeric admission checks may defer that
   effect obligation only for a complete, grounded acquisition stage with both

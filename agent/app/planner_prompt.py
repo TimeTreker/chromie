@@ -358,6 +358,12 @@ def planner_reentry_source_work_projection(
             if key in item
         }
         steps.append(projected)
+    deferred_steps = [
+        {key: copy.deepcopy(item[key]) for key in ("step_id", "capability_id", "args", "source_goal_ids")
+         if key in item} | {"depends_on": list((item.get("metadata") or {}).get("depends_on") or [])}
+        for item in plan.get("deferred_steps") or []
+        if isinstance(item, dict) and (not scoped or scoped.intersection(item.get("source_goal_ids") or []))
+    ]
     return {
         "plan_id": plan.get("plan_id"),
         "goal_ids": [
@@ -366,6 +372,8 @@ def planner_reentry_source_work_projection(
             if not scoped or str(goal_id).strip() in scoped
         ],
         "steps": steps,
+        # Held effects this decision settles (owner choice B); omitted when none.
+        **({"deferred_steps": deferred_steps} if deferred_steps else {}),
     }
 
 
@@ -791,12 +799,17 @@ def fast_evidence_reentry_prompt(
         "emit exactly one goal_decisions item. next_action=respond means fresh trusted Evidence "
         "is sufficient and no new Work is needed; cite the exact evidence_refs and put nothing "
         "in new_work for that Goal. next_action=execute means genuinely new Work is required; "
-        "author it only in new_work and never replay a completed source Activity; each new_work "
+        "author it only in new_work and never replay a completed source Activity. The source "
+        "Work's deferred_steps are effects held for this decision: author one in new_work only "
+        "when the Evidence settles its condition in favour, otherwise decide without it; each new_work "
         "step lists depends_on, the earlier new_work steps or completed Work (its step_id or evidence_ref) it must wait for "
         "(none means it may start with the others). clarify is "
         "only for a real user-resolvable blocker; unavailable/refused are terminal limitations. "
         "SC owns all user-facing wording. "
-        "satisfaction_score/status assess how fully the selected next action covers the Goal; "
+        "satisfaction_score/status assess how fully the selected next action covers the Goal "
+        "once it succeeds, not the Goal's current state: performing the deferred step its "
+        "condition calls for, or answering truthfully that the condition does not hold, covers "
+        "it fully; "
         f"the score must lie in the selected status band: {score_bands}. "
         "pending execution alone does not lower prospective adequacy. Preserve uncertainty and "
         "epistemic strength from Evidence. Historical source Work and execution facts are input "
@@ -896,9 +909,7 @@ def fast_advance_layered_prompt(
         "execute for capability-only Work, respond for response-only Work, clarify for input-only "
         "needs, mixed when distinct Responsibilities require different roles, or unavailable. "
         "Decide every Responsibility first in responsibility_decisions: work, answer, clarify, or "
-        "unavailable. When a single Responsibility's work decision offers step_purpose, it is the "
-        "purpose of all of its Activities now: acquire_information when this Work only reads what "
-        "decides or forms the rest, otherwise achieve_effect. Choose unavailable only for a Responsibility that no loaded or library "
+        "unavailable. Choose unavailable only for a Responsibility that no loaded or library "
         "Capability can realize now; name what is missing there (facts, never wording) and give "
         "it no Activities. Every other decision is realized by that Responsibility's own "
         "Activities; defaults or assumptions are never a limitation. Ordinary speech (a joke, "
@@ -914,10 +925,11 @@ def fast_advance_layered_prompt(
         "Match each whole requested outcome against Capability semantic_scope, effects and "
         "resource_contract; select only a complete realization with valid arguments. "
         "A prerequisite is not fulfillment. When an action depends on information that must be "
-        "acquired first (for example act only if rain is forecast), plan only that "
-        "acquire_information Work now, put the decision its result settles in "
-        "deferred_requirement (facts, never wording), and schedule no dependent action; the "
-        "trusted result re-enters and the action is decided from it. If several steps are needed "
+        "acquired first (for example act only if rain is forecast), plan that "
+        "acquire_information Work, put the decision its result settles in "
+        "deferred_requirement (facts, never wording), and include the dependent action with "
+        "deferred=true and depends_on that read: Runtime holds it and the trusted result "
+        "re-enters to decide it. Every other effect has deferred=false. If several steps are needed "
         "compose them within the four-step budget or report unavailable before dispatch; "
         "never mark a partial first action as complete or leave intended later Work only in reason_summary. "
         "Preserve every numeric and named binding through declared argument_realization; "

@@ -311,11 +311,14 @@ Planner's result need. Ordinary speech is always answered, never decided unavail
 state admits only its matching decision; the authored disposition must equal the one
 the decisions imply, and a contradiction fails closed without rewriting. An
 acquire-information read serving a non-information Responsibility (for example a
-conditional action) states the decision its result settles in `deferred_requirement`
-and schedules no dependent action; the re-entry Plan decides it. With one
-Responsibility whose Work could either read or act, its `work` decision also names
-`step_purpose` before any Activity, and the decoder offers only that stage's providers;
-the Host rejects Activities whose provider-fixed purpose differs. Canonical and re-entry
+conditional action) states the decision its result settles in `deferred_requirement`.
+The dependent action rides in the same Work with `deferred: true` and `depends_on` that
+read (owner choice B, 2026-10-12): when a read is on offer every effect states `deferred`,
+and a deferred effect waits only on reads of its own Responsibility. A uniform decision
+state offers only the roles its decision realizes (no clarification beside `work`). The Host keeps it out
+of execution groups and executable steps, carries it as the Plan's `deferred_steps`, and
+Runtime never starts it; the evidence re-entry sees it and performs it through `new_work`
+only when the Evidence settles the condition in favour. Canonical and re-entry
 steps likewise offer only their provider's purpose, and `acquire_information` requires
 `expected_outcome`. In a mixed turn the decoder fixes each Responsibility's decision before
 Activities (every decision pair with two Responsibilities; each set of `unavailable` ones with
@@ -367,7 +370,9 @@ before Work wait for the appropriate delivery/consent barrier; optional progress
 cannot delay task Work. Only an actually delivered covered answer can complete a
 responding Goal. A progress report cannot complete an executable Goal.
 
-On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Planner establishes the Work outcome and required communication facts. SC independently authors any post-Evidence words against that exact Goal/Evidence scope, execution status and epistemic strength. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. The re-entry decoder offers only what that validation accepts: `respond` cites completed Evidence only, `respond`/`execute` keep no unresolved needs, and with no new Work the relation is `exact` without confirmation (adjusted or alternative Work is confirmed). New Work may cite completed Work in `depends_on` by its step_id or evidence_ref. Failure at this boundary fails closed; the Host never rewrites the sentence, and the person hears the Host's operational failure notice instead of silence.
+On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Planner establishes the Work outcome and required communication facts. SC independently authors any post-Evidence words against that exact Goal/Evidence scope, execution status and epistemic strength. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. The re-entry decoder offers only what that validation accepts: `respond` cites completed Evidence only, `respond`/`execute` keep no unresolved needs, and with no new Work the relation is `exact` without confirmation (adjusted or alternative Work is confirmed). New Work may cite completed Work in `depends_on` by its step_id or evidence_ref.
+Satisfaction is prospective (the Goal once the selected action succeeds); outside
+reporting re-entries the decoder offers `respond` only at substantial or exact. Failure at this boundary fails closed; the Host never rewrites the sentence, and the person hears the Host's operational failure notice instead of silence.
 
 `POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may finish an easy turn directly after its terminal result is mechanically bound to GA's conserved Responsibility-to-Goal mapping. Creating a new resource Goal from that unchanged Responsibility does not call `/fast-plan` again. Actual provisional or retained Work, a GA-authored change to retained Goal meaning, trusted Evidence/result re-entry, or another material open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
 
@@ -469,8 +474,11 @@ confirmation and before-action ordering retain their barriers. The ordinary turn
 
 Only `/social-cognition` exposes optional `auxiliary_activities[]`, nested under its
 exact communicative act. Requested gestures remain ordinary Planner Work. SC receives
-eligible catalog candidates and trusted target evidence; Runtime can execute the exact
-validated expression or suppress it without replacing its meaning or blocking Work.
+eligible catalog candidates and trusted target evidence; a Capability the current or
+source Plan selected or deferred is never a candidate. Runtime can execute the exact
+validated expression or suppress it without replacing its meaning or blocking Work. A
+gesture paired with speech that waits for result Evidence waits with it; only
+result-producing Work, never decoration, defers such speech.
 
 `POST /tools/execute` is a trusted provider boundary, not a semantic router. It accepts an exact `capability_id` and schema-valid arguments already produced by the Goal-driven planner. The Agent rejects unknown, unavailable, non-local, side-effecting, confirmation-gated, or non-`safe_read` capabilities and returns structured output without composing user speech. The Trusted Capability Runtime (`CapabilityRuntime`) remains responsible for provider registration, input validation, timing, cancellation, and correlated execution evidence. The first maintained binding is `chromie.weather.lookup`; additional local tools require an explicit manifest declaration and trusted provider binding rather than phrase rules.
 

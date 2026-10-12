@@ -434,7 +434,15 @@ class FastPlannerCapabilityActivity(CapabilityIdentityModel):
         description=(
             "For acquire_information only: the decision this Responsibility still owes once "
             "the trusted result re-enters, for example whether to perform a conditional "
-            "action. Facts, never wording; no dependent action is scheduled now."
+            "action. Facts, never wording."
+        ),
+    )
+    deferred: bool = Field(
+        default=False,
+        description=(
+            "For an effect that waits on that decision (owner choice B, 2026-10-12): it depends "
+            "on the read whose result settles it, Runtime never starts it, and the re-entry "
+            "decides it from the trusted result."
         ),
     )
     source_responsibility_refs: list[str] = Field(min_length=1)
@@ -819,9 +827,6 @@ class FastPlannerResponsibilityDecision(BaseModel):
 
     decision: Literal["work", "answer", "clarify", "unavailable"]
     missing: list[str] = Field(default_factory=list, max_length=4)
-    # One Responsibility's work states its Activities' purpose before them, so the
-    # decoder never forces an intended effect into a read (live 2026-10-12).
-    step_purpose: PlanStepPurpose | None = None
 
     @field_validator("missing", mode="before")
     @classmethod
@@ -833,8 +838,6 @@ class FastPlannerResponsibilityDecision(BaseModel):
     def missing_names_a_limitation(self) -> "FastPlannerResponsibilityDecision":
         if (self.decision == "unavailable") != bool(self.missing):
             raise ValueError("only an unavailable decision names what is missing, and it must")
-        if self.step_purpose is not None and self.decision != "work":
-            raise ValueError("only a work decision states its Activities' step_purpose")
         return self
 
 
@@ -1095,11 +1098,28 @@ def validate_goal_satisfaction_conservation(
 
 
 def validate_acquisition_stage_isolation(steps: list[tuple[list[str], str]]) -> None:
-    """One Goal's deferred effect waits for a new evidence-driven Plan."""
+    """One Goal's executable steps either acquire or achieve; an effect waiting on the
+    acquisition's result is a deferred step, never an executable one."""
     acquisition = {goal for goals, purpose in steps if purpose == "acquire_information" for goal in goals}
     effects = {goal for goals, purpose in steps if purpose == "achieve_effect" for goal in goals}
     if acquisition & effects:
         raise ValueError("acquisition and deferred effect for the same Goal require separate Plans")
+
+
+def validate_deferred_steps(steps: list[Any], deferred_steps: list[Any]) -> None:
+    """A deferred step is an effect that waits only on acquisition steps of its own Goal."""
+    by_id = {step.step_id: step for step in steps}
+    for step in deferred_steps:
+        waits_on = [str(ref) for ref in step.metadata.get("depends_on") or []]
+        if step.step_purpose != "achieve_effect" or step.step_id in by_id or not waits_on:
+            raise ValueError("a deferred step is a distinct effect that waits on acquisition: " + step.step_id)
+        for ref in waits_on:
+            read = by_id.get(ref)
+            if (read is None or read.step_purpose != "acquire_information"
+                    or not set(step.source_goal_ids) <= set(read.source_goal_ids)):
+                raise ValueError(
+                    "a deferred step waits only on its own Goal's acquisition steps: "
+                    f"{step.step_id} -> {ref}")
 
 
 class PlannedGoalTimeCondition(BaseModel):
@@ -1288,6 +1308,9 @@ class CanonicalPlan(BaseModel):
         max_length=24,
     )
     steps: list[CanonicalPlanStep] = Field(default_factory=list)
+    # Effects that wait on an acquisition step's result in this Plan; Runtime never
+    # starts them and the evidence re-entry decides each (owner choice B, 2026-10-12).
+    deferred_steps: list[CanonicalPlanStep] = Field(default_factory=list, max_length=8)
     cancel_activity_ids: list[str] = Field(default_factory=list, max_length=32)
     auxiliary_activities: list[AuxiliaryPlanActivity] = Field(
         default_factory=list,
@@ -1610,6 +1633,7 @@ class CanonicalPlan(BaseModel):
             validate_acquisition_stage_isolation(
                 [(step.source_goal_ids, step.step_purpose) for step in self.steps]
             )
+            validate_deferred_steps(self.steps, self.deferred_steps)
             validate_goal_satisfaction_conservation(
                 [(item.goal_id, item.disposition, item.satisfaction) for item in self.goal_outcomes],
                 self.goal_satisfaction,
