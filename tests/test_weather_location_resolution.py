@@ -684,6 +684,56 @@ class WeatherLocationResolutionTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(queries, list(captured.exception.attempted_queries))
 
+    async def test_a_stalled_provider_read_is_retried_within_the_lookup_budget(self) -> None:
+        """Live 2026-10-13: a geocode stalled past the 8 s Capability timeout on its only
+        attempt. Each attempt now uses at most half the budget, so the stall is retried
+        and the lookup still answers; a provider that never answers fails on its own
+        budget with provider_timeout instead of the Host's Capability timeout."""
+        import asyncio
+        import time
+
+        geocodes = []
+
+        async def handler(request: httpx.Request) -> httpx.Response:
+            if request.url.path.endswith("/search"):
+                geocodes.append(time.monotonic())
+                if len(geocodes) == 1:
+                    await asyncio.sleep(30)
+                return httpx.Response(200, json={"results": [{
+                    "name": "Beijing", "latitude": 39.9, "longitude": 116.4,
+                    "country": "China", "admin1": "Beijing",
+                }]})
+            return httpx.Response(200, json={
+                "timezone": "Asia/Shanghai", "current": {"temperature_2m": 17.0},
+                "daily": {"time": ["2026-10-13", "2026-10-14"]},
+            })
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            timeout_s=1.0, transport=httpx.MockTransport(handler),
+        )
+        started = time.monotonic()
+        report = await client.lookup(WeatherQuery(location="Beijing"))
+        self.assertEqual(report.location_name, "Beijing")
+        self.assertEqual(len(geocodes), 2)
+        self.assertLess(time.monotonic() - started, 1.0)
+
+        async def never(request: httpx.Request) -> httpx.Response:
+            await asyncio.sleep(30)
+            raise AssertionError("unreachable")
+
+        client = OpenMeteoWeatherClient(
+            geocoding_url="https://example.test/v1/search",
+            forecast_url="https://example.test/v1/forecast",
+            timeout_s=1.0, transport=httpx.MockTransport(never),
+        )
+        started = time.monotonic()
+        with self.assertRaises(WeatherLookupError) as captured:
+            await client.lookup(WeatherQuery(location="Beijing"))
+        self.assertEqual(captured.exception.reason_code, "provider_timeout")
+        self.assertLess(time.monotonic() - started, 1.2)
+
 
 if __name__ == "__main__":
     unittest.main()

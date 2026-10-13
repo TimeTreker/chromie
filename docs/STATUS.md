@@ -1,6 +1,17 @@
 # Chromie Current Status
 
-## Current delivery — Deep Planner retired (stage B), 2026-10-11
+## Current delivery — Run-5 root-cause repairs, 2026-10-13
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `ff9e87417` (Planner limitation contracts and conditional composition B, 2026-10-12): the weather provider retries a stalled read within a 7 s lookup budget below the 8 s Capability timeout; a GA Planner or SC request over unchanged meaning joins the cognition already running (Charter: an identity-only GA join needs no model call); every Goal of a Host-qualified Planner limitation carries a result need; UMI keeps a condition inside its effect, types changing-fact questions as information and requested expressive acts as body expressions, and cites non-overlapping spans; SC speaks the request's language and states changing facts only from Evidence; the Planner names needs as requested results, treats an unstated manner as a partial fit, and adds no decoration or closing posture. |
+| Automatic verification | Four regressions red before / green after (weather stall, GA coalescing, limitation result need, SC reply language). Recorded-request replays against the live model: UMI 11/20 → 20/20 (probe 23/28 → 42/42), SC Chinese replies in English 12/31 → 0/32, Planner targets 20/38 → 27/38 and run 5 44/50 → 46/50. Freeze 30 (`75bc4811…`), strict replay 6,000/6,000 with zero model calls, Level A 45/45, canonical gate (pytest 3,809 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Live run 6 (contract cohort) on `rootcause-20261013`: mechanical 31/35, judged 24 pass / 6 partial / 5 fail (run 5: 24 / 3 / 8). Live run 7 (33 everyday cases) on `rootcause2-20261013`: mechanical 22/33, judged 20 pass / 5 partial / 8 fail. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause2-20261013` (source-verified). No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Deep Planner retired (stage B), 2026-10-11
 
 | Axis | Current evidence |
 | --- | --- |

@@ -1,6 +1,38 @@
 # Chromie Handoff
 
-## Current work — Planner limitation contracts, 2026-10-12
+## Current work — Run-5 root-cause repairs, 2026-10-13
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts` (= `origin/main`
+`ff9e87417` plus the uncommitted repair diff); the expected resume revision is the latest commit
+containing this file. Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README with the
+per-episode workflows; `capture30.py`, `freeze30.py`, `strict-replay-freeze30/`, `level-a/`, `probes/`
+holding the weather, UMI, SC and Planner probes and their outputs). Gate worktree:
+`/tmp/claude-1000/-home-chromie-github-chromie/e21d98fd-a592-451c-b8b4-95a68a5e25c7/scratchpad/gate11`
+(diff applied, freeze-30 case files extracted).
+
+Live state: `chromie-agent:latest` = `option-b2-e96811c56` (`cc4b1ca3`); TTS self-warming; Soridormi
+water scene. Built and verified, not deployed: `chromie-agent:rootcause-20261013` (`sha256:91b4763d…`,
+125 files identical to the gate tree, digest `a31918e2555535df`).
+
+Live run 6 ran on `chromie-agent:rootcause-20261013` (`run6/`, judged in the README). The run-6 repairs
+are in the tree; image `chromie-agent:rootcause2-20261013` (`sha256:46fab20a…`, 125 files identical to
+`scratchpad/gate12`, digest `60242981da267ac0`) is deployed (owner). Freeze 31 archive `fa793952…`.
+Run 7 (daily-life cohort, `daily-scenarios/`, `run7/`) is judged in the README; rerun it with
+`python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live`.
+
+```bash
+# deployed 2026-10-13 (rollback: chromie-agent:rootcause-20261013, then option-b2-e96811c56)
+docker tag chromie-agent:rootcause2-20261013 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then: live run 6 on the full directory-discovered cohort (one invocation, one bundle), judged in the README
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir <new dir>   # strict replay, freeze 30
+```
+
+Network fact (2026-10-13): container egress does not reach Open-Meteo directly. The host runs Clash
+Verge (mihomo) in TUN mode with fake-IP DNS; Open-Meteo matches the final `Match` rule → `PROXY` →
+`bwg-hy2` (Hysteria2) over a phone hotspot. `trust_env=False` does not bypass the TUN.
+
+## Previous work — Planner limitation contracts, 2026-10-12
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`, base `origin/main`
 `41570d182`, delivered to `origin/main`; the expected resume revision is the latest commit containing this
@@ -57,7 +89,7 @@ Deploy pitfall (2026-10-12): Compose interpolates `${HTTP_PROXY:-}` from the dep
 `--env-file`. A shell with `HTTP_PROXY=http://127.0.0.1:7897` gives containers a proxy on their own
 loopback: TTS crash-looped (`huggingface_hub` re-raises ProxyError instead of using the local cache) and
 the Agent's weather lookups were refused. Run Compose with `env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy
--u https_proxy`; containers reach open-meteo directly.
+-u https_proxy`; container egress then follows the host's Clash TUN (see the 2026-10-13 network fact).
 
 Live state on this host (owner-deployed): `chromie-agent:latest` = `chromie-agent:planlim-wt4-20261012`,
 `chromie-tts:latest` = `chromie-tts:selfwarm-20261012` (rollback `chromie-tts:pre-selfwarm-20261012`),

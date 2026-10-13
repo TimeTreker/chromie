@@ -3453,6 +3453,27 @@ class GoalDrivenRuntimeCoordinator:
         return ordered
 
     @staticmethod
+    def _continuity_unchanged(association: GoalAssociationResolution, refs: set[str]) -> bool:
+        """Whether GA left everything a cognition already reading ``refs`` saw unchanged.
+
+        A Goal created from a Responsibility with no association, relation, supersession
+        or referent change only names what UMI already handed over. Charter: a purely
+        identity-preserving GA result is bound without another model call, and GA
+        continuity never erases a valid Planner result (live 2026-10-13: a GA re-plan of
+        an unchanged "Nod twice" replaced the correct nod with a spoken reply).
+        """
+
+        if association.referent_updates or association.resolved_references:
+            return False
+        if any(set(item.source_responsibility_refs) & refs for item in association.associations):
+            return False
+        return not any(
+            goal.related_goal_ids or goal.supersedes_goal_ids
+            for goal in association.new_goals
+            if set(goal.source_responsibility_refs) & refs
+        )
+
+    @staticmethod
     def _remaining_meaning_uncertainties(
         request: CognitiveWorkRequest,
         association: GoalAssociationResolution,
@@ -4367,6 +4388,7 @@ class GoalDrivenRuntimeCoordinator:
         context: dict[str, Any],
         history: list[dict[str, Any]],
         timings: dict[str, float],
+        planner_refs_in_flight: frozenset[str] = frozenset(),
     ) -> _GoalAssociationStageResult:
         """Run GA and publish its validated canonical continuity mechanically.
 
@@ -4550,6 +4572,14 @@ class GoalDrivenRuntimeCoordinator:
                     "reason": "GA requested Planner for non-Goal-owned Responsibilities",
                 },
             )
+        if (
+            ga_planner_refs
+            and ga_planner_refs <= planner_refs_in_flight
+            and self._continuity_unchanged(association, ga_planner_refs)
+        ):
+            # The UMI-triggered Planner already plans exactly this unchanged meaning.
+            logger.info("ga_planner_request_coalesced sid=%s refs=%s", sid, ",".join(sorted(ga_planner_refs)))
+            ga_planner_refs = set()
         planning_work_request = (
             self._subset_work_request(work_request, ga_planner_refs)
             if ga_planner_refs
@@ -5122,6 +5152,7 @@ class GoalDrivenRuntimeCoordinator:
                         context=context,
                         history=history,
                         timings=timings,
+                        planner_refs_in_flight=frozenset(speculative_ref_set),
                     )
                 )
                 if ga_refs
@@ -5411,6 +5442,15 @@ class GoalDrivenRuntimeCoordinator:
                 (item for item in association.cognitive_requests if item.authority == "social_cognition"),
                 None,
             )
+            if (
+                ga_social_request is not None
+                and initial_social_task is not None
+                and self._continuity_unchanged(association, set(ga_social_request.responsibility_refs))
+            ):
+                # The standing SC of this turn already holds this unchanged meaning.
+                logger.info("ga_social_request_coalesced sid=%s refs=%s", sid,
+                            ",".join(sorted(ga_social_request.responsibility_refs)))
+                ga_social_request = None
             if ga_social_request is not None and self.policy.mode == "apply":
                 ga_social_refs = set(ga_social_request.responsibility_refs)
                 ga_social_request_work = self._subset_work_request(

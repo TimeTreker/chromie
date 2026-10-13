@@ -2571,6 +2571,38 @@ def test_goal_less_terminal_failure_hides_unrelated_retained_goal_context():
     ):
         assert key not in projected
 
+@pytest.mark.asyncio
+async def test_every_social_decision_names_the_reply_language_beside_its_contract() -> None:
+    """Live 2026-10-13: every Chinese turn was acknowledged with the English example
+    "Got it."; a later result call carried no guard at all. Each call ends by naming the
+    request's language; an unknown language adds nothing."""
+    for language, expected in (("zh-CN", "Reply language: zh-CN."), ("en-US", "Reply language: en-US."), ("auto", None)):
+        model = Model(response())
+        await SocialCognitionResolver(model, Catalog()).resolve(request(language=language))
+        prompt = model.calls[0][0]
+        if expected is None:
+            assert "Reply language:" not in prompt
+        else:
+            assert prompt.rstrip().endswith(expected + " Every spoken text is in this language.")
+
+
+def test_social_snapshot_shows_utc_bookkeeping_in_local_time() -> None:
+    """Live 2026-10-13 (lib_clock_time_zh): before the clock result arrived, SC told
+    "早上 6:04" from UTC bookkeeping timestamps while the local time was 14:04. Every UTC
+    instant in the snapshot is shown as the same instant in local time."""
+    import re
+    from datetime import datetime
+    from agent.app.social_cognition import social_cognition_prompt
+
+    utc = "2026-10-13T06:04:19.905542+00:00"
+    current = request(context={"interaction_context": {"events": [{"occurred_at": utc, "text": "Okay."}]},
+                               "execution_outcome_bundle": {"evidence": [{"started_at": "2026-10-13T06:04:19.910802Z"}]}})
+    prompt = social_cognition_prompt(current, [], num_ctx=65536)
+    local = datetime.fromisoformat(utc).astimezone().isoformat(timespec="seconds")
+    assert local in prompt
+    assert not re.search(r"T\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|\+00:00)", prompt) or local.endswith("+00:00")
+
+
 def test_current_turn_output_guard_keeps_task_acknowledgement_precommitment() -> None:
     from agent.app.social_cognition import _social_current_turn_output_guard
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -2586,7 +2618,7 @@ def test_current_turn_output_guard_keeps_task_acknowledgement_precommitment() ->
     guard = _social_current_turn_output_guard(current)
     assert "acknowledge receipt or understanding only" in guard
     assert "Do not promise, accept, announce an intention to execute" in guard
-    assert "Use neutral acknowledgement wording such as 'Okay' or 'Got it'" in guard
+    assert "Use neutral acknowledgement wording in the person's language" in guard
     assert "'I'll do/get/bring it' is a future-Work commitment" in guard
 
 

@@ -335,6 +335,18 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
         self.assertEqual(plan.steps, [])
         self.assertEqual(plan.metadata["reason"], "goal_satisfaction_below_commitment")
         self.assertEqual(plan.metadata["path_classification"], "terminal")
+        # Live 2026-10-12 (run 4): a re-entry limitation with no result need let Social
+        # Cognition stay silent. Each limited Goal carries the result SC must say now.
+        from shared.chromie_contracts.social_cognition import SocialCognitionRequest, must_say_now_need_ids
+        [need] = plan.communication_needs
+        self.assertEqual((need.owner, need.kind, need.source_goal_ids), ("planner", "result", ["goal-blink"]))
+        self.assertEqual(need.facts["disposition"], "unavailable")
+        social = SocialCognitionRequest(
+            request_id="sc:limitation", trigger="work_state", source_refs=[plan.plan_id],
+            goal_ids=plan.goal_ids, responsibilities=request("多眨几下眼睛。", goal_ids=["goal-blink"]).responsibilities,
+            communication_needs=plan.communication_needs,
+        )
+        self.assertEqual(must_say_now_need_ids(social), {need.need_id})
 
     def test_complete_accounting_can_truthfully_report_an_unsatisfied_goal(self):
         plan = CanonicalPlan.model_validate(

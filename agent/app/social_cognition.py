@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 import json
 import re
+from datetime import datetime
 from typing import Any, get_args
 
 from jsonschema import Draft202012Validator
@@ -58,7 +59,12 @@ SOCIAL_COGNITION_WORK_STATE_PROMPT = (
 SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "You are Social Cognition inside Chromie's Cognitive Core. You own interaction "
     "with people: whether and when to communicate, exact wording, and coherent optional "
-    "social expression. Read the supplied facts, shared Goal overview, Work and Evidence, "
+    "social expression. Speak in the request's language, the person's own language; quoted "
+    "example wording in these instructions shows the kind of reply, never its language. "
+    "State a changing fact, such as the current time, date or weather, only from supplied "
+    "Evidence or trusted context; without that source, say you would need to check instead "
+    "of guessing. Tell a time from a clock reading's local time; bookkeeping timestamps such as "
+    "started_at or occurred_at record Chromie's own processing, never the time asked about. Read the supplied facts, shared Goal overview, Work and Evidence, "
     "Situation, disclosure-safe Memory, Stable Mind and delivered/pending interaction. "
     "Ground first-person sensory wording in trusted Situation or perception Evidence. "
     "A person's scene description is a report, never Chromie's own sight or hearing. "
@@ -67,7 +73,7 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "idioms such as 'I see that there is an object' or 'I hear you about the object' "
     "when the object was only reported in text. Do not replace one sensory idiom "
     "with another. "
-    "A simple 'Okay' or 'Got it' is enough. This remains "
+    "A simple 'Okay', said in the person's language, is enough. This remains "
     "true when UMI asks to acknowledge presence or Planner supplies an answer need. "
     "UMI owns WHAT and Planner owns requested task Work. Never reinterpret their decisions, "
     "invent a user turn, change Goals, plan task actions, grant consent or authorize effects. "
@@ -1076,7 +1082,8 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
             "that Planner/Runtime has not established yet. If you speak now, acknowledge "
             "receipt or understanding only. Do not promise, accept, announce an intention "
             "to execute, or say the Work will happen; later supplied Work facts own that "
-            "commitment. Use neutral acknowledgement wording such as 'Okay' or 'Got it'. "
+            "commitment. Use neutral acknowledgement wording in the person's language, such as "
+            "'Okay' or '好的'. "
             "Wording like 'I'll do/get/bring it' is a future-Work commitment, not an "
             "acknowledgement.\n"
         )
@@ -1088,8 +1095,18 @@ def _social_current_turn_output_guard(request: SocialCognitionRequest) -> str:
         "or perception Evidence supplies your own observation, this is a report-only "
         "reply. Do not use 'I see', 'I hear', or any other first-person sensory "
         "idiom, and do not claim that you observed the reported object. Reply with "
-        "a short neutral receipt such as 'Okay.' or 'Got it.'\n"
+        "a short neutral receipt in the person's language, such as 'Okay.' or '好的。'\n"
     )
+
+
+def _social_language_guard(request: SocialCognitionRequest) -> str:
+    """Name the reply language next to the output contract (live 2026-10-13: every Chinese
+    turn was acknowledged with the English example wording "Got it.")."""
+
+    language = str(request.language or "").strip()
+    if not language or language.casefold() == "auto":
+        return ""
+    return f"\nReply language: {language}. Every spoken text is in this language.\n"
 
 
 LIMITATION_RESULT_NOTICE = (
@@ -1138,6 +1155,25 @@ def _social_value_judgment_guard(request: SocialCognitionRequest) -> str:
     )
 
 
+_UTC_INSTANT = re.compile(r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d+)?(?:Z|\+00:00)$")
+
+
+def _local_instants(value: Any) -> Any:
+    """Show every UTC bookkeeping instant in the person's local time.
+
+    The same instant, only re-expressed: a snapshot full of UTC timestamps led SC to tell
+    "早上 6:04" from a clock reading of 14:04 local (live 2026-10-13).
+    """
+
+    if isinstance(value, dict):
+        return {key: _local_instants(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [_local_instants(item) for item in value]
+    if isinstance(value, str) and _UTC_INSTANT.match(value):
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone().isoformat(timespec="seconds")
+    return value
+
+
 def social_cognition_prompt(
     request: SocialCognitionRequest, candidates: list[dict[str, Any]], *, num_ctx: int,
 ) -> str:
@@ -1177,11 +1213,12 @@ def social_cognition_prompt(
         terminal_result_notice += "\n"
     if must_say_now_need_ids(request):
         terminal_result_notice += LIMITATION_RESULT_NOTICE
-    packet = {
+    packet = _local_instants({
         "interaction_context": interaction,
         "request": payload,
         "social_expression": auxiliary_social_prompt_context(request.context, candidates),
-    }
+    })
+    opportunity = _local_instants(opportunity)
     return (
         STABLE_MIND_SEMANTIC_CONTRACT
         + "\nImmediate interaction opportunity:\n"
@@ -1260,7 +1297,8 @@ class SocialCognitionResolver:
             prompt + "\nRequired output contract JSON:\n" + required_json(
                 schema, max_chars=self.num_ctx * 3, label="Social Cognition output contract",
             ) + "\n" + SOCIAL_COGNITION_WORK_STATE_PROMPT
-            + _social_current_turn_output_guard(request) + _social_value_judgment_guard(request),
+            + _social_current_turn_output_guard(request) + _social_value_judgment_guard(request)
+            + _social_language_guard(request),
             system=SOCIAL_COGNITION_AUTHORITY_PROMPT + (
                 "This is the sole deeper pass; decide communicate or silence now." if deep else ""
             ),

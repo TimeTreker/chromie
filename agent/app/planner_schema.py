@@ -443,6 +443,7 @@ def fast_evidence_reentry_response_schema(
     information_capability_ids: list[str] | None = None,
     completed_evidence_refs: list[str] | None = None,
     respond_requires_commitment: bool = False,
+    held_effect_goal_ids: list[str] | None = None,
 ) -> dict[str, Any]:
     """Compact decoder contract for trusted Fast Planner Evidence re-entry.
 
@@ -523,13 +524,28 @@ def fast_evidence_reentry_response_schema(
     completed = (list(evidence) if completed_evidence_refs is None
                  else [ref for ref in dict.fromkeys(completed_evidence_refs) if ref in evidence])
 
+    # A Goal whose source Plan holds an effect (owner choice B) is settled by this
+    # decision: performing the held effect, or answering that its condition does not
+    # hold, covers it. Host rejects an execute below commitment for such a Goal, so the
+    # decoder offers execute there only at substantial/exact (live 2026-10-13: a held
+    # wave scored "partial" became a limitation the person heard as "I can't wave").
+    held = [goal for goal in goals if goal in set(held_effect_goal_ids or [])]
+    goal_sets = [subset for subset in ([goal for goal in goals if goal not in held], held) if subset]
+
     def decision_branches(actions: list[str]) -> dict[str, Any]:
+        branches = []
+        for subset in goal_sets:
+            branches.extend(subset_branches(actions, subset, holds_effect=subset is held))
+        return {"anyOf": branches}
+
+    def subset_branches(actions: list[str], subset: list[str], *, holds_effect: bool) -> list[dict[str, Any]]:
         branches = []
         for status, (minimum, maximum) in GOAL_SATISFACTION_SCORE_BANDS.items():
             permitted = [
                 action for action in actions
                 if (status != "exact" or action in {"respond", "execute"})
                 and (action != "respond" or completed)
+                and not (holds_effect and action == "execute" and status not in {"substantial", "exact"})
             ]
             groups = [[action] for action in ("respond", "execute") if action in permitted]
             if rest := [action for action in permitted if action not in {"respond", "execute"}]:
@@ -537,6 +553,8 @@ def fast_evidence_reentry_response_schema(
             for group in groups:
                 branch = copy.deepcopy(decision_base)
                 fields = branch["properties"]
+                if len(goal_sets) > 1:
+                    fields["goal_id"]["enum"] = list(subset)
                 fields["next_action"]["enum"] = group
                 fields["satisfaction_status"]["enum"] = [status]
                 # Keep fractional bands in full Schema validation. The serving
@@ -556,7 +574,7 @@ def fast_evidence_reentry_response_schema(
                     fields["evidence_refs"].update(minItems=1, maxItems=len(completed))
                     branch["required"] = [*branch["required"], "evidence_refs"]
                 branches.append(branch)
-        return {"anyOf": branches}
+        return branches
 
     definitions["PlannerEvidenceReentryGoalDecision"] = decision_branches(allowed_actions)
     # Without new Work nothing is adjusted or confirmed; adjusted or alternative Work is

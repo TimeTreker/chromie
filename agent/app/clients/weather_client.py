@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
+import time
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -550,6 +552,12 @@ class OpenMeteoWeatherClient:
     the conversational answer. Host-bound Evidence reactivates the Goal-driven
     Fast Planner, which remains the semantic answer authority while this
     provider stays a read-only data boundary.
+
+    ``timeout_s`` is the budget for one whole lookup (geocoding and forecast).
+    Each HTTP attempt may use at most half of it, so a stalled connection is
+    retried once before the budget ends and the provider reports its own failure
+    rather than the Host's Capability timeout (live 2026-10-13: a proxied TLS
+    setup stalled past 8 s on a first and only attempt).
     """
 
     def __init__(
@@ -581,8 +589,9 @@ class OpenMeteoWeatherClient:
         # Explicit qualifiers retain priority; identity validation stays strict.
         geocoding_identity = context.admin1 or context.country or context.locality or location
         geocoding_language = "zh" if re.search(r"[\u4e00-\u9fff]", geocoding_identity) else "en"
+        deadline = time.monotonic() + self.timeout_s
         async with httpx.AsyncClient(
-            timeout=httpx.Timeout(self.timeout_s),
+            timeout=httpx.Timeout(self.timeout_s / 2),
             trust_env=False,
             transport=self.transport,
         ) as client:
@@ -592,6 +601,7 @@ class OpenMeteoWeatherClient:
                 candidates=candidates,
                 context=context,
                 language=geocoding_language,
+                deadline=deadline,
             )
             latitude = result.get("latitude")
             longitude = result.get("longitude")
@@ -652,11 +662,9 @@ class OpenMeteoWeatherClient:
                         "weather_code",
                     ]
                 )
-            forecast_resp = await client.get(
-                self.forecast_url,
-                params=forecast_params,
+            forecast_resp = await self._get(
+                client, self.forecast_url, forecast_params, deadline=deadline, stage="forecast",
             )
-            forecast_resp.raise_for_status()
             forecast_data = forecast_resp.json()
             logger.info(
                 "weather_forecast_done location=%r timezone=%r daily_keys=%s current_keys=%s",
@@ -700,6 +708,7 @@ class OpenMeteoWeatherClient:
         candidates: list[str],
         context: WeatherLocationContext,
         language: str,
+        deadline: float,
     ) -> tuple[dict[str, Any], str]:
         attempted: list[str] = []
         for ordinal, candidate in enumerate(candidates):
@@ -713,16 +722,18 @@ class OpenMeteoWeatherClient:
                 language,
                 self.geocoding_url,
             )
-            geo_resp = await client.get(
+            geo_resp = await self._get(
+                client,
                 self.geocoding_url,
-                params={
+                {
                     "name": candidate,
                     "count": 10,
                     "language": "zh" if language.lower().startswith("zh") else "en",
                     "format": "json",
                 },
+                deadline=deadline,
+                stage="geocode",
             )
-            geo_resp.raise_for_status()
             result = self._select_geocoding_result(
                 geo_resp.json(),
                 requested_location=requested_location,
@@ -742,6 +753,48 @@ class OpenMeteoWeatherClient:
             reason_code="location_not_found",
             attempted_queries=tuple(attempted),
         )
+
+    async def _get(
+        self,
+        client: httpx.AsyncClient,
+        url: str,
+        params: dict[str, Any],
+        *,
+        deadline: float,
+        stage: str,
+    ) -> httpx.Response:
+        """One idempotent provider read, retried while the lookup budget allows.
+
+        A timeout, transport error or server error is retried; any other HTTP
+        error is the provider's answer and propagates.
+        """
+
+        attempt = 0
+        while True:
+            attempt += 1
+            attempt_s = min(self.timeout_s / 2, max(deadline - time.monotonic(), 0.001))
+            timed_out = False
+            try:
+                response = await asyncio.wait_for(client.get(url, params=params), attempt_s)
+                if response.status_code < 500:
+                    response.raise_for_status()
+                    return response
+                failure = f"HTTP {response.status_code}"
+            except (TimeoutError, httpx.TimeoutException) as exc:
+                timed_out, failure = True, type(exc).__name__
+            except httpx.TransportError as exc:
+                failure = type(exc).__name__
+            remaining = deadline - time.monotonic()
+            logger.warning(
+                "weather_provider_attempt_failed stage=%s attempt=%s failure=%s remaining_s=%.2f",
+                stage, attempt, failure, remaining,
+            )
+            if remaining < min(1.0, self.timeout_s / 4):
+                raise WeatherLookupError(
+                    f"weather provider {stage} did not answer within {self.timeout_s:g}s "
+                    f"({attempt} attempts, last {failure})",
+                    reason_code="provider_timeout" if timed_out else "provider_unavailable",
+                )
 
     def _select_geocoding_result(
         self,

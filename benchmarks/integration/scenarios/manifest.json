@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-12",
+  "frozen_on": "2026-10-13",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "f1dbe3eedb359bdc316572c1e735393ad1db27f2a188252bcb59764b15f788c8",
-    "workflow-conditional-dry.json": "0141005fd077d0614e3d55c4adca5ad3c1fb9285e64038160d952592d9c07e96",
-    "workflow-conditional-rain.json": "a5acdde9348fe97deb987e99c1636931ffd3863c8eb6488334305b9534fa0690",
-    "workflow-delayed.json": "0f2631bb3bde6a5f996ce3dfbeaa3e9e8bfb31a5d40fa3ae5a5f8398961c2a3a",
-    "workflow-normal.json": "29a71805d5f4f4bdd9fb7446744ac306ef4deaf29cd48fe7afb8bb9893049de2"
+    "workflow-cancellation.json": "c8f4fc1357ce6318407988d435b015a3cdf471c2fd614af9e5ccf0804c2e531f",
+    "workflow-conditional-dry.json": "bf4ed8db070860ba6a6b884cfa3c3c98f5b20c7567ae098be15ec09fe7e047f5",
+    "workflow-conditional-rain.json": "443b9f924460b411e8a7387b815b6f9e20018d57b89bc0098f9924fade096365",
+    "workflow-delayed.json": "d0945add8b8eddd6a0a0737e3656973ce0f9b574d9fce36dbcb30603b9578044",
+    "workflow-normal.json": "044765234c3382f01a8a57bffc8a11e91b006e3b77ebabfa2fb39e27f2b53183"
   },
-  "freeze_revision": 29,
-  "freeze_note": "Option-B live follow-ups (2026-10-12). Every request recaptured: uniform streamed decision states offer only their decision's roles; outside reporting the re-entry decoder offers respond only at substantial or exact and the re-entry prompt states prospective satisfaction; SC never receives a Capability the current or source Plan selected or deferred as an optional expression. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 31,
+  "freeze_note": "Live run-6 repairs (2026-10-13). Every request recaptured: re-entry execute for a Goal holding an effect only at commitment; a Host limitation says no ability is known to be missing; UMI keeps pretense as speech and adds no acknowledgement-only Responsibility; SC tells time from a clock reading and sees UTC bookkeeping in local time. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

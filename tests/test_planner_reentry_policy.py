@@ -1100,6 +1100,43 @@ def test_reentry_sees_the_action_the_source_plan_held_for_it() -> None:
             validate_deferred_steps(steps, [held])
 
 
+def test_a_held_effect_is_performed_only_as_a_committed_execute() -> None:
+    """Live 2026-10-13 (cond_sunny_wave_en/zh): the re-entry performed the held wave but
+    scored it partial 0.5; Host made that a limitation and the person heard "I can't
+    wave". For a Goal whose source Plan holds an effect, execute is offered only at
+    substantial or exact; other Goals keep their bands."""
+    from jsonschema import Draft202012Validator
+
+    wave = {"type": "object", "properties": {}, "additionalProperties": False}
+
+    def output(goal, status, score):
+        return {"goal_decisions": [{"goal_id": goal, "next_action": "execute",
+                                    "satisfaction_status": status, "satisfaction_score": score,
+                                    "evidence_refs": ["evidence-weather"], "rationale": "From the read."}],
+                "new_work": [{"capability_id": "test.wave", "step_id": "wave", "args": {},
+                              "depends_on": ["evidence-weather"], "source_goal_ids": [goal]}],
+                "confidence": 1.0, "plan_relation": "exact", "user_confirmation_required": False}
+
+    for held in ([], ["goal-wave"]):
+        schema = Draft202012Validator(fast_evidence_reentry_response_schema(
+            expected_goal_ids=["goal-wave"], evidence_refs=["evidence-weather"],
+            allowed_capability_ids=["test.wave"], capability_input_schemas={"test.wave": wave},
+            completed_evidence_refs=["evidence-weather"], held_effect_goal_ids=held))
+        assert schema.is_valid(output("goal-wave", "partial", 0.5)) is (not held)
+        assert schema.is_valid(output("goal-wave", "exact", 1.0))
+
+    mixed = Draft202012Validator(fast_evidence_reentry_response_schema(
+        expected_goal_ids=["goal-wave", "goal-read"], evidence_refs=["evidence-weather"],
+        allowed_capability_ids=["test.wave"], capability_input_schemas={"test.wave": wave},
+        completed_evidence_refs=["evidence-weather"], held_effect_goal_ids=["goal-wave"]))
+    decision = output("goal-read", "partial", 0.5)["goal_decisions"][0]
+    both = output("goal-wave", "exact", 1.0)
+    both["goal_decisions"].append(decision)
+    assert mixed.is_valid(both)
+    both["goal_decisions"][0].update(satisfaction_status="partial", satisfaction_score=0.5)
+    assert not mixed.is_valid(both)
+
+
 def test_a_reentry_answer_outside_reporting_is_a_committed_answer() -> None:
     """Live 2026-10-12: the re-entry answered "no rain, so no nod" scored unsatisfied 0.0;
     Host turned it into a limitation by the commitment rule. Outside reporting, respond is

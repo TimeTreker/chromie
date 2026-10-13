@@ -1387,6 +1387,37 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.terminal_plan.auxiliary_activities, [])
         self.assertTrue(result.metadata["umi_fanout_concurrent"])
 
+    def test_ga_requests_over_unchanged_meaning_join_the_cognition_already_running(self):
+        """Live 2026-10-13 ctl_nod_en: GA only created the Goal for "Nod twice." yet asked
+        for Planner and SC again; the GA plan (a spoken reply) replaced the correct nod.
+        A GA result that changes nothing UMI handed over wakes no second Planner or SC."""
+        advance = FastPlannerAdvance(
+            turn_id="turn-nod", disposition="respond", coverage="complete",
+            covered_responsibility_refs=["r1"],
+            activities=[FastPlannerResponseNeed(activity_id="answer", role="complete_response",
+                source_responsibility_refs=["r1"], rationale="Scripted Work decision.")],
+            confidence=0.98, reason_summary="Scripted.",
+        )
+        association = GoalAssociationResolution.model_validate({
+            **new_goal_association().model_dump(mode="json"),
+            "cognitive_requests": [
+                {"authority": "planner", "responsibility_refs": ["r1"], "reason_summary": ""},
+                {"authority": "social_cognition", "responsibility_refs": ["r1"], "reason_summary": ""},
+            ],
+        })
+        client = ScriptedClient(association=association, fast_plans=[], fast_advances=[advance])
+        coordinator = GoalDrivenRuntimeCoordinator(
+            agent_client=client, adapter=CanonicalPlanRuntimeAdapter(FastAdvanceRuntime()),
+            policy=CognitiveRuntimePolicy(mode="apply"),
+        )
+        result = self.run_resolution(coordinator, client, text="点两下头")
+
+        self.assertEqual(result.status, "applied", (result.fallback_reason, result.metadata))
+        self.assertCountEqual(client.calls, ["stream", "association"])
+        self.assertFalse(result.metadata["umi_planning_superseded"])
+        self.assertFalse(result.metadata["independent_goal_planning"])
+        self.assertNotIn("goal_state", [request.trigger for request in client.social_requests])
+
     def test_fast_failure_retrieves_already_failed_goal_association_task(self):
         class Client:
             async def resolve_goal_association(self, *args, **kwargs):

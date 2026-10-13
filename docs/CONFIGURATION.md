@@ -450,7 +450,7 @@ retained. See
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum model-neutral catalog preview attached at the native interaction boundary; default `8`. It does not rank user language. |
 | `AGENT_WEATHER_ENABLED` | Enable the read-only weather lookup handled by `tool_agent`; default `1`. |
-| `AGENT_WEATHER_TIMEOUT_S` | HTTP timeout for Open-Meteo geocoding/forecast calls; interactive default `8`. The explicit `qualification` operator mode owns `120` seconds so full live architecture proof is not mistaken for an interactive-latency test. |
+| `AGENT_WEATHER_TIMEOUT_S` | Budget for one Open-Meteo lookup (geocoding and forecast together); interactive default `7`, below the weather Capability's 8 s timeout so the provider reports its own `provider_timeout`. Each HTTP attempt may use half the budget, so a stalled connection is retried once. The explicit `qualification` operator mode owns `120` seconds so full live architecture proof is not mistaken for an interactive-latency test. |
 | `AGENT_WEATHER_GEOCODING_URL` | Weather geocoding endpoint; default `https://geocoding-api.open-meteo.com/v1/search`. |
 | `AGENT_WEATHER_FORECAST_URL` | Weather forecast endpoint; default `https://api.open-meteo.com/v1/forecast`. |
 | `AGENT_EXTERNAL_INFORMATION_ENABLED` | Enable the provider-neutral read-only external-information adapter; default `0`. |

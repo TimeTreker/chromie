@@ -361,7 +361,7 @@ class Settings(BaseModel):
     user_meaning_interpreter_debug_prompt: bool = Field(default_factory=lambda: os.getenv("CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT", os.getenv("AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT", "0")).strip().lower() not in {"", "0", "false", "no", "off"})
     weather_geocoding_url: str = Field(default_factory=lambda: os.getenv("AGENT_WEATHER_GEOCODING_URL", "https://geocoding-api.open-meteo.com/v1/search"))
     weather_forecast_url: str = Field(default_factory=lambda: os.getenv("AGENT_WEATHER_FORECAST_URL", "https://api.open-meteo.com/v1/forecast"))
-    weather_timeout_s: float = Field(default_factory=lambda: float(os.getenv("AGENT_WEATHER_TIMEOUT_S", "8")), gt=0.0)
+    weather_timeout_s: float = Field(default_factory=lambda: float(os.getenv("AGENT_WEATHER_TIMEOUT_S", "7")), gt=0.0)
     environment: dict[str, str] = Field(default_factory=lambda: dict(os.environ), exclude=True, repr=False)
     mode: Literal["runtime"] = "runtime"
 

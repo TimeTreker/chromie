@@ -533,7 +533,10 @@ new Goal plan supersedes the unfinished UMI result. A failed GA-triggered call d
 erase a valid UMI result covering the same Responsibilities, and a failed UMI result waits
 for a requested GA plan; completion order alone never decides. Already delivered or pending speech
 is retained in Interaction Context. An identity-only GA join of unchanged Responsibility
-meaning remains mechanical and does not require another call. No task reviews or repairs
+meaning remains mechanical and does not require another call: when GA's result adds no
+association, related or superseded Goal, or referent change to what UMI handed over, its own
+Planner or SC request joins the cognition already running for those Responsibilities
+(`ga_planner_request_coalesced`, `ga_social_request_coalesced`). No task reviews or repairs
 another task's semantic decision.
 
 Each GA/Evidence-triggered call receives actual Runtime Work plus canonical Goal state.

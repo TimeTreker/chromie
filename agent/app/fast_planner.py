@@ -483,6 +483,12 @@ class FastPlannerResolver:
                     ).values()
                 ],
                 respond_requires_commitment=not (reporting_goal_ids & set(expected_goal_ids_for_turn)),
+                held_effect_goal_ids=sorted({
+                    str(goal_id)
+                    for step in (context.get("canonical_plan_resolution") or {}).get("deferred_steps") or []
+                    if isinstance(step, dict)
+                    for goal_id in step.get("source_goal_ids") or []
+                }),
             )
         else:
             contract_schema = (

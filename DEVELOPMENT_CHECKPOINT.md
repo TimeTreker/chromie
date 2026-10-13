@@ -1,6 +1,57 @@
 # Chromie Development Checkpoint
 
-## Current work — Planner limitation contracts (items 1-4) and run-1/2/3 repairs, 2026-10-12
+## Current work — Run-5 root-cause repairs, 2026-10-13
+
+Base `origin/main` `ff9e87417` (fetched 2026-10-13; branch `planner-limitation-contracts` equal to it).
+Owner request (2026-10-13): explain the weather timeout, then "try to fix these, sure, findout the root
+cause first" for the run-5 open list. Uncommitted until the owner approves; the expected resume revision
+is the latest commit containing this file. Evidence and per-episode workflows:
+`.chromie/acceptance/remaining-defects-20261013/README.md`.
+
+| Defect (run 5) | Earliest wrong boundary | Root cause | Change |
+|---|---|---|---|
+| Weather timeout ×2 | weather provider | one 8 s attempt, no retry; the read crosses Clash TUN → `bwg-hy2` (Hysteria2) → phone hotspot, where new TLS setups occasionally stall (3/29 geocodes in runs 2-5; probe max 6.06 s). Open-Meteo itself answered 200 every time | `AGENT_WEATHER_TIMEOUT_S` = whole-lookup budget, default 7 s; each attempt ≤ half; timeout/transport/5xx retried; `provider_timeout` from the provider |
+| ctl_nod_en nod replaced | Host GA scheduling | GA created the Goal with no association yet requested Planner+SC; the GA plan (`respond`) superseded the valid nod | `_continuity_unchanged`: such requests join the running cognition (`ga_planner_request_coalesced`, `ga_social_request_coalesced`) |
+| celebrate ×2, "现在几点" | UMI typing | no rule for requested expressive acts; changing facts treated like context facts while the receipt instant sits in context | UMI prompt: expressive act → `body_action/social_expression`; changing fact → information |
+| cond_rain_nod_en 503 | UMI decomposition | condition split into an overlapping information Responsibility; prompt never said spans must not overlap | UMI prompt: condition stays in its effect; non-overlapping spans |
+| SC English on zh turns | SC prompt | no reply-language instruction; English example wording quoted three times | speak the request's language; bilingual examples; `Reply language` line; changing facts only from Evidence |
+| silence after a conditional (run 4) | Host limitation | Host-qualified limitation carried no result need (trigger fixed in `e96811c56`) | every limited Goal carries a Planner result need |
+| coffee as fetch, curve decomposed, decoration, duplicate wave | Planner prompt | loose need/fit/repetition/decoration rules; `walk_forward` judged to fit a curve | need = requested result; unstated manner = partial fit; one Activity per effect; no decoration or closing posture |
+
+Verified (working tree): four regressions red before / green after; recorded-request replays against the
+live model (UMI 11/20 → 20/20 and probe 42/42; SC zh-in-English 12/31 → 0/32; Planner targets 20/38 →
+27/38, run 5 44/50 → 46/50); freeze 30 archive `75bc4811…`; strict replay 6,000/6,000 with zero model
+calls; Level A 45/45; canonical gate in clean worktree `scratchpad/gate11` (pytest 3,809 + 5 skipped,
+benchmarks 169, legacy 20). Agent image `chromie-agent:rootcause-20261013` source-verified (125 files),
+deployed by the owner. Live run 6 on it (`run6/`): mechanical 31/35 (run 5: 27/35), judged 24 pass /
+6 partial / 5 fail (run 5: 24 / 3 / 8); fixed live: coffee_zh, ctl_nod_en, cond_rain_nod_en, Chinese
+acknowledgements, time questions read the clock.
+
+Run-6 repairs (in the tree, not yet live): re-entry `execute` for a Goal holding an effect only at
+substantial/exact (the held wave scored partial became a limitation); the limitation fact says no ability is
+known to be missing (SC had said "I can't wave"); UMI keeps pretense/role-play as speech and adds no
+acknowledgement-only Responsibility (vs_pretend_hurt_en 503); SC tells time from the clock reading and sees
+UTC bookkeeping in local time (an answer before the clock result said "早上 6:04"). Freeze 31 archive
+`fa793952…`; strict replay 6,000/6,000 zero model calls; Level A 45/45; gate `scratchpad/gate12` (pytest 3,811
++ 5 skipped, benchmarks 169, legacy 20). Image `chromie-agent:rootcause2-20261013` (`46fab20a…`, 125 files
+verified), deployed by the owner. Live run 7 replaced the contract cohort with 33 everyday cases (owner:
+"please use common scenarios"; `make_daily_cohort.py`, rubric declared before inference): mechanical 22/33,
+judged 20 pass / 5 partial / 8 fail. Fixed live: time questions read the clock and say local time; honest coffee
+and dance limitations; deception declined. Next-iteration clusters: SC output its Host validation rejects (422,
+three kinds); UMI overlapping spans (503); Planner streamed argument/target provenance; Soridormi delivery
+failures (`execute_failed_fatal`); GA-requested canonical plan DTO failures (contained).
+
+Open after this work:
+- Planner still writes a conditional "点两下头" as two `nod_yes` each `count: 2`; English weather reads
+  in conditionals sometimes omit `date` (run-5 cond_sunny_wave_en read had no `tomorrow`).
+- Host scope extension (2026-10-12) discards a valid UMI plan when GA makes a Goal for a sibling speech
+  Responsibility (lib_celebrate ×2 lost `celebrate`); needs a design decision.
+- Planner repetition until the 60 s stream timeout (mix_wave_coffee_en) and its failure-notice SC 422;
+  Planner decoration (`blink_eyes`, `stand_idle`) in 4/35.
+- Owner-side network option: a Clash rule sending `open-meteo.com` DIRECT (~0.35 s vs ~1.1 s per read).
+- Next owner-approved job unchanged: the ~300-case daily-life suite (see below).
+
+## Previous work — Planner limitation contracts (items 1-4) and run-1/2/3 repairs, 2026-10-12
 
 Branch `planner-limitation-contracts` from `origin/main` `41570d182`, delivered to `origin/main` with the
 owner's approval (commit and push after live results); the expected resume revision is the latest commit

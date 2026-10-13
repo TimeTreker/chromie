@@ -10,9 +10,9 @@ try:
 except ImportError:  # pragma: no cover
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 try:
-    from chromie_contracts.plan import CanonicalPlan
+    from chromie_contracts.plan import CanonicalPlan, SocialCommunicationNeed, communication_need_id
 except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.plan import CanonicalPlan
+    from shared.chromie_contracts.plan import CanonicalPlan, SocialCommunicationNeed, communication_need_id
 
 logger = logging.getLogger("chromie.agent.planner_fallback")
 
@@ -103,9 +103,35 @@ def materialize_planner_unavailable(
 
     Missing provider ability, or a plan the Planner itself judged inadequate, is not
     user-semantic ambiguity; additional user detail cannot create an absent
-    Capability. The Goal stays unmet and Social Cognition says so honestly.
+    Capability. The Goal stays unmet and Social Cognition says so honestly: each
+    Goal carries a Planner result need, the same one a streamed limitation carries
+    (live 2026-10-12: a re-entry limitation without one left only silence).
     """
 
+    goal_context = planner_goal_context(
+        request.context if isinstance(request.context, dict) else {},
+        reentry_scope=request.planner_reentry_scope,
+    )
+    request_refs = {item.local_ref for item in request.responsibilities}
+    refs_by_goal = {
+        str(goal.get("goal_id")): [
+            str(ref) for ref in goal.get("source_responsibility_refs") or [] if str(ref) in request_refs
+        ]
+        for goal in goal_context.authoritative_goals if isinstance(goal, dict)
+    }
+    needs = [
+        SocialCommunicationNeed(
+            need_id=communication_need_id(plan_id, goal_id), owner="planner", kind="result",
+            reference_id=plan_id, source_goal_ids=[goal_id],
+            source_responsibility_refs=refs_by_goal.get(goal_id, []),
+            facts={"goal_id": goal_id, "disposition": "unavailable", "coverage": "uncertain",
+                   "unresolved": list(unresolved or []),
+                   "rationale": ("Chromie did not reach a plan she could commit to this time; "
+                                 "no ability is known to be missing."),
+                   "capability_known_missing": False},
+        )
+        for goal_id in goal_context.expected_goal_ids
+    ]
     detail = dict(metadata or {})
     detail.update(
         {
@@ -124,9 +150,10 @@ def materialize_planner_unavailable(
         coverage="uncertain",
         confidence=0.0,
         goal_summary=request.text,
-        goal_ids=_request_goal_ids(request),
+        goal_ids=list(goal_context.expected_goal_ids),
         response_text="",
         steps=[],
         unresolved=list(unresolved or []),
+        communication_needs=needs,
         metadata=detail,
     )

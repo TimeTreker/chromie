@@ -742,6 +742,9 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
         {"authority": "social_cognition", "responsibility_refs": ["r1"],
          "reason_summary": "Observe Goal state."},
     ]
+    # GA relates the new Goal to retained history, so its requests are new cognition;
+    # an unchanged GA result would join the running plan instead (no late GA failure).
+    data["new_goals"][0]["related_goal_ids"] = ["goal-earlier"]
     association = type(association).model_validate(data)
 
     class Agent(ScriptedClient):
