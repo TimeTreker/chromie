@@ -1363,3 +1363,45 @@ class SessionCompletionTests(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.asyncio
+async def test_a_case_waits_for_the_result_reentries_it_started() -> None:
+    """Live 2026-10-13: a conditional's held wave ran after its read re-entered; the case
+    closed first and the wave ran into the next case. The case settles its re-entries,
+    including ones they start, and never waits on reflection."""
+    import asyncio
+    from types import SimpleNamespace
+
+    from scripts.interaction_text_mujoco_check import settle_case_follow_up_work
+
+    finished: list[str] = []
+    assistant = SimpleNamespace(active_cognitive_runtime_tasks={})
+
+    def track(coroutine, name):
+        task = asyncio.create_task(coroutine, name=name)
+        assistant.active_cognitive_runtime_tasks[task] = name
+        task.add_done_callback(lambda done: assistant.active_cognitive_runtime_tasks.pop(done, None))
+        return task
+
+    async def held_wave():
+        await asyncio.sleep(0.05)
+        finished.append("wave")
+
+    async def read_reentry():
+        await asyncio.sleep(0.02)
+        track(held_wave(), "capability-result-reentry:wave")
+        finished.append("read")
+
+    reflection = track(asyncio.sleep(5), "outcome-reflection:read")
+    before = {reflection}
+    track(read_reentry(), "capability-result-reentry:read")
+    await settle_case_follow_up_work(assistant, before, timeout_s=2.0)
+    assert finished == ["read", "wave"]
+    assert not reflection.done()
+
+    track(asyncio.sleep(5), "capability-result-reentry:slow")
+    with pytest.raises(TimeoutError):
+        await settle_case_follow_up_work(assistant, before, timeout_s=0.05)
+    for task in list(assistant.active_cognitive_runtime_tasks):
+        task.cancel()

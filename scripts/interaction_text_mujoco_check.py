@@ -675,6 +675,29 @@ async def wait_for_session_done(
     raise TimeoutError(f"session {sid} did not finish within {timeout_s:.1f}s")
 
 
+async def settle_case_follow_up_work(assistant: Any, before: set[Any], *, timeout_s: float) -> float:
+    """Wait for this case's detached result re-entries, including those they start.
+
+    A conditional's held action runs only after its read re-enters; closing the case
+    first let that action run into the next case (live 2026-10-13). Reflection and the
+    ambient perception loop cause no effects and are not awaited.
+    """
+
+    started = time.monotonic()
+    while True:
+        pending = [
+            task for task in getattr(assistant, "active_cognitive_runtime_tasks", {})
+            if task not in before and not task.done()
+            and task.get_name().startswith("capability-result-reentry:")
+        ]
+        if not pending:
+            return (time.monotonic() - started) * 1000.0
+        remaining = timeout_s - (time.monotonic() - started)
+        if remaining <= 0:
+            raise TimeoutError(f"{len(pending)} follow-up result re-entries did not settle within {timeout_s:.1f}s")
+        await asyncio.wait(pending, timeout=remaining)
+
+
 async def wait_for_provider_started(
     runtime: Any,
     *,
@@ -1034,6 +1057,7 @@ async def run_check(
 
         ambient_perception = await _prepare_ambient_perception(assistant)
         _write_json(evidence_dir / "ambient_perception.json", ambient_perception)
+        tasks_before_case = set(getattr(assistant, "active_cognitive_runtime_tasks", {}))
         sid = assistant.create_session()
         context = assistant.build_context(sid)
         robot_state = dict(context.get("robot_state") or {})
@@ -1563,6 +1587,11 @@ async def run_check(
                     "failure_stage": "session_completion",
                     "error": _exception_text(exc),
                 }
+            try:
+                timings_ms["follow_up_settle_ms"] = await settle_case_follow_up_work(
+                    assistant, tasks_before_case, timeout_s=args.timeout_s)
+            except TimeoutError as exc:
+                errors.append(f"follow-up result re-entry did not settle: {_exception_text(exc)}")
 
             session_state = assistant.sessions.state.get(sid) or {}
             require_tts = should_require_tts_speech(require_speech=args.require_speech)

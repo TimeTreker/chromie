@@ -75,20 +75,23 @@ python scripts/general_ability_acceptance.py --mode live-text --scenario-root $D
 ./scripts/collect_debug_bundle.sh
 ```
 
-Option B (owner, 2026-10-12) is in this revision (see DEVELOPMENT_CHECKPOINT). Live state: the owner
-deployed `chromie-agent:option-b-20261012` (first B image, before the follow-up repairs; rollback
-`chromie-agent:pre-option-b-20261012`). The follow-up repairs are not in any image yet. Corpus freeze 29
-(`frozen.tar.xz` archive `e2f282fb…`).
+Option B (owner, 2026-10-12) is in this revision (see DEVELOPMENT_CHECKPOINT). Live state on this host
+(2026-10-13): `chromie-agent:latest` = `chromie-agent:option-b2-e96811c56` (`sha256:cc4b1ca3…`, built from
+`e96811c56`; rollback `chromie-agent:option-b-20261012`), `chromie-tts:latest` = self-warming TTS, Soridormi
+water scene started with `(cd ../soridormi && ./scripts/run_scenario.sh --scenario
+configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer)`. Corpus freeze 29
+(`frozen.tar.xz` archive `e2f282fb…`). Evidence: `focused-b2/`, `run5/` (one bundle) in
+`.chromie/acceptance/planner-limitation-20261012/`; the harness settle repair is host-side (no image change).
 
 ```bash
-# resume: build the Agent image from a clean worktree of this revision, then (owner) deploy without proxies
-git worktree add --detach <dir> HEAD && cd <dir> && docker build -f /home/chromie/github/chromie/.chromie/acceptance/deep-removal-20261011/AgentDockerfile -t chromie-agent:option-b2 .
-docker tag chromie-agent:option-b2 chromie-agent:latest
-env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
-python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/planner-limitation-20261012/scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live --only-case cond_rain_nod_en --only-case cond_rain_nod_zh --only-case cond_sunny_wave_en --only-case cond_sunny_wave_zh
+# rerun the declared cohort (one invocation, one bundle) after capturing identity
+D=.chromie/acceptance/planner-limitation-20261012
+python scripts/capture_runtime_identity.py --orchestrator-env .chromie/voice-runtime/orchestrator.env --allow-dirty --output $D/runN/runtime-identity.json
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root $D/scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity $D/runN/runtime-identity.json --evidence-dir $D/runN/live
+./scripts/collect_debug_bundle.sh
 ```
 
-Next: deploy the follow-up image, rerun the conditional cases and then the full cohort.
+Next: the owner-approved daily-life scenario suite (DEVELOPMENT_CHECKPOINT "Next").
 
 ## Previous delivery — Deep Planner retired (stage B), 2026-10-11
 

@@ -198,8 +198,31 @@ dependent action; Runtime holds the action and the evidence re-entry decides it.
 - Freeze 29 (`capture29.py`, `freeze29.py`, archive `e2f282fb…`; freeze 28 before it). Strict replay
   6,000/6,000, zero model calls. Level A 46/46. Canonical gate (clean worktree `scratchpad/gate10`): pytest 3,805 + 5 skipped, benchmarks 169, legacy 20.
 
-Next: build the Agent image from this revision; the owner deploys it; rerun the four conditional cases,
-then the full 35-case cohort, one bundle, judge every case. The SC/UMI items stay open as listed above.
+Live verification of B (2026-10-13): the owner deployed `chromie-agent:option-b2-e96811c56` (built from
+`e96811c56`, 118 files verified). Focused run (`focused-b2/`): cond_rain_nod_zh passed end to end, and in
+cond_sunny_wave_en the re-entry performed the held wave. The harness closed that case before the wave
+ran, so the next case's preflight found the robot busy. Harness repair (host-side): a case waits, bounded
+by its timeout, for the `capability-result-reentry:` tasks it started (and those they start) before the
+post-run probe (`settle_case_follow_up_work`, `timings_ms.follow_up_settle_ms`).
+Run 5 (`run5/`, one bundle): mechanical 27/35; judged 24 pass, 3 partial, 8 fail. Every conditional case
+that reached the Planner planned read + deferred action; the two sunny-wave reads were lost to an external
+geocoding stall (8 s, no per-attempt timeout). Value-reviewed speech 5/5.
+
+Open, by earliest boundary (evidence README, runs 2-5):
+- GA second Planner pass replaces a correct streamed plan (ctl_nod_en → spoken reply only); the owner's
+  earlier decision says GA re-plan must be a non-destructive revision (NO_CHANGE/delta).
+- UMI: "celebrate with me" and "现在几点" read as speech (the latter led to an unread time being stated);
+  cond_rain_nod_en splits with overlapping spans (503) in 3 of the last 4 runs.
+- SC: sometimes silent after a conditional result; English or technical replies to Chinese turns.
+- Planner: "make coffee" planned as fetch; curve walk decomposed or decorated (blink); duplicate gestures.
+- Weather provider: per-attempt timeout shorter than the 8 s capability timeout so a stalled geocode retries.
+
+Next (owner, 2026-10-13): build a daily-life live scenario suite (about 300 cases: easy about 15% must-pass,
+normal about 65%, hard about 20%, multi-turn in normal and hard, multi-label tags) plus a separate held-out
+suite; test easy → normal → hard in random batches, optimize at the earliest boundary between batches, and
+finish with one full held-out run. Judgment reads each recorded episode against a short pre-declared rubric
+(must happen / must not happen / acceptable variants) instead of literal expected outputs; only objective
+invariants (safety, safe idle, service integrity, no unrequested physical effect) fail mechanically.
 
 ## Previous delivery — Deep Planner retired (stage B), 2026-10-11
 
