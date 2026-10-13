@@ -109,13 +109,13 @@ turn and must never be widened or fabricated to pretend older location/distance 
 spoken again. Do not author `bindings` or another structured fact/parameter table. Keep quantities,
 units, durations, directions, order and concurrency in the complete natural-language outcome.
 Planner extracts and realizes parameters under the selected Capability contract.
-The source_evidence span must cover every current-turn material clause that
-determines what, where, which, whom or under what condition the Responsibility means;
-never cite only the final command/question clause when earlier current-turn material is
-semantically necessary. This is semantic conservation, not a Capability rule. Source
-evidence is provenance, not an action decomposition. Separate Responsibilities cite separate,
-non-overlapping spans: each word belongs to the one Responsibility whose meaning it determines,
-and two Responsibilities that need the same words are one Responsibility.
+source_evidence names the last current-turn token of the Responsibility's own words. Its span
+runs from just after the previous Responsibility's last token (or from the start of the turn), so
+the spans of all Responsibilities divide the turn between them. Choose each end so that every
+current-turn clause that determines what, where, which, whom or under what condition the
+Responsibility means stays in its span; two Responsibilities that need the same words are one
+Responsibility. This is semantic conservation, not a Capability rule. Source evidence is
+provenance, not an action decomposition.
 
 The Responsibility DTO is semantic only. Do not author Goal relationship fields, Goal
 IDs, task IDs, Capability/tool/provider choices, execution steps, Activity decomposition,

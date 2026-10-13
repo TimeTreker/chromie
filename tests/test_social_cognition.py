@@ -377,6 +377,65 @@ async def test_no_capability_catalog_cannot_produce_gesture():
         await SocialCognitionResolver(model, Catalog()).resolve(request())
 
 
+@pytest.mark.asyncio
+async def test_an_act_covering_a_need_carries_that_need_s_bindings():
+    """Live 2026-10-13 (val_cookie_en, run-6 failure notice): the reply covered its need
+    but omitted the need's Goal or Responsibility, and Host rejected the whole reply
+    (422). The bindings follow mechanically from the need the act addresses."""
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+
+    need = SocialCommunicationNeed(
+        need_id="need:declined", owner="runtime", kind="result", reference_id="plan:1",
+        source_goal_ids=["goal:1"], source_responsibility_refs=["r1"],
+        facts={"value_declined": True, "reason": "It would deceive someone."},
+    )
+    current = request(
+        responsibilities=[CognitiveResponsibilityProposal(
+            local_ref="r1", outcome="Tell my brother the dog ate his cookie.", output_mode="speech",
+            continuity_scope="turn", value_review=True,
+            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
+        )],
+        communication_needs=[need],
+    )
+    raw = response(activity_id="decline", text="I won't tell him that; it isn't true.", function="respond",
+                   source_goal_ids=[], addressed_need_ids=[need.need_id])
+    raw["need_outcomes"] = {need.need_id: "covered"}
+    result = await SocialCognitionResolver(Model(raw), Catalog()).resolve(current)
+    [act] = result.activities
+    assert (act.source_goal_ids, act.source_responsibility_refs) == (["goal:1"], ["r1"])
+
+
+def test_goal_scoped_speech_is_only_acknowledged_before_its_answer_need():
+    """Live 2026-10-13 (val_story_en): UMI scoped "Tell me a short story" as goal; the
+    decoder still offered a direct answer at ingress, which Host rejects (422). The
+    decoder now offers respond/ask only for turn-local speech, and the act's function
+    comes before its words so an answer is never written and relabelled."""
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+
+    def ingress(scope):
+        return request(trigger="interpretation", goal_ids=[], source_turn={"turn_id": "t"}, context={},
+                       responsibilities=[CognitiveResponsibilityProposal(
+                           local_ref="r1", outcome="Tell a short story about a cat.", output_mode="speech",
+                           continuity_scope=scope, value_review=False,
+                           source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"})])
+
+    def act(function):
+        return {"disposition": "communicate", "reason_summary": "Reply.", "activities": [{
+            "activity_id": "a1", "text": "Once upon a time...", "function": function,
+            "truth_stage": "context_grounded", "progress_kind": None,
+            "source_responsibility_refs": ["r1"], "source_goal_ids": [], "evidence_refs": [],
+            "addressed_need_ids": [], "repair_of_activity_ids": [], "auxiliary_activities": []}]}
+
+    goal_scoped = social_cognition_response_schema(ingress("goal"), [])
+    turn_scoped = social_cognition_response_schema(ingress("turn"), [])
+    assert not Draft202012Validator(goal_scoped).is_valid(act("respond"))
+    assert Draft202012Validator(goal_scoped).is_valid(act("acknowledge"))
+    assert Draft202012Validator(turn_scoped).is_valid(act("respond"))
+    for branch in goal_scoped["$defs"]["SocialCommunicativeAct"]["oneOf"]:
+        assert list(branch["properties"])[:2] == ["function", "text"]
+
+
 def test_terminal_work_failure_result_need_cannot_choose_silence():
     from shared.chromie_contracts.plan import SocialCommunicationNeed
 

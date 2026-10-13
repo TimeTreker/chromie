@@ -377,3 +377,33 @@ def test_primary_packet_exposes_the_same_host_clock_decision_as_validation(tier)
         assert 'ALREADY ARRIVED' in due['user_prompt']
         assert 'not yet ready' not in due['user_prompt']
     asyncio.run(run())
+
+
+def test_every_exposed_waiting_shape_offers_only_outcomes_the_dto_accepts():
+    """Live 2026-10-13 (multi_thirsty_yes_en, "Yes, please."): the decoder followed the
+    readiness wrapper's inner waiting shape and wrote a partial respond, which the Goal
+    outcome DTO rejects; the final native pass had reached only the outer shapes."""
+    from agent.app.planner_schema import (
+        canonical_plan_response_schema, native_goal_outcome_branches, planner_readiness_response_schema)
+
+    wave = {"type": "object", "properties": {}, "additionalProperties": False}
+    schema = native_goal_outcome_branches(planner_readiness_response_schema(
+        canonical_plan_response_schema(expected_goal_ids=["goal-water"], allowed_capability_ids=["test.wave"],
+                                       capability_input_schemas={"test.wave": wave}),
+        ["goal-water"]))
+
+    def exposed(node):
+        yield node
+        for key in ("oneOf", "anyOf"):
+            for item in node.get(key) or []:
+                yield from exposed(item)
+
+    respond_coverages = [
+        branch["properties"]["coverage"]["enum"]
+        for shape in exposed(schema)
+        for outcome in ((shape.get("properties") or {}).get("goal_outcomes") or {}).get("properties", {}).values()
+        for branch in outcome.get("oneOf", [outcome])
+        if branch.get("properties", {}).get("disposition", {}).get("enum") == ["respond"]
+    ]
+    assert len(respond_coverages) > 1 and all(coverage == ["complete"] for coverage in respond_coverages)
+    assert schema["anyOf"][1]["anyOf"], "the waiting shape keeps its inner alternatives"

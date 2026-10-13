@@ -307,7 +307,11 @@ first decides every Responsibility in `responsibility_decisions` (`work`, `answe
 non-limitation decision with its own Capability Activity or word-free response/input
 Need. A limitation is that decision, not a model-authored Activity: the Host binds it
 as the unavailable Activity (a terminal Activity for that Responsibility) and the
-Planner's result need. Ordinary speech is always answered, never decided unavailable. Each uniform disposition
+Planner's result need. An `answer` decision whose word-free response Need was omitted
+is bound the same way (the Need names only its Responsibility); `work` and `clarify`
+carry content only the model authors and fail closed without their Activity. A mixed
+state may therefore hold only a response or an input Need beside a limitation.
+Ordinary speech is always answered, never decided unavailable. Each uniform disposition
 state admits only its matching decision; the authored disposition must equal the one
 the decisions imply, and a contradiction fails closed without rewriting. An
 acquire-information read serving a non-information Responsibility (for example a

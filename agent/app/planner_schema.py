@@ -547,8 +547,11 @@ def fast_evidence_reentry_response_schema(
                 and (action != "respond" or completed)
                 and not (holds_effect and action == "execute" and status not in {"substantial", "exact"})
             ]
-            groups = [[action] for action in ("respond", "execute") if action in permitted]
-            if rest := [action for action in permitted if action not in {"respond", "execute"}]:
+            # A clarify carries the input need the person can resolve; its lifted Goal
+            # outcome requires one (live 2026-10-13: after a failed fetch a clarify with
+            # only a rationale passed this decoder and failed the outcome DTO).
+            groups = [[action] for action in ("respond", "execute", "clarify") if action in permitted]
+            if rest := [action for action in permitted if action not in {"respond", "execute", "clarify"}]:
                 groups.append(rest)
             for group in groups:
                 branch = copy.deepcopy(decision_base)
@@ -565,6 +568,8 @@ def fast_evidence_reentry_response_schema(
                 ]
                 if group[0] in {"respond", "execute"}:
                     fields["unresolved_needs"]["maxItems"] = 0
+                if group == ["clarify"]:
+                    fields["unresolved_needs"]["minItems"] = 1
                 if respond_requires_commitment and group == ["respond"] and status not in {"substantial", "exact"}:
                     # Outside reporting, a respond below commitment becomes a limitation at
                     # Host; that choice is unavailable's (live 2026-10-12).
@@ -651,12 +656,18 @@ def native_goal_outcome_branches(schema: dict[str, Any]) -> dict[str, Any]:
     """Final decoder pass: each Goal outcome becomes per-disposition native branches.
 
     Applied after every canonical schema refinement, so each branch carries the final
-    per-Goal enums and bounds. Validation semantics are unchanged.
+    per-Goal enums and bounds. Validation semantics are unchanged. Every exposed shape
+    is covered, however deeply nested: the decoder follows a nested alternative and
+    ignores its siblings (live 2026-10-13: the readiness wrapper's inner waiting shapes
+    still offered a partial respond, which the outcome DTO rejects).
     """
     result = copy.deepcopy(schema)
-    shapes = [result, *[item for key in ("oneOf", "anyOf") for item in result.get(key) or []
-                        if isinstance(item, dict)]]
-    for shape in shapes:
+
+    def exposed(node: dict[str, Any]) -> list[dict[str, Any]]:
+        return [node, *[shape for key in ("oneOf", "anyOf") for item in node.get(key) or []
+                        if isinstance(item, dict) for shape in exposed(item)]]
+
+    for shape in exposed(result):
         outcomes = (shape.get("properties") or {}).get("goal_outcomes")
         goals = outcomes.get("properties") if isinstance(outcomes, dict) else None
         if not isinstance(goals, dict):
@@ -1741,7 +1752,12 @@ def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
 
 
 def _fast_terminal_activity_contract() -> dict[str, Any]:
-    """Require real Work or a complete response alongside a clarification."""
+    """Require real Work, or for mixed any answered or clarified Responsibility.
+
+    Mixed follows from the Responsibility decisions; Host adds each unavailable
+    Activity, so "answer one, cannot do the other" is mixed with only a response
+    (live 2026-10-13: "你会后空翻吗？翻一个给我看看！" was rejected here).
+    """
 
     def contains_role(role: str) -> dict[str, Any]:
         return {
@@ -1764,7 +1780,7 @@ def _fast_terminal_activity_contract() -> dict[str, Any]:
                 {"properties": {"activities": contains_role("capability")}},
                 {"properties": {
                     "disposition": {"const": "mixed"},
-                    "activities": {"allOf": [
+                    "activities": {"anyOf": [
                         contains_role("complete_response"),
                         contains_role("clarification"),
                     ]},
@@ -1899,6 +1915,7 @@ def fast_advance_response_schema(
     committed_communicative: bool = False,
     suppress_new_communicative: bool = False,
     suppress_new_progress: bool = False,
+    trusted_target_ref: str = "",
 ) -> dict[str, Any]:
     """Constrain Fast Activities to authoritative WHAT and the live catalog.
 
@@ -2300,6 +2317,12 @@ def fast_advance_response_schema(
                     "enum": [capability_id_value],
                 }
                 branch_properties["args"] = _ordered_capability_arguments(input_schema)
+                # Host accepts a target argument only as the exact current trusted target.
+                target_property = (branch_properties["args"].get("properties") or {}).get("target_ref")
+                if trusted_target_ref and isinstance(target_property, dict):
+                    branch_properties["args"]["properties"]["target_ref"] = {
+                        "type": "string", "const": trusted_target_ref,
+                    }
                 # This purpose is fixed by the provider, not by Goal terminality.
                 branch_properties["step_purpose"] = {
                     "type": "string", "enum": [
@@ -2662,12 +2685,14 @@ def fast_streaming_advance_response_schema(
     source_token_refs: list[str] | None = None,
     original_user_text: str = "",
     situation_source_refs: list[str] | None = None,
+    trusted_target_ref: str = "",
 ) -> dict[str, Any]:
     """One complete Work result; independent SC owns communication latency."""
     schema = fast_advance_response_schema(
         responsibility_refs, responsibilities=responsibilities, capabilities=capabilities,
         meaning_uncertainties=meaning_uncertainties, source_token_refs=source_token_refs,
         original_user_text=original_user_text, situation_source_refs=situation_source_refs,
+        trusted_target_ref=trusted_target_ref,
     )
     compiled = _ollama_streaming_schema(schema, retain_value_constraints=True)
     compiled["title"] = "FastPlannerWorkAdvanceOutput"

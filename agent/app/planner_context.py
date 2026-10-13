@@ -1252,6 +1252,25 @@ def trusted_target_prompt_context(context: dict[str, Any]) -> dict[str, Any]:
     return {"target_evidence": target_evidence}
 
 
+def trusted_target_ref(context: dict[str, Any]) -> str:
+    """The one current trusted target a provider target argument must copy, or ""."""
+
+    target_context = context.get("planner_target_evidence_context")
+    evidence = target_context.get("target_evidence") if isinstance(target_context, dict) else None
+    target = evidence.get("target") if isinstance(evidence, dict) and evidence.get("available") else None
+    return str(target.get("target_ref") or "").strip() if isinstance(target, dict) else ""
+
+
+def realizable_with_current_target(item: Any, target_ref: str) -> bool:
+    """A Capability whose required target can only be copied from trusted target evidence
+    is unavailable while no such evidence exists (live 2026-10-13: with no trusted
+    target, "转过来看着我" was planned with a scene object's id and Host rejected it)."""
+
+    schema = getattr(item, "input_schema", None)
+    required = schema.get("required") or [] if isinstance(schema, dict) else []
+    return bool(target_ref) or "target_ref" not in required
+
+
 def auxiliary_social_prompt_context(
     context: dict[str, Any],
     candidates: list[dict[str, Any]],

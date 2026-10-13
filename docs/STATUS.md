@@ -1,6 +1,28 @@
 # Chromie Current Status
 
-## Current delivery — Run-5 root-cause repairs, 2026-10-13
+## Current delivery — Run-8 repairs: Planner decoder/DTO agreement, 2026-10-13
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `1d432208b` plus the run-7 repairs: a streamed mixed result may hold only a response or a clarification beside a Host-added limitation, and an omitted response need is projected from its `answer` decision; every exposed canonical shape offers native per-disposition Goal outcomes; a re-entry clarify names its unresolved input need in the decoder, compact DTO and prompt. Soridormi (separate repo, uncommitted): requester recipient referent and all-around scene markers. |
+| Automatic verification | Four regressions red on the deployed sources / green now; freeze 33 (`c6b4abb6…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,818 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Run 8 (everyday cohort, `rootcause3-20261013`): mechanical 26/33, judged 21 pass / 6 partial / 6 fail. These repairs are not yet live (run 9 pending). Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause3-20261013`; `rootcause4-20261013` built and source-verified, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Run-7 cluster repairs, 2026-10-13
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `1d432208b`: SC projects addressed-need bindings and answers at ingress only turn-local speech; UMI requires only span ends and Host derives starts (spans partition the turn); the streamed Planner offers a target-requiring Capability only with a trusted target and pins it. |
+| Automatic verification | New regressions red before / green after; recorded UMI replay 38/38 accepted; freeze 32 (`d88f05bd…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,814 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Live run 8 (everyday cohort): mechanical 26/33, judged 21 pass / 6 partial / 6 fail. |
+| Deployment state | `chromie-agent:rootcause3-20261013` deployed by the owner. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Run-5 root-cause repairs, 2026-10-13
 
 | Axis | Current evidence |
 | --- | --- |

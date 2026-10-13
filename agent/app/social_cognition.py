@@ -237,7 +237,9 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
 )
 
 
-def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialCognitionRequest) -> None:
+def _constrain_social_activity_identity(
+    schema: dict[str, Any], request: SocialCognitionRequest, *, function_first: bool = False,
+) -> None:
     """Keep fresh IDs compact while preserving immutable reuse of delivered wording.
 
     Activity identity is transport bookkeeping, not a social-expression quota.  Fresh
@@ -337,8 +339,11 @@ def _constrain_social_activity_identity(schema: dict[str, Any], request: SocialC
             properties = variant["properties"]
             # Choose words before their identity; old IDs cannot coerce new
             # information into an old message. Distinct repeated acts stay valid.
-            variant["properties"] = {"text": properties["text"], **{
-                key: value for key, value in properties.items() if key != "text"
+            # Where the act's function bounds what it may answer, choose the function
+            # first so an answer is never written and then relabelled.
+            first = ("function", "text") if function_first else ("text",)
+            variant["properties"] = {**{key: properties[key] for key in first}, **{
+                key: value for key, value in properties.items() if key not in first
             }}
             branches.append(variant)
     schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": branches}
@@ -396,6 +401,31 @@ def _terminal_work_failure_requires_result_update(
         _terminal_failure_need_ids(request)
         and not user_turn_prohibits_speech(request.context.get("user_turn_envelope"))
     )
+
+
+def _bind_addressed_need_provenance(raw: Any, request: SocialCognitionRequest) -> Any:
+    """An act that addresses a need concerns that need's Goals and Responsibilities.
+
+    The model chooses which needs an act addresses; their bindings follow mechanically,
+    so they are projected rather than re-authored (live 2026-10-13: a declined result and
+    a failure notice each omitted one binding and the whole reply was rejected, 422).
+    """
+
+    needs = {need.need_id: need for need in request.communication_needs}
+    if not isinstance(raw, dict) or not needs:
+        return raw
+    for act in raw.get("activities") or []:
+        if not isinstance(act, dict):
+            continue
+        for need_id in act.get("addressed_need_ids") or []:
+            need = needs.get(need_id)
+            if need is None:
+                continue
+            for field, values in (("source_goal_ids", need.source_goal_ids),
+                                  ("source_responsibility_refs", need.source_responsibility_refs)):
+                current = list(act.get(field) or [])
+                act[field] = current + [value for value in values if value not in current]
+    return raw
 
 
 def _materialize_communicative_auxiliary_anchors(raw: Any) -> Any:
@@ -648,10 +678,14 @@ def social_cognition_response_schema(
         # acknowledgement/nonverbal act until Planner/Evidence establishes facts.
         # Speech UMI marked value_review waits for Value Judgment; the rest is immediate.
         routed = value_review_responsibility_refs(request)
+        # Host accepts a direct answer here only for turn-local speech; goal-scoped speech
+        # waits for its Planner answer need (live 2026-10-13: a goal-scoped story was
+        # answered at ingress and rejected, 422).
         direct_speech_refs = sorted(
             item.local_ref
             for item in request.responsibilities
-            if item.output_mode == "speech" and item.local_ref not in routed
+            if item.output_mode == "speech" and item.continuity_scope == "turn"
+            and item.local_ref not in routed
         )
         task_refs = sorted(
             item.local_ref
@@ -686,7 +720,10 @@ def social_cognition_response_schema(
                 properties["source_responsibility_refs"] = source_refs
                 continuity_branches.append(variant)
         schema["$defs"]["SocialCommunicativeAct"] = {"oneOf": continuity_branches}
-    _constrain_social_activity_identity(schema, request)
+    _constrain_social_activity_identity(
+        schema, request,
+        function_first=request.trigger == "interpretation" and not request.communication_needs,
+    )
     # Native decoding does not enforce conditional decision-state dependencies.
     # Realize the existing DTO/Host states without deciding whether speech is
     # useful: silence leaves needs pending, and deliberation commits no result.
@@ -1307,7 +1344,7 @@ class SocialCognitionResolver:
             response_format=schema, prompt_family="social_cognition.deep" if deep else "social_cognition.primary",
             turn_id=request.request_id, attempt=1,
         )
-        raw = _materialize_communicative_auxiliary_anchors(raw)
+        raw = _bind_addressed_need_provenance(_materialize_communicative_auxiliary_anchors(raw), request)
         schema_errors = [error.message for error in Draft202012Validator(schema).iter_errors(raw)]
         if schema_errors:
             raise ValueError(f"Social Cognition raw Schema rejected: {schema_errors}")

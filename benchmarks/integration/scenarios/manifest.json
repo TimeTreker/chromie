@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "c8f4fc1357ce6318407988d435b015a3cdf471c2fd614af9e5ccf0804c2e531f",
-    "workflow-conditional-dry.json": "bf4ed8db070860ba6a6b884cfa3c3c98f5b20c7567ae098be15ec09fe7e047f5",
-    "workflow-conditional-rain.json": "443b9f924460b411e8a7387b815b6f9e20018d57b89bc0098f9924fade096365",
-    "workflow-delayed.json": "d0945add8b8eddd6a0a0737e3656973ce0f9b574d9fce36dbcb30603b9578044",
-    "workflow-normal.json": "044765234c3382f01a8a57bffc8a11e91b006e3b77ebabfa2fb39e27f2b53183"
+    "workflow-cancellation.json": "6cf05e2542f00c13acf5843273dae15e6314c63adde7743cd15ec55073951c93",
+    "workflow-conditional-dry.json": "ecd36ad01005a79a3fcc7b570d27c7ec5b57b0fda80c2e17f7aa627f773e444e",
+    "workflow-conditional-rain.json": "ee940b40c8bf9c9e4b752a18c1be03f4998ea2b9671fbd6d23934d7e73626457",
+    "workflow-delayed.json": "60f5ff226fb734e6454231c556fcc0b139f7628e1c76af6cc81dda547fc7fab5",
+    "workflow-normal.json": "f0707fa493aeeb51b1aa5ccec65b0871c15ac36e48f6cc1f9ba08cd87a3ba470"
   },
-  "freeze_revision": 31,
-  "freeze_note": "Live run-6 repairs (2026-10-13). Every request recaptured: re-entry execute for a Goal holding an effect only at commitment; a Host limitation says no ability is known to be missing; UMI keeps pretense as speech and adds no acknowledgement-only Responsibility; SC tells time from a clock reading and sees UTC bookkeeping in local time. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 33,
+  "freeze_note": "Run-8 repairs (2026-10-13). Every request recaptured: a streamed mixed result may hold only a response or a clarification beside a Host-added limitation and a decided answer's omitted response need is projected; every exposed canonical shape offers native per-disposition Goal outcomes; a re-entry clarify names its unresolved input need. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

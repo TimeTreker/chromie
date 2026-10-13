@@ -47,6 +47,8 @@ from .planner_context import (
     completed_acquisition_goal_ids,
     completed_work_step_evidence,
     trusted_target_prompt_context,
+    trusted_target_ref,
+    realizable_with_current_target,
     cancellation_capability_facts,
     fast_capability_payload,
     fast_capability_context,
@@ -226,10 +228,12 @@ class FastPlannerResolver:
             for invocation in range(2):
                 current, catalog, entries = await fast_capability_context(self.catalog, request, loaded_ids)
                 current.context["planner_target_evidence_context"] = trusted_target_prompt_context(current.context)
+                target_ref = trusted_target_ref(current.context)
                 output_modes = {item.output_mode for item in responsibilities}
                 projected = [fast_capability_payload(item, include_side_effect_free=True)
                     for item in catalog if item.available and item.interaction_executable
-                    and is_planner_step_capability(item.capability_id)]
+                    and is_planner_step_capability(item.capability_id)
+                    and realizable_with_current_target(item, target_ref)]
                 capabilities = qualify_capability_catalog_for_output_mode_values(
                     projected,
                     output_modes=output_modes,
@@ -250,6 +254,7 @@ class FastPlannerResolver:
                     source_token_refs=[item["ref"] for item in user_turn_source_tokens(current.original_user_text)],
                     original_user_text=current.original_user_text,
                     situation_source_refs=list(situation_source_observations(current.context)),
+                    trusted_target_ref=target_ref,
                 ), loaded_capability_ids)
                 prompt = fast_advance_layered_prompt(current, responsibilities=responsibilities,
                     capabilities=capabilities, response_schema=schema)

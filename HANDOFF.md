@@ -1,6 +1,44 @@
 # Chromie Handoff
 
-## Current work — Run-5 root-cause repairs, 2026-10-13
+## Current work — Run-8 repairs, 2026-10-13
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
+`1d432208b`; the run-7 + run-8 repairs are pushed to `origin/main` (expected resume revision: the latest commit
+containing this file). Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README "Live
+run 8" and "Repairs after run 8"; `run8/` with bundle and digests; `capture33.py`, `freeze33.py`,
+`strict-replay-freeze33/`, `level-a-run8-repairs/`, `probes/recipient/`, `run8-soridormi/`). Gate worktree
+`scratchpad/gate14`. Live: `chromie-agent:latest` = `rootcause3-20261013`; built and verified, not deployed:
+`chromie-agent:rootcause4-20261013` (`sha256:e310f2b4…`, digest `52c25882a59fa651`).
+
+Soridormi: the fix is pushed to Soridormi `origin/main` (on top of `afb6a1a`) from `/home/chromie/github/soridormi`
+(branch `scenario-control-stall`, bind-mounted into sim and MCP). The water scene was restarted with it (`./scripts/run_scenario.sh --scenario configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer`,
+which replaces the simulator only when the runtime is idle and restarts the MCP).
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause3-20261013)
+docker tag chromie-agent:rootcause4-20261013 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then live run 9 on the everyday cohort (one invocation, one bundle)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
+```
+
+## Previous work — Run-7 cluster repairs, 2026-10-13
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts` = `origin/main` `1d432208b` plus the
+run-7 repair diff (delivered with the run-8 repairs above). Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README "Repairs after
+run 7"; `capture32.py`, `freeze32.py`, `strict-replay-freeze32/`, `level-a-run7-repairs/`, `daily-scenarios/`).
+Gate worktree `scratchpad/gate13`. Live: `chromie-agent:latest` = `rootcause2-20261013`; built and verified, not
+deployed: `chromie-agent:rootcause3-20261013` (`sha256:a62d744a…`, digest `d19269a8c3864d4a`).
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause2-20261013)
+docker tag chromie-agent:rootcause3-20261013 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then live run 8 on the everyday cohort (one invocation, one bundle)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
+```
+
+## Previous work — Run-5 root-cause repairs, 2026-10-13
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts` (= `origin/main`
 `ff9e87417` plus the uncommitted repair diff); the expected resume revision is the latest commit

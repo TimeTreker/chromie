@@ -27,7 +27,7 @@ def test_user_meaning_interpretation_prompt_uses_general_rules_not_casebook_lite
     ):
         assert literal not in prompt
     assert "ordering, concurrency" in prompt.casefold()
-    assert "source_evidence span must cover every current-turn material clause" in prompt
+    assert "source_evidence names the last current-turn token" in prompt
     assert "Do not convert a question about whether P is true into an assertion that P is true." in prompt
 
 

@@ -1709,12 +1709,20 @@ class FastPlannerResolverTests(unittest.TestCase):
                 terminal_schema = model.prompts[0][1]["response_format"]
                 wire = declared_ability_needs(wire, terminal_schema)
                 Draft202012Validator(terminal_schema).validate(wire)
-                for removed in (0, 1):
-                    incomplete = copy.deepcopy(wire)
-                    incomplete["activities"].pop(removed)
-                    self.assertFalse(Draft202012Validator(terminal_schema).is_valid(incomplete))
-                    rejected = asyncio.run(FastPlannerResolver(FakeOllama(incomplete), FullCatalog()).resolve_advance(run_request))
-                    self.assertIn("error", rejected.metadata)
+                # A decided clarification carries the model's question need, so it
+                # cannot be omitted; a decided answer's response need is projected.
+                without_question = copy.deepcopy(wire)
+                without_question["activities"].pop(0)
+                rejected = asyncio.run(FastPlannerResolver(FakeOllama(without_question), FullCatalog()).resolve_advance(run_request))
+                self.assertIn("error", rejected.metadata)
+                without_response = copy.deepcopy(wire)
+                without_response["activities"].pop(1)
+                projected = asyncio.run(FastPlannerResolver(FakeOllama(without_response), FullCatalog()).resolve_advance(run_request))
+                self.assertNotIn("error", projected.metadata)
+                self.assertEqual(
+                    [(item.role, item.source_responsibility_refs) for item in projected.activities],
+                    [("clarification", ["r1"]), ("complete_response", ["r2"])],
+                )
 
     def test_capability_repair_feedback_keeps_distinct_argument_failures(self):
         error = planner_fast_validation.CapabilityArgumentValidationError(

@@ -64,8 +64,8 @@ def test_primitive_binding_type_wrapper_is_representation_only() -> None:
 def test_user_meaning_interpreter_source_span_covers_material_clauses_not_only_command() -> None:
     prompt = PROMPT.read_text(encoding="utf-8").casefold()
 
-    assert "source_evidence span must cover every current-turn material clause" in prompt
-    assert "never cite only the final command/question clause" in prompt
+    assert "source_evidence names the last current-turn token" in prompt
+    assert "from just after the previous responsibility's last token" in prompt
     assert "determines what, where, which, whom or under what" in prompt
     assert "semantic conservation, not a capability rule" in prompt
 

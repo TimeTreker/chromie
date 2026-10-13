@@ -1040,6 +1040,36 @@ def test_reentry_decoder_offers_only_actions_the_host_accepts() -> None:
     assert not completed.is_valid(output("execute", work=[nod], relation="alternative"))
 
 
+def test_a_reentry_clarify_names_the_need_its_goal_outcome_requires() -> None:
+    """Live 2026-10-13 (errand_milk_en, errand_remote_en): after a failed fetch the
+    Planner chose clarify with only a rationale. The decoder and the compact DTO
+    accepted it, its lifted Goal outcome did not, and the person heard a generic
+    failure. Each of the three now asks for the input need the person can resolve."""
+    from jsonschema import Draft202012Validator
+
+    validator = Draft202012Validator(fast_evidence_reentry_response_schema(
+        expected_goal_ids=["goal-milk"], evidence_refs=["evidence-fetch"],
+        allowed_capability_ids=[], allow_new_work=False))
+
+    def output(needs):
+        return {"goal_decisions": [{"goal_id": "goal-milk", "next_action": "clarify",
+                                    "satisfaction_status": "unsatisfied", "satisfaction_score": 0.0,
+                                    "evidence_refs": ["evidence-fetch"], "unresolved_needs": needs,
+                                    "unmet_requirements": ["the milk was not found"],
+                                    "rationale": "The fetch failed."}],
+                "new_work": [], "confidence": 1.0, "plan_relation": "exact",
+                "user_confirmation_required": False}
+
+    assert not validator.is_valid(output([]))
+    assert validator.is_valid(output(["where the milk is"]))
+    with pytest.raises(ValueError, match="clarify re-entry requires the unresolved input need"):
+        PlannerEvidenceReentryModelOutput.model_validate(output([]))
+    compact = PlannerEvidenceReentryModelOutput.model_validate(output(["where the milk is"]))
+    lifted = PlannerModelOutput.model_validate(materialize_evidence_reentry_model_output(
+        compact, expected_goal_ids_for_turn=["goal-milk"], allowed_evidence_refs={"evidence-fetch"}))
+    assert lifted.goal_outcomes["goal-milk"].unresolved == ["where the milk is"]
+
+
 def test_completed_work_may_be_cited_by_its_evidence_ref() -> None:
     """Live 2026-10-12 (cond_sunny_wave_en): the re-entry wave depended on the read's
     evidence_ref, the identifier its prompt shows for completed Work."""

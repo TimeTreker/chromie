@@ -737,11 +737,27 @@ async def test_required_target_ref_uses_trusted_evidence_without_binding_mapping
 
 @pytest.mark.asyncio
 async def test_declared_target_realization_rejects_mismatched_trusted_ref() -> None:
-    resolver = FastPlannerResolver(_StreamingModel([_wire_output(_look_output(target_ref='invented_person'))]), _Catalog([_look_at_person_catalog_capability()]))
+    """The decoder offers only the current trusted target, so a mismatch fails at the wire
+    contract before any Host projection (and before commit)."""
+    model = _StreamingModel([_wire_output(_look_output(target_ref='invented_person'))])
+    resolver = FastPlannerResolver(model, _Catalog([_look_at_person_catalog_capability()]))
     frames = [frame async for frame in resolver.stream_advance(_look_request())]
     assert isinstance(frames[0], FastPlannerStreamFailure)
     assert frames[0].failure_stage == 'before_commit'
-    assert 'must copy exact current trusted target evidence' in frames[0].reason
+    assert 'current_speaker' in json.dumps(model.last_kwargs['response_format'])
+
+
+@pytest.mark.asyncio
+async def test_a_target_capability_is_not_offered_without_a_trusted_target() -> None:
+    """Live 2026-10-13 (body_look_zh): no trusted target existed, yet look_at_person was
+    offered and planned with a scene object's id; Host rejected the turn. Without trusted
+    target evidence a Capability that must copy it is unavailable to the Planner."""
+    request = _look_request()
+    request = request.model_copy(update={'context': {}})
+    model = _StreamingModel([_wire_output(_look_output(target_ref='current_speaker'))])
+    resolver = FastPlannerResolver(model, _Catalog([_look_at_person_catalog_capability()]))
+    [frame async for frame in resolver.stream_advance(request)]
+    assert 'soridormi.look_at_person' not in json.dumps(model.last_kwargs['response_format'])
 
 @pytest.mark.asyncio
 async def test_declared_structured_resource_realization_accepts_exact_gi_values() -> None:
@@ -1542,6 +1558,59 @@ def test_a_mixed_limitation_gets_no_activity():
     assert not validator.is_valid(output([waving, {**asking, "source_responsibility_refs": ["r1"]}]))
     mixed = [state for state in schema["oneOf"] if state["properties"]["disposition"]["enum"] == ["mixed"]]
     assert len(mixed) == 6  # every non-uniform pair of {work, clarify, unavailable}
+
+
+def _answer_beside_body(decision: dict[str, Any], activities: list[dict[str, Any]]):
+    responsibilities = [
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="perform it", output_mode="body_action", confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="answer the question", output_mode="speech", confidence=1.0),
+    ]
+    wave = {"capability_id": "test.wave", "input_schema": {"type": "object", "properties": {},
+            "additionalProperties": False}, "effects": ["physical_motion"]}
+    schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=responsibilities, capabilities=[wave])
+    output = {"responsibility_decisions": {"r1": decision, "r2": {"decision": "answer", "missing": []}},
+              "activities": activities, "disposition": "mixed", "coverage": "complete",
+              "covered_responsibility_refs": ["r1", "r2"], "confidence": 1.0, "unresolved": [],
+              "reason_summary": "x"}
+    return schema, output
+
+
+def test_an_answer_beside_a_limitation_is_mixed_with_only_its_response():
+    """Live 2026-10-13 ("你会后空翻吗？翻一个给我看看！"): an answer plus a limitation is mixed,
+    and Host adds the limitation, so the response is the only authored Activity."""
+    from agent.app.planner_fast_validation import project_responsibility_decisions
+
+    respond = {"role": "complete_response", "activity_id": "resp_r2", "source_responsibility_refs": ["r2"],
+               "rationale": "Answer from what Chromie knows."}
+    schema, output = _answer_beside_body({"decision": "unavailable", "missing": ["a backflip ability"]}, [respond])
+    assert Draft202012Validator(schema).is_valid(output)
+    projected = project_responsibility_decisions(
+        FastPlannerAdvanceModelOutput.model_validate(output), responsibility_refs=["r1", "r2"], speech_refs={"r2"})
+    assert [(item.role, item.source_responsibility_refs) for item in projected.activities] == [
+        ("complete_response", ["r2"]), ("unavailable", ["r1"])]
+
+
+def test_a_decided_answer_without_its_response_is_projected():
+    """Live 2026-10-13 ("Wave to my little brother, then tell us a joke."): the joke was
+    decided answer but its response was omitted, and the whole turn failed. The response
+    need names only its Responsibility, so the decision realizes it; a decided
+    clarification still needs the model's own question need."""
+    from agent.app.planner_fast_validation import project_responsibility_decisions
+
+    waving = {"role": "capability", "capability_id": "test.wave", "activity_id": "act_wave", "args": {},
+              "depends_on": [], "source_responsibility_refs": ["r1"]}
+    schema, output = _answer_beside_body({"decision": "work", "missing": []}, [waving])
+    assert Draft202012Validator(schema).is_valid(output)
+    projected = project_responsibility_decisions(
+        FastPlannerAdvanceModelOutput.model_validate(output), responsibility_refs=["r1", "r2"], speech_refs={"r2"})
+    assert [(item.role, item.activity_id, item.source_responsibility_refs) for item in projected.activities] == [
+        ("capability", "act_wave", ["r1"]), ("complete_response", "response-r2", ["r2"])]
+    unasked = FastPlannerAdvanceModelOutput.model_validate({
+        **output, "responsibility_decisions": {"r1": {"decision": "clarify", "missing": []},
+                                               "r2": {"decision": "answer", "missing": []}},
+        "activities": []})
+    with pytest.raises(PlannerDTOContractError, match="decided clarify without its Activity"):
+        project_responsibility_decisions(unasked, responsibility_refs=["r1", "r2"], speech_refs={"r2"})
 
 
 def test_decision_states_share_each_activity_branch_on_the_wire():

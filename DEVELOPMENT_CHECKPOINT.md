@@ -1,6 +1,68 @@
 # Chromie Development Checkpoint
 
-## Current work — Run-5 root-cause repairs, 2026-10-13
+## Current work — Run-8 repairs: Planner decoder/DTO agreement; Soridormi delivery, 2026-10-13
+
+Base `origin/main` `1d432208b`; the run-7 repairs below and these run-8 repairs are delivered together on the
+owner's instruction "commit and push all to remote repo" (2026-10-13); the expected resume revision is the latest
+commit containing this file. Owner (2026-10-13): "deployed , go on, fix soridormi too." Live run 8 (everyday cohort, `rootcause3-20261013`): mechanical
+26/33, judged 21 pass / 6 partial / 6 fail (run 7: 20/5/8). Evidence: `.chromie/acceptance/remaining-defects-20261013/`
+README ("Live run 8", "Repairs after run 8"), `run8/`.
+
+- C1a streamed Planner: `mixed` accepts any response or clarification (answer + Host-added limitation is mixed);
+  an `answer` decision whose response need was omitted is projected from the decision like the unavailable one;
+  clarify + limitation is `mixed` in the Host check too (backflip, wave+joke).
+- C1b canonical: `native_goal_outcome_branches` covers every exposed `oneOf`/`anyOf` shape at any depth; the
+  readiness wrapper's inner waiting shapes offered `respond` with partial coverage (thirsty "Yes, please.").
+  Offline XGrammar: the recorded schema accepts the recorded invalid output, the repaired one rejects it.
+- C1c re-entry: clarify is its own decoder branch with `unresolved_needs` ≥ 1, matching the compact DTO, the
+  prompt and the lifted Goal outcome (milk, remote after a failed fetch).
+- Soridormi (separate repo, delivered to Soridormi `origin/main` on top of `afb6a1a` in the same session):
+  recipient `referent_id` is `"requester" | null`
+  and the realization contract says when; the mock user actor carries the provider-internal requester role;
+  every scene marker (milk included) is read all around; misses say `resource` or `recipient`.
+- Open: UMI acknowledgement-only Responsibility (celebrate, 503 equal ends); Planner provenance (umbrella date,
+  guessed look yaw); SC ingress acknowledgement promising a value-reviewed act (cookie); Planner decoration and
+  repeated deliveries; Planner `missing` naming items (coffee → "我找不到…"); a provider failure raised as an
+  exception is not model-visible output (re-entry sees only `schema_invalid`).
+
+Verification: four new regressions red on the deployed sources / green now; freeze 33 (`c6b4abb6…`, no reply
+migrated, 6,000 + 5 recaptured with 0 failures); strict replay 6,000/6,000 zero model calls (same outcome
+distribution as freeze 32); Level A 45/45; gate in clean worktree `scratchpad/gate14` (pytest 3,818 + 5
+skipped, benchmarks 169, legacy 20, policies and docs). Recorded-request replay of the Soridormi contract:
+`requester` 23/23 vs 0/23. Soridormi focused 151 passed, full 831 passed + 8 environment failures identical on
+unmodified `afb6a1a`. Image `chromie-agent:rootcause4-20261013` (`e310f2b4…`, 125 files identical, digest
+`52c25882a59fa651`), not deployed. Soridormi scene restarted with the fix (MCP 10:51 UTC); focused live check on `rootcause3`
+(`run8-soridormi/`): mix_water_time_zh delivered twice (Planner repetition, open) to `referent_id: "requester"`
+and said the time; errand_milk_en saw the milk 9.854 m to Chromie's left (outside the old field) and delivered
+it to the requester in 5 min 38 s.
+
+## Previous work — Run-7 cluster repairs, 2026-10-13
+
+Base `origin/main` `1d432208b` (runs 5-6 repairs, pushed on the owner's instruction "commit and push ... then fix
+the problem you found"). Owner agreed order: SC 422 first, then UMI overlapping spans and Planner argument
+provenance, then the same everyday cohort; Soridormi delivery to be investigated by me. Delivered with the
+run-8 repairs above.
+Evidence: `.chromie/acceptance/remaining-defects-20261013/README.md` ("Repairs after run 7").
+
+- SC: addressed-need Goal/Responsibility bindings are projected from `addressed_need_ids` (all three 422 kinds
+  of runs 2-7); at ingress the decoder offers respond/ask only for turn-local speech and orders `function`
+  before `text`.
+- UMI: only each Responsibility's last token is required; Host derives every span start from the previous end,
+  so independent spans partition the turn (an authored start is admissible for frozen references and ignored).
+  Recorded-prompt replay 38/38 accepted. Prompt-only v7 (lead-in rule) did not help and was reverted.
+- Planner (streamed): a target-requiring Capability is offered only with trusted target evidence; the decoder
+  pins `target_ref` to it.
+- Open: umbrella-type dependent question (UMI omits place/time in the second Responsibility; a shared-read
+  prompt line had no effect, reverted); Soridormi delivery — recipient matched lexically to the marker "user"
+  ("me"/"the person" fail on the return leg, mislabelled as resource), milk marker visible only in a 90°
+  forward field. Soridormi changes await the owner's direction.
+
+Verification: freeze 32 archive `d88f05bd…` (no reply migrated); strict replay 6,000/6,000 zero model calls;
+Level A 45/45; gate in clean worktree `scratchpad/gate13` (pytest 3,814 + 5 skipped, benchmarks 169, legacy 20).
+Image `chromie-agent:rootcause3-20261013` (`a62d744a…`, 125 files identical, digest `d19269a8c3864d4a`), deployed
+by the owner; live run 8 above.
+
+## Previous work — Run-5 root-cause repairs, 2026-10-13
 
 Base `origin/main` `ff9e87417` (fetched 2026-10-13; branch `planner-limitation-contracts` equal to it).
 Owner request (2026-10-13): explain the weather timeout, then "try to fix these, sure, findout the root

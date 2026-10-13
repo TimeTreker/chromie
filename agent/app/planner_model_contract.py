@@ -450,12 +450,9 @@ class PlannerEvidenceReentryGoalDecision(BaseModel):
             raise ValueError("post-execution respond requires trusted Evidence refs")
         if self.next_action in {"respond", "execute"} and self.unresolved_needs:
             raise ValueError("complete re-entry action cannot retain unresolved needs")
-        if self.next_action == "clarify" and not (
-            self.unresolved_needs or self.unmet_requirements or self.rationale
-        ):
-            raise ValueError(
-                "clarify re-entry requires a concrete unresolved need or rationale"
-            )
+        if self.next_action == "clarify" and not self.unresolved_needs:
+            # The lifted Goal outcome requires the same unresolved input need.
+            raise ValueError("clarify re-entry requires the unresolved input need")
         if self.next_action in {"clarify", "unavailable", "refused"}:
             if self.satisfaction_status == "exact":
                 raise ValueError("noncompletion re-entry action cannot claim exact satisfaction")

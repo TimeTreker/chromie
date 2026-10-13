@@ -27,6 +27,7 @@ try:
     )
     from chromie_contracts.plan import (
         argument_source_span,
+        FastPlannerResponseNeed,
         FastPlannerUnavailableNeed,
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
@@ -48,6 +49,7 @@ except ImportError:  # pragma: no cover
     )
     from shared.chromie_contracts.plan import (
         argument_source_span,
+        FastPlannerResponseNeed,
         FastPlannerUnavailableNeed,
         CanonicalPlan,
         FastPlannerAdvanceModelOutput,
@@ -140,7 +142,11 @@ def project_responsibility_decisions(
     The Planner decides every Responsibility first (live 2026-10-11: an impossible
     sibling was left only in ``unresolved``). An unavailable decision carries its
     missing facts and becomes the Host-side unavailable Activity the model no longer
-    authors; any other decision must be realized by its own Activity. The authored
+    authors. An answer decision is realized by a response need that names only the
+    Responsibility, so a missing one is projected the same way (live 2026-10-13:
+    "Wave to my little brother, then tell us a joke." decided answer for the joke,
+    omitted its response, and lost both). Work and clarification carry content only
+    the model can author, so they must be its own Activities. The authored
     aggregate disposition must equal the one these decisions imply; a contradiction
     fails closed instead of being replaced.
     """
@@ -168,6 +174,11 @@ def project_responsibility_decisions(
                 activities.append(FastPlannerUnavailableNeed(
                     role="unavailable", activity_id=f"unavailable-{ref}",
                     source_responsibility_refs=[ref], missing=list(item.missing)))
+        elif item.decision == "answer" and "complete_response" not in own:
+            activities.append(FastPlannerResponseNeed(
+                role="complete_response", activity_id=f"response-{ref}",
+                source_responsibility_refs=[ref],
+                rationale="The Planner decided to answer this Responsibility."))
         elif DECISION_ACTIVITY_ROLE[item.decision] not in own:
             raise PlannerDTOContractError(
                 f"Responsibility {ref} was decided {item.decision} without its Activity")
@@ -832,11 +843,15 @@ def validate_fast_advance_output(
                 "disposition; missing=" + ",".join(sorted(missing_terminal_refs))
             )
     if clarification_activities:
-        expected_disposition = "mixed" if capability_activities or complete_response_activities else "clarify"
+        unavailable_activities = [item for item in output.activities if item.role == "unavailable"]
+        expected_disposition = (
+            "mixed" if capability_activities or complete_response_activities or unavailable_activities
+            else "clarify"
+        )
         if output.disposition != expected_disposition:
             raise PlannerDTOContractError(
                 "clarification disposition must be clarify when it is the only "
-                "terminal work, or mixed when independent Capability work or a complete response proceeds"
+                "terminal work, or mixed beside independent Capability work, a complete response or a limitation"
             )
     all_gap_ids = [
         gap.gap_id for activity in clarification_activities for gap in activity.information_gaps
