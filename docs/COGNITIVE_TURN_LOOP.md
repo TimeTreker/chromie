@@ -1137,7 +1137,11 @@ projection decision plus a content digest under the evidence-retention policy;
 it does not make raw secrets model-visible. Schema failure, projection failure,
 or an empty required observation fails closed as `observation_unavailable`.
 Trusted terminal status may still be recorded, but the Core cannot invent the
-missing payload or make a claim that depends on it.
+missing payload or make a claim that depends on it. A provider's declared
+non-completion (for Soridormi `completed: false` with a summary, such as a
+resource or recipient the scene does not show) is evidence like a completion: the
+adapter keeps only the declared fields, so the observation validates and the
+reason can be said; the full provider payload stays diagnostic metadata.
 
 ## 8. Outcome reconciliation and speech contracts
 

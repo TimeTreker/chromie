@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-13",
+  "frozen_on": "2026-10-14",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
     "workflow-cancellation.json": "6cf05e2542f00c13acf5843273dae15e6314c63adde7743cd15ec55073951c93",
-    "workflow-conditional-dry.json": "ecd36ad01005a79a3fcc7b570d27c7ec5b57b0fda80c2e17f7aa627f773e444e",
-    "workflow-conditional-rain.json": "ee940b40c8bf9c9e4b752a18c1be03f4998ea2b9671fbd6d23934d7e73626457",
+    "workflow-conditional-dry.json": "54c5f15a5d059ac40e36ae0fb712a40d818fb7dfeae710c75ce819c9b73092a3",
+    "workflow-conditional-rain.json": "9030eb984b2e25e52f47531f50d34c332d7098d49b65a04f9f5201695a2b2583",
     "workflow-delayed.json": "60f5ff226fb734e6454231c556fcc0b139f7628e1c76af6cc81dda547fc7fab5",
     "workflow-normal.json": "f0707fa493aeeb51b1aa5ccec65b0871c15ac36e48f6cc1f9ba08cd87a3ba470"
   },
-  "freeze_revision": 33,
-  "freeze_note": "Run-8 repairs (2026-10-13). Every request recaptured: a streamed mixed result may hold only a response or a clarification beside a Host-added limitation and a decided answer's omitted response need is projected; every exposed canonical shape offers native per-disposition Goal outcomes; a re-entry clarify names its unresolved input need. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 34,
+  "freeze_note": "Run-9 repairs (2026-10-14). Every request recaptured: the Planner names a limitation's missing ability and a re-entry clarify need as a short fact; SC answers a direct robot question with its robot body. A Soridormi declared non-completion keeps only the declared adapter fields. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

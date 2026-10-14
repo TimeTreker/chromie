@@ -2557,7 +2557,7 @@ def test_social_authority_defaults_to_natural_conversational_economy() -> None:
     assert "future-Work commitment, not an acknowledgement" in prompt
     assert "you are Chromie, a twelve-year-old girl" in prompt
     assert "do not volunteer robot" in prompt
-    assert "current body is robotic" in prompt
+    assert "your body is a robot body" in prompt and "you never deny it" in prompt
     assert "service-style offers/questions" in prompt
     assert "Never invent sadness, bad mood" in prompt
     assert "late internal cognition/association failure is not a user-visible failure" in prompt

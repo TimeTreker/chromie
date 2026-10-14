@@ -1,13 +1,24 @@
 # Chromie Current Status
 
-## Current delivery — Run-8 repairs: Planner decoder/DTO agreement, 2026-10-13
+## Current delivery — Run-9 repairs: truthful limitation and identity speech, 2026-10-14
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `c101d8272`: SC answers a direct robot question with its robot body; the Planner names a limitation's missing ability and a re-entry clarify need as a short fact; a Soridormi declared non-completion keeps only the declared adapter fields. Soridormi (separate repo): an unobserved or ambiguous delivery target is a declared `completed: false` outcome. The owner rejected the robot-body answer (2026-10-14); it is the next change. |
+| Automatic verification | Recorded-request replays (identity denial 8/8 → 0/6; limitation `missing` items/dependencies → abilities; re-entry need sentence → short fact); one new regression red on HEAD / green; freeze 34 (`c6862ab5…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,819 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Run 9 (everyday cohort, `rootcause4-20261013`): mechanical 30/33, judged 24 pass / 5 partial / 4 fail. These repairs are not yet live (run 10 pending). Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause5-20261014`, deployed by the owner. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Run-8 repairs: Planner decoder/DTO agreement, 2026-10-13
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `1d432208b` plus the run-7 repairs: a streamed mixed result may hold only a response or a clarification beside a Host-added limitation, and an omitted response need is projected from its `answer` decision; every exposed canonical shape offers native per-disposition Goal outcomes; a re-entry clarify names its unresolved input need in the decoder, compact DTO and prompt. Soridormi (separate repo, uncommitted): requester recipient referent and all-around scene markers. |
 | Automatic verification | Four regressions red on the deployed sources / green now; freeze 33 (`c6b4abb6…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,818 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 8 (everyday cohort, `rootcause3-20261013`): mechanical 26/33, judged 21 pass / 6 partial / 6 fail. These repairs are not yet live (run 9 pending). Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause3-20261013`; `rootcause4-20261013` built and source-verified, not deployed. No release. |
+| Target validation | Run 8 (everyday cohort, `rootcause3-20261013`): mechanical 26/33, judged 21 / 6 / 6. Run 9 on these repairs: mechanical 30/33, judged 24 pass / 5 partial / 4 fail. Not qualified. |
+| Deployment state | Delivered as `c101d8272`; `rootcause4-20261013` deployed by the owner. No release. |
 
 Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
 

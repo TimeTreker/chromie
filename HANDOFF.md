@@ -1,14 +1,37 @@
 # Chromie Handoff
 
-## Current work — Run-8 repairs, 2026-10-13
+## Current work — Run-9 repairs, 2026-10-14
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
+`c101d8272`; the run-9 repairs are pushed to `origin/main` (expected resume revision: the latest commit containing
+this file). Soridormi `/home/chromie/github/soridormi` (branch `scenario-control-stall`): the declared
+non-completion change is pushed to Soridormi `origin/main` on top of `af20f8b`; the water scene was restarted with it
+on 2026-10-14 (sim and MCP bind-mount that checkout). Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README "Live
+run 9" and "Repairs after run 9"; `run9/` with bundle and digests; `probes/replay_generic.py` and its
+`identity/`, `missing/`, `reentry/` outputs; `capture34.py`, `freeze34.py`, `strict-replay-freeze34/`,
+`level-a-run9-repairs/`). Gate worktree `scratchpad/gate15`. Live:
+`chromie-agent:latest` = `rootcause5-20261014` (`sha256:c592f99a…`, digest `94c0fec19599560d`), deployed by the
+owner on 2026-10-14. Next: the owner's identity direction (see the checkpoint) and live run 10.
+
+```bash
+# deployed 2026-10-14 (rollback: chromie-agent:rootcause4-20261013)
+docker tag chromie-agent:rootcause5-20261014 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# (already done) restart the Soridormi scene after a Soridormi change; it replaces the simulator only when idle
+# cd /home/chromie/github/soridormi && ./scripts/run_scenario.sh --scenario configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer
+# then live run 10 on the everyday cohort (one invocation, one bundle)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
+```
+
+## Previous work — Run-8 repairs, 2026-10-13
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
 `1d432208b`; the run-7 + run-8 repairs are pushed to `origin/main` (expected resume revision: the latest commit
 containing this file). Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README "Live
 run 8" and "Repairs after run 8"; `run8/` with bundle and digests; `capture33.py`, `freeze33.py`,
 `strict-replay-freeze33/`, `level-a-run8-repairs/`, `probes/recipient/`, `run8-soridormi/`). Gate worktree
-`scratchpad/gate14`. Live: `chromie-agent:latest` = `rootcause3-20261013`; built and verified, not deployed:
-`chromie-agent:rootcause4-20261013` (`sha256:e310f2b4…`, digest `52c25882a59fa651`).
+`scratchpad/gate14`. `chromie-agent:rootcause4-20261013` (`sha256:e310f2b4…`, digest `52c25882a59fa651`) was
+deployed by the owner on 2026-10-14 and measured as run 9.
 
 Soridormi: the fix is pushed to Soridormi `origin/main` (on top of `afb6a1a`) from `/home/chromie/github/soridormi`
 (branch `scenario-control-stall`, bind-mounted into sim and MCP). The water scene was restarted with it (`./scripts/run_scenario.sh --scenario configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer`,

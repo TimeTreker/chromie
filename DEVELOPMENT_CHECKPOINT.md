@@ -1,6 +1,42 @@
 # Chromie Development Checkpoint
 
-## Current work — Run-8 repairs: Planner decoder/DTO agreement; Soridormi delivery, 2026-10-13
+## Current work — Run-9 repairs: truthful limitation and identity speech; failures the person can hear, 2026-10-14
+
+Base `origin/main` `c101d8272` (run-7/8 repairs, deployed by the owner as `rootcause4-20261013`). Owner: "go on
+please". Live run 9 (everyday cohort, clean tree, Soridormi `af20f8b`): mechanical 30/33, judged 24 pass /
+5 partial / 4 fail (run 8: 21/6/6). Delivered on the owner's instruction "commit and push to remote repo main
+branch" (2026-10-14); the expected resume revision is the latest commit containing this file. Evidence: `.chromie/acceptance/remaining-defects-20261013/`
+README ("Live run 9", "Repairs after run 9"), `run9/`, `probes/identity/`, `probes/missing/`, `probes/reentry/`.
+
+- SC: a direct human/robot/AI question is answered honestly that the body is a robot body (run 9 denied it).
+- Planner: an unavailable Responsibility's `missing` names the ability Chromie lacks, never objects or
+  information (coffee "我找不到…", rain_tell "can't check the weather"); a re-entry clarify names its need as a
+  short fact the person can supply, never wording ("a fatal schema error" was spoken).
+- Soridormi adapter (Chromie): a declared non-completion keeps only the declared output fields, like a
+  completion, so it validates and reaches re-entry/SC; the full payload stays in `metadata.provider_output`.
+- Soridormi (separate repo, delivered to Soridormi `origin/main` on top of `af20f8b`): an unobserved or
+  ambiguous resource/recipient returns `completed: false` with a summary and an honest `resource_outcome`
+  instead of raising.
+- Owner direction after delivery (2026-10-14), next work: the robot-body answer above is rejected — "When we ask
+  chromie, she must not tell us she is robot, she can reply, I am chromie, a 12 years old girl ... This is a
+  basic identity setting." It conflicts with Charter IDENTITY-TRUTH-001, the Stable Mind identity guidance and
+  the SC prompt, which all say to answer a direct question truthfully; those owners change together.
+- Needs the owner: Planner repetition of an identical effect (fail closed vs collapse, P31).
+- Open: UMI acknowledgement-only Responsibility; canonical waiting misread (contained); Planner provenance
+  (umbrella, look yaw); decoration.
+
+Verification: recorded-request replays (identity denial 8/8 → 0/6 with controls unchanged; coffee_zh 4/4
+abilities vs 1/4 items + 3/4 fetch; rain_tell 3/3 ability vs dependency; re-entry need 3/3 short fact vs
+diagnosis sentence); Chromie `test_a_declared_non_completion_is_evidence_the_model_may_read` red on HEAD /
+green; freeze 34 (`c6862ab5…`, no reply migrated, 6,000 + 5 recaptured, 0 failures); strict replay 6,000/6,000
+zero model calls (same outcome distribution); Level A 45/45; gate in clean worktree `scratchpad/gate15` (pytest
+3,819 + 5 skipped, benchmarks 169, legacy 20, policies, docs) after updating the literal SC prompt assertion
+the first gate run caught. Soridormi focused 152 passed; full 836 passed + 4 failed (script smokes needing `rg`,
+identical on unmodified `af20f8b`); governance and body-concurrency pass. Image
+`chromie-agent:rootcause5-20261014` (`c592f99a…`, 125 files identical, digest `94c0fec19599560d`), deployed by the
+owner on 2026-10-14.
+
+## Previous work — Run-8 repairs: Planner decoder/DTO agreement; Soridormi delivery, 2026-10-13
 
 Base `origin/main` `1d432208b`; the run-7 repairs below and these run-8 repairs are delivered together on the
 owner's instruction "commit and push all to remote repo" (2026-10-13); the expected resume revision is the latest
@@ -31,7 +67,7 @@ distribution as freeze 32); Level A 45/45; gate in clean worktree `scratchpad/ga
 skipped, benchmarks 169, legacy 20, policies and docs). Recorded-request replay of the Soridormi contract:
 `requester` 23/23 vs 0/23. Soridormi focused 151 passed, full 831 passed + 8 environment failures identical on
 unmodified `afb6a1a`. Image `chromie-agent:rootcause4-20261013` (`e310f2b4…`, 125 files identical, digest
-`52c25882a59fa651`), not deployed. Soridormi scene restarted with the fix (MCP 10:51 UTC); focused live check on `rootcause3`
+`52c25882a59fa651`), deployed by the owner on 2026-10-14 (live run 9 above). Soridormi scene restarted with the fix (MCP 10:51 UTC); focused live check on `rootcause3`
 (`run8-soridormi/`): mix_water_time_zh delivered twice (Planner repetition, open) to `referent_id: "requester"`
 and said the time; errand_milk_en saw the milk 9.854 m to Chromie's left (outside the old field) and delivered
 it to the requester in 5 min 38 s.

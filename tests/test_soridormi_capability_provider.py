@@ -730,6 +730,48 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(execution.results[0].output["capability_id"], "soridormi.nod_yes")
         self.assertNotIn("skill_id", execution.results[0].output)
 
+    async def test_a_declared_non_completion_is_evidence_the_model_may_read(self) -> None:
+        """Live 2026-10-14 (errand_remote_en): a fetch Soridormi could not start reached
+        re-entry only as schema_invalid and was spoken as "a fatal schema error". A declared
+        non-completion keeps only the declared fields, as a completion does."""
+        from jsonschema import Draft202012Validator
+        from orchestrator.runtime.soridormi_capability_provider import (
+            SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA,
+        )
+
+        summary = "The requested resource is not observed in the simulator, so it was not fetched."
+        invoker = _RecordingInvoker(
+            overrides={
+                "soridormi.skill.execute_plan": ToolCallOutcome.success({
+                    "completed": False, "skill_id": "nod_yes", "mode": "sim", "no_motion": True,
+                    "recommendation_only": False, "summary": summary, "segments_run": 0,
+                })
+            }
+        )
+
+        execution = await submit_and_wait_terminal(self._runtime(invoker),
+            InteractionResponse(
+                capabilities=[
+                    {"request_id": "nod-1", "capability_id": "soridormi.nod_yes", "args": {"count": 1}}
+                ]
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids={"nod-1"},
+                safety_monitor_active=True,
+            ),
+        )
+
+        result = execution.results[0]
+        self.assertEqual((execution.status, result.reason_code, result.message),
+                         ("failed", "execution_incomplete", summary))
+        self.assertEqual(result.output, {
+            "completed": False, "capability_id": "soridormi.nod_yes", "mode": "sim",
+            "no_motion": True, "recommendation_only": False, "summary": summary,
+        })
+        self.assertTrue(Draft202012Validator(SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA).is_valid(result.output))
+        self.assertEqual(result.metadata["provider_output"]["segments_run"], 0)
+        self.assertNotIn("skill_id", result.metadata["provider_output"])
+
     async def test_execute_rejects_mismatched_provider_identity(self) -> None:
         invoker = _RecordingInvoker(
             overrides={

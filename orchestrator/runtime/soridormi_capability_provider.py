@@ -437,26 +437,28 @@ class SoridormiCapabilityProvider:
             )
             if resource_failure is not None:
                 return resource_failure
+        # A declared non-completion is evidence like a completion: both expose only the
+        # declared adapter fields, so the person can be told why (live 2026-10-14: a
+        # failed fetch reached re-entry only as schema_invalid and was spoken as "a fatal
+        # schema error"). Soridormi's full payload stays diagnostic metadata.
         return CapabilityResult(
             request_id=request.request_id,
             capability_id=request.capability_id,
             capability_version=definition.version,
             status="completed" if completed else "failed",
             provider_id=self.provider_id,
-            output=(
-                self._successful_execution_output(
-                    executed.output,
-                    request=request,
-                    upstream_skill_id=upstream_skill_id,
-                )
+            output=self._declared_execution_output(executed.output, request=request),
+            metadata=(
+                {}
                 if completed
-                else self._canonical_provider_output(executed.output, request=request)
+                else {"provider_output": self._canonical_provider_output(executed.output, request=request)}
             ),
             reason_code=None if completed else "execution_incomplete",
             message=(
                 ""
                 if completed
-                else "Soridormi did not explicitly report skill completion"
+                else str(executed.output.get("summary") or "")
+                or "Soridormi did not explicitly report skill completion"
             ),
         )
 
@@ -1091,16 +1093,15 @@ class SoridormiCapabilityProvider:
         return projected
 
     @staticmethod
-    def _successful_execution_output(
+    def _declared_execution_output(
         output: dict[str, Any],
         *,
         request: CapabilityRequest,
-        upstream_skill_id: str,
     ) -> dict[str, Any]:
-        """Project successful provider output into the declared adapter schema."""
+        """Project provider execution output into the declared adapter schema."""
 
         projected = {
-            "completed": True,
+            "completed": output.get("completed") is True,
             "capability_id": str(request.capability_id),
             "mode": str(output.get("mode") or ""),
             "no_motion": output.get("no_motion") is True,
