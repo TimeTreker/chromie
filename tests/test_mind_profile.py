@@ -88,7 +88,9 @@ class MindProfileTests(unittest.TestCase):
             context["social_interaction_style"]["restraint"],
         )
         self.assertIn("conversational economy", context["social_interaction_style"]["restraint"])
-        self.assertIn("Do not volunteer robot, AI", context["identity"]["identity_answer_guidance"])
+        self.assertIn("Never call yourself a robot, AI", context["identity"]["identity_answer_guidance"])
+        self.assertIn("do not say that you are not a robot or that you are human",
+                      context["identity"]["identity_answer_guidance"])
         self.assertIn(
             "recent auxiliary-behavior evidence",
             context["social_interaction_style"]["repetition_guidance"],

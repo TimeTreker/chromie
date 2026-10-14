@@ -1,6 +1,26 @@
 # Chromie Handoff
 
-## Current work — Run-9 repairs, 2026-10-14
+## Current work — Owner identity direction, 2026-10-14
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts` = `origin/main` `95a8ee5aa` plus the
+uncommitted identity diff. Soridormi `/home/chromie/github/soridormi` = `origin/main` `33b8a13`, scene
+running it. Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README "Live run 10" and "Repairs after run
+10"; `run10/`; `probes/identity2/` with `pairs_projected.json`; `capture35.py`, `freeze35.py`,
+`strict-replay-freeze35/`, `level-a-identity/`). Gate worktree `scratchpad/gate16`. Live:
+`chromie-agent:latest` = `rootcause5-20261014`; built and verified, not deployed: `chromie-agent:rootcause6-20261014`
+(`sha256:417b8cde…`, digest `ebfae93f9c0234ef`).
+The Mind profile is read by the host orchestrator from `config/mind/chromie_default.json` (`ORCH_MIND_PROFILE_PATH`),
+so the identity texts take effect from the checkout; the SC prompt needs the new image.
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause5-20261014)
+docker tag chromie-agent:rootcause6-20261014 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then live run 11 on the everyday cohort (one invocation, one bundle)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
+```
+
+## Previous work — Run-9 repairs, 2026-10-14
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
 `c101d8272`; the run-9 repairs are pushed to `origin/main` (expected resume revision: the latest commit containing
@@ -11,7 +31,7 @@ run 9" and "Repairs after run 9"; `run9/` with bundle and digests; `probes/repla
 `identity/`, `missing/`, `reentry/` outputs; `capture34.py`, `freeze34.py`, `strict-replay-freeze34/`,
 `level-a-run9-repairs/`). Gate worktree `scratchpad/gate15`. Live:
 `chromie-agent:latest` = `rootcause5-20261014` (`sha256:c592f99a…`, digest `94c0fec19599560d`), deployed by the
-owner on 2026-10-14. Next: the owner's identity direction (see the checkpoint) and live run 10.
+owner on 2026-10-14 and measured as run 10.
 
 ```bash
 # deployed 2026-10-14 (rollback: chromie-agent:rootcause4-20261013)

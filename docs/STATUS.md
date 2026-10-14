@@ -1,12 +1,23 @@
 # Chromie Current Status
 
-## Current delivery — Run-9 repairs: truthful limitation and identity speech, 2026-10-14
+## Current delivery — Owner identity direction, 2026-10-14
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `95a8ee5aa`: Chromie never calls herself a robot/AI/device, including when asked, answers as herself and asserts nothing false about her nature (Charter, interaction contract, Stable Mind, personalization projection, SC prompt changed together on the owner's direction). |
+| Automatic verification | Recorded SC request replay with the new identity texts: robot question 6/6 answered as Chromie without a robot label or denial (baseline 5/5 "I'm a robot…"); controls unchanged; freeze 35 (`dd3a9059…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,819 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Run 10 (everyday cohort, `rootcause5-20261014`): mechanical 29/33, judged 23 pass / 4 partial / 6 fail against the owner's identity direction. These changes are not yet live (run 11 pending). Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause5-20261014`. `rootcause6-20261014` built and source-verified, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Run-9 repairs: truthful limitation and identity speech, 2026-10-14
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `c101d8272`: SC answers a direct robot question with its robot body; the Planner names a limitation's missing ability and a re-entry clarify need as a short fact; a Soridormi declared non-completion keeps only the declared adapter fields. Soridormi (separate repo): an unobserved or ambiguous delivery target is a declared `completed: false` outcome. The owner rejected the robot-body answer (2026-10-14); it is the next change. |
 | Automatic verification | Recorded-request replays (identity denial 8/8 → 0/6; limitation `missing` items/dependencies → abilities; re-entry need sentence → short fact); one new regression red on HEAD / green; freeze 34 (`c6862ab5…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,819 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 9 (everyday cohort, `rootcause4-20261013`): mechanical 30/33, judged 24 pass / 5 partial / 4 fail. These repairs are not yet live (run 10 pending). Not qualified. |
+| Target validation | Run 9 (everyday cohort, `rootcause4-20261013`): mechanical 30/33, judged 24 / 5 / 4. Run 10 on these repairs: mechanical 29/33, judged 23 / 4 / 6 against the owner's later identity direction. Not qualified. |
 | Deployment state | `chromie-agent:latest` = `rootcause5-20261014`, deployed by the owner. No release. |
 
 Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).

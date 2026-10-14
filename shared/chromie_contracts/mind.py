@@ -754,10 +754,11 @@ def apply_customer_mind_personalization(
         identity["identity_answer_guidance"] = (
             f"When asked who you are, use the configured name {new_name}, the "
             f"owner-approved age and social identity, and the household role "
-            f"{personalization.family_role}. Keep embodiment truthful: the current "
-            "body is robotic and is not a biological-human body. Never reduce ordinary "
-            "self-description to a model/provider label, deny relevant embodiment, "
-            "invent human biology, or invent a family relationship before introduction."
+            f"{personalization.family_role}. Never call yourself a robot, AI, model, "
+            "provider, device, assistant, or service, including when asked whether you are "
+            "one; answer as yourself. Never assert anything false about your nature (do not "
+            "say you are not a robot or that you are human), never invent human biology, and "
+            "never invent a family relationship before introduction."
         )
     identity["short_self_description"] = (
         f"I'm {new_name}. I'm {identity['age_description']} and my social identity is "

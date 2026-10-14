@@ -6127,19 +6127,19 @@
     "eb82ff9a66b09e72c393e16ecfa9ba9ad34c075b446062d13e74b405d5941daf.json": "eb82ff9a66b09e72c393e16ecfa9ba9ad34c075b446062d13e74b405d5941daf"
   },
   "frozen_on": "2026-10-14",
-  "freeze_revision": 34,
-  "freeze_note": "Run-9 repairs (2026-10-14). Every request recaptured: the Planner names a limitation's missing ability and a re-entry clarify need as a short fact; SC answers a direct robot question with its robot body. A Soridormi declared non-completion keeps only the declared adapter fields. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 35,
+  "freeze_note": "Owner identity direction (2026-10-14). Every request recaptured: Chromie never calls herself a robot, AI or device, including when asked, answers as herself and asserts nothing false about her nature (Charter, Stable Mind, personalization projection, SC prompt). No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "previous_freeze": {
-    "manifest_sha256": "eb457e648c9aad97b1c832db31d248baa543b47ae94f6e5ec53d876ac46ec308",
+    "manifest_sha256": "c6b8a2bda88de3ba8bddd3fb9ae6d0081da5df220d42045f050112cc6048cb17",
     "storage": {
       "archive_path": "benchmarks/integration/workflow_scenarios/frozen.tar.xz",
-      "archive_sha256": "c6b4abb6200e17445641747bf42bfc55ec165ec840ce5ef3d59d080e2deec1e2",
-      "manifest_sha256": "de070b98c8a080f0c3da3299f32a249003371abc4dd218bd94b13c0662ede26f"
+      "archive_sha256": "c6862ab5dac27990c945fba9e2086dcf491c68dc8c2bf127791f91b41072a48f",
+      "manifest_sha256": "3c30a9e731505335e1efc5c559b9cfba60aaacf71849aec268e2bfcd449a1a7a"
     }
   },
   "storage": {
     "archive_path": "benchmarks/integration/workflow_scenarios/frozen.tar.xz",
-    "archive_sha256": "c6862ab5dac27990c945fba9e2086dcf491c68dc8c2bf127791f91b41072a48f",
-    "manifest_sha256": "3c30a9e731505335e1efc5c559b9cfba60aaacf71849aec268e2bfcd449a1a7a"
+    "archive_sha256": "dd3a90597adf0957e67a9d8c20dbf3490abf1f50de22ad35bfb93ad2f58e6eaa",
+    "manifest_sha256": "a30ce57b00d60b7b4fc9a1153f0fb4bd8771ba21afe80a4e0bbf0467d136e93b"
   }
 }

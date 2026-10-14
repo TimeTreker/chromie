@@ -1,6 +1,36 @@
 # Chromie Development Checkpoint
 
-## Current work — Run-9 repairs: truthful limitation and identity speech; failures the person can hear, 2026-10-14
+## Current work — Owner identity direction, 2026-10-14
+
+Base `origin/main` `95a8ee5aa` (run-9 repairs, deployed by the owner as `rootcause5-20261014`). Live run 10
+(everyday cohort, clean tree): mechanical 29/33, judged 23 pass / 4 partial / 6 fail against the owner's identity
+direction. Uncommitted. Evidence: `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 10",
+"Repairs after run 10"), `run10/`, `probes/identity2/`.
+
+- Owner direction (2026-10-14): Chromie never calls herself a robot, AI, model, device, assistant or service,
+  including when asked; she answers as herself (name, a twelve-year-old girl, what she likes or can do). Changed
+  together at the global identity owners: Charter IDENTITY-TRUTH-001, `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md`,
+  `config/mind/chromie_default.json` (identity guidance, boundary, self-concept), the personalization projection
+  in `shared/chromie_contracts/mind.py`, and the SC prompt. She asserts nothing false about her nature (no "I'm
+  not a robot", no "I'm human"); her robotic body stays the internal fact for what she can perceive and do. The
+  agent declined only that explicit denial and told the owner.
+- Not changed: the canonical readiness waiting shape stays offered to every turn. Gating it on time-typed
+  bindings was tried and reverted (400 corpus cases carry their time only in the Goal outcome); the contained
+  "Yes, please." failure stays open.
+- Open: SC silence after a declared non-completion when its earlier Value Judgment question looks unanswered
+  (harness grants confirmation without speech); "make coffee" planned as a fetch; Planner repetition (owner
+  decision: fail closed vs collapse); UMI acknowledgement-only Responsibility; Planner provenance (umbrella, look
+  yaw); SC wording slips.
+
+Verification: replay of run-10 SC requests with the four projected identity texts swapped (`probes/identity2/`):
+"Are you a robot?" 6/6 "I'm Chromie, a twelve-year-old girl who lives with my family." (baseline 5/5 "I'm a
+robot…"; SC prompt alone 4/5 "I'm not a robot"), backflip 6/6 without a robot mention, controls unchanged;
+identity/Mind/SC tests updated to the new owner texts; freeze 35 (`dd3a9059…`, no reply migrated, 6,000 + 5
+recaptured, 0 failures); strict replay 6,000/6,000 zero model calls (same distribution); Level A 45/45; gate in
+clean worktree `scratchpad/gate16` (pytest 3,819 + 5 skipped, benchmarks 169, legacy 20, policies, docs). Image
+`chromie-agent:rootcause6-20261014` (`417b8cde…`, 125 files identical, digest `ebfae93f9c0234ef`), not deployed.
+
+## Previous work — Run-9 repairs: truthful limitation and identity speech; failures the person can hear, 2026-10-14
 
 Base `origin/main` `c101d8272` (run-7/8 repairs, deployed by the owner as `rootcause4-20261013`). Owner: "go on
 please". Live run 9 (everyday cohort, clean tree, Soridormi `af20f8b`): mechanical 30/33, judged 24 pass /
@@ -34,7 +64,7 @@ zero model calls (same outcome distribution); Level A 45/45; gate in clean workt
 the first gate run caught. Soridormi focused 152 passed; full 836 passed + 4 failed (script smokes needing `rg`,
 identical on unmodified `af20f8b`); governance and body-concurrency pass. Image
 `chromie-agent:rootcause5-20261014` (`c592f99a…`, 125 files identical, digest `94c0fec19599560d`), deployed by the
-owner on 2026-10-14.
+owner on 2026-10-14; live run 10 above. The robot-body SC answer was rejected by the owner and replaced above.
 
 ## Previous work — Run-8 repairs: Planner decoder/DTO agreement; Soridormi delivery, 2026-10-13
 

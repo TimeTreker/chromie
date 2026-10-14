@@ -110,7 +110,7 @@ STALE_PHRASES = {
     "8c448e2de2cd8a602b0d48e31461f9be9f1b8d08": "stale repository snapshot revision",
     "current host has no microphone": "retained physical input now reaches VAD/ASR; the intelligible required utterance remains open",
     "a simple greeting may finish there without goal association": "every admitted greeting retains canonical Goal continuity after early speech",
-    "the owner-approved identity is a six-year-old girl, not a robot": "social identity must not deny truthful robotic embodiment",
+    "the owner-approved identity is a six-year-old girl, not a robot": "the owner-approved identity is twelve, and Chromie never asserts she is not a robot",
     "robotidentity": "the current identity contract is ChromieIdentity",
     "retained capabilityagent planner": "CapabilityAgent is retired from the maintained semantic architecture",
     "emergency compatibility planner is retained": "there is no maintained emergency semantic planner",

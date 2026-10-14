@@ -12,7 +12,7 @@
     "workflow-delayed.json": "60f5ff226fb734e6454231c556fcc0b139f7628e1c76af6cc81dda547fc7fab5",
     "workflow-normal.json": "f0707fa493aeeb51b1aa5ccec65b0871c15ac36e48f6cc1f9ba08cd87a3ba470"
   },
-  "freeze_revision": 34,
-  "freeze_note": "Run-9 repairs (2026-10-14). Every request recaptured: the Planner names a limitation's missing ability and a re-entry clarify need as a short fact; SC answers a direct robot question with its robot body. A Soridormi declared non-completion keeps only the declared adapter fields. No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 35,
+  "freeze_note": "Owner identity direction (2026-10-14). Every request recaptured: Chromie never calls herself a robot, AI or device, including when asked, answers as herself and asserts nothing false about her nature (Charter, Stable Mind, personalization projection, SC prompt). No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }
