@@ -2706,6 +2706,14 @@ def fast_streaming_advance_response_schema(
         retained_bound = int(activities.get("maxItems", 24))
         fast_bound = max(1, len(responsibility_refs)) * 5
         activities["maxItems"] = min(retained_bound, fast_bound)
+        compiled["properties"] = {
+            **{name: value for name, value in compiled["properties"].items() if name != "activities"
+               and name not in _AFTER_ACTIVITIES},
+            "activity_count": {"type": "integer", "minimum": 0, "maximum": activities["maxItems"]},
+            "activities": activities,
+            **{name: value for name, value in compiled["properties"].items() if name in _AFTER_ACTIVITIES},
+        }
+        compiled["required"] = [*compiled.get("required", []), "activity_count"]
     # Native decoders do not enforce the conditional allOf contract. Keep that
     # full validation and expose the same execution/limitation states as unions.
     states = []
@@ -2741,8 +2749,41 @@ def fast_streaming_advance_response_schema(
             else:
                 properties["activities"]["maxItems"] = 0
         states.append(state)
-    compiled["oneOf"] = states
+    compiled["oneOf"] = _exact_activity_count_states(states)
     return compiled
+
+
+_AFTER_ACTIVITIES = frozenset({
+    "disposition", "coverage", "covered_responsibility_refs", "confidence", "unresolved", "reason_summary",
+})
+
+
+def _exact_activity_count_states(states: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The Planner states how many Activities it writes before writing them.
+
+    Without it the decision to write another Activity rode on a fused value-closing
+    token such as ``."},`` or ``"]},``, chosen as a way to end a string, after which
+    the decoder had to open another Activity and the model copied the previous one
+    (live 2026-10-13/14: two or five identical deliveries). With the count first, the
+    array has exactly that length, so no closing token can open an extra Activity.
+    """
+    exact = []
+    for state in states:
+        properties = state["properties"]
+        activities = properties["activities"]
+        low = int(activities.get("minItems", 0))
+        high = int(activities.get("maxItems", low))
+        for count in range(low, high + 1):
+            ordered: dict[str, Any] = {}
+            for name, value in properties.items():
+                if name == "activities":
+                    ordered["activity_count"] = {"type": "integer", "enum": [count]}
+                    value = {**value, "minItems": count, "maxItems": count}
+                ordered[name] = value
+            required = list(state.get("required", []))
+            exact.append({**state, "properties": ordered,
+                          "required": required if "activity_count" in required else [*required, "activity_count"]})
+    return exact
 
 
 _STATE_DECISION = {"execute": "work", "respond": "answer", "clarify": "clarify", "unavailable": "unavailable"}

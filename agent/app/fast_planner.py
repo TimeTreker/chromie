@@ -27,6 +27,7 @@ from .planner_model_contract import (
     parse_ability_needs,
     stable_plan_id,
     take_ability_needs,
+    take_activity_count,
 )
 from .planner_schema import (
     need_first_response_schema,
@@ -298,6 +299,7 @@ class FastPlannerResolver:
                 raw = parse_fast_work_document(raw_text)
                 Draft202012Validator(schema).validate(raw)
                 final_needs = take_ability_needs(raw, loaded_capability_ids=loaded_capability_ids)
+                take_activity_count(raw)
                 output = FastPlannerAdvanceModelOutput.model_validate(raw)
                 output, repeated_activity_repairs = drop_repeated_identical_activities(output)
                 if repeated_activity_repairs:

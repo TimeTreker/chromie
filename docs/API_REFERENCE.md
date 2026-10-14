@@ -303,9 +303,11 @@ complete Work JSON, end of stream, raw Schema, DTO and Host validation succeed.
 Otherwise one `FastPlannerStreamFailure` (`frame_type=failure`) grants no Work.
 There is no presentation frame or partial dispatch. `FastPlannerWorkAdvanceOutput`
 first decides every Responsibility in `responsibility_decisions` (`work`, `answer`,
-`clarify`, or `unavailable` with up to four `missing` facts), then realizes each
-non-limitation decision with its own Capability Activity or word-free response/input
-Need. A limitation is that decision, not a model-authored Activity: the Host binds it
+`clarify`, or `unavailable` with up to four `missing` facts), states `activity_count`, then
+realizes each non-limitation decision with its own Capability Activity or word-free
+response/input Need. The decoder fixes `activities` to exactly `activity_count` items and
+the Host takes the count before the DTO (it must equal the Activities written), so a
+value-closing token can no longer open an extra, copied Activity. A limitation is that decision, not a model-authored Activity: the Host binds it
 as the unavailable Activity (a terminal Activity for that Responsibility) and the
 Planner's result need. An `answer` decision whose word-free response Need was omitted
 is bound the same way (the Need names only its Responsibility); `work` and `clarify`

@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "6cf05e2542f00c13acf5843273dae15e6314c63adde7743cd15ec55073951c93",
-    "workflow-conditional-dry.json": "54c5f15a5d059ac40e36ae0fb712a40d818fb7dfeae710c75ce819c9b73092a3",
-    "workflow-conditional-rain.json": "9030eb984b2e25e52f47531f50d34c332d7098d49b65a04f9f5201695a2b2583",
-    "workflow-delayed.json": "60f5ff226fb734e6454231c556fcc0b139f7628e1c76af6cc81dda547fc7fab5",
-    "workflow-normal.json": "f0707fa493aeeb51b1aa5ccec65b0871c15ac36e48f6cc1f9ba08cd87a3ba470"
+    "workflow-cancellation.json": "3b3522a1b9555fbe4131796ddc013e9692c0349388c56495602b82cc060a1040",
+    "workflow-conditional-dry.json": "5736b8e1c2a1a258a9256255c3bf78b8afa451020894a408fb1255bac156832d",
+    "workflow-conditional-rain.json": "2f70d1c9997843ff6a0ca1adee461789512646b7e5b3c780ce5674280f9d74cd",
+    "workflow-delayed.json": "bd7fd1e64acfe1837c8341e45061bdc8cb69059eccc0b2f7e6cb340e1bd19594",
+    "workflow-normal.json": "2eb4d16da77ebafc6ff78925d0cf4c913f221bb5c9efc7d9e7f6fc4f2deb9fb9"
   },
-  "freeze_revision": 35,
-  "freeze_note": "Owner identity direction (2026-10-14). Every request recaptured: Chromie never calls herself a robot, AI or device, including when asked, answers as herself and asserts nothing false about her nature (Charter, Stable Mind, personalization projection, SC prompt). No reply migrated. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 36,
+  "freeze_note": "Repeated Activities and Planner-free identity (2026-10-14). Every request recaptured: the streamed Planner states activity_count before its Activities (exact length); an information request is one read Activity answered by SC after Evidence; shared identity projections carry no robot/human label and only the SC prompt holds the robot-body fact. Declared migration: a recorded streamed reply without activity_count declares the number of Activities it wrote. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

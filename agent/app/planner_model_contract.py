@@ -89,6 +89,17 @@ def take_ability_needs(raw: dict[str, Any], *, loaded_capability_ids: list[str])
         raise ValueError("Planner Work must begin with ability_needs")
     return parse_ability_needs(raw.pop("ability_needs"), loaded_capability_ids=loaded_capability_ids)
 
+def take_activity_count(raw: dict[str, Any]) -> int | None:
+    """Remove the declared Activity count; it must equal the Activities written."""
+    if "activity_count" not in raw:
+        return None
+    count = raw.pop("activity_count")
+    activities = raw.get("activities")
+    if (isinstance(count, bool) or not isinstance(count, int) or not isinstance(activities, list)
+            or count != len(activities)):
+        raise PlannerDTOContractError("activity_count must equal the Activities written")
+    return count
+
 NON_PLANNER_TRANSPORT_CAPABILITY_IDS = frozenset({"chromie.speak"})
 DETERMINISTIC_CONTROL_CAPABILITY_IDS = frozenset({"soridormi.stop"})
 PLANNER_LIBRARY_INTROSPECTION_SUFFIXES = (".get_capabilities", ".skill.list")

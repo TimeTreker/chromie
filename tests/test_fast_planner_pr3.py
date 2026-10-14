@@ -44,7 +44,7 @@ from shared.chromie_contracts.plan import (
 )
 from shared.chromie_contracts.tool_result import canonical_value_sha256
 from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
-from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text
+from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text, declared_activity_count
 
 
 def _work_facts(prompt):
@@ -1713,10 +1713,12 @@ class FastPlannerResolverTests(unittest.TestCase):
                 # cannot be omitted; a decided answer's response need is projected.
                 without_question = copy.deepcopy(wire)
                 without_question["activities"].pop(0)
+                without_question.pop("activity_count", None)
                 rejected = asyncio.run(FastPlannerResolver(FakeOllama(without_question), FullCatalog()).resolve_advance(run_request))
                 self.assertIn("error", rejected.metadata)
                 without_response = copy.deepcopy(wire)
                 without_response["activities"].pop(1)
+                without_response.pop("activity_count", None)
                 projected = asyncio.run(FastPlannerResolver(FakeOllama(without_response), FullCatalog()).resolve_advance(run_request))
                 self.assertNotIn("error", projected.metadata)
                 self.assertEqual(
@@ -6888,13 +6890,13 @@ class FastPlannerResolverTests(unittest.TestCase):
             "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1"], "confidence": 1.0, "unresolved": [],
             "reason_summary": "Provider resolves the source.",
         }
-        self.assertEqual(list(Draft202012Validator(schema).iter_errors(raw)), [])
+        self.assertEqual(list(Draft202012Validator(schema).iter_errors(declared_activity_count(raw, schema))), [])
         known = copy.deepcopy(raw)
         known["activities"][0]["args"]["source"] = {"status": "known"}
         self.assertTrue(list(Draft202012Validator(schema).iter_errors(known)))
         unknown = copy.deepcopy(raw)
         unknown["activities"][0]["args"]["source"] = {"status": "unknown"}
-        self.assertEqual(list(Draft202012Validator(schema).iter_errors(unknown)), [])
+        self.assertEqual(list(Draft202012Validator(schema).iter_errors(declared_activity_count(unknown, schema))), [])
         planner_fast_validation.validate_fast_advance_output(
             FastPlannerAdvanceModelOutput.model_validate(raw), request=work,
             responsibilities=work.responsibilities, capabilities=[capability],

@@ -914,7 +914,11 @@ def fast_advance_layered_prompt(
         "if no input is missing, create capability Work, never an empty clarification. Each "
         "activity_id is unique. List each Responsibility once in covered_responsibility_refs; "
         "several necessary Activities may share that ref to realize its complete outcome. "
-        "Do not add a response for Work whose result is not available yet. The top disposition is "
+        "When the person asks for information (a fact to establish, a question to answer), your Work is the "
+        "one read Activity that establishes it; telling or answering them is Social Cognition's job once its "
+        "Evidence arrives and needs no Activity of yours, so never add a second read, a response or a delivery "
+        "Activity for it. One requested effect or read is one Activity, never written twice. "
+        "The top disposition is "
         "execute for capability-only Work, respond for response-only Work, clarify for input-only "
         "needs, mixed when distinct Responsibilities require different roles, or unavailable. "
         "Decide every Responsibility first in responsibility_decisions: work, answer, clarify, or "
@@ -1226,7 +1230,8 @@ def fast_streaming_advance_system_prompt() -> str:
         "args_schema, including nested objects. Decide all needed arguments before writing "
         "that object: after emitting a later property, the constrained decoder cannot return "
         "to an earlier property. This is only serialization order; retain every supplied "
-        "material binding."
+        "material binding. Before activities write activity_count: how many Activities you are "
+        "about to write, counting each needed Activity once; then write exactly that many."
     )
 
 

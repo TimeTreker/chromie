@@ -1,14 +1,34 @@
 # Chromie Handoff
 
-## Current work — Owner identity direction, 2026-10-14
+## Current work — Repeated Activities; Planner-free identity, 2026-10-14
 
-Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts` = `origin/main` `95a8ee5aa` plus the
-uncommitted identity diff. Soridormi `/home/chromie/github/soridormi` = `origin/main` `33b8a13`, scene
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
+`4ed5a5143`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing this
+file). Soridormi `origin/main` `33b8a13`, scene running it. Evidence: `.chromie/acceptance/remaining-defects-20261013/`
+(README "Repeated Activities — root cause and repair"; `probes/dup_*.py` and `probes/dup/`; `probes/identity_replay.py`
+and `probes/identity3/`; `capture36.py`, `freeze36.py`, `strict-replay-freeze36/`, `level-a-repetition/`). Live:
+`chromie-agent:latest` = `rootcause6-20261014`. Gate worktree `scratchpad/gate18`. Built, not deployed:
+`chromie-agent:rootcause7-20261014` (`sha256:71f279bf…`, 125 files identical to the gate worktree, digest
+`4d7075dbae2047d9`). Restore the frozen corpus with `python -m benchmarks.regression restore-fixtures`; do not
+untar `frozen.tar.xz` over `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause6-20261014)
+docker tag chromie-agent:rootcause7-20261014 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then live run 11 on the everyday cohort (one invocation, one bundle)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
+```
+
+## Previous work — Owner identity direction, 2026-10-14
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; base `95a8ee5aa`; committed by the
+owner as `4ed5a5143`. Soridormi `/home/chromie/github/soridormi` = `origin/main` `33b8a13`, scene
 running it. Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README "Live run 10" and "Repairs after run
 10"; `run10/`; `probes/identity2/` with `pairs_projected.json`; `capture35.py`, `freeze35.py`,
 `strict-replay-freeze35/`, `level-a-identity/`). Gate worktree `scratchpad/gate16`. Live:
-`chromie-agent:latest` = `rootcause5-20261014`; built and verified, not deployed: `chromie-agent:rootcause6-20261014`
-(`sha256:417b8cde…`, digest `ebfae93f9c0234ef`).
+`chromie-agent:rootcause6-20261014` (`sha256:417b8cde…`, digest `ebfae93f9c0234ef`) was deployed by the owner on
+2026-10-14.
 The Mind profile is read by the host orchestrator from `config/mind/chromie_default.json` (`ORCH_MIND_PROFILE_PATH`),
 so the identity texts take effect from the checkout; the SC prompt needs the new image.
 

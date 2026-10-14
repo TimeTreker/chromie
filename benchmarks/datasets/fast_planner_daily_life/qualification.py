@@ -329,19 +329,44 @@ def declared_deferred_effects(reply: Any, response_format: Any) -> Any:
     return {**reply, "activities": activities}
 
 
+def _requires_activity_count(schema: Any) -> bool:
+    if not isinstance(schema, dict):
+        return False
+    return any(isinstance(shape, dict) and "activity_count" in (shape.get("properties") or {})
+               for shape in (schema, *[item for key in ("oneOf", "anyOf") for item in schema.get(key) or []]))
+
+
+def declared_activity_count(reply: Any, response_format: Any) -> Any:
+    """Adapt a streamed fixture authored before the declared Activity count (2026-10-14).
+
+    The decoder now asks how many Activities follow before writing them; a fixture without
+    the count declares the number of Activities it already wrote.
+    """
+    if (not _requires_activity_count(response_format) or not isinstance(reply, dict)
+            or "activity_count" in reply or not isinstance(reply.get("activities"), list)):
+        return reply
+    ordered: dict[str, Any] = {}
+    for key, value in reply.items():
+        if key == "activities":
+            ordered["activity_count"] = len(value)
+        ordered[key] = value
+    return ordered
+
+
 def declared_responsibility_decisions(reply: Any, response_format: Any) -> Any:
     """Adapt a streamed fixture authored before Responsibility decisions (2026-10-12).
 
     Each Responsibility's decision is read from the fixture's own Activities; a former
     ``unavailable`` Activity becomes that Responsibility's unavailable decision and its
     missing facts. A ref the fixture never realized is left undecided (still invalid).
-    Fixtures that author decisions keep them; effect Activities declare ``deferred``.
+    Fixtures that author decisions keep them; effect Activities declare ``deferred``,
+    and the Activity count is declared.
     """
     refs = _responsibility_decision_refs(response_format)
     if refs is None or not isinstance(reply, dict):
         return reply
     if "responsibility_decisions" in reply:
-        return declared_deferred_effects(reply, response_format)
+        return declared_activity_count(declared_deferred_effects(reply, response_format), response_format)
     role_decision = {"capability": "work", "complete_response": "answer", "clarification": "clarify"}
     activities, decisions = [], {}
     for activity in reply.get("activities") or []:
@@ -357,8 +382,9 @@ def declared_responsibility_decisions(reply: Any, response_format: Any) -> Any:
     ordered = {ref: decisions[ref] for ref in refs if ref in decisions}
     rest = {key: value for key, value in reply.items() if key not in {"ability_needs", "activities"}}
     head = {"ability_needs": reply["ability_needs"]} if "ability_needs" in reply else {}
-    return declared_deferred_effects(
-        {**head, "responsibility_decisions": ordered, "activities": activities, **rest}, response_format)
+    return declared_activity_count(declared_deferred_effects(
+        {**head, "responsibility_decisions": ordered, "activities": activities, **rest}, response_format),
+        response_format)
 
 
 def declared_ability_needs(reply: Any, response_format: Any) -> Any:

@@ -81,8 +81,8 @@ def test_capability_argument_decoder_order_matches_sorted_catalog_recursively():
         assert list(compiled["properties"]) == ["alpha", "zeta"]
         assert list(compiled["properties"]["alpha"]["items"]["properties"]) == ["a", "z"]
         example = {"zeta": 0.2, "alpha": [{"z": 10, "a": "same source value"}]}
-        Draft202012Validator(arguments).validate(example)
-        Draft202012Validator(compiled).validate(example)
+        Draft202012Validator(arguments).validate(_counted(example))
+        Draft202012Validator(compiled).validate(_counted(example))
     assert list(arguments["properties"]) == ["zeta", "alpha"]
 
 def _valid_output() -> dict[str, Any]:
@@ -93,8 +93,25 @@ def _valid_output() -> dict[str, Any]:
             "timing": "parallel", "rationale": "An ordinary greeting can be returned from context."}], "confidence": 1.0, "unresolved": [], "reason_summary": "Establish an ordinary greeting obligation."}
 
 
+def _counted(payload):
+    """A Work output states its Activity count before the Activities (2026-10-14)."""
+    if not isinstance(payload, dict) or "activity_count" in payload or not isinstance(payload.get("activities"), list):
+        return payload
+    counted = {}
+    for key, value in payload.items():
+        if key == "activities":
+            counted["activity_count"] = len(value)
+        counted[key] = value
+    return counted
+
+
+def _uncounted(payload):
+    """Production takes the count before the DTO (``take_activity_count``)."""
+    return {key: value for key, value in payload.items() if key != "activity_count"}
+
+
 def _wire_output(payload):
-    return json.dumps(payload, ensure_ascii=False)
+    return json.dumps(_counted(payload), ensure_ascii=False)
 
 
 @pytest.mark.parametrize("with_needs", [False, True])
@@ -141,14 +158,14 @@ def test_native_clarification_requires_owned_resolution_sources(source_kind, sou
     wire = build_sglang_chat_payload(model="fixed", messages=[], compute_class=CognitionComputeClass.REALTIME,
         options={}, response_format=schema, stream=True, priority_step=100)["response_format"]["json_schema"]["schema"]
     for contract in (schema, wire):
-        assert Draft202012Validator(contract).is_valid(raw) == expected
+        assert Draft202012Validator(contract).is_valid(_counted(raw)) == expected
     if expected and "capability_schema" in sources:
         # Source order is not semantic. The native decoder may choose an order,
         # but canonical validation must continue accepting existing valid DTOs.
         gap["resolution_sources_considered"] = list(reversed(sources))
         PlannerInformationGap.model_validate(gap)
-        assert Draft202012Validator(schema).is_valid(raw)
-        assert not Draft202012Validator(wire).is_valid(raw)
+        assert Draft202012Validator(schema).is_valid(_counted(raw))
+        assert not Draft202012Validator(wire).is_valid(_counted(raw))
     if with_needs and expected:
         assert not Draft202012Validator(wire).is_valid({**raw, "ability_needs": [{**need, "closest_loaded": "test.indexed"}]})
         assert not Draft202012Validator(wire).is_valid({key: value for key, value in raw.items() if key != "ability_needs"})
@@ -192,7 +209,7 @@ def test_meaning_gaps_preserve_independent_terminal_work(preserve_all: bool, ind
     if preserve_all and independent:
         validate_fast_advance_output(output, request=request, responsibilities=responsibilities, capabilities=capabilities)
         schema = fast_streaming_advance_response_schema(['r1', 'r2'], responsibilities=responsibilities, capabilities=capabilities, meaning_uncertainties=request.meaning_uncertainties)
-        Draft202012Validator(schema).validate(raw)
+        Draft202012Validator(schema).validate(_counted(raw))
     else:
         with pytest.raises(AuthoritativeGroundingValidationError):
             validate_fast_advance_output(output, request=request, responsibilities=responsibilities, capabilities=capabilities)
@@ -251,7 +268,7 @@ async def test_streamed_string_argument_mapping_preserves_source_ownership(varia
     schema = model.last_kwargs["response_format"]
     sent = declared_ability_needs(raw, schema)
     for contract in (schema, {"$defs": schema.get("$defs", {}), "oneOf": schema["oneOf"]}):
-        assert Draft202012Validator(contract).is_valid(sent) is (variant != "missing")
+        assert Draft202012Validator(contract).is_valid(_counted(sent)) is (variant != "missing")
     if variant in {"missing", "foreign_span"}:
         assert isinstance(events[0], FastPlannerStreamFailure)
         assert events[0].failure_class == "fast_stream_contract_invalid"
@@ -525,16 +542,16 @@ def test_fast_schema_forbids_false_source_span_for_inherited_source_role_binding
     source_bindings = activity["properties"]["args"]["properties"]["source"]["properties"]["bindings"]
     assert source_bindings["properties"]["distance"] == {"enum": [{"value": 50, "unit": "meters"}]}
     assert source_bindings["required"] == ["distance"]
-    valid = _contextual_structured_resource_output()
-    assert Draft202012Validator(schema).is_valid(valid)
+    valid = _counted(_contextual_structured_resource_output())
+    assert Draft202012Validator(schema).is_valid(_counted(valid))
     wrong_shape = json.loads(json.dumps(valid))
     wrong_shape["activities"][0]["args"]["source"]["bindings"]["distance"] = "50 meters"
-    assert not Draft202012Validator(schema).is_valid(wrong_shape)
+    assert not Draft202012Validator(schema).is_valid(_counted(wrong_shape))
     invalid = json.loads(json.dumps(valid))
     invalid["activities"][0]["argument_sources"] = {
         "source": {"source_start_token_ref": "t4", "source_end_token_ref": "t10"},
     }
-    assert not Draft202012Validator(schema).is_valid(invalid)
+    assert not Draft202012Validator(schema).is_valid(_counted(invalid))
 
 
 def test_fast_schema_does_not_offer_provider_owned_resource_as_missing_input() -> None:
@@ -856,7 +873,7 @@ def test_native_work_schema_requires_dependencies_not_timing(parallel):
             "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["walk"],
             "activities": [activity], "confidence": 1, "unresolved": [],
             "reason_summary": "Direct walk."}
-        return list(Draft202012Validator(schema).iter_errors(output))
+        return list(Draft202012Validator(schema).iter_errors(_counted(output)))
 
     # Order and concurrency are WorkDAG dependencies, whatever the provider's parallel support.
     assert not errors({**walk, "depends_on": []})
@@ -908,7 +925,7 @@ def test_native_work_timing_keeps_honest_limitation_when_no_provider_can_honor_c
     for timing in ("parallel", "sequential"):
         act = {"role": "capability", "activity_id": "one", "capability_id": capability["capability_id"],
                "args": {"duration_s": 10}, "timing": timing, "source_responsibility_refs": ["first"]}
-        assert list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(act))
+        assert list(Draft202012Validator(schema["properties"]["activities"]["items"]).iter_errors(_counted(act)))
     missing = ["A provider that can run both actions at the same time."]
     limitation = {"responsibility_decisions": {
             "first": {"decision": "unavailable", "missing": missing},
@@ -916,7 +933,7 @@ def test_native_work_timing_keeps_honest_limitation_when_no_provider_can_honor_c
         "activities": [], "disposition": "unavailable", "coverage": "uncertain",
         "covered_responsibility_refs": ["first", "second"], "confidence": 1,
         "unresolved": ["Concurrent composition unavailable."], "reason_summary": "No provider honors the concurrency."}
-    Draft202012Validator(schema).validate(limitation)
+    Draft202012Validator(schema).validate(_counted(limitation))
 
 
 @pytest.mark.parametrize("count", [1, 2, 3, 6])
@@ -977,7 +994,7 @@ def test_native_advance_preserves_vocal_source_mode_without_redirecting_body_wor
         "activities": [body], "disposition": "mixed", "coverage": "complete",
         "covered_responsibility_refs": ["voice", "body"], "confidence": 0.5,
         "unresolved": ["Requested vocal mode is unavailable."], "reason_summary": "Honest limitation."}
-    Draft202012Validator(schema).validate(honest)
+    Draft202012Validator(schema).validate(_counted(honest))
     assert not validator.is_valid({"role": "unavailable", "activity_id": "limit",
         "source_responsibility_refs": ["voice"], "missing": ["A provider for the requested vocal mode."]})
 
@@ -1001,12 +1018,12 @@ def test_native_vocal_work_with_empty_catalog_cannot_invent_a_provider():
     schema = fast_streaming_advance_response_schema([source.local_ref], responsibilities=[source], capabilities=[])
     act = {"role": "capability", "activity_id": "voice", "capability_id": "unavailable.provider",
         "args": {"mode": "singing", "text": "performance"}, "depends_on": [], "source_responsibility_refs": ["song"]}
-    assert not Draft202012Validator(schema["properties"]["activities"]["items"]).is_valid(act)
-    Draft202012Validator(schema).validate({
+    assert not Draft202012Validator(schema["properties"]["activities"]["items"]).is_valid(_counted(act))
+    Draft202012Validator(schema).validate(_counted({
         "responsibility_decisions": {"song": {"decision": "unavailable", "missing": ["A qualified vocal provider."]}},
         "activities": [], "disposition": "unavailable", "coverage": "uncertain",
         "covered_responsibility_refs": ["song"], "confidence": 0.5,
-        "unresolved": ["No qualified vocal provider."], "reason_summary": "Honest limitation."})
+        "unresolved": ["No qualified vocal provider."], "reason_summary": "Honest limitation."}))
 
 
 @pytest.mark.parametrize("disposition,coverage,activity,valid", [
@@ -1040,8 +1057,8 @@ def test_native_decision_alternatives_preserve_execution_limitation_boundary(dis
         "confidence": 1, "unresolved": [], "reason_summary": "Bounded Work decision."}
     # Exercise the native alternatives independently of the Host's conditional
     # allOf checks, which the deployed decoder does not enforce.
-    assert Draft202012Validator({"oneOf": schema["oneOf"]}).is_valid(output) == valid
-    assert Draft202012Validator(schema).is_valid(output) == valid
+    assert Draft202012Validator({"oneOf": schema["oneOf"]}).is_valid(_counted(output)) == valid
+    assert Draft202012Validator(schema).is_valid(_counted(output)) == valid
 
 
 def test_planner_authority_forbids_confirmation_only_complete_response_for_work() -> None:
@@ -1097,9 +1114,9 @@ def test_fast_decoder_purpose_matches_provider_normalization(resource_contract, 
     if expected and normalize_fast_capability_activity_purpose(
             output, capabilities=[definition]).activities[0].step_purpose == "acquire_information":
         # A read for a body outcome must state the decision its result settles.
-        assert not Draft202012Validator(schema).is_valid(raw)
+        assert not Draft202012Validator(schema).is_valid(_counted(raw))
         raw["activities"][0]["deferred_requirement"] = "Decide the effect from the result."
-    assert Draft202012Validator(schema).is_valid(raw) == expected
+    assert Draft202012Validator(schema).is_valid(_counted(raw)) == expected
 
 
 @pytest.mark.parametrize("start,end", [(0, 0), (0, 10), (9, 10), (10, 10), (10, 9), (10, 0), (0, 11)])
@@ -1501,10 +1518,10 @@ def test_a_conditional_plans_its_read_and_holds_the_action():
             "depends_on": ["act_weather"], "source_responsibility_refs": ["r1"], "deferred": True}
 
     def output(activities):
-        return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
+        return _counted({"responsibility_decisions": {"r1": {"decision": "work", "missing": []}},
                 "activities": activities, "disposition": "execute", "coverage": "complete",
                 "covered_responsibility_refs": ["r1"], "confidence": 1.0, "unresolved": [],
-                "reason_summary": "Read the forecast; the wave waits on it."}
+                "reason_summary": "Read the forecast; the wave waits on it."})
 
     assert validator.is_valid(output([read, held]))
     # Live 2026-10-12 (B): the wait was also modelled as a clarification of the same work.
@@ -1518,7 +1535,7 @@ def test_a_conditional_plans_its_read_and_holds_the_action():
 
     def host(activities):
         return normalize_fast_capability_activity_purpose(
-            FastPlannerAdvanceModelOutput.model_validate(output(activities)), capabilities=[weather, wave])
+            FastPlannerAdvanceModelOutput.model_validate(_uncounted(output(activities))), capabilities=[weather, wave])
 
     assert [item.deferred for item in host([read, held]).activities] == [False, True]
     with pytest.raises(PlannerDTOContractError, match="waits on a read"):
@@ -1546,17 +1563,18 @@ def test_a_mixed_limitation_gets_no_activity():
               "information_gaps": []}
 
     def output(activities):
-        return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []},
+        return _counted({"responsibility_decisions": {"r1": {"decision": "work", "missing": []},
                                              "r2": {"decision": "unavailable", "missing": ["a coffee machine"]}},
                 "activities": activities, "disposition": "mixed", "coverage": "complete",
                 "covered_responsibility_refs": ["r1", "r2"], "confidence": 1.0, "unresolved": [],
-                "reason_summary": "Wave; coffee is not possible."}
+                "reason_summary": "Wave; coffee is not possible."})
 
     assert validator.is_valid(output([waving]))
     assert not validator.is_valid(output([waving, asking]))
     # Nor can a started clarification be pushed onto the wave: r1 decided work.
     assert not validator.is_valid(output([waving, {**asking, "source_responsibility_refs": ["r1"]}]))
-    mixed = [state for state in schema["oneOf"] if state["properties"]["disposition"]["enum"] == ["mixed"]]
+    mixed = {json.dumps(state["properties"]["responsibility_decisions"], sort_keys=True)
+             for state in schema["oneOf"] if state["properties"]["disposition"]["enum"] == ["mixed"]}
     assert len(mixed) == 6  # every non-uniform pair of {work, clarify, unavailable}
 
 
@@ -1572,7 +1590,7 @@ def _answer_beside_body(decision: dict[str, Any], activities: list[dict[str, Any
               "activities": activities, "disposition": "mixed", "coverage": "complete",
               "covered_responsibility_refs": ["r1", "r2"], "confidence": 1.0, "unresolved": [],
               "reason_summary": "x"}
-    return schema, output
+    return schema, _counted(output)
 
 
 def test_an_answer_beside_a_limitation_is_mixed_with_only_its_response():
@@ -1583,9 +1601,9 @@ def test_an_answer_beside_a_limitation_is_mixed_with_only_its_response():
     respond = {"role": "complete_response", "activity_id": "resp_r2", "source_responsibility_refs": ["r2"],
                "rationale": "Answer from what Chromie knows."}
     schema, output = _answer_beside_body({"decision": "unavailable", "missing": ["a backflip ability"]}, [respond])
-    assert Draft202012Validator(schema).is_valid(output)
+    assert Draft202012Validator(schema).is_valid(_counted(output))
     projected = project_responsibility_decisions(
-        FastPlannerAdvanceModelOutput.model_validate(output), responsibility_refs=["r1", "r2"], speech_refs={"r2"})
+        FastPlannerAdvanceModelOutput.model_validate(_uncounted(output)), responsibility_refs=["r1", "r2"], speech_refs={"r2"})
     assert [(item.role, item.source_responsibility_refs) for item in projected.activities] == [
         ("complete_response", ["r2"]), ("unavailable", ["r1"])]
 
@@ -1600,13 +1618,13 @@ def test_a_decided_answer_without_its_response_is_projected():
     waving = {"role": "capability", "capability_id": "test.wave", "activity_id": "act_wave", "args": {},
               "depends_on": [], "source_responsibility_refs": ["r1"]}
     schema, output = _answer_beside_body({"decision": "work", "missing": []}, [waving])
-    assert Draft202012Validator(schema).is_valid(output)
+    assert Draft202012Validator(schema).is_valid(_counted(output))
     projected = project_responsibility_decisions(
-        FastPlannerAdvanceModelOutput.model_validate(output), responsibility_refs=["r1", "r2"], speech_refs={"r2"})
+        FastPlannerAdvanceModelOutput.model_validate(_uncounted(output)), responsibility_refs=["r1", "r2"], speech_refs={"r2"})
     assert [(item.role, item.activity_id, item.source_responsibility_refs) for item in projected.activities] == [
         ("capability", "act_wave", ["r1"]), ("complete_response", "response-r2", ["r2"])]
     unasked = FastPlannerAdvanceModelOutput.model_validate({
-        **output, "responsibility_decisions": {"r1": {"decision": "clarify", "missing": []},
+        **_uncounted(output), "responsibility_decisions": {"r1": {"decision": "clarify", "missing": []},
                                                "r2": {"decision": "answer", "missing": []}},
         "activities": []})
     with pytest.raises(PlannerDTOContractError, match="decided clarify without its Activity"):
@@ -1639,9 +1657,9 @@ def test_decision_states_share_each_activity_branch_on_the_wire():
                 "depends_on": [], "source_responsibility_refs": [ref]}
 
     def output(decisions, activities, disposition):
-        return {"responsibility_decisions": decisions, "activities": activities, "disposition": disposition,
+        return _counted({"responsibility_decisions": decisions, "activities": activities, "disposition": disposition,
                 "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"], "confidence": 1.0,
-                "unresolved": [], "reason_summary": "x"}
+                "unresolved": [], "reason_summary": "x"})
 
     work = {"decision": "work", "missing": []}
     limited = {"decision": "unavailable", "missing": ["x"]}
@@ -1649,5 +1667,41 @@ def test_decision_states_share_each_activity_branch_on_the_wire():
                output({"r1": work, "r2": limited}, [act("wave", "r1")], "mixed"),
                output({"r1": work, "r2": limited}, [act("wave", "r1"), act("nod", "r2")], "mixed")]
     for sample in samples:
-        assert Draft202012Validator(wire).is_valid(sample) == Draft202012Validator(schema).is_valid(sample)
-    assert [Draft202012Validator(wire).is_valid(sample) for sample in samples] == [True, True, False]
+        assert Draft202012Validator(wire).is_valid(_counted(sample)) == Draft202012Validator(schema).is_valid(_counted(sample))
+    assert [Draft202012Validator(wire).is_valid(_counted(sample)) for sample in samples] == [True, True, False]
+
+
+def test_the_activity_count_comes_first_and_fixes_how_many_activities_follow():
+    """Live 2026-10-13/14 ("Could you bring me the milk, please?", "Can you get me the TV
+    remote?"): a value-closing token such as ``"]},`` committed the decoder to another
+    Activity, and the model copied the delivery it had just written. The count is now
+    chosen first, so the array cannot grow past it."""
+    from agent.app.planner_model_contract import take_activity_count
+
+    source = CognitiveResponsibilityProposal(local_ref="r1", outcome="bring the milk", output_mode="body_action",
+                                             confidence=1.0)
+    fetch = {"capability_id": "test.fetch", "effects": ["physical_motion"],
+             "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}}
+    schema = fast_streaming_advance_response_schema(["r1"], responsibilities=[source], capabilities=[fetch])
+    Draft202012Validator.check_schema(schema)
+    for state in schema["oneOf"]:
+        names = list(state["properties"])
+        assert names.index("activity_count") == names.index("activities") - 1
+        count = state["properties"]["activity_count"]["enum"]
+        assert len(count) == 1 and state["properties"]["activities"]["minItems"] == count[0] == state["properties"]["activities"]["maxItems"]
+    delivery = {"role": "capability", "capability_id": "test.fetch", "activity_id": "act_0", "args": {},
+                "depends_on": [], "source_responsibility_refs": ["r1"]}
+
+    def output(count, activities):
+        return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []}}, "activity_count": count,
+                "activities": activities, "disposition": "execute", "coverage": "complete",
+                "covered_responsibility_refs": ["r1"], "confidence": 1.0, "unresolved": [], "reason_summary": "x"}
+
+    validator = Draft202012Validator(schema)
+    assert validator.is_valid(output(1, [delivery]))
+    assert not validator.is_valid(output(1, [delivery, {**delivery, "activity_id": "act_1"}]))
+    assert not validator.is_valid({key: value for key, value in output(1, [delivery]).items() if key != "activity_count"})
+    raw = output(1, [delivery])
+    assert take_activity_count(raw) == 1 and "activity_count" not in raw
+    with pytest.raises(PlannerDTOContractError, match="activity_count must equal"):
+        take_activity_count(output(2, [delivery]))

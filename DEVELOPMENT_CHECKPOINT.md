@@ -1,10 +1,43 @@
 # Chromie Development Checkpoint
 
-## Current work — Owner identity direction, 2026-10-14
+## Current work — Repeated Activities; Planner-free identity, 2026-10-14
+
+Base `origin/main` `4ed5a5143` (the owner's identity commit, deployed as `rootcause6-20261014`). Owner: "make it
+clear why the LLM model output the same activities twice … fix it by optimize LLM model prompt or something" and
+"I do not think planner should know whether itself is a robot or a human"; then "OK, agree, go on. if you finish,
+just commit and push". Delivered with this file. Evidence: `.chromie/acceptance/remaining-defects-20261013/`
+README ("Repeated Activities — root cause and repair"), `probes/dup/`, `probes/identity3/`.
+
+- Repeated Activities had two causes: an intended "read, then tell the person" step that a `work` state cannot
+  express (written as a second identical read), and fused value-closing tokens (`."},`, `"]},`) whose comma obliges
+  another Activity that the model then copies. Repair: the streamed decoder takes `activity_count` before
+  `activities` and fixes the array to that length; the Host takes the count before the DTO; the Planner prompt says
+  an information request is one read answered by SC after Evidence. Recorded replays: repeat-prone requests 0/24
+  (base 14/24), all 92 recorded streamed requests 0/92 (base 5/92); `reason_summary` required and a logit ban were
+  tried and rejected (no effect; degeneration).
+- Identity: shared projections read by Planner/GA/UMI/SC/Reflection (Stable Mind boundary and self-concept, a
+  privacy rationale, `IDENTITY_SEMANTIC_CONTRACT`) carry no robot/human label; abilities and Evidence say what she
+  can perceive or do. Only the SC prompt holds the robot-body fact, so she never denies it (without it SC said
+  "I'm not a robot" 4/4). Charter IDENTITY-TRUTH-001 and the interaction contract say so.
+- Open: SC silence after a declared non-completion when its Value Judgment question looks unanswered (harness);
+  "make coffee" as a fetch; UMI acknowledgement-only Responsibility; canonical waiting shape misuse (contained);
+  Planner provenance (umbrella, look yaw); SC wording slips.
+
+Verification: recorded streamed Planner requests replayed with the change (`probes/dup/`): repeat-prone 0/24 (base
+14/24), all 92 recorded 0/92 (base 5/92), latency 11.3 s vs 11.0 s; SC identity replay (`probes/identity3/`) robot
+question 4/4 "I'm Chromie, a twelve-year-old girl!" and backflip 4/4 without a body label or denial; freeze 36
+(`0ce191dc…`; declared migration: a recorded streamed reply states the number of Activities it wrote; no reply
+re-authored; 6,000 + 5 recaptured, 0 failures); strict replay 6,000/6,000 zero model calls (same distribution);
+Level A 45/45; gate in clean worktree `scratchpad/gate18` (pytest 3,820 + 5 skipped, benchmarks 169, legacy 20,
+policies, docs, test ownership). Image `chromie-agent:rootcause7-20261014` (`71f279bf…`, 125 files identical,
+digest `4d7075dbae2047d9`), not deployed; not yet live (run 11 pending).
+
+## Previous work — Owner identity direction, 2026-10-14
 
 Base `origin/main` `95a8ee5aa` (run-9 repairs, deployed by the owner as `rootcause5-20261014`). Live run 10
 (everyday cohort, clean tree): mechanical 29/33, judged 23 pass / 4 partial / 6 fail against the owner's identity
-direction. Uncommitted. Evidence: `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 10",
+direction. Committed by the owner as `4ed5a5143` and deployed as `rootcause6-20261014`; refined above. Evidence:
+`.chromie/acceptance/remaining-defects-20261013/` README ("Live run 10",
 "Repairs after run 10"), `run10/`, `probes/identity2/`.
 
 - Owner direction (2026-10-14): Chromie never calls herself a robot, AI, model, device, assistant or service,

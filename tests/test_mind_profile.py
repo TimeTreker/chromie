@@ -78,8 +78,9 @@ class MindProfileTests(unittest.TestCase):
         self.assertIn("lively", context["personality_expression"]["core_traits"])
         self.assertIn("cute", context["personality_expression"]["core_traits"])
         self.assertIn("twelve-year-old girl", context["personality_expression"]["self_concept"])
-        self.assertIn("robotic", context["personality_expression"]["self_concept"])
-        self.assertIn("biological human", context["personality_expression"]["self_concept"])
+        # Owner 2026-10-14: no robot/human self-label; abilities say what she can do.
+        self.assertNotIn("robotic", context["personality_expression"]["self_concept"])
+        self.assertIn("available abilities", context["personality_expression"]["self_concept"])
         self.assertIn("one compact sentence", context["personality_expression"]["answer_style"])
         self.assertIn("Do not automatically summarize", context["personality_expression"]["answer_style"])
         self.assertIn("logs and memory", context["personality_expression"]["internal_language_boundary"])

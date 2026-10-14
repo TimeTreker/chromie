@@ -17,7 +17,7 @@ from agent.app.goal_association import GoalAssociationResolver
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_contracts.plan import FastPlannerStreamFailure, FastPlannerStreamTerminal
-from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text
+from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_activity_count, declared_ability_needs_text
 
 
 EPISODES = [
@@ -80,7 +80,7 @@ def test_complete_intent_needs_no_capability_fields(text):
     request = UserMeaningInterpretationRequest(text=text)
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
     result = intent_result(text, "information" if text in EPISODES[-2:] else "body_action")
-    Draft202012Validator(schema).validate(result)
+    Draft202012Validator(schema).validate(_counted(result))
     decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
         request, json.dumps(result), response_schema=schema,
     )
@@ -101,7 +101,7 @@ def test_umi_speech_states_value_review(value_review):
     item.pop("body_effect_family", None)
     if value_review is not None:
         item["value_review"] = value_review
-    assert Draft202012Validator(schema).is_valid(result) is (value_review is not None)
+    assert Draft202012Validator(schema).is_valid(_counted(result)) is (value_review is not None)
     if value_review is None:
         with pytest.raises(ValueError, match="value_review"):
             OllamaUserMeaningInterpreter._validate_interpretation_content(request, json.dumps(result), response_schema=schema)
@@ -224,6 +224,11 @@ def host_work(activities):
     return {key: value for key, value in work(activities).items() if key != "responsibility_decisions"}
 
 
+def _counted(payload):
+    """A streamed Work output states its Activity count before the Activities (2026-10-14)."""
+    return declared_activity_count(payload, {"properties": {"activity_count": {}}})
+
+
 def need(text, closest="none", fits=False, does="No loaded Capability realizes it."):
     return {"need": text, "closest_loaded": closest, "closest_loaded_does": does, "fits": fits}
 
@@ -266,7 +271,7 @@ async def test_compound_intent_becomes_three_grounded_activities_and_one_goal():
                 "reason_summary": "New intent."}
     ga = Model([ga_reply])
     association = await GoalAssociationResolver(ga).resolve(request)
-    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(ga_reply)
+    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(_counted(ga_reply))
     assert len(association.new_goals) == 1
     assert association.new_goals[0].description == EPISODES[0]
     assert association.new_goals[0].metadata["output_mode"] == "body_action"
@@ -485,7 +490,7 @@ async def test_planner_owns_new_future_readiness_without_gi_time_fields(fault):
                 "reason_summary": "New intent."}
     ga = Model([ga_reply])
     association = await GoalAssociationResolver(ga).resolve(request)
-    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(ga_reply)
+    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(_counted(ga_reply))
     assert association.resolution_status == "resolved", association.metadata
     goal_id = association.new_goals[0].goal_id
     assert not association.new_goals[0].object.get("bindings")
@@ -536,7 +541,7 @@ async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path)
                 "reason_summary": "Two independent intentions."}
     ga = Model([ga_reply])
     association = await GoalAssociationResolver(ga).resolve(request)
-    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(ga_reply)
+    Draft202012Validator(ga.packets[0][1]["response_format"]).validate(_counted(ga_reply))
     assert association.resolution_status == "resolved", association.metadata
     request.context["goal_association_resolution"] = association.model_dump(mode="json")
     future, ready = [goal.goal_id for goal in association.new_goals]
@@ -716,9 +721,9 @@ def test_intent_only_numeric_activity_requires_provenance_at_decoder():
         capabilities=[catalog.model_dump(mode="json")])
     raw = work([activity("walk",{"duration_s":10},source_spans("walk for ten seconds", {"duration_s":"ten seconds"}))])
     validator = Draft202012Validator(schema)
-    validator.validate(raw)
+    validator.validate(_counted(raw))
     del raw['activities'][0]['argument_sources']
-    assert list(validator.iter_errors(raw))
+    assert list(validator.iter_errors(_counted(raw)))
 
 
 def test_intent_only_structured_activity_requires_provenance_at_decoder():
@@ -754,10 +759,10 @@ def test_intent_only_structured_activity_requires_provenance_at_decoder():
         }),
     )])
     validator = Draft202012Validator(schema)
-    validator.validate(raw)
+    validator.validate(_counted(raw))
 
     del raw["activities"][0]["argument_sources"]
-    errors = list(validator.iter_errors(raw))
+    errors = list(validator.iter_errors(_counted(raw)))
     assert errors
 
 
@@ -773,18 +778,18 @@ def test_optional_numeric_arguments_expose_sources_without_requiring_defaults():
         capabilities=capabilities)
     validator = Draft202012Validator(schema)
     raw = work([activity("walk", {"duration_s":10}, source_spans("walk for ten seconds", {"duration_s":"ten seconds"}))])
-    validator.validate(raw)
+    validator.validate(_counted(raw))
     validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
         responsibilities=request.responsibilities, capabilities=capabilities)
     del raw["activities"][0]["argument_sources"]
     # Without UserTurn provenance this same schema-valid value is a Planner-owned
     # HOW choice, not a claim that the person supplied the parameter.
-    validator.validate(raw)
+    validator.validate(_counted(raw))
     validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
         responsibilities=request.responsibilities, capabilities=capabilities)
     # Omitting an optional input still permits the provider's authoritative default.
     raw["activities"][0]["args"] = {}
-    validator.validate(raw)
+    validator.validate(_counted(raw))
     validate_fast_advance_output(FastPlannerAdvanceModelOutput.model_validate(raw), request=request,
         responsibilities=request.responsibilities, capabilities=capabilities)
 
@@ -852,9 +857,9 @@ def test_provider_style_defaults_keep_one_compact_capability_contract():
         {"count": 5, "amplitude": "medium", "duration_s": 5},
         {},
     )])
-    validator.validate(count_only)
-    validator.validate(exact_defaults)
-    validator.validate(planner_override)
+    validator.validate(_counted(count_only))
+    validator.validate(_counted(exact_defaults))
+    validator.validate(_counted(planner_override))
     capabilities = [entry.model_dump(mode="json")]
     for raw in (count_only, planner_override):
         validate_fast_advance_output(
@@ -884,8 +889,8 @@ def test_provider_style_defaults_keep_one_compact_capability_contract():
         priority_step=100,
     )["response_format"]["json_schema"]["schema"]
     wire_validator = Draft202012Validator(wire)
-    wire_validator.validate(count_only)
-    wire_validator.validate(planner_override)
+    wire_validator.validate(_counted(count_only))
+    wire_validator.validate(_counted(planner_override))
 
 
 def test_fast_argument_source_cannot_escape_owning_responsibility_span():
@@ -942,7 +947,7 @@ def test_optional_argument_citations_follow_native_argument_order():
         assert list(fields["argument_sources"]["properties"]) == list(fields["args"]["properties"])
     raw = work([activity("walk", {"duration_s": 10, "vx_mps": .2},
                          source_spans("Walk at 0.2 speed for ten seconds", {"duration_s": "ten seconds", "vx_mps": "0.2 speed"}))])
-    Draft202012Validator(schema).validate(raw)
+    Draft202012Validator(schema).validate(_counted(raw))
 
 
 def test_fast_argument_source_canonicalization_minimizes_unique_literal_only() -> None:
@@ -1427,7 +1432,7 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
     second = model.packets[1][1]["response_format"]
     loaded_needs = {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
                                            "Retrieve weather for a named place.")]}
-    assert Draft202012Validator(second).is_valid({**loaded_needs, **work([decided, nod_after])})
+    assert Draft202012Validator(second).is_valid(_counted({**loaded_needs, **work([decided, nod_after])}))
     assert not Draft202012Validator(second).is_valid({**loaded_needs, **work([read, nod_after])}), \
         "the read names the decision its result settles"
     undeclared = {key: value for key, value in nod_after.items() if key != "deferred"}

@@ -1,13 +1,24 @@
 # Chromie Current Status
 
-## Current delivery — Owner identity direction, 2026-10-14
+## Current delivery — Repeated Activities; Planner-free identity, 2026-10-14
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `4ed5a5143`: the streamed Planner states `activity_count` before an exact-length `activities` array and is told an information request is one read answered by SC after Evidence; shared identity projections carry no robot/human label and only the SC prompt holds the robot-body fact, so she never denies it. |
+| Automatic verification | Recorded streamed Planner request replay: repeat-prone 0/24 (base 14/24), all 92 recorded 0/92 (base 5/92); SC identity replay: robot question 4/4 answered as Chromie without a label or denial; freeze 36 (`0ce191dc…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,820 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Not yet live (run 11 pending). Run 10 on `rootcause5`: 23 / 4 / 6. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause6-20261014`. `rootcause7-20261014` built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Owner identity direction, 2026-10-14
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `95a8ee5aa`: Chromie never calls herself a robot/AI/device, including when asked, answers as herself and asserts nothing false about her nature (Charter, interaction contract, Stable Mind, personalization projection, SC prompt changed together on the owner's direction). |
 | Automatic verification | Recorded SC request replay with the new identity texts: robot question 6/6 answered as Chromie without a robot label or denial (baseline 5/5 "I'm a robot…"); controls unchanged; freeze 35 (`dd3a9059…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,819 + 5 skipped, benchmarks 169, legacy 20). |
 | Target validation | Run 10 (everyday cohort, `rootcause5-20261014`): mechanical 29/33, judged 23 pass / 4 partial / 6 fail against the owner's identity direction. These changes are not yet live (run 11 pending). Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause5-20261014`. `rootcause6-20261014` built and source-verified, not deployed. No release. |
+| Deployment state | Committed by the owner as `4ed5a5143`; `rootcause6-20261014` deployed. No release. |
 
 Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
 
