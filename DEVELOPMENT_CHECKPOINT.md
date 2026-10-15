@@ -1,10 +1,36 @@
 # Chromie Development Checkpoint
 
-## Current work — Run-14 repairs: withheld answers unbindable, Activities name Responsibilities first, 2026-10-15
+## Current work — Run-15 repairs: canonical continuity Plans, 2026-10-15
+
+Base `origin/main` `5b29ea29b` (deployed as `rootcause11-20261015`). Live run 15 (everyday cohort, clean tree, one
+bundle): mechanical 27/33, judged 24 pass / 2 partial / 7 fail. Owner: "commit and push, deployed, please go
+on" and, from now on, rerun only the recently failed cases (2026-10-15). Delivered with this file. Evidence:
+`.chromie/acceptance/remaining-defects-20261013/` README ("Live run 15", "Repairs after run 15"), `run15/`,
+`probes/planner_time_first_replay.py`, `probes/binding/time_first_combined_replay.txt`.
+
+- GA-requested canonical Plans on continuity turns ("Do it again!", "Yes, please.") reached the waiting shape with
+  invented time conditions. The single-Goal canonical decoder no longer offers `respond` for an effectful Goal (as
+  for several Goals; Host always rejected it), and `time_conditions` follow `ability_needs` so readiness is stated
+  before any outcome.
+- Open: umbrella binding (refs-first not enough live; also dropped `date`); ability_needs copy loop causing the
+  water+time Planner deadline (2/221 calls); SC offering "water or milk" then milk fetched; cookie ingress ack
+  "Okay, I'll let him know."; Planner provenance (rain_tell date, "那上海呢？", look yaw); UMI overlap (celebrate);
+  remote harness.
+
+Verification: replays of the recorded canonical requests: nod again waiting 6/6 → `execute nod_yes` 6/6; thirsty
+waiting 6/6 → `execute acquire_and_deliver_resource` 6/6 with both changes; no recorded live request legitimately
+waits through this wrapper (evidence gap). Regressions red on HEAD (`CanonicalContinuityDecoderTests`). Freeze 39
+(`70725d90…`, no reply re-authored, 6,000 + 5 recaptured, 0 failures); strict replay 6,000/6,000 zero model calls
+(same distribution); Level A 45/45; gate in clean worktree `scratchpad/gate24` (pytest 3,833 + 5 skipped,
+benchmarks 169, legacy 20, policies, docs, test ownership). Image `chromie-agent:rootcause12-20261015`
+(`0c69f2fa…`, 125 files identical, digest `08def7a73277d66b`), deployed by the owner on 2026-10-15 (focused run 16 next).
+
+## Previous work — Run-14 repairs: withheld answers unbindable, Activities name Responsibilities first, 2026-10-15
 
 Base `origin/main` `ad4dfcf96` (deployed as `rootcause10-20261015`, `chromie-llm` restarted). Live run 14 (everyday
 cohort, clean tree, one bundle, after a host reboot): mechanical 26/33, judged 26 pass / 1 partial / 6 fail.
-Owner: "commit and push, deployed, please go on" (2026-10-15). Delivered with this file. Evidence: `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 14", "Repairs after run
+Owner: "commit and push, deployed, please go on" (2026-10-15). Committed as `5b29ea29b`, deployed as `rootcause11-20261015`, measured as run 15.
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 14", "Repairs after run
 14"), `run14/`, `probes/sc_drop_need_replay.py`, `probes/planner_refs_first_replay.py`.
 
 - Run-13 repairs verified live: robot answer "I'm Chromie! I'm twelve years old and I'm a girl.", notice after a
@@ -19,7 +45,7 @@ result bound 6/6; umbrella binding 5/6 → 6/6 in runs 14 and 11, water+time and
 on HEAD. No corpus change: strict replay of freeze 38 6,000/6,000 zero model calls (same distribution); Level A
 45/45; gate in clean worktree `scratchpad/gate23` (pytest 3,831 + 5 skipped, benchmarks 169, legacy 20, policies,
 docs, test ownership). Image `chromie-agent:rootcause11-20261015` (`7aa59da6…`, 125 files identical, digest
-`3ef029f9a6cb7e73`), deployed by the owner on 2026-10-15 (run 15 next).
+`3ef029f9a6cb7e73`), deployed by the owner on 2026-10-15 and measured as run 15.
 
 ## Previous work — Run-13 repairs: never silent after Work, scope extension, identity, internal causes, 2026-10-15
 

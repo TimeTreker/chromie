@@ -31,6 +31,7 @@ from .planner_model_contract import (
 )
 from .planner_schema import (
     need_first_response_schema,
+    readiness_first_response_schema,
     scoped_reporting_response_schema,
     planner_readiness_response_schema,
     work_change_response_schema,
@@ -560,6 +561,9 @@ class FastPlannerResolver:
                     requires_execution=requires_execution,
                     response_goal_ids=response_goal_ids,
                     nonfulfilling_response_goal_ids=sorted(reporting_goal_ids),
+                    effectful_goal_ids=list(
+                        planner_effectful_goal_ids(authoritative_goals) - reporting_goal_ids
+                    ),
                     confirmation_required_capability_ids=[
                         item["capability_id"]
                         for item in capability_payload
@@ -597,10 +601,10 @@ class FastPlannerResolver:
                         if item.get("requires_confirmation")
                     ],
                 )
-            response_schema = need_first_response_schema(
+            response_schema = readiness_first_response_schema(need_first_response_schema(
                 native_goal_outcome_branches(response_schema),
                 [item["capability_id"] for item in capability_payload],
-            )
+            ))
         options = {
             "temperature": 0,
             "top_p": 0.9,

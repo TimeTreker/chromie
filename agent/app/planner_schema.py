@@ -620,6 +620,7 @@ def canonical_plan_response_schema(
     requires_execution: bool = False,
     response_goal_ids: list[str] | None = None,
     nonfulfilling_response_goal_ids: list[str] | None = None,
+    effectful_goal_ids: list[str] | None = None,
     confirmation_required_capability_ids: list[str] | None = None,
     unavailable_goal_ids: list[str] | None = None,
     information_capability_ids: list[str] | None = None,
@@ -644,11 +645,40 @@ def canonical_plan_response_schema(
         requires_execution=requires_execution,
         response_goal_ids=response_goal_ids,
         nonfulfilling_response_goal_ids=nonfulfilling_response_goal_ids,
+        # As for several Goals: an effectful Goal is never answered with words alone,
+        # which Host rejects (live 2026-10-15: "Yes, please." for water was planned as
+        # respond and then reached the waiting shape to get past the decoder).
+        effectful_goal_ids=effectful_goal_ids,
         confirmation_required_capability_ids=(confirmation_required_capability_ids),
         unavailable_goal_ids=unavailable_goal_ids,
         information_capability_ids=information_capability_ids,
     )
     schema["title"] = "FastPlannerModelOutput"
+    return schema
+
+
+def readiness_first_response_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """The Planner states any future readiness before it writes the Goal outcomes.
+
+    Waiting was chosen implicitly by the outcome the model wrote first, so a Goal the
+    model meant to acknowledge reached the waiting shape and was given an invented
+    condition ("Yes, please.", "Do it again!"; live 2026-10-13/15). With time_conditions
+    after ability_needs, an empty list closes waiting before any outcome. Order only.
+    """
+    def visit(node: Any) -> None:
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if isinstance(properties, dict) and "time_conditions" in properties and "goal_outcomes" in properties:
+                first = [name for name in ("ability_needs", "time_conditions") if name in properties]
+                node["properties"] = {**{name: properties[name] for name in first},
+                                      **{name: value for name, value in properties.items() if name not in first}}
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(schema)
     return schema
 
 

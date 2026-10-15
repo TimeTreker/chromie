@@ -6985,3 +6985,45 @@ def test_single_resource_goal_decoder_hides_routine_stand_idle_cleanup() -> None
         for branch in schema["$defs"]["PlannerModelStep"]["oneOf"]
     ]
     assert capability_ids == ["soridormi.acquire_and_deliver_resource"]
+
+
+class CanonicalContinuityDecoderTests(unittest.TestCase):
+    """Live 2026-10-13/15 ("Do it again!", "Yes, please."): a GA-requested canonical Plan
+    answered an effectful Goal with words and reached the waiting shape with an invented
+    time condition; Host rejected every such Plan."""
+
+    def _schema(self):
+        from tests.test_planner_canonical_contract import FullCatalog, _canonical_compound_body_case
+
+        run_request, raw = _canonical_compound_body_case()
+        model = FakeOllama(raw)
+        asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
+        return model.prompts[0][1]["response_format"], raw
+
+    def test_an_effectful_goal_is_never_offered_respond(self):
+        schema, raw = self._schema()
+        words_only = copy.deepcopy(raw)
+        words_only.update(disposition="respond", steps=[], time_conditions=[])
+        words_only["goal_outcomes"]["goal-compound"].update(disposition="respond", step_ids=[])
+        validator = Draft202012Validator(schema)
+        self.assertTrue(validator.is_valid(declared_ability_needs(raw, schema)))
+        self.assertFalse(validator.is_valid(declared_ability_needs(words_only, schema)))
+
+    def test_readiness_is_stated_before_any_goal_outcome(self):
+        schema, _ = self._schema()
+        orders = []
+
+        def walk(node):
+            if isinstance(node, dict):
+                properties = node.get("properties")
+                if isinstance(properties, dict) and "time_conditions" in properties and "goal_outcomes" in properties:
+                    orders.append(list(properties)[:2])
+                for value in node.values():
+                    walk(value)
+            elif isinstance(node, list):
+                for value in node:
+                    walk(value)
+
+        walk(schema)
+        self.assertTrue(orders)
+        self.assertTrue(all(order == ["ability_needs", "time_conditions"] for order in orders), orders)
