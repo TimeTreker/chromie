@@ -2833,9 +2833,29 @@ def _exact_activity_count_states(states: list[dict[str, Any]]) -> list[dict[str,
                     value = {**value, "minItems": count, "maxItems": count}
                 ordered[name] = value
             required = list(state.get("required", []))
+            refs = list((properties.get("responsibility_decisions") or {}).get("properties", {}))
+            if count == 1 and len(refs) > 1 and properties["disposition"].get("enum") == ["execute"]:
+                # Every Responsibility was decided work and one Activity realizes them: it
+                # serves each of them (live 2026-10-15: one weather read for "will it rain"
+                # and "should I take an umbrella" cited the first only; Host rejected it).
+                ordered["activities"] = {**ordered["activities"],
+                                         "items": _serving_every_responsibility(ordered["activities"]["items"], refs)}
             exact.append({**state, "properties": ordered,
                           "required": required if "activity_count" in required else [*required, "activity_count"]})
     return exact
+
+
+def _serving_every_responsibility(items: Any, refs: list[str]) -> Any:
+    """The same Activity alternatives, each citing exactly every given Responsibility."""
+    items = copy.deepcopy(items)
+    for branch in items.get("oneOf", [items]) if isinstance(items, dict) else []:
+        properties = branch.get("properties") if isinstance(branch, dict) else None
+        if isinstance(properties, dict) and "source_responsibility_refs" in properties:
+            properties["source_responsibility_refs"] = {
+                "type": "array", "prefixItems": [{"type": "string", "const": ref} for ref in refs],
+                "items": {"type": "string", "enum": refs}, "minItems": len(refs), "maxItems": len(refs),
+            }
+    return items
 
 
 _STATE_DECISION = {"execute": "work", "respond": "answer", "clarify": "clarify", "unavailable": "unavailable"}

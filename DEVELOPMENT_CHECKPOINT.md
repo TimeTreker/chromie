@@ -1,10 +1,31 @@
 # Chromie Development Checkpoint
 
-## Current work — Run-15 repairs: canonical continuity Plans, 2026-10-15
+## Current work — Focused run 16; one Activity serving every work Responsibility, 2026-10-15
+
+Base `origin/main` `5526e71cb` (deployed as `rootcause12-20261015`). Focused live run 16 (owner: rerun only recent
+failures; 12 cases, clean tree, one bundle): mechanical 6/12; thirsty passed mechanically for the first time and the
+weather follow-up answered "上海明天". Owner: "commit and push" (2026-10-15). Delivered with this file. Evidence:
+`.chromie/acceptance/remaining-defects-20261013/` README ("Live run 16 (focused) and the v2 everyday cohort"),
+`run16/`, `probes/planner_single_activity_refs_replay.py`.
+
+- In a streamed state where every Responsibility was decided work and one Activity is written, that Activity
+  cites every Responsibility (umbrella: one read for "will it rain" and "should I take an umbrella" cited r1 only).
+- Open: celebrate (UMI overlap); water+time Planner deadline after need search (clock not in the common prompt
+  tier); rain_tell date span; look yaw; remote harness; contained canonical `clarify` with steps (exposed shape
+  lacks the disposition/steps assignment); ability_needs copy loop (2/221).
+
+Verification: replays of the run-15/16 umbrella requests 6/6 ok each (the single-Activity case did not recur in 12
+samples); regression `test_one_activity_for_every_work_responsibility_serves_them_all` (red on HEAD); no corpus change
+(freeze 39 strict replay 6,000/6,000 zero model calls); Level A 45/45; gate in clean worktree `scratchpad/gate25`
+(pytest 3,834 + 5 skipped, benchmarks 169, legacy 20, policies, test ownership). Image
+`chromie-agent:rootcause13-20261015` (`354d6eec…`, 125 files identical, digest `5848cf023a42f77e`), not deployed.
+
+## Previous work — Run-15 repairs: canonical continuity Plans, 2026-10-15
 
 Base `origin/main` `5b29ea29b` (deployed as `rootcause11-20261015`). Live run 15 (everyday cohort, clean tree, one
 bundle): mechanical 27/33, judged 24 pass / 2 partial / 7 fail. Owner: "commit and push, deployed, please go
-on" and, from now on, rerun only the recently failed cases (2026-10-15). Delivered with this file. Evidence:
+on" and, from now on, rerun only the recently failed cases (2026-10-15). Committed as `5526e71cb`, deployed as
+`rootcause12-20261015`, measured as focused run 16. Evidence:
 `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 15", "Repairs after run 15"), `run15/`,
 `probes/planner_time_first_replay.py`, `probes/binding/time_first_combined_replay.txt`.
 
@@ -23,7 +44,7 @@ waits through this wrapper (evidence gap). Regressions red on HEAD (`CanonicalCo
 (`70725d90…`, no reply re-authored, 6,000 + 5 recaptured, 0 failures); strict replay 6,000/6,000 zero model calls
 (same distribution); Level A 45/45; gate in clean worktree `scratchpad/gate24` (pytest 3,833 + 5 skipped,
 benchmarks 169, legacy 20, policies, docs, test ownership). Image `chromie-agent:rootcause12-20261015`
-(`0c69f2fa…`, 125 files identical, digest `08def7a73277d66b`), deployed by the owner on 2026-10-15 (focused run 16 next).
+(`0c69f2fa…`, 125 files identical, digest `08def7a73277d66b`), deployed by the owner on 2026-10-15 and measured as focused run 16.
 
 ## Previous work — Run-14 repairs: withheld answers unbindable, Activities name Responsibilities first, 2026-10-15
 

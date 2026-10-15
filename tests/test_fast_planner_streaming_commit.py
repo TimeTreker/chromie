@@ -1732,3 +1732,28 @@ def test_an_activity_names_its_responsibilities_before_its_capability():
 
     walk(schema)
     assert seen and all(names == ["role", "source_responsibility_refs"] for names in seen)
+
+
+def test_one_activity_for_every_work_responsibility_serves_them_all():
+    """Live 2026-10-15 (info_umbrella_zh, runs 14-16): both Responsibilities were decided work
+    and one weather read was written for them, citing the first only; Host rejected the turn."""
+    sources = [CognitiveResponsibilityProposal(local_ref=ref, outcome=text, output_mode="information",
+                                               confidence=1.0)
+               for ref, text in (("r1", "will it rain tomorrow"), ("r2", "should I take an umbrella"))]
+    read = {"capability_id": "test.weather", "effects": ["information"],
+            "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}}
+    schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=sources, capabilities=[read])
+
+    def output(refs):
+        return {"responsibility_decisions": {"r1": {"decision": "work", "missing": []},
+                                             "r2": {"decision": "work", "missing": []}},
+                "activity_count": 1,
+                "activities": [{"role": "capability", "source_responsibility_refs": refs,
+                                "capability_id": "test.weather", "activity_id": "act_0", "args": {},
+                                "depends_on": []}],
+                "disposition": "execute", "coverage": "complete", "covered_responsibility_refs": ["r1", "r2"],
+                "confidence": 1.0, "unresolved": [], "reason_summary": "x"}
+
+    validator = Draft202012Validator(schema)
+    assert not validator.is_valid(output(["r1"]))
+    assert validator.is_valid(output(["r1", "r2"]))

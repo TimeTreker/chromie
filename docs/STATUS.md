@@ -1,12 +1,23 @@
 # Chromie Current Status
 
-## Current delivery — Run-15 repairs, 2026-10-15
+## Current delivery — Focused run 16 repair, 2026-10-15
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `5526e71cb`: in a streamed state where every Responsibility was decided work and one Activity is written, that Activity cites every Responsibility. |
+| Automatic verification | Umbrella request replays 6/6 ok (two runs); regression red on HEAD; freeze 39 strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,834 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Focused run 16 (`rootcause12`, 12 recently failed cases): mechanical 6/12; thirsty and the weather follow-up's "明天" fixed live. This repair is not yet live. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause12-20261015`. `rootcause13-20261015` built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Run-15 repairs, 2026-10-15
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `5b29ea29b`: the single-Goal canonical decoder offers no `respond` for an effectful Goal; canonical `time_conditions` follow `ability_needs`, so readiness is stated before any outcome. |
 | Automatic verification | Recorded canonical request replays: nod again and thirsty waiting misuse 6/6 → correct execute 6/6; regressions red on HEAD; freeze 39 (`70725d90…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,833 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 15 (`rootcause11`, everyday cohort): mechanical 27/33, judged 24 / 2 / 7. Focused run 16 on these repairs pending. Not qualified. |
+| Target validation | Run 15 (`rootcause11`, everyday cohort): mechanical 27/33, judged 24 / 2 / 7. Focused run 16 on these repairs: 6/12 (12 recently failed cases). Not qualified. |
 | Deployment state | `chromie-agent:latest` = `rootcause12-20261015`, deployed 2026-10-15. No release. |
 
 Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
