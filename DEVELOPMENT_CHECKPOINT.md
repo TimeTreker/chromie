@@ -1,6 +1,38 @@
 # Chromie Development Checkpoint
 
-## Current work — Everyday live cohort in the repo; clock in the common prompt tier, 2026-10-15
+## Current work — Planner disposition/step assignment exposed to the decoder (freeze 40), 2026-10-15
+
+Base `origin/main` `c942172ae`. Owner: "read the handoff and checkpoint … then continue" and "you are now on rtx4090
+laptop, not on rtx5090" (2026-10-15). Cloud session, no access to the deployed services or the ignored evidence root;
+branch `claude/continue-from-checkpoint-om8ui5`, draft PR. Evidence: this file, the PR, and the capture/freeze scripts
+quoted in the PR (request-only; not retained in the repo).
+
+- Open item "contained canonical `clarify` with steps": the aggregate disposition/step assignment of the canonical
+  and multi-Goal Planner schema lived only in `allOf`, which native decoders ignore, so the visible shape offered
+  clarify, respond and unavailable with up to four steps, and execute with none; `PlannerModelOutput` rejects all four.
+  Reproduced with the stock XGrammar 0.2.1 matcher on the exact SGLang wire schema (single Goal, readiness wrapper):
+  all four accepted on `c942172ae`, all four rejected after; valid execute (one step) and clarify (no steps) accepted
+  on both.
+- Repair (`native_goal_outcome_branches`, the final decoder pass): each permitted assignment becomes a native branch
+  narrowed into the already-native shape (Goal outcome branches, steps bounds, satisfaction status, confirmation);
+  above 8 mixed assignments they share one merged branch. `allOf` stays once on the enclosing shape; repeated Goal
+  outcomes are shared `$defs`. The model still authors every outcome and the aggregate; the DTO is unchanged.
+- Decoder size (XGrammar grammar text, single Goal / 2 / 3 Goals): 160K/129K/182K → 167K/185K/275K. Synthetic-vocabulary
+  compile on CPU 29/23/32 s → 27/27/43 s (relative only). Not measured on the deployed decoder (evidence gap).
+- Freeze 40: 4,700 of 6,000 cases and all 5 prototypes had a Planner `format` recaptured; no other request byte
+  changed, no reply re-authored; per-case verdicts identical to the `c942172ae` strict replay (2,700 expected
+  rejection / 1,800 observed expected state / 1,500 pass); no recorded response changed its schema validity (3,680
+  valid, 1,020 intentional faults invalid, both before and after).
+- Hardware: the owner's machine is now the RTX 4090 Laptop profile (Qwen3.5-4B AWQ, 49K, laptop SGLang overlay). Live
+  runs 7-16 and the frozen corpus were recorded on the RTX 5090 Gemma4-12B profile; they are not evidence for the
+  laptop model. The first laptop everyday cohort is a new aggregate baseline.
+
+Verification: regression `test_every_exposed_plan_shape_ties_its_disposition_to_its_steps` (red on `c942172ae`);
+schema-structure tests read the branches through the test-support view; strict replay 6,000/6,000 zero model calls on
+the branch (same verdict counts); Level A 45/45; canonical gate on the branch (pytest 3,835 + 5 skipped, benchmarks
+169, legacy 20, policies, docs, test ownership). Not run live; no Agent image built (cloud).
+
+## Previous work — Everyday live cohort in the repo; clock in the common prompt tier, 2026-10-15
 
 Base `origin/main` `773ad886c`. Owner: "commit and push, then put suite into repo, add clock ... correct the
 scenarios suite if necessary" (2026-10-15). Delivered with this file. Evidence:

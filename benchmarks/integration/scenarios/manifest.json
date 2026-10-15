@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "1eeaa7d3e522f3f1409099df7b884c844ecf95d1f038e373b33e715d6414306e",
-    "workflow-conditional-dry.json": "9df2e84ea973b1c3943aa0f434bb9de85960075a7310c95eed4262995e3a7a74",
-    "workflow-conditional-rain.json": "6ec2992f9cef6675b02393b86c823bd2eade5d1bcb0ab8f57ab844ed6552d312",
-    "workflow-delayed.json": "0c627a09909c73178a5cdba1ee4c40171a1361780a990fb7e6c6b3dd1f02d0cc",
-    "workflow-normal.json": "5bfec565de2bf79122cda0dc2722af9b09648f7235f35a423c577fb9b44aae58"
+    "workflow-cancellation.json": "e4d33726f0911df389a5907293db60e354c11b1ee90fc25ab86ef0b0c8cf92ef",
+    "workflow-conditional-dry.json": "fb11ffcb5ce04c4f595c81292fb5307f6a8eefa46babdc6a57aa91d5f7d5169d",
+    "workflow-conditional-rain.json": "cba67a39a4d9c4bee6b054dde7dfa62013f8b8476ef51f006e166b10c73cfe06",
+    "workflow-delayed.json": "e1f6843a12efc3c15fad0dc46c38302ba0f4bccc07c50d127bec77aee51f9961",
+    "workflow-normal.json": "5569ad06a3746379914a8d49bb17ff2035f8e2ae158861a6567d8a75f005a670"
   },
-  "freeze_revision": 39,
-  "freeze_note": "Run-14/15 repairs (2026-10-15). Every request recaptured: SC never offers a withheld answer for binding; streamed Activities name their Responsibilities first; the single-Goal canonical decoder offers no respond for an effectful Goal; canonical time_conditions follow ability_needs. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 40,
+  "freeze_note": "Decoder exposure of the Planner disposition/step assignment (2026-10-15). Every Planner request whose decoder schema changed is recaptured: the aggregate assignment is exposed as native branches, so clarify, respond and unavailable carry no steps and execute carries one. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

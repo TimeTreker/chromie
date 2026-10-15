@@ -1,6 +1,17 @@
 # Chromie Current Status
 
-## Current delivery — Everyday live cohort in the repo; clock common tier, 2026-10-15
+## Current delivery — Planner assignment exposed to the decoder (freeze 40), 2026-10-15
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On branch `claude/continue-from-checkpoint-om8ui5` (draft PR, base `c942172ae`): the canonical/multi-Goal Planner decoder exposes each permitted disposition/step assignment as a native branch, so clarify, respond and unavailable carry no steps and execute carries at least one. |
+| Automatic verification | XGrammar 0.2.1 matcher on the wire schema: 4 DTO-rejected shapes accepted before, rejected after; regression red on HEAD; freeze 40 (`377b7b5a…`, 4,700 + 5 requests recaptured, no reply re-authored, verdicts unchanged); strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,835 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Not run live. Earlier live runs used the RTX 5090 Gemma4-12B profile; the owner's machine is now the RTX 4090 Laptop profile (Qwen3.5-4B), with no live baseline yet. Not qualified. |
+| Deployment state | Not built or deployed (cloud session). `chromie-agent:latest` on the owner's machine is unknown after the hardware change. No release. |
+
+Evidence: the PR and [Handoff](../HANDOFF.md).
+
+## Previous delivery — Everyday live cohort in the repo; clock common tier, 2026-10-15
 
 | Axis | Current evidence |
 | --- | --- |

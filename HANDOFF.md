@@ -1,6 +1,28 @@
 # Chromie Handoff
 
-## Current work — Everyday live cohort in the repo; clock common tier, 2026-10-15
+## Current work — Planner assignment exposed to the decoder (freeze 40), 2026-10-15
+
+Cloud session; branch `claude/continue-from-checkpoint-om8ui5` (draft PR) on base `origin/main` `c942172ae`. The
+owner's machine is now the **RTX 4090 Laptop** profile: `./scripts/compose.sh` regenerates `.env.runtime` and selects
+`docker-compose.sglang-rtx4090-laptop.yml` (Qwen3.5-4B AWQ, 49K). The commands in the entries below hardcode the RTX
+5090 overlay (`docker-compose.sglang.yml`, Gemma4-12B); do not reuse them on the laptop. Not built or deployed:
+the change is Agent-side (`agent/app/planner_schema.py`), so the Agent image must be rebuilt. Freeze 40 archive
+`377b7b5a…` (restore: `python -m benchmarks.regression restore-fixtures`).
+
+```bash
+# owner, on the laptop after merge: rebuild and recreate only the Agent through the profile-aware wrapper
+./scripts/compose.sh build chromie-agent
+./scripts/compose.sh up -d --no-deps --force-recreate chromie-agent
+./scripts/verify_runtime_profile.sh
+# then the everyday smoke stage first as a new laptop baseline (no --keep-going)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root scenarios/everyday --goal-driven-runtime apply --execute --runtime-identity <identity> --evidence-dir <dir>/live
+# local checks
+python scripts/run_workflow_replay.py --workers 8 --evidence-dir <dir>/strict-replay-freeze40
+python scripts/general_ability_acceptance.py --mode level-a --evidence-dir <dir>/level-a
+./scripts/run_tests.sh
+```
+
+## Previous work — Everyday live cohort in the repo; clock common tier, 2026-10-15
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
 `773ad886c`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing this

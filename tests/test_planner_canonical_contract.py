@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tests.cognitive_work_test_support import ordinary_plan_schema
+from tests.cognitive_work_test_support import ordinary_plan_schema, plan_assignment_branches
 
 from agent.app import planner_validation
 from agent.app import planner_schema
@@ -2038,7 +2038,10 @@ class PlannerResolverTests(unittest.TestCase):
         )
         self.assertEqual(len(ollama.prompts), 1)
         response_schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
-        self.assertNotIn("oneOf", response_schema)
+        # Every exposed plan shape is a complete closed object; nothing outside it is required.
+        for branch in plan_assignment_branches(ollama.prompts[0][1]["response_format"]):
+            self.assertFalse(branch["additionalProperties"])
+            self.assertTrue({"disposition", "steps", "goal_outcomes", "goal_satisfaction"} <= set(branch["required"]))
 
     def test_multi_goal_step_ownership_is_never_filled_from_all_host_goals(self):
         invalid = {
