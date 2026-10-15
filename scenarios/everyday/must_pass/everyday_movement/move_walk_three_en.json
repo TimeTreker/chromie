@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "move_walk_three_en",
+  "stage": "must_pass",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "daily_life_v2_2026_10_15",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Walk forward for about three seconds.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Walk forward for about three seconds."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Another motion; a different duration; words only."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Walk forward for about three seconds.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_movement",
+        "title": "Everyday movement and attention",
+        "general_rule": "Walking, turning, stepping and looking use the matching body ability with the requested amount, from the person's words or the observed scene, never a guessed value.",
+        "rationale": "Walk forward for about three seconds.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Planner",
+          "Soridormi"
+        ]
+      }
+    ]
+  },
+  "text": "Can you walk forward for about three seconds?",
+  "expected_capabilities": [
+    "soridormi.walk_forward"
+  ],
+  "expected_args": [
+    "0:duration_s=3.0"
+  ],
+  "require_speech": false
+}

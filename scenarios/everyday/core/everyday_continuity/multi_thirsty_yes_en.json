@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "multi_thirsty_yes_en",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "daily_life_run7_2026_10_13",
+    "derived_from_existing_scenario": false,
+    "carried_into": "daily_life_v2_2026_10_15"
+  },
+  "rationale": "Turn 1: respond to thirst (an offer to get water is natural). Turn 2 'Yes, please.': fetch the water.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: respond to thirst (an offer to get water is natural). Turn 2 'Yes, please.': fetch the water."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Turn 2 treated as small talk; fetch the milk."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Turn 1: respond to thirst (an offer to get water is natural). Turn 2 'Yes, please.': fetch the water.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_continuity",
+        "title": "Everyday multi-turn continuity",
+        "general_rule": "Follow-ups such as 'yes please', 'what about...' and 'again' continue the previous turn's meaning.",
+        "rationale": "Turn 1: respond to thirst (an offer to get water is natural). Turn 2 'Yes, please.': fetch the water.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner"
+        ]
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "text": "I'm really thirsty.",
+      "language": "en-US",
+      "require_speech": true
+    },
+    {
+      "id": "turn-02",
+      "text": "Yes, please.",
+      "language": "en-US",
+      "require_speech": true,
+      "expected_capabilities": [
+        "soridormi.acquire_and_deliver_resource"
+      ]
+    }
+  ]
+}

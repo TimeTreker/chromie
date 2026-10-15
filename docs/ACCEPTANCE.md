@@ -576,7 +576,11 @@ tool/conversation lane discipline, deterministic safety controls, and evidence
 claim discipline, plus multi-goal daily-life planning. The runner writes evidence summaries under
 `.chromie/acceptance/general-ability/` unless `--no-write` is supplied.
 
-The live cohort has three ordered stages: 55 `must_pass`, 16 `core`, and 8
+The everyday live cohort `scenarios/everyday` (owner, 2026-10-15) is the default live acceptance set: 15
+`must_pass` smoke cases, 49 `core` and 5 `challenge` over 16 ability classes, every utterance an everyday
+sentence. Its smoke stage runs first; a hard smoke failure stops core and challenge (no `--keep-going`).
+
+The general-ability live cohort has three ordered stages: 55 `must_pass`, 16 `core`, and 8
 `challenge` cases (79 total). The owner removed the spelling-error probe
 `tianxin_ambiguous_tool`; previous 80-case scores remain historical evidence.
 The first stage includes retained regressions, owner-reported conversations,

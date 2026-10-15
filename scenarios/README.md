@@ -82,6 +82,7 @@ scenarios/
   cognitive_runtime/ Goal-driven planning and coordinated-response scenarios
   cognitive_turn_loop/ Deterministic outcome-closure and cancellation scenarios
   general_ability/ Self-describing staged live-text scenarios
+  everyday/        Everyday live-text cohort (smoke-first; same layout as general_ability)
   templates/        Authoring templates, not executed as scenarios
 ```
 
@@ -145,6 +146,21 @@ conversation-state snapshot. A turn may set `run_interaction=true` to pass the
 final User Meaning Interpretation decision through the dependency-light native InteractionRuntime
 and assert emitted skills and arguments. This is deterministic Level A replay,
 not a live-model, microphone, simulator, or robot claim.
+
+## Everyday live cohort
+
+`everyday/<must_pass|core|challenge>/<ability-class>/` holds the everyday-utterance live cohort the owner
+uses for live acceptance (owner, 2026-10-15): 15 `must_pass` smoke cases (one or more per ability), 49
+`core` and 5 `challenge` cases over 16 ability classes. Each file carries its declared review rubric. Run
+the smoke stage first and let its gate stop later stages (no `--keep-going`):
+
+```bash
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root scenarios/everyday \
+  --goal-driven-runtime apply --execute --runtime-identity <identity> --evidence-dir <dir>
+```
+
+After a repair, the recently failed cases can be rerun alone with repeated `--only-case <id>`; such a
+focused run is not a cohort result.
 
 ## General ability scenario library
 

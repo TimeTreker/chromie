@@ -1,0 +1,83 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "memory_language_pref_zh",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "daily_life_v2_2026_10_15",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 1: agree. Turn 2: tell the weekday from the clock, in Chinese as asked.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: agree. Turn 2: tell the weekday from the clock, in Chinese as asked."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Turn 2 answers in English; guesses the day."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Turn 1: agree. Turn 2: tell the weekday from the clock, in Chinese as asked.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_memory",
+        "title": "Everyday remembering within a conversation",
+        "general_rule": "What the person told Chromie earlier in the conversation (a name, a liking, a plan, a preference) is remembered and used later.",
+        "rationale": "Turn 1: agree. Turn 2: tell the weekday from the clock, in Chinese as asked.",
+        "root_cause_boundaries": [
+          "Goal Association",
+          "Memory",
+          "Social Cognition"
+        ]
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "text": "以后先用中文回答我，可以吗？",
+      "language": "zh-CN",
+      "expect_no_capabilities": true,
+      "require_speech": true
+    },
+    {
+      "id": "turn-02",
+      "text": "What day is it today?",
+      "language": "en-US",
+      "expected_capabilities": [
+        "chromie.clock.local"
+      ],
+      "require_speech": true
+    }
+  ]
+}

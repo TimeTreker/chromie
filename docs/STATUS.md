@@ -1,6 +1,17 @@
 # Chromie Current Status
 
-## Current delivery — Focused run 16 repair, 2026-10-15
+## Current delivery — Everyday live cohort in the repo; clock common tier, 2026-10-15
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `773ad886c`: `scenarios/everyday` (69 everyday live-text cases, 16 classes; 15-case smoke stage gating core and challenge); `chromie.clock.local` in the owner-preset common prompt tier. |
+| Automatic verification | Harness loader accepts all 69 everyday cases; strict replay 6,000/6,000 zero model calls with the clock tier; canonical gate (pytest 3,834 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Not run live (owner: coverage first). Focused run 16: 6/12. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause12-20261015`; `rootcause13-20261015` built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Focused run 16 repair, 2026-10-15
 
 | Axis | Current evidence |
 | --- | --- |

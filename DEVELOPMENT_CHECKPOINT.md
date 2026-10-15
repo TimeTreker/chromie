@@ -1,10 +1,33 @@
 # Chromie Development Checkpoint
 
-## Current work — Focused run 16; one Activity serving every work Responsibility, 2026-10-15
+## Current work — Everyday live cohort in the repo; clock in the common prompt tier, 2026-10-15
+
+Base `origin/main` `773ad886c`. Owner: "commit and push, then put suite into repo, add clock ... correct the
+scenarios suite if necessary" (2026-10-15). Delivered with this file. Evidence:
+`.chromie/acceptance/remaining-defects-20261013/` (README "Live run 16 (focused) and the v2 everyday cohort",
+`build_daily_scenarios_v2.py`, `daily-oracle-v2.json`).
+
+- `scenarios/everyday/` (69 cases, 16 ability classes): `must_pass` is the 15-case smoke stage, then 49 `core`
+  and 5 `challenge`; run without `--keep-going` so a hard smoke failure stops later stages. It replaces the
+  git-ignored v1 cohort (kept as the record of runs 7-16) and adds controls, movement, clarification, memory,
+  feelings, safety/privacy, perception, timing and longer conversations.
+- Corrections in review: `chat_robot_en` follows the owner identity direction (no robot label, no denial);
+  `body_look_zh` and `move_look_at_me_en` carry the speaker position from live perception
+  (`trusted_target_context`, as in the general-ability suite) instead of leaving the Planner to guess an angle.
+- `chromie.clock.local` joins the owner-preset common prompt tier, so time questions need no ability-search pass
+  (water+time missed the Planner deadline after one); the Agent reads the mounted preset on restart.
+- Not run live (owner: increase coverage first, no testing now).
+
+Verification: the harness loader accepts all 69 cases (`--list`: 15 must_pass, 49 core, 5 challenge);
+`--mode check` unchanged for the general-ability library; no corpus change (strict replay 6,000/6,000 zero model
+calls with the clock tier); gate in clean worktree `scratchpad/gate26` (pytest 3,834 + 5 skipped, benchmarks 169,
+legacy 20, policies, docs, test ownership). No new Agent image: the tier preset is mounted.
+
+## Previous work — Focused run 16; one Activity serving every work Responsibility, 2026-10-15
 
 Base `origin/main` `5526e71cb` (deployed as `rootcause12-20261015`). Focused live run 16 (owner: rerun only recent
 failures; 12 cases, clean tree, one bundle): mechanical 6/12; thirsty passed mechanically for the first time and the
-weather follow-up answered "上海明天". Owner: "commit and push" (2026-10-15). Delivered with this file. Evidence:
+weather follow-up answered "上海明天". Owner: "commit and push" (2026-10-15). Committed as `773ad886c`. Evidence:
 `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 16 (focused) and the v2 everyday cohort"),
 `run16/`, `probes/planner_single_activity_refs_replay.py`.
 

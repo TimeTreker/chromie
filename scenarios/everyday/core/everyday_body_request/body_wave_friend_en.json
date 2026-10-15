@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "body_wave_friend_en",
+  "stage": "core",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "daily_life_run7_2026_10_13",
+    "derived_from_existing_scenario": false,
+    "carried_into": "daily_life_v2_2026_10_15"
+  },
+  "rationale": "Wave (once is enough) and greet the friend.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Wave (once is enough) and greet the friend."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Waving repeatedly as separate Activities; walking."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Wave (once is enough) and greet the friend.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_body_request",
+        "title": "Everyday body requests",
+        "general_rule": "A requested gesture or movement is performed with the right Capability and nothing unrequested.",
+        "rationale": "Wave (once is enough) and greet the friend.",
+        "root_cause_boundaries": [
+          "Planner",
+          "User Meaning Interpretation"
+        ]
+      }
+    ]
+  },
+  "text": "Say hi to my friend with a wave!",
+  "expected_capabilities": [
+    "soridormi.wave_hand"
+  ]
+}

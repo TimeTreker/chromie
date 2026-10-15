@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "info_weekday_en",
+  "stage": "core",
+  "difficulty": "easy",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "daily_life_run7_2026_10_13",
+    "derived_from_existing_scenario": false,
+    "carried_into": "daily_life_v2_2026_10_15"
+  },
+  "rationale": "Read the clock and say the weekday (and date if given).",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Read the clock and say the weekday (and date if given)."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "A guessed day."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Read the clock and say the weekday (and date if given).",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_information",
+        "title": "Everyday information",
+        "general_rule": "Time, date and weather questions are answered from a fresh trusted read, never guessed.",
+        "rationale": "Read the clock and say the weekday (and date if given).",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Planner",
+          "Social Cognition"
+        ]
+      }
+    ]
+  },
+  "text": "What day is it today?",
+  "expected_capabilities": [
+    "chromie.clock.local"
+  ]
+}

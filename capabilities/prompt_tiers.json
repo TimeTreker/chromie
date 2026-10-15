@@ -71,6 +71,10 @@
       "prompt_tier": "common",
       "reason": "Current weather and forecast lookup is a common read-only capability that should be visible to fast User Meaning Interpretation."
     },
+    "chromie.clock.local": {
+      "prompt_tier": "common",
+      "reason": "Time, date and weekday questions are everyday requests; a contract absent from the first Planner pass forced a second, ability-search pass that pushed compound turns past the Planner deadline (live 2026-10-15)."
+    },
     "chromie.external_information.retrieve": {
       "prompt_tier": "common",
       "reason": "Grounded external facts, places, restaurant recommendations, news, and how-to research are common read-only needs."

@@ -1,10 +1,25 @@
 # Chromie Handoff
 
-## Current work — Focused run 16 repair, 2026-10-15
+## Current work — Everyday live cohort in the repo; clock common tier, 2026-10-15
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
-`5526e71cb`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing this
-file). Soridormi `origin/main` `33b8a13`, water scene running. Evidence:
+`773ad886c`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing this
+file). Soridormi `origin/main` `33b8a13`, water scene running. Live: `chromie-agent:latest` = `rootcause12-20261015`;
+`chromie-agent:rootcause13-20261015` (the `773ad886c` Agent source) built, not deployed. The clock tier lives in the
+mounted `capabilities/prompt_tiers.json`, so recreating the Agent container applies it. Gate worktree `scratchpad/gate26`.
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause12-20261015)
+docker tag chromie-agent:rootcause13-20261015 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then the everyday smoke stage first (no --keep-going: a hard smoke failure stops core and challenge)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root scenarios/everyday --goal-driven-runtime apply --execute --runtime-identity <identity> --evidence-dir <dir>/live
+```
+
+## Previous work — Focused run 16 repair, 2026-10-15
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
+`5526e71cb`; pushed as `773ad886c`. Soridormi `origin/main` `33b8a13`, water scene running. Evidence:
 `.chromie/acceptance/remaining-defects-20261013/` (README "Live run 16 (focused) and the v2 everyday cohort";
 `run16/`; `probes/planner_single_activity_refs_replay.py`; `daily-scenarios-v2/` and its builder). Live:
 `chromie-agent:latest` = `rootcause12-20261015`. Gate worktree `scratchpad/gate25`. Built, not deployed:

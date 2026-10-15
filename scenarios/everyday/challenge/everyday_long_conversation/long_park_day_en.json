@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "long_park_day_en",
+  "stage": "challenge",
+  "difficulty": "hard",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "daily_life_v2_2026_10_15",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 2: Beijing this afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 2: Beijing this afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Turn 2 asks where again; turn 3 contradicts the forecast; turn 4 another gesture."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "en-US",
+  "description": "Turn 2: Beijing this afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_long_conversation",
+        "title": "Everyday longer conversations",
+        "general_rule": "Over several turns Chromie keeps the topic, the person's earlier words and her own earlier answers coherent, and changes course when the person corrects her.",
+        "rationale": "Turn 2: Beijing this afternoon from a weather read. Turn 3: umbrella advice that follows from it. Turn 4: wave goodbye.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner",
+          "Social Cognition"
+        ]
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "text": "I'm going to the park in Beijing this afternoon.",
+      "language": "en-US",
+      "expect_no_capabilities": true,
+      "require_speech": true
+    },
+    {
+      "id": "turn-02",
+      "text": "Will it rain there this afternoon?",
+      "language": "en-US",
+      "expected_capabilities": [
+        "chromie.weather.lookup"
+      ],
+      "require_speech": true
+    },
+    {
+      "id": "turn-03",
+      "text": "Then should I take an umbrella?",
+      "language": "en-US",
+      "require_speech": true
+    },
+    {
+      "id": "turn-04",
+      "text": "Okay, wave goodbye to me!",
+      "language": "en-US",
+      "expected_capabilities": [
+        "soridormi.wave_hand"
+      ],
+      "require_speech": false
+    }
+  ]
+}
