@@ -6146,7 +6146,10 @@ class VoiceAssistant:
                 "result_kind": "resource_delivery_handover",
                 "optional_completion_update": True,
             },
-            delivery_phase="final",
+            # Built after the handover completed: the ordering is already met, and
+            # this independent SC interaction transports immediate acts only (live
+            # 2026-10-15: a `final` "给你。" was rejected and the handover was silent).
+            delivery_phase="immediate",
             after_step_ids=[item.step_id for item in plan.steps],
         )
         request = SocialCognitionRequest(

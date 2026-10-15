@@ -43,6 +43,10 @@ except ImportError:  # pragma: no cover
     )
 
 PlannerTier = Literal["fast"]
+# Refusing is Value Judgment's decision; a Planner re-entry never refuses, and the
+# canonical validators reject a refused Planner disposition (live 2026-10-15: a
+# provider timeout re-entered as `refused` and the whole re-entry was discarded).
+PlannerReentryAction = Literal["respond", "execute", "clarify", "unavailable"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
 # Need-first Planner contract (owner amendment 2026-10-10). Before Work, the Planner
@@ -416,7 +420,7 @@ class PlannerEvidenceReentryGoalDecision(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     goal_id: str = Field(min_length=1, max_length=160)
-    next_action: GoalOutcomeDisposition
+    next_action: PlannerReentryAction
     satisfaction_status: GoalSatisfactionStatus
     satisfaction_score: float = Field(ge=0.0, le=1.0)
     evidence_refs: list[str] = Field(default_factory=list, max_length=32)
@@ -464,7 +468,7 @@ class PlannerEvidenceReentryGoalDecision(BaseModel):
         if self.next_action == "clarify" and not self.unresolved_needs:
             # The lifted Goal outcome requires the same unresolved input need.
             raise ValueError("clarify re-entry requires the unresolved input need")
-        if self.next_action in {"clarify", "unavailable", "refused"}:
+        if self.next_action in {"clarify", "unavailable"}:
             if self.satisfaction_status == "exact":
                 raise ValueError("noncompletion re-entry action cannot claim exact satisfaction")
         return self

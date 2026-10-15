@@ -1,22 +1,42 @@
 # Chromie Handoff
 
-## Current work — Repeated Activities; Planner-free identity, 2026-10-14
+## Current work — Run-11 repairs, 2026-10-15
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
-`4ed5a5143`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing this
-file). Soridormi `origin/main` `33b8a13`, scene running it. Evidence: `.chromie/acceptance/remaining-defects-20261013/`
+`941f09796`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing
+this file). Soridormi `origin/main` `33b8a13`; the water scene was restarted on 2026-10-15 after a host reboot
+(`./scripts/run_scenario.sh --scenario configs/simulation_scenarios/thirst_water_delivery.json --profile
+open_duck_forward --viewer`). Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README "Live run 11" and
+"Repairs after run 11"; `run11/` with identity, bundle and digests; `probes/binding/` and the replay probes;
+`capture37.py`, `freeze37.py`, `strict-replay-freeze37/`, `level-a-run11-repairs/`). Live:
+`chromie-agent:latest` = `rootcause8-20261015` (deployed by the owner on 2026-10-15). Gate worktree
+`scratchpad/gate19`. `chromie-agent:rootcause8-20261015` (`sha256:0248c42d…`, 125 files identical to the gate worktree, digest
+`169e55c8c36366dd`). The handover-phase fix is in `orchestrator/orchestrator.py` and runs from this checkout.
+
+```bash
+# deployed 2026-10-15 (rollback: chromie-agent:rootcause7-20261014)
+docker tag chromie-agent:rootcause8-20261015 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then live run 12 on the everyday cohort (one invocation, one bundle)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
+```
+
+## Previous work — Repeated Activities; Planner-free identity, 2026-10-14
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
+`4ed5a5143`; pushed as `941f09796`. Soridormi `origin/main` `33b8a13`, scene running it. Evidence: `.chromie/acceptance/remaining-defects-20261013/`
 (README "Repeated Activities — root cause and repair"; `probes/dup_*.py` and `probes/dup/`; `probes/identity_replay.py`
 and `probes/identity3/`; `capture36.py`, `freeze36.py`, `strict-replay-freeze36/`, `level-a-repetition/`). Live:
-`chromie-agent:latest` = `rootcause6-20261014`. Gate worktree `scratchpad/gate18`. Built, not deployed:
+`chromie-agent:latest` = `rootcause6-20261014`. Gate worktree `scratchpad/gate18`. Deployed by the owner on 2026-10-15 (measured as run 11):
 `chromie-agent:rootcause7-20261014` (`sha256:71f279bf…`, 125 files identical to the gate worktree, digest
 `4d7075dbae2047d9`). Restore the frozen corpus with `python -m benchmarks.regression restore-fixtures`; do not
 untar `frozen.tar.xz` over `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
 
 ```bash
-# owner: deploy (rollback: chromie-agent:rootcause6-20261014)
+# deployed 2026-10-15 (rollback: chromie-agent:rootcause6-20261014)
 docker tag chromie-agent:rootcause7-20261014 chromie-agent:latest
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
-# then live run 11 on the everyday cohort (one invocation, one bundle)
+# then live run 11 (done: run11/)
 python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
 ```
 

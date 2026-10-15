@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-14",
+  "frozen_on": "2026-10-15",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
     "workflow-cancellation.json": "3b3522a1b9555fbe4131796ddc013e9692c0349388c56495602b82cc060a1040",
-    "workflow-conditional-dry.json": "5736b8e1c2a1a258a9256255c3bf78b8afa451020894a408fb1255bac156832d",
-    "workflow-conditional-rain.json": "2f70d1c9997843ff6a0ca1adee461789512646b7e5b3c780ce5674280f9d74cd",
+    "workflow-conditional-dry.json": "25a460c70011e38dfdd7e24975701c755a1c5fb82659e395a0ace8866cc90e08",
+    "workflow-conditional-rain.json": "5b2d15aba06ed2346b01adb994b211b0cab32b29f198052254bb7f3fa0c9cfb1",
     "workflow-delayed.json": "bd7fd1e64acfe1837c8341e45061bdc8cb69059eccc0b2f7e6cb340e1bd19594",
     "workflow-normal.json": "2eb4d16da77ebafc6ff78925d0cf4c913f221bb5c9efc7d9e7f6fc4f2deb9fb9"
   },
-  "freeze_revision": 36,
-  "freeze_note": "Repeated Activities and Planner-free identity (2026-10-14). Every request recaptured: the streamed Planner states activity_count before its Activities (exact length); an information request is one read Activity answered by SC after Evidence; shared identity projections carry no robot/human label and only the SC prompt holds the robot-body fact. Declared migration: a recorded streamed reply without activity_count declares the number of Activities it wrote. Inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 37,
+  "freeze_note": "Run-11 repairs (2026-10-15). Every request recaptured: Planner re-entry never refuses (Value Judgment owns refusal; a failed provider is unavailable); one Activity serving several Responsibilities lists each; a complete_response rationale names the Responsibility and facts, never words or what Chromie is; SC acts bind their needs before their words; the post-handover need is immediate. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

@@ -487,7 +487,7 @@ def fast_evidence_reentry_response_schema(
         if not allow_new_work:
             next_action = decision_properties.get("next_action")
             if isinstance(next_action, dict):
-                next_action["enum"] = ["respond", "clarify", "unavailable", "refused"]
+                next_action["enum"] = ["respond", "clarify", "unavailable"]
 
     new_work = properties.get("new_work")
     if isinstance(new_work, dict):

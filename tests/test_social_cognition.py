@@ -461,6 +461,31 @@ def test_terminal_work_failure_result_need_cannot_choose_silence():
     assert schema["properties"]["need_outcomes"]["properties"][need.need_id]["const"] == "covered"
 
 
+def test_an_act_binds_its_needs_before_its_words():
+    """Live 2026-10-15 (body_backflip_zh): one sentence answered "can you?" and said the
+    limitation, but it was written before its bindings and bound to the answer only; the
+    limitation that had to be said stayed unbound and Host rejected the reply (422)."""
+    from shared.chromie_contracts.json_schema import expose_intersection_shapes
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+
+    answer = SocialCommunicationNeed(
+        need_id="need:answer", owner="planner", kind="answer", source_goal_ids=["goal:1"],
+        reference_id="plan:1", facts={"role": "complete_response"}, delivery_phase="immediate",
+    )
+    limitation = SocialCommunicationNeed(
+        need_id="need:limit", owner="planner", kind="result", source_goal_ids=["goal:1"],
+        reference_id="plan:1", facts={"disposition": "unavailable", "unresolved": ["backflip"]},
+    )
+    schema = social_cognition_response_schema(request(communication_needs=[answer, limitation]), [])
+    expose_intersection_shapes(schema)
+    for branch in schema["$defs"]["SocialCommunicativeAct"]["oneOf"]:
+        # The decoder follows the exposed native shape; both must bind before wording.
+        for shape in (branch, *branch.get("anyOf", [])):
+            order = list(shape["properties"])
+            assert order.index("addressed_need_ids") < order.index("text")
+            assert order.index("delivery_phase") < order.index("text")
+
+
 def test_prior_acknowledgement_cannot_cover_later_terminal_failure():
     from agent.app.social_cognition import social_cognition_prompt, validate_social_cognition_output
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal

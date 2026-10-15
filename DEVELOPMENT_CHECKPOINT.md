@@ -1,11 +1,43 @@
 # Chromie Development Checkpoint
 
-## Current work — Repeated Activities; Planner-free identity, 2026-10-14
+## Current work — Run-11 repairs: failures the person hears, needs bound before words, 2026-10-15
+
+Base `origin/main` `941f09796` (deployed by the owner as `rootcause7-20261014`). Live run 11 (everyday cohort,
+clean tree, one bundle): mechanical 26/33, judged 23 pass / 2 partial / 8 fail. Owner: "commit and push,
+deployed, go on with run12" (2026-10-15). Delivered with this file. Evidence:
+`.chromie/acceptance/remaining-defects-20261013/` README ("Live run 11", "Repairs after run 11"), `run11/`,
+`probes/binding/`.
+
+- Planner re-entry never refuses: `next_action` is respond/execute/clarify/unavailable in the DTO and decoder
+  (refusing is Value Judgment's; Host rejected `refused`, so a weather timeout ended in a generic notice).
+- The post-handover social need is `immediate` (a `final` "给你。" was rejected on the immediate-only path).
+- SC acts state their needs and phase before their words, and one act may fulfill several needs (a limitation that
+  had to be said was left unbound → 422 → generic notice).
+- Planner: a complete_response rationale names the Responsibility and facts, never words or what Chromie is (its
+  "as I am a robot" made SC say "因为我是机器人"); "an action of Chromie's" replaces "a robot action"; one Activity
+  serving several Responsibilities lists each of them.
+- Open: UMI acknowledgement-only overlapping Responsibility (celebrate 503); "make coffee" as a fetch; Planner
+  provenance (look yaw, rain_tell date, milk for "Yes, please."); VJ asking a planning question with the harness
+  granting confirmation without speech (remote); 4 pre-existing ambient Situation source-ref errors; scheduler RSS
+  plateau 17.8 GB (run 10: 13.4 GB).
+
+Verification: replays of the recorded run-11 requests (`probes/binding/`): backflip SC limitation bound 0/6 →
+14/14 with no body label once the Planner rationale is clean ("我没法做后空翻。"), 10 SC calls × 3 all bound (two
+live-unbound now bound); Planner rationale body label 6/6 → 0/6; umbrella binding 2/6 → 6/6. Regressions red on
+HEAD: `test_reentry_never_refuses_a_failed_read`, `test_handover_words_bound_to_the_need_reach_the_person`,
+`test_an_act_binds_its_needs_before_its_words`. Freeze 37 (`40e08784…`, no reply re-authored, 6,000 + 5
+recaptured, 0 failures); strict replay 6,000/6,000 zero model calls (same distribution); Level A 45/45; gate in
+clean worktree `scratchpad/gate19` (pytest 3,824 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test
+ownership). Image `chromie-agent:rootcause8-20261015` (`0248c42d…`, 125 files identical, digest
+`169e55c8c36366dd`), deployed by the owner on 2026-10-15 (run 12 next); the handover-phase change is Host-side
+and runs from the checkout.
+
+## Previous work — Repeated Activities; Planner-free identity, 2026-10-14
 
 Base `origin/main` `4ed5a5143` (the owner's identity commit, deployed as `rootcause6-20261014`). Owner: "make it
 clear why the LLM model output the same activities twice … fix it by optimize LLM model prompt or something" and
 "I do not think planner should know whether itself is a robot or a human"; then "OK, agree, go on. if you finish,
-just commit and push". Delivered with this file. Evidence: `.chromie/acceptance/remaining-defects-20261013/`
+just commit and push". Committed as `941f09796`, deployed as `rootcause7-20261014`, measured as run 11. Evidence: `.chromie/acceptance/remaining-defects-20261013/`
 README ("Repeated Activities — root cause and repair"), `probes/dup/`, `probes/identity3/`.
 
 - Repeated Activities had two causes: an intended "read, then tell the person" step that a `work` state cannot
@@ -30,7 +62,7 @@ question 4/4 "I'm Chromie, a twelve-year-old girl!" and backflip 4/4 without a b
 re-authored; 6,000 + 5 recaptured, 0 failures); strict replay 6,000/6,000 zero model calls (same distribution);
 Level A 45/45; gate in clean worktree `scratchpad/gate18` (pytest 3,820 + 5 skipped, benchmarks 169, legacy 20,
 policies, docs, test ownership). Image `chromie-agent:rootcause7-20261014` (`71f279bf…`, 125 files identical,
-digest `4d7075dbae2047d9`), not deployed; not yet live (run 11 pending).
+digest `4d7075dbae2047d9`), deployed by the owner on 2026-10-15 and measured as run 11.
 
 ## Previous work — Owner identity direction, 2026-10-14
 

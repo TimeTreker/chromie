@@ -368,7 +368,10 @@ and multi-Activity timing; otherwise it cancels pending/cancellable retained Wor
 after the Planner decision and executes the corrected Plan.
 
 SC Communicative Activities carry exact text, truth stage, supplied provenance and
-Evidence references. The Host validates and transports their words unchanged.
+Evidence references. The decoder has each act state the needs it fulfills and their phase
+before its words; one act may fulfill several needs. The Host validates and transports
+their words unchanged. A handover close requested after the handover completed is an
+`immediate` need (its ordering is already met).
 Planner records answer/input/result obligations and exact `before_step_ids` /
 `after_step_ids`. The response projection joins SC acts to immutable Work without
 copying speech back into the Plan. Required confirmation and communication ordered
@@ -376,7 +379,7 @@ before Work wait for the appropriate delivery/consent barrier; optional progress
 cannot delay task Work. Only an actually delivered covered answer can complete a
 responding Goal. A progress report cannot complete an executable Goal.
 
-On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Planner establishes the Work outcome and required communication facts. SC independently authors any post-Evidence words against that exact Goal/Evidence scope, execution status and epistemic strength. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. The re-entry decoder offers only what that validation accepts: `respond` cites completed Evidence only, `respond`/`execute` keep no unresolved needs, `clarify` names at least one as a short fact the person can supply (never wording), and with no new Work the relation is `exact` without confirmation (adjusted or alternative Work is confirmed). New Work may cite completed Work in `depends_on` by its step_id or evidence_ref.
+On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Planner establishes the Work outcome and required communication facts. SC independently authors any post-Evidence words against that exact Goal/Evidence scope, execution status and epistemic strength. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. The re-entry decoder offers only what that validation accepts: `next_action` is `respond`, `execute`, `clarify` or `unavailable` (a failed or silent provider is `unavailable`; refusing is Value Judgment's, never a Planner next action), `respond` cites completed Evidence only, `respond`/`execute` keep no unresolved needs, `clarify` names at least one as a short fact the person can supply (never wording), and with no new Work the relation is `exact` without confirmation (adjusted or alternative Work is confirmed). New Work may cite completed Work in `depends_on` by its step_id or evidence_ref.
 Satisfaction is prospective (the Goal once the selected action succeeds); outside
 reporting re-entries the decoder offers `respond` only at substantial or exact. Failure at this boundary fails closed; the Host never rewrites the sentence, and the person hears the Host's operational failure notice instead of silence.
 

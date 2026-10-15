@@ -1,13 +1,24 @@
 # Chromie Current Status
 
-## Current delivery — Repeated Activities; Planner-free identity, 2026-10-14
+## Current delivery — Run-11 repairs, 2026-10-15
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `941f09796`: Planner re-entry never refuses (VJ owns refusal); the post-handover need is immediate; SC acts bind needs before words; Planner rationales never state words or what Chromie is; one Activity serving several Responsibilities lists each. |
+| Automatic verification | Recorded run-11 request replays: required SC limitation bound 0/6 → 14/14, 10 SC calls all bound; Planner rationale body label 6/6 → 0/6; umbrella binding 2/6 → 6/6; three regressions red on HEAD; freeze 37 (`40e08784…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,824 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Run 11 (`rootcause7`, everyday cohort): mechanical 26/33, judged 23 / 2 / 8. Run 12 on these repairs pending. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause8-20261015`, deployed 2026-10-15. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Repeated Activities; Planner-free identity, 2026-10-14
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `4ed5a5143`: the streamed Planner states `activity_count` before an exact-length `activities` array and is told an information request is one read answered by SC after Evidence; shared identity projections carry no robot/human label and only the SC prompt holds the robot-body fact, so she never denies it. |
 | Automatic verification | Recorded streamed Planner request replay: repeat-prone 0/24 (base 14/24), all 92 recorded 0/92 (base 5/92); SC identity replay: robot question 4/4 answered as Chromie without a label or denial; freeze 36 (`0ce191dc…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,820 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Not yet live (run 11 pending). Run 10 on `rootcause5`: 23 / 4 / 6. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause6-20261014`. `rootcause7-20261014` built, not deployed. No release. |
+| Target validation | Run 11 on `rootcause7`: 26/33 mechanical, judged 23 / 2 / 8 (identity question answered as Chromie). Not qualified. |
+| Deployment state | `rootcause7-20261014` deployed 2026-10-15. No release. |
 
 Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
 

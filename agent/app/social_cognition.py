@@ -207,7 +207,8 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "Put actual words in text, not in reason_summary. Cite its supplied Goal and "
     "Responsibility refs. A covered need requires an explicit returned verbal act "
     "with nonempty text, its ID in addressed_need_ids, and the need's exact source "
-    "bindings. If an exact current-turn pending or delivered act already satisfies "
+    "bindings. One act may fulfill several needs; list every need it fulfills in its "
+    "addressed_need_ids. If an exact current-turn pending or delivered act already satisfies "
     "that need, return its unchanged activity_id and identical text with the need "
     "binding: Runtime reuses that delivery rather than speaking it twice, and still "
     "waits for playback completion. An acknowledgement alone does not cover an "
@@ -342,7 +343,13 @@ def _constrain_social_activity_identity(
             # information into an old message. Distinct repeated acts stay valid.
             # Where the act's function bounds what it may answer, choose the function
             # first so an answer is never written and then relabelled.
-            first = ("function", "text") if function_first else ("text",)
+            # The needs an act fulfills and their timing come before its words, so the
+            # words are written for the needs already bound (live 2026-10-15: a sentence
+            # written first was then bound to the answer only, leaving a limitation that
+            # had to be said unbound, 422).
+            binding = ("addressed_need_ids", "delivery_phase") if request.communication_needs else ()
+            first = [key for key in (*(("function",) if function_first else ()), *binding, "text")
+                     if key in properties]
             variant["properties"] = {**{key: properties[key] for key in first}, **{
                 key: value for key, value in properties.items() if key not in first
             }}

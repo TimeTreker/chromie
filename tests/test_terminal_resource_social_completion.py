@@ -32,9 +32,8 @@ def _host():
     return host, runtime
 
 
-def test_completed_resource_handover_becomes_optional_social_completion_need() -> None:
-    host, runtime = _host()
-    result = asyncio.run(VoiceAssistant._optional_completed_resource_social_response(host,
+def _handover_request(host):
+    return asyncio.run(VoiceAssistant._optional_completed_resource_social_response(host,
         source_response=SimpleNamespace(metadata={
             "user_turn_envelope": {
                 "turn_id": "turn-water",
@@ -57,6 +56,11 @@ def test_completed_resource_handover_becomes_optional_social_completion_need() -
         )],
     ))
 
+
+def test_completed_resource_handover_becomes_optional_social_completion_need() -> None:
+    host, runtime = _host()
+    result = _handover_request(host)
+
     assert result == "social-response"
     assert runtime.request is not None
     assert runtime.request.trigger == "evidence"
@@ -65,7 +69,8 @@ def test_completed_resource_handover_becomes_optional_social_completion_need() -
     need = runtime.request.communication_needs[0]
     assert need.owner == "runtime"
     assert need.kind == "result"
-    assert need.delivery_phase == "final"
+    assert need.delivery_phase == "immediate"
+    assert need.after_step_ids == ["deliver-water"]
     assert need.facts == {
         "status": "completed",
         "result_kind": "resource_delivery_handover",
@@ -92,3 +97,30 @@ def test_non_resource_completion_does_not_create_handover_social_need() -> None:
 
     assert result is None
     assert runtime.request is None
+
+
+def test_handover_words_bound_to_the_need_reach_the_person() -> None:
+    """Live 2026-10-15: SC's "给你。" kept the need's phase and the transport rejected it."""
+    from orchestrator.runtime.response_plan import build_social_interaction_response
+    from shared.chromie_contracts.social_cognition import SocialCognitionResolution
+
+    host, runtime = _host()
+    _handover_request(host)
+    request = runtime.request
+    need = request.communication_needs[0]
+    result = SocialCognitionResolution(
+        request_id=request.request_id, snapshot_digest=request.snapshot_digest(),
+        disposition="communicate", model_call_count=1,
+        reason_summary="A brief close after the completed handover.",
+        need_outcomes={need.need_id: "covered"},
+        activities=[{"activity_id": "handover", "text": "Here you are.", "function": "respond",
+                     "truth_stage": "context_grounded", "delivery_phase": need.delivery_phase,
+                     "source_goal_ids": request.goal_ids, "evidence_refs": request.evidence_refs,
+                     "addressed_need_ids": [need.need_id]}],
+    )
+
+    response = build_social_interaction_response(
+        request, result, session_id="sid-water", interaction_context=None,
+    )
+
+    assert [item.text for item in response.speech] == ["Here you are."]

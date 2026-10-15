@@ -845,6 +845,32 @@ def test_reentry_decoder_satisfaction_bands_match_dto(status, score):
     assert Draft202012Validator(schema).is_valid(raw) == accepted
 
 
+@pytest.mark.parametrize("allow_new_work", [True, False])
+def test_reentry_never_refuses_a_failed_read(allow_new_work):
+    """Live 2026-10-15: a weather timeout re-entered as `refused`; Host rejects it for every tier."""
+    from jsonschema import Draft202012Validator
+    from pydantic import ValidationError
+
+    schema = fast_evidence_reentry_response_schema(
+        expected_goal_ids=["goal-weather"], evidence_refs=["evidence-weather"],
+        allowed_capability_ids=[], allow_new_work=allow_new_work,
+    )
+    validator = Draft202012Validator(schema)
+    for action, accepted in (("refused", False), ("unavailable", True)):
+        raw = _reentry_decision_output("unsatisfied", 0.0)
+        raw["goal_decisions"][0].update(
+            next_action=action, evidence_refs=[], unresolved_needs=[],
+            rationale="The weather provider did not answer.",
+        )
+        try:
+            PlannerEvidenceReentryModelOutput.model_validate(raw)
+            dto_accepts = True
+        except ValidationError:
+            dto_accepts = False
+        assert dto_accepts is accepted
+        assert validator.is_valid(raw) is accepted
+
+
 @pytest.mark.parametrize("goal_count", [1, 2])
 def test_reentry_decoder_offers_no_delegation(goal_count):
     # One Planner (PLANNER-AUTHORITY-001): re-entry decides, never delegates.
