@@ -12,7 +12,7 @@
     "workflow-delayed.json": "bd7fd1e64acfe1837c8341e45061bdc8cb69059eccc0b2f7e6cb340e1bd19594",
     "workflow-normal.json": "2eb4d16da77ebafc6ff78925d0cf4c913f221bb5c9efc7d9e7f6fc4f2deb9fb9"
   },
-  "freeze_revision": 37,
-  "freeze_note": "Run-11 repairs (2026-10-15). Every request recaptured: Planner re-entry never refuses (Value Judgment owns refusal; a failed provider is unavailable); one Activity serving several Responsibilities lists each; a complete_response rationale names the Responsibility and facts, never words or what Chromie is; SC acts bind their needs before their words; the post-handover need is immediate. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 38,
+  "freeze_note": "Run-12/13 repairs (2026-10-15). Every request recaptured: SC act text is whitespace-normalized; SC neither confirms nor denies being a robot/human/AI and says who she is; an internal processing cause is told with no reason; post-Work failures give the operational notice; a scope extension supersedes the speculative Plan. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

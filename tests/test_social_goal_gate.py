@@ -477,3 +477,78 @@ async def test_goal_scope_beyond_the_first_plan_is_planned_once_over_ga_goals() 
     assert result.status == "applied", result.fallback_reason
     assert calls.count("planner:r1") == 1 and "planner:r1,r2" in calls
     assert {item.goal_id for item in result.terminal_plan.goal_outcomes} == {"goal-r1", "goal-r2"}
+
+
+@pytest.mark.asyncio
+async def test_a_scope_extension_replaces_the_speculative_prepared_work() -> None:
+    """Live 2026-10-15 (body_celebrate_zh): the first Plan for r1 prepared its body Work, GA
+    extended the scope to r2, and the extended Plan could not be prepared ("one UMI planning
+    task cannot replace its prepared result"), so the celebration never ran."""
+    calls: list[str] = []
+
+    class Agent:
+        async def resolve_goal_association(self, session, **kwargs):
+            del session, kwargs
+            return GoalAssociationResolution(
+                turn_id="turn-extend", resolution_status="resolved",
+                new_goals=[SemanticGoal(goal_id="goal-r1", source_responsibility_refs=["r1"], description="Blink.",
+                                        source_text="Blink.", metadata={"output_mode": "body_action"}),
+                           SemanticGoal(goal_id="goal-r2", source_responsibility_refs=["r2"], description="Cheer.",
+                                        source_text="Cheer.", metadata={"output_mode": "speech"})],
+                confidence=1.0, reason_summary="Both Responsibilities are Goal-owned.",
+            )
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            del session, kwargs
+            needs = list(request.communication_needs)
+            return SocialCognitionResolution(
+                request_id=request.request_id, snapshot_digest=request.snapshot_digest(), model_call_count=1,
+                disposition="communicate", reason_summary="Reply.",
+                need_outcomes={need.need_id: "covered" for need in needs},
+                activities=[{"activity_id": f"say-{index}", "text": "Yay!", "function": "respond",
+                             "truth_stage": "context_grounded", "source_goal_ids": need.source_goal_ids,
+                             "source_responsibility_refs": need.source_responsibility_refs,
+                             "addressed_need_ids": [need.need_id]} for index, need in enumerate(needs)]
+                or [{"activity_id": "ack", "text": "Okay.", "function": "acknowledge", "truth_stage": "context_grounded"}],
+            )
+
+        async def stream_fast_advance(self, session, *, request, **kwargs):
+            del session, kwargs
+            refs = [item.local_ref for item in request.responsibilities]
+            calls.append("planner:" + ",".join(refs))
+            activities = [FastPlannerCapabilityActivity(
+                activity_id=f"blink-{len(refs)}", role="capability", capability_id="soridormi.blink_eyes",
+                args={"count": 1}, depends_on=[], source_responsibility_refs=["r1"])]
+            if "r2" in refs:
+                activities.append({"role": "complete_response", "activity_id": "cheer", "source_responsibility_refs": ["r2"],
+                                   "rationale": "Answer.", "timing": "parallel"})
+            yield FastPlannerStreamTerminal(turn_id=request.sid, advance=FastPlannerAdvance(
+                turn_id=request.sid, disposition="mixed" if "r2" in refs else "execute", coverage="complete",
+                covered_responsibility_refs=refs, activities=activities, confidence=1.0,
+                reason_summary="Blink and cheer."))
+
+    runtime = FakeRuntime([blink_definition()])
+    coordinator = GoalDrivenRuntimeCoordinator(
+        agent_client=Agent(), adapter=CanonicalPlanRuntimeAdapter(runtime),
+        policy=CognitiveRuntimePolicy(mode="apply"), goal_state_apply=lambda *args, **kwargs: [],
+    )
+    core, envelope = admitted_core(
+        "Blink, and cheer with me!", sid="extend", language="en-US",
+        responsibilities=[
+            {"local_ref": "r1", "outcome": "Blink.", "output_mode": "body_action",
+             "continuity_scope": "goal", "confidence": 1.0},
+            {"local_ref": "r2", "outcome": "Cheer with me.", "output_mode": "speech",
+             "continuity_scope": "goal", "confidence": 1.0},
+        ],
+        cognitive_requests=[
+            {"authority": "goal_association", "responsibility_refs": ["r1", "r2"], "reason_summary": "Continuity."},
+            {"authority": "planner", "responsibility_refs": ["r1"], "reason_summary": "HOW."},
+        ],
+    )
+    result = await coordinator.resolve(
+        object(), text="Blink, and cheer with me!", sid="extend",
+        core_interpretation=core, turn_envelope=envelope, context={"history": []}, history=[], language="en-US",
+    )
+    assert calls == ["planner:r1", "planner:r1,r2"]
+    assert result.status == "applied", result.fallback_reason
+    assert [step.capability_id for step in result.terminal_plan.steps] == ["soridormi.blink_eyes"]

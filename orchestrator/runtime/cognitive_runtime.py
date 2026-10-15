@@ -4978,6 +4978,12 @@ class GoalDrivenRuntimeCoordinator:
                         association_result.has_named_goal_cancellation
                     )
                     has_goal_replacement = association_result.has_goal_replacement
+            await cancel_early_safe_reads(reason)
+
+        async def cancel_early_safe_reads(reason: str) -> None:
+            """Stop safe reads a Fast Plan started before Goal binding."""
+
+            nonlocal ready_fast_capability_status
             execution = ready_fast_capability_execution
             execution_status = ready_fast_capability_status
             if (
@@ -5539,6 +5545,14 @@ class GoalDrivenRuntimeCoordinator:
                 # decision). Plan once over exactly GA's Goal-owned scope; non-Goal refs stay out.
                 logger.info("fast_planner_scope_extended_to_ga_goals sid=%s uncovered=%s",
                             sid, ",".join(uncovered_goal_refs))
+                # That Plan supersedes the speculative one: drop its prepared Work and stop
+                # any safe read it started, or the new Plan cannot be prepared (live
+                # 2026-10-15: "one UMI planning task cannot replace its prepared result").
+                await self.adapter.interaction_runtime.runtime.discard_prepared_planner_work(
+                    self._context_turn_id(context, sid)
+                )
+                await cancel_early_safe_reads("scope_extended_to_ga_goals")
+                ready_fast_capability_execution = None
                 fast_advance = None
                 await plan_current_responsibilities(
                     self._subset_work_request(post_ga_request, goal_responsibility_refs),

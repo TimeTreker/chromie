@@ -434,12 +434,12 @@
       "ordinal": 5,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
-      "contract": "Retain the trusted outcome and response_planning_failed diagnostic when re-entry fails; return without result speech or further Work.",
+      "contract": "Retain the trusted outcome when result planning fails; deliver the Host operational notice as the result response (never silence) without further Work.",
       "review_status": "reviewed",
-      "body_sha256": "e9a56d05cb710c9a198000606e4e7ff72ed5a51114cb30be68c46973c4e28e9a",
+      "body_sha256": "6c2bc81058d476d32a8ee76043fce06408aa5da2698c46fe6064f1959fd94515",
       "failure_signals": [
         "diagnostic",
-        "return"
+        "state_update"
       ]
     },
     {
@@ -531,12 +531,13 @@
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
+      "contract": "Any failure deciding what follows completed or failed Work returns the Host operational notice with the failure stage/class in metadata; never silence, never a derived result.",
       "review_status": "reviewed",
-      "body_sha256": "ce2b1b9b0b7604380ef2d03dfe835f75a1f62ac40b1df2ded4090e40114b791c",
+      "body_sha256": "473ef86ceb70a67025cb221455d22b051b78176237b71a01b47fb270ce4f9aaf",
       "failure_signals": [
         "diagnostic",
-        "return"
+        "return",
+        "state_update"
       ]
     },
     {
@@ -1069,11 +1070,11 @@
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "GoalDrivenRuntimeCoordinator._resolve.cancel_uncommitted_fast_work",
+      "symbol": "GoalDrivenRuntimeCoordinator._resolve.cancel_early_safe_reads",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator.cognitive_runtime",
-      "contract": "Best-effort cancellation of Fast Work that never received canonical Goal binding; retain an observable failure status if cleanup itself fails.",
+      "contract": "Best-effort cancellation of safe reads a Fast Plan started before canonical Goal binding (failed turn or superseded speculative Plan); retain an observable failure status if cleanup itself fails.",
       "review_status": "reviewed",
       "body_sha256": "7de9bc4f72ec18f5e7ec53062f64b4570d5b69aeab90f2f77752069d1ec13eb9",
       "failure_signals": [

@@ -229,7 +229,9 @@ delivery as completion evidence. A body receipt does not enter that join.
 The same containment applies to result, provider, time and Situation re-entry:
 returned technical failures and thrown call errors are retained as failed workflow
 stages before adaptation or commitment. A technical failure invokes no other
-planner; a genuine limitation is an honest `unavailable` outcome.
+planner; a genuine limitation is an honest `unavailable` outcome. Whatever fails after
+Work — a cognition stage, a Host contract or result planning — the person hears the Host
+operational notice; a post-Work failure is never silent (owner, 2026-10-15).
 Acceptance inspects these retained failed stages even when the initial turn's
 detached dispatch was already applied; it stops the cohort and marks coverage
 incomplete. Redacted error prose is not interpreted as semantic evidence.

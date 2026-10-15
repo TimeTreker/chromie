@@ -1,12 +1,23 @@
 # Chromie Current Status
 
-## Current delivery — Live run 12; SC words survive the exact-words join, 2026-10-15
+## Current delivery — Run-13 repairs, 2026-10-15
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `ce42d576d`: any error after Work gives the operational notice; a Planner scope extension supersedes the speculative Plan; SC neither confirms nor denies being a robot/human/AI and tells an internal cause with no reason. |
+| Automatic verification | Recorded run-13 request replays: robot denial 8/8 → 0/8, internal-cause leak 6/6 → 0/6; regressions red on HEAD (notice inner/outer, scope extension); freeze 38 (`7310d690…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,829 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Run 13 (`rootcause9`, everyday cohort): mechanical 28/33, judged 26 / 1 / 6. Run 14 on these repairs pending. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause10-20261015`, deployed 2026-10-15. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Live run 12; SC words survive the exact-words join, 2026-10-15
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `0ead8031f`: SC act text is whitespace-normalized like every transport stage, so the exact-words join compares the same words. |
 | Automatic verification | Regression red on HEAD; freeze 37 verified unchanged; Level A 45/45; canonical gate (pytest 3,827 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 12 (`rootcause8`, everyday cohort): mechanical 30/33, judged 25 / 2 / 6; run-11 repairs verified live. Run 13 on this repair pending. Not qualified. |
+| Target validation | Run 12 (`rootcause8`, everyday cohort): mechanical 30/33, judged 25 / 2 / 6; run-11 repairs verified live. Run 13 on this repair: 28/33, judged 26 / 1 / 6. Not qualified. |
 | Deployment state | `chromie-agent:latest` = `rootcause9-20261015`, deployed 2026-10-15. No release. |
 
 Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).

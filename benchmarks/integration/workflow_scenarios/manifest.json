@@ -6127,19 +6127,19 @@
     "1ccbb6e1b36925309e6d0c0fb960369789363c6484a9b7f023833c8db77a6981.json": "1ccbb6e1b36925309e6d0c0fb960369789363c6484a9b7f023833c8db77a6981"
   },
   "frozen_on": "2026-10-15",
-  "freeze_revision": 37,
-  "freeze_note": "Run-11 repairs (2026-10-15). Every request recaptured: Planner re-entry never refuses (Value Judgment owns refusal; a failed provider is unavailable); one Activity serving several Responsibilities lists each; a complete_response rationale names the Responsibility and facts, never words or what Chromie is; SC acts bind their needs before their words; the post-handover need is immediate. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 38,
+  "freeze_note": "Run-12/13 repairs (2026-10-15). Every request recaptured: SC act text is whitespace-normalized; SC neither confirms nor denies being a robot/human/AI and says who she is; an internal processing cause is told with no reason; post-Work failures give the operational notice; a scope extension supersedes the speculative Plan. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "previous_freeze": {
-    "manifest_sha256": "99ab372dfe44d72317613994ead669f5b1dcf82c0c904cfc7a6923b928a0dba2",
+    "manifest_sha256": "7d0298437377754fbcc17cc349c40ffaf3b59b5683ab010344829cd3456dd576",
     "storage": {
       "archive_path": "benchmarks/integration/workflow_scenarios/frozen.tar.xz",
-      "archive_sha256": "0ce191dc31905676b41b899d0842dd618bf38bf6c0b8179a9266c9c32a39919e",
-      "manifest_sha256": "49873c1660248e955d6f0f04f96757ecfa5b4bb62c1f5a0d6bb65e6c50e44c4e"
+      "archive_sha256": "40e087845399ed13cb02d4a7f50652a15eccfa5ccccd983dffa4b04e1d6efec1",
+      "manifest_sha256": "f4b637ffbffb35100e4ae295eb81b88b8601bee36ee763fc17188613ad4db59d"
     }
   },
   "storage": {
     "archive_path": "benchmarks/integration/workflow_scenarios/frozen.tar.xz",
-    "archive_sha256": "40e087845399ed13cb02d4a7f50652a15eccfa5ccccd983dffa4b04e1d6efec1",
-    "manifest_sha256": "f4b637ffbffb35100e4ae295eb81b88b8601bee36ee763fc17188613ad4db59d"
+    "archive_sha256": "7310d6904d93c150ab9cb86aa7e12026456fc2b1f5ac8fb0b8e63d8ca95788a5",
+    "manifest_sha256": "69ddab1bcba678855944e7fb5723fd5d43af585b1350856aa31b6d078443ba90"
   }
 }

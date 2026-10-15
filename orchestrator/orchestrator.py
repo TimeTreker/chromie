@@ -4720,6 +4720,7 @@ class VoiceAssistant:
             )
             return "incremental_planner_reentry_handled"
 
+        final_response = None
         try:
             final_response = await self._plan_evidence_bound_capability_result_response(
                 source_response=response,
@@ -4757,16 +4758,18 @@ class VoiceAssistant:
                 type(exc).__name__,
                 exc,
             )
-            self._record_cognitive_outcome_evidence(
-                bundle,
-                session_id=session_id,
-                final_response=None,
-                delivery_status="response_planning_failed",
-                suppression_reason=type(exc).__name__,
-                goal_state_results=goal_state_results,
-                execution=execution,
-            )
-            return "response_planning_failed"
+            if final_response is None:
+                # An error after Work is never silent (owner, 2026-10-15): the person
+                # hears the operational notice; the error stays in its metadata.
+                envelope = response.metadata.get("user_turn_envelope") if isinstance(response.metadata, dict) else None
+                normalized_input = envelope.get("normalized_input") if isinstance(envelope, dict) else None
+                final_response = self._cognitive_core_exception_safe_response(
+                    str(normalized_input.get("text") or "") if isinstance(normalized_input, dict) else "",
+                    context={"user_turn_envelope": envelope},
+                    failure_stage="cognitive_outcome_response",
+                    failure_class=type(exc).__name__,
+                    failure_error=str(exc),
+                )
 
         if defer_for_ordinary_overlap:
             goal_ids = tuple(
@@ -6382,16 +6385,19 @@ class VoiceAssistant:
                 type(exc).__name__,
                 exc,
             )
-            if not isinstance(exc, CognitiveStageFailure):
-                return None
-            # The Planner could not decide what follows this Work. Say so with the
-            # operational notice instead of ending silently (live 2026-10-12: three
-            # failed re-entries left the person with only "Got it.").
+            # Whatever failed after this Work, say so with the operational notice instead
+            # of ending silently (live 2026-10-12: three failed re-entries left the person
+            # with only "Got it."; owner 2026-10-15: any error gets at least one notice,
+            # after a Host contract error left a completed weather read unanswered).
+            stage_failure = isinstance(exc, CognitiveStageFailure)
             return self._cognitive_core_exception_safe_response(
                 user_request,
                 context={"user_turn_envelope": envelope},
-                failure_stage=exc.stage,
-                failure_class=str(exc.failure_metadata.get("failure_class") or ""),
+                failure_stage=exc.stage if stage_failure else "fast_planner_evidence_reentry",
+                failure_class=(
+                    str(exc.failure_metadata.get("failure_class") or "")
+                    if stage_failure else type(exc).__name__
+                ),
                 failure_error=str(exc),
             )
 

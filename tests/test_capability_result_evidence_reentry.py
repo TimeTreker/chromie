@@ -877,7 +877,12 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         self.assertEqual([item.text for item in response.speech], ["我这边刚才出了点问题，没能把这件事完成。"])
         self.assertEqual(response.metadata["effect_execution"], "not_authorized")
         self.assertEqual(response.metadata["semantic_failure_stage"], "fast_planner_evidence_reentry")
-        self.assertIsNone(respond_with(RuntimeError("not a cognition stage failure")))
+        # Any error after Work is told, not only cognition failures (owner, 2026-10-15;
+        # live: a Host contract error after a completed weather read was silent).
+        contract = respond_with(ValueError("SC projection changed exact words, scope or delivery order"))
+        self.assertEqual([item.text for item in contract.speech], ["我这边刚才出了点问题，没能把这件事完成。"])
+        self.assertEqual(contract.metadata["semantic_failure_stage"], "fast_planner_evidence_reentry")
+        self.assertEqual(contract.metadata["semantic_failure_class"], "ValueError")
 
     def test_aggregate_reentry_excludes_already_consumed_sibling_evidence_and_goal(self) -> None:
         first_goal = "goal-walk"

@@ -126,3 +126,27 @@ def test_background_reflection_expires_drains_and_cannot_reopen_goal(ending):
         else:
             assert 'reflection_state_results' not in response.metadata
     asyncio.run(run())
+
+
+def test_an_error_planning_the_result_is_told_not_silent():
+    """Owner 2026-10-15: any error after Work gives at least one operational notice."""
+    async def run():
+        values = episode()
+        host, sid, response, execution = values[:4]
+        delivered = []
+
+        async def failing_result(**kwargs):
+            raise RuntimeError('result planning failed')
+
+        async def deliver(final_response, *, session_id):
+            delivered.append(final_response); return 'applied'
+
+        host._plan_evidence_bound_capability_result_response = failing_result
+        host._apply_planner_reentry_response = deliver
+        result = await asyncio.wait_for(host._close_cognitive_execution(response=response,
+            execution=execution, session_id=sid, generation=4, provider_status=None), 2)
+        assert result == 'applied'
+        [notice] = delivered
+        assert [item.text for item in notice.speech] == ["I ran into a problem and couldn't complete that."]
+        assert notice.metadata['semantic_failure_stage'] == 'cognitive_outcome_response'
+    asyncio.run(run())

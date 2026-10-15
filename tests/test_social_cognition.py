@@ -2584,6 +2584,8 @@ def test_social_authority_defaults_to_natural_conversational_economy() -> None:
     assert "Never call yourself a robot" in prompt
     assert "including when the person asks whether you are one" in prompt
     assert "never say that you are not a robot or that you are human" in prompt
+    assert "neither confirm nor deny it: say who you are instead" in prompt
+    assert "An internal processing cause" in prompt and "with no reason" in prompt
     assert "service-style offers/questions" in prompt
     assert "Never invent sadness, bad mood" in prompt
     assert "late internal cognition/association failure is not a user-visible failure" in prompt

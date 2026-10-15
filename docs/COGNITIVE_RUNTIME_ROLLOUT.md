@@ -44,6 +44,8 @@ SC and Work are independent until a required confirmation or explicit before/aft
 dependency joins. Only validated, contract-declared side-effect-free safe reads may
 execute before canonical Goal binding; effectful Work remains prepared until all
 prerequisites hold. No partial JSON, speculative speech or failed Plan authorizes an effect.
+When GA's Goals exceed the first Planner scope, the turn is planned once over them; that Plan
+supersedes the first, whose prepared Work is discarded and early safe reads are cancelled.
 
 ## 2. Authority boundaries
 

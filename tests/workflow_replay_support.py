@@ -408,6 +408,8 @@ class Episode(PlannerActivationFixture):
                 assert next_response is not None
                 assert self.last_request.planner_reentry_scope.source_plan_id == plan.plan_id
                 assert self.last_request.context['trusted_terminal_evidence'][0]['data'] == self.case['provider_outputs']['chromie.weather.lookup']
+                # A failed re-entry is told with the operational notice, which carries no Plan.
+                assert 'canonical_plan' in next_response.metadata, next_response.metadata.get('semantic_failure_stage')
                 next_response.metadata['turn_id'] = self.request.sid
                 next_plan = plan.model_validate(next_response.metadata['canonical_plan'])
                 self.manager.record_interaction_response(self.request.sid, next_response)

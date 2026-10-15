@@ -1,10 +1,37 @@
 # Chromie Development Checkpoint
 
-## Current work — Live run 12; SC words survive the exact-words join, 2026-10-15
+## Current work — Run-13 repairs: never silent after Work, scope extension, identity, internal causes, 2026-10-15
+
+Base `origin/main` `ce42d576d` (deployed as `rootcause9-20261015`). Live run 13 (everyday cohort, clean tree, one
+bundle): mechanical 28/33, judged 26 pass / 1 partial / 6 fail. Owner: "commit and push. deployed and restarted
+the chromie-llm" (2026-10-15). Delivered with this file. Evidence:
+`.chromie/acceptance/remaining-defects-20261013/` README ("Live run 13", "Repairs after run 13"), `run13/`,
+`probes/binding/identity_pairs.json`, `probes/binding/cause_pairs.json`.
+
+- Owner decision implemented: any error after Work gives the Host operational notice, never silence (evidence
+  re-entry and result planning).
+- A Planner scope extension supersedes the speculative Plan: its prepared Work is discarded and early safe reads are
+  cancelled (celebrate failed with "one UMI planning task cannot replace its prepared result").
+- SC neither confirms nor denies being a robot, human or AI and says who she is (a priming UMI reason made her say
+  "I'm not a robot" 8/8); an internal processing cause is told with no reason.
+- Open: canonical waiting-shape misuse (nod again); Planner provenance/binding (look yaw, rain_tell r2, "那上海呢？"
+  date); thirsty (no offer, UMI chose milk); weather provider timeouts (network); scheduler RSS rising across runs.
+
+Verification: replays of the recorded run-13 requests: robot question "I'm not a robot" 8/8 → 0/8 (controls
+unchanged), internal-cause leak 6/6 → 0/6 (timeout explanation kept); regressions red on HEAD for the notice
+(inner and outer) and the scope extension; boundary registry re-audited. Freeze 38 (`7310d690…`, no reply
+re-authored, 6,000 + 5 recaptured, 0 failures); strict replay 6,000/6,000 zero model calls (same distribution);
+Level A 45/45; gate in clean worktree `scratchpad/gate21` (pytest 3,829 + 5 skipped, benchmarks 169, legacy 20,
+policies, docs, test ownership). Image `chromie-agent:rootcause10-20261015` (`5368e6a2…`, 125 files identical,
+digest `4bddd79b07cf8d62`), deployed by the owner on 2026-10-15 with `chromie-llm` restarted (run 14 next); the
+notice and scope-extension changes are Host-side (checkout). The gate worktree was lost in a host reboot.
+
+## Previous work — Live run 12; SC words survive the exact-words join, 2026-10-15
 
 Base `origin/main` `0ead8031f` (run-11 repairs, deployed as `rootcause8-20261015`). Live run 12 (everyday cohort,
 clean tree, one bundle): mechanical 30/33, judged 25 pass / 2 partial / 6 fail. Owner: "commit and push,
-deployed and go on" (2026-10-15). Delivered with this file. Evidence:
+deployed and go on" (2026-10-15). Committed as `ce42d576d`, deployed as `rootcause9-20261015`, measured as
+run 13. Evidence:
 `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 12", "Repair after run 12"), `run12/`.
 
 - Run-11 repairs verified live: backflip limitation said without a body label, water handover close spoken, umbrella
@@ -19,7 +46,7 @@ deployed and go on" (2026-10-15). Delivered with this file. Evidence:
 Verification: regression `test_sc_words_survive_the_exact_words_join` (red on HEAD); no corpus change (freeze 37
 `40e08784…` verified); Level A 45/45; gate in clean worktree `scratchpad/gate20` (pytest 3,827 + 5 skipped,
 benchmarks 169, legacy 20, policies, docs, test ownership). Image `chromie-agent:rootcause9-20261015`
-(`bcc9ebed…`, 125 files identical, digest `60ec1216930957a5`), deployed by the owner on 2026-10-15 (run 13 next); the contract is shared, so the Host
+(`bcc9ebed…`, 125 files identical, digest `60ec1216930957a5`), deployed by the owner on 2026-10-15 and measured as run 13; the contract is shared, so the Host
 uses it from the checkout.
 
 ## Previous work — Run-11 repairs: failures the person hears, needs bound before words, 2026-10-15
