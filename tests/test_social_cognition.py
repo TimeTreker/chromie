@@ -2867,3 +2867,15 @@ def test_optional_expression_never_performs_planner_work():
     }
     assert planner_work_capability_ids(context) == {"chromie.weather.lookup", "soridormi.wave_hand"}
     assert planner_work_capability_ids({}) == set()
+
+
+@pytest.mark.parametrize("text", ["因为有雨，建议你带把伞。 ", "  Here you are.\n", "Two  spaces\tand a tab."])
+def test_sc_words_survive_the_exact_words_join(text):
+    """Live 2026-10-15 (info_umbrella_zh): a correct answer ended with a space; the
+    response stage normalized it, the exact-words join saw "changed words" and the
+    person heard nothing."""
+    from shared.chromie_contracts.semantic_task import ResponseStage
+
+    act = SocialCommunicativeAct(activity_id="a1", text=text, function="respond",
+                                 truth_stage="context_grounded")
+    assert ResponseStage(text=act.text).text == act.text

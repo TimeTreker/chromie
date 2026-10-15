@@ -1,10 +1,33 @@
 # Chromie Development Checkpoint
 
-## Current work — Run-11 repairs: failures the person hears, needs bound before words, 2026-10-15
+## Current work — Live run 12; SC words survive the exact-words join, 2026-10-15
+
+Base `origin/main` `0ead8031f` (run-11 repairs, deployed as `rootcause8-20261015`). Live run 12 (everyday cohort,
+clean tree, one bundle): mechanical 30/33, judged 25 pass / 2 partial / 6 fail. Owner: "commit and push,
+deployed and go on" (2026-10-15). Delivered with this file. Evidence:
+`.chromie/acceptance/remaining-defects-20261013/` README ("Live run 12", "Repair after run 12"), `run12/`.
+
+- Run-11 repairs verified live: backflip limitation said without a body label, water handover close spoken, umbrella
+  SC bound both needs in one act, coffee answered honestly, no re-entry `refused`.
+- Repair: SC act text is whitespace-normalized like every transport stage; a correct umbrella answer ending in a
+  space was rejected by the exact-words join and the person heard nothing.
+- Owner decision (2026-10-15): any error after Work must give at least one operational notice, never silence
+  (next repair; a non-cognition error after a completed read is still silent in this delivery).
+- Open: celebrate (UMI overlap), remote (harness/SC), Planner provenance (look yaw, rain_tell date, "那上海呢？"
+  dropping the outcome's 明天), thirsty (SC offered nothing; UMI chose milk), teacher (asks then answers).
+
+Verification: regression `test_sc_words_survive_the_exact_words_join` (red on HEAD); no corpus change (freeze 37
+`40e08784…` verified); Level A 45/45; gate in clean worktree `scratchpad/gate20` (pytest 3,827 + 5 skipped,
+benchmarks 169, legacy 20, policies, docs, test ownership). Image `chromie-agent:rootcause9-20261015`
+(`bcc9ebed…`, 125 files identical, digest `60ec1216930957a5`), deployed by the owner on 2026-10-15 (run 13 next); the contract is shared, so the Host
+uses it from the checkout.
+
+## Previous work — Run-11 repairs: failures the person hears, needs bound before words, 2026-10-15
 
 Base `origin/main` `941f09796` (deployed by the owner as `rootcause7-20261014`). Live run 11 (everyday cohort,
 clean tree, one bundle): mechanical 26/33, judged 23 pass / 2 partial / 8 fail. Owner: "commit and push,
-deployed, go on with run12" (2026-10-15). Delivered with this file. Evidence:
+deployed, go on with run12" (2026-10-15). Committed as `0ead8031f`, deployed as `rootcause8-20261015`,
+measured as run 12. Evidence:
 `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 11", "Repairs after run 11"), `run11/`,
 `probes/binding/`.
 
@@ -29,7 +52,7 @@ HEAD: `test_reentry_never_refuses_a_failed_read`, `test_handover_words_bound_to_
 recaptured, 0 failures); strict replay 6,000/6,000 zero model calls (same distribution); Level A 45/45; gate in
 clean worktree `scratchpad/gate19` (pytest 3,824 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test
 ownership). Image `chromie-agent:rootcause8-20261015` (`0248c42d…`, 125 files identical, digest
-`169e55c8c36366dd`), deployed by the owner on 2026-10-15 (run 12 next); the handover-phase change is Host-side
+`169e55c8c36366dd`), deployed by the owner on 2026-10-15 and measured as run 12; the handover-phase change is Host-side
 and runs from the checkout.
 
 ## Previous work — Repeated Activities; Planner-free identity, 2026-10-14

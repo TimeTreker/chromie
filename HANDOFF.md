@@ -1,10 +1,27 @@
 # Chromie Handoff
 
-## Current work — Run-11 repairs, 2026-10-15
+## Current work — Live run 12; SC words survive the exact-words join, 2026-10-15
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
-`941f09796`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing
-this file). Soridormi `origin/main` `33b8a13`; the water scene was restarted on 2026-10-15 after a host reboot
+`0ead8031f`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing
+this file). Soridormi `origin/main` `33b8a13`, water scene running since 2026-10-15. Evidence:
+`.chromie/acceptance/remaining-defects-20261013/` (README "Live run 12" and "Repair after run 12"; `run12/` with
+identity, bundle and digests; `probes/planner_args_replay.py`, `probes/binding/date_replay.txt`). Live:
+`chromie-agent:latest` = `rootcause9-20261015` (deployed by the owner on 2026-10-15). Gate worktree
+`scratchpad/gate20`. `chromie-agent:rootcause9-20261015` (`sha256:bcc9ebed…`, 125 files identical, digest `60ec1216930957a5`).
+
+```bash
+# deployed 2026-10-15 (rollback: chromie-agent:rootcause8-20261015)
+docker tag chromie-agent:rootcause9-20261015 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then live run 13 on the everyday cohort (one invocation, one bundle)
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
+```
+
+## Previous work — Run-11 repairs, 2026-10-15
+
+Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
+`941f09796`; pushed as `0ead8031f`. Soridormi `origin/main` `33b8a13`; the water scene was restarted on 2026-10-15 after a host reboot
 (`./scripts/run_scenario.sh --scenario configs/simulation_scenarios/thirst_water_delivery.json --profile
 open_duck_forward --viewer`). Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README "Live run 11" and
 "Repairs after run 11"; `run11/` with identity, bundle and digests; `probes/binding/` and the replay probes;
@@ -17,7 +34,7 @@ open_duck_forward --viewer`). Evidence: `.chromie/acceptance/remaining-defects-2
 # deployed 2026-10-15 (rollback: chromie-agent:rootcause7-20261014)
 docker tag chromie-agent:rootcause8-20261015 chromie-agent:latest
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
-# then live run 12 on the everyday cohort (one invocation, one bundle)
+# then live run 12 (done: run12/)
 python scripts/general_ability_acceptance.py --mode live-text --scenario-root .chromie/acceptance/remaining-defects-20261013/daily-scenarios --goal-driven-runtime apply --execute --keep-going --runtime-identity <identity> --evidence-dir <dir>/live
 ```
 

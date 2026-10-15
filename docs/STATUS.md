@@ -1,12 +1,23 @@
 # Chromie Current Status
 
-## Current delivery — Run-11 repairs, 2026-10-15
+## Current delivery — Live run 12; SC words survive the exact-words join, 2026-10-15
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `0ead8031f`: SC act text is whitespace-normalized like every transport stage, so the exact-words join compares the same words. |
+| Automatic verification | Regression red on HEAD; freeze 37 verified unchanged; Level A 45/45; canonical gate (pytest 3,827 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Run 12 (`rootcause8`, everyday cohort): mechanical 30/33, judged 25 / 2 / 6; run-11 repairs verified live. Run 13 on this repair pending. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause9-20261015`, deployed 2026-10-15. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Run-11 repairs, 2026-10-15
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `941f09796`: Planner re-entry never refuses (VJ owns refusal); the post-handover need is immediate; SC acts bind needs before words; Planner rationales never state words or what Chromie is; one Activity serving several Responsibilities lists each. |
 | Automatic verification | Recorded run-11 request replays: required SC limitation bound 0/6 → 14/14, 10 SC calls all bound; Planner rationale body label 6/6 → 0/6; umbrella binding 2/6 → 6/6; three regressions red on HEAD; freeze 37 (`40e08784…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,824 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 11 (`rootcause7`, everyday cohort): mechanical 26/33, judged 23 / 2 / 8. Run 12 on these repairs pending. Not qualified. |
+| Target validation | Run 12 (`rootcause8`): mechanical 30/33, judged 25 / 2 / 6 (run 11: 23 / 2 / 8). Not qualified. |
 | Deployment state | `chromie-agent:latest` = `rootcause8-20261015`, deployed 2026-10-15. No release. |
 
 Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).

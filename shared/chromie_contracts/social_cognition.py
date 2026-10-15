@@ -9,11 +9,12 @@ import hashlib
 import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
 from .interaction import reject_forbidden_low_level_fields
 from .semantic_artifact import SemanticArtifactLineage, semantic_artifact_ref
+from .text import normalize_whitespace
 from .user_turn import user_turn_prohibits_speech
 from .plan import (
     AuxiliaryPlanActivity, CommunicativeTruthStage, FastProgressKind, SocialCommunicationNeed,
@@ -146,6 +147,14 @@ class SocialCommunicativeAct(BaseModel):
     addressed_need_ids: list[str] = Field(default_factory=list)
     repair_of_activity_ids: list[str] = Field(default_factory=list, max_length=8)
     auxiliary_activities: list[AuxiliaryPlanActivity] = Field(default_factory=list)
+
+    @field_validator("text", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> Any:
+        # The same words every transport stage carries (ResponseStage normalizes too):
+        # live 2026-10-15 a trailing space made the exact-words join reject a correct
+        # answer as "changed words" and the person heard nothing.
+        return normalize_whitespace(value)
 
     @model_validator(mode="after")
     def validate_expression(self) -> "SocialCommunicativeAct":
