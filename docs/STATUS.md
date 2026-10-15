@@ -1,12 +1,23 @@
 # Chromie Current Status
 
-## Current delivery — Run-13 repairs, 2026-10-15
+## Current delivery — Run-14 repairs, 2026-10-15
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `ad4dfcf96`: SC never offers an answer Value Judgment withheld for binding; each streamed Planner Activity names its Responsibilities before its Capability and args. |
+| Automatic verification | Recorded live request replays: withheld-answer binding failure 1/6 → 0/6, umbrella binding 5/6 → 6/6 (two runs); regressions red on HEAD; freeze 38 strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,831 + 5 skipped, benchmarks 169, legacy 20). |
+| Target validation | Run 14 (`rootcause10`, everyday cohort): mechanical 26/33, judged 26 / 1 / 6. Run 15 on these repairs pending. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause11-20261015`, deployed 2026-10-15. No release. |
+
+Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
+
+## Previous delivery — Run-13 repairs, 2026-10-15
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `ce42d576d`: any error after Work gives the operational notice; a Planner scope extension supersedes the speculative Plan; SC neither confirms nor denies being a robot/human/AI and tells an internal cause with no reason. |
 | Automatic verification | Recorded run-13 request replays: robot denial 8/8 → 0/8, internal-cause leak 6/6 → 0/6; regressions red on HEAD (notice inner/outer, scope extension); freeze 38 (`7310d690…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,829 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 13 (`rootcause9`, everyday cohort): mechanical 28/33, judged 26 / 1 / 6. Run 14 on these repairs pending. Not qualified. |
+| Target validation | Run 13 (`rootcause9`, everyday cohort): mechanical 28/33, judged 26 / 1 / 6. Run 14 on these repairs: 26/33, judged 26 / 1 / 6. Not qualified. |
 | Deployment state | `chromie-agent:latest` = `rootcause10-20261015`, deployed 2026-10-15. No release. |
 
 Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).

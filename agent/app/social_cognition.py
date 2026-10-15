@@ -535,11 +535,15 @@ def social_cognition_response_schema(
                    "required": ["addressed_need_ids"]},
             "then": {"properties": {"delivery_phase": {"const": need.delivery_phase}}},
         } for need in ordered_needs)
+    # An answer Value Judgment withheld is not said, so no act may bind it (live
+    # 2026-10-15: a decline was bound to the withheld answer instead of the decline
+    # result that had to be said, 422).
+    withheld = value_withheld_need_ids(request)
     refs = {
         "source_responsibility_refs": [item.local_ref for item in request.responsibilities],
         "source_goal_ids": request.goal_ids,
         "evidence_refs": request.evidence_refs,
-        "addressed_need_ids": [item.need_id for item in request.communication_needs],
+        "addressed_need_ids": [item.need_id for item in request.communication_needs if item.need_id not in withheld],
     }
     for name, values in refs.items():
         if values:
@@ -626,7 +630,8 @@ def social_cognition_response_schema(
                 properties = variant["properties"]
                 properties["delivery_phase"] = {"type": "string", "const": phase}
                 compatible_ids = [need.need_id for need in request.communication_needs
-                                  if need.delivery_phase is None or need.delivery_phase == phase]
+                                  if (need.delivery_phase is None or need.delivery_phase == phase)
+                                  and need.need_id not in withheld]
                 if compatible_ids:
                     properties["addressed_need_ids"]["items"] = {"type": "string", "enum": compatible_ids}
                 else:

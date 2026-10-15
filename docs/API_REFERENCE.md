@@ -369,7 +369,8 @@ after the Planner decision and executes the corrected Plan.
 
 SC Communicative Activities carry exact text, truth stage, supplied provenance and
 Evidence references. The decoder has each act state the needs it fulfills and their phase
-before its words; one act may fulfill several needs. The Host validates and transports
+before its words; one act may fulfill several needs, and an answer Value Judgment withheld
+is never offered for binding. The Host validates and transports
 their words unchanged. A handover close requested after the handover completed is an
 `immediate` need (its ordering is already met).
 Planner records answer/input/result obligations and exact `before_step_ids` /

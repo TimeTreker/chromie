@@ -1,10 +1,32 @@
 # Chromie Development Checkpoint
 
-## Current work — Run-13 repairs: never silent after Work, scope extension, identity, internal causes, 2026-10-15
+## Current work — Run-14 repairs: withheld answers unbindable, Activities name Responsibilities first, 2026-10-15
+
+Base `origin/main` `ad4dfcf96` (deployed as `rootcause10-20261015`, `chromie-llm` restarted). Live run 14 (everyday
+cohort, clean tree, one bundle, after a host reboot): mechanical 26/33, judged 26 pass / 1 partial / 6 fail.
+Owner: "commit and push, deployed, please go on" (2026-10-15). Delivered with this file. Evidence: `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 14", "Repairs after run
+14"), `run14/`, `probes/sc_drop_need_replay.py`, `probes/planner_refs_first_replay.py`.
+
+- Run-13 repairs verified live: robot answer "I'm Chromie! I'm twelve years old and I'm a girl.", notice after a
+  post-Work timeout, thirst offer of water.
+- SC never offers an answer Value Judgment withheld for binding (homework 422).
+- Each streamed Activity names its Responsibilities before its Capability and args (umbrella).
+- Open: canonical waiting-shape misuse on continuity turns; Planner deadline with two streamed passes on a cold LLM
+  (water+time); UMI overlap (celebrate); Planner provenance (rain_tell date, look yaw); weather timeouts (network).
+
+Verification: replays of the recorded live requests: homework decline bound to the withheld answer 1/6 → decline
+result bound 6/6; umbrella binding 5/6 → 6/6 in runs 14 and 11, water+time and rain_tell unchanged; regressions red
+on HEAD. No corpus change: strict replay of freeze 38 6,000/6,000 zero model calls (same distribution); Level A
+45/45; gate in clean worktree `scratchpad/gate23` (pytest 3,831 + 5 skipped, benchmarks 169, legacy 20, policies,
+docs, test ownership). Image `chromie-agent:rootcause11-20261015` (`7aa59da6…`, 125 files identical, digest
+`3ef029f9a6cb7e73`), deployed by the owner on 2026-10-15 (run 15 next).
+
+## Previous work — Run-13 repairs: never silent after Work, scope extension, identity, internal causes, 2026-10-15
 
 Base `origin/main` `ce42d576d` (deployed as `rootcause9-20261015`). Live run 13 (everyday cohort, clean tree, one
 bundle): mechanical 28/33, judged 26 pass / 1 partial / 6 fail. Owner: "commit and push. deployed and restarted
-the chromie-llm" (2026-10-15). Delivered with this file. Evidence:
+the chromie-llm" (2026-10-15). Committed as `ad4dfcf96`, deployed as `rootcause10-20261015`, measured as
+run 14. Evidence:
 `.chromie/acceptance/remaining-defects-20261013/` README ("Live run 13", "Repairs after run 13"), `run13/`,
 `probes/binding/identity_pairs.json`, `probes/binding/cause_pairs.json`.
 
@@ -23,7 +45,7 @@ unchanged), internal-cause leak 6/6 → 0/6 (timeout explanation kept); regressi
 re-authored, 6,000 + 5 recaptured, 0 failures); strict replay 6,000/6,000 zero model calls (same distribution);
 Level A 45/45; gate in clean worktree `scratchpad/gate21` (pytest 3,829 + 5 skipped, benchmarks 169, legacy 20,
 policies, docs, test ownership). Image `chromie-agent:rootcause10-20261015` (`5368e6a2…`, 125 files identical,
-digest `4bddd79b07cf8d62`), deployed by the owner on 2026-10-15 with `chromie-llm` restarted (run 14 next); the
+digest `4bddd79b07cf8d62`), deployed by the owner on 2026-10-15 with `chromie-llm` restarted and measured as run 14; the
 notice and scope-extension changes are Host-side (checkout). The gate worktree was lost in a host reboot.
 
 ## Previous work — Live run 12; SC words survive the exact-words join, 2026-10-15

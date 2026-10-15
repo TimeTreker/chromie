@@ -1705,3 +1705,30 @@ def test_the_activity_count_comes_first_and_fixes_how_many_activities_follow():
     assert take_activity_count(raw) == 1 and "activity_count" not in raw
     with pytest.raises(PlannerDTOContractError, match="activity_count must equal"):
         take_activity_count(output(2, [delivery]))
+
+
+def test_an_activity_names_its_responsibilities_before_its_capability():
+    """Live 2026-10-15 (info_umbrella_zh): one weather read served "will it rain" and "should I
+    take an umbrella" but, written after its args, was bound to the first only (Host: "r2 was
+    decided work without its Activity"). Each Activity now names its Responsibilities first."""
+    sources = [CognitiveResponsibilityProposal(local_ref=ref, outcome=text, output_mode="information",
+                                               confidence=1.0)
+               for ref, text in (("r1", "will it rain tomorrow"), ("r2", "should I take an umbrella"))]
+    read = {"capability_id": "test.weather", "effects": ["information"],
+            "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}}
+    schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=sources, capabilities=[read])
+    seen = []
+
+    def walk(node):
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if isinstance(properties, dict) and "role" in properties and "source_responsibility_refs" in properties:
+                seen.append(list(properties)[:2])
+            for value in node.values():
+                walk(value)
+        elif isinstance(node, list):
+            for value in node:
+                walk(value)
+
+    walk(schema)
+    assert seen and all(names == ["role", "source_responsibility_refs"] for names in seen)

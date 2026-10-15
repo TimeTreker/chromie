@@ -2881,3 +2881,27 @@ def test_sc_words_survive_the_exact_words_join(text):
     act = SocialCommunicativeAct(activity_id="a1", text=text, function="respond",
                                  truth_stage="context_grounded")
     assert ResponseStage(text=act.text).text == act.text
+
+
+def test_no_act_can_bind_an_answer_value_judgment_withheld():
+    """Live 2026-10-15 (val_homework_zh): the decline was bound to the withheld answer
+    instead of the decline result that had to be said, and Host rejected the reply (422)."""
+    from shared.chromie_contracts.json_schema import expose_intersection_shapes
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+
+    verdict = {"decision": "decline", "concern": "deception", "affected": "another_adult",
+               "reason": "It would deceive a family member."}
+    answer = SocialCommunicationNeed(need_id="need:answer", owner="planner", kind="answer",
+        source_goal_ids=["goal:1"], reference_id="plan:1", delivery_phase="immediate",
+        facts={"disposition": "respond", "value_judgment": verdict, "value_withheld": True})
+    decline = SocialCommunicationNeed(need_id="need:decline", owner="runtime", kind="result",
+        source_goal_ids=["goal:1"], reference_id="plan:1", delivery_phase="immediate",
+        facts={"value_declined": verdict, "withheld_answer_need_ids": ["need:answer"]})
+    schema = social_cognition_response_schema(request(communication_needs=[answer, decline]), [])
+    expose_intersection_shapes(schema)
+    offered = set()
+    for branch in schema["$defs"]["SocialCommunicativeAct"]["oneOf"]:
+        for shape in (branch, *branch.get("anyOf", [])):
+            offered |= set(shape["properties"]["addressed_need_ids"].get("items", {}).get("enum", []))
+    assert "need:answer" not in offered
+    assert "need:decline" in offered
