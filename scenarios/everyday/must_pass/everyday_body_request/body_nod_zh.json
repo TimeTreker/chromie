@@ -10,7 +10,7 @@
     "derived_from_existing_scenario": false,
     "carried_into": "daily_life_v2_2026_10_15"
   },
-  "rationale": "Nod.",
+  "rationale": "Nod; a short word is optional.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -31,13 +31,13 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Nod."
+      "Nod; a short word is optional."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
     ],
     "forbidden_semantic_outcomes": [
-      "Shake the head; speak only."
+      "Shake the head; speak only; a long reply."
     ],
     "verdicts": [
       "pass",
@@ -47,14 +47,14 @@
     ]
   },
   "language": "zh-CN",
-  "description": "Nod.",
+  "description": "Nod; a short word is optional.",
   "general_ability": {
     "memberships": [
       {
         "id": "everyday_body_request",
         "title": "Everyday body requests",
         "general_rule": "A requested gesture or movement is performed with the right Capability and nothing unrequested.",
-        "rationale": "Nod.",
+        "rationale": "Nod; a short word is optional.",
         "root_cause_boundaries": [
           "Planner",
           "User Meaning Interpretation"
@@ -65,5 +65,6 @@
   "text": "听懂了就点点头。",
   "expected_capabilities": [
     "soridormi.nod_yes"
-  ]
+  ],
+  "require_speech": false
 }

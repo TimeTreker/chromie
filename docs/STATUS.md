@@ -1,13 +1,24 @@
 # Chromie Current Status
 
-## Current delivery — Information answered from perception (B); a receipt that does not agree (E), 2026-10-16
+## Current delivery — A turn waiting for Value Judgment answers nothing directly; run 4 smoke, 2026-10-16
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `a28bcf759`: while any Responsibility of a turn waits for Value Judgment, the SC decoder offers that turn only an acknowledgement at ingress and Host rejects any other act; sibling speech is answered after Value Judgment through its Planner need. `body_nod_zh` makes speech optional. |
+| Automatic verification | Regression `test_a_turn_waiting_for_value_judgment_answers_no_sibling_directly` (red on HEAD); strict replay 6,000/6,000 zero model calls; canonical gate in clean worktree `scratchpad/gate30` (pytest 3,842 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership); scenario check 70 cases. |
+| Target validation | Run 4 smoke on `rootcause16`: mechanical 14/15 (silent nod); B/E live ("嗯，我看看。" then the limitation or answer); homework judged fail — a sibling reply promised the lie before VJ declined (6/6 in replay with or without E). This repair is not yet live. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause16-20261016`. `rootcause17-20261016` (`b2a67642…`, 125 files identical, digest `e1e800e2eef7a021`) built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Run 4").
+
+## Previous delivery — Information answered from perception (B); a receipt that does not agree (E), 2026-10-16
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `79e26919c`: an information Responsibility with citable current perception states `observed_refs` before its decision; only a non-empty list opens `answer_from_perception`, which Host binds as a cited response Need (current established perception only). SC receives a fresh request or question with a receipt that does not agree before its Work is decided and shares in news. |
 | Automatic verification | Offline current-Planner replays on recorded turns: "家里还有水吗？" 4/4 answered from the seen water (was a fetch); time 4/4 clock, weather 4/4 lookup, nod + weekday 4/4, thirsty 4/4 deliver. SC replays: neutral receipt on 6 of 10 task turns 3/3 each, good news "太棒了！" 3/3, chat controls unchanged. Regression red on HEAD; Level A unaffected; strict replay 6,000/6,000 zero model calls on freeze 40 (no recorded request changed); canonical gate in clean worktree `scratchpad/gate29` (pytest 3,841 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
 | Target validation | Not live yet (the deployed Agent is `rootcause14`; `rootcause15`, with the clock fix, was never deployed). Known: "去那边等我" still acknowledged "好的。"; the time question sometimes delegates to deliberative SC. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause14-20261016`. `rootcause16-20261016` (`4e2c2595…`, 125 files identical, digest `643bc027d7828a4f`; includes the clock fix) built, not deployed. No release. |
+| Deployment state | `rootcause16-20261016` (`4e2c2595…`, 125 files identical, digest `643bc027d7828a4f`; includes the clock fix), deployed by the owner and measured as run 4. No release. |
 
 Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Repairs B and E").
 

@@ -702,11 +702,12 @@ def social_cognition_response_schema(
         # Host accepts a direct answer here only for turn-local speech; goal-scoped speech
         # waits for its Planner answer need (live 2026-10-13: a goal-scoped story was
         # answered at ingress and rejected, 422).
-        direct_speech_refs = sorted(
+        # While one Responsibility waits for Value Judgment, its turn is answered after it:
+        # a sibling's direct reply promised the lie under review (live 2026-10-16).
+        direct_speech_refs = [] if routed else sorted(
             item.local_ref
             for item in request.responsibilities
             if item.output_mode == "speech" and item.continuity_scope == "turn"
-            and item.local_ref not in routed
         )
         task_refs = sorted(
             item.local_ref
@@ -846,6 +847,10 @@ def validate_social_cognition_output(
     if any(act.function not in {"acknowledge", "nonverbal"} and not act.addressed_need_ids
            and set(act.source_responsibility_refs) & reviewed_refs for act in output.activities):
         raise ValueError("speech marked value_review is said only through a reviewed communication need")
+    if reviewed_refs and request.trigger == "interpretation" and not request.communication_needs and any(
+        act.function not in {"acknowledge", "nonverbal"} for act in output.activities
+    ):
+        raise ValueError("a turn waiting for Value Judgment receives only an acknowledgement")
     required_failure_need_ids = _result_needs_said_now(request)
     if required_failure_need_ids:
         if output.disposition != "communicate" or any(

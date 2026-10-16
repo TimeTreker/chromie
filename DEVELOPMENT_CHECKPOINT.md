@@ -1,6 +1,25 @@
 # Chromie Development Checkpoint
 
-## Current work — B (answer from perception) and E (receipt that does not agree), 2026-10-16
+## Current work — A turn waiting for Value Judgment answers nothing directly; run 4, 2026-10-16
+
+Base `origin/main` `a28bcf759` (B/E, deployed by the owner as `rootcause16-20261016`). Run 4 smoke (clean tree, one
+bundle): mechanical 14/15. Owner: "committed and pushed, deployed, go on" (2026-10-16). Evidence:
+`.chromie/acceptance/everyday-20261016/` README ("Run 4").
+
+- B/E live: "Mm, let me see." then "I'm sorry, I can't dance for you."; "嗯，我看看。" then the time or the question.
+- `val_homework_zh`: UMI split the request into the reviewed lie (r1) and plain turn speech (r2); SC answered r2 at
+  ingress with "我知道了，那等妈妈回来我一定跟她说你写完了。" before VJ declined. Not caused by E (replay 6/6 either
+  way). While any Responsibility of the turn waits for Value Judgment, ingress now offers and admits only an
+  acknowledgement; r2 is answered after VJ through its Planner answer need.
+- `body_nod_zh`: a silent nod answered "听懂了就点点头"; the scenario now makes speech optional.
+- Open: core/challenge not yet run on B/E; "去那边等我" still "好的。"; D, F, G.
+
+Verification: regression red on HEAD; strict replay 6,000/6,000 zero model calls; gate in clean worktree
+`scratchpad/gate30` (pytest 3,842 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership); scenario
+check 70. Image `chromie-agent:rootcause17-20261016` (`b2a67642…`, 125 files identical, digest `e1e800e2eef7a021`),
+not deployed.
+
+## Previous work — B (answer from perception) and E (receipt that does not agree), 2026-10-16
 
 Base `origin/main` `79e26919c` (the clock fix, committed and pushed by the agent on the owner's approval; the deployed
 Agent is still `rootcause14`). Owner: "do B and E first" and, on B, the Planner composes Work while Chromie may reply

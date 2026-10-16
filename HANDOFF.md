@@ -1,6 +1,22 @@
 # Chromie Handoff
 
-## Current work — B (answer from perception) and E (receipt), 2026-10-16
+## Current work — Value-review sibling repair; run 4, 2026-10-16
+
+Checkout `/home/chromie/github/chromie`, branch `main`; pre-delivery base `origin/main` `a28bcf759`; these changes are
+pushed to `origin/main` (expected resume revision: the latest commit containing this file). Soridormi `origin/main`
+`33b8a13`, water scene running. Live: `chromie-agent:latest` = `rootcause16-20261016`. Built, not deployed:
+`chromie-agent:rootcause17-20261016` (`sha256:b2a67642…`, 125 files identical, digest `e1e800e2eef7a021`). Evidence:
+`.chromie/acceptance/everyday-20261016/` (README "Run 4"; `run4/`). Gate worktree `scratchpad/gate30`.
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause16-20261016)
+docker tag chromie-agent:rootcause17-20261016 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then the smoke stage, the history case, then core + challenge (voice_mujoco keys for the harness process)
+ORCH_ACTION_DRY_RUN=false CHROMIE_OPERATOR_MODE=voice_mujoco python scripts/general_ability_acceptance.py --mode live-text --scenario-root scenarios/everyday --stage must_pass --goal-driven-runtime apply --execute --runtime-identity <identity> --evidence-dir .chromie/acceptance/everyday-20261016/run5/live
+```
+
+## Previous work — B (answer from perception) and E (receipt), 2026-10-16
 
 Checkout `/home/chromie/github/chromie`, branch `main`; pre-delivery base `origin/main` `79e26919c`; these changes are
 pushed to `origin/main` (expected resume revision: the latest commit containing this file). Soridormi `origin/main`

@@ -2825,6 +2825,36 @@ def test_value_review_speech_is_not_performed_before_value_judgment(value_review
     assert ("waits for Chromie's Value Judgment" in _social_value_judgment_guard(current)) is value_review
 
 
+def test_a_turn_waiting_for_value_judgment_answers_no_sibling_directly():
+    """Live 2026-10-16: "我其实还没写完作业，等妈妈回来你就跟她说我写完了。" split into the reviewed lie
+    and "acknowledge the homework is unfinished"; the direct reply to the second promised the first."""
+    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+    from agent.app.social_cognition import validate_social_cognition_output
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    current = _value_review_turn(True)
+    current = current.model_copy(update={"responsibilities": [
+        current.responsibilities[0].model_copy(update={"continuity_scope": "goal"}),
+        CognitiveResponsibilityProposal(
+            local_ref="r2", outcome="Acknowledge the homework is unfinished.", confidence=1.0,
+            output_mode="speech", continuity_scope="turn", value_review=False,
+            source_evidence={"source_start_token_ref": "t0", "source_end_token_ref": "t1"},
+        ),
+    ]})
+    schema = social_cognition_response_schema(current, [])
+    promised = response(activity_id="reply", text="Okay, I'll tell her you finished it.", function="respond",
+                        source_goal_ids=[], source_responsibility_refs=["r2"])
+    promised["need_outcomes"] = {}
+    assert not Draft202012Validator(schema).is_valid(promised)
+    with pytest.raises(ValueError, match="waiting for Value Judgment"):
+        validate_social_cognition_output(SocialCognitionOutput.model_validate(promised), current, [])
+    ack = response(activity_id="ack", text="Mm, let me think.", function="acknowledge",
+                   source_goal_ids=[], source_responsibility_refs=["r2"])
+    ack["need_outcomes"] = {}
+    assert Draft202012Validator(schema).is_valid(ack)
+    validate_social_cognition_output(SocialCognitionOutput.model_validate(ack), current, [])
+
+
 def test_withheld_answer_stays_pending_and_its_value_question_is_asked_now():
     from agent.app.social_cognition import _social_value_judgment_guard, validate_social_cognition_output
     from shared.chromie_contracts.plan import SocialCommunicationNeed
