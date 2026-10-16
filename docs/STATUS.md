@@ -1,6 +1,17 @@
 # Chromie Current Status
 
-## Current delivery — Everyday smoke repair: UMI keeps an unsettled "那个" uncertain, 2026-10-16
+## Current delivery — Clock in the common tier (effective); scenario corrections; everyday runs 2-3, 2026-10-16
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `e1d14b8ec`: the local clock provider declares `prompt_tier: common` (the owner preset alone never took effect because a provider declaration wins). `clarify_go_there_zh` and `clarify_remind_later_zh` accept an honest limitation (no go-to-a-place or reminder ability exists). |
+| Automatic verification | Clock regression red on HEAD; strict replay 6,000/6,000 zero model calls (no corpus change); canonical gate in clean worktree `scratchpad/gate28` (pytest 3,835 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership); scenario check 70 cases. |
+| Target validation | Run 2 (`rootcause14`): smoke 15/15 mechanical ("那个" fix live: Chromie asks which bottle); history case failed (information question answered by fetching). Run 3 core: stopped at 13/55 on a hard Planner timeout (`mix_nod_weekday_zh`, clock missing from the first pass). This repair is not yet live. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause14-20261016`. `rootcause15-20261016` (`529d7a25…`, 125 files identical, digest `a9e639daa055a708`) built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/everyday-20261016/` (README.md).
+
+## Previous delivery — Everyday smoke repair: UMI keeps an unsettled "那个" uncertain, 2026-10-16
 
 | Axis | Current evidence |
 | --- | --- |
@@ -15,7 +26,7 @@ Evidence: `.chromie/acceptance/everyday-20261016/` (README.md).
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | On `773ad886c`: `scenarios/everyday` (69 everyday live-text cases, 16 classes; 15-case smoke stage gating core and challenge); `chromie.clock.local` in the owner-preset common prompt tier. |
+| Implementation | On `773ad886c`: `scenarios/everyday` (69 everyday live-text cases, 16 classes; 15-case smoke stage gating core and challenge); `chromie.clock.local` in the owner-preset common prompt tier (not effective: the clock's provider declared `rare`, which wins over the preset; corrected 2026-10-16). |
 | Automatic verification | Harness loader accepts all 69 everyday cases; strict replay 6,000/6,000 zero model calls with the clock tier; canonical gate (pytest 3,834 + 5 skipped, benchmarks 169, legacy 20). |
 | Target validation | Not run live (owner: coverage first). Focused run 16: 6/12. Not qualified. |
 | Deployment state | `chromie-agent:latest` = `rootcause12-20261015`; `rootcause13-20261015` built, not deployed. No release. |

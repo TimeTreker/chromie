@@ -9,7 +9,7 @@
     "batch_id": "daily_life_v2_2026_10_15",
     "derived_from_existing_scenario": false
   },
-  "rationale": "Ask what to remind about (and when) in Chinese.",
+  "rationale": "Ask what to remind about (and when), or say honestly in Chinese that she can't set reminders.",
   "oracle_policy": {
     "mode": "hybrid",
     "deterministic_sources": [
@@ -30,7 +30,7 @@
       "truthfulness"
     ],
     "primary_outcomes": [
-      "Ask what to remind about (and when) in Chinese."
+      "Ask what to remind about (and when), or say honestly in Chinese that she can't set reminders."
     ],
     "acceptable_auxiliary": [
       "A brief acknowledgement in the person's language."
@@ -46,14 +46,14 @@
     ]
   },
   "language": "zh-CN",
-  "description": "Ask what to remind about (and when) in Chinese.",
+  "description": "Ask what to remind about (and when), or say honestly in Chinese that she can't set reminders.",
   "general_ability": {
     "memberships": [
       {
         "id": "everyday_clarification",
         "title": "Everyday unclear requests",
         "general_rule": "When the person's request leaves something Chromie cannot know (which object, where, when), she asks one short question instead of guessing.",
-        "rationale": "Ask what to remind about (and when) in Chinese.",
+        "rationale": "Ask what to remind about (and when), or say honestly in Chinese that she can't set reminders.",
         "root_cause_boundaries": [
           "User Meaning Interpretation",
           "Planner",
@@ -64,8 +64,5 @@
   },
   "text": "一会儿提醒我。",
   "expect_no_capabilities": true,
-  "require_social_communicative_act": true,
-  "expected_social_communicative_functions": [
-    "ask"
-  ]
+  "require_social_communicative_act": true
 }

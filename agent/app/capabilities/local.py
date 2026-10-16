@@ -921,12 +921,12 @@ def chromie_manifests(
                 default_failure_policy=FailurePolicy(strategy="stop_and_report"),
                 llm_hints={
                     "interaction_executable": True,
-                    "prompt_tier": "rare",
+                    "prompt_tier": "common",
                     "prompt_tier_reason": (
-                        "Local clock is a zero-argument domain-specific read. Keep it in "
-                        "the indexed library so Fast Planner loads it only for an actual "
-                        "time/date need instead of exposing an attractive unrelated branch "
-                        "in every common Work schema."
+                        "Time, date and weekday questions are everyday requests (owner, "
+                        "2026-10-15). A clock absent from the first Planner pass forced an "
+                        "ability-search pass that pushed compound turns past the Planner "
+                        "deadline (live 2026-10-15/16)."
                     ),
                     "when_to_use": (
                         "Use for the current local time, date, weekday, timezone, or UTC "

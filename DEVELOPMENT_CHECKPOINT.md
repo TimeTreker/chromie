@@ -1,6 +1,32 @@
 # Chromie Development Checkpoint
 
-## Current work — Everyday smoke repair: UMI keeps an unsettled "那个" uncertain, 2026-10-16
+## Current work — Clock in the common tier (effective); scenario corrections; everyday runs 2-3, 2026-10-16
+
+Base `origin/main` `e1d14b8ec` (the "那个" repair, deployed by the owner as `rootcause14-20261016`). Owner: "Deployed,
+go on" (2026-10-16). Evidence: `.chromie/acceptance/everyday-20261016/` README ("Run 2", "Run 3"), `run2/`,
+`run2-history/`, `run3/` (one bundle per iteration).
+
+- Run 2 smoke 15/15 mechanical; the "那个" fix is live ("我不确定你要拿哪一个"). The harness process needed
+  `ORCH_ACTION_DRY_RUN=false CHROMIE_OPERATOR_MODE=voice_mujoco` because `.env.runtime` had been regenerated in
+  `mode:speech`; the shared file was not changed.
+- Run 3 core stopped at 13/55 on a hard Planner timeout (`mix_nod_weekday_zh`): the clock was missing from the first
+  Planner pass because its provider declared `prompt_tier: rare`, which wins over the owner preset; the `c942172ae`
+  claim that the clock joined the common tier was wrong. The provider now declares `common` (owner decision
+  2026-10-15) and the test that pinned `rare` asserts `common`.
+- Scenarios: `clarify_go_there_zh` and `clarify_remind_later_zh` accept an honest limitation (no go-to-a-place or
+  reminder ability).
+- Open, for the owner (README clusters B, D-G): an information question answerable from trusted Situation has no
+  answer path, so the Planner fetched the water for "家里还有水吗？"; `unavailable` chosen where `clarify` fits; an
+  agreeing "好的。" before a limitation; VJ consent/meaning questions (hug); SC echoing the user's words (celebrate).
+  Constrained Planner decoding runs 12–15 tokens/s in grammar-heavy regions, so a second Planner pass misses the
+  deadline.
+
+Verification: clock regression `test_local_clock_is_a_common_safe_read` (red on HEAD); strict replay 6,000/6,000 zero
+model calls (no corpus change); scenario check 70 cases; gate in clean worktree `scratchpad/gate28` (pytest 3,835 + 5
+skipped, benchmarks 169, legacy 20, policies, docs, test ownership). Image `chromie-agent:rootcause15-20261016`
+(`529d7a25…`, 125 files identical, digest `a9e639daa055a708`), not deployed.
+
+## Previous work — Everyday smoke repair: UMI keeps an unsettled "那个" uncertain, 2026-10-16
 
 Base `origin/main` `c942172ae` (deployed as `rootcause13-20261015`). Everyday run 1 (smoke stage, clean tree, one
 bundle): 13/15, so core and challenge did not run (owner: a smoke failure stops the test). Owner on the referent
@@ -48,7 +74,8 @@ scenarios suite if necessary" (2026-10-15). Delivered with this file. Evidence:
 - Corrections in review: `chat_robot_en` follows the owner identity direction (no robot label, no denial);
   `body_look_zh` and `move_look_at_me_en` carry the speaker position from live perception
   (`trusted_target_context`, as in the general-ability suite) instead of leaving the Planner to guess an angle.
-- `chromie.clock.local` joins the owner-preset common prompt tier, so time questions need no ability-search pass
+- `chromie.clock.local` joins the owner-preset common prompt tier (not effective — the provider's `rare` wins; corrected
+  2026-10-16), so time questions need no ability-search pass
   (water+time missed the Planner deadline after one); the Agent reads the mounted preset on restart.
 - Not run live (owner: increase coverage first, no testing now).
 

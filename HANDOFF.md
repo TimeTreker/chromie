@@ -1,6 +1,24 @@
 # Chromie Handoff
 
-## Current work — Everyday smoke repair (UMI demonstratives), 2026-10-16
+## Current work — Clock common tier; scenario corrections, 2026-10-16
+
+Checkout `/home/chromie/github/chromie`, branch `main`; pre-delivery base `origin/main` `e1d14b8ec`; these changes are
+pushed to `origin/main` (expected resume revision: the latest commit containing this file). Soridormi `origin/main`
+`33b8a13`, water scene running. Live: `chromie-agent:latest` = `rootcause14-20261016`. Built, not deployed:
+`chromie-agent:rootcause15-20261016` (`sha256:529d7a25…`, 125 files identical, digest `a9e639daa055a708`). Evidence:
+`.chromie/acceptance/everyday-20261016/` (README; `run2/`, `run2-history/`, `run3/` with bundles). Gate worktree
+`scratchpad/gate28`. `.env.runtime` is in `mode:speech`; give the harness process the two voice_mujoco keys (below)
+rather than editing it.
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause14-20261016)
+docker tag chromie-agent:rootcause15-20261016 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then core + challenge (smoke passed in run 2)
+ORCH_ACTION_DRY_RUN=false CHROMIE_OPERATOR_MODE=voice_mujoco python scripts/general_ability_acceptance.py --mode live-text --scenario-root scenarios/everyday --stage core --stage challenge --goal-driven-runtime apply --execute --runtime-identity <identity> --evidence-dir .chromie/acceptance/everyday-20261016/run4/live
+```
+
+## Previous work — Everyday smoke repair (UMI demonstratives), 2026-10-16
 
 Checkout `/home/chromie/github/chromie`, branch `main` (the earlier `planner-limitation-contracts` branch is merged
 and deleted); pre-delivery base `origin/main` `c942172ae`; these changes are pushed to `origin/main` (expected resume

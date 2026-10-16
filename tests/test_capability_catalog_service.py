@@ -615,12 +615,14 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(weather.idempotent)
         self.assertTrue(weather.side_effect_free)
 
-    async def test_local_clock_is_indexed_safe_read_without_polluting_common_schema(self) -> None:
+    async def test_local_clock_is_a_common_safe_read(self) -> None:
+        # Owner 2026-10-15: time questions are everyday; a clock missing from the first
+        # Planner pass cost an ability-search pass and the Planner deadline (live 2026-10-16).
         registry = CapabilityRegistry.from_bundles([chromie_capability_bundle()])
         catalog = CapabilityCatalog(registry, live_invoker=None)
 
         common = await catalog.prompt_entries(scope="common")
-        self.assertNotIn(
+        self.assertIn(
             "chromie.clock.local",
             {item.capability_id for item in common},
         )
@@ -629,7 +631,7 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(clock.agent_id, "chromie.clock")
         self.assertEqual(clock.safety_class, "safe_read")
         self.assertTrue(clock.interaction_executable)
-        self.assertEqual(clock.prompt_tier, "rare")
+        self.assertEqual(clock.prompt_tier, "common")
         self.assertEqual(clock.input_schema.get("required"), [])
         self.assertEqual(clock.input_schema.get("additionalProperties"), False)
         self.assertIn("clock_lookup", clock.effects)
