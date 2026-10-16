@@ -1,6 +1,25 @@
 # Chromie Handoff
 
-## Current work — Everyday live cohort in the repo; clock common tier, 2026-10-15
+## Current work — Everyday smoke repair (UMI demonstratives), 2026-10-16
+
+Checkout `/home/chromie/github/chromie`, branch `main` (the earlier `planner-limitation-contracts` branch is merged
+and deleted); pre-delivery base `origin/main` `c942172ae`; these changes are pushed to `origin/main` (expected resume
+revision: the latest commit containing this file). Soridormi `origin/main` `33b8a13`, water scene running. Live:
+`chromie-agent:latest` = `rootcause13-20261015`. Evidence: `.chromie/acceptance/everyday-20261016/` (README.md;
+`run1/` smoke 13/15 with its bundle; `umi_*.txt` replays); probes `umi_variant_replay.py`, `umi_fork.py`,
+`umi_regress.py`; `capture40.py`, `freeze40.py`, `freeze40-review.json`, `strict-replay-freeze40/` in
+`.chromie/acceptance/remaining-defects-20261013/`. Gate worktree `scratchpad/gate27`. Built, not deployed: `chromie-agent:rootcause14-20261016` (`sha256:4fe9d3d4…`, 125 files identical, digest `def53b3786935f97`).
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause13-20261015)
+docker tag chromie-agent:rootcause14-20261016 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then the smoke stage again (the UMI change touches every turn), and the new history case
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root scenarios/everyday --stage must_pass --goal-driven-runtime apply --execute --runtime-identity <identity> --evidence-dir .chromie/acceptance/everyday-20261016/run2/live
+python scripts/general_ability_acceptance.py --mode live-text --scenario-root scenarios/everyday --only-case multi_that_water_zh --goal-driven-runtime apply --execute --runtime-identity <identity> --evidence-dir .chromie/acceptance/everyday-20261016/run2-history/live
+```
+
+## Previous work — Everyday live cohort in the repo; clock common tier, 2026-10-15
 
 Checkout `/home/chromie/github/chromie`, branch `planner-limitation-contracts`; pre-delivery base `origin/main`
 `773ad886c`; these changes are pushed to `origin/main` (expected resume revision: the latest commit containing this

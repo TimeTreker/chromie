@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "kind": "chromie_general_ability_live_text",
+  "id": "multi_that_water_zh",
+  "stage": "core",
+  "difficulty": "medium",
+  "provenance": {
+    "origin": "codex_generated_common_scene",
+    "batch_id": "daily_life_v2_2026_10_15",
+    "derived_from_existing_scenario": false
+  },
+  "rationale": "Turn 1: say whether there is water (a bottle is in view). Turn 2: 'that' is the water just talked about, so bring the water without asking which one.",
+  "oracle_policy": {
+    "mode": "hybrid",
+    "deterministic_sources": [
+      "typed_schema_and_runtime_contracts",
+      "safety_authorization_capability_and_execution_evidence",
+      "provenance_and_llm_integrity"
+    ],
+    "semantic_dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "semantic_blocking": true
+  },
+  "review_rubric": {
+    "judge_meaning_not_exact_wording": true,
+    "dimensions": [
+      "capability_choice",
+      "truthfulness"
+    ],
+    "primary_outcomes": [
+      "Turn 1: say whether there is water (a bottle is in view). Turn 2: 'that' is the water just talked about, so bring the water without asking which one."
+    ],
+    "acceptable_auxiliary": [
+      "A brief acknowledgement in the person's language."
+    ],
+    "forbidden_semantic_outcomes": [
+      "Turn 2 brings the milk, or asks which object although the water was just talked about."
+    ],
+    "verdicts": [
+      "pass",
+      "partial",
+      "fail",
+      "insufficient_evidence"
+    ]
+  },
+  "language": "zh-CN",
+  "description": "Turn 1: say whether there is water (a bottle is in view). Turn 2: 'that' is the water just talked about, so bring the water without asking which one.",
+  "general_ability": {
+    "memberships": [
+      {
+        "id": "everyday_continuity",
+        "title": "Everyday multi-turn continuity",
+        "general_rule": "Follow-ups such as 'yes please', 'what about...' and 'again' continue the previous turn's meaning.",
+        "rationale": "Turn 1: say whether there is water (a bottle is in view). Turn 2: 'that' is the water just talked about, so bring the water without asking which one.",
+        "root_cause_boundaries": [
+          "User Meaning Interpretation",
+          "Goal Association",
+          "Planner"
+        ]
+      }
+    ]
+  },
+  "turns": [
+    {
+      "id": "turn-01",
+      "text": "家里还有水吗？",
+      "language": "zh-CN",
+      "require_speech": true,
+      "forbidden_capabilities": [
+        "soridormi.acquire_and_deliver_resource"
+      ]
+    },
+    {
+      "id": "turn-02",
+      "text": "把那个拿给我。",
+      "language": "zh-CN",
+      "expected_capabilities": [
+        "soridormi.acquire_and_deliver_resource"
+      ]
+    }
+  ]
+}

@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-15",
+  "frozen_on": "2026-10-16",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "1eeaa7d3e522f3f1409099df7b884c844ecf95d1f038e373b33e715d6414306e",
-    "workflow-conditional-dry.json": "9df2e84ea973b1c3943aa0f434bb9de85960075a7310c95eed4262995e3a7a74",
-    "workflow-conditional-rain.json": "6ec2992f9cef6675b02393b86c823bd2eade5d1bcb0ab8f57ab844ed6552d312",
-    "workflow-delayed.json": "0c627a09909c73178a5cdba1ee4c40171a1361780a990fb7e6c6b3dd1f02d0cc",
-    "workflow-normal.json": "5bfec565de2bf79122cda0dc2722af9b09648f7235f35a423c577fb9b44aae58"
+    "workflow-cancellation.json": "f9cc949000c400360804fc001794bdf29a37d5256c80f7b7ed1b5cc84edf34bd",
+    "workflow-conditional-dry.json": "02813cf922162c65c86a91893f7e940b956c2eebeabb0f3c24d1e8221fea7107",
+    "workflow-conditional-rain.json": "a8999e8f4dcd6159a22908764bfb332a6a04f30bbb4b6c360ae522564c416efe",
+    "workflow-delayed.json": "225a0dbab5a860f3de9181bd31a02b9f0d7af8421ca9ccce6179c60a2a6dadeb",
+    "workflow-normal.json": "1ba69365b6e75a012ba99ca41042a60e94eb5c7a986502c5bb9e503365f52f51"
   },
-  "freeze_revision": 39,
-  "freeze_note": "Run-14/15 repairs (2026-10-15). Every request recaptured: SC never offers a withheld answer for binding; streamed Activities name their Responsibilities first; the single-Goal canonical decoder offers no respond for an effectful Goal; canonical time_conditions follow ability_needs. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 40,
+  "freeze_note": "Everyday smoke repair (2026-10-16). Every UMI request recaptured: meaning_uncertainties are decoded before the Responsibilities and confidence after them; the UMI prompt says a bare demonstrative names a perceived object only when the conversation or trusted target evidence singles it out. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

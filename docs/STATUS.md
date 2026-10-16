@@ -1,6 +1,17 @@
 # Chromie Current Status
 
-## Current delivery — Everyday live cohort in the repo; clock common tier, 2026-10-15
+## Current delivery — Everyday smoke repair: UMI keeps an unsettled "那个" uncertain, 2026-10-16
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `c942172ae`: UMI decodes `meaning_uncertainties` before its Responsibilities and `confidence` after them; its prompt says a bare demonstrative names a perceived object only when the conversation or trusted target evidence singles it out. `ctrl_stop_walk_zh` expects a cancelled walk; new core case `multi_that_water_zh` (70 everyday cases). |
+| Automatic verification | Recorded-call replays: bare "那个"/"这个"/cup+book 4/4 each uncertain (base 1/18); 36/42 recorded run-1/run-15 UMI turns unchanged, the rest reviewed; regression red on HEAD; Level A 45/45; freeze 40 (`3008707a…`, no reply re-authored, 6,000 + 5 recaptured, 0 failures) strict replay 6,000/6,000 zero model calls; canonical gate in clean worktree `scratchpad/gate27` (pytest 3,835 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
+| Target validation | Everyday run 1 (`rootcause13`): smoke 13/15, core and challenge stopped by the smoke gate. This repair is not yet live. A "那个" the previous turn named is also flagged by UMI (replay 4/4); resolving it is left to Goal Association, unmeasured. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause13-20261015`. `rootcause14-20261016` (`4fe9d3d4…`, 125 files identical, digest `def53b3786935f97`) built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/everyday-20261016/` (README.md).
+
+## Previous delivery — Everyday live cohort in the repo; clock common tier, 2026-10-15
 
 | Axis | Current evidence |
 | --- | --- |

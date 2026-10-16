@@ -300,7 +300,7 @@ def test_umi_system_prompt_carries_contextual_resource_facts_in_complete_outcome
         Path(__file__).parents[1]
         / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt"
     ).read_text(encoding="utf-8")
-    assert "previously introduced physical resource" in prompt
+    assert "physical resource previously introduced in the conversation" in prompt
     assert "entity, location, distance, quantity, recipient" in prompt
     assert "present in this Responsibility's complete outcome" in prompt
     assert "Do not author `bindings` or another structured fact/parameter table" in prompt
@@ -685,6 +685,21 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
         self.assertFalse(validator.is_valid({"source_start_token_ref": refs[0]}))
         self.assertFalse(validator.is_valid({"source_end_token_ref": "t999"}))
         Draft202012Validator.check_schema(schema)
+
+    def test_uncertainty_is_decoded_before_meaning_and_confidence_after_it(self) -> None:
+        # A leading confidence committed the model to resolving "那个" from the perceived scene.
+        for payload in (
+            self._interpreter().build_interpretation_payload(
+                UserMeaningInterpretationRequest(text="把那个拿给我。", language="zh-CN")
+            ),
+            self._interpreter().build_deep_interpretation_payload(
+                UserMeaningInterpretationRequest(text="把那个拿给我。", language="zh-CN")
+            ),
+        ):
+            schema = payload["format"]
+            order = ["meaning_uncertainties", "responsibilities", "confidence", "cognitive_requests"]
+            self.assertEqual(list(schema["properties"]), order)
+            self.assertEqual(schema["required"], order)
 
 
 

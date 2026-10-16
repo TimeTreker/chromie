@@ -784,10 +784,16 @@ class OllamaUserMeaningInterpreter:
         by other owners. None of those defaults grant UMI model-write authority.
         """
         schema = UserMeaningInterpretationDecision.model_json_schema()
+        # Uncertainty is decided before the meaning and confidence after it: a leading
+        # confidence of 1.0 committed the model to resolving "那个" from whatever it perceived,
+        # and the resolved outcome then left no uncertainty (live 2026-10-16).
         schema["required"] = [
-            "confidence", "responsibilities", "meaning_uncertainties",
+            "meaning_uncertainties", "responsibilities", "confidence",
             "cognitive_requests",
         ]
+        schema["properties"] = {
+            name: schema["properties"][name] for name in schema["required"]
+        }
         item = schema["$defs"]["CognitiveResponsibilityProposal"]
         base_item_value_review_description = item["properties"]["value_review"]["description"]
         fields = (

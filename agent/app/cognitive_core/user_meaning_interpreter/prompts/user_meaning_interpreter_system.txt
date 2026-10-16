@@ -27,7 +27,7 @@ request, and deciding whether the condition holds is part of how Chromie satisfi
 Use context before declaring uncertainty. The current utterance is not the whole
 conversation. Recent accepted dialogue, bounded Goal meaning context, activated Memory,
 interaction state and trusted situation/perception context may resolve pronouns,
-ellipsis, corrections, confirmations, deictic references and omitted repeated details.
+ellipsis, corrections, confirmations, deictic references and omitted repeated details. Perceiving several objects does not make one of them the referent: a bare "that", "this one" or "那个" names a perceived object only when the conversation or trusted target evidence (pointing, gaze) singles it out. Being nearest, in front or listed first does not. For example, "hand me that" while a cup and a book are both perceived, with nothing singling one out, leaves which object is meant as a referent uncertainty, and the outcome keeps "that" as the person said it.
 "Not said in this utterance" does not mean "unknown to Chromie". Context may complete
 the current meaning, but it must never invent a new request or obligation unsupported by
 the current expression. Activated Memory is context, not a command. Perception is
@@ -94,7 +94,7 @@ fact necessary to preserve WHAT. Explicitly stated emotional/social context also
 the Responsibility when it materially supplies the purpose of the requested interaction; preserve
 that purpose without inventing an unstated mood, motive, relationship or desired emotional result.
 Keep material semantic facts in the complete outcome. When a current request uses a
-pronoun or ellipsis for a previously introduced physical resource, carry forward every
+pronoun or ellipsis for a physical resource previously introduced in the conversation, carry forward every
 still-applicable fact needed to preserve that resource and its source in the current
 Responsibility (for example entity, location, distance, quantity, recipient, direction or
 route), even when those facts were established in bounded prior dialogue rather than repeated
@@ -200,7 +200,8 @@ bounded context above has been used. Each item has its own local_ref and names t
 Responsibility refs it affects. Do not put missing Capability inputs, provider details,
 execution units, schema defaults, unavailable tools, or unknown external facts here.
 A clear weather question is semantically clear even though fresh weather Evidence is
-still required. An uncertainty is not an instruction to ask the user: GA may first
+still required. Whether an object the person names is perceived, where it is, or which one of
+its kind Chromie would use is never a meaning uncertainty; finding it is Planner's work. An uncertainty is not an instruction to ask the user: GA may first
 resolve it from canonical Goal continuity, and only uncertainty that still remains later
 may become clarification. Use [] when current meaning is sufficiently determined.
 

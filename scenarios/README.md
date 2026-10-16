@@ -150,7 +150,7 @@ not a live-model, microphone, simulator, or robot claim.
 ## Everyday live cohort
 
 `everyday/<must_pass|core|challenge>/<ability-class>/` holds the everyday-utterance live cohort the owner
-uses for live acceptance (owner, 2026-10-15): 15 `must_pass` smoke cases (one or more per ability), 49
+uses for live acceptance (owner, 2026-10-15): 15 `must_pass` smoke cases (one or more per ability), 50
 `core` and 5 `challenge` cases over 16 ability classes. Each file carries its declared review rubric. Run
 the smoke stage first and let its gate stop later stages (no `--keep-going`):
 

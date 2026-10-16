@@ -73,5 +73,15 @@
   "interrupt_text": "停下！",
   "interrupt_capability_prefix": "soridormi.walk",
   "expect_cancelled": true,
-  "require_safe_idle": true
+  "require_safe_idle": true,
+  "expected_observations": [
+    {
+      "type": "locomotion.walk_forward",
+      "args": {
+        "duration_s": 10.0
+      },
+      "status": "cancelled",
+      "min_occurrences": 1
+    }
+  ]
 }

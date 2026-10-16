@@ -1,6 +1,40 @@
 # Chromie Development Checkpoint
 
-## Current work — Everyday live cohort in the repo; clock in the common prompt tier, 2026-10-15
+## Current work — Everyday smoke repair: UMI keeps an unsettled "那个" uncertain, 2026-10-16
+
+Base `origin/main` `c942172ae` (deployed as `rootcause13-20261015`). Everyday run 1 (smoke stage, clean tree, one
+bundle): 13/15, so core and challenge did not run (owner: a smoke failure stops the test). Owner on the referent
+question: resolve it from the conversation if possible, otherwise ask the person (2026-10-16). Evidence:
+`.chromie/acceptance/everyday-20261016/` (README.md, `run1/`, `umi_*.txt`); probes `umi_variant_replay.py`,
+`umi_fork.py`, `umi_regress.py` in `.chromie/acceptance/remaining-defects-20261013/probes/`.
+
+- `ctrl_stop_walk_zh`: the walk was cancelled correctly; the case lacked `expected_observations`, so the harness
+  expected a completed walk. It now expects `status: cancelled`.
+- `clarify_bring_that_zh` ("把那个拿给我。", milk ahead, water left): UMI wrote "那个（瓶装牛奶…）" with no
+  uncertainty; Value Judgment then asked "milk or water?" under `others_property` (a meaning question in the
+  values stage, P30 conflict, not changed here) and the harness granted the confirmation, so the milk was fetched.
+  Token logprobs show the first output token, `confidence`, decides it. UMI now decodes `meaning_uncertainties`
+  first and `confidence` after the Responsibilities, and its prompt says a bare demonstrative names a perceived
+  object only when the conversation or trusted target evidence singles it out.
+- Known cost: a "那个" the previous turn named is also flagged by UMI (synthetic replays 4/4). No UMI form did both
+  (ten variants, including the deep call and an explicit referent field). Goal Association may resolve the
+  uncertainty from history; new core case `multi_that_water_zh` measures that live. "那瓶药" with no medicine seen
+  now asks which bottle.
+- Open (unchanged): celebrate UMI overlap; Planner provenance (rain_tell date, "那上海呢？"); ability_needs copy
+  loop; canonical `clarify` with steps; remote harness; VJ asking meaning questions.
+
+Verification: recorded-call replays (exact committed text) bare "那个", synthetic "这个" and cup+book 4/4 each with a
+referent uncertainty (base 1/18); "那瓶牛奶", "门口那个包", TV remote, thirsty, "Do it again!", wave unchanged; 36/42
+recorded run-1/run-15 UMI turns unchanged, the other 6 reviewed (target, homework keeps `value_review`, greeting
+without Planner, joke adds GA, order, wave+greet). Regression
+`test_uncertainty_is_decoded_before_meaning_and_confidence_after_it` (red on HEAD). Freeze 40 (`3008707a…`, no
+reply re-authored, 6,000 + 5 recaptured, 0 failures); strict replay 6,000/6,000 zero model calls (same
+distribution); gate in clean worktree `scratchpad/gate27` (pytest 3,835 + 5 skipped, benchmarks 169, legacy 20,
+policies, docs, test ownership). Image `chromie-agent:rootcause14-20261016` (`4fe9d3d4…`, 125 files identical,
+digest `def53b3786935f97`), not deployed. Level A 45/45 (`level-a/`); the scenario check accepts all 70 everyday
+cases. Level A does not exercise the UMI referent decision; live smoke is the check.
+
+## Previous work — Everyday live cohort in the repo; clock in the common prompt tier, 2026-10-15
 
 Base `origin/main` `773ad886c`. Owner: "commit and push, then put suite into repo, add clock ... correct the
 scenarios suite if necessary" (2026-10-15). Delivered with this file. Evidence:
