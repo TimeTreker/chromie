@@ -173,6 +173,13 @@ FAST_SITUATION_SOURCE_PROMPT = (
     "observe and cite the observation; their words stay context. "
 )
 
+UNRESOLVED_MEANING_PROMPT = (
+    "UMI left the meaning_uncertainties listed below unresolved. Which thing or meaning the person "
+    "intends is not an ability need and never makes a Responsibility unavailable: when the abilities "
+    "it needs fit, decide clarify for each Responsibility an uncertainty names and ask through its "
+    "information_gaps. Decide unavailable only when an ability it needs is missing whatever they meant. "
+)
+
 FAST_PERCEIVED_ANSWER_PROMPT = (
     "When a current situation.interpretations entry already observes what an information "
     "Responsibility asks (for example whether something is here, or where it is), that observation "
@@ -1045,7 +1052,8 @@ def fast_advance_layered_prompt(
         role_memory_context(context, role="planner") + contract + EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
         + (PROVIDER_SOURCE_PROMPT if provider_sources else "")
         + (FAST_SITUATION_SOURCE_PROMPT if observed_sources else "")
-        + (FAST_PERCEIVED_ANSWER_PROMPT if perceived_answers else "") + CAPABILITY_NEED_PROMPT
+        + (FAST_PERCEIVED_ANSWER_PROMPT if perceived_answers else "")
+        + (UNRESOLVED_MEANING_PROMPT if request.meaning_uncertainties else "") + CAPABILITY_NEED_PROMPT
         + "\nOwner-approved Chromie identity JSON:\n" + bounded_identity_json(context)
         + "\nOwner-approved Personality Expression JSON:\n" + bounded_personality_json(context)
         + "\nOwner-approved Stable Mind JSON:\n" + bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS)

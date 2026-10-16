@@ -1301,6 +1301,52 @@ async def test_information_already_perceived_is_answered_from_the_cited_observat
         assert (answer.role, answer.situation_interpretation_refs) == ("complete_response", observed)
 
 
+UNSETTLED_THAT = "Which object '那个' means is not singled out: several objects are perceived."
+
+
+def clarified(cited, count):
+    gap = {"gap_id": "which", "description": "Which object the person means.", "blocking": True,
+           "required_for": ["resource"], "preferred_resolution": "ask_user", "source_kind": "unresolved_meaning",
+           "source_reference": cited, "resolution_sources_considered": ["authoritative_context"]}
+    return {"responsibility_decisions": {"r1": {"decision": "clarify", "missing": []}},
+        "disposition": "clarify", "coverage": "uncertain", "covered_responsibility_refs": ["r1"],
+        "activity_count": count,
+        "activities": [{"role": "clarification", "activity_id": "ask_which", "source_responsibility_refs": ["r1"],
+                        "timing": "sequential", "information_gaps": [gap]}][:count],
+        "confidence": 0.5, "unresolved": ["u1"], "reason_summary": "Ask which object is meant."}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("cited, count, decoder_ok, host_ok", [
+    (UNSETTLED_THAT, 1, True, True),
+    (UNSETTLED_THAT, 0, False, False),  # a clarify decision carries its authored question
+    ("u1", 1, False, False),  # the gap cites the UMI wording Host checks, never a local ref
+])
+async def test_unsettled_referent_is_clarified_with_a_gap_citing_umi_wording(cited, count, decoder_ok, host_ok):
+    # Live 2026-10-16 ("把那个拿给我。"): decided unavailable naming the object; when asked to clarify, the
+    # decoder let it write no Activity, then a gap citing "u1", and Host failed the turn both times.
+    from shared.chromie_contracts.core_interpretation import UserMeaningUncertainty
+    request = request_for("Bring that to me.")
+    request.meaning_uncertainties = [UserMeaningUncertainty(
+        local_ref="u1", kind="referent", description=UNSETTLED_THAT, responsibility_refs=["r1"])]
+    raw = clarified(cited, count)
+    model = Model([raw])
+    frames = [frame async for frame in FastPlannerResolver(
+        model, Catalog([provider_source_capability()])).stream_advance(request)]
+    from agent.app.clients.sglang_protocol import build_sglang_chat_payload
+    from agent.app.inference_compute import CognitionComputeClass
+
+    payload = build_sglang_chat_payload(
+        model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+        options=None, response_format=model.packets[0][1]["response_format"],
+        stream=True, priority_step=1,
+    )
+    sent = declared_ability_needs(raw, model.packets[0][1]["response_format"])
+    errors = list(Draft202012Validator(payload["response_format"]["json_schema"]["schema"]).iter_errors(sent))
+    assert (not errors) is decoder_ok, errors[:1]
+    assert isinstance(frames[0], FastPlannerStreamTerminal) is host_ok, frames[0]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("observed, provider_source, expected", [
     (True, True, True),

@@ -2426,7 +2426,8 @@ class FastPlannerResolverTests(unittest.TestCase):
         self.assertEqual(
             advance.metadata["failure_class"], "fast_stream_contract_invalid"
         )
-        self.assertIn("exact UMI unresolved meaning", advance.metadata["error"])
+        # The decoder admits only the UMI wording, so the invented source fails at the schema.
+        self.assertIn("A device color is unknown.", advance.metadata["error"])
 
     def test_missing_weather_location_is_a_planner_execution_input_gap(self):
         raw = self._clarification_output(

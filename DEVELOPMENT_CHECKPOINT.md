@@ -1,6 +1,26 @@
 # Chromie Development Checkpoint
 
-## Current work — A turn waiting for Value Judgment answers nothing directly; run 4, 2026-10-16
+## Current work — An unsettled referent is clarified, never a limitation (D); run 5, 2026-10-16
+
+Base `origin/main` `1f7bb73bc` (deployed by the owner as `rootcause17-20261016`). Run 5 smoke (clean tree, one bundle):
+mechanical 14/15. Owner: "committed and pushed, deployed, go on" (2026-10-16). Evidence:
+`.chromie/acceptance/everyday-20261016/` README ("Run 5").
+
+- Homework sibling repair live ("好的，我知道了。" then the decline, no promise); nod passes.
+- `clarify_bring_that_zh`: Chromie asked which object, but the Planner had decided `unavailable` naming the object
+  (its own ability_needs said the delivery fits), so SC answered a result need as `respond`; pass 1 also searched
+  the library for "identify which object". On turns with UMI uncertainty the prompt now says which thing is meant
+  is never an ability need or a limitation; the decoder requires a clarify state's Activity (it allowed none) and
+  an `unresolved_meaning` gap to cite the exact UMI wording (it allowed "u1").
+- Open: core/challenge not yet run on B/E/D; "去那边等我" "好的。"; F (VJ), G (echo); corpus lacks SC and
+  perceived-answer steps.
+
+Verification: regression red on HEAD (two decoder cases); offline replays as in STATUS; strict replay 6,000/6,000
+zero model calls; gate in clean worktree `scratchpad/gate31` (pytest 3,845 + 5 skipped, benchmarks 169, legacy 20,
+policies, docs, test ownership). Image `chromie-agent:rootcause18-20261016` (`f15411c1…`, 125 files identical, digest
+`180cd0d00f6fcb79`), not deployed.
+
+## Previous work — A turn waiting for Value Judgment answers nothing directly; run 4, 2026-10-16
 
 Base `origin/main` `a28bcf759` (B/E, deployed by the owner as `rootcause16-20261016`). Run 4 smoke (clean tree, one
 bundle): mechanical 14/15. Owner: "committed and pushed, deployed, go on" (2026-10-16). Evidence:

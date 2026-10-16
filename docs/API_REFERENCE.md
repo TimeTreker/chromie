@@ -311,7 +311,9 @@ value-closing token can no longer open an extra, copied Activity. A limitation i
 as the unavailable Activity (a terminal Activity for that Responsibility) and the
 Planner's result need. An `answer` decision whose word-free response Need was omitted
 is bound the same way (the Need names only its Responsibility); `work` and `clarify`
-carry content only the model authors and fail closed without their Activity. A mixed
+carry content only the model authors and fail closed without their Activity, so the decoder
+requires a `clarify` state's Activity, and an `unresolved_meaning` gap cites the exact UMI
+uncertainty wording. A mixed
 state may therefore hold only a response or an input Need beside a limitation.
 Ordinary speech is always answered, never decided unavailable. An information
 Responsibility that current established perception already answers first names those

@@ -2183,6 +2183,16 @@ def fast_advance_response_schema(
                             variant["properties"].update(constraint["properties"])
                             native_gaps.append(variant)
                         information_gap_contract["oneOf"] = native_gaps
+            elif unresolved_meaning:
+                # Host admits only the exact UMI uncertainty wording as an unresolved_meaning
+                # source (live 2026-10-16: a gap cited "u1" and the clarification failed).
+                meaning_gap = copy.deepcopy(information_gap_contract)
+                meaning_gap["properties"]["source_kind"] = {"type": "string", "const": "unresolved_meaning"}
+                meaning_gap["properties"]["source_reference"] = {
+                    "type": "string", "enum": sorted(unresolved_meaning)}
+                input_gap = copy.deepcopy(information_gap_contract)
+                input_gap["properties"]["source_kind"] = {"type": "string", "const": "execution_input"}
+                information_gap_contract["oneOf"] = [meaning_gap, input_gap]
             # Expose PlannerInformationGap's existing membership invariants.
             # Source order remains irrelevant to the canonical contract.
             source_variants = []
@@ -2782,6 +2792,10 @@ def fast_streaming_advance_response_schema(
         if disposition in {"execute", "mixed", "respond"}:
             properties["coverage"] = {"type": "string", "enum": ["complete"]}
             # Every Work state carries at least one Activity (limitations are decisions).
+            properties["activities"]["minItems"] = 1
+        if disposition == "clarify":
+            # Host binds no clarification from a bare decision: its information_gaps are authored
+            # (live 2026-10-16: "把那个拿给我" decided clarify with zero Activities and failed).
             properties["activities"]["minItems"] = 1
         if disposition == "unavailable":
             # Every Responsibility is a limitation: its facts live in its decision.

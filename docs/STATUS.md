@@ -1,13 +1,24 @@
 # Chromie Current Status
 
-## Current delivery — A turn waiting for Value Judgment answers nothing directly; run 4 smoke, 2026-10-16
+## Current delivery — An unsettled referent is clarified, never a limitation (D); run 5 smoke, 2026-10-16
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `1f7bb73bc`: on turns with UMI meaning uncertainty the Planner prompt says which thing is meant is never an ability need or a limitation (clarify unless an ability is missing); the streamed decoder requires a clarify state's Activity and lets an `unresolved_meaning` gap cite only the exact UMI wording. |
+| Automatic verification | Offline current-Planner replays of the run-5 "把那个拿给我" turn: unavailable → clarify with a clarification 6/6; controls history "那个" clarify 4/4, thirsty deliver 3/3. Regression `test_unsettled_referent_is_clarified_with_a_gap_citing_umi_wording` (red on HEAD for both decoder cases); strict replay 6,000/6,000 zero model calls (no request changed); canonical gate in clean worktree `scratchpad/gate31` (pytest 3,845 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
+| Target validation | Run 5 smoke on `rootcause17`: mechanical 14/15 (bring_that asked as a `respond` act after an `unavailable` decision); homework sibling repair live. This repair is not yet live. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause17-20261016`. `rootcause18-20261016` (`f15411c1…`, 125 files identical, digest `180cd0d00f6fcb79`) built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Run 5").
+
+## Previous delivery — A turn waiting for Value Judgment answers nothing directly; run 4 smoke, 2026-10-16
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `a28bcf759`: while any Responsibility of a turn waits for Value Judgment, the SC decoder offers that turn only an acknowledgement at ingress and Host rejects any other act; sibling speech is answered after Value Judgment through its Planner need. `body_nod_zh` makes speech optional. |
 | Automatic verification | Regression `test_a_turn_waiting_for_value_judgment_answers_no_sibling_directly` (red on HEAD); strict replay 6,000/6,000 zero model calls; canonical gate in clean worktree `scratchpad/gate30` (pytest 3,842 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership); scenario check 70 cases. |
 | Target validation | Run 4 smoke on `rootcause16`: mechanical 14/15 (silent nod); B/E live ("嗯，我看看。" then the limitation or answer); homework judged fail — a sibling reply promised the lie before VJ declined (6/6 in replay with or without E). This repair is not yet live. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause16-20261016`. `rootcause17-20261016` (`b2a67642…`, 125 files identical, digest `e1e800e2eef7a021`) built, not deployed. No release. |
+| Deployment state | `rootcause17-20261016` (`b2a67642…`, 125 files identical, digest `e1e800e2eef7a021`), deployed by the owner and measured as run 5. No release. |
 
 Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Run 4").
 
