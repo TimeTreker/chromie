@@ -6,37 +6,22 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from .goal_progress_communication import goal_progress_communication_prompt
 from .clients.ollama_client import LayeredPrompt
 from .cognitive_identity import (
-    IDENTITY_SEMANTIC_CONTRACT,
-    PERSONALITY_SEMANTIC_CONTRACT,
-    bounded_identity_json,
-    bounded_personality_json,
     owner_approved_identity_context,
 )
 from .goal_association_contract import (
-    _EXECUTION_CONTRACT_PROMPT,
     _GOAL_SEGMENTATION_IDENTITY_CONTRACT,
     GoalAssociationModelOutput,
     GoalSegmentationModelOutput,
 )
 from .prompt_projection import bounded_json, required_json
 
-try:
-    from chromie_contracts.memory import role_memory_context
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.memory import role_memory_context
+from shared.chromie_contracts.memory import role_memory_context
 
 
-try:
-    from chromie_contracts.core_interpretation import CognitiveWorkRequest
-    from chromie_contracts.discourse import DiscourseReferent
-    from chromie_contracts.situation import SituationProjection
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-    from shared.chromie_contracts.discourse import DiscourseReferent
-    from shared.chromie_contracts.situation import SituationProjection
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_contracts.discourse import DiscourseReferent
 
 
 logger = logging.getLogger("chromie.agent.goal_association.prompt")
@@ -88,18 +73,6 @@ def discourse_referents(request: CognitiveWorkRequest) -> list[dict[str, Any]]:
             )
             continue
     return out
-
-
-def situation_projection(request: CognitiveWorkRequest) -> dict[str, Any]:
-    context = request.context if isinstance(request.context, dict) else {}
-    raw = context.get("situation")
-    if not isinstance(raw, dict):
-        return {}
-    try:
-        return SituationProjection.model_validate(raw).prompt_projection()
-    except ValidationError as exc:
-        logger.debug("Ignoring malformed Situation projection error=%s", exc)
-        return {}
 
 
 def build_segmentation_prompt(request: CognitiveWorkRequest) -> str:

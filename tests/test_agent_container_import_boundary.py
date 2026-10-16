@@ -10,14 +10,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_attention_review_imports_under_agent_container_package_layout(tmp_path: Path) -> None:
-    """The Agent image exposes app and chromie_contracts as top-level packages."""
+    """The Agent image exposes app and the shared namespace as top-level packages."""
 
     (tmp_path / "app").symlink_to(PROJECT_ROOT / "agent" / "app", target_is_directory=True)
-    (tmp_path / "chromie_contracts").symlink_to(
+    (tmp_path / "shared").mkdir()
+    (tmp_path / "shared" / "chromie_contracts").symlink_to(
         PROJECT_ROOT / "shared" / "chromie_contracts",
         target_is_directory=True,
     )
-    (tmp_path / "chromie_runtime").symlink_to(
+    (tmp_path / "shared" / "chromie_runtime").symlink_to(
         PROJECT_ROOT / "shared" / "chromie_runtime",
         target_is_directory=True,
     )

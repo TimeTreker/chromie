@@ -155,23 +155,6 @@
       "target_reference": "e2e/general_ability",
       "migration_state": "referenced_in_place",
       "expected_inventory_count": 1
-    },
-    {
-      "name": "m13_voice",
-      "path": "scripts/m13_voice_acceptance.py",
-      "kind": "acceptance_entrypoint",
-      "layer": "e2e",
-      "datasets": [
-        "voice_acceptance"
-      ],
-      "evidence_levels": [
-        "live_service",
-        "simulated"
-      ],
-      "optional": true,
-      "target_reference": "e2e/voice_acceptance",
-      "migration_state": "referenced_in_place",
-      "expected_inventory_count": null
     }
   ],
   "compatibility_entrypoints": [

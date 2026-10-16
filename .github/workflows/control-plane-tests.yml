@@ -21,7 +21,47 @@ jobs:
           cache-dependency-path: requirements-test.txt
       - name: Install test dependencies
         run: python -m pip install -r requirements-test.txt
-      - name: Restore checksum-pinned replay fixtures
-        run: python -m benchmarks.regression restore-fixtures
       - name: Run control-plane tests
         run: ./scripts/run_tests.sh
+
+  compose-config:
+    name: Compose configuration
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - name: Validate every maintained Compose file against generated profiles
+        shell: bash
+        run: |
+          set -euo pipefail
+          work="$(mktemp -d)"
+          generate() {
+            local name="$1" gpu="$2" compute="$3" memory="$4" arch="$5" root="$work/$1"
+            mkdir -p "$root/scripts" "$root/env"
+            cp .env.common "$root/"
+            cp -r env/profiles env/modes env/validation "$root/env/"
+            cp scripts/detect_hardware_profile.sh "$root/scripts/"
+            printf '%s\n' \
+              "CHROMIE_OS_KERNEL='Linux ci'" CHROMIE_HOST_TIMEZONE=UTC \
+              CHROMIE_CPU_ARCH=x86_64 "CHROMIE_CPU_MODEL='CI CPU'" CHROMIE_CPU_CORES=4 \
+              CHROMIE_MEM_TOTAL_MIB=16384 CHROMIE_IS_JETSON=0 "CHROMIE_JETSON_MODEL=''" \
+              "CHROMIE_NVIDIA_GPU_NAME='$gpu'" "CHROMIE_NVIDIA_COMPUTE_CAP=$compute" \
+              "CHROMIE_NVIDIA_MEMORY_TOTAL_MIB=$memory" "CHROMIE_DETECTED_CUDA_ARCH=$arch" \
+              > "$root/system_info.env"
+            (cd "$root" && env -u CHROMIE_OPERATOR_MODE python3 "$GITHUB_WORKSPACE/scripts/generate_runtime_env.py" \
+              --root "$root" --system-info-file "$root/system_info.env" >/dev/null)
+          }
+          generate default "" "" "" ""
+          generate rtx5090 "NVIDIA GeForce RTX 5090" 12.0 32607 120
+          generate rtx4090_laptop "NVIDIA GeForce RTX 4090 Laptop GPU" 8.9 16376 89
+          for name in default rtx5090 rtx4090_laptop; do
+            runtime="$work/$name/.env.runtime"
+            args=(--env-file "$runtime" -f docker-compose.yml)
+            overrides="$(grep '^CHROMIE_COMPOSE_OVERRIDE_FILES=' "$runtime" | cut -d= -f2- || true)"
+            [ -n "$overrides" ] && args+=(-f "$overrides")
+            docker compose "${args[@]}" --profile tts-evaluation config --quiet
+            echo "compose config ok: $name ${overrides:-}"
+          done
+          SGLANG_IMAGE=ci SGLANG_HF_CACHE_DIR=/tmp SGLANG_MODEL=ci SGLANG_MODEL_REVISION=ci \
+            SGLANG_SERVED_MODEL_NAME=ci docker compose -f docker-compose.sglang-qualification.yml config --quiet
+          VLLM_IMAGE=ci VLLM_HF_CACHE_DIR=/tmp VLLM_MODEL=ci VLLM_MODEL_REVISION=ci \
+            VLLM_SERVED_MODEL_NAME=ci docker compose -f docker-compose.vllm-qualification.yml config --quiet

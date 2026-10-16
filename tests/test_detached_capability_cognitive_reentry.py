@@ -303,7 +303,7 @@ def _response() -> InteractionResponse:
 def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.interaction_runtime = coordinator
-    assistant.playback_generation = 0
+    assistant.playback_delivery.playback_generation = 0
     assistant.sessions = _Sessions()
     assistant.conversation_state = _ConversationState()
     assistant.agent_client = _AgentClient()

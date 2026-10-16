@@ -1227,7 +1227,7 @@ async def test_social_expression_uses_existing_trusted_runtime_without_goal_work
 @pytest.mark.asyncio
 @pytest.mark.parametrize("covered", [True, False])
 async def test_sc_words_bind_to_work_without_changing_its_identity_or_completing_progress(covered):
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime
+    from tests.cognitive_runtime_test_support import FakeRuntime
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import CanonicalPlan, canonical_plan_fingerprint
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1260,7 +1260,7 @@ async def test_sc_words_bind_to_work_without_changing_its_identity_or_completing
 
 @pytest.mark.asyncio
 async def test_optional_sc_progress_does_not_create_a_physical_work_playback_barrier():
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime, walk_definition
+    from tests.cognitive_runtime_test_support import FakeRuntime, walk_definition
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1310,7 +1310,7 @@ async def test_sc_projection_rejects_relabeling_exact_speech_as_other_authority(
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.planner_response import PlannerResponseProjection
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime
+    from tests.cognitive_runtime_test_support import FakeRuntime
 
     plan = CanonicalPlan(
         plan_id="plan", planner_tier="fast", disposition="respond", coverage="complete", goal_ids=["goal:1"],
@@ -1347,7 +1347,7 @@ async def test_sc_projection_rejects_relabeling_exact_speech_as_other_authority(
 
 @pytest.mark.asyncio
 async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime, blink_definition, body_goal_association, admitted_core
+    from tests.cognitive_runtime_test_support import FakeRuntime, blink_definition, body_goal_association, admitted_core
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
     from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerStreamTerminal
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1401,7 +1401,7 @@ async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
 
 @pytest.mark.asyncio
 async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime, new_goal_association, admitted_core
+    from tests.cognitive_runtime_test_support import FakeRuntime, new_goal_association, admitted_core
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
     from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerStreamTerminal
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1458,7 +1458,7 @@ async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
 
 @pytest.mark.asyncio
 async def test_ordered_sc_answer_stays_between_work_steps_and_waits_for_delivery():
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime, blink_definition
+    from tests.cognitive_runtime_test_support import FakeRuntime, blink_definition
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1634,7 +1634,7 @@ async def test_social_dialogue_history_requires_completed_playback(playback_comp
 def test_terminal_fast_limitation_establishes_exact_result_need(disposition):
     from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
     from shared.chromie_contracts.plan import FastPlannerAdvance
-    from tests.test_cognitive_runtime_pr7 import new_goal_association
+    from tests.cognitive_runtime_test_support import new_goal_association
     advance = FastPlannerAdvance(
         turn_id="turn", disposition=disposition, coverage="uncertain",
         covered_responsibility_refs=["r1"], confidence=1.0,
@@ -1897,7 +1897,7 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
     )
     from shared.chromie_contracts.plan import FastPlannerStreamFailure
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime, admitted_core, body_goal_association
+    from tests.cognitive_runtime_test_support import FakeRuntime, admitted_core, body_goal_association
 
     social_started, planner_failed, release_social = asyncio.Event(), asyncio.Event(), asyncio.Event()
     submitted, cancelled = [], []

@@ -5,42 +5,23 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-try:
-    from chromie_contracts.interaction import CapabilityIdentityModel
-    from chromie_contracts.text import normalize_whitespace
-    from chromie_contracts.plan import (
-        GoalOutcomeDisposition,
-        GoalSatisfactionAssessment,
-        GoalSatisfactionStatus,
-        PlanCoverage,
-        PlanDisposition,
-        PlanParameterResolution,
-        PlannedGoalTimeCondition,
-        SocialCommunicationNeed,
-        communication_need_id,
-        PlanStepPurpose,
-        PlanTiming,
-        validate_acquisition_stage_isolation,
-        validate_goal_satisfaction_conservation,
-    )
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.interaction import CapabilityIdentityModel
-    from shared.chromie_contracts.text import normalize_whitespace
-    from shared.chromie_contracts.plan import (
-        GoalOutcomeDisposition,
-        GoalSatisfactionAssessment,
-        GoalSatisfactionStatus,
-        PlanCoverage,
-        PlanDisposition,
-        PlanParameterResolution,
-        PlannedGoalTimeCondition,
-        SocialCommunicationNeed,
-        communication_need_id,
-        PlanStepPurpose,
-        PlanTiming,
-        validate_acquisition_stage_isolation,
-        validate_goal_satisfaction_conservation,
-    )
+from shared.chromie_contracts.interaction import CapabilityIdentityModel
+from shared.chromie_contracts.text import normalize_whitespace
+from shared.chromie_contracts.plan import (
+    GoalOutcomeDisposition,
+    GoalSatisfactionAssessment,
+    GoalSatisfactionStatus,
+    PlanCoverage,
+    PlanDisposition,
+    PlanParameterResolution,
+    PlannedGoalTimeCondition,
+    SocialCommunicationNeed,
+    communication_need_id,
+    PlanStepPurpose,
+    PlanTiming,
+    validate_acquisition_stage_isolation,
+    validate_goal_satisfaction_conservation,
+)
 
 PlannerTier = Literal["fast"]
 # Refusing is Value Judgment's decision; a Planner re-entry never refuses, and the

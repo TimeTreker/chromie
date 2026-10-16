@@ -6,10 +6,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-try:
-    from chromie_contracts.interaction import find_raw_controller_array_schema
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.interaction import find_raw_controller_array_schema
+from shared.chromie_contracts.interaction import find_raw_controller_array_schema
 
 SafetyClass = Literal[
     "safe_read",
@@ -222,12 +219,6 @@ class CapabilityRegistry:
         if llm_visible is not None:
             tools = [tool for tool in tools if tool.llm_visible is llm_visible]
         return tools
-
-    def tools_with_effect(self, effect: str) -> list[ToolCapability]:
-        return [tool for tool in self.list_tools() if effect in tool.effects]
-
-    def tools_requiring_confirmation(self) -> list[ToolCapability]:
-        return [tool for tool in self.list_tools() if tool.confirmation.required]
 
     def tools_for_llm(self) -> list[ToolCapability]:
         visible_agents = {agent.agent_id for agent in self.list_agents() if agent.llm_visible and agent.status.available}

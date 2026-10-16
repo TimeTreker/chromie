@@ -26,7 +26,8 @@ def source_identity():
     paths += [ROOT/name for name in (
         'scripts/run_workflow_replay.py', 'benchmarks/integration/model_replay.py',
         'tests/workflow_replay_support.py', 'tests/capability_runtime_test_support.py',
-        'tests/test_cognitive_runtime_pr7.py', 'benchmarks/datasets/fast_planner_daily_life/qualification.py',
+        'tests/cognitive_runtime_test_support.py', 'tests/cognitive_work_test_support.py',
+        'benchmarks/datasets/fast_planner_daily_life/qualification.py',
         'benchmarks/regression/archive.py',
     )]
     return {str(p.relative_to(ROOT)):hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(paths)}

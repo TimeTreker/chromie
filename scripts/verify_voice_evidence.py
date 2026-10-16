@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 import shlex
@@ -12,6 +11,11 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Sequence
+
+try:
+    from evidence_io import sha256_file as _sha256_file
+except ImportError:  # imported as scripts.verify_voice_evidence
+    from scripts.evidence_io import sha256_file as _sha256_file
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -85,14 +89,6 @@ LIVE_VOICE_BLOCKING_FAILURE_CLASSES = {
 
 def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _message_field(message: str, name: str) -> str | None:

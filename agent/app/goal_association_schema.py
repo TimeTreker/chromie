@@ -14,10 +14,7 @@ from .goal_association_contract import (
 )
 
 
-try:
-    from chromie_contracts.json_schema import expose_intersection_shapes as _expose_intersection_shapes
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.json_schema import expose_intersection_shapes as _expose_intersection_shapes
+from shared.chromie_contracts.json_schema import expose_intersection_shapes as _expose_intersection_shapes
 
 
 def _prune_unreferenced_definitions(schema: dict[str, Any]) -> dict[str, Any]:
@@ -483,68 +480,6 @@ def goal_association_response_schema(
             )
     _expose_intersection_shapes(schema)
     return _prune_unreferenced_definitions(schema)
-
-
-def binding_semantic_contract_response_schema(
-    response_schema: dict[str, Any],
-) -> dict[str, Any]:
-    """Expose the existing canonical binding invariant to constrained decoding."""
-
-    schema = copy.deepcopy(response_schema)
-    binding_schema = schema.get("$defs", {}).get(
-        "GoalAssociationModelBinding"
-    )
-    if not isinstance(binding_schema, dict):
-        return schema
-    categories = {
-        "distance": ["distance"],
-        "direction": ["direction"],
-        "duration": ["duration", "duration_seconds"],
-        "quantity": [
-            "amount",
-            "count",
-            "item_count",
-            "quantity",
-            "quantity_binding",
-            "resource_count",
-            "resource_quantity",
-        ],
-        "speed": ["speed"],
-    }
-    clauses = binding_schema.setdefault("allOf", [])
-    for names in categories.values():
-        clauses.append(
-            {
-                "if": {
-                    "properties": {"name": {"enum": names}},
-                    "required": ["name"],
-                },
-                "then": {
-                    "properties": {"entity_type": {"enum": names}},
-                    "required": ["entity_type"],
-                },
-            }
-        )
-    clauses.append(
-        {
-            "if": {
-                "properties": {"entity_type": {"const": "speed"}},
-                "required": ["entity_type"],
-            },
-            "then": {
-                "properties": {
-                    "value": {
-                        "anyOf": [
-                            {"enum": ["slow", "normal", "quick"]},
-                            {"pattern": r".*[0-9].*"},
-                        ]
-                    }
-                },
-                "required": ["value"],
-            },
-        }
-    )
-    return schema
 
 
 def _goal_resource_branches_are_closed(goal_schema: dict[str, Any]) -> bool:

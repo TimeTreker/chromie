@@ -25,7 +25,7 @@ def _host():
 
     host = SimpleNamespace(
         cognitive_runtime=runtime,
-        playback_generation=0,
+        playback_delivery=SimpleNamespace(playback_generation=0),
         get_http_session=get_http_session,
         _outcome_response_is_stale=lambda **_kwargs: False,
     )

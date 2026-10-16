@@ -125,7 +125,7 @@ SC does not infer missing identity or audience. Ordinary turns and trusted Situa
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
 | Trusted Goal-free Situation | Goal-Driven Cognitive Core; SC owns communication | authoritative, communication-only | Situation → bounded Social Cognition invocation → exact Activity → existing delivery runtime; no synthetic Goal or Capability Work | Invalid provenance/identity/repair fails before Memory or delivery; unavailable cognition remains quiet. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
-| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Work Planner, Social Cognition (including optional expression), Goal Association, Reflection, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
+| Agent module endpoints | The named cognitive owner only | bounded module authority | `/cognitive-core/interpret`, Planner, Social Cognition (including optional expression), Goal Association, Reflection, Agent Skill, tool, and WorkDAG contracts | Endpoint failure remains local to that bounded contract; it cannot reopen a second semantic planner. |
 
 The first user-facing speech path belongs to SC. One accepted UMI result can start
 SC, GA and Work planning independently. At that point SC may acknowledge understanding

@@ -16,16 +16,9 @@ from .cognitive_identity import (
     owner_approved_identity_context,
     owner_approved_personality_context,
 )
-from .goal_progress_communication import goal_progress_communication_prompt
-try:
-    from chromie_contracts.semantic_authority import PLANNER_WORK_AUTHORITY_PROMPT
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.semantic_authority import PLANNER_WORK_AUTHORITY_PROMPT
+from shared.chromie_contracts.semantic_authority import PLANNER_WORK_AUTHORITY_PROMPT
 
-try:
-    from chromie_contracts.user_turn import user_turn_source_tokens
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+from shared.chromie_contracts.user_turn import user_turn_source_tokens
 
 from .prompt_projection import bounded_json, required_json
 from .planner_grounding import provider_resolves_required_source
@@ -43,10 +36,7 @@ from .planner_context import (
     situation_source_observations,
 )
 
-try:
-    from chromie_contracts.memory import role_memory_context
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.memory import role_memory_context
+from shared.chromie_contracts.memory import role_memory_context
 
 
 def planner_interaction_context_projection(value: Any) -> Any:
@@ -64,20 +54,12 @@ def planner_interaction_context_projection(value: Any) -> Any:
     return projected
 
 
-try:
-    from chromie_contracts.core_interpretation import (
-        CognitiveResponsibilityProposal,
-        CognitiveWorkRequest,
-    )
-    from chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
-    from chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS, responsibility_outcome_source_tokens
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import (
-        CognitiveResponsibilityProposal,
-        CognitiveWorkRequest,
-    )
-    from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
-    from shared.chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS, responsibility_outcome_source_tokens
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    CognitiveWorkRequest,
+)
+from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
+from shared.chromie_contracts.plan import GOAL_SATISFACTION_SCORE_BANDS, responsibility_outcome_source_tokens
 
 
 # Owner decision 2026-10-10 (option A): the Planner reasons with the full Stable Mind,
@@ -1064,14 +1046,6 @@ def fast_advance_layered_prompt(
         + "\n" + immutable_source_turn_prompt(request, what_authority="UMI Responsibilities")
     )
     return LayeredPrompt.promote(rendered, operating_contract=(contract,))
-
-
-def _normalized_sibling_refs(value: Any) -> list[str]:
-    if isinstance(value, str):
-        return [value]
-    if isinstance(value, list):
-        return [str(item) for item in value if str(item).strip()]
-    return []
 
 
 def fast_responsibility_decision_projection(

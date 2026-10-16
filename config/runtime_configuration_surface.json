@@ -6,6 +6,13 @@
     "ORCH_RUNTIME_OVERRIDE_"
   ],
   "compatibility_aliases": {},
+  "env_file_only_keys": {
+    "CHROMIE_ARCH": "Profile identity validated by scripts/generate_runtime_env.py from the parsed profile file.",
+    "CHROMIE_GPU_CLASS": "Profile identity required by scripts/generate_runtime_env.py (REQUIRED_PROFILE_KEYS).",
+    "CHROMIE_GPU_VENDOR": "Profile identity validated by scripts/generate_runtime_env.py from the parsed profile file.",
+    "CHROMIE_HARDWARE_PROFILE": "Profile identity validated by scripts/generate_runtime_env.py and reported by tools/chromie_cli.",
+    "COMPOSE_PROJECT_NAME": "Read by Docker Compose itself to name the project, networks and volumes."
+  },
   "maintained_modes": {
     "qualification": {
       "file": "env/modes/qualification.env",

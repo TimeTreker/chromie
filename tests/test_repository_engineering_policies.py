@@ -185,9 +185,6 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
             deep = root / "orchestrator" / "runtime" / "deepthinking_policy.py"
             deep.parent.mkdir(parents=True)
             deep.write_text("class DeepThinkingDelegationPolicy: pass\n", encoding="utf-8")
-            runtime = root / "agent" / "app" / "runtime.py"
-            runtime.parent.mkdir(parents=True)
-            runtime.write_text("MotionPlannerAgent = object\n", encoding="utf-8")
             catalog = root / "agent" / "app" / "capabilities" / "catalog.py"
             catalog.parent.mkdir(parents=True)
             catalog.write_text(
@@ -225,12 +222,6 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
                 "def is_followup_reference(text): return text in DEFAULT_FOLLOWUP_PHRASES\n",
                 encoding="utf-8",
             )
-            tool = root / "agent" / "app" / "agents" / "tool.py"
-            tool.parent.mkdir(parents=True, exist_ok=True)
-            tool.write_text(
-                "async def run(services, query): return await services.weather_client.lookup(query)\n",
-                encoding="utf-8",
-            )
             memory = root / "agent" / "app" / "agents" / "memory.py"
             memory.parent.mkdir(parents=True, exist_ok=True)
             memory.write_text(
@@ -241,19 +232,9 @@ class RepositoryEngineeringPolicyTests(unittest.TestCase):
                 "    acknowledgement = 'I will remember that.'\n",
                 encoding="utf-8",
             )
-            speaker = root / "agent" / "app" / "agents" / "speaker.py"
-            speaker.write_text(
-                "class SpeakerAgent:\n"
-                "    def _default_speech(self): return 'I understand.'\n",
-                encoding="utf-8",
-            )
-            conversation = root / "agent" / "app" / "agents" / "conversation.py"
-            conversation.write_text(
-                "import re\n"
-                "class ConversationAgent:\n"
-                "    ACTION_PHRASES = ('walk', 'blink')\n"
-                "    bad_prefixes = ('assistant:',)\n"
-                "    def _fallback_reply(self): return 'That sounds tiring.'\n",
+            session = root / "orchestrator" / "runtime" / "session.py"
+            session.write_text(
+                "ACTION_PHRASES = ('walk', 'blink')\n",
                 encoding="utf-8",
             )
             schema = root / "agent" / "app" / "cognitive_core" / "user_meaning_interpreter" / "schema.py"

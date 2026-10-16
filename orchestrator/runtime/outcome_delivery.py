@@ -145,8 +145,8 @@ def build_host_outcome_delivery(host: Any) -> OutcomeDeliveryCoordinator:
         ),
         output_idle=lambda: bool(
             not host.is_playing_audio
-            and host.playback_queue.empty()
-            and not host.active_synthesis_tasks
+            and host.playback_delivery.playback_queue.empty()
+            and not host.playback_delivery.active_synthesis_tasks
         ),
         goals_deliverable=lambda goal_ids: goals_deliverable_from_snapshot(
             host.conversation_state.snapshot(),

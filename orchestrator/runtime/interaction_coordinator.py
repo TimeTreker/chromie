@@ -95,17 +95,6 @@ def _float_env(name: str, default: float, *, minimum: float = 0.0) -> float:
     return max(minimum, value)
 
 
-def _int_env(name: str, default: int, *, minimum: int = 0) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        value = int(raw)
-    except ValueError:
-        return default
-    return max(minimum, value)
-
-
 @dataclass
 class ReadyPlannerCommunicativeExecution:
     """One Planner-owned Communicative Activity entering the Vocal lane."""

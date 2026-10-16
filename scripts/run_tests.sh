@@ -19,7 +19,7 @@ python scripts/check_host_configuration_ownership.py
 python scripts/check_service_configuration_ownership.py
 python scripts/check_runtime_structure.py
 python scripts/check_docs.py
-./scripts/benchmark_check.sh
+./scripts/benchmark_check.sh --skip-policy-check
 
 LOG_LEVEL=WARNING AGENT_LOG_LEVEL=WARNING AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL=WARNING \
   python -m pytest -q tests

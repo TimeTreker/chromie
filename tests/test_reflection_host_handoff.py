@@ -27,7 +27,7 @@ def episode(timeout_ms=125000, perspective='Curiosity deserves patient attention
                          provider_id='test.provider', status='completed', output={'user_summary': 'Second completed.'}),
     ])
     host, sid, _ = CognitiveTurnLoopClosureTests()._assistant(_Runtime(execution), response)
-    host.cognitive_runtime_policy = SimpleNamespace(deep_planner_timeout_ms=timeout_ms)
+    host.cognitive_runtime_policy = SimpleNamespace(deliberative_timeout_ms=timeout_ms)
     mind = MindManager().context()
     mind['worldview']['household_perspectives'] = [perspective]
     mind['private_session_payload'] = 'PRIVATE_MARKER_MUST_NOT_TRANSFER'
@@ -108,11 +108,11 @@ def test_background_reflection_expires_drains_and_cannot_reopen_goal(ending):
             for task in tasks: task.cancel()
         elif ending == 'shutdown':
             host.sessions = None
-            host.playback_start_waiters = {}
+            host.playback_delivery.playback_start_waiters = {}
             async def close_output(): return None
             await shutdown_voice_assistant(host, close_output_stream=close_output)
         elif ending == 'stale':
-            host.playback_generation += 1; release.set()
+            host.playback_delivery.playback_generation += 1; release.set()
         elif ending == 'terminal':
             host.conversation_state._set_goal_responsibility_status(goal, 'satisfied', source='trusted_delivery')
             release.set()

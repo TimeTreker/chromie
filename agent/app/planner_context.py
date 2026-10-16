@@ -13,28 +13,16 @@ from pydantic import ValidationError
 from .planner_grounding import _goal_binding_map
 from .planner_model_contract import is_planner_step_capability
 
-try:
-    from chromie_contracts.core_interpretation import PlannerReentryScope
-    from chromie_contracts.control import GoalCancellationEvidence
-    from chromie_contracts.execution_outcome import ExecutionOutcomeBundle
-    from chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
-    from chromie_contracts.interaction import (
-        MEDIA_CAPABILITY_IDS,
-        reject_forbidden_low_level_fields,
-    )
-    from chromie_contracts.situation import CognitiveOpportunity, SituationProjection
-    from chromie_contracts.tool_result import ToolResultEvidence
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.core_interpretation import PlannerReentryScope
-    from shared.chromie_contracts.control import GoalCancellationEvidence
-    from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
-    from shared.chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
-    from shared.chromie_contracts.interaction import (
-        MEDIA_CAPABILITY_IDS,
-        reject_forbidden_low_level_fields,
-    )
-    from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
-    from shared.chromie_contracts.tool_result import ToolResultEvidence
+from shared.chromie_contracts.core_interpretation import PlannerReentryScope
+from shared.chromie_contracts.control import GoalCancellationEvidence
+from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
+from shared.chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
+from shared.chromie_contracts.interaction import (
+    MEDIA_CAPABILITY_IDS,
+    reject_forbidden_low_level_fields,
+)
+from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
+from shared.chromie_contracts.tool_result import ToolResultEvidence
 
 
 def goal_association_prompt_projection(
@@ -773,11 +761,10 @@ def goal_cancellation_evidence_reentry_goal_ids(
 
 @dataclass(frozen=True)
 class PlannerGoalContext:
-    """One immutable Goal/evidence projection shared by Fast and Deep Planner.
+    """One immutable Goal/evidence projection shared by every Planner pass.
 
-    Fast and Deep are cognition depths of one Planner authority.  The semantic
-    meaning of the current Goal set, cancellation Evidence, and terminal-result
-    re-entry therefore must not drift between pass-specific resolver code.
+    The semantic meaning of the current Goal set, cancellation Evidence, and
+    terminal-result re-entry must not drift between pass-specific resolver code.
     """
 
     expected_goal_ids: tuple[str, ...]
@@ -1120,28 +1107,6 @@ def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False
         payload["idempotent"] = bool(getattr(item, "idempotent", False))
         payload["side_effect_free"] = bool(getattr(item, "side_effect_free", False))
     return payload
-
-
-def deep_capability_payload(item: Any) -> dict[str, Any]:
-    """Project one catalog entry onto Deep Planner's read-only capability surface."""
-
-    return {
-        "capability_id": item.capability_id,
-        "description": item.description,
-        "input_schema": item.input_schema,
-        "available": item.available,
-        "interaction_executable": item.interaction_executable,
-        "requires_confirmation": item.requires_confirmation,
-        "effects": item.effects,
-        "safety_class": item.safety_class,
-        "behavior_domains": list(item.behavior_domains),
-        "can_run_parallel": item.can_run_parallel,
-        "parallel_metadata_declared": item.parallel_metadata_declared,
-        "exclusive_group": item.exclusive_group,
-        "resource_claims": item.resource_claims,
-        "execution_constraints": item.execution_constraints,
-        "hints": dict(item.hints),
-    }
 
 
 def cancellation_capability_facts(entries: list[Any]) -> list[dict[str, Any]]:

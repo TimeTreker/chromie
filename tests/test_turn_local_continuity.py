@@ -16,7 +16,7 @@ from shared.chromie_contracts.core_interpretation import (
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.plan import FastPlannerStreamFailure
 from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-from tests.test_cognitive_runtime_pr7 import FakeRuntime, RecordingPlannerAdapter, admitted_core, body_goal_association, new_goal_association
+from tests.cognitive_runtime_test_support import FakeRuntime, RecordingPlannerAdapter, admitted_core, body_goal_association, new_goal_association
 
 
 def test_turn_local_scope_is_semantic_and_speech_only() -> None:
@@ -659,7 +659,7 @@ async def test_late_sc_request_failure_preserves_delivered_conversation_but_not_
     speech_only, error_type,
 ) -> None:
     from shared.chromie_contracts.plan import CanonicalPlan
-    from tests.test_cognitive_runtime_pr7 import ScriptedClient, respond_plan
+    from tests.cognitive_runtime_test_support import ScriptedClient, respond_plan
 
     goal_id = "goal-late-sc"
     association = new_goal_association(goal_id) if speech_only else body_goal_association(goal_id)
@@ -731,7 +731,7 @@ async def test_late_sc_request_failure_preserves_delivered_conversation_but_not_
 async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_failure(speech_only):
     import asyncio
     from orchestrator.runtime.cognitive_runtime import CognitiveStageFailure
-    from tests.test_cognitive_runtime_pr7 import ScriptedClient, respond_plan
+    from tests.cognitive_runtime_test_support import ScriptedClient, respond_plan
 
     goal_id = "goal-silent-state"
     association = new_goal_association(goal_id) if speech_only else body_goal_association(goal_id)

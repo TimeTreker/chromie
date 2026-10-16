@@ -40,14 +40,13 @@ class ReleaseProvenanceTests(unittest.TestCase):
     def test_sglang_candidate_served_model_is_source_revision_locked(self) -> None:
         env = {
             "AGENT_LLM_PROVIDER": "sglang",
-            "AGENT_MODEL": "chromie-qwen35-9b-sglang",
-            "AGENT_USER_MEANING_INTERPRETER_MODEL": "chromie-qwen35-9b-sglang",
-            "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "chromie-qwen35-9b-sglang",
-            "AGENT_GOAL_ASSOCIATION_MODEL": "chromie-qwen35-9b-sglang",
-            "AGENT_FAST_PLANNER_MODEL": "chromie-qwen35-9b-sglang",
-            "AGENT_DEEP_PLANNER_MODEL": "chromie-qwen35-9b-sglang",
-            "AGENT_TASK_CONTINUITY_MODEL": "chromie-qwen35-9b-sglang",
-            "AGENT_SKILL_SELECTION_MODEL": "chromie-qwen35-9b-sglang",
+            "AGENT_MODEL": "chromie-qwen35-4b",
+            "AGENT_USER_MEANING_INTERPRETER_MODEL": "chromie-qwen35-4b",
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "chromie-qwen35-4b",
+            "AGENT_GOAL_ASSOCIATION_MODEL": "chromie-qwen35-4b",
+            "AGENT_FAST_PLANNER_MODEL": "chromie-qwen35-4b",
+            "AGENT_DELIBERATIVE_MODEL": "chromie-qwen35-4b",
+            "AGENT_SKILL_SELECTION_MODEL": "chromie-qwen35-4b",
             **{
                 key: value
                 for key, value in source_environment(ROOT).items()
@@ -58,9 +57,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
         }
         self.assertEqual(model_lock_errors(ROOT, env), [])
         lock = json.loads((ROOT / "release" / "model-lock.json").read_text(encoding="utf-8"))
-        model = lock["sglang"]["candidate_served_models"]["chromie-qwen35-9b-sglang"]
-        self.assertEqual(model["source_model_id"], "Qwen/Qwen3.5-9B")
-        self.assertEqual(model["revision"], "c202236235762e1c871ad0ccb60c8ee5ba337b9a")
+        self.assertNotIn("chromie-qwen35-9b-sglang", lock["sglang"]["candidate_served_models"])
         self.assertEqual(lock["sglang"]["promotion_status"], "runtime_selected_release_unqualified")
         laptop = lock["sglang"]["candidate_served_models"]["chromie-qwen35-4b"]
         self.assertEqual(laptop["source_model_id"], "cyankiwi/Qwen3.5-4B-AWQ-4bit")

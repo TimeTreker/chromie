@@ -119,7 +119,7 @@ The ordinary turn and Goal-free Situation paths share the SC transaction.
 |---|---|---|
 | Host fan-out | One UMI result starts SC, GA and Fast Work independently. | SC output cannot predict an unfinished Plan. |
 | Fast Planner | One complete validated Work result, no early presentation. | No partial Work or raw token dispatch. |
-| Canonical Fast/Deep | Word-free Work and exact communication Needs. | SC joins against the immutable Plan and input snapshot. |
+| Canonical Planner | Word-free Work and exact communication Needs. | SC joins against the immutable Plan and input snapshot. |
 | Goal-free Situation | Trusted revisions/opportunities enter the same SC authority. | Stale revisions fail before delivery or Memory application. |
 | Delivery | Ordered speech, cancellation and actual playback receipts. | Pending or started speech is not heard/completed history. |
 | Optional expression | SC proposals anchor to its exact communicative act. | Runtime validates exact catalog/target/resource authority; optional failure cannot block Work. |
@@ -331,7 +331,7 @@ remaining uncertainty or consequence justifies broader reasoning. A numeric conf
 score is evidence, not the sole escalation switch. Harmless ordinary conversation
 should not pay a Deep-thinking tax merely because confidence is imperfectly calibrated.
 
-The word **deep** is owner-scoped. Deep UMI, GA, Planner and Reflection keep their
+The word **deep** is owner-scoped. Deep UMI, deliberative SC and Reflection keep their
 separate semantic responsibilities. Planner owns Work planning and SC owns ordinary communication, with permissions
 fixed by each invocation's input contract. SC's restricted Situation pass may choose
 silence or qualified interaction with no task Goal/Work authority. Fast may delegate unresolved scope once before producing an Activity or

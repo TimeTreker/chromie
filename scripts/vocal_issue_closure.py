@@ -14,7 +14,6 @@ or robot hardware behavior.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import math
 import os
@@ -24,6 +23,11 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+
+try:
+    from evidence_io import sha256_file as _sha256_file, write_json as _write_json
+except ImportError:  # imported as scripts.vocal_issue_closure
+    from scripts.evidence_io import sha256_file as _sha256_file, write_json as _write_json
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -48,14 +52,6 @@ def _acceptance_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
-def _write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-
 def _read_json(path: Path) -> dict[str, Any]:
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -64,14 +60,6 @@ def _read_json(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ClosureError(f"{path}: expected a JSON object")
     return payload
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _run(

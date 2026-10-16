@@ -129,6 +129,14 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                 environ={"ORCH_ENABLE_AGENT": "maybe"},
             )
 
+    def test_empty_boolean_uses_default(self) -> None:
+        settings = HostSettingsSnapshot.from_env(
+            project_root=Path("/tmp"),
+            environ={"ORCH_ENABLE_AGENT": ""},
+        )
+        default = HostSettingsSnapshot.from_env(project_root=Path("/tmp"), environ={})
+        self.assertEqual(settings, default)
+
     def test_invalid_choice_fails_closed_instead_of_silent_default(self) -> None:
         with self.assertRaisesRegex(
             HostConfigurationError,

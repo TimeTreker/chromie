@@ -44,7 +44,7 @@ from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_contracts.interaction import CapabilityResult
 from shared.chromie_contracts.tool_result import canonical_value_sha256
 from tests.capability_runtime_test_support import submit_and_wait_terminal
-from tests.test_cognitive_runtime_pr7 import FakeRuntime
+from tests.cognitive_runtime_test_support import FakeRuntime
 
 from tests.cognitive_work_test_support import PlannerActivationFixture, word_free_model_fixture, social_fixture_resolution, social_fixture_response
 
@@ -332,7 +332,7 @@ async def reenter(request, catalog, plan, adapter, response, bundle, raw):
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = client
     assistant.cognitive_runtime_policy = SimpleNamespace(
-        fast_planner_timeout_ms=3000, deep_planner_timeout_ms=6000
+        fast_planner_timeout_ms=3000, deliberative_timeout_ms=6000
     )
     assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
         agent_client=client, adapter=adapter, policy=CognitiveRuntimePolicy(mode="apply")

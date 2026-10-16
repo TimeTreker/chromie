@@ -492,7 +492,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             "read_only_source_provenance",
         )
 
-        assistant._turn_speech_events = {
+        assistant.playback_delivery.turn_speech_events = {
             "session": [
                 {
                     "event_id": "speech-event-existing",

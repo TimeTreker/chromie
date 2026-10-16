@@ -900,7 +900,7 @@ def test_user_meaning_interpreter_keeps_multi_action_physical_compounds_body_act
     from pathlib import Path
 
     prompt = (
-        Path("agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
+        (Path(__file__).resolve().parents[1] / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
         .read_text(encoding="utf-8")
     )
     assert "do not use other merely because the compound has" in prompt
@@ -911,7 +911,7 @@ def test_user_meaning_interpreter_scope_prompt_distinguishes_work_from_duration(
     from pathlib import Path
 
     prompt = (
-        Path("agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
+        (Path(__file__).resolve().parents[1] / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
         .read_text(encoding="utf-8")
     )
     assert "lifetime distinction" in prompt
@@ -923,7 +923,7 @@ def test_user_meaning_interpreter_scope_prompt_distinguishes_work_from_duration(
 
 def test_umi_preserves_explicit_social_purpose_without_inventing_emotion() -> None:
     prompt = (
-        Path("agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
+        (Path(__file__).resolve().parents[1] / "agent/app/cognitive_core/user_meaning_interpreter/prompts/user_meaning_interpreter_system.txt")
         .read_text(encoding="utf-8")
     )
     assert "Explicitly stated emotional/social context" in prompt

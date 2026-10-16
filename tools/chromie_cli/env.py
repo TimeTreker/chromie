@@ -368,14 +368,6 @@ def summarize_diagnostics(diagnostics: list[Diagnostic]) -> tuple[str, int]:
     return "ok", int(ExitCode.OK)
 
 
-def diagnostics_by_level(diagnostics: list[Diagnostic]) -> dict[str, list[str]]:
-    return {
-        level: [item.message for item in diagnostics if item.level == level]
-        for level in ("failure", "warning", "skip", "ok")
-        if any(item.level == level for item in diagnostics)
-    }
-
-
 def service_endpoint(url: str) -> tuple[str, int] | None:
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https", "ws", "wss"} or not parsed.hostname:

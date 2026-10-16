@@ -253,7 +253,7 @@ class VoiceAssistant:
         )
         self.fast_planner_mode = cognition_settings.fast_planner_mode
         self.fast_planner_timeout_ms = cognition_settings.fast_planner_timeout_ms
-        self.deep_planner_timeout_ms = cognition_settings.deep_planner_timeout_ms
+        self.deliberative_timeout_ms = cognition_settings.deliberative_timeout_ms
         self.goal_association_mode = cognition_settings.goal_association_mode
         self.goal_association_timeout_ms = (
             cognition_settings.goal_association_timeout_ms
@@ -461,8 +461,7 @@ class VoiceAssistant:
             max_utterance_ms=self.max_vad_utterance_ms,
         )
 
-        # Focused collaborators own task, microphone, playback, and ledger state;
-        # the Host keeps compatibility aliases while lifecycle mutation stays testable.
+        # Focused collaborators own task, microphone, playback, and ledger state.
         self.input_turn_lifecycle = InputTurnLifecycle()
         self.playback_delivery = PlaybackDeliveryLifecycle(
             interaction_event_sink=host_support.interaction_ledger.record_playback_event,
@@ -487,7 +486,7 @@ class VoiceAssistant:
             mode=self.cognitive_runtime_mode,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
             fast_planner_timeout_ms=self.fast_planner_timeout_ms,
-            deep_planner_timeout_ms=self.deep_planner_timeout_ms,
+            deliberative_timeout_ms=self.deliberative_timeout_ms,
             value_review_capability_ids=load_value_review_capability_ids(
                 PROJECT_ROOT / VALUE_REVIEW_RELATIVE_PATH
             ),
@@ -559,76 +558,21 @@ class VoiceAssistant:
             self.__dict__["input_turn_lifecycle"] = state
         return state
 
-    _PLAYBACK_STATE_ALIASES = {
-        "next_playback_order": "next_playback_order",
-        "pending_audio": "pending_audio",
-        "synthesis_order": "synthesis_order",
-        "playback_generation": "playback_generation",
-        "_tts_text_by_generation": "tts_text_by_generation",
-        "playback_start_waiters": "playback_start_waiters",
-        "playback_release_waiters": "playback_release_waiters",
-        "playback_released_keys": "playback_released_keys",
-        "cancelled_playback_orders": "cancelled_playback_orders",
-        "_turn_speech_events": "turn_speech_events",
-        "_turn_speech_event_by_playback_key": "turn_speech_event_by_playback_key",
-        "order_lock": "order_lock",
-        "playback_queue": "playback_queue",
-        "playback_task": "playback_task",
-        "active_synthesis_tasks": "active_synthesis_tasks",
-        "synthesis_semaphore": "synthesis_semaphore",
-        "output_stream": "output_stream",
-        "output_stream_lock": "output_stream_lock",
-        "output_write_lock": "output_write_lock",
-    }
-    _PLAYBACK_STATE_COERCERS = {
-        "next_playback_order": int,
-        "synthesis_order": int,
-        "playback_generation": int,
-    }
-    _INPUT_TURN_STATE_ALIASES = {
-        "loop": "loop",
-        "mic_queue": "mic_queue",
-        "_vad_leftover": "vad_leftover",
-        "_vad_segment_started_during_playback": (
-            "vad_segment_started_during_playback"
-        ),
-        "_vad_segment_playback_generation": (
-            "vad_segment_playback_generation"
-        ),
-        "active_asr_task": "active_asr_task",
-        "active_turn_task": "active_turn_task",
-        "active_turn_tasks": "active_turn_tasks",
-        "_turn_cancellation_reasons": "turn_cancellation_reasons",
-        "active_reflex_task": "active_reflex_task",
-        "concurrent_protective_reflex_tasks": "concurrent_protective_reflex_tasks",
-        "_pending_turn_after_reflex": "pending_turn_after_reflex",
-        "_pending_vad_audio": "pending_vad_audio",
-    }
+    @property
+    def playback_delivery(self) -> PlaybackDeliveryLifecycle:
+        return self._playback_state()
 
-    def __getattr__(self, name: str) -> Any:
-        playback_field = self._PLAYBACK_STATE_ALIASES.get(name)
-        if playback_field is not None:
-            return getattr(self._playback_state(), playback_field)
-        input_field = self._INPUT_TURN_STATE_ALIASES.get(name)
-        if input_field is not None:
-            return getattr(self._input_turn_state(), input_field)
-        raise AttributeError(f"{type(self).__name__!s} has no attribute {name!r}")
+    @playback_delivery.setter
+    def playback_delivery(self, value: PlaybackDeliveryLifecycle) -> None:
+        self.__dict__["playback_delivery"] = value
 
-    def __setattr__(self, name: str, value: Any) -> None:
-        playback_field = self._PLAYBACK_STATE_ALIASES.get(name)
-        if playback_field is not None:
-            coercer = self._PLAYBACK_STATE_COERCERS.get(name)
-            setattr(
-                self._playback_state(),
-                playback_field,
-                coercer(value) if coercer is not None else value,
-            )
-            return
-        input_field = self._INPUT_TURN_STATE_ALIASES.get(name)
-        if input_field is not None:
-            setattr(self._input_turn_state(), input_field, value)
-            return
-        object.__setattr__(self, name, value)
+    @property
+    def input_turn_lifecycle(self) -> InputTurnLifecycle:
+        return self._input_turn_state()
+
+    @input_turn_lifecycle.setter
+    def input_turn_lifecycle(self, value: InputTurnLifecycle) -> None:
+        self.__dict__["input_turn_lifecycle"] = value
 
     def playback_start_key(
         self,
@@ -855,31 +799,6 @@ class VoiceAssistant:
             return False
         return any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in text)
 
-    def pop_tts_chunk(
-        self,
-        buffer: str,
-        *,
-        flush_chars: int | None = None,
-    ) -> tuple[str | None, str]:
-        candidate = self.normalize_tts_candidate(buffer)
-        if not candidate:
-            return None, ""
-        limit = max(4, int(flush_chars or self.tts_flush_chars))
-        match = re.search(r".+?[.!?。！？](?:\s+|$)", candidate)
-        if match and (match.end() <= limit or len(candidate) <= limit):
-            end = match.end()
-            return candidate[:end].strip(), candidate[end:].strip()
-        if len(candidate) >= limit:
-            cut = candidate[:limit]
-            cut_points = [cut.rfind(sep) for sep in (",", "，", "、", ";", ":", " ")]
-            cut_at = max(cut_points)
-            if cut_at < max(4, limit // 2):
-                cut_at = limit
-            else:
-                cut_at += 1
-            return candidate[:cut_at].strip(), candidate[cut_at:].strip()
-        return None, candidate
-
     def split_tts_text(self, text: str) -> list[str]:
         candidate = self.normalize_tts_candidate(text)
         if not self.is_valid_tts_text(candidate):
@@ -1027,7 +946,7 @@ class VoiceAssistant:
         return np.tile(samples.reshape(-1, 1), (1, self.output_channels))
 
     def is_stale_playback(self, generation: int, session_id: Optional[str]) -> bool:
-        return generation != self.playback_generation or session_id != self.session_id
+        return generation != self.playback_delivery.playback_generation or session_id != self.session_id
 
     @staticmethod
     def _normalize_echo_text(text: str) -> str:
@@ -1038,10 +957,10 @@ class VoiceAssistant:
         normalized = self.normalize_tts_candidate(text)
         if not normalized:
             return
-        store = getattr(self, "_tts_text_by_generation", None)
+        store = self.playback_delivery.tts_text_by_generation
         if not isinstance(store, dict):
             store = {}
-            self._tts_text_by_generation = store
+            self.playback_delivery.tts_text_by_generation = store
         history = store.setdefault(int(generation), [])
         history.append(normalized)
         # Retain only the current and a few recent generations.  A delayed ASR
@@ -1074,7 +993,7 @@ class VoiceAssistant:
                 or capture_started_monotonic_ms > playback_end_ms + max(0.0, float(post_playback_tail_ms))
             ):
                 return False, 0.0, 0.0
-        store = getattr(self, "_tts_text_by_generation", {})
+        store = self.playback_delivery.tts_text_by_generation
         if not isinstance(store, dict):
             store = {}
         spoken_parts = store.get(
@@ -1149,21 +1068,21 @@ class VoiceAssistant:
         if not self.is_valid_tts_text(sentence):
             self.session_log(session_id, "tts_skip_invalid_sentence_no_order: chars=%s text=%r", len(sentence), sentence)
             return {"scheduled": False, "reason": "invalid_tts_text"}
-        async with self.order_lock:
-            generation = self.playback_generation
+        async with self.playback_delivery.order_lock:
+            generation = self.playback_delivery.playback_generation
             if self.is_stale_playback(generation, session_id):
                 self.session_log(
                     session_id,
                     "tts_drop_stale_no_order: chars=%s generation=%s current_generation=%s current_sid=%s text=%r",
                     len(sentence),
                     generation,
-                    self.playback_generation,
+                    self.playback_delivery.playback_generation,
                     self.session_id,
                     sentence,
                 )
                 return {"scheduled": False, "reason": "stale_playback"}
-            order = self.synthesis_order
-            self.synthesis_order += 1
+            order = self.playback_delivery.synthesis_order
+            self.playback_delivery.synthesis_order += 1
         if self.is_stale_playback(generation, session_id):
             return {"scheduled": False, "reason": "stale_playback"}
         self._remember_tts_text(generation, sentence)
@@ -1172,7 +1091,7 @@ class VoiceAssistant:
         execution_start = current_execution_start.get()
         if execution_start is not None:
             self._playback_state().execution_starts[key] = execution_start
-        self.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
+        self.playback_delivery.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
         self._playback_state().create_playback_release_waiter(
             generation=generation,
             order=order,
@@ -1183,8 +1102,8 @@ class VoiceAssistant:
             state["scheduled_tts"] = int(state.get("scheduled_tts", 0)) + 1
         self.session_log(session_id, "tts_schedule: order=%s chars=%s scheduled_tts=%s generation=%s text=%r", order, len(sentence), state.get("scheduled_tts", 0) if state else "unknown", generation, sentence)
         task = asyncio.create_task(playback_transport_for(self).synthesize_one(sentence, order, session_id, generation))
-        self.active_synthesis_tasks.add(task)
-        task.add_done_callback(self.active_synthesis_tasks.discard)
+        self.playback_delivery.active_synthesis_tasks.add(task)
+        task.add_done_callback(self.playback_delivery.active_synthesis_tasks.discard)
         self.ensure_playback_worker()
         return {"scheduled": True, "order": order, "generation": generation}
 
@@ -1726,28 +1645,26 @@ class VoiceAssistant:
         return scheduled
 
     def ensure_playback_worker(self) -> None:
-        if not hasattr(self, "playback_queue"):
-            return
-        playback_task = getattr(self, "playback_task", None)
+        playback_task = self.playback_delivery.playback_task
         if playback_task is None or playback_task.done():
-            self.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
+            self.playback_delivery.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
         self.session_idle_sweeper_task = asyncio.create_task(
             input_session_runtime_for(self)._session_idle_sweeper()
         )
 
     async def reset_playback_ordering(self):
-        async with self.order_lock:
+        async with self.playback_delivery.order_lock:
             self.resolve_all_playback_start_waiters(
                 started=False,
                 reason="reset_playback_ordering",
             )
-            self.synthesis_order = 0
-            self.next_playback_order = 0
-            self.pending_audio.clear()
-            getattr(self, "cancelled_playback_orders", set()).clear()
-            while not self.playback_queue.empty():
+            self.playback_delivery.synthesis_order = 0
+            self.playback_delivery.next_playback_order = 0
+            self.playback_delivery.pending_audio.clear()
+            self.playback_delivery.cancelled_playback_orders.clear()
+            while not self.playback_delivery.playback_queue.empty():
                 try:
-                    self.playback_queue.get_nowait()
+                    self.playback_delivery.playback_queue.get_nowait()
                 except asyncio.QueueEmpty:
                     break
         self.ensure_playback_worker()
@@ -1827,7 +1744,7 @@ class VoiceAssistant:
         mind_context = self.mind.context()
         return {
             "is_speaking": self.is_playing_audio,
-            "current_generation": self.playback_generation,
+            "current_generation": self.playback_delivery.playback_generation,
             "session_id": session_id,
             "conversation_id": conversation.get("conversation_id"),
             "interaction_engagement": self._interaction_engagement_context(
@@ -1895,7 +1812,7 @@ class VoiceAssistant:
             or isinstance(active_tasks, list)
             and active_tasks
         )
-        active_routed_turns = getattr(self, "active_turn_tasks", None)
+        active_routed_turns = self.input_turn_lifecycle.active_turn_tasks
         has_other_in_flight_turn = bool(
             isinstance(active_routed_turns, dict)
             and any(
@@ -4216,7 +4133,7 @@ class VoiceAssistant:
         session_id: str | None,
     ) -> bool:
         current_generation = int(
-            getattr(self, "playback_generation", generation)
+            self.playback_delivery.playback_generation
         )
         current_session_id = getattr(self, "session_id", session_id)
         return (
@@ -4424,13 +4341,13 @@ class VoiceAssistant:
             return
 
         async def learn_forward() -> None:
-            timeout_ms = self.cognitive_runtime_policy.deep_planner_timeout_ms
+            timeout_ms = self.cognitive_runtime_policy.deliberative_timeout_ms
             try:
                 async with asyncio.timeout(timeout_ms / 1000):
                     session = await self.get_http_session()
                     for request in requests:
                         result = await reflection_call(session, request=request, timeout_ms=timeout_ms)
-                        if generation != self.playback_generation:
+                        if generation != self.playback_delivery.playback_generation:
                             self.session_log(session_id, "selective_reflection_suppressed: reason=stale_generation")
                             return
                         state_results = self.conversation_state.apply_reflection_resolution(result, sid=session_id)
@@ -4617,7 +4534,7 @@ class VoiceAssistant:
             and outcome_delivery.is_ordinary_overlap(
                 origin_session_id=session_id,
                 current_session_id=current_session_id,
-                generation_changed=(generation != self.playback_generation),
+                generation_changed=(generation != self.playback_delivery.playback_generation),
                 execution_status=str(execution.status),
                 aggregate_status=str(bundle.aggregate_status),
             )
@@ -6178,7 +6095,7 @@ class VoiceAssistant:
                 },
             },
         )
-        generation = int(getattr(self, "playback_generation", 0))
+        generation = int(self.playback_delivery.playback_generation)
         resolved = await self.cognitive_runtime.resolve_social_interaction(
             await self.get_http_session(),
             request=request,
@@ -6461,7 +6378,7 @@ class VoiceAssistant:
 
         if reset_playback:
             await self.reset_playback_ordering()
-        generation = int(getattr(self, "playback_generation", 0))
+        generation = int(self.playback_delivery.playback_generation)
         started_ms = now_ms()
         try:
             dispatch = await self.interaction_runtime.submit_response(
@@ -6936,7 +6853,7 @@ class VoiceAssistant:
         *,
         cancel_cognitive_work: bool = True,
     ) -> None:
-        self.playback_generation += 1
+        self.playback_delivery.playback_generation += 1
         self._playback_state().cancel_output_duck()
         self.resolve_all_playback_start_waiters(
             started=False,
@@ -6948,18 +6865,18 @@ class VoiceAssistant:
                 cancel_all=False,
                 reason="foreground_interaction_interrupted",
             )
-        for task in list(self.active_synthesis_tasks):
+        for task in list(self.playback_delivery.active_synthesis_tasks):
             if not task.done():
                 task.cancel()
-        self.pending_audio.clear()
-        getattr(self, "cancelled_playback_orders", set()).clear()
-        while not self.playback_queue.empty():
+        self.playback_delivery.pending_audio.clear()
+        self.playback_delivery.cancelled_playback_orders.clear()
+        while not self.playback_delivery.playback_queue.empty():
             try:
-                self.playback_queue.get_nowait()
+                self.playback_delivery.playback_queue.get_nowait()
             except asyncio.QueueEmpty:
                 break
-        self.next_playback_order = 0
-        self.synthesis_order = 0
+        self.playback_delivery.next_playback_order = 0
+        self.playback_delivery.synthesis_order = 0
 
     def _schedule_output_abort(
         self,
@@ -6980,7 +6897,7 @@ class VoiceAssistant:
                 self.session_log(
                     new_session_id,
                     "interrupt_previous_audio_done: playback_generation=%s",
-                    self.playback_generation,
+                    self.playback_delivery.playback_generation,
                 )
 
         task = asyncio.create_task(abort_and_log())
@@ -7022,7 +6939,7 @@ class VoiceAssistant:
             )
         await playback_transport_for(self).abort_output_stream()
         if new_session_id and log_event:
-            self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
+            self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_delivery.playback_generation)
 
     async def _apply_reflex_cancellation(
         self,
@@ -7427,7 +7344,7 @@ class VoiceAssistant:
         if active is not None and not active.done():
             active.cancel()
         if new_session_id:
-            self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_generation)
+            self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_delivery.playback_generation)
 
     @staticmethod
     def _spoken_text_response_schema(
@@ -7781,8 +7698,8 @@ class VoiceAssistant:
             is_valid_text=self.is_valid_tts_text,
             schedule_text=schedule_text,
             playback_start_key=self.playback_start_key,
-            playback_start_waiters=getattr(self, "playback_start_waiters", {}),
-            next_playback_order=lambda: getattr(self, "next_playback_order", 0),
+            playback_start_waiters=self.playback_delivery.playback_start_waiters,
+            next_playback_order=lambda: self.playback_delivery.next_playback_order,
             execute_orientation=execute_orientation,
         )
 
@@ -7810,7 +7727,7 @@ class VoiceAssistant:
 
     async def run(self):
         self.asr_ws = (await self.wait_for_interaction_services()).asr_ws
-        self.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
+        self.playback_delivery.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
         if any(
             uses_followed_system_default(self, kind)
             for kind in ("input", "output")

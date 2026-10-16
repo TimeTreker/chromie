@@ -27,6 +27,11 @@ from typing import Any
 import httpx
 import websockets
 
+try:
+    from evidence_io import git_revision as _git_revision
+except ImportError:  # imported as scripts.qualify_inference_provider
+    from scripts.evidence_io import git_revision as _git_revision
+
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -39,7 +44,6 @@ DEFAULT_USER_MEANING_INTERPRETER_MANIFEST = (
 )
 
 from agent.app.inference_compute import CognitionComputeClass, compute_rank  # noqa: E402
-
 
 
 class QualificationFailure(RuntimeError):
@@ -301,18 +305,6 @@ class Evidence:
                 "samples": samples,
             },
         }
-
-
-def _git_revision() -> str | None:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            cwd=ROOT,
-            text=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-    except Exception:
-        return None
 
 
 def _git_dirty() -> bool | None:
@@ -2046,7 +2038,6 @@ async def _qualify_foreground_under_deep_load(
     }
 
 
-
 async def _qualify(args: argparse.Namespace, evidence: Evidence) -> None:
     endpoint = f"{args.base_url.rstrip('/')}/chat/completions"
     async with httpx.AsyncClient(timeout=None, trust_env=False) as client:
@@ -2573,7 +2564,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.provider == "sglang":
             args.base_url = "http://127.0.0.1:30000/v1"
         elif args.provider == "vllm":
-            args.base_url = "http://127.0.0.1:8000/v1"
+            args.base_url = "http://127.0.0.1:8001/v1"
         else:
             args.base_url = "http://127.0.0.1:11434/v1"
     args.base_url = args.base_url.rstrip("/")

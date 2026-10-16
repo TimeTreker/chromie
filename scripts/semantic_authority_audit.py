@@ -43,7 +43,7 @@ def audit() -> dict[str, Any]:
     if apply.get("fallback") != "fail_closed_without_legacy_reentry":
         errors.append("apply path must fail closed without legacy semantic re-entry")
 
-    runtime_mode_surfaces = (".env.common", ".env.example", "scripts/start_chromie.sh")
+    runtime_mode_surfaces = (".env.common", "scripts/start_chromie.sh")
     for relative in runtime_mode_surfaces:
         text = _read(relative)
         if "ORCH_COGNITIVE_RUNTIME_MODE=apply" not in text:

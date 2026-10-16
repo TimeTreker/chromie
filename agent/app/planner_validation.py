@@ -14,37 +14,23 @@ import re
 from typing import Any
 
 
-try:
-    from chromie_contracts.core_interpretation import PlannerReentryScope
-    from chromie_contracts.interaction import (
-        MEDIA_CAPABILITY_IDS,
-        VOCAL_MODES,
-        VOCAL_PERFORMANCE_CAPABILITY_ID,
-    )
-    from chromie_contracts.plan import (
-        CanonicalPlan,
-        GoalSatisfactionStatus,
-        PlanParameterResolution,
-    )
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.core_interpretation import PlannerReentryScope
-    from shared.chromie_contracts.interaction import (
-        MEDIA_CAPABILITY_IDS,
-        VOCAL_MODES,
-        VOCAL_PERFORMANCE_CAPABILITY_ID,
-    )
-    from shared.chromie_contracts.plan import (
-        CanonicalPlan,
-        GoalSatisfactionStatus,
-        PlanParameterResolution,
-    )
+from shared.chromie_contracts.core_interpretation import PlannerReentryScope
+from shared.chromie_contracts.interaction import (
+    MEDIA_CAPABILITY_IDS,
+    VOCAL_MODES,
+    VOCAL_PERFORMANCE_CAPABILITY_ID,
+)
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    GoalSatisfactionStatus,
+    PlanParameterResolution,
+)
 
 from .planner_context import (
     _goal_output_mode,
     acquisition_source_goal_ids,
     completed_acquisition_goal_ids,
     evidence_bound_dialogue,
-    goal_association_prompt_projection,
     goal_cancellation_evidence_reentry_goal_ids,
     future_goal_readiness_times,
     goal_readiness_times,
@@ -1488,38 +1474,6 @@ def parallel_plan_contract_errors(
         error for members in groups.values()
         for error in parallel_activity_contract_errors(members, capabilities)
     ]
-
-
-def retained_evidence_response_review_required(
-    context: dict[str, Any] | None,
-    plan: CanonicalPlan,
-) -> bool:
-    """Identify typed retained-Goal responses that need semantic turn review.
-
-    Goal Association, not Host wording rules, decides whether the latest turn
-    continues or otherwise refers to an existing Goal. The review is required
-    only when trusted delivered evidence is also available and the terminal
-    Plan proposes a conversational response with no executable effects.
-    """
-
-    if plan.disposition != "respond" or plan.steps:
-        return False
-    responding_goal_ids = {
-        item.goal_id for item in plan.goal_outcomes if item.disposition == "respond"
-    } or set(plan.goal_ids)
-    if not responding_goal_ids or not evidence_bound_dialogue(context):
-        return False
-    association = goal_association_prompt_projection(context)
-    return any(
-        isinstance(item, dict)
-        and str(item.get("relationship") or "").strip() != "new"
-        and responding_goal_ids.intersection(
-            str(goal_id).strip()
-            for goal_id in item.get("target_goal_ids") or []
-            if str(goal_id).strip()
-        )
-        for item in association.get("associations") or []
-    )
 
 
 def validate_goal_binding_argument_grounding(

@@ -27,7 +27,7 @@ python -m benchmarks.stress.validate --check
 ## Run a workload
 
 ```bash
-python -m benchmarks.stress.run \
+python -m benchmarks.stress \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --workload long_session_social_attention \
   --command "python scripts/my_e2e_adapter.py" \
@@ -38,7 +38,7 @@ python -m benchmarks.stress.run \
   --output benchmarks/reports/long-session-v1.json
 ```
 
-The adapter contract is the Phase 5 E2E adapter contract. For degradation
+The adapter contract is the E2E adapter contract. For degradation
 workloads, only the benchmark adapter may inject the declared failure pattern.
 Chromie production services remain unaware of workload IDs.
 

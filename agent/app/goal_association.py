@@ -13,70 +13,36 @@ from .clients.ollama_client import (
     llm_failure_metadata,
 )
 from .prompt_projection import bounded_json
-try:
-    from chromie_contracts.core_interpretation import (
-        CognitiveWorkRequest,
-        responsibility_binding_material_value,
-    )
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import (
-        CognitiveWorkRequest,
-        responsibility_binding_material_value,
-    )
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveWorkRequest,
+    responsibility_binding_material_value,
+)
 
-try:
-    from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
-    from chromie_runtime.llm_diagnostics import cognition_text_reference
-    from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
-except ImportError:  # pragma: no cover
-    from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
-    from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
-    from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
+from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
-try:
-    from chromie_contracts.discourse import (
-        DiscourseReferent,
-        DiscourseReferentUpdate,
-        GoalEntityBinding,
-        ResolvedDiscourseReference,
-        stable_referent_id,
-    )
-    from chromie_contracts.goal import (
-        ActiveGoalSnapshot,
-        GoalAssociation,
-        GoalAssociationResolution,
-        stable_goal_operation_id,
-    )
-    from chromie_contracts.resource import (
-        AcquireAndDeliverResource,
-        ResourceDescriptor,
-        ResourceRecipient,
-        ResourceSource,
-    )
-    from chromie_contracts.semantic_task import SemanticGoal, apply_goal_meaning_update, semantic_goal_fingerprint
-    from chromie_contracts.situation import SituationProjection
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.discourse import (
-        DiscourseReferent,
-        DiscourseReferentUpdate,
-        GoalEntityBinding,
-        ResolvedDiscourseReference,
-        stable_referent_id,
-    )
-    from shared.chromie_contracts.goal import (
-        ActiveGoalSnapshot,
-        GoalAssociation,
-        GoalAssociationResolution,
-        stable_goal_operation_id,
-    )
-    from shared.chromie_contracts.resource import (
-        AcquireAndDeliverResource,
-        ResourceDescriptor,
-        ResourceRecipient,
-        ResourceSource,
-    )
-    from shared.chromie_contracts.semantic_task import SemanticGoal, apply_goal_meaning_update, semantic_goal_fingerprint
-    from shared.chromie_contracts.situation import SituationProjection
+from shared.chromie_contracts.discourse import (
+    DiscourseReferent,
+    DiscourseReferentUpdate,
+    GoalEntityBinding,
+    ResolvedDiscourseReference,
+    stable_referent_id,
+)
+from shared.chromie_contracts.goal import (
+    ActiveGoalSnapshot,
+    GoalAssociation,
+    GoalAssociationResolution,
+    stable_goal_operation_id,
+)
+from shared.chromie_contracts.resource import (
+    AcquireAndDeliverResource,
+    ResourceDescriptor,
+    ResourceRecipient,
+    ResourceSource,
+)
+from shared.chromie_contracts.semantic_task import SemanticGoal, apply_goal_meaning_update, semantic_goal_fingerprint
+from shared.chromie_contracts.situation import SituationProjection
 
 logger = logging.getLogger("chromie.agent.goal_association")
 

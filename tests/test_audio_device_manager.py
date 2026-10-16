@@ -558,23 +558,23 @@ class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
         assistant._input_device_change_event = asyncio.Event()
         assistant._input_device_change_event.set()
         assistant._pending_input_params = new_input
-        assistant.mic_queue = asyncio.Queue()
-        assistant.mic_queue.put_nowait(object())
+        assistant.input_turn_lifecycle.mic_queue = asyncio.Queue()
+        assistant.input_turn_lifecycle.mic_queue.put_nowait(object())
         assistant.vad = _FakeVAD()
-        assistant._vad_leftover = b"partial"
-        assistant._vad_segment_started_during_playback = True
-        assistant._vad_segment_playback_generation = 7
+        assistant.input_turn_lifecycle.vad_leftover = b"partial"
+        assistant.input_turn_lifecycle.vad_segment_started_during_playback = True
+        assistant.input_turn_lifecycle.vad_segment_playback_generation = 7
 
         changed = await apply_pending_input_device_change(assistant)
 
         self.assertTrue(changed)
         self.assertEqual(assistant.input_device, 8)
         self.assertEqual(assistant.input_rate, 44100)
-        self.assertTrue(assistant.mic_queue.empty())
+        self.assertTrue(assistant.input_turn_lifecycle.mic_queue.empty())
         self.assertEqual(assistant.vad.reset_count, 1)
-        self.assertEqual(assistant._vad_leftover, b"")
-        self.assertFalse(assistant._vad_segment_started_during_playback)
-        self.assertIsNone(assistant._vad_segment_playback_generation)
+        self.assertEqual(assistant.input_turn_lifecycle.vad_leftover, b"")
+        self.assertFalse(assistant.input_turn_lifecycle.vad_segment_started_during_playback)
+        self.assertIsNone(assistant.input_turn_lifecycle.vad_segment_playback_generation)
 
     async def test_output_switch_closes_old_stream_before_next_playback(self) -> None:
         new_output = self._params(
@@ -585,10 +585,10 @@ class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
         stream = _FakeOutputStream()
         assistant = _new_voice_assistant()
         assistant._audio_device_refresh_lock = asyncio.Lock()
-        assistant.output_write_lock = asyncio.Lock()
-        assistant.output_stream_lock = asyncio.Lock()
+        assistant.playback_delivery.output_write_lock = asyncio.Lock()
+        assistant.playback_delivery.output_stream_lock = asyncio.Lock()
         assistant._pending_output_params = new_output
-        assistant.output_stream = stream
+        assistant.playback_delivery.output_stream = stream
 
         with mock.patch(
             "orchestrator.runtime.audio_device_lifecycle.asyncio.to_thread",
@@ -599,7 +599,7 @@ class OrchestratorAudioDeviceFollowTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(changed)
         self.assertTrue(stream.stopped)
         self.assertTrue(stream.closed)
-        self.assertIsNone(assistant.output_stream)
+        self.assertIsNone(assistant.playback_delivery.output_stream)
         self.assertEqual(assistant.output_device, 9)
         self.assertEqual(assistant.output_params, new_output)
 

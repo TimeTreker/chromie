@@ -85,10 +85,12 @@ OLLAMA_MODEL
 AGENT_USER_MEANING_INTERPRETER_MODEL
 AGENT_GOAL_ASSOCIATION_MODEL
 AGENT_FAST_PLANNER_MODEL
-AGENT_DEEP_PLANNER_MODEL
-AGENT_TASK_CONTINUITY_MODEL
-AGENT_SOCIAL_ATTENTION_MODEL
+AGENT_DELIBERATIVE_MODEL
+AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL
 ```
+
+`scripts/generate_runtime_env.py` (`MODEL_PLAN_KEYS`) rejects a profile that
+leaves any of these empty.
 
 Startup warms every active model in that plan and stops immediately if a model
 is missing. After containers start, `scripts/verify_runtime_profile.sh` checks
@@ -122,22 +124,28 @@ qualification watchdog merely because that profile was auto-detected.
 
 | Profile | Intended class | Quality model | Fast model | TTS context |
 |---|---|---|---|---:|
-| `default` | Unknown/conservative | `gemma4:e2b` | `qwen3:4b` | 2048 |
+| `default` | Unknown/conservative | `gemma4:e2b` | `qwen3:4b` (UMI: `qwen3.5:4b`) | 2048 |
 | `nvidia_ada` | RTX 4080/4070 class | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `nvidia_blackwell` | RTX 5080/5070 and laptop Blackwell | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `rtx4090` | Desktop RTX 4090 | `gemma4:e2b` | `qwen3:4b` | 4096 |
-| `rtx4090_laptop` | RTX 4090 Laptop GPU | `qwen3.5:4b` for all LLM roles | `qwen3.5:4b` | 4096 |
-| `rtx5090` | Desktop RTX 5090 | `gemma4:12b` | `qwen3:4b` | 8192 |
+| `rtx4090_laptop` | RTX 4090 Laptop GPU | `chromie-qwen35-4b` (SGLang, Qwen3.5-4B AWQ) for all LLM roles | same | 4096 |
+| `rtx5090` | Desktop RTX 5090 | `chromie-gemma4-12b` (SGLang, Gemma4-12B FP8) for all LLM roles | same | 8192 |
 | `jetson_orin_nano_super` | 8 GB shared-memory Orin edge target | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_agx_orin` | AGX Orin | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_thor` | AGX Thor placeholder profile | `gemma4:12b` | `qwen3:4b` | 4096 |
 
-The quality model is normally used by Goal Association and the deliberative roles
-(`AGENT_DEEP_PLANNER_MODEL`: Social Cognition's deep client, Deep UMI, Reflection). The fast
-model is normally used by User Meaning Interpretation, the Planner (including terminal
-Evidence re-entry), Task Continuity, and Social Attention unless the profile
-explicitly states otherwise. RTX 5090 uses `gemma4:12b`; RTX 4090 Laptop assigns
-all of those roles to one `qwen3.5:4b` SGLang engine with three bounded running-request slots.
+On the Ollama profiles the quality model is `AGENT_MODEL` and the deliberative
+roles (`AGENT_DELIBERATIVE_MODEL`: Social Cognition's deep client, Deep UMI,
+Reflection). The fast model is used by User Meaning Interpretation, Cognitive
+Gateway attention, Goal Association and the Planner (including terminal Evidence
+re-entry). RTX 5090 and RTX 4090 Laptop assign every role to one SGLang engine.
+
+With the default CosyVoice TTS backend, `TTS_COSYVOICE_COMPACT_COGNITION=1`
+(the `.env.common` default) makes the launchers replace every role model above
+with `TTS_COSYVOICE_OLLAMA_MODEL` (`qwen3:4b`) so one Ollama model stays
+resident next to CosyVoice. Only `rtx4090_laptop` and `rtx5090` set it to `0`;
+on every other profile the quality/fast split applies only with
+`--tts-backend oute|qwen3` or `TTS_COSYVOICE_COMPACT_COGNITION=0`.
 That assignment is a maintained profile configuration, not a target-quality
 claim. Camera frames are not yet part of the runtime input contract.
 Input preflight
@@ -192,6 +200,3 @@ cat .chromie/runtime_profile.json | python -m json.tool
   actual toolchain.
 - Jetson profiles do not prove that the current base images work on ARM64.
 - A detected profile is configuration evidence, not target acceptance evidence.
-
-The old `PRESET_RTX4090_LAPTOP.txt` file is only a legacy pointer; profile
-selection is dynamic and automatic.

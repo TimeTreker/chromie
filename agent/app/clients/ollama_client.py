@@ -16,32 +16,18 @@ from ..settings import AgentServiceSettings
 
 import httpx
 
-try:
-    from chromie_runtime.llm_diagnostics import (
-        PrefixCacheTracker,
-        log_llm_call_evidence,
-        ollama_completion_diagnostics,
-        ollama_prompt_preflight_diagnostics,
-    )
-    from chromie_runtime.log_colors import colorize_for_cli
-    from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
-    from chromie_runtime.ollama_non_thinking import (
-        OllamaNonThinkingViolation,
-        enforce_non_thinking_ollama_response,
-    )
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_runtime.llm_diagnostics import (
-        PrefixCacheTracker,
-        log_llm_call_evidence,
-        ollama_completion_diagnostics,
-        ollama_prompt_preflight_diagnostics,
-    )
-    from shared.chromie_runtime.log_colors import colorize_for_cli
-    from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
-    from shared.chromie_runtime.ollama_non_thinking import (
-        OllamaNonThinkingViolation,
-        enforce_non_thinking_ollama_response,
-    )
+from shared.chromie_runtime.llm_diagnostics import (
+    PrefixCacheTracker,
+    log_llm_call_evidence,
+    ollama_completion_diagnostics,
+    ollama_prompt_preflight_diagnostics,
+)
+from shared.chromie_runtime.log_colors import colorize_for_cli
+from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+from shared.chromie_runtime.ollama_non_thinking import (
+    OllamaNonThinkingViolation,
+    enforce_non_thinking_ollama_response,
+)
 
 
 logger = logging.getLogger("chromie.agent.ollama")

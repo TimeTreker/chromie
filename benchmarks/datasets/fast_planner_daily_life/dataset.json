@@ -153,7 +153,7 @@
         "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md sections 8-12 and 15",
         "docs/LLM_PROMPT_QUALIFICATION_METHOD.md section 7",
         "docs/AGENT_SKILLS_ARCHITECTURE.md",
-        "docs/work_dag.md",
+        "docs/WORK_DAG.md",
         "docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md",
         "docs/RESOURCE_ACQUISITION_AND_DELIVERY.md",
         "docs/EXECUTION_LANES_AND_COORDINATION.md",
@@ -321,7 +321,7 @@
         "obligation": "Author the required Work leaves, Goal bindings, dependencies, sequential order, requested concurrency, and bounded policy using declared resource and compatibility facts.",
         "boundary_not_owned": "Runtime validates and schedules the authored topology; Planner does not perform resource arbitration or provider-internal decomposition.",
         "authority_refs": [
-          "docs/work_dag.md Authority boundary",
+          "docs/WORK_DAG.md Authority boundary",
           "docs/EXECUTION_LANES_AND_COORDINATION.md Planner and Runtime boundaries",
           "agent/app/planner_model_contract.py PlannerModelStep"
         ]
@@ -391,7 +391,7 @@
         "obligation": "Decide whether supplied retained Work remains valid or needs semantic revision while preserving immutable completed Work and never replaying an already completed identical Activity.",
         "boundary_not_owned": "Host and DAGEngine validate revision monotonicity, history integrity, and stale or duplicate dispatch.",
         "authority_refs": [
-          "docs/work_dag.md Revision and continuity contract",
+          "docs/WORK_DAG.md Revision and continuity contract",
           "docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md Contract",
           "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md section 8.5"
         ]

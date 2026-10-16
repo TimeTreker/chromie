@@ -102,7 +102,7 @@ surroundings. Examples:
 - Activity-attached Social Attention choice;
 - MindProfile and Social Interaction Style prompt projection;
 - capability retrieval and model-facing catalog projection;
-- Host-bound terminal Evidence and Fast Planner re-entry.
+- Host-bound terminal Evidence and Planner re-entry.
 
 Module benchmarks may replay recorded model output to isolate validators, but
 model-quality runs must also support a live configured model.
@@ -113,10 +113,10 @@ Exercise meaningful component chains without requiring the entire deployed
 system. Examples:
 
 ```text
-MindProfile -> Planner Communicative Activity -> Social Attention proposal
+MindProfile -> Social Cognition Communicative Activity -> Social Attention proposal
 Cognitive Gateway -> Goal-Driven Cognitive Core -> Planner
 Capability catalog -> Planner -> Trusted Capability Runtime validation
-Tool result -> Host Evidence binding -> Fast Planner -> truthful final speech
+Tool result -> Host Evidence binding -> Planner -> Social Cognition -> truthful final speech
 ```
 
 ### 4.3 End-to-end benchmarks
@@ -128,7 +128,7 @@ text or audio
 -> Cognitive Gateway
 -> Goal-Driven Cognitive Core
 -> tool and/or named-skill execution
--> Planner-owned Communicative Activity
+-> Social Cognition Communicative Activity
 -> speech and Activity-attached optional auxiliary behavior
 -> terminal evidence
 ```
@@ -150,7 +150,7 @@ timeouts, provider degradation, multi-user context, and resource pressure.
 Stress benchmarks report rates and distributions instead of pretending one run
 proves stability.
 
-The implemented workload layer reuses unchanged normalized scenarios and Phase 5
+The implemented workload layer reuses unchanged normalized scenarios and the
 E2E evidence profiles. It records sample/session counts, seed, concurrency,
 participant assignment, descriptive harness conditions, model/Prompt/MindProfile
 and revision identity, evidence completeness, latency, violation families, and
@@ -780,7 +780,7 @@ must be inspected or sanitized before it leaves the operator's machine.
 The maintained 16-case daily-life generated-voice cohort references the
 canonical daily-conversation scenarios directly and can collect this capsule
 once after the whole run. Its executable judge-diagnose-fix-rerun method is
-owned by [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-daily-life-generated-voice-repair-loop).
+owned by [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#73-daily-life-generated-voice-repair-loop).
 
 Coding agents must follow the executable
 [LLM-versus-workflow root-cause method](../CONTRIBUTING.md#llm-versus-workflow-root-cause-method)

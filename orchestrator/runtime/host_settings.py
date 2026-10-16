@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from shared.chromie_contracts.mind import active_customer_mind_profile_path
+from shared.chromie_runtime.env_values import InvalidBooleanSetting, parse_bool
 
 
 class HostConfigurationError(ValueError):
@@ -29,17 +30,10 @@ def _text(values: Mapping[str, str], name: str, default: str = "") -> str:
 
 
 def _bool(values: Mapping[str, str], name: str, default: bool) -> bool:
-    raw = values.get(name)
-    if raw is None:
-        return default
-    normalized = str(raw).strip().casefold()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    raise HostConfigurationError(
-        f"{name} must be a boolean (0/1, false/true, no/yes, off/on); got {raw!r}"
-    )
+    try:
+        return parse_bool(values.get(name), name=name, default=default)
+    except InvalidBooleanSetting as exc:
+        raise HostConfigurationError(str(exc)) from exc
 
 
 def _int(
@@ -271,7 +265,7 @@ class CognitionSettings:
     enable_soridormi_capabilities: bool
     fast_planner_mode: str
     fast_planner_timeout_ms: int
-    deep_planner_timeout_ms: int
+    deliberative_timeout_ms: int
     goal_association_mode: str
     goal_association_timeout_ms: int
     runtime_mode: str
@@ -588,8 +582,8 @@ class HostSettingsSnapshot:
                 fast_planner_timeout_ms=_int(
                     values, "ORCH_FAST_PLANNER_TIMEOUT_MS", 65000, minimum=100
                 ),
-                deep_planner_timeout_ms=_int(
-                    values, "ORCH_DEEP_PLANNER_TIMEOUT_MS", 125000, minimum=100
+                deliberative_timeout_ms=_int(
+                    values, "ORCH_DELIBERATIVE_TIMEOUT_MS", 125000, minimum=100
                 ),
                 goal_association_mode=_choice(
                     values,

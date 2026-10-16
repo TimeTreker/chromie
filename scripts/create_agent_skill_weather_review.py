@@ -4,31 +4,20 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+try:
+    from evidence_io import read_json_object as _read_json, sha256_file as _sha256
+except ImportError:  # imported as scripts.create_agent_skill_weather_review
+    from scripts.evidence_io import read_json_object as _read_json, sha256_file as _sha256
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "agent_skill_weather_qualification_v1.json"
 )
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return payload
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def create(args: argparse.Namespace) -> dict[str, Any]:

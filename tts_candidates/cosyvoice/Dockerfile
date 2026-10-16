@@ -1,7 +1,8 @@
 ARG CUDA_IMAGE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu22.04
 FROM ${CUDA_IMAGE}
 
-ARG COSYVOICE3_SOURCE_REVISION=074ca6dc9e80a2f424f1f74b48bdd7d3fea531cc
+# Supplied by docker-compose.yml from .env.common (locked in release/model-lock.json).
+ARG COSYVOICE3_SOURCE_REVISION
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 ARG TTS_CUDA_ARCH=89
 ARG CHROMIE_BUILD_PROFILE=unknown
@@ -24,13 +25,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsndfile1 \
     libsox-dev \
     python3 \
-    python3-dev \
     python3-pip \
-    python3-venv \
     sox \
     && rm -rf /var/lib/apt/lists/*
 
-RUN python3 -m venv /opt/venv
+# Ubuntu 22.04 ships Python 3.10, below the repository's declared 3.11 floor
+# (shared/pyproject.toml, scripts/check_python_runtime.py) for the shared tts/*
+# modules this image runs. Bootstrap a pinned uv and build the venv on a
+# managed CPython 3.11.
+ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
+RUN python3 -m pip install --no-cache-dir uv==0.12.20 && \
+    uv python install 3.11 && \
+    uv venv --seed --python 3.11 /opt/venv && \
+    /opt/venv/bin/python -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version"
 ENV PATH=/opt/venv/bin:$PATH
 RUN pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1
 

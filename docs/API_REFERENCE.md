@@ -107,8 +107,8 @@ text, language, and bounded host engagement evidence. Suppression is limited to 
 unresolved unclear, malformed, unavailable or failed review admits the turn.
 Charter principles 30–31 prohibit a second same-authority semantic classification.
 Current implementation nevertheless uses surface cues and one model repair on
-some contradictions; this is an open conformance defect documented in the
-[project audit](../ARCHITECTURE_AUDIT.md), not an allowed API repair contract.
+some contradictions; this is an open conformance defect tracked in
+[Status](STATUS.md#current-open-work), not an allowed API repair contract.
 
 `POST /cognitive-core/interpret` accepts only a schema-valid admitted
 `CoreTurnRequest`. Bare text, a suppressed envelope, mismatched context identity,
@@ -488,7 +488,7 @@ delivery to Goal completion. Progress and silence cannot complete that Goal.
 Optional progress has no playback-start barrier for task Work; required input,
 confirmation and before-action ordering retain their barriers. The ordinary turn, confirmation and result re-entry paths use this join.
 
-`POST /reflection` reuses the deliberative model (`AGENT_DEEP_PLANNER_MODEL`, historical name) only for a trusted `CognitiveOpportunity` whose `recommended_cognition` is `slow`. The Host supplies the exact affected Goal IDs and evidence references and binds those identities into the returned `ReflectionResolution`; the model cannot widen them. Reflection is optional post-outcome cognition. The Host starts it only after eligible result planning has settled, under one bounded existing background task. Requests carry the privacy-filtered owner-approved Mind. Replan/clarification/correction proposals are retained as diagnostics without current Planner re-entry; only actually applied bounded Memory counts as future adaptation. **Current endpoint semantics remain open-Responsibility-only:** applied actions require runtime-bound trusted evidence and a completed outcome is terminal to this API path. Reflection may propose future replan, clarification, a future user correction candidate, or bounded `task`/`session` Memory candidates. It cannot authorize effects, reopen the current turn, rewrite `ExecutionOutcome`/Evidence/history, change Stable Mind, or create provider capabilities. A Memory proposal is not durable by itself: the Host promotes only matching repeated-evidence candidates to ephemeral task/session Memory, while durable profile Memory retains the existing explicit-current-turn-consent boundary. The accepted architecture now specifies a later contract split in which terminal evidence may support bounded `experience`/`calibration` without reopening Responsibility; that design is not implemented by this endpoint yet.
+`POST /reflection` reuses the deliberative model (`AGENT_DELIBERATIVE_MODEL`) only for a trusted `CognitiveOpportunity` whose `recommended_cognition` is `slow`. The Host supplies the exact affected Goal IDs and evidence references and binds those identities into the returned `ReflectionResolution`; the model cannot widen them. Reflection is optional post-outcome cognition. The Host starts it only after eligible result planning has settled, under one bounded existing background task. Requests carry the privacy-filtered owner-approved Mind. Replan/clarification/correction proposals are retained as diagnostics without current Planner re-entry; only actually applied bounded Memory counts as future adaptation. **Current endpoint semantics remain open-Responsibility-only:** applied actions require runtime-bound trusted evidence and a completed outcome is terminal to this API path. Reflection may propose future replan, clarification, a future user correction candidate, or bounded `task`/`session` Memory candidates. It cannot authorize effects, reopen the current turn, rewrite `ExecutionOutcome`/Evidence/history, change Stable Mind, or create provider capabilities. A Memory proposal is not durable by itself: the Host promotes only matching repeated-evidence candidates to ephemeral task/session Memory, while durable profile Memory retains the existing explicit-current-turn-consent boundary. The accepted architecture now specifies a later contract split in which terminal evidence may support bounded `experience`/`calibration` without reopening Responsibility; that design is not implemented by this endpoint yet.
 
 Only `/social-cognition` exposes optional `auxiliary_activities[]`, nested under its
 exact communicative act. Requested gestures remain ordinary Planner Work. SC receives
@@ -523,7 +523,7 @@ unchanged to Planner. A `walk_velocity` provider can declare human
 `speed -> vx_mps` and `duration -> duration_s`; applicability depends on the exact
 live catalog, not a historical declaration. An explicit numeric request must
 not be replaced by a provider default. The Host does not invent or repair the
-semantic transformation. Both Fast advance and canonical Fast/Deep validation
+semantic transformation. Both Fast advance and canonical Planner validation
 require `minimum_arguments` from every applicable realization contract whenever
 an owned Responsibility/Goal explicitly binds its `source_entity_type`, including
 optional and defaulted inputs. Other arguments and sibling Activities cannot
@@ -531,7 +531,7 @@ witness that presence. The provider declares gaze `duration -> duration_s` as we
 omitting it cannot silently select the four-second default. This is a presence
 check; interpretation and unit conversion remain Planner-owned.
 
-Canonical Fast/Deep also preserve repetition identity when projecting duplicate
+Canonical Planner validation also preserves repetition identity when projecting duplicate
 parameter provenance. A typed count may support only an exact declared argument
 name, a count-typed input, or a provider-declared count realization. Equal numeric
 values alone cannot make a count evidence for duration, yaw, or another quantity.

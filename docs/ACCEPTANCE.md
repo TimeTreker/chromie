@@ -576,9 +576,10 @@ tool/conversation lane discipline, deterministic safety controls, and evidence
 claim discipline, plus multi-goal daily-life planning. The runner writes evidence summaries under
 `.chromie/acceptance/general-ability/` unless `--no-write` is supplied.
 
-The everyday live cohort `scenarios/everyday` (owner, 2026-10-15) is the default live acceptance set: 15
-`must_pass` smoke cases, 50 `core` and 5 `challenge` over 16 ability classes, every utterance an everyday
-sentence. Its smoke stage runs first; a hard smoke failure stops core and challenge (no `--keep-going`).
+The everyday live cohort `scenarios/everyday` (owner, 2026-10-15) is the current target live acceptance set: 15
+`must_pass` smoke cases, 50 `core` and 5 `challenge` (70 total), every utterance an everyday
+sentence. Select it with `--scenario-root scenarios/everyday`; the script default remains
+`scenarios/general_ability`. Its smoke stage runs first; a hard smoke failure stops core and challenge (no `--keep-going`).
 
 The general-ability live cohort has three ordered stages: 55 `must_pass`, 16 `core`, and 8
 `challenge` cases (79 total). The owner removed the spelling-error probe

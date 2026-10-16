@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-try:
-    from .drivers.mock_robot import MockRobotDriver
-    from .schema import ActionCommand, ActionResult, ActionStatus
-except ImportError:  # pragma: no cover - direct script launch
-    from drivers.mock_robot import MockRobotDriver
-    from schema import ActionCommand, ActionResult, ActionStatus
+from .drivers.mock_robot import MockRobotDriver
+from .schema import ActionCommand, ActionResult, ActionStatus
 
 
 class HardwareService:

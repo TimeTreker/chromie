@@ -763,7 +763,7 @@ async def resolve_goal_free_situation_response(
     relational_memory = host.conversation_state.activated_memory_context(
         activation_texts=situation_activation_texts,
         activation_subject_refs=list(opportunity.subject_refs),
-        # PSM-4 never infers an audience in Host code.  A source-specific trusted
+        # Host code never infers an audience.  A source-specific trusted
         # principal/presence adapter may supply the complete current audience through
         # Situation; absent or partial audience keeps gated Memory hidden.
         audience_refs=list(observation.projection.audience_refs),
@@ -846,7 +846,7 @@ async def resolve_goal_free_situation_response(
         request=request,
         timeout_ms=max(
             host.cognitive_runtime_policy.fast_planner_timeout_ms,
-            host.cognitive_runtime_policy.deep_planner_timeout_ms,
+            host.cognitive_runtime_policy.deliberative_timeout_ms,
         ),
     )
     record_session_workflow_stage(

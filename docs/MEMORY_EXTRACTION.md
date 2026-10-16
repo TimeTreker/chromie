@@ -6,7 +6,7 @@ Implemented. The host Orchestrator has bounded `MemoryEntry`, `MemoryStore`,
 `MemoryExtractor`, and `MemoryPromptBuilder` support. `ConversationStateManager`
 exposes `memory_summary` and `extracted_memory`, records typed task/context and
 trusted Runtime outcome memory, and keeps explicitly consent-bound profile Memory
-in protected owner-local storage. PSM-2 extends the same entry with bounded relational
+in protected owner-local storage. Relational Memory extends the same entry with bounded relational
 provenance (`relation`, `subject_refs`, `source_person_refs`, `audience_refs`, and
 `disclosure_scope`) without adding a SocialGraph or relationship-memory service. Prompt
 selection is current-context-conditioned: the latest user turn, open Goal/task context,
@@ -223,13 +223,13 @@ not the same fact. Until source fields for that boundary exist, broad durable re
 private third-party social information must fail conservatively rather than assume family
 access.
 
-The **first PSM-2 source slice is implemented**. `MemoryEntry` now carries bounded
+The **first relational Memory source slice is implemented**. `MemoryEntry` now carries bounded
 `relation`, `subject_refs`, `source_person_refs`, `audience_refs`, and
 `disclosure_scope`. Structured relational entries with no disclosure decision default to
 `unknown` and are retained but excluded from ordinary model prompts. `public` entries may
 be projected normally; `shared_with_audience` entries are visible only when the caller
 supplies a complete current audience contained by the stored allowed audience. `private`
-and `unknown` remain non-projectable. Legacy non-social entries retain their pre-PSM-2
+and `unknown` remain non-projectable. Legacy non-social entries retain their earlier
 prompt behavior.
 
 Exact Situation `subject_refs` now participate in deterministic Memory activation, so a
@@ -248,7 +248,7 @@ a permissive disclosure scope, and that method explicitly assumes a source-speci
 has already established principal/source/audience policy; it does not perform recognition or
 authentication itself. Restrictive `private|unknown` labels may always fail closed.
 
-PSM-2 intentionally **does not enable durable relational/profile retention**. Structured
+Relational Memory intentionally **does not enable durable relational/profile retention**. Structured
 relational entries are rejected from the existing owner-profile durable store even when its
 ordinary explicit-consent fields are present, because third-party principal identity,
 privacy, deletion, and consent policy need separate qualification. This is conservative
@@ -256,11 +256,11 @@ retention policy, not a claim that public relationships can never be durable.
 
 ## Cognitive relationship experience
 
-PSM-7 permits the same Goal-free Cognitive Core to propose a small `shared_experience` entry grounded in the current trusted Situation. Runtime binds subject/source provenance and stores it only as private, ephemeral session Memory. The proposal records an episode; it does not promote a person to friend/family/trusted, grant disclosure, or authorize effects. Repeated interactions therefore accumulate evidence for later cognition rather than crossing hard-coded relationship thresholds.
+Shared-experience Memory lets the same Goal-free Cognitive Core to propose a small `shared_experience` entry grounded in the current trusted Situation. Runtime binds subject/source provenance and stores it only as private, ephemeral session Memory. The proposal records an episode; it does not promote a person to friend/family/trusted, grant disclosure, or authorize effects. Repeated interactions therefore accumulate evidence for later cognition rather than crossing hard-coded relationship thresholds.
 
 ## Short-lived self context
 
-PSM-9 reuses Memory rather than adding a Concern/Intention manager. Goal-free cognition may retain a bounded `self_concern` or `interest` about Chromie's own current life, with exact Situation source refs and expiry. The Memory is visible as `self_context` to later cognition but has no Goal, timer, Work, effect, or authorization semantics. This supports continuity such as wanting to return to a drawing without creating an autonomous background loop.
+Self-directed concern Memory reuses Memory rather than adding a Concern/Intention manager. Goal-free cognition may retain a bounded `self_concern` or `interest` about Chromie's own current life, with exact Situation source refs and expiry. The Memory is visible as `self_context` to later cognition but has no Goal, timer, Work, effect, or authorization semantics. This supports continuity such as wanting to return to a drawing without creating an autonomous background loop.
 
 ## Prompt Builder
 

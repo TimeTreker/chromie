@@ -53,7 +53,7 @@ physical robot evidence are optional and do not affect its result.
 
 ### `current_revision_qualification`
 
-This is the Phase 6 audit-remediation qualification profile. It requires every report
+This is the current-revision qualification profile. It requires every report
 to bind to the same clean committed Chromie revision and adds three tracks to the
 existing source-bound development evidence:
 
@@ -104,7 +104,7 @@ python scripts/run_target_evidence_closure.py init \
   --evidence-root "$EVIDENCE_ROOT"
 ```
 
-For the Phase 6 current-revision closure use:
+For the current-revision closure use:
 
 ```bash
 python scripts/run_target_evidence_closure.py init \
@@ -113,7 +113,7 @@ python scripts/run_target_evidence_closure.py init \
   --evidence-root "$EVIDENCE_ROOT"
 ```
 
-Then capture the exact deployed runtime identity and collect the three Phase 6-specific
+Then capture the exact deployed runtime identity and collect the three current-revision
 tracks before (or alongside) the existing Core/weather/Social-Attention/LAN tracks:
 
 ```bash
@@ -163,13 +163,13 @@ the earlier revision.
 The `status` command may still inspect an existing bundle from another checkout,
 but that does not make its reports eligible for the current revision.
 
-## Phase 6 source and interaction evidence
+## Current-revision source and interaction evidence
 
 The current-revision profile treats the source report as a retained track rather than
 assuming that tests run earlier in a shell still describe the deployed commit.
 `collect-source-qualification` writes its report directly into the closure. The source
 contract includes the ordinary repository/static gates plus the semantic-authority audit,
-focused Phase 1-5 regression set, all retained Level-A general-ability scenarios, and the
+focused audit-remediation regression set, all retained Level-A general-ability scenarios, and the
 local deterministic provider fault matrix. The full maintained suite remains required; a
 missing pinned tool/dependency blocks rather than passes the source track.
 
@@ -291,8 +291,7 @@ python scripts/run_target_evidence_closure.py collect-social \
   --effective-model social_cognition_deep=<resolved-model>
 ```
 
-`social_cognition_deep` names the deliberative model (`AGENT_DEEP_PLANNER_MODEL`, a
-historical name); the Deep Planner was retired on 2026-10-11.
+`social_cognition_deep` names the deliberative model (`AGENT_DELIBERATIVE_MODEL`).
 
 The collector derives the complete mode/style set from the reviewed dataset,
 runs each slice independently, and assembles the qualification report. Review

@@ -27,13 +27,6 @@
   "schema_version": 2,
   "sglang": {
     "candidate_served_models": {
-      "chromie-qwen35-9b-sglang": {
-        "source_model_id": "Qwen/Qwen3.5-9B",
-        "revision": "c202236235762e1c871ad0ccb60c8ee5ba337b9a",
-        "weight_format": "safetensors",
-        "quantization": "none",
-        "dtype": "bfloat16"
-      },
       "chromie-gemma4-12b": {
         "source_model_id": "google/gemma-4-12B-it",
         "revision": "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7",
@@ -41,7 +34,7 @@
         "quantization": "fp8_online",
         "dtype": "bfloat16",
         "source_safetensors_sha256": "5a84cb313260ac447237b890387116dfa8682e49a6b44bc585ae8353abbff18d",
-        "runtime_image": "chromie-sglang:gemma4-fp8",
+        "runtime_image": "chromie-sglang:${CHROMIE_IMAGE_TAG}",
         "runtime_build": "llm/sglang/Dockerfile"
       },
       "chromie-qwen35-4b": {
@@ -51,7 +44,7 @@
         "quantization": "compressed_tensors_w4a16_awq",
         "dtype": "bfloat16",
         "source_safetensors_sha256": "902477edf53bc6768bd1f212dd1866856fd5a0627def06887780c95900ffb013",
-        "runtime_image": "chromie-sglang:qwen35-4b-awq",
+        "runtime_image": "chromie-sglang:${CHROMIE_IMAGE_TAG}",
         "runtime_build": "llm/sglang/Dockerfile"
       }
     },
@@ -71,9 +64,9 @@
         "revision": "29e01c4e8d000f4bcd70751be16fa94bf3d85a18"
       },
       "voice_reference": {
-        "path": ".chromie/private/tts-voice",
+        "path": "assets/tts/voices/manifest.json",
         "required": true,
-        "revision_source": "reference.json audio_sha256"
+        "revision_source": "tts/voice_catalog.py validate_voice_catalog().revision over the manifest and every speaker reference.json"
       }
     },
     "alternatives": {

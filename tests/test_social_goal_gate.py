@@ -27,7 +27,7 @@ from shared.chromie_contracts.social_cognition import (
     SocialCognitionRequest,
     SocialCognitionResolution,
 )
-from tests.test_cognitive_runtime_pr7 import FakeRuntime, admitted_core, blink_definition
+from tests.cognitive_runtime_test_support import FakeRuntime, admitted_core, blink_definition
 
 
 def _speech(ref: str = "r1") -> CognitiveResponsibilityProposal:

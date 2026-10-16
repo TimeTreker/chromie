@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 import shutil
@@ -15,6 +14,11 @@ except ModuleNotFoundError:  # Python 3.10 host tooling fallback.
 import urllib.request
 from pathlib import Path
 from typing import Any
+
+try:
+    from evidence_io import sha256_file as sha256
+except ImportError:  # imported as scripts.release_provenance
+    from scripts.evidence_io import sha256_file as sha256
 
 REQUIREMENT_FILES = (
     "agent/requirements.txt",
@@ -30,14 +34,6 @@ PROJECT_IMAGE_NAMES = (
     "chromie-agent",
 )
 MUTABLE_TAGS = {"latest", "main", "master", "stable", "edge"}
-
-
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def parse_env(path: Path) -> dict[str, str]:
@@ -233,7 +229,6 @@ def ollama_models(url: str, expected: list[str]) -> list[dict[str, Any]]:
     return result
 
 
-
 def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str]:
     errors: list[str] = []
     path = root / "release" / "model-lock.json"
@@ -320,8 +315,7 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
                 "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
                 "AGENT_GOAL_ASSOCIATION_MODEL",
                 "AGENT_FAST_PLANNER_MODEL",
-                "AGENT_DEEP_PLANNER_MODEL",
-                "AGENT_TASK_CONTINUITY_MODEL",
+                "AGENT_DELIBERATIVE_MODEL",
                 "AGENT_SKILL_SELECTION_MODEL",
             )
             configured_sglang_models = {
@@ -376,7 +370,6 @@ def collect_provenance(
         "tts_candidates/cosyvoice/provider_impl.py",
         "tts_candidates/qwen3/Dockerfile",
         "tts_candidates/qwen3/provider_impl.py",
-        "tts_candidates/model-lock.json",
         "release/model-lock.json",
     ):
         path = root / relative

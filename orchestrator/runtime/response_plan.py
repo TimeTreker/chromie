@@ -9,10 +9,7 @@ from shared.chromie_contracts.plan import validate_communicative_activity_identi
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
 from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
 
-try:
-    from chromie_contracts.semantic_task import ResponsePlan, ResponseStage
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
+from shared.chromie_contracts.semantic_task import ResponsePlan, ResponseStage
 
 
 _PROCESS_COMMITMENTS = {"none", "heard", "evaluating"}

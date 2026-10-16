@@ -27,7 +27,6 @@ from scripts.interaction_text_mujoco_check import (  # noqa: E402
 ARTIFACT_ROOT_ENV = "CHROMIE_DAILY_BENCHMARK_ARTIFACT_ROOT"
 QUALITY_HEALTH_FIELDS = (
     "model",
-    "deep_planner_model",
     "goal_association_model",
 )
 FAST_HEALTH_FIELDS = (

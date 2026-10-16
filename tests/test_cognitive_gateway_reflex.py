@@ -404,10 +404,10 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         ) -> None:
             events.append((message % args).split(":", 1)[0])
 
-        assistant.active_turn_task = None
-        assistant.active_reflex_task = None
-        assistant._pending_turn_after_reflex = deque()
-        assistant.concurrent_protective_reflex_tasks = set()
+        assistant.input_turn_lifecycle.active_turn_task = None
+        assistant.input_turn_lifecycle.active_reflex_task = None
+        assistant.input_turn_lifecycle.pending_turn_after_reflex = deque()
+        assistant.input_turn_lifecycle.concurrent_protective_reflex_tasks = set()
         assistant.active_interaction_task = None
         assistant.active_interaction_id = "foreground-interaction"
         assistant.active_interaction_tasks = {}
@@ -415,15 +415,15 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.confirmation_dialogue = ConfirmationDialogue()
         assistant.conversation_state = _ConversationState()
         assistant.sessions = _Sessions()
-        assistant.playback_generation = 0
-        assistant.playback_start_waiters = {}
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.playback_start_waiters = {}
         assistant.active_llm_task = None
-        assistant.active_synthesis_tasks = set()
-        assistant.pending_audio = {}
-        assistant.cancelled_playback_orders = set()
-        assistant.playback_queue = asyncio.Queue()
-        assistant.next_playback_order = 0
-        assistant.synthesis_order = 0
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.pending_audio = {}
+        assistant.playback_delivery.cancelled_playback_orders = set()
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.next_playback_order = 0
+        assistant.playback_delivery.synthesis_order = 0
         assistant.output_abort_tasks = set()
         playback_transport_for(assistant).abort_output_stream = MethodType(
             abort_output_stream,
@@ -618,7 +618,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         assistant.active_interaction_task = None
         assistant.active_interaction_id = "interaction-stop"
-        assistant.playback_generation = 7
+        assistant.playback_delivery.playback_generation = 7
         assistant.interaction_runtime = _Runtime()
         assistant.agent_client = _AgentClient()
         assistant.sessions = _Sessions()
@@ -913,17 +913,17 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.active_interaction_id = None
         assistant.active_interaction_task = None
         assistant.active_interaction_tasks = {}
-        assistant.playback_generation = 0
-        assistant.playback_start_waiters = {}
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.playback_start_waiters = {}
         assistant.active_llm_task = None
-        assistant.active_turn_task = None
-        assistant.active_reflex_task = None
-        assistant.active_synthesis_tasks = set()
-        assistant.pending_audio = {}
-        assistant.cancelled_playback_orders = set()
-        assistant.playback_queue = asyncio.Queue()
-        assistant.next_playback_order = 0
-        assistant.synthesis_order = 0
+        assistant.input_turn_lifecycle.active_turn_task = None
+        assistant.input_turn_lifecycle.active_reflex_task = None
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.pending_audio = {}
+        assistant.playback_delivery.cancelled_playback_orders = set()
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.next_playback_order = 0
+        assistant.playback_delivery.synthesis_order = 0
         assistant.output_abort_tasks = set()
         playback_transport_for(assistant).abort_output_stream = MethodType(
             abort_output_stream,
@@ -1265,7 +1265,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         )
 
         input_session_runtime_for(assistant)._launch_routed_turn("Stop talking.", "sid-output")
-        output_reflex = assistant.active_reflex_task
+        output_reflex = assistant.input_turn_lifecycle.active_reflex_task
         assert output_reflex is not None
         await asyncio.wait_for(
             controls["abort_started"].wait(),
@@ -1293,11 +1293,11 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(output_reflex.done())
         self.assertEqual(
-            list(assistant._pending_turn_after_reflex),
+            list(assistant.input_turn_lifecycle.pending_turn_after_reflex),
             [],
         )
         emergency_tasks = set(
-            assistant.concurrent_protective_reflex_tasks
+            assistant.input_turn_lifecycle.concurrent_protective_reflex_tasks
         )
         self.assertEqual(len(emergency_tasks), 1)
 
@@ -1308,7 +1308,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
 
         self.assertEqual(
-            list(assistant._pending_turn_after_reflex),
+            list(assistant.input_turn_lifecycle.pending_turn_after_reflex),
             [("What time is it?", "sid-ordinary", "voice")],
         )
         self.assertFalse(controls["ordinary_started"].is_set())
@@ -1372,7 +1372,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                 return None
 
         input_session_runtime_for(assistant)._launch_routed_turn("Stop talking.", "sid-output")
-        output_reflex = assistant.active_reflex_task
+        output_reflex = assistant.input_turn_lifecycle.active_reflex_task
         assert output_reflex is not None
         await asyncio.wait_for(
             controls["abort_started"].wait(),
@@ -1388,13 +1388,13 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.asr_timeout_s = 1.0
         assistant.asr_ws = _Asr()
         assistant.active_llm_task = None
-        assistant.active_synthesis_tasks = set()
-        assistant.pending_audio = {}
-        assistant.cancelled_playback_orders = set()
-        assistant.playback_queue = asyncio.Queue()
-        assistant.next_playback_order = 0
-        assistant.synthesis_order = 0
-        assistant.playback_start_waiters = {}
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.pending_audio = {}
+        assistant.playback_delivery.cancelled_playback_orders = set()
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.next_playback_order = 0
+        assistant.playback_delivery.synthesis_order = 0
+        assistant.playback_delivery.playback_start_waiters = {}
         assistant.create_session = MethodType(
             lambda self: "sid-emergency",
             assistant,
@@ -1437,7 +1437,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(
             asyncio.gather(
                 *tuple(
-                    assistant.concurrent_protective_reflex_tasks
+                    assistant.input_turn_lifecycle.concurrent_protective_reflex_tasks
                 ),
             ),
             timeout=1.0,
@@ -1587,17 +1587,17 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         def maybe_session_done(self: VoiceAssistant, sid: str | None) -> None:
             events.append(f"session_done:{sid}")
 
-        assistant.active_turn_task = None
-        assistant.active_reflex_task = None
-        assistant._pending_turn_after_reflex = deque()
-        assistant.playback_generation = 0
+        assistant.input_turn_lifecycle.active_turn_task = None
+        assistant.input_turn_lifecycle.active_reflex_task = None
+        assistant.input_turn_lifecycle.pending_turn_after_reflex = deque()
+        assistant.playback_delivery.playback_generation = 0
         assistant.active_llm_task = None
-        assistant.active_synthesis_tasks = set()
-        assistant.pending_audio = {}
-        assistant.cancelled_playback_orders = set()
-        assistant.playback_queue = asyncio.Queue()
-        assistant.next_playback_order = 0
-        assistant.synthesis_order = 0
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.pending_audio = {}
+        assistant.playback_delivery.cancelled_playback_orders = set()
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.next_playback_order = 0
+        assistant.playback_delivery.synthesis_order = 0
         assistant.resolve_all_playback_start_waiters = lambda **kwargs: None
         assistant.sessions = _Sessions()
         assistant.handle_routed_text = MethodType(handle, assistant)
@@ -1608,7 +1608,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
 
         input_session_runtime_for(assistant)._launch_routed_turn("Stop now.", "sid-stop")
-        reflex_task = assistant.active_turn_task
+        reflex_task = assistant.input_turn_lifecycle.active_turn_task
         assert reflex_task is not None
         await reflex_started.wait()
 
@@ -1622,11 +1622,11 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         input_session_runtime_for(assistant)._launch_routed_turn("Keep the other request too.", "sid-another")
         await asyncio.sleep(0)
 
-        self.assertIs(assistant.active_turn_task, reflex_task)
+        self.assertIs(assistant.input_turn_lifecycle.active_turn_task, reflex_task)
         self.assertFalse(reflex_task.cancelled())
         self.assertFalse(all_following_completed.is_set())
         self.assertEqual(
-            list(assistant._pending_turn_after_reflex),
+            list(assistant.input_turn_lifecycle.pending_turn_after_reflex),
             [
                 ("Hello after stop.", "sid-next", "voice"),
                 ("Keep the other request too.", "sid-another", "voice"),

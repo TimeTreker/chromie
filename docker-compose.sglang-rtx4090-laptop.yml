@@ -3,7 +3,8 @@
 # do not change when the serving backend changes from Ollama to SGLang.
 services:
   chromie-llm:
-    image: chromie-sglang:qwen35-4b-awq
+    # One image for every SGLang profile: both overlays build llm/sglang/Dockerfile.
+    image: chromie-sglang:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
     build:
       context: ./llm/sglang
       dockerfile: Dockerfile

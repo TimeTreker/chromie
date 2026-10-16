@@ -7,10 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-try:
-    from chromie_runtime import ResourceArbiter
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_runtime import ResourceArbiter
+from shared.chromie_runtime import ResourceArbiter
 
 from ..capabilities.models import CapabilityRegistry, FailurePolicy
 from ..tool_invocation import AsyncToolInvoker, ToolInvocationContext

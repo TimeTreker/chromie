@@ -130,13 +130,17 @@ fi
 
 if [ "$PULL_EXTERNAL" = "1" ]; then
   echo "[deploy-chromie] Pulling external runtime images..."
-  docker compose "${COMPOSE_ARGS[@]}" pull chromie-llm
+  # SGLang profiles build chromie-llm locally; only pull registry images.
+  docker compose "${COMPOSE_ARGS[@]}" pull --ignore-buildable chromie-llm
 else
   echo "[deploy-chromie] Skipping external image pull."
 fi
 
 if [ "$BUILD_IMAGES" = "1" ]; then
   build_services=(chromie-asr chromie-tts chromie-agent)
+  if [ "${AGENT_LLM_PROVIDER:-ollama}" = "sglang" ]; then
+    build_services+=(chromie-llm)
+  fi
   if [ "$REBUILD_NO_CACHE" = "1" ]; then
     echo "[deploy-chromie] Building Chromie images with --no-cache..."
     docker compose "${COMPOSE_ARGS[@]}" build --no-cache "${build_services[@]}"

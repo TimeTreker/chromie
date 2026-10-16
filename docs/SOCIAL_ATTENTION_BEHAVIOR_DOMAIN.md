@@ -7,7 +7,7 @@ expression to Social Cognition's primary decision. It may use exact eligible
 social-domain Capability proposals with its immutable communicative anchor;
 Runtime/Soridormi retain validation and safe realization. This includes trusted
 Situation-driven initiative without UMI. No additional decoration model is added.
-The representation below belongs to SC; Work Planner is not an expression author. Explicitly requested gestures remain
+The representation below belongs to SC; Planner is not an expression author. Explicitly requested gestures remain
 Goal-owned Planner Work. Source and evidence progress are tracked in
 [Status](STATUS.md#social-cognition-migration).
 

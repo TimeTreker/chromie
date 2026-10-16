@@ -7,7 +7,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from jsonschema import Draft202012Validator
+
 from scripts.verify_robot_candidate import verify_candidate
+
+COMMISSIONING = Path(__file__).resolve().parents[1] / "commissioning"
 
 
 def selected_candidate() -> dict[str, object]:
@@ -121,6 +125,20 @@ def _write_evidence_bundle(
 
 
 class RobotCandidateVerifierTests(unittest.TestCase):
+    def test_commissioning_schema_accepts_the_example_and_selected_candidate(self) -> None:
+        # The schema and verify_robot_candidate.py both describe the record; keep them aligned.
+        schema = json.loads(
+            (COMMISSIONING / "reference_robot_candidate.schema.json").read_text(encoding="utf-8")
+        )
+        Draft202012Validator.check_schema(schema)
+        validator = Draft202012Validator(schema)
+        example = json.loads(
+            (COMMISSIONING / "reference_robot_candidate.example.json").read_text(encoding="utf-8")
+        )
+        for name, document in (("example", example), ("selected", selected_candidate())):
+            with self.subTest(document=name):
+                self.assertEqual([error.message for error in validator.iter_errors(document)], [])
+
     def test_complete_selected_candidate_passes_without_authorizing_motion(self) -> None:
         report = verify_candidate(selected_candidate())
 

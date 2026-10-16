@@ -44,7 +44,7 @@ settings instance.
 `tts.settings.TTSServiceSettings` now owns the maintained TTS transport,
 provider, generation-budget, worker-pool, speaker, alignment, and immutable
 model-source environment surface. `tts/server.py`, `tts/candidate_server.py`,
-`tts/create_speaker.py`, and `tts/model_sources.py` receive one typed snapshot
+and `tts/model_sources.py` receive one typed snapshot
 instead of reparsing environment values independently. Invalid ports, ranges,
 booleans, and missing immutable model references fail with the owning key.
 

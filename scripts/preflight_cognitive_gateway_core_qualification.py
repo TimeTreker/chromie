@@ -17,11 +17,15 @@ import subprocess
 import sys
 import time
 import uuid
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
 import aiohttp
+
+try:
+    from evidence_io import utc_now as _utc_now
+except ImportError:  # imported as scripts.preflight_cognitive_gateway_core_qualification
+    from scripts.evidence_io import utc_now as _utc_now
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -41,10 +45,6 @@ DEFAULT_OUTPUT = (
 
 class PreflightError(RuntimeError):
     pass
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _read_json(path: Path) -> dict[str, Any]:

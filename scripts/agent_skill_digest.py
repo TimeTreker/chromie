@@ -7,7 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "agent"))
-sys.path.insert(0, str(ROOT / "shared"))
+sys.path.insert(0, str(ROOT))  # Agent code imports shared.chromie_contracts
 
 from app.agent_skills import compute_agent_skill_content_digest  # noqa: E402
 

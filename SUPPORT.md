@@ -1,7 +1,7 @@
 # Support
 
-Chromie is currently a prepared alpha candidate, not a published or supported
-production product.
+Chromie is in active development (`development` identity) with no planned
+release; it is not a published or supported production product.
 
 ## Before asking for help
 
@@ -9,7 +9,7 @@ Run and include the non-secret output of:
 
 ```bash
 ./scripts/show_profile.sh
-docker compose --env-file .env.runtime ps
+./scripts/compose.sh ps
 curl -fsS http://127.0.0.1:8092/health
 ./scripts/run_tests.sh
 ```

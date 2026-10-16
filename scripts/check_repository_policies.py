@@ -687,8 +687,11 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "orchestrator/runtime/outcome_response.py": RULE_HOST_SEMANTIC_AUTHORITY,
         "orchestrator/runtime/body_recovery.py": RULE_HOST_SEMANTIC_AUTHORITY,
         "agent/app/planner_audit.py": RULE_HOST_SEMANTIC_AUTHORITY,
-        "agent/app/agents/motion_planner.py": RULE_LEGACY_PHRASE_AGENTS,
-        "agent/app/agents/robot_pose_controller.py": RULE_LEGACY_PHRASE_AGENTS,
+        # The phrase-routed downstream agent package (conversation, capability,
+        # tool, memory, deepthinking, motion_planner, robot_pose_controller, ...)
+        # is retired as a whole; the regex MemoryAgent keeps its own memory rule.
+        "agent/app/agents": RULE_LEGACY_PHRASE_AGENTS,
+        "agent/app/agents/memory.py": RULE_MEMORY_MODEL_AUTHORED,
     }
     for relative, rule_id in forbidden_files.items():
         if (root / relative).exists():
@@ -726,15 +729,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "proposal_from_body_recovery",
             ),
             "ordinary deep-thinking and user-facing wording must remain model/Core-authored",
-        ),
-        "agent/app/runtime.py": (
-            RULE_LEGACY_PHRASE_AGENTS,
-            (
-                "MotionPlannerAgent",
-                "RobotPoseControllerAgent",
-                "allow_legacy_rule_agents",
-            ),
-            "caller context must not reactivate phrase-based semantic agents",
         ),
         "agent/app/capabilities/catalog.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -931,18 +925,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "Host truth reconciliation must preserve safe model speech or fail closed without authoring semantic wording",
         ),
-        "agent/app/agents/tool.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "_is_weather_request",
-                '"weather" in intent',
-                '"forecast" in intent',
-                "services.weather_client",
-                "weather_client.lookup",
-                "client.lookup(query)",
-            ),
-            "ToolAgent may dispatch only from an exact model-authored Capability identity",
-        ),
         "orchestrator/runtime/conversation_state.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
@@ -959,17 +941,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "_looks_like_meaningful_task_text",
             ),
             "conversation state may apply typed model decisions and hard idle expiry but may not classify discourse or reset semantics",
-        ),
-        "orchestrator/runtime/abilities.py": (
-            RULE_HOST_SEMANTIC_AUTHORITY,
-            (
-                "speech_templates",
-                'implementation="host_tts"',
-                'implementation="host_speech"',
-                "unavailable_en",
-                "unavailable_zh",
-            ),
-            "the static ability ontology may describe responsibility but may not author user-facing speech",
         ),
         "agent/app/cognitive_core/user_meaning_interpreter/engine.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -1069,8 +1040,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 )
 
     semantic_rule_paths = (
-        "agent/app/agents/conversation.py",
-        "agent/app/agents/capability.py",
         "agent/app/capabilities/catalog.py",
         "agent/app/capabilities/validator.py",
         "agent/app/cognitive_core/user_meaning_interpreter/engine.py",
@@ -1085,8 +1054,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "shared/chromie_contracts/perception.py",
     )
     strict_no_regex_paths = {
-        "agent/app/agents/conversation.py",
-        "agent/app/agents/capability.py",
         "agent/app/capabilities/catalog.py",
         "agent/app/capabilities/validator.py",
         "orchestrator/runtime/confirmation.py",
@@ -1160,47 +1127,6 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 )
             )
 
-    memory_path = root / "agent/app/agents/memory.py"
-    tree = None
-    if memory_path.is_file():
-        tree, parse_findings = _parse_python(memory_path, root)
-        findings.extend(parse_findings)
-    if tree is not None:
-        for module_name, node in _imported_module_names(tree):
-            if module_name.split(".", 1)[0] in {"re", "regex"}:
-                findings.append(
-                    PolicyFinding(
-                        rule_id=RULE_MEMORY_MODEL_AUTHORED,
-                        path=_relative(memory_path, root),
-                        line=getattr(node, "lineno", 0) or 0,
-                        symbol="<module>",
-                        message="MemoryAgent may not use regex or phrase classification",
-                    )
-                )
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Attribute) and _attribute_chain(node) == "request.text":
-                findings.append(
-                    PolicyFinding(
-                        rule_id=RULE_MEMORY_MODEL_AUTHORED,
-                        path=_relative(memory_path, root),
-                        line=node.lineno,
-                        symbol="MemoryAgent.run",
-                        message="MemoryAgent must consume the typed model proposal, not infer semantics from raw text",
-                    )
-                )
-        if not any(
-            isinstance(node, ast.Attribute) and node.attr == "memory_update"
-            for node in ast.walk(tree)
-        ):
-            findings.append(
-                _source_policy_finding(
-                    root=root,
-                    path=_relative(memory_path, root),
-                    rule_id=RULE_MEMORY_MODEL_AUTHORED,
-                    symbol="MemoryAgent.run",
-                    message="MemoryAgent must consume a typed memory_update proposal",
-                )
-            )
     return findings
 
 
@@ -1762,11 +1688,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         "orchestrator/runtime/interaction_preflight.py",
         "orchestrator/runtime/episode.py",
         "orchestrator/runtime/experience.py",
-        "orchestrator/runtime/task_proposals.py",
-        "agent/app/agents/capability.py",
-        "agent/app/agents/deepthinking.py",
         "agent/app/fast_planner.py",
-        "agent/app/planner_contract.py",
     )
     for relative in canonical_runtime_files:
         path = root / relative
@@ -1794,10 +1716,6 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             "exact supplied skill IDs",
             "Skills are plan leaves",
         ),
-        "agent/app/agents/deepthinking.py": (
-            'item["skill_id"]',
-            'item.get("skill_id")',
-        ),
         "orchestrator/runtime/cognitive_runtime.py": (
             '"skill_id": step.',
             '"skill_id": request.',
@@ -1811,10 +1729,6 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         ),
         "orchestrator/runtime/interaction_coordinator.py": (
             '"suppressed_skill_ids"',
-        ),
-        "orchestrator/runtime/task_proposals.py": (
-            'proposal["skill_id"]',
-            'proposal.get("skill_id")',
         ),
         "orchestrator/runtime/conversation_state.py": (
             '"skill_id": "chromie.speak"',

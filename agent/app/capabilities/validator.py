@@ -2,10 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from chromie_contracts.json_schema import json_schema_validation_errors
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.json_schema import json_schema_validation_errors
+from shared.chromie_contracts.json_schema import json_schema_validation_errors
 
 def normalize_args_for_schema(
     args: dict[str, Any],

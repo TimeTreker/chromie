@@ -1,6 +1,6 @@
 # End-to-End Benchmark Execution and Evidence Profiles
 
-Status: implemented Benchmark Phase 5 foundation
+Status: implemented Benchmark E2E foundation
 
 ## Purpose
 
@@ -103,7 +103,7 @@ python -m benchmarks.e2e.validate --check
 Run a deployed text cohort:
 
 ```bash
-python -m benchmarks.e2e.run \
+python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_service_text \
   --command "python scripts/my_e2e_adapter.py" \
@@ -115,7 +115,7 @@ python -m benchmarks.e2e.run \
 Run a supervised physical case:
 
 ```bash
-python -m benchmarks.e2e.run \
+python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile physical_supervised \
   --command "python scripts/my_physical_e2e_adapter.py" \

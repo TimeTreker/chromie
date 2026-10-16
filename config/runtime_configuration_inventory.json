@@ -97,7 +97,8 @@
       "category": "service_internal",
       "key": "AGENT_COGNITIVE_ACTIVATION_ENABLED",
       "owners": [
-        "agent/app/settings.py"
+        "agent/app/settings.py",
+        "docker-compose.yml"
       ]
     },
     {
@@ -105,7 +106,8 @@
       "category": "service_internal",
       "key": "AGENT_COGNITIVE_ACTIVATION_MODEL",
       "owners": [
-        "agent/app/settings.py"
+        "agent/app/settings.py",
+        "docker-compose.yml"
       ]
     },
     {
@@ -113,7 +115,8 @@
       "category": "service_internal",
       "key": "AGENT_COGNITIVE_ACTIVATION_NUM_CTX",
       "owners": [
-        "agent/app/settings.py"
+        "agent/app/settings.py",
+        "docker-compose.yml"
       ]
     },
     {
@@ -121,7 +124,8 @@
       "category": "service_internal",
       "key": "AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT",
       "owners": [
-        "agent/app/settings.py"
+        "agent/app/settings.py",
+        "docker-compose.yml"
       ]
     },
     {
@@ -129,7 +133,8 @@
       "category": "service_internal",
       "key": "AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS",
       "owners": [
-        "agent/app/settings.py"
+        "agent/app/settings.py",
+        "docker-compose.yml"
       ]
     },
     {
@@ -278,7 +283,7 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_DEEP_PLANNER_ENABLED",
+      "key": "AGENT_DELIBERATIVE_ENABLED",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -288,7 +293,7 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "AGENT_DEEP_PLANNER_MODEL",
+      "key": "AGENT_DELIBERATIVE_MODEL",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -307,7 +312,7 @@
     {
       "boolean": false,
       "category": "acceptance_override",
-      "key": "AGENT_DEEP_PLANNER_NUM_CTX",
+      "key": "AGENT_DELIBERATIVE_NUM_CTX",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -321,7 +326,7 @@
     {
       "boolean": false,
       "category": "acceptance_override",
-      "key": "AGENT_DEEP_PLANNER_NUM_PREDICT",
+      "key": "AGENT_DELIBERATIVE_NUM_PREDICT",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -334,7 +339,7 @@
     {
       "boolean": false,
       "category": "acceptance_override",
-      "key": "AGENT_DEEP_PLANNER_TIMEOUT_MS",
+      "key": "AGENT_DELIBERATIVE_TIMEOUT_MS",
       "owners": [
         ".env.common",
         "agent/app/settings.py",
@@ -672,6 +677,8 @@
       "key": "AGENT_MODEL",
       "owners": [
         "agent/app/settings.py",
+        "docker-compose.sglang-rtx4090-laptop.yml",
+        "docker-compose.sglang.yml",
         "docker-compose.yml",
         "env/profiles/default.env",
         "env/profiles/jetson_agx_orin.env",
@@ -855,51 +862,6 @@
         "agent/app/settings.py",
         "docker-compose.yml",
         "env/modes/qualification.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "AGENT_TASK_CONTINUITY_MODEL",
-      "owners": [
-        "env/profiles/default.env",
-        "env/profiles/jetson_agx_orin.env",
-        "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/jetson_thor.env",
-        "env/profiles/nvidia_ada.env",
-        "env/profiles/nvidia_blackwell.env",
-        "env/profiles/rtx4090.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_TASK_CONTINUITY_NUM_CTX",
-      "owners": [
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_TASK_CONTINUITY_NUM_PREDICT",
-      "owners": [
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_TASK_CONTINUITY_TIMEOUT_MS",
-      "owners": [
-        "env/modes/qualification.env",
-        "env/validation/architecture.env"
       ]
     },
     {
@@ -1115,30 +1077,6 @@
     {
       "boolean": false,
       "category": "profile_constant",
-      "key": "ASR_BACKEND",
-      "owners": [
-        ".env.common"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ASR_BEAM_SIZE",
-      "owners": [
-        ".env.common"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ASR_CONDITION_ON_PREVIOUS_TEXT",
-      "owners": [
-        ".env.common"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
       "key": "ASR_CUDA_IMAGE",
       "owners": [
         ".env.common",
@@ -1275,18 +1213,12 @@
       ]
     },
     {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ASR_VAD_FILTER",
-      "owners": [
-        ".env.common"
-      ]
-    },
-    {
       "boolean": false,
       "category": "service_internal",
       "key": "CHROMIE_ACTIVE_PROFILE",
       "owners": [
+        "docker-compose.sglang-rtx4090-laptop.yml",
+        "docker-compose.sglang.yml",
         "docker-compose.yml"
       ]
     },
@@ -1426,6 +1358,8 @@
       "category": "service_internal",
       "key": "CHROMIE_HOST_TIMEZONE",
       "owners": [
+        "docker-compose.sglang-rtx4090-laptop.yml",
+        "docker-compose.sglang.yml",
         "docker-compose.yml"
       ]
     },
@@ -1435,17 +1369,9 @@
       "key": "CHROMIE_IMAGE_TAG",
       "owners": [
         ".env.common",
+        "docker-compose.sglang-rtx4090-laptop.yml",
+        "docker-compose.sglang.yml",
         "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "CHROMIE_JETSON",
-      "owners": [
-        "env/profiles/jetson_agx_orin.env",
-        "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/jetson_thor.env"
       ]
     },
     {
@@ -1465,6 +1391,8 @@
       "category": "service_internal",
       "key": "CHROMIE_RUNTIME_ENV_FINGERPRINT",
       "owners": [
+        "docker-compose.sglang-rtx4090-laptop.yml",
+        "docker-compose.sglang.yml",
         "docker-compose.yml"
       ]
     },
@@ -1713,14 +1641,6 @@
     {
       "boolean": false,
       "category": "service_internal",
-      "key": "HARDWARE_DRIVER",
-      "owners": [
-        "hardware/daemon.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
       "key": "HARDWARE_HOST",
       "owners": [
         "hardware/daemon.py"
@@ -1735,28 +1655,24 @@
       ]
     },
     {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "HARDWARE_SERIAL_BAUD",
-      "owners": [
-        "hardware/drivers/serial_robot.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "HARDWARE_SERIAL_PORT",
-      "owners": [
-        "hardware/drivers/serial_robot.py"
-      ]
-    },
-    {
       "boolean": true,
       "category": "profile_constant",
       "key": "HF_HUB_OFFLINE",
       "owners": [
         ".env.common",
+        "docker-compose.sglang-qualification.yml",
+        "docker-compose.sglang-rtx4090-laptop.yml",
         "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "HF_TOKEN",
+      "owners": [
+        "docker-compose.sglang-qualification.yml",
+        "docker-compose.sglang-rtx4090-laptop.yml",
+        "docker-compose.vllm-qualification.yml"
       ]
     },
     {
@@ -1765,6 +1681,8 @@
       "key": "HTTPS_PROXY",
       "owners": [
         ".env.common",
+        "docker-compose.sglang-qualification.yml",
+        "docker-compose.sglang-rtx4090-laptop.yml",
         "docker-compose.yml"
       ]
     },
@@ -1774,6 +1692,8 @@
       "key": "HTTP_PROXY",
       "owners": [
         ".env.common",
+        "docker-compose.sglang-qualification.yml",
+        "docker-compose.sglang-rtx4090-laptop.yml",
         "docker-compose.yml"
       ]
     },
@@ -1795,7 +1715,6 @@
         "agent/app/settings.py",
         "asr/settings.py",
         "docker-compose.yml",
-        "orchestrator/.env.local.example",
         "orchestrator/orchestrator.py",
         "scripts/chromie_psm_live_text_console.py",
         "tts/settings.py"
@@ -1806,6 +1725,7 @@
       "category": "service_internal",
       "key": "MIN_TTS_GENERATION_LENGTH",
       "owners": [
+        "docker-compose.yml",
         "env/profiles/default.env",
         "env/profiles/jetson_agx_orin.env",
         "env/profiles/jetson_orin_nano_super.env",
@@ -1824,6 +1744,8 @@
       "key": "NO_PROXY",
       "owners": [
         ".env.common",
+        "docker-compose.sglang-qualification.yml",
+        "docker-compose.sglang-rtx4090-laptop.yml",
         "docker-compose.yml"
       ]
     },
@@ -1833,6 +1755,10 @@
       "key": "NVIDIA_DRIVER_CAPABILITIES",
       "owners": [
         ".env.common",
+        "docker-compose.sglang-qualification.yml",
+        "docker-compose.sglang-rtx4090-laptop.yml",
+        "docker-compose.sglang.yml",
+        "docker-compose.vllm-qualification.yml",
         "docker-compose.yml"
       ]
     },
@@ -1842,6 +1768,10 @@
       "key": "NVIDIA_VISIBLE_DEVICES",
       "owners": [
         ".env.common",
+        "docker-compose.sglang-qualification.yml",
+        "docker-compose.sglang-rtx4090-laptop.yml",
+        "docker-compose.sglang.yml",
+        "docker-compose.vllm-qualification.yml",
         "docker-compose.yml"
       ]
     },
@@ -2032,42 +1962,10 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
-      "key": "OLLAMA_TEMPERATURE",
-      "owners": [
-        "env/profiles/default.env",
-        "env/profiles/jetson_agx_orin.env",
-        "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/jetson_thor.env",
-        "env/profiles/nvidia_ada.env",
-        "env/profiles/nvidia_blackwell.env",
-        "env/profiles/rtx4090.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "service_internal",
       "key": "OLLAMA_TIMEOUT_MS",
       "owners": [
         "agent/app/settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "OLLAMA_TOP_P",
-      "owners": [
-        "env/profiles/default.env",
-        "env/profiles/jetson_agx_orin.env",
-        "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/jetson_thor.env",
-        "env/profiles/nvidia_ada.env",
-        "env/profiles/nvidia_blackwell.env",
-        "env/profiles/rtx4090.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -2272,7 +2170,6 @@
         "env/modes/services.env",
         "env/modes/speech.env",
         "env/modes/voice_mujoco.env",
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
         "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
@@ -2432,7 +2329,7 @@
     {
       "boolean": false,
       "category": "acceptance_override",
-      "key": "ORCH_DEEP_PLANNER_TIMEOUT_MS",
+      "key": "ORCH_DELIBERATIVE_TIMEOUT_MS",
       "owners": [
         ".env.common",
         "env/modes/qualification.env",
@@ -2441,14 +2338,6 @@
         "env/modes/voice_mujoco.env",
         "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_DIRECT_LLM_REQUIRE_COMPLETE_OUTPUT",
-      "owners": [
-        ".env.common"
       ]
     },
     {
@@ -2481,7 +2370,6 @@
       "category": "service_internal",
       "key": "ORCH_EMIT_EPISODE_RUNTIME_EVENTS",
       "owners": [
-        "orchestrator/runtime/episode.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2525,7 +2413,6 @@
       "key": "ORCH_ENABLE_EPISODE_RECORDING",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/episode.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2534,7 +2421,6 @@
       "category": "service_internal",
       "key": "ORCH_ENABLE_EXPERIENCE_JOURNAL",
       "owners": [
-        "orchestrator/runtime/experience.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2548,7 +2434,6 @@
         "env/modes/services.env",
         "env/modes/speech.env",
         "env/modes/voice_mujoco.env",
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
         "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
@@ -2566,7 +2451,6 @@
         "env/modes/services.env",
         "env/modes/speech.env",
         "env/modes/voice_mujoco.env",
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
         "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
@@ -2590,7 +2474,6 @@
       "key": "ORCH_EPISODE_LOG_PATH",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/episode.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2600,7 +2483,6 @@
       "key": "ORCH_EPISODE_MAX_TURNS",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/episode.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -3007,7 +2889,6 @@
       "key": "ORCH_SAVE_AUDIO",
       "owners": [
         ".env.common",
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -3033,7 +2914,6 @@
       "key": "ORCH_SESSION_TIMING_LOGS",
       "owners": [
         "env/modes/qualification.env",
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
         "scripts/interaction_text_mujoco_check.py"
       ]
@@ -3062,7 +2942,6 @@
       "key": "ORCH_SORIDORMI_MANIFEST",
       "owners": [
         ".env.common",
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
         "scripts/chromie_psm_live_text_console.py",
         "scripts/interaction_text_mujoco_check.py"
@@ -3074,15 +2953,6 @@
       "key": "ORCH_TASK_CONTEXT_STORE_PATH",
       "owners": [
         "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "ORCH_TASK_CONTINUITY_TIMEOUT_MS",
-      "owners": [
-        "env/modes/qualification.env",
-        "env/validation/architecture.env"
       ]
     },
     {
@@ -3118,7 +2988,6 @@
       "key": "ORCH_TTS_CONCURRENCY",
       "owners": [
         ".env.common",
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -3307,6 +3176,126 @@
       ]
     },
     {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_CHUNKED_PREFILL_SIZE",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_CONTEXT_LENGTH",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_CUDA_GRAPH_BACKEND_PREFILL",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_DEFAULT_PRIORITY_VALUE",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_HF_CACHE_DIR",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_IMAGE",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_MAX_MAMBA_CACHE_SIZE",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_MAX_RUNNING_REQUESTS",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_MAX_TOTAL_TOKENS",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_MEM_FRACTION_STATIC",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_MODEL",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_MODEL_REVISION",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_PRIORITY_PREEMPTION_THRESHOLD",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_SCHEDULE_CONSERVATIVENESS",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "SGLANG_SERVED_MODEL_NAME",
+      "owners": [
+        "docker-compose.sglang-qualification.yml"
+      ]
+    },
+    {
       "boolean": true,
       "category": "service_internal",
       "key": "SHERPA_ONNX_DEBUG",
@@ -3398,7 +3387,8 @@
         "scripts/run_cognitive_gateway_core_qualification.py",
         "scripts/run_target_evidence_closure.py",
         "scripts/vocal_issue_closure.py",
-        "scripts/voice_acceptance.py"
+        "scripts/voice_acceptance.py",
+        "tools/chromie_cli/capability.py"
       ]
     },
     {
@@ -3425,6 +3415,8 @@
       "key": "TRANSFORMERS_OFFLINE",
       "owners": [
         ".env.common",
+        "docker-compose.sglang-qualification.yml",
+        "docker-compose.sglang-rtx4090-laptop.yml",
         "docker-compose.yml"
       ]
     },
@@ -3444,7 +3436,9 @@
       "key": "TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts_candidates/cosyvoice/provider_impl.py",
+        "tts_candidates/qwen3/provider_impl.py"
       ]
     },
     {
@@ -3453,7 +3447,9 @@
       "key": "TTS_CANDIDATE_COLD_FIRST_AUDIO_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts_candidates/cosyvoice/provider_impl.py",
+        "tts_candidates/qwen3/provider_impl.py"
       ]
     },
     {
@@ -3462,7 +3458,9 @@
       "key": "TTS_CANDIDATE_COLD_REQUEST_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts_candidates/cosyvoice/provider_impl.py",
+        "tts_candidates/qwen3/provider_impl.py"
       ]
     },
     {
@@ -3479,7 +3477,9 @@
       "key": "TTS_CANDIDATE_FIRST_AUDIO_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts_candidates/cosyvoice/provider_impl.py",
+        "tts_candidates/qwen3/provider_impl.py"
       ]
     },
     {
@@ -3488,7 +3488,9 @@
       "key": "TTS_CANDIDATE_REQUEST_TIMEOUT_SEC",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts_candidates/cosyvoice/provider_impl.py",
+        "tts_candidates/qwen3/provider_impl.py"
       ]
     },
     {
@@ -3587,7 +3589,8 @@
       "key": "TTS_DEFAULT_SPEAKER",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts_candidates/cosyvoice/provider_impl.py"
       ]
     },
     {
@@ -3606,7 +3609,6 @@
       "key": "TTS_FLUSH_CHARS",
       "owners": [
         ".env.common",
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -3849,7 +3851,6 @@
       "category": "service_internal",
       "key": "TTS_SPEAKER_ID",
       "owners": [
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
         "scripts/benchmark_tts.py",
         "scripts/preflight_cognitive_gateway_core_qualification.py",
@@ -3918,9 +3919,17 @@
     {
       "boolean": false,
       "category": "service_internal",
+      "key": "TTS_TRANSPORT_CHUNK_MS",
+      "owners": [
+        "docker-compose.yml",
+        "tts_candidates/qwen3/provider_impl.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
       "key": "TTS_URL",
       "owners": [
-        "orchestrator/.env.local.example",
         "orchestrator/runtime/host_settings.py",
         "scripts/benchmark_tts.py",
         "scripts/closed_loop_e2e.py",
@@ -3934,7 +3943,8 @@
       "key": "TTS_VOICE_ROOT",
       "owners": [
         ".env.common",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "tts_candidates/cosyvoice/provider_impl.py"
       ]
     },
     {
@@ -3950,12 +3960,14 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_WORKER_STARTUP_TIMEOUT_SEC",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/settings.py"
+        "tts/settings.py",
+        "tts_candidates/cosyvoice/provider_impl.py",
+        "tts_candidates/qwen3/provider_impl.py"
       ]
     },
     {
@@ -3974,6 +3986,70 @@
         "scripts/run_agent_skill_weather_qualification.py",
         "scripts/run_cognitive_gateway_core_qualification.py",
         "scripts/run_target_evidence_closure.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "VLLM_CONTEXT_LENGTH",
+      "owners": [
+        "docker-compose.vllm-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "VLLM_GPU_MEMORY_UTILIZATION",
+      "owners": [
+        "docker-compose.vllm-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "VLLM_HF_CACHE_DIR",
+      "owners": [
+        "docker-compose.vllm-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "VLLM_IMAGE",
+      "owners": [
+        "docker-compose.vllm-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "VLLM_MAX_NUM_BATCHED_TOKENS",
+      "owners": [
+        "docker-compose.vllm-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "VLLM_MODEL",
+      "owners": [
+        "docker-compose.vllm-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "VLLM_MODEL_REVISION",
+      "owners": [
+        "docker-compose.vllm-qualification.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "VLLM_SERVED_MODEL_NAME",
+      "owners": [
+        "docker-compose.vllm-qualification.yml"
       ]
     },
     {
@@ -3996,14 +4072,14 @@
   "schema_version": "1.0",
   "summary": {
     "category_counts": {
-      "acceptance_override": 34,
+      "acceptance_override": 30,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 128,
+      "profile_constant": 120,
       "public_choice": 9,
-      "service_internal": 209
+      "service_internal": 230
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 380
+    "total_keys": 389
   }
 }

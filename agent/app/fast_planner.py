@@ -90,44 +90,23 @@ from .planner_fast_validation import (
     validate_work_reuse_selection,
 )
 from .planner_fallback import materialize_planner_failure, materialize_planner_unavailable
-try:
-    from chromie_contracts.core_interpretation import CognitiveWorkRequest
-    from chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
-    from chromie_contracts.user_turn import user_turn_source_tokens
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-    from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
-    from shared.chromie_contracts.user_turn import user_turn_source_tokens
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_contracts.interaction import VOCAL_PERFORMANCE_CAPABILITY_ID
+from shared.chromie_contracts.user_turn import user_turn_source_tokens
 
-try:
-    from chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
-    from chromie_runtime.llm_diagnostics import cognition_text_reference
-    from chromie_runtime.runtime_trace import TraceModule, runtime_tracer
-except ImportError:  # pragma: no cover
-    from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
-    from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
-    from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+from shared.chromie_runtime.cognitive_integrity_events import cognitive_integrity_metadata
+from shared.chromie_runtime.llm_diagnostics import cognition_text_reference
+from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
-try:
-    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
-    from chromie_contracts.plan import (
-        CanonicalPlan,
-        FastPlannerAdvance,
-        FastPlannerAdvanceModelOutput,
-        FastPlannerStreamFailure,
-        FastPlannerStreamFrame,
-        FastPlannerStreamTerminal,
-    )
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
-    from shared.chromie_contracts.plan import (
-        CanonicalPlan,
-        FastPlannerAdvance,
-        FastPlannerAdvanceModelOutput,
-        FastPlannerStreamFailure,
-        FastPlannerStreamFrame,
-        FastPlannerStreamTerminal,
-    )
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
+from shared.chromie_contracts.plan import (
+    CanonicalPlan,
+    FastPlannerAdvance,
+    FastPlannerAdvanceModelOutput,
+    FastPlannerStreamFailure,
+    FastPlannerStreamFrame,
+    FastPlannerStreamTerminal,
+)
 
 from .planner_prompt import (
     fast_advance_layered_prompt,

@@ -7,6 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from agent.app.settings import UserMeaningInterpreterSettings, Settings
+from shared.chromie_runtime.env_values import InvalidBooleanSetting, parse_bool
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -35,6 +36,47 @@ class AgentSettingsTests(unittest.TestCase):
         self.assertFalse(hasattr(settings, "social_attention_model"))
         self.assertFalse(settings.weather_enabled)
 
+    def test_boolean_flags_fail_closed_on_unrecognized_values(self) -> None:
+        for name in (
+            "AGENT_ENABLE_GUARDED_DAG_EXECUTION",
+            "AGENT_ENABLE_PARALLEL_DAG_EXECUTION",
+            "AGENT_ENABLE_PHYSICAL_DAG_EXECUTION",
+            "AGENT_USE_LLM",
+            "CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW",
+        ):
+            for value in ("disabled", "maybe", "2", "enable"):
+                with self.subTest(name=name, value=value):
+                    with patch.dict(os.environ, {name: value}, clear=True):
+                        with self.assertRaisesRegex(InvalidBooleanSetting, name):
+                            Settings()
+
+    def test_boolean_flags_accept_strict_vocabulary_and_empty_means_default(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                "AGENT_ENABLE_GUARDED_DAG_EXECUTION": "",
+                "AGENT_ENABLE_PARALLEL_DAG_EXECUTION": "  ",
+                "AGENT_ENABLE_READ_ONLY_DAG_EXECUTION": "YES",
+                "AGENT_WEATHER_ENABLED": "Off",
+            },
+            clear=True,
+        ):
+            settings = Settings()
+        self.assertFalse(settings.enable_guarded_dag_execution)
+        self.assertFalse(settings.enable_parallel_dag_execution)
+        self.assertTrue(settings.enable_read_only_dag_execution)
+        self.assertFalse(settings.weather_enabled)
+
+    def test_shared_boolean_parser_vocabulary(self) -> None:
+        for raw in ("1", "true", "TRUE", " yes ", "On"):
+            self.assertTrue(parse_bool(raw, name="X", default=False))
+        for raw in ("0", "false", "No", " OFF "):
+            self.assertFalse(parse_bool(raw, name="X", default=True))
+        self.assertTrue(parse_bool(None, name="X", default=True))
+        self.assertFalse(parse_bool("", name="X", default=False))
+        with self.assertRaisesRegex(InvalidBooleanSetting, "X must be a boolean"):
+            parse_bool("disabled", name="X", default=False)
+
     def test_fast_planner_stream_has_one_model_and_timeout_authority(self) -> None:
         with patch.dict(
             os.environ,
@@ -58,7 +100,7 @@ class AgentSettingsTests(unittest.TestCase):
             {
                 "AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS": "7777",
                 "AGENT_USER_MEANING_INTERPRETER_MODEL": "fast-umi",
-                "AGENT_DEEP_PLANNER_MODEL": "deep-cognition",
+                "AGENT_DELIBERATIVE_MODEL": "deep-cognition",
             },
             clear=False,
         ):

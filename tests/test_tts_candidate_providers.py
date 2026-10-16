@@ -573,9 +573,9 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
             await worker.stop()
 
     def test_candidate_locks_match_provider_constants_and_compose_profile(self) -> None:
-        lock = json.loads(
-            (ROOT / "tts_candidates" / "model-lock.json").read_text(encoding="utf-8")
-        )
+        tts_lock = json.loads(
+            (ROOT / "release" / "model-lock.json").read_text(encoding="utf-8")
+        )["tts"]
         cosy = load_provider_impl(
             "tts_candidates/cosyvoice/provider_impl.py", "cosy_provider_fixture"
         )
@@ -583,15 +583,18 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
             "tts_candidates/qwen3/provider_impl.py", "qwen_provider_fixture"
         )
         self.assertEqual(
-            lock["candidates"][cosy.PROVIDER_ID]["model"]["revision"],
+            tts_lock["default"]["model"]["revision"],
             cosy.DEFAULT_MODEL_REVISION,
         )
         self.assertEqual(
-            lock["candidates"][qwen.PROVIDER_ID]["runtime"]["revision"],
+            tts_lock["alternatives"]["qwen3_tts"]["runtime"]["revision"],
             qwen.DEFAULT_SOFTWARE_REVISION,
         )
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-        self.assertEqual(lock["default_provider"], cosy.PROVIDER_ID)
+        self.assertEqual(tts_lock["default"]["provider_id"], cosy.PROVIDER_ID)
+        self.assertEqual(
+            tts_lock["alternatives"]["qwen3_tts"]["provider_id"], qwen.PROVIDER_ID
+        )
         self.assertIn("chromie-tts:", compose)
         self.assertIn("dockerfile: tts_candidates/cosyvoice/Dockerfile", compose)
         self.assertIn('"127.0.0.1:5000:5000"', compose)

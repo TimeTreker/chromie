@@ -57,8 +57,7 @@ def test_laptop_sglang_profile_uses_colon_free_served_alias() -> None:
         "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
         "AGENT_GOAL_ASSOCIATION_MODEL",
         "AGENT_FAST_PLANNER_MODEL",
-        "AGENT_DEEP_PLANNER_MODEL",
-        "AGENT_TASK_CONTINUITY_MODEL",
+        "AGENT_DELIBERATIVE_MODEL",
         "AGENT_SKILL_SELECTION_MODEL",
     ):
         assert values[key] == values["AGENT_MODEL"]
@@ -69,7 +68,7 @@ def test_laptop_sglang_profile_uses_colon_free_served_alias() -> None:
 def test_laptop_sglang_service_keeps_base_service_identity_and_pinned_model() -> None:
     service = _service()
     command = service["command"]
-    assert service["image"] == "chromie-sglang:qwen35-4b-awq"
+    assert service["image"] == "chromie-sglang:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}"
     assert service["entrypoint"] == ["python3", "-m", "sglang.launch_server"]
     assert _value_after(command, "--model-path") == "cyankiwi/Qwen3.5-4B-AWQ-4bit"
     assert _value_after(command, "--revision") == "ef85d23bebaba87b3c4672ba11c449c79dbdb23e"

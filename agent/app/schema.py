@@ -43,10 +43,3 @@ class HealthResponse(BaseModel):
     fast_planner_model: str | None = None
 
 
-def detect_language(text: str) -> str:
-    text = text or ""
-    if any("\u4e00" <= ch <= "\u9fff" for ch in text):
-        return "zh-CN"
-    if any("\u0400" <= ch <= "\u04ff" for ch in text):
-        return "ru-RU"
-    return "en-US"

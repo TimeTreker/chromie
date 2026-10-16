@@ -17,31 +17,28 @@ Use this split for new capabilities:
 ```text
 User request
   -> Cognitive Gateway admits an immutable UserTurnEnvelope
-  -> Goal Association resolves the user's responsibility and continuity
+  -> User Meaning Interpretation states the Responsibility (WHAT)
+  -> Goal Association resolves canonical Goal continuity
   -> the Planner selects an exact registered Capability
+  -> Value Judgment reviews it when the Capability is value-reviewed
   -> Trusted Capability Runtime validates and invokes the owning Provider
   -> exact result Evidence is reconciled to the source Goal and Plan
-  -> Fast Planner re-enters with trusted Evidence and authors the grounded result Communicative Activity
+  -> the Planner re-enters with trusted Evidence and states the communication Need
+  -> Social Cognition authors the grounded Communicative Activity
 ```
 
-Before canonical Goal identity exists, Fast Planner may author one prospective
-Communicative Activity grounded only in UMI Responsibility evidence and its current
-truth stage. It must not claim Capability selection, execution, result Evidence, or
-Goal completion. The Host may transport only that exact validated Activity; it does
-not author a generic semantic acknowledgement. Every cognitive re-entry follows the
-same still-needed-delta rule. For a safe-read
-or other executable Plan, an equivalent audible or pending acknowledgement is
-referenced by exact speech-event identity rather than repeated. If no equivalent
-act exists, a Planner may author one new prospective
-acknowledgement or correction, but provider evidence and Goal reconciliation still
-govern any result/completion claim. Reuse requires
-`reuse_current_turn_speech=true` plus the exact `reused_speech_event_id`; text
-equality is never de-duplication authority.
+Social Cognition owns every user-facing Communicative Activity, including any
+receipt spoken before canonical Goal identity exists. Such speech is grounded only
+in the admitted turn and current truth stage; it must not claim Capability
+selection, execution, result Evidence, or Goal completion. The Host transports only
+exact validated Activities and does not author a generic acknowledgement. Every
+cognitive re-entry follows the still-needed-delta rule: an equivalent audible or
+pending act is referenced by exact speech-event identity rather than repeated, and
+text equality is never de-duplication authority.
 
 An **Agent Skill** is a different object. It is passive reusable task
 knowledge selected by an Agent to help generate a Plan. Adding an Agent
 Skill does not add an executable capability, provider, permission, or route. See
-[Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) and
 [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md).
 
 ## Resource-provider capabilities
@@ -65,7 +62,9 @@ feature.
 ## Registration checklist
 
 1. **Create or select the Agent implementation.**
-   - Use `agent/app/agents/tool.py` for small read-only tools such as weather.
+   - Small read-only tools such as weather execute in
+     `agent/app/local_tool_execution.py` and are declared in
+     `agent/app/capabilities/local.py`.
    - Use a dedicated Agent class when the capability has its own state machine,
      long-running workflow, or domain-specific result interpretation. It must not
      become a second canonical planner.
@@ -96,7 +95,7 @@ feature.
      `llm_hints.semantic_scope`, `llm_hints.when_to_use`, and any compact
      guidance that helps model-owned interpretation and planning understand the
      Capability without phrase examples. Add `pre_execution_speech_guidance` only when the Capability needs
-     compact pre-result truth constraints for a Planner Communicative Activity.
+     compact pre-result truth constraints for a Social Cognition Communicative Activity.
 
 4. **Bind execution to the owning Provider.**
    - The execution adapter must require an exact plan-selected `capability_id`
@@ -109,8 +108,9 @@ feature.
 
 5. **Expose the Capability to model-owned planning.**
    - Catalog projection may present the compact semantic description and schema
-     to fast User Meaning Interpretation and the canonical planners.
-   - Goal Association owns what the user means; the Planner
+     to User Meaning Interpretation and the Planner.
+   - User Meaning Interpretation owns what the user means and Goal Association
+     owns continuity; the Planner
      owns exact Capability selection and complete Goal coverage.
    - Review/repair stages may reject malformed or out-of-envelope proposals, but
      deterministic code must not substitute another Capability or invent user
@@ -163,14 +163,14 @@ prompt_tier: common
 ```
 
 Its schema exposes `location`, `date`, and `units`. Goal Association preserves
-the weather responsibility and resolved references; the canonical planner may
+the weather Goal and its continuity; the Planner may
 select `chromie.weather.lookup` only when the catalog and Goal require it. The
 Provider returns structured weather evidence, and only the evidence-bound
-response path may report the result after exact reconciliation.
+Social Cognition act may report the result after exact reconciliation.
 
 ## Anti-patterns
 
-Do not add a tool only as hidden Agent code. The canonical planner cannot
+Do not add a tool only as hidden Agent code. The Planner cannot
 select or prove a Capability that is absent from the catalog.
 
 Do not add large phrase tables such as “重庆天气 -> weather”. Use semantic
@@ -181,7 +181,7 @@ cannot access realtime data” when the catalog advertises a working tool. If th
 Capability is disabled or fails, return a structured grounded failure so the
 model-owned response boundary can report it honestly.
 
-User Meaning Interpretation has no speech contract. Any pre-Goal-binding progress speech is a
-Planner-owned Communicative Activity and must not claim a selected Capability, final
+User Meaning Interpretation has no speech contract. Any pre-Goal-binding speech is a
+Social Cognition Communicative Activity and must not claim a selected Capability, final
 result, permanent memory write, physical completion, or any truth stage that Runtime /
 Evidence has not established.

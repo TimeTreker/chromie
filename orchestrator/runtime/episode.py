@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -230,37 +229,6 @@ class EpisodeRecorder:
             trigger_root=settings.trigger_root,
         )
 
-    @classmethod
-    def from_env(cls, project_root: Path) -> "EpisodeRecorder":
-        enabled = os.getenv("ORCH_ENABLE_EPISODE_RECORDING", "1").strip().lower() not in {
-            "0",
-            "false",
-            "no",
-            "off",
-        }
-        raw_path = os.getenv("ORCH_EPISODE_LOG_PATH", "").strip()
-        if raw_path:
-            path = Path(raw_path).expanduser()
-            log_path = path if path.is_absolute() else project_root / path
-        else:
-            log_path = project_root / ".chromie" / "experience" / "episodes.jsonl"
-        max_turns = int(os.getenv("ORCH_EPISODE_MAX_TURNS", "12"))
-        emit_runtime_events = os.getenv(
-            "ORCH_EMIT_EPISODE_RUNTIME_EVENTS", "0"
-        ).strip().lower() in {"1", "true", "yes", "on"}
-        event_root = cls._optional_env_path("CHROMIE_RUNTIME_EVENT_ROOT", project_root)
-        trigger_root = cls._optional_env_path(
-            "CHROMIE_DATA_LOOP_TRIGGER_ROOT", project_root
-        )
-        return cls(
-            enabled=enabled,
-            log_path=log_path,
-            max_turns=max_turns,
-            emit_runtime_events=emit_runtime_events,
-            event_root=event_root,
-            trigger_root=trigger_root,
-        )
-
     def record_interaction(
         self,
         *,
@@ -345,9 +313,6 @@ class EpisodeRecorder:
         )
         return episode
 
-    def reset_thread(self, conversation_id: str) -> None:
-        self._episodes.pop(conversation_id, None)
-
     def _emit_episode_event(
         self,
         *,
@@ -399,14 +364,6 @@ class EpisodeRecorder:
                 exc,
             )
             return
-
-    @staticmethod
-    def _optional_env_path(name: str, project_root: Path) -> Path | None:
-        raw = os.getenv(name, "").strip()
-        if not raw:
-            return None
-        path = Path(raw).expanduser()
-        return path if path.is_absolute() else project_root / path
 
     def _turn_from_response(
         self,

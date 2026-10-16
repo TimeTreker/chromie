@@ -29,71 +29,39 @@ from .local_tool_execution import LocalToolExecutor
 from .cognitive_gateway import AttentionReviewer
 from .cognitive_activation import CognitiveActivationResolver
 
-try:
-    from chromie_contracts.agent_skill import (
-        AgentSkillDisclosureRequest,
-        AgentSkillDisclosureResolution,
-        AgentSkillRegistrySnapshot,
-        AgentSkillSelectionRequest,
-        AgentSkillSelectionResolution,
-    )
-    from chromie_contracts.core_interpretation import (
-        CognitiveWorkRequest,
-        CoreInterpretationResult,
-        CoreInterpretationUnavailable,
-    )
-    from chromie_contracts.cognitive_activation import (
-        CognitiveActivationContext,
-        CognitiveActivationDecision,
-    )
-    from chromie_contracts.tool_result import (
-        ToolExecutionRequest,
-        ToolExecutionResponse,
-    )
-    from chromie_contracts.user_turn import (
-        AttentionReviewRequest,
-        AttentionReviewResult,
-        CoreTurnRequest,
-    )
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.agent_skill import (
-        AgentSkillDisclosureRequest,
-        AgentSkillDisclosureResolution,
-        AgentSkillRegistrySnapshot,
-        AgentSkillSelectionRequest,
-        AgentSkillSelectionResolution,
-    )
-    from shared.chromie_contracts.core_interpretation import (
-        CognitiveWorkRequest,
-        CoreInterpretationResult,
-        CoreInterpretationUnavailable,
-    )
-    from shared.chromie_contracts.cognitive_activation import (
-        CognitiveActivationContext,
-        CognitiveActivationDecision,
-    )
-    from shared.chromie_contracts.tool_result import (
-        ToolExecutionRequest,
-        ToolExecutionResponse,
-    )
-    from shared.chromie_contracts.user_turn import (
-        AttentionReviewRequest,
-        AttentionReviewResult,
-        CoreTurnRequest,
-    )
+from shared.chromie_contracts.agent_skill import (
+    AgentSkillDisclosureRequest,
+    AgentSkillDisclosureResolution,
+    AgentSkillRegistrySnapshot,
+    AgentSkillSelectionRequest,
+    AgentSkillSelectionResolution,
+)
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveWorkRequest,
+    CoreInterpretationResult,
+    CoreInterpretationUnavailable,
+)
+from shared.chromie_contracts.cognitive_activation import (
+    CognitiveActivationContext,
+    CognitiveActivationDecision,
+)
+from shared.chromie_contracts.tool_result import (
+    ToolExecutionRequest,
+    ToolExecutionResponse,
+)
+from shared.chromie_contracts.user_turn import (
+    AttentionReviewRequest,
+    AttentionReviewResult,
+    CoreTurnRequest,
+)
 from .goal_association import GoalAssociationResolver
 from .fast_planner import FastPlannerResolver
 from .social_cognition import SocialCognitionResolver
 from .reflection import ReflectionResolver
 from .value_judgment import ValueJudgmentResolver
-try:
-    from chromie_contracts.reflection import ReflectionRequest
-    from chromie_contracts.value_judgment import ValueJudgmentResult
-    from chromie_contracts.social_cognition import SocialCognitionRequest
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.reflection import ReflectionRequest
-    from shared.chromie_contracts.value_judgment import ValueJudgmentResult
-    from shared.chromie_contracts.social_cognition import SocialCognitionRequest
+from shared.chromie_contracts.reflection import ReflectionRequest
+from shared.chromie_contracts.value_judgment import ValueJudgmentResult
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest
 from .schema import HealthResponse
 from .cognitive_core.user_meaning_interpreter import (
     UserMeaningInterpretationRequest,
@@ -116,10 +84,7 @@ from .work_dag import (
 )
 from .tool_invocation import McpStreamableHttpInvoker
 
-try:
-    from chromie_contracts.semantic_authority import semantic_authority_route_matrix
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.semantic_authority import semantic_authority_route_matrix
+from shared.chromie_contracts.semantic_authority import semantic_authority_route_matrix
 
 
 
@@ -374,20 +339,20 @@ social_cognition_client = (
 )
 social_cognition_deep_client = (
     build_model_client(
-        model=settings.deep_planner_model,
-        timeout_ms=settings.deep_planner_timeout_ms,
+        model=settings.deliberative_model,
+        timeout_ms=settings.deliberative_timeout_ms,
         purpose="social_cognition_deep",
         service_settings=settings,
     )
-    if settings.use_llm and settings.deep_planner_enabled
+    if settings.use_llm and settings.deliberative_enabled
     else None
 )
 social_cognition_resolver = (
     SocialCognitionResolver(
         social_cognition_client, capability_catalog,
         deep_model=social_cognition_deep_client,
-        num_ctx=max(settings.fast_planner_num_ctx, settings.deep_planner_num_ctx),
-        num_predict=min(settings.deep_planner_num_predict, 1024),
+        num_ctx=max(settings.fast_planner_num_ctx, settings.deliberative_num_ctx),
+        num_predict=min(settings.deliberative_num_predict, 1024),
     )
     if social_cognition_client is not None
     else None
@@ -411,19 +376,19 @@ value_judgment_resolver = (
 )
 reflection_client = (
     build_model_client(
-        model=settings.deep_planner_model,
-        timeout_ms=settings.deep_planner_timeout_ms,
+        model=settings.deliberative_model,
+        timeout_ms=settings.deliberative_timeout_ms,
         purpose="reflection",
         service_settings=settings,
     )
-    if settings.use_llm and settings.deep_planner_enabled
+    if settings.use_llm and settings.deliberative_enabled
     else None
 )
 reflection_resolver = (
     ReflectionResolver(
         reflection_client,
-        num_ctx=settings.deep_planner_num_ctx,
-        num_predict=settings.deep_planner_num_predict,
+        num_ctx=settings.deliberative_num_ctx,
+        num_predict=settings.deliberative_num_predict,
     )
     if reflection_client is not None
     else None

@@ -192,7 +192,7 @@ def test_build_context_uses_disclosure_safe_memory_projection_not_raw_snapshot()
 
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.is_playing_audio = False
-    assistant.playback_generation = 0
+    assistant.playback_delivery.playback_generation = 0
     assistant.action_dry_run = False
     assistant.mind = SimpleNamespace(context=lambda: {})
     assistant._interaction_engagement_context = lambda *_args, **_kwargs: {}

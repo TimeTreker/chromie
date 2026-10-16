@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +22,10 @@ if str(ROOT) not in sys.path:
 
 from orchestrator.runtime.evidence_identity import (  # noqa: E402
     load_runtime_evidence_identity,
+)
+from scripts.evidence_io import (  # noqa: E402
+    git_revision as _git_revision,
+    read_json_object as _read_json,
 )
 from scripts.cognitive_runtime_acceptance import (  # noqa: E402
     _evidence_capability_id,
@@ -36,13 +39,6 @@ from scripts.interaction_text_mujoco_check import (  # noqa: E402
 DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "cognitive_gateway_core_qualification_v1.json"
 )
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return payload
 
 
 def _file_sha256(path: Path) -> str:
@@ -74,18 +70,6 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"{path}:{line_number}: expected a JSON object")
         events.append(value)
     return events
-
-
-def _git_revision() -> str | None:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            cwd=ROOT,
-            text=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-    except Exception:
-        return None
 
 
 def _event_by_type(
@@ -221,7 +205,7 @@ def _validate_runtime_identity(
                     "AGENT_USER_MEANING_INTERPRETER_MODEL",
                     "AGENT_GOAL_ASSOCIATION_MODEL",
                     "AGENT_FAST_PLANNER_MODEL",
-                    "AGENT_DEEP_PLANNER_MODEL",
+                    "AGENT_DELIBERATIVE_MODEL",
                 }
                 for key in sorted(required_model_keys):
                     expected = launcher_models.get(key)

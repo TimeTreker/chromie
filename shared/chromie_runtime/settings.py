@@ -6,16 +6,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
+from .env_values import parse_bool
+
 
 def _text(values: Mapping[str, str], name: str, default: str = "") -> str:
     return str(values.get(name, default) or "").strip()
 
 
 def _boolean(values: Mapping[str, str], name: str, default: bool = False) -> bool:
-    raw = values.get(name)
-    if raw is None:
-        return default
-    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+    return parse_bool(values.get(name), name=name, default=default)
 
 
 def _integer(

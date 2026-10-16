@@ -303,9 +303,9 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.interaction_runtime = runtime
         assistant.playback_delivery = runtime.playback_delivery
-        assistant.playback_generation = 4
-        assistant.playback_queue = asyncio.Queue()
-        assistant.active_synthesis_tasks = set()
+        assistant.playback_delivery.playback_generation = 4
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.active_synthesis_tasks = set()
         assistant.is_playing_audio = False
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
@@ -645,7 +645,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         assistant_ref: dict[str, VoiceAssistant] = {}
 
         def make_stale() -> None:
-            assistant_ref["assistant"].playback_generation += 1
+            assistant_ref["assistant"].playback_delivery.playback_generation += 1
 
         runtime = _Runtime(
             CapabilityRuntimeResult(
@@ -687,7 +687,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
 
         def make_overlap() -> None:
             assistant = assistant_ref["assistant"]
-            assistant.playback_generation += 1
+            assistant.playback_delivery.playback_generation += 1
             sid = assistant.sessions.create()
             newer_session["sid"] = sid
 

@@ -1,7 +1,9 @@
 # Chromie Bilingual OuteTTS Speaker Guide
 
-This guide creates a Chromie OuteTTS speaker profile that works better for both
-English and Chinese. OuteTTS can synthesize both languages, but the speaker
+This guide applies only to the optional OuteTTS backend (`chromie-tts-oute`, a
+low-resource fallback; see [TTS](tts/README.md)). The maintained default,
+CosyVoice3, installs its reference voice with `scripts/tts_reference.py` instead.
+It creates an OuteTTS speaker profile that works better for both English and Chinese. OuteTTS can synthesize both languages, but the speaker
 reference strongly affects accent, tone, and pronunciation. A clean bilingual
 reference WAV is usually better than the built-in English-only test speaker.
 
@@ -67,7 +69,6 @@ wpctl status
 Record with PipeWire:
 
 ```bash
-cd /home/chromie/github/chromie
 mkdir -p tts/speakers
 pw-record --rate 48000 --channels 1 tts/speakers/chromie_bilingual_zh_en.wav
 ```
@@ -105,17 +106,19 @@ best take is not the most dramatic one; it is the clearest, steadiest one.
 
 ## Create The Speaker Profile
 
-Start Chromie's services first if they are not already running:
+Start the OuteTTS service first if it is not already running (from the repository
+root):
 
 ```bash
-cd /home/chromie/github/chromie
-./scripts/start_services.sh
+./scripts/compose.sh --profile tts-evaluation up -d chromie-tts-oute
 ```
+
+`tts/speakers/` is bind-mounted into that container as `/app/speakers`; put the
+reference WAV and its transcript there.
 
 Create the OuteTTS speaker profile and make it the default:
 
 ```bash
-cd /home/chromie/github/chromie
 ./scripts/create_speaker_in_container.sh \
   /app/speakers/chromie_bilingual_zh_en.wav \
   chromie_bilingual_zh_en \
@@ -129,15 +132,15 @@ tts/speakers/chromie_bilingual_zh_en.json
 tts/speakers/default.json
 ```
 
-Chromie's orchestrator normally uses `TTS_SPEAKER_ID=default`, so making this
-speaker the default is the simplest setup.
+When OuteTTS is the selected backend (`./scripts/start_chromie.sh --tts-backend oute`),
+the orchestrator uses `TTS_SPEAKER_ID=default`, so making this speaker the default
+is the simplest setup.
 
 ## Test English And Chinese
 
 Use Chromie's text-to-MuJoCo voice path with speaker output:
 
 ```bash
-cd /home/chromie/github/chromie
 ./scripts/run_voice_mujoco_text_case.sh "Hello, I am Chromie. I can speak English clearly." --speaker
 ./scripts/run_voice_mujoco_text_case.sh "你好，我是 Chromie。我可以自然地说中文。" --speaker
 ```

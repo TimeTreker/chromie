@@ -10,18 +10,11 @@ from typing import Any, AsyncGenerator
 
 import httpx
 
-try:
-    from chromie_runtime.llm_diagnostics import (
-        log_llm_call_evidence,
-        ollama_prompt_preflight_diagnostics,
-    )
-    from chromie_runtime.runtime_trace import TraceModule
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_runtime.llm_diagnostics import (
-        log_llm_call_evidence,
-        ollama_prompt_preflight_diagnostics,
-    )
-    from shared.chromie_runtime.runtime_trace import TraceModule
+from shared.chromie_runtime.llm_diagnostics import (
+    log_llm_call_evidence,
+    ollama_prompt_preflight_diagnostics,
+)
+from shared.chromie_runtime.runtime_trace import TraceModule
 
 from ..inference_compute import CognitionComputeClass
 from ..settings import AgentServiceSettings

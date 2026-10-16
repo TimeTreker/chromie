@@ -6,6 +6,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .text import normalize_whitespace
 
+# Persisted identifiers. Soridormi's DAG contract names the same lanes
+# ``speaking_execution`` ("vocal" here) and ``activity_execution``; its
+# ``social_attention_proposal`` lane has no Chromie execution identifier because
+# Social Attention proposals never execute as a lane of their own.
 ChromieExecutionLane = Literal[
     "vocal",
     "activity",

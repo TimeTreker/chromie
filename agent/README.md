@@ -229,5 +229,4 @@ For project architecture and current status, see:
 Additional owned mechanical contracts:
 
 - [Capability Result Evidence Re-entry](../docs/CAPABILITY_RESULT_EVIDENCE_REENTRY.md)
-- [WorkDAG mechanics](../docs/work_dag.md)
-- [WorkDAG concurrency decision](../docs/dag_engine_concurrency.md)
+- [WorkDAG mechanics and concurrency](../docs/WORK_DAG.md)

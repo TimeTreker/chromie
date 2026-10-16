@@ -36,8 +36,9 @@ from scripts.qualify_inference_provider import (  # noqa: E402
 )
 
 # Input cohort keeps its frozen historical filename/qualification ID; this probe's
-# runtime role and output contract are UMI.
-DEFAULT_USER_MEANING_INTERPRETER_MANIFEST = ROOT / "benchmarks/manifests/goal_interpreter_primary_v1.json"
+# runtime role and output contract are UMI. It shares the file-backed cohort used
+# by `qualify_inference_provider.py --goal-interpreter-probe`.
+DEFAULT_USER_MEANING_INTERPRETER_MANIFEST = ROOT / "benchmarks/manifests/goal_interpreter_primary_v2.json"
 
 DEFAULT_OUTPUT_ROOT = (
     ROOT / ".chromie" / "acceptance" / "model-qualification" / "umi-model-potential"

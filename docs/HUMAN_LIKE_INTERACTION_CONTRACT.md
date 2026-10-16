@@ -582,9 +582,9 @@ The first Goal-free non-turn source path is implemented: an already-trusted type
 revision may raise a provenance-bound Goal-free `CognitiveOpportunity` and enter a stateless
 Social Cognition Situation scope without a synthetic user turn, Responsibility or Goal.
 It is an independent SC call with a restricted input/output contract. The result is either silence or one context-grounded low-commitment speech
-Activity and can never contain Capability Work. PSM-5 now provides a source-neutral trusted person/presence/audience observation contract; concrete perception providers and the quality/frequency of initiative remain separately qualified target behavior; `slow` Goal-free readiness and Fast semantic escalation now enter one bounded PSM-8 deliberative pass using the quality/deep model under the same restricted SC authority. The pass may not create Goal/Work or recurse; depth does not widen its permissions. A completed decision is never sent for another model review.
+Activity and can never contain Capability Work. A source-neutral trusted person/presence/audience observation contract exists; concrete perception providers and the quality/frequency of initiative remain separately qualified target behavior; `slow` Goal-free readiness and Fast semantic escalation now enter one bounded deliberative pass using the quality/deep model under the same restricted SC authority. The pass may not create Goal/Work or recurse; depth does not widen its permissions. A completed decision is never sent for another model review.
 
-PSM-6 also admits trusted social feedback as ordinary Goal-free Situation. A source may bind an observed signal to exact delivered Chromie Activity IDs; the same SC authority decides silence, follow-up, or repair. `repair` is a Communicative Activity function and must cite an actually delivered Activity. Runtime validates the citation only; it never classifies the human reaction or chooses an apology.
+Trusted social feedback is also admitted as ordinary Goal-free Situation. A source may bind an observed signal to exact delivered Chromie Activity IDs; the same SC authority decides silence, follow-up, or repair. `repair` is a Communicative Activity function and must cite an actually delivered Activity. Runtime validates the citation only; it never classifies the human reaction or chooses an apology.
 
 The first relational-Memory slice is likewise implemented inside the existing Memory owner.
 Person/relationship/shared-experience entries may carry exact subject/source-person/audience
@@ -616,7 +616,7 @@ accepts already-trusted typed interpretations only; source adapters remain respo
 sensing, person/principal resolution, audience resolution, privacy admission, and semantic
 interpretation.
 
-PSM-9 also allows short-lived Chromie-owned concerns/interests to survive as bounded session Memory. They are not user Responsibilities and do not become Goals merely because Chromie cares about them. They may influence later cognition when relevant, expire naturally, and cannot schedule themselves or authorize effects.
+Short-lived Chromie-owned concerns/interests may survive as bounded session Memory. They are not user Responsibilities and do not become Goals merely because Chromie cares about them. They may influence later cognition when relevant, expire naturally, and cannot schedule themselves or authorize effects.
 
 ## Progressive cognition and conversational self-repair
 
@@ -733,7 +733,7 @@ communication needs. A scheduled act is not heard speech and cannot complete a
 conversational Goal. Only its correlated completed playback can supply that evidence.
 SC may remain silent when it would repeat a delivered message or add no useful
 information. It must not describe scheduled Work as running, or running Work as
-completed. UMI supplies meaning, Work Planner supplies execution and communication
+completed. UMI supplies meaning, Planner supplies execution and communication
 obligations, and SC supplies words, timing and optional expression. The Host validates
 and delivers their exact decisions without rewriting semantics.
 

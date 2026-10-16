@@ -89,7 +89,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
                 assistant = VoiceAssistant.__new__(VoiceAssistant)
                 assistant.action_dry_run = dry_run
                 assistant.is_playing_audio = False
-                assistant.playback_generation = 0
+                assistant.playback_delivery.playback_generation = 0
                 assistant.conversation_state = SimpleNamespace(
                     snapshot=lambda: {"history": [{"role": "user", "text": "hello"}]},
                     active_goal_snapshots=lambda *, limit=None: [],
@@ -641,7 +641,7 @@ def test_failure_after_sc_reaches_session_terminal_without_resetting_audio(early
         ))
         assistant.sessions = SessionTracker(enabled=False)
         sid = assistant.sessions.create()
-        assistant.playback_generation = 2
+        assistant.playback_delivery.playback_generation = 2
         state = assistant.sessions.state[sid]
         state.update(scheduled_tts=1, played_tts=int(early_status == "playback_completed"))
         event = assistant._register_turn_speech_event(
@@ -699,7 +699,7 @@ def test_failure_after_sc_reaches_session_terminal_without_resetting_audio(early
         await _wait_for_session_done(assistant, sid, 0.2, lambda: None)
         assert state["done_logged"]
         assert not state["interrupted"]
-        assert assistant.playback_generation == 2
+        assert assistant.playback_delivery.playback_generation == 2
 
     asyncio.run(run())
 

@@ -65,12 +65,14 @@ authority, or failure semantics become clearer. See the size-review policy in
   features, new architecture, new runtime switches, or new terminology unless
   the change directly closes those prerequisites or a demonstrated
   safety/provenance blocker.
-- Before creating or pushing any delivery commit, update both
-  `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in that same commit with the exact
-  implemented scope, evidence actually observed, known failures/blockers,
-  revision context, retained artifact paths, and next resume commands. Never
-  rely on chat history as the only handoff and never claim an unrun or failing
-  gate as passed.
+- When a delivery commit changes behavior, evidence, blockers or resume state,
+  update `docs/STATUS.md`, `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in that
+  same commit by replacing their current sections: implemented scope, evidence
+  actually observed, known failures/blockers, retained artifact paths and next
+  resume commands. These are current-state documents; never append a dated
+  delivery entry or keep superseded commands. History belongs in Git and a short
+  `CHANGELOG.md` entry. Never rely on chat history as the only handoff and never
+  claim an unrun or failing gate as passed.
 - Treat the Project Charter's engineering principles and canonical architecture
   invariants as binding constraints during normal development. A coding agent
   may identify evidence that a principle itself should change, but must not
@@ -225,10 +227,7 @@ For interface, configuration, status, or support changes, update the owned
 source-of-truth document in the same patch. Use the four-axis status vocabulary
 from `docs/STATUS.md`.
 
-## Static analysis
+## Static analysis and test ownership
 
-Run the pinned incremental static-analysis gates through `./scripts/run_tests.sh`. The reviewed scope, rules, and ratchet policy are documented in [Static Analysis Ratchets](docs/STATIC_ANALYSIS.md). Do not add blanket ignores or remove checked paths to make a gate pass.
-
-## Test ownership
-
-Behavior belongs in executable assertions, forbidden architecture in the repository policy checker, and literal source checks only in reviewed generated-artifact contracts. See [Test Ownership](docs/TEST_OWNERSHIP.md) and run `python scripts/check_test_ownership.py`.
+Follow the Static analysis and Test ownership sections of
+[CONTRIBUTING.md](CONTRIBUTING.md).

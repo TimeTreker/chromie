@@ -56,29 +56,18 @@ async def shutdown_voice_assistant(
         reason="cleanup",
     )
 
-    playback_state = getattr(host, "playback_delivery", None)
-    if playback_state is not None:
-        playback_state.cancel_output_duck()
+    playback_state = host.playback_delivery
+    playback_state.cancel_output_duck()
 
     await _cancel_and_drain(getattr(host, "audio_device_monitor_task", None))
 
-    _cancel_tasks(set(getattr(host, "active_synthesis_tasks", set())))
+    _cancel_tasks(set(playback_state.active_synthesis_tasks))
 
-    input_lifecycle = getattr(host, "input_turn_lifecycle", None)
-    shutdown_tasks = getattr(input_lifecycle, "shutdown_tasks", None)
-    if callable(shutdown_tasks):
-        shutdown_tasks()
-        input_lifecycle.active_reflex_task = None
-        input_lifecycle.pending_turn_after_reflex.clear()
-        input_lifecycle.pending_vad_audio = None
-    else:
-        # Minimal test/diagnostic hosts may not have constructed the collaborator.
-        active_asr_task = getattr(host, "active_asr_task", None)
-        if active_asr_task is not None and not active_asr_task.done():
-            active_asr_task.cancel()
-        active_turn_task = getattr(host, "active_turn_task", None)
-        if active_turn_task is not None and not active_turn_task.done():
-            active_turn_task.cancel()
+    input_lifecycle = host.input_turn_lifecycle
+    input_lifecycle.shutdown_tasks()
+    input_lifecycle.active_reflex_task = None
+    input_lifecycle.pending_turn_after_reflex.clear()
+    input_lifecycle.pending_vad_audio = None
 
     output_abort_tasks = list(getattr(host, "output_abort_tasks", set()))
     _cancel_tasks(output_abort_tasks)
@@ -98,9 +87,9 @@ async def shutdown_voice_assistant(
 
     _cancel_tasks(set(getattr(host, "observability_tasks", set())))
 
-    playback_task = getattr(host, "playback_task", None)
+    playback_task = playback_state.playback_task
     if playback_task is not None and not playback_task.done():
-        await host.playback_queue.put((None, None, None, None, None, None))
+        await playback_state.playback_queue.put((None, None, None, None, None, None))
         playback_task.cancel()
 
     await close_output_stream()

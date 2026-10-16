@@ -12,24 +12,14 @@ from ..clients.ollama_client import llm_failure_metadata
 from ..prompt_projection import bounded_json
 from .loader import AgentSkillRegistry
 
-try:
-    from chromie_contracts.agent_skill import (
-        AgentSkillProjectionName,
-        AgentSkillSelectionModelOutput,
-        AgentSkillSelectionRequest,
-        AgentSkillSelectionResolution,
-        AgentSkillSummary,
-        SelectedAgentSkill,
-    )
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.agent_skill import (
-        AgentSkillProjectionName,
-        AgentSkillSelectionModelOutput,
-        AgentSkillSelectionRequest,
-        AgentSkillSelectionResolution,
-        AgentSkillSummary,
-        SelectedAgentSkill,
-    )
+from shared.chromie_contracts.agent_skill import (
+    AgentSkillProjectionName,
+    AgentSkillSelectionModelOutput,
+    AgentSkillSelectionRequest,
+    AgentSkillSelectionResolution,
+    AgentSkillSummary,
+    SelectedAgentSkill,
+)
 
 
 logger = logging.getLogger("chromie.agent.agent_skills.selection")

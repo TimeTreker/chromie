@@ -14,12 +14,8 @@ from typing import Any
 
 from .clients.ollama_client import OllamaClient, OllamaGenerationError, llm_failure_metadata
 
-try:
-    from chromie_contracts.core_interpretation import CognitiveWorkRequest
-    from chromie_contracts.value_judgment import ValueJudgmentModelOutput, ValueJudgmentResult
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-    from shared.chromie_contracts.value_judgment import ValueJudgmentModelOutput, ValueJudgmentResult
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_contracts.value_judgment import ValueJudgmentModelOutput, ValueJudgmentResult
 
 logger = logging.getLogger("chromie.agent.value_judgment")
 

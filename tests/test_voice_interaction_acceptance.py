@@ -383,8 +383,6 @@ def write_live_voice_fixture(root: Path) -> None:
     (root / "acceptance-overrides.env").write_text(
         "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
         "ORCH_ENABLE_SORIDORMI_CAPABILITIES=0\n"
-        "AGENT_INTERACTION_OUTPUT_MODE=native\n"
-        "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
         "ORCH_AUDIO_INPUT_MODE=device\n"
         "ORCH_AUDIO_OUTPUT_MODE=device\n"
         "ORCH_COGNITIVE_RUNTIME_MODE=apply\n"
@@ -2252,8 +2250,6 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             (root / "acceptance-overrides.env").write_text(
                 "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
                 "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1\n"
-                "AGENT_INTERACTION_OUTPUT_MODE=native\n"
-                "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
                 "ORCH_AUDIO_INPUT_MODE=device\n"
                 "ORCH_AUDIO_OUTPUT_MODE=device\n"
                 + GOAL_DRIVEN_OVERRIDE_TEXT
@@ -2337,8 +2333,6 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             (root / "acceptance-overrides.env").write_text(
                 "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
                 "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1\n"
-                "AGENT_INTERACTION_OUTPUT_MODE=native\n"
-                "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
                 "ORCH_AUDIO_INPUT_MODE=stdin\n"
                 "ORCH_AUDIO_OUTPUT_MODE=discard\n"
                 + GOAL_DRIVEN_OVERRIDE_TEXT
@@ -2463,8 +2457,6 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             (evidence / "acceptance-overrides.env").write_text(
                 "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
                 "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1\n"
-                "AGENT_INTERACTION_OUTPUT_MODE=native\n"
-                "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
                 "ORCH_AUDIO_INPUT_MODE=device\n"
                 "ORCH_AUDIO_OUTPUT_MODE=device\n"
                 + GOAL_DRIVEN_OVERRIDE_TEXT
@@ -2633,8 +2625,6 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
             (root / "acceptance-overrides.env").write_text(
                 "ORCH_ENABLE_INTERACTION_RESPONSE=1\n"
                 "ORCH_ENABLE_SORIDORMI_CAPABILITIES=1\n"
-                "AGENT_INTERACTION_OUTPUT_MODE=native\n"
-                "AGENT_NATIVE_INTERACTION_FALLBACK=0\n"
                 "ORCH_AUDIO_INPUT_MODE=device\n"
                 "ORCH_AUDIO_OUTPUT_MODE=device\n"
                 + GOAL_DRIVEN_OVERRIDE_TEXT

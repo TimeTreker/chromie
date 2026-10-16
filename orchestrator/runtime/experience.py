@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -39,34 +38,6 @@ class ExperienceManager:
             log_path=settings.log_path,
             proposal_path=settings.proposal_path,
         )
-
-    @classmethod
-    def from_env(cls, project_root: Path) -> "ExperienceManager":
-        enabled = os.getenv("ORCH_ENABLE_EXPERIENCE_JOURNAL", "1").strip().lower() not in {
-            "0",
-            "false",
-            "no",
-            "off",
-        }
-        log_path = cls._path_from_env(
-            "ORCH_EXPERIENCE_LOG_PATH",
-            project_root / ".chromie" / "experience" / "experience.jsonl",
-            project_root,
-        )
-        proposal_path = cls._path_from_env(
-            "ORCH_MIND_PROPOSAL_LOG_PATH",
-            project_root / ".chromie" / "experience" / "mind_update_proposals.jsonl",
-            project_root,
-        )
-        return cls(enabled=enabled, log_path=log_path, proposal_path=proposal_path)
-
-    @staticmethod
-    def _path_from_env(name: str, default: Path, project_root: Path) -> Path:
-        raw = os.getenv(name, "").strip()
-        if not raw:
-            return default
-        path = Path(raw).expanduser()
-        return path if path.is_absolute() else project_root / path
 
     def record_interaction(
         self,

@@ -43,6 +43,7 @@ from orchestrator.runtime.observability_recording import (
 )
 from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
 from orchestrator.runtime.soridormi_scene_perception import refresh_soridormi_ambient_scene_once
+from scripts.evidence_io import write_json as _write_json  # noqa: E402
 from scripts.outcome_observations import observed_capability_args
 DEFAULT_EVIDENCE_ROOT = ROOT / ".chromie" / "acceptance" / "text-mujoco"
 DEFAULT_TEXT = (
@@ -403,14 +404,6 @@ def print_result_summary(summary: dict[str, Any]) -> None:
             "[interaction-text-mujoco][evidence] "
             f"{Path(evidence_dir) / 'summary.json'}"
         )
-
-
-def _write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _exception_text(exc: BaseException) -> str:

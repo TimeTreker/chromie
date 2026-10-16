@@ -12,3 +12,11 @@ hf_cache/
 ollama_data/
 recordings/
 tts/speakers/
+**/.ruff_cache/
+# Private voice references, acceptance evidence and runtime traces never
+# belong in an image build context (.gitignore keeps them out of git too).
+.chromie/
+# No image COPYs these trees; keep them out of the root build context.
+benchmarks/
+docs/
+tests/

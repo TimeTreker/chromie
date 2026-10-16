@@ -15,12 +15,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY agent/app ./app
 COPY agent-skills ./agent-skills
-COPY shared/chromie_contracts ./chromie_contracts
-COPY shared/chromie_runtime ./chromie_runtime
+# Agent code imports the shared packages as shared.chromie_contracts and
+# shared.chromie_runtime, the same import root the host and tests use.
+COPY shared/chromie_contracts ./shared/chromie_contracts
+COPY shared/chromie_runtime ./shared/chromie_runtime
 
 # Validate the packaged import layout during image construction. Source-tree
 # imports must not survive until the container restart loop.
-RUN python -c "from app.capabilities.catalog import CapabilityCatalog; from chromie_contracts.soridormi_body_contract import normalize_soridormi_body_contract; assert CapabilityCatalog and callable(normalize_soridormi_body_contract)"
+RUN python -c "from app.capabilities.catalog import CapabilityCatalog; from shared.chromie_contracts.soridormi_body_contract import normalize_soridormi_body_contract; assert CapabilityCatalog and callable(normalize_soridormi_body_contract)"
 
 EXPOSE 8092
 

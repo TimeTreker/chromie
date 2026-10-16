@@ -9,7 +9,6 @@ runtime policy, or grant release qualification.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import subprocess
@@ -23,6 +22,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.evidence_io import (  # noqa: E402
+    read_json_object as _read_json,
+    sha256_file as _sha256,
+    utc_now as _utc_now,
+)
 from scripts.generate_runtime_env import parse_env_file  # noqa: E402
 
 DEFAULT_MANIFEST = (
@@ -59,27 +63,8 @@ class StageSpec:
     env_files: tuple[Path, ...] = ()
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def _run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    value = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(value, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return value
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _artifact_record(path: Path) -> dict[str, Any]:

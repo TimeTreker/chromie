@@ -19,12 +19,8 @@ from pydantic import (
 )
 from pydantic.json_schema import JsonSchemaValue
 
-try:
-    from chromie_contracts.text import normalize_whitespace
-    from chromie_contracts.core_interpretation import CognitiveActivationRequest
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.text import normalize_whitespace
-    from shared.chromie_contracts.core_interpretation import CognitiveActivationRequest
+from shared.chromie_contracts.text import normalize_whitespace
+from shared.chromie_contracts.core_interpretation import CognitiveActivationRequest
 
 
 # Existing location-binding vocabulary shared by the decoder and Host validator.

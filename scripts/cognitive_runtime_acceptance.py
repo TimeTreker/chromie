@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -21,6 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.evidence_io import (  # noqa: E402
+    git_revision as _git_revision,
+    read_json_object as _read_json,
+)
 from scripts.behavior_scenarios import (  # noqa: E402
     DEFAULT_SCENARIO_ROOT,
     load_scenarios,
@@ -29,13 +32,6 @@ from scripts.behavior_scenarios import (  # noqa: E402
 
 DEFAULT_EVENTS = ROOT / ".chromie" / "evidence" / "cognitive-runtime" / "events.jsonl"
 DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "acceptance" / "cognitive-runtime"
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return payload
 
 
 def _read_events(path: Path) -> list[dict[str, Any]]:
@@ -50,15 +46,6 @@ def _read_events(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"{path}:{line_number}: expected a JSON object")
         events.append(value)
     return events
-
-
-def _git_revision() -> str | None:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True, stderr=subprocess.DEVNULL
-        ).strip()
-    except Exception:
-        return None
 
 
 def _soridormi_revision() -> str | None:

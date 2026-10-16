@@ -280,7 +280,7 @@ def test_future_intention_survives_restart_and_due_host_reentry_dispatches_once(
         host=VoiceAssistant.__new__(VoiceAssistant)
         host.agent_client=client
         host.conversation_state=restored
-        host.cognitive_runtime_policy=SimpleNamespace(fast_planner_timeout_ms=3000,deep_planner_timeout_ms=6000)
+        host.cognitive_runtime_policy=SimpleNamespace(fast_planner_timeout_ms=3000,deliberative_timeout_ms=6000)
         host.cognitive_runtime=GoalDrivenRuntimeCoordinator(agent_client=client,adapter=adapter,policy=CognitiveRuntimePolicy(mode='apply'))
         logs=[]
         host.session_log=lambda *args,**kwargs: logs.append((args,kwargs))

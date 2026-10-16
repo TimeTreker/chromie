@@ -23,6 +23,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from orchestrator.runtime.evidence_identity import canonical_json_sha256  # noqa: E402
+from scripts.evidence_io import sha256_file as _sha256_file  # noqa: E402
 from scripts.generate_runtime_env import COGNITIVE_BUDGET_KEYS  # noqa: E402
 
 DEFAULT_OUTPUT = ROOT / ".chromie" / "evidence" / "runtime-identity.json"
@@ -43,7 +44,7 @@ MODEL_KEYS = (
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_COGNITIVE_ACTIVATION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
-    "AGENT_DEEP_PLANNER_MODEL",
+    "AGENT_DELIBERATIVE_MODEL",
     "AGENT_MODEL",
     "OLLAMA_MODEL",
 )
@@ -150,14 +151,6 @@ def _run(command: Iterable[str], *, cwd: Path = ROOT) -> str:
         detail = completed.stderr.strip() or completed.stdout.strip() or "unknown error"
         raise CaptureError(f"command failed ({' '.join(command)}): {detail}")
     return completed.stdout.strip()
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _git_source_tree_identity(root: Path) -> dict[str, Any]:

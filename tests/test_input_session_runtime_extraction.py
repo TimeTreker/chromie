@@ -86,13 +86,15 @@ class InputSessionRuntimeExtractionTests(unittest.TestCase):
         self.assertNotIn("GoalAssociation", source)
         self.assertNotIn("CanonicalPlan", source)
 
-    def test_voice_assistant_compatibility_aliases_resolve_to_lifecycle(self) -> None:
+    def test_voice_assistant_exposes_lifecycle_state_only_through_collaborators(self) -> None:
         host = VoiceAssistant.__new__(VoiceAssistant)
-        host.input_turn_lifecycle = InputTurnLifecycle()
+        lifecycle = InputTurnLifecycle()
+        host.input_turn_lifecycle = lifecycle
 
-        self.assertIs(host.mic_queue, host.input_turn_lifecycle.mic_queue)
-        host._vad_leftover = b"abc"
-        self.assertEqual(host.input_turn_lifecycle.vad_leftover, b"abc")
+        self.assertIs(host.input_turn_lifecycle, lifecycle)
+        self.assertIsInstance(host.playback_delivery.playback_generation, int)
+        for retired_alias in ("mic_queue", "_vad_leftover", "playback_queue", "order_lock"):
+            self.assertFalse(hasattr(host, retired_alias), retired_alias)
 
 
 if __name__ == "__main__":
