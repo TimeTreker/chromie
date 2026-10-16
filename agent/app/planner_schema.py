@@ -2018,6 +2018,12 @@ def fast_advance_response_schema(
     }
     speech_only = {item.local_ref for item in responsibility_items if item.output_mode == "speech"}
     capability_refs = [ref for ref in refs if ref not in speech_only]
+    # An information question that current established perception already answers ("is there
+    # water?" with a bottle in view) is answered from the cited observation; with no answer
+    # path the Planner fetched the water to "confirm" it (live 2026-10-16).
+    perceived_answer_refs = {
+        item.local_ref for item in responsibility_items if item.output_mode == "information"
+    } if situation_source_refs else set()
     # Both ends of a typed requested concurrency; a Capability that cannot run in
     # parallel cannot realize them, so the decoder leaves a limitation instead.
     concurrent_refs: set[str] = set()
@@ -2236,6 +2242,9 @@ def fast_advance_response_schema(
             source_refs["items"] = {"type": "string", "enum": allowed_refs}
             source_refs["uniqueItems"] = True
             source_refs["maxItems"] = len(allowed_refs)
+        if contract_name == "FastPlannerResponseNeed":
+            # Host writes a perceived answer's citations from the decision's observed_refs.
+            contract_properties.pop("situation_interpretation_refs", None)
         role = contract_properties.get("role")
         if isinstance(role, dict):
             # Put the discriminating semantic choice before the branch payload.
@@ -2306,6 +2315,24 @@ def fast_advance_response_schema(
             # does not know, or will not say (live 2026-10-12: a joke was "unavailable").
             branches = ([answered] if ref in speech_only and "answer" in choices
                         else [limitation] if not choices else [answered, limitation])
+            if ref in perceived_answer_refs and not (committed_communicative or suppress_new_communicative):
+                # Name the observations first; only a cited one opens answer_from_perception.
+                observed = {
+                    "type": "object", "additionalProperties": False,
+                    "required": ["observed_refs", "decision", "missing"],
+                    "properties": {
+                        "observed_refs": {"type": "array", "minItems": 1, "uniqueItems": True,
+                                          "maxItems": min(8, len(situation_source_refs or [])),
+                                          "items": {"type": "string", "enum": list(situation_source_refs or [])}},
+                        "decision": {"type": "string", "enum": ["answer_from_perception"]},
+                        "missing": {"type": "array", "maxItems": 0},
+                    },
+                }
+                for branch in branches:
+                    branch["properties"] = {"observed_refs": {"type": "array", "maxItems": 0},
+                                            **branch["properties"]}
+                    branch["required"] = ["observed_refs", *branch["required"]]
+                branches = [*branches, observed]
             per_ref[ref] = copy.deepcopy(branches[0]) if len(branches) == 1 else {"oneOf": copy.deepcopy(branches)}
         decisions_schema.clear()
         decisions_schema.update({
@@ -2767,17 +2794,21 @@ def fast_streaming_advance_response_schema(
             continue
         # A uniform decision is realized only by its own roles (live 2026-10-12: a single
         # work decision also authored a clarification and Host rejected the turn).
-        roles = _DECISION_ROLES.get(_STATE_DECISION.get(disposition, ""))
+        decided = _STATE_DECISION.get(disposition)
+        roles = set().union(*(_DECISION_ROLES[item] for item in decided)) if decided else None
         items = properties["activities"]["items"]
         if roles is not None and isinstance(items, dict) and isinstance(items.get("oneOf"), list):
             kept = [item for item in items["oneOf"]
                     if (item.get("properties", {}).get("role", {}).get("enum") or [""])[0] in roles]
-            if not kept and properties["activities"].get("minItems"):
+            # Host writes an answer from perception, so such a state may have no Activity.
+            activity_free = _state_decisions(properties) <= _ACTIVITY_FREE_DECISIONS
+            if not kept and properties["activities"].get("minItems") and not activity_free:
                 continue
             if kept:
                 items["oneOf"] = kept
             else:
                 properties["activities"]["maxItems"] = 0
+                properties["activities"].pop("minItems", None)
         states.append(state)
     compiled["oneOf"] = _exact_activity_count_states(states)
     _responsibility_refs_first(compiled)
@@ -2858,7 +2889,8 @@ def _serving_every_responsibility(items: Any, refs: list[str]) -> Any:
     return items
 
 
-_STATE_DECISION = {"execute": "work", "respond": "answer", "clarify": "clarify", "unavailable": "unavailable"}
+_STATE_DECISION = {"execute": {"work"}, "respond": {"answer", "answer_from_perception"},
+                   "clarify": {"clarify"}, "unavailable": {"unavailable"}}
 
 
 def _restrict_state_decisions(
@@ -2881,9 +2913,10 @@ def _restrict_state_decisions(
         kept = []
         for branch in choice.get("oneOf", [choice]):
             allowed = branch.get("properties", {}).get("decision", {}).get("enum") or []
-            if wanted in allowed:
+            if wanted & set(allowed):
                 narrowed = copy.deepcopy(branch)
-                narrowed["properties"]["decision"] = {"type": "string", "enum": [wanted]}
+                narrowed["properties"]["decision"] = {
+                    "type": "string", "enum": [value for value in allowed if value in wanted]}
                 kept.append(narrowed)
         if not kept:
             return False
@@ -2893,7 +2926,21 @@ def _restrict_state_decisions(
 
 MIXED_DECISION_STATE_MAX_REFS = 2
 MIXED_LIMITATION_STATE_MAX_REFS = 3
+_ACTIVITY_FREE_DECISIONS = frozenset({"answer_from_perception", "unavailable"})
+
+
+def _state_decisions(properties: dict[str, Any]) -> set[str]:
+    """Every decision a state still offers any Responsibility."""
+    per_ref = properties.get("responsibility_decisions", {}).get("properties", {})
+    found: set[str] = set()
+    for choice in per_ref.values():
+        for branch in choice.get("oneOf", [choice]):
+            found.update(branch.get("properties", {}).get("decision", {}).get("enum") or [])
+    return found
+
+
 _DECISION_ROLES = {"work": {"capability", "complete_response"}, "answer": {"complete_response"},
+                   "answer_from_perception": set(),
                    "clarify": {"clarification"}, "unavailable": set()}
 
 
@@ -2960,6 +3007,10 @@ def _mixed_limitation_states(state: dict[str, Any], responsibility_refs: list[st
                 kept_items.append(item)
             if kept_items:
                 stage["properties"]["activities"]["items"] = {"oneOf": kept_items}
+                states.append(stage)
+            elif all(assignment[ref] in _ACTIVITY_FREE_DECISIONS for ref in responsibility_refs):
+                stage["properties"]["activities"]["maxItems"] = 0
+                stage["properties"]["activities"].pop("minItems", None)
                 states.append(stage)
     return states
 

@@ -1248,6 +1248,59 @@ def test_host_rejects_observed_values_cited_to_the_persons_words():
     validate({"status": "known", "bindings": {"distance": 50}}, "fifty meters away")
 
 
+def perceived_answer(observed, decision="answer_from_perception", authored=False):
+    """Evidence before the decision; Host writes the cited response itself."""
+    return {"responsibility_decisions": {"r1": {"observed_refs": observed, "decision": decision, "missing": []}},
+        "disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["r1"],
+        "activities": [{"role": "complete_response", "activity_id": "answer_water",
+                        "source_responsibility_refs": ["r1"],
+                        "rationale": "r1 is answered by the observed bottle of water."}] if authored else [],
+        "confidence": 1.0, "unresolved": [], "reason_summary": "Answer from what Chromie sees."}
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("seen, observed, decision, authored, decoder_ok, host_ok", [
+    (True, [SEEN_WATER], "answer_from_perception", False, True, True),
+    (True, [], "answer_from_perception", False, False, False),  # an information answer cites what Chromie sees
+    (True, [SEEN_JUICE], "answer_from_perception", False, False, False),  # provisional: not citable
+    (False, [SEEN_WATER], "answer_from_perception", False, False, False),  # nothing perceived: no path
+    # The basis comes before the decision: a bare answer let "what time is it?" cite a milk bottle.
+    (True, [], "answer", False, False, False),
+    (True, [SEEN_WATER], "answer_from_perception", True, False, False),  # Host writes the response
+])
+async def test_information_already_perceived_is_answered_from_the_cited_observation(
+    seen, observed, decision, authored, decoder_ok, host_ok,
+):
+    # Live 2026-10-16: "家里还有水吗？" had no answer path, so the Planner fetched the water.
+    text = "Is there any water at home?"
+    meaning = OllamaUserMeaningInterpreter._validate_interpretation_content(
+        UserMeaningInterpretationRequest(text=text), json.dumps(intent_result(text, "information")),
+    )
+    request = CognitiveWorkRequest(sid="intent-handoff", text=text,
+        responsibilities=meaning.responsibilities, interpretation_confidence=1.0)
+    if seen:
+        request.context["situation"] = observed_scene()
+    raw = perceived_answer(observed, decision, authored)
+    model = Model([raw])
+    frames = [frame async for frame in FastPlannerResolver(
+        model, Catalog([provider_source_capability()])).stream_advance(request)]
+    from agent.app.clients.sglang_protocol import build_sglang_chat_payload
+    from agent.app.inference_compute import CognitionComputeClass
+
+    payload = build_sglang_chat_payload(
+        model="fixed", messages=[], compute_class=CognitionComputeClass.INTERACTIVE,
+        options=None, response_format=model.packets[0][1]["response_format"],
+        stream=True, priority_step=1,
+    )
+    sent = declared_ability_needs(raw, model.packets[0][1]["response_format"])
+    errors = list(Draft202012Validator(payload["response_format"]["json_schema"]["schema"]).iter_errors(sent))
+    assert (not errors) is decoder_ok, errors[:1]
+    assert isinstance(frames[0], FastPlannerStreamTerminal) is host_ok, frames[0]
+    if host_ok:
+        [answer] = frames[0].advance.activities
+        assert (answer.role, answer.situation_interpretation_refs) == ("complete_response", observed)
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("observed, provider_source, expected", [
     (True, True, True),

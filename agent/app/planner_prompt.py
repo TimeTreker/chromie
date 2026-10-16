@@ -173,6 +173,16 @@ FAST_SITUATION_SOURCE_PROMPT = (
     "observe and cite the observation; their words stay context. "
 )
 
+FAST_PERCEIVED_ANSWER_PROMPT = (
+    "When a current situation.interpretations entry already observes what an information "
+    "Responsibility asks (for example whether something is here, or where it is), that observation "
+    "is its Evidence: list it in that Responsibility's observed_refs and decide answer_from_perception, "
+    "with no Activity to check, fetch or confirm it. Otherwise leave observed_refs empty: perception "
+    "shows things and people around Chromie, never the time, the weather or other facts. Offering "
+    "further help with what was found is Social Cognition's; plan that help only when the person "
+    "asked for it. "
+)
+
 
 def provider_source_evidence(*, observed: bool) -> dict[str, Any]:
     """The ways a provider-owned source may be grounded, beside its Capability."""
@@ -888,6 +898,9 @@ def fast_advance_layered_prompt(
     # provider-owned source; the Situation part only when something is observed now.
     provider_sources = any(provider_resolves_required_source(item, "source") for item in capabilities)
     observed_sources = provider_sources and bool(situation_source_observations(context))
+    perceived_answers = bool(situation_source_observations(context)) and any(
+        item.output_mode == "information" for item in responsibilities
+    )
     contract = PLANNER_WORK_AUTHORITY_PROMPT + (
         "UMI owns WHAT. This Fast invocation decides Work over exact Responsibility refs while "
         "GA independently binds canonical Goals. The responsibilities array below is the complete "
@@ -1031,7 +1044,8 @@ def fast_advance_layered_prompt(
     rendered = (
         role_memory_context(context, role="planner") + contract + EXPLICIT_NUMERIC_ARGUMENT_GROUNDING_PROMPT
         + (PROVIDER_SOURCE_PROMPT if provider_sources else "")
-        + (FAST_SITUATION_SOURCE_PROMPT if observed_sources else "") + CAPABILITY_NEED_PROMPT
+        + (FAST_SITUATION_SOURCE_PROMPT if observed_sources else "")
+        + (FAST_PERCEIVED_ANSWER_PROMPT if perceived_answers else "") + CAPABILITY_NEED_PROMPT
         + "\nOwner-approved Chromie identity JSON:\n" + bounded_identity_json(context)
         + "\nOwner-approved Personality Expression JSON:\n" + bounded_personality_json(context)
         + "\nOwner-approved Stable Mind JSON:\n" + bounded_stable_mind_json(context, max_chars=PLANNER_STABLE_MIND_MAX_CHARS)

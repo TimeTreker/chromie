@@ -1,6 +1,29 @@
 # Chromie Development Checkpoint
 
-## Current work — Clock in the common tier (effective); scenario corrections; everyday runs 2-3, 2026-10-16
+## Current work — B (answer from perception) and E (receipt that does not agree), 2026-10-16
+
+Base `origin/main` `79e26919c` (the clock fix, committed and pushed by the agent on the owner's approval; the deployed
+Agent is still `rootcause14`). Owner: "do B and E first" and, on B, the Planner composes Work while Chromie may reply
+"水在厨房，要我给你拿过来吗？" (2026-10-16). Evidence: `.chromie/acceptance/everyday-20261016/` README ("Repairs B
+and E"); probes `planner_offline_stream.py`, `sc_ack_replay.py`.
+
+- B: "家里还有水吗？" was fetched because an information Responsibility had no answer path and no scene-read
+  Capability exists. The decoder now offers such a Responsibility, when perception is citable, `observed_refs` first
+  and `answer_from_perception` only after a non-empty list; Host writes the cited complete_response and admits only
+  current established perception. A generic answer let "现在几点了？" cite a scene object (3/3), so the evidence
+  precedes the decision. Offering further help stays SC's.
+- E: SC's anchor "A simple 'Okay' … is enough" made every pre-evidence receipt "好的。/Okay.", contradicting a
+  following limitation. It now receives a fresh request or question without agreeing ("嗯，我看看。") and shares in news.
+- Open: "去那边等我" still "好的。"; the time question may choose deliberative SC; D (unavailable vs clarify), F (VJ),
+  G (echo); the corpus has no SC step or perceived-answer turn (evidence gap; replays and unit tests cover them).
+
+Verification: regression `test_information_already_perceived_is_answered_from_the_cited_observation` (red on HEAD);
+offline replays as in STATUS; strict replay 6,000/6,000 zero model calls on freeze 40 (capture41 changed no request,
+discarded); gate in clean worktree `scratchpad/gate29` (pytest 3,841 + 5 skipped, benchmarks 169, legacy 20,
+policies, docs, test ownership). Image `chromie-agent:rootcause16-20261016` (`4e2c2595…`, 125 files identical,
+digest `643bc027d7828a4f`), not deployed.
+
+## Previous work — Clock in the common tier (effective); scenario corrections; everyday runs 2-3, 2026-10-16
 
 Base `origin/main` `e1d14b8ec` (the "那个" repair, deployed by the owner as `rootcause14-20261016`). Owner: "Deployed,
 go on" (2026-10-16). Evidence: `.chromie/acceptance/everyday-20261016/` README ("Run 2", "Run 3"), `run2/`,

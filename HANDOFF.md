@@ -1,6 +1,23 @@
 # Chromie Handoff
 
-## Current work — Clock common tier; scenario corrections, 2026-10-16
+## Current work — B (answer from perception) and E (receipt), 2026-10-16
+
+Checkout `/home/chromie/github/chromie`, branch `main`; pre-delivery base `origin/main` `79e26919c`; these changes are
+pushed to `origin/main` (expected resume revision: the latest commit containing this file). Soridormi `origin/main`
+`33b8a13`, water scene running. Live: `chromie-agent:latest` = `rootcause14-20261016`. Built, not deployed:
+`chromie-agent:rootcause16-20261016` (`sha256:4e2c2595…`, 125 files identical, digest `643bc027d7828a4f`; also carries
+the clock fix of `79e26919c`). Evidence: `.chromie/acceptance/everyday-20261016/` (README "Repairs B and E").
+Gate worktree `scratchpad/gate29`. `.env.runtime` is in `mode:speech`: give the harness process the two voice_mujoco keys.
+
+```bash
+# owner: deploy (rollback: chromie-agent:rootcause14-20261016)
+docker tag chromie-agent:rootcause16-20261016 chromie-agent:latest
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy docker compose --env-file .env.runtime -f docker-compose.yml -f docker-compose.sglang.yml up -d --no-build --force-recreate --no-deps chromie-agent
+# then smoke (SC and Planner changed for every turn), the history case, then core + challenge
+ORCH_ACTION_DRY_RUN=false CHROMIE_OPERATOR_MODE=voice_mujoco python scripts/general_ability_acceptance.py --mode live-text --scenario-root scenarios/everyday --stage must_pass --goal-driven-runtime apply --execute --runtime-identity <identity> --evidence-dir .chromie/acceptance/everyday-20261016/run4/live
+```
+
+## Previous work — Clock common tier; scenario corrections, 2026-10-16
 
 Checkout `/home/chromie/github/chromie`, branch `main`; pre-delivery base `origin/main` `e1d14b8ec`; these changes are
 pushed to `origin/main` (expected resume revision: the latest commit containing this file). Soridormi `origin/main`

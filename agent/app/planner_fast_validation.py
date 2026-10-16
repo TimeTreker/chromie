@@ -127,8 +127,10 @@ def fast_capability_acquires_information(definition: dict[str, Any]) -> bool:
     )
 
 
-DECISION_ACTIVITY_ROLE = {"work": "capability", "answer": "complete_response", "clarify": "clarification"}
-DECISION_DISPOSITION = {"work": "execute", "answer": "respond", "clarify": "clarify", "unavailable": "unavailable"}
+DECISION_ACTIVITY_ROLE = {"work": "capability", "answer": "complete_response",
+                          "answer_from_perception": "complete_response", "clarify": "clarification"}
+DECISION_DISPOSITION = {"work": "execute", "answer": "respond", "answer_from_perception": "respond",
+                        "clarify": "clarify", "unavailable": "unavailable"}
 
 
 def project_responsibility_decisions(
@@ -174,6 +176,14 @@ def project_responsibility_decisions(
                 activities.append(FastPlannerUnavailableNeed(
                     role="unavailable", activity_id=f"unavailable-{ref}",
                     source_responsibility_refs=[ref], missing=list(item.missing)))
+        elif item.decision == "answer_from_perception":
+            if own:
+                raise PlannerDTOContractError(
+                    f"an answer from perception is Host's response, never authored Activities: {ref}")
+            activities.append(FastPlannerResponseNeed(
+                role="complete_response", activity_id=f"response-{ref}",
+                source_responsibility_refs=[ref], situation_interpretation_refs=list(item.observed_refs),
+                rationale="Answered from the cited current perception."))
         elif item.decision == "answer" and "complete_response" not in own:
             activities.append(FastPlannerResponseNeed(
                 role="complete_response", activity_id=f"response-{ref}",
@@ -182,8 +192,8 @@ def project_responsibility_decisions(
         elif DECISION_ACTIVITY_ROLE[item.decision] not in own:
             raise PlannerDTOContractError(
                 f"Responsibility {ref} was decided {item.decision} without its Activity")
-    kinds = {decisions[ref].decision for ref in responsibility_refs}
-    implied = DECISION_DISPOSITION[next(iter(kinds))] if len(kinds) == 1 else "mixed"
+    kinds = {DECISION_DISPOSITION[decisions[ref].decision] for ref in responsibility_refs}
+    implied = next(iter(kinds)) if len(kinds) == 1 else "mixed"
     if output.disposition != implied:
         raise PlannerDTOContractError(
             f"Fast Planner disposition {output.disposition} contradicts its Responsibility decisions ({implied})")
@@ -774,12 +784,19 @@ def validate_fast_advance_output(
         item for item in output.activities if item.role == "complete_response"
     ]
     for activity in complete_response_activities:
+        cited = set(activity.situation_interpretation_refs)
+        if cited - set(situation_observations):
+            raise AuthoritativeGroundingValidationError(
+                "complete_response may cite only current established perception: "
+                + ", ".join(sorted(cited - set(situation_observations)))
+            )
         for source_ref in activity.source_responsibility_refs:
             source = by_ref.get(source_ref)
             mixed_work = source is not None and source.output_mode == "other" and any(
                 source_ref in item.source_responsibility_refs for item in capability_activities
             )
-            if source is not None and source.output_mode != "speech" and not mixed_work:
+            perceived_answer = source is not None and source.output_mode == "information" and bool(cited)
+            if source is not None and source.output_mode != "speech" and not mixed_work and not perceived_answer:
                 raise PlannerDTOContractError(
                     "complete_response Activity may satisfy only an ordinary "
                     "speech Responsibility; observable, informational, vocal, "

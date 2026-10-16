@@ -1,6 +1,17 @@
 # Chromie Current Status
 
-## Current delivery — Clock in the common tier (effective); scenario corrections; everyday runs 2-3, 2026-10-16
+## Current delivery — Information answered from perception (B); a receipt that does not agree (E), 2026-10-16
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `79e26919c`: an information Responsibility with citable current perception states `observed_refs` before its decision; only a non-empty list opens `answer_from_perception`, which Host binds as a cited response Need (current established perception only). SC receives a fresh request or question with a receipt that does not agree before its Work is decided and shares in news. |
+| Automatic verification | Offline current-Planner replays on recorded turns: "家里还有水吗？" 4/4 answered from the seen water (was a fetch); time 4/4 clock, weather 4/4 lookup, nod + weekday 4/4, thirsty 4/4 deliver. SC replays: neutral receipt on 6 of 10 task turns 3/3 each, good news "太棒了！" 3/3, chat controls unchanged. Regression red on HEAD; Level A unaffected; strict replay 6,000/6,000 zero model calls on freeze 40 (no recorded request changed); canonical gate in clean worktree `scratchpad/gate29` (pytest 3,841 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
+| Target validation | Not live yet (the deployed Agent is `rootcause14`; `rootcause15`, with the clock fix, was never deployed). Known: "去那边等我" still acknowledged "好的。"; the time question sometimes delegates to deliberative SC. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause14-20261016`. `rootcause16-20261016` (`4e2c2595…`, 125 files identical, digest `643bc027d7828a4f`; includes the clock fix) built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Repairs B and E").
+
+## Previous delivery — Clock in the common tier (effective); scenario corrections; everyday runs 2-3, 2026-10-16
 
 | Axis | Current evidence |
 | --- | --- |

@@ -313,7 +313,13 @@ Planner's result need. An `answer` decision whose word-free response Need was om
 is bound the same way (the Need names only its Responsibility); `work` and `clarify`
 carry content only the model authors and fail closed without their Activity. A mixed
 state may therefore hold only a response or an input Need beside a limitation.
-Ordinary speech is always answered, never decided unavailable. Each uniform disposition
+Ordinary speech is always answered, never decided unavailable. An information
+Responsibility that current established perception already answers first names those
+`situation.interpretations` IDs in its decision's `observed_refs`, then decides
+`answer_from_perception`; only a non-empty `observed_refs` opens that decision, which
+carries no authored Activity: the Host binds it as a word-free response Need whose
+`situation_interpretation_refs` are those IDs (it admits only current established
+perception). Every other decision of such a Responsibility states `observed_refs: []`. Each uniform disposition
 state admits only its matching decision; the authored disposition must equal the one
 the decisions imply, and a contradiction fails closed without rewriting. An
 acquire-information read serving a non-information Responsibility (for example a

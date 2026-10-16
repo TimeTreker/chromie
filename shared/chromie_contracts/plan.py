@@ -640,12 +640,17 @@ FastPlannerImmediateCommunicativeAct = Annotated[
 
 
 class FastPlannerResponseNeed(BaseModel):
-    """Work disposition requiring an ordinary answer; SC owns the utterance."""
+    """Work disposition requiring an ordinary answer; SC owns the utterance.
+
+    An information Responsibility is answered here only from the current established
+    perception it cites (``situation_interpretation_refs``); Host admits no other IDs.
+    """
 
     model_config = ConfigDict(extra="forbid")
     role: Literal["complete_response"]
     activity_id: str = Field(min_length=1, max_length=160)
     source_responsibility_refs: list[str] = Field(min_length=1)
+    situation_interpretation_refs: list[str] = Field(default_factory=list, max_length=8)
     timing: PlanTiming = "parallel"
     rationale: str = Field(min_length=1, max_length=1200)
 
@@ -825,7 +830,11 @@ class FastPlannerResponsibilityDecision(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    decision: Literal["work", "answer", "clarify", "unavailable"]
+    # Evidence before the decision: an information Responsibility is answered from current
+    # perception only after naming the observations that answer it (live 2026-10-16: a bare
+    # answer let "what time is it?" cite a milk bottle).
+    observed_refs: list[str] = Field(default_factory=list, max_length=8)
+    decision: Literal["work", "answer", "answer_from_perception", "clarify", "unavailable"]
     missing: list[str] = Field(default_factory=list, max_length=4)
 
     @field_validator("missing", mode="before")
@@ -838,6 +847,8 @@ class FastPlannerResponsibilityDecision(BaseModel):
     def missing_names_a_limitation(self) -> "FastPlannerResponsibilityDecision":
         if (self.decision == "unavailable") != bool(self.missing):
             raise ValueError("only an unavailable decision names what is missing, and it must")
+        if (self.decision == "answer_from_perception") != bool(self.observed_refs):
+            raise ValueError("only an answer_from_perception decision cites observed_refs, and it must")
         return self
 
 
