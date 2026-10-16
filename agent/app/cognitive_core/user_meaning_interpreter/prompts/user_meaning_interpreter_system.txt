@@ -111,11 +111,11 @@ units, durations, directions, order and concurrency in the complete natural-lang
 Planner extracts and realizes parameters under the selected Capability contract.
 source_evidence names the last current-turn token of the Responsibility's own words. Its span
 runs from just after the previous Responsibility's last token (or from the start of the turn), so
-the spans of all Responsibilities divide the turn between them. Choose each end so that every
+the spans of all Responsibilities divide the turn between them: list Responsibilities in the order their words occur, each ending at a later token than the one before. A reply to news or feelings the person shares ends where they finish sharing it, before a request that follows. Choose each end so that every
 current-turn clause that determines what, where, which, whom or under what condition the
 Responsibility means stays in its span; two Responsibilities that need the same words are one
 Responsibility. This is semantic conservation, not a Capability rule. Source evidence is
-provenance, not an action decomposition.
+provenance, not an action decomposition. For example, in "I'm home! Turn on the light." the reply to the news ends at "home!".
 
 The Responsibility DTO is semantic only. Do not author Goal relationship fields, Goal
 IDs, task IDs, Capability/tool/provider choices, execution steps, Activity decomposition,

@@ -1,6 +1,24 @@
 # Chromie Development Checkpoint
 
-## Current work — An unsettled referent is clarified, never a limitation (D); run 5, 2026-10-16
+## Current work — UMI spans for news + request; runs 6-7, 2026-10-16
+
+Base `origin/main` `961fc1a5d` (deployed by the owner as `rootcause18-20261016`). Run 6 smoke 15/15 mechanical; run 7
+core stopped at 4/55 on a hard UMI 503. Owner: "committed and pushed, deployed, go on" (2026-10-16). Evidence:
+`.chromie/acceptance/everyday-20261016/` README ("Run 6 … run 7"); one bundle each.
+
+- Run 6: "把那个拿给我" → "你是说牛奶瓶还是水瓶呀？"; homework declines but offers reminders it cannot set (partial).
+- Run 7: "我考了满分！快跟我一起庆祝一下！" — UMI ended both the celebration and the reply to the news at the last
+  token, so Host rejected overlapping spans (503). The UMI prompt now asks for word order with later ends and says a
+  reply to news ends where the sharing ends (with one aside example; placed inside the rule it retyped a time request
+  as speech).
+- Open: core/challenge still to run; homework over-offer; "去那边等我" "好的。"; F (VJ), G (echo).
+
+Verification: UMI replays as in STATUS; freeze 41 (`a36b1ebf…`, every UMI request recaptured, 0 failures); strict
+replay 6,000/6,000 zero model calls; gate in clean worktree `scratchpad/gate32` (pytest 3,845 + 5 skipped, benchmarks
+169, legacy 20, policies, docs, test ownership). Image `chromie-agent:rootcause19-20261016` (`2d3e917e…`, 125 files
+identical, digest `7c33fc6132d09d56`), not deployed.
+
+## Previous work — An unsettled referent is clarified, never a limitation (D); run 5, 2026-10-16
 
 Base `origin/main` `1f7bb73bc` (deployed by the owner as `rootcause17-20261016`). Run 5 smoke (clean tree, one bundle):
 mechanical 14/15. Owner: "committed and pushed, deployed, go on" (2026-10-16). Evidence:

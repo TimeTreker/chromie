@@ -1,13 +1,24 @@
 # Chromie Current Status
 
-## Current delivery — An unsettled referent is clarified, never a limitation (D); run 5 smoke, 2026-10-16
+## Current delivery — UMI spans: a reply to news ends where the sharing ends; runs 6-7, 2026-10-16
+
+| Axis | Current evidence |
+| --- | --- |
+| Implementation | On `961fc1a5d`: the UMI prompt says Responsibilities are listed in word order, each ending at a later token, and a reply to news or feelings ends where the sharing ends (one example). |
+| Automatic verification | Recorded UMI replays: "我考了满分！快跟我一起庆祝一下！" equal ends 4/4 → reply ends at t5 4/4; eight compound and information controls unchanged or better (time and water+time stay `information`). Freeze 41 (`a36b1ebf…`, every UMI request recaptured, no reply re-authored, 0 failures); strict replay 6,000/6,000 zero model calls; canonical gate in clean worktree `scratchpad/gate32` (pytest 3,845 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
+| Target validation | Run 6 smoke on `rootcause18`: 15/15 mechanical ("你是说牛奶瓶还是水瓶呀？"). Run 7 core stopped at 4/55 on the celebrate UMI 503 (hard). This repair is not yet live. Not qualified. |
+| Deployment state | `chromie-agent:latest` = `rootcause18-20261016`. `rootcause19-20261016` (`2d3e917e…`, 125 files identical, digest `7c33fc6132d09d56`) built, not deployed. No release. |
+
+Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Run 6 … run 7").
+
+## Previous delivery — An unsettled referent is clarified, never a limitation (D); run 5 smoke, 2026-10-16
 
 | Axis | Current evidence |
 | --- | --- |
 | Implementation | On `1f7bb73bc`: on turns with UMI meaning uncertainty the Planner prompt says which thing is meant is never an ability need or a limitation (clarify unless an ability is missing); the streamed decoder requires a clarify state's Activity and lets an `unresolved_meaning` gap cite only the exact UMI wording. |
 | Automatic verification | Offline current-Planner replays of the run-5 "把那个拿给我" turn: unavailable → clarify with a clarification 6/6; controls history "那个" clarify 4/4, thirsty deliver 3/3. Regression `test_unsettled_referent_is_clarified_with_a_gap_citing_umi_wording` (red on HEAD for both decoder cases); strict replay 6,000/6,000 zero model calls (no request changed); canonical gate in clean worktree `scratchpad/gate31` (pytest 3,845 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
 | Target validation | Run 5 smoke on `rootcause17`: mechanical 14/15 (bring_that asked as a `respond` act after an `unavailable` decision); homework sibling repair live. This repair is not yet live. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause17-20261016`. `rootcause18-20261016` (`f15411c1…`, 125 files identical, digest `180cd0d00f6fcb79`) built, not deployed. No release. |
+| Deployment state | `rootcause18-20261016` (`f15411c1…`, 125 files identical, digest `180cd0d00f6fcb79`), deployed by the owner and measured as runs 6-7. No release. |
 
 Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Run 5").
 

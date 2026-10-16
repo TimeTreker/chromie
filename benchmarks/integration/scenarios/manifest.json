@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "f9cc949000c400360804fc001794bdf29a37d5256c80f7b7ed1b5cc84edf34bd",
-    "workflow-conditional-dry.json": "02813cf922162c65c86a91893f7e940b956c2eebeabb0f3c24d1e8221fea7107",
-    "workflow-conditional-rain.json": "a8999e8f4dcd6159a22908764bfb332a6a04f30bbb4b6c360ae522564c416efe",
-    "workflow-delayed.json": "225a0dbab5a860f3de9181bd31a02b9f0d7af8421ca9ccce6179c60a2a6dadeb",
-    "workflow-normal.json": "1ba69365b6e75a012ba99ca41042a60e94eb5c7a986502c5bb9e503365f52f51"
+    "workflow-cancellation.json": "44fbf59aaee33bb9e38d35b01383802633d9cfc56be5233c71a5c531d2fc0fea",
+    "workflow-conditional-dry.json": "256c69cca00071dc862776349a85ab7d76ac8f92768ea1ec6f2a2903c9fa7a49",
+    "workflow-conditional-rain.json": "57d4eff54c8c2efc987c8a8eded33283609b12c6432661b39ee5fa49a59322af",
+    "workflow-delayed.json": "889494cc4fc73a65eac220736c5def18cb7d950aa4c7bc7d894e2b9d931b5e0b",
+    "workflow-normal.json": "4af5c5999cb1ae1e956d2c49008cffb8d916d361a6bdb34712b9bf715b56ff0f"
   },
-  "freeze_revision": 40,
-  "freeze_note": "Everyday smoke repair (2026-10-16). Every UMI request recaptured: meaning_uncertainties are decoded before the Responsibilities and confidence after them; the UMI prompt says a bare demonstrative names a perceived object only when the conversation or trusted target evidence singles it out. No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 41,
+  "freeze_note": "UMI span repair (2026-10-16). Every UMI request recaptured: Responsibilities are listed in source order, each ending later, and a reply to shared news ends where the sharing ends (live: 我考了满分！快跟我一起庆祝一下！ failed with equal ends). No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }
