@@ -314,7 +314,7 @@ async def test_live_check_consumes_social_delivery_without_replaying_it(
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
-    from tests.test_planner_auxiliary_activity_contract import _definition
+    from tests.auxiliary_activity_test_support import social_capability_definition as _definition
 
     ledger = InteractionLedger()
     speak = AsyncMock(return_value={"scheduled": True})

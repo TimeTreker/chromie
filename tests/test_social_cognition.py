@@ -1191,7 +1191,7 @@ async def test_situation_speech_retains_correlation_through_actual_delivery_ledg
 
 @pytest.mark.asyncio
 async def test_social_expression_uses_existing_trusted_runtime_without_goal_work():
-    from tests.test_planner_auxiliary_activity_contract import _Runtime, _definition
+    from tests.auxiliary_activity_test_support import RecordingCapabilityRuntime as _Runtime, social_capability_definition as _definition
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1749,7 +1749,7 @@ async def test_independent_sc_result_reaches_runtime_expression_queue(spoken, pr
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-    from tests.test_planner_auxiliary_activity_contract import _Runtime, _definition
+    from tests.auxiliary_activity_test_support import RecordingCapabilityRuntime as _Runtime, social_capability_definition as _definition
 
     class Runtime(_Runtime):
         def __init__(self, definitions):
@@ -2067,7 +2067,7 @@ async def test_sc_expression_uses_real_runtime_queue_and_completion_ledger(fresh
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-    from tests.test_planner_auxiliary_activity_contract import _definition
+    from tests.auxiliary_activity_test_support import social_capability_definition as _definition
 
     ledger = InteractionLedger()
     runtime = InteractionRuntimeCoordinator(lambda _: {"scheduled": True}, interaction_ledger=ledger)
@@ -2130,7 +2130,7 @@ async def test_social_terminal_ledger_has_one_writer_through_cognitive_closure()
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.interaction import CapabilityRequest, InteractionResponse
-    from tests.test_planner_auxiliary_activity_contract import _definition
+    from tests.auxiliary_activity_test_support import social_capability_definition as _definition
 
     class CountingLedger(InteractionLedger):
         def __init__(self):

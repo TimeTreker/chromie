@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from functools import partial
 
 from pydantic import ValidationError
 
@@ -16,16 +17,9 @@ from shared.chromie_contracts.plan import (
     GoalSatisfactionAssessment,
     PlanParameterResolution,
 )
+from tests.model_fakes import ScriptedOllama
 
-
-class FakeOllama:
-    def __init__(self, responses):
-        self.responses = list(responses)
-        self.prompts = []
-
-    async def generate(self, prompt, **kwargs):
-        self.prompts.append(prompt)
-        return declared_ability_needs(self.responses.pop(0), kwargs.get("response_format"))
+FakeOllama = partial(ScriptedOllama, shape=declared_ability_needs)
 
 
 class Catalog:
@@ -431,8 +425,8 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
                 request("往前走。", goal_ids=["goal-walk"])
             )
         )
-        self.assertIn("Satisfaction measures prospective Goal fulfillment", ollama.prompts[0])
-        self.assertIn("minimum_goal_satisfaction", ollama.prompts[0])
+        self.assertIn("Satisfaction measures prospective Goal fulfillment", ollama.prompts[0][0])
+        self.assertIn("minimum_goal_satisfaction", ollama.prompts[0][0])
 
 
 if __name__ == "__main__":

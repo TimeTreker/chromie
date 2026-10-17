@@ -16,7 +16,8 @@ from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from agent.app import goal_association_prompt as ga_prompt
 from agent.app import planner_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
-from tests.goal_association_test_support import FakeOllama, create_goals, intent_goal
+from tests.goal_association_test_support import create_goals, intent_goal
+from tests.model_fakes import FakeOllama
 from tests.fast_planner_test_support import FakeOllama as PlannerOllama, execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 

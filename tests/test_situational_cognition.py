@@ -29,6 +29,7 @@ from shared.chromie_contracts.situation import (
     SituationRevisionObservation,
     SituationSourceRef,
 )
+from tests.model_fakes import FakeOllama
 from tests.voice_assistant_test_support import bare_voice_assistant
 
 
@@ -205,18 +206,6 @@ def test_trusted_goal_free_ingress_rejects_goal_semantics() -> None:
 class EmptyCatalog:
     async def prompt_entries(self, **kwargs):
         return []
-
-
-class FakeOllama:
-    def __init__(self, output: dict[str, object]) -> None:
-        self.output = output
-        self.calls = 0
-        self.prompt = ""
-
-    async def generate(self, prompt: str, **_kwargs):
-        self.calls += 1
-        self.prompt = prompt
-        return self.output
 
 
 def request_for(observation: SituationRevisionObservation) -> SocialCognitionRequest:
@@ -803,7 +792,7 @@ async def test_newer_situation_supersedes_inflight_speech_and_memory():
 @pytest.mark.asyncio
 async def test_environment_nonverbal_sc_uses_existing_soridormi_expression_runtime():
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
-    from tests.test_planner_auxiliary_activity_contract import _Runtime, _definition
+    from tests.auxiliary_activity_test_support import RecordingCapabilityRuntime as _Runtime, social_capability_definition as _definition
 
     provider = _Runtime([_definition()])
     async def resolve(_session, *, request, **kwargs):
