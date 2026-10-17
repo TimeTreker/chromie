@@ -128,38 +128,39 @@ The following specialized tools remain useful at their owning boundaries:
 The repository policy checker is the canonical aggregate gate. Specialized
 checks do not create separate policy authority.
 
-## Size measurements and blocking ownership checks
+## Size ratchets and blocking ownership checks
 
-Under the owner-approved [Issue #45](https://github.com/TimeTreker/chromie/issues/45)
-decision, size is review evidence in every phase, including before target-evidence
-closure. The delivery constraint in AGENTS remains unchanged. There is no temporary
-size ceiling, phase switch, or size-based exception. Do not split files, move methods,
-trim useful evidence, or raise a limit merely to obtain a passing gate.
+Runtime structure size is a ratchet: it may shrink but not grow. Do not split
+files, move methods or trim useful evidence merely to pass the gate; move new
+behavior to its owner instead of growing the composition root or a god file.
 
-`scripts/check_runtime_structure.py` reports VoiceAssistant method/property counts,
-initializer lines and initialized attributes against `size_baselines` in
-`config/runtime_structure_ratchets.json`. It still rejects missing collaborators,
-lifecycle state returning to the composition root, forbidden compatibility methods
-and direct legacy Host model calls. A large class may pass these mechanical checks;
-review must still establish correct ownership and an understandable implementation.
+`scripts/check_runtime_structure.py` fails when VoiceAssistant method/property
+counts, initializer lines or initialized attributes rise above `size_baselines`,
+or when a file listed in `file_line_baselines` grows above its recorded line
+count, both in `config/runtime_structure_ratchets.json`. It also rejects missing
+collaborators, lifecycle state returning to the composition root, forbidden
+compatibility methods and direct legacy Host model calls. A class under its
+baselines may still be wrong; review must still establish correct ownership and
+an understandable implementation. When a change shrinks a measured value, lower
+the baseline in the same change. Raising a baseline requires a reviewed reason.
 
 `scripts/check_docs.py` reports owner-document lines, core reading-path length and
 maintained/root-doc Markdown counts using `config/documentation_authority.json`.
-It still rejects missing or duplicate authorities, invalid paths, unindexed content,
-and specialized documents without an owner or checked contract. See
+Those counts are informational. The checker still rejects missing or duplicate
+authorities, invalid paths, unindexed content, and specialized documents without
+an owner or checked contract. See
 [Documentation Authority](DOCUMENTATION_AUTHORITY.md) for the owned review rules.
 
-Both reports retain current values, measured baselines and signed deltas. The
-`size_baseline_revision` identifies the source of those measurements; it is not a
-maximum. Rebaselining requires a reviewed reason and retained before/after evidence.
-New documents, configuration and concepts still need the owner, project need and
-consolidation analysis required by AGENTS and CONTRIBUTING. Counts cannot decide
-whether that justification is sound.
+Both reports print current values, baselines and signed deltas.
+`size_baseline_revision` identifies the commit the runtime baselines were measured
+at. New documents, configuration and concepts still need the owner, project need
+and consolidation analysis required by AGENTS and CONTRIBUTING. Counts cannot
+decide whether that justification is sound.
 
-Only these ten size ceilings became informational. Exception classifications,
-configuration ownership/compatibility checks, semantic authority, provenance,
-safety, pinned Ruff/Mypy scope and tests remain blocking. This change neither
-qualifies runtime behavior nor advances target, audio, robot or release evidence.
+Exception classifications, configuration ownership/compatibility checks, semantic
+authority, provenance, safety, pinned Ruff/Mypy scope and tests are blocking.
+Passing these checks neither qualifies runtime behavior nor advances target,
+audio, robot or release evidence.
 
 ## Non-goals
 

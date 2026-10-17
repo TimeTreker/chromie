@@ -50,25 +50,19 @@ or alter Soridormi safety.
 
 ## Mechanical structural baseline
 
-Blocking ownership rules and informational size baselines are owned by
-`config/runtime_structure_ratchets.json` and checked/reported by:
+Blocking ownership rules and size ratchets are owned by
+`config/runtime_structure_ratchets.json` and checked by:
 
 ```bash
 python scripts/check_runtime_structure.py
 ```
 
-The reviewed measurements at `bd955740` are retained with their full revision in
-the config; each run reports current values and signed deltas:
-
-| Measure | Measured baseline |
-|---|---:|
-| `VoiceAssistant` methods | 104 |
-| properties | 1 |
-| `__init__` lines | 304 |
-| initialized `self` attributes | 108 |
-
-These size values are informational in every delivery phase under approved #45;
-they do not prove that structural simplification is complete. Missing collaborators,
+The config holds the VoiceAssistant method, property, `__init__` line and
+initialized-attribute baselines, and line baselines for `orchestrator.py` and the
+other runtime files over 3,000 lines, measured at its `size_baseline_revision`.
+Each run reports current values and signed deltas, and fails if a value grows
+above its baseline. Staying under the baselines does not prove that structural
+simplification is complete. Missing collaborators,
 returned lifecycle state, forbidden compatibility methods and any direct legacy
 Host model call remain blocking. One Host model call still exists outside Social
 Cognition: when an owner explicitly sets `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1`
