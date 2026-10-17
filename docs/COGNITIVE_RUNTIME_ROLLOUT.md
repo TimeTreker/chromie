@@ -424,7 +424,6 @@ The text-to-MuJoCo checker uses the unified authority path by default:
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "Walk forward for five seconds, then nod." \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --no-speaker \

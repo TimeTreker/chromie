@@ -234,8 +234,10 @@ repository root, run:
 The launcher uses the same `.env.runtime` and Compose image definitions as the
 normal service scripts. It enables structured InteractionResponse, Soridormi
 named skills, physical microphone input, and speaker output without redefining
-image tags. Use `--require-confirmation` to require spoken confirmation for all
-simulator skills, or `--build` to rebuild repository-owned service images.
+image tags. Use `--build` to rebuild repository-owned service images. There is no
+launcher switch that forces spoken confirmation for every skill: confirmation
+follows each skill's declared confirmation policy and the Planner's typed
+`user_confirmation_required` decision.
 
 ## 5.2 Text-to-MuJoCo without microphone or ASR
 
@@ -276,7 +278,6 @@ Chromie's response through the configured speaker:
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --expect-capability soridormi.walk_velocity \
@@ -294,8 +295,8 @@ catalog/default timeouts unchanged. Evidence is written under
 `.chromie/acceptance/text-mujoco/<id>/`. The summary records exact source,
 manifest, and semantic-runtime provenance. This is the current cognitive
 text-to-MuJoCo path; it is not supervised microphone evidence and does not prove
-physical audio-device quality. Use `--no-cognitive-runtime` only for an
-explicitly labelled legacy compatibility diagnosis.
+physical audio-device quality. The runner always uses the cognitive runtime; there
+is no legacy or non-cognitive mode.
 
 For behavior-quality text probes without executing robot motion, run the
 general ability live-text preview:
@@ -689,10 +690,13 @@ The normal startup script uses `/tmp/chromie-orchestrator.lock`.
 - Compare at least two isolated endpoints with identical inputs:
 
   ```bash
-  TTS_AB_REFERENCE_DIR=.chromie/private/tts-voice \
-  TTS_AB_SKIP_REFERENCE_GENERATION=1 \
   ./scripts/run_tts_candidate_ab.sh
   ```
+
+  The comparison uses the committed voice catalog at `TTS_VOICE_ROOT` (default
+  `assets/tts/voices`), not a private reference. Optional controls:
+  `TTS_AB_RUN_ID`, `TTS_AB_OUTPUT_DIR`, `TTS_AB_KEEP_CANDIDATES=1`,
+  `TTS_AB_SKIP_BUILD=1`, `TTS_AB_WARMUP`, and `TTS_AB_CASE_TIMEOUT_SEC`.
 
 - Review `result.json`, every WAV, and `listening-review.json`. A fast automated run is not a Mandarin listening verdict.
 - If interruption recovery fails, inspect the provider cancellation mode,

@@ -90,11 +90,7 @@ What is the robot status?
 Stop.
 ```
 
-默认允许 Soridormi 清单中明确声明的模拟器免确认技能立即执行。希望每次动作都经过语音确认时：
-
-```bash
-./scripts/start_voice_mujoco.sh --require-confirmation
-```
+默认允许 Soridormi 清单中明确声明的模拟器免确认技能立即执行。启动脚本没有强制每个动作都语音确认的开关；是否需要确认由每个技能声明的确认策略和 Planner 输出的 `user_confirmation_required` 决定。
 
 ## 日常启动
 
