@@ -3790,7 +3790,6 @@
         ".env.common",
         "docker-compose.yml",
         "orchestrator/runtime/host_settings.py",
-        "scripts/voice_acceptance.py",
         "tts/settings.py"
       ]
     },

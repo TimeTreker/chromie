@@ -53,12 +53,11 @@ async def _generate_fixtures_async(
     output_dir: Path,
     tts_url: str,
     speaker_id: str,
-    default_sample_rate: int,
     timeout_s: float,
 ) -> dict[str, AudioFixture]:
     from orchestrator.clients.tts_client import TTSClient
 
-    client = TTSClient(tts_url, default_sample_rate=default_sample_rate)
+    client = TTSClient(tts_url)
     fixtures: dict[str, AudioFixture] = {}
     for index, text in enumerate(dict.fromkeys(texts), start=1):
         pcm16, sample_rate = await asyncio.wait_for(
@@ -94,7 +93,6 @@ def generate_tts_fixtures(
     output_dir: Path,
     tts_url: str,
     speaker_id: str,
-    default_sample_rate: int = 44100,
     timeout_s: float = 180.0,
 ) -> dict[str, AudioFixture]:
     return asyncio.run(
@@ -103,7 +101,6 @@ def generate_tts_fixtures(
             output_dir=output_dir,
             tts_url=tts_url,
             speaker_id=speaker_id,
-            default_sample_rate=default_sample_rate,
             timeout_s=timeout_s,
         )
     )

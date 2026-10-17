@@ -540,7 +540,6 @@ def warm_supervised_tts_delivery(
     runtime_env_path: Path,
     output_dir: Path,
     fallback_speaker_id: str,
-    default_sample_rate: int,
     timeout_s: float,
 ) -> dict[str, Any]:
     """Prime the exact supervised response voice before opening the microphone."""
@@ -553,7 +552,6 @@ def warm_supervised_tts_delivery(
         output_dir=output_dir,
         tts_url=endpoint,
         speaker_id=speaker_id,
-        default_sample_rate=default_sample_rate,
         timeout_s=timeout_s,
     )
     fixture = fixtures[SUPERVISED_TTS_WARMUP_TEXT]
@@ -3337,7 +3335,6 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 runtime_env_path=ROOT / ".env.runtime",
                 output_dir=evidence_dir / "tts-warmup",
                 fallback_speaker_id=args.tts_speaker_id,
-                default_sample_rate=args.tts_sample_rate,
                 timeout_s=args.tts_timeout_s,
             )
             print(
@@ -3363,7 +3360,6 @@ def run_acceptance(args: argparse.Namespace) -> int:
                 output_dir=evidence_dir / "generated-input",
                 tts_url=args.tts_url,
                 speaker_id=args.tts_speaker_id,
-                default_sample_rate=args.tts_sample_rate,
                 timeout_s=args.tts_timeout_s,
             )
             write_json(
@@ -3647,12 +3643,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--tts-speaker-id",
         default=os.getenv("TTS_SPEAKER_ID", "default"),
-    )
-    parser.add_argument(
-        "--tts-sample-rate",
-        type=int,
-        default=int(os.getenv("TTS_SAMPLE_RATE", "44100")),
-        help="Fallback rate when the TTS start frame omits sample_rate.",
     )
     parser.add_argument(
         "--tts-timeout-s",
