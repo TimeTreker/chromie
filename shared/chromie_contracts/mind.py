@@ -9,6 +9,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .text import compact_text
 
 Priority = Literal["low", "normal", "high", "critical"]
 SocialInteractionPreset = Literal["courteous", "neutral", "reserved", "custom"]
@@ -17,13 +18,6 @@ ProposalStatus = Literal["proposed", "approved", "rejected", "superseded"]
 
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _compact_text(value: str, *, limit: int = 500) -> str:
-    text = " ".join((value or "").strip().split())
-    if len(text) > limit:
-        return text[:limit].rstrip() + "..."
-    return text
 
 
 class CorePrinciple(BaseModel):
@@ -39,7 +33,7 @@ class CorePrinciple(BaseModel):
     @field_validator("statement", "rationale")
     @classmethod
     def normalize_text(cls, value: str) -> str:
-        return _compact_text(value, limit=800)
+        return compact_text(value, limit=800)
 
 
 class LongTermGoal(BaseModel):
@@ -54,7 +48,7 @@ class LongTermGoal(BaseModel):
     @field_validator("statement")
     @classmethod
     def normalize_statement(cls, value: str) -> str:
-        return _compact_text(value, limit=800)
+        return compact_text(value, limit=800)
 
 
 class InternalComponent(BaseModel):
@@ -69,13 +63,13 @@ class InternalComponent(BaseModel):
     @field_validator("component_id", "kind")
     @classmethod
     def normalize_component_text(cls, value: str) -> str:
-        return _compact_text(value, limit=120)
+        return compact_text(value, limit=120)
 
     @field_validator("roles")
     @classmethod
     def normalize_roles(cls, value: list[str]) -> list[str]:
         return [
-            _compact_text(item, limit=120)
+            compact_text(item, limit=120)
             for item in value
             if str(item or "").strip()
         ]
@@ -122,12 +116,12 @@ class ChromieIdentity(BaseModel):
     )
     @classmethod
     def normalize_text(cls, value: str) -> str:
-        return _compact_text(value, limit=500)
+        return compact_text(value, limit=500)
 
     @field_validator("pronouns")
     @classmethod
     def normalize_pronouns(cls, value: list[str]) -> list[str]:
-        normalized = [_compact_text(item, limit=40) for item in value if item.strip()]
+        normalized = [compact_text(item, limit=40) for item in value if item.strip()]
         if not normalized:
             raise ValueError("identity pronouns must not be empty")
         return normalized
@@ -172,12 +166,12 @@ class PersonalityExpression(BaseModel):
     )
     @classmethod
     def normalize_guidance(cls, value: str) -> str:
-        return _compact_text(value, limit=900)
+        return compact_text(value, limit=900)
 
     @field_validator("core_traits")
     @classmethod
     def normalize_traits(cls, value: list[str]) -> list[str]:
-        normalized = [_compact_text(item, limit=100) for item in value if str(item or "").strip()]
+        normalized = [compact_text(item, limit=100) for item in value if str(item or "").strip()]
         if not normalized:
             raise ValueError("personality expression requires at least one trait")
         return normalized
@@ -310,7 +304,7 @@ class SocialInteractionStyle(BaseModel):
     )
     @classmethod
     def normalize_guidance(cls, value: str) -> str:
-        normalized = _compact_text(value, limit=800)
+        normalized = compact_text(value, limit=800)
         if not normalized:
             raise ValueError("social interaction style guidance must not be empty")
         return normalized
@@ -344,13 +338,13 @@ class Worldview(BaseModel):
     )
     @classmethod
     def normalize_foundation(cls, value: str) -> str:
-        return _compact_text(value, limit=800)
+        return compact_text(value, limit=800)
 
     @field_validator("household_perspectives")
     @classmethod
     def normalize_household_perspectives(cls, value: list[str]) -> list[str]:
         normalized = [
-            _compact_text(item, limit=240)
+            compact_text(item, limit=240)
             for item in value
             if str(item or "").strip()
         ]
@@ -379,13 +373,13 @@ class HouseholdValues(BaseModel):
     @field_validator("authority_boundary")
     @classmethod
     def normalize_authority_boundary(cls, value: str) -> str:
-        return _compact_text(value, limit=600)
+        return compact_text(value, limit=600)
 
     @field_validator("statements")
     @classmethod
     def normalize_statements(cls, value: list[str]) -> list[str]:
         normalized = [
-            _compact_text(item, limit=240)
+            compact_text(item, limit=240)
             for item in value
             if str(item or "").strip()
         ]
@@ -425,7 +419,7 @@ class CustomerMindPersonalization(BaseModel):
     def normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
-        normalized = _compact_text(value, limit=160)
+        normalized = compact_text(value, limit=160)
         return normalized or None
 
     @field_validator("pronouns")
@@ -434,7 +428,7 @@ class CustomerMindPersonalization(BaseModel):
         if value is None:
             return None
         normalized = [
-            _compact_text(item, limit=40)
+            compact_text(item, limit=40)
             for item in value
             if str(item or "").strip()
         ]
@@ -448,7 +442,7 @@ class CustomerMindPersonalization(BaseModel):
     @classmethod
     def normalize_customer_guidance(cls, value: list[str]) -> list[str]:
         normalized = [
-            _compact_text(item, limit=240)
+            compact_text(item, limit=240)
             for item in value
             if str(item or "").strip()
         ]
@@ -640,7 +634,7 @@ class MindProfile(BaseModel):
         lines.extend(f"- {item}" for item in self.household_values.statements)
         lines.append("Experience tuning policy:")
         lines.extend(f"- {item}" for item in self.experience_tuning_policy)
-        return _compact_text("\n".join(lines), limit=max_chars)
+        return compact_text("\n".join(lines), limit=max_chars)
 
 
 class ExperienceRecord(BaseModel):
@@ -666,7 +660,7 @@ class ExperienceRecord(BaseModel):
     @field_validator("user_text")
     @classmethod
     def compact_user_text(cls, value: str) -> str:
-        return _compact_text(value, limit=500)
+        return compact_text(value, limit=500)
 
 
 class MindUpdateProposal(BaseModel):
@@ -685,7 +679,7 @@ class MindUpdateProposal(BaseModel):
     @field_validator("proposed_change", "rationale")
     @classmethod
     def normalize_text(cls, value: str) -> str:
-        return _compact_text(value, limit=1000)
+        return compact_text(value, limit=1000)
 
     @field_validator("auto_apply")
     @classmethod

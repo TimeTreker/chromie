@@ -12,6 +12,7 @@ from agent.app.social_cognition import SocialCognitionResolver, social_cognition
 from agent.app.capabilities.validator import validate_args_for_schema
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCommunicativeAct
 from tests.test_situational_cognition import goal_free_observation
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class Model:
@@ -936,7 +937,7 @@ async def test_host_rejects_obsolete_state_without_delivery_or_work_mutation():
 @pytest.mark.parametrize("state", ["committed", "completed", "cancelled"])
 @pytest.mark.parametrize("path", ["optional", "required"])
 async def test_state_social_refreshes_continuity_after_previous_speech(state, path):
-    from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
+    from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime
     from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -974,7 +975,7 @@ async def test_state_social_refreshes_continuity_after_previous_speech(state, pa
     coordinator = GoalDrivenRuntimeCoordinator(
         agent_client=Agent(),
         adapter=SimpleNamespace(
-            interaction_runtime=SimpleNamespace(runtime=CapabilityRuntime(CapabilityRegistry())),
+            interaction_runtime=SimpleNamespace(runtime=CapabilityRuntime(CapabilityDefinitionRegistry())),
             build_social_cognition_response=build_response,
         ),
         policy=CognitiveRuntimePolicy(mode="apply"), context_refresh=refresh, interaction_ledger=ledger,
@@ -1032,7 +1033,7 @@ async def test_state_social_refreshes_continuity_after_previous_speech(state, pa
 @pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["same_work", "cancelled_work", "other_work", "interpretation"])
 async def test_pending_state_social_result_rechecks_actual_work(change):
-    from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime, MockCapabilityProvider
+    from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime, MockCapabilityProvider
     from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
     from shared.chromie_contracts.interaction import InteractionResponse
@@ -1049,7 +1050,7 @@ async def test_pending_state_social_result_rechecks_actual_work(change):
             await release[request.request_id].wait()
             return await super().execute(request, definition, context)
 
-    registry = CapabilityRegistry()
+    registry = CapabilityDefinitionRegistry()
     registry.register(_body_definition(exclusive_group=None))
     runtime = CapabilityRuntime(registry)
     runtime.register_provider(Provider("mock.body"))
@@ -1200,7 +1201,7 @@ async def test_situation_speech_retains_correlation_through_actual_delivery_ledg
 
 @pytest.mark.asyncio
 async def test_social_expression_uses_existing_trusted_runtime_without_goal_work():
-    from tests.test_planner_auxiliary_activity_contract import _Runtime, _definition
+    from tests.auxiliary_activity_test_support import RecordingCapabilityRuntime as _Runtime, social_capability_definition as _definition
     from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1751,19 +1752,19 @@ async def test_social_route_preserves_typed_budget_failure_without_unhandled_ser
 @pytest.mark.parametrize("spoken", [False, True])
 @pytest.mark.parametrize("primary", ["none", "same", "same_compatible", "conflicting", "compatible"])
 async def test_independent_sc_result_reaches_runtime_expression_queue(spoken, primary):
-    from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
+    from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime
     from orchestrator.runtime.cognitive_runtime import (
         CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator,
     )
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-    from tests.test_planner_auxiliary_activity_contract import _Runtime, _definition
+    from tests.auxiliary_activity_test_support import RecordingCapabilityRuntime as _Runtime, social_capability_definition as _definition
 
     class Runtime(_Runtime):
         def __init__(self, definitions):
             super().__init__(definitions)
-            self.runtime = CapabilityRuntime(CapabilityRegistry())
+            self.runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
 
         async def record_social_delivery(self, *args, **kwargs):
             return True
@@ -2076,7 +2077,7 @@ async def test_sc_expression_uses_real_runtime_queue_and_completion_ledger(fresh
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-    from tests.test_planner_auxiliary_activity_contract import _definition
+    from tests.auxiliary_activity_test_support import social_capability_definition as _definition
 
     ledger = InteractionLedger()
     runtime = InteractionRuntimeCoordinator(lambda _: {"scheduled": True}, interaction_ledger=ledger)
@@ -2139,7 +2140,7 @@ async def test_social_terminal_ledger_has_one_writer_through_cognitive_closure()
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.interaction import CapabilityRequest, InteractionResponse
-    from tests.test_planner_auxiliary_activity_contract import _definition
+    from tests.auxiliary_activity_test_support import social_capability_definition as _definition
 
     class CountingLedger(InteractionLedger):
         def __init__(self):
@@ -2190,7 +2191,7 @@ async def test_social_terminal_ledger_has_one_writer_through_cognitive_closure()
     execution = await runtime.wait_dispatch(dispatch)
     assert ledger.social_result_calls == 1
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.interaction_runtime = runtime
     assistant.session_log = lambda *args, **kwargs: None
     status = await assistant._close_cognitive_execution(

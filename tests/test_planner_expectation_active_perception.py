@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
 from shared.chromie_contracts.plan import CanonicalPlan, GoalSatisfactionAssessment
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def _satisfaction(goal_id: str) -> dict[str, object]:
@@ -168,7 +169,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
         async def build_social_cognition_response(self, **_kwargs):
             return InteractionResponse(interaction_id="after-observation", status="ok")
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Client()
     assistant.cognitive_runtime_policy = SimpleNamespace(
         planner_timeout_ms=3000,

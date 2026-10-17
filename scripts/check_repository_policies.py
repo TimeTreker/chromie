@@ -412,6 +412,7 @@ def audit_agent_skill_authority(root: Path) -> list[PolicyFinding]:
     forbidden_modules = {"subprocess", "runpy", "importlib", "ctypes"}
     forbidden_names = {
         "CapabilityRegistry",
+        "CapabilityDefinitionRegistry",
         "CapabilityProvider",
         "CapabilityDefinition",
         "CapabilityRuntime",

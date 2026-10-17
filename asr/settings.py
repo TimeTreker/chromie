@@ -34,7 +34,7 @@ def _bool(values: Mapping[str, str], name: str, default: bool) -> bool:
     raw = values.get(name)
     if raw is None or not raw.strip():
         return default
-    normalized = raw.strip().lower()
+    normalized = raw.strip().casefold()
     if normalized in _TRUE_VALUES:
         return True
     if normalized in _FALSE_VALUES:

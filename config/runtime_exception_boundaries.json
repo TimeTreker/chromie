@@ -226,19 +226,6 @@
     },
     {
       "path": "agent/app/tool_invocation.py",
-      "symbol": "FunctionToolInvoker.invoke",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "c6a9c5af49859c62c23e24af88158f5caaf8940620430a0a5f00c554d689234a",
-      "failure_signals": [
-        "return"
-      ]
-    },
-    {
-      "path": "agent/app/tool_invocation.py",
       "symbol": "McpStreamableHttpInvoker.invoke",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
@@ -1286,9 +1273,9 @@
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
-      "contract": "Remove temporary output, retain a persistence diagnostic, and re-raise so the owning operation cannot claim durable success.",
+      "contract": "Retain a persistence diagnostic (the shared atomic writer removes temporary output), and re-raise so the owning operation cannot claim durable success.",
       "review_status": "reviewed",
-      "body_sha256": "6a1bedb8ce5ba1a5579f69f3f309684a1ca86340df014bed91ed961d22579d44",
+      "body_sha256": "f8a09c45333723fce636349858e35aeea896bbe08c338469cafbf7b09c33b4a3",
       "failure_signals": [
         "bare_reraise",
         "diagnostic",

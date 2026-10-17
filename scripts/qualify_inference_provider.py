@@ -17,7 +17,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -28,9 +27,9 @@ import httpx
 import websockets
 
 try:
-    from evidence_io import git_revision as _git_revision
+    from evidence_io import git_revision as _git_revision, write_json as _write_json
 except ImportError:  # imported as scripts.qualify_inference_provider
-    from scripts.evidence_io import git_revision as _git_revision
+    from scripts.evidence_io import git_revision as _git_revision, write_json as _write_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -387,23 +386,6 @@ def _accelerator_identity() -> dict[str, Any]:
             }
         )
     return {"status": "observed", "devices": devices}
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    temporary_path = Path(temporary)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
-    finally:
-        temporary_path.unlink(missing_ok=True)
 
 
 def _reasoning_control_identity(provider: str, model: str) -> dict[str, Any]:

@@ -44,7 +44,6 @@ from scipy import signal
 from orchestrator.audio_device_manager import AudioDeviceManager
 from orchestrator.readiness import ServiceReadinessGate
 from orchestrator.vad import VAD
-from orchestrator.clients.action_client import ActionClient
 from orchestrator.runtime.audio_device_lifecycle import (
     audio_device_monitor,
     set_input_device_params,
@@ -212,6 +211,7 @@ from shared.chromie_runtime.llm_diagnostics import (
     ollama_completion_diagnostics,
     ollama_prompt_preflight_diagnostics,
 )
+from tts.text_normalization import has_speakable_content, strip_speech_markup
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -272,13 +272,8 @@ class VoiceAssistant:
         )
 
         self.agent_url = cognition_settings.agent_url
-        self.action_executor_url = cognition_settings.action_executor_url
         self.action_dry_run = cognition_settings.action_dry_run
         self.agent_client = build_agent_client(self.host_settings)
-        self.action_client = ActionClient(
-            self.action_executor_url,
-            cognition_settings.action_timeout_ms,
-        )
         self.asr_timeout_s = max(0.001, audio_settings.asr_timeout_ms / 1000.0)
 
         self.min_rms = audio_settings.min_rms
@@ -440,10 +435,9 @@ class VoiceAssistant:
             self.discard_playback_realtime,
         )
         logger.info(
-            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s action_url=%s dry_run=%s cognitive_runtime_mode=%s",
+            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s dry_run=%s cognitive_runtime_mode=%s",
             self.agent_url,
             self.enable_agent,
-            self.action_executor_url,
             self.action_dry_run,
             self.cognitive_runtime_mode,
         )
@@ -541,43 +535,13 @@ class VoiceAssistant:
     def maybe_session_done(self, sid: Optional[str]) -> None:
         self.sessions.maybe_done(sid)
 
-    def _playback_state(self) -> PlaybackDeliveryLifecycle:
-        state = self.__dict__.get("playback_delivery")
-        if not isinstance(state, PlaybackDeliveryLifecycle):
-            state = PlaybackDeliveryLifecycle()
-            self.__dict__["playback_delivery"] = state
-        return state
-
-    def _input_turn_state(self) -> InputTurnLifecycle:
-        state = self.__dict__.get("input_turn_lifecycle")
-        if not isinstance(state, InputTurnLifecycle):
-            state = InputTurnLifecycle()
-            self.__dict__["input_turn_lifecycle"] = state
-        return state
-
-    @property
-    def playback_delivery(self) -> PlaybackDeliveryLifecycle:
-        return self._playback_state()
-
-    @playback_delivery.setter
-    def playback_delivery(self, value: PlaybackDeliveryLifecycle) -> None:
-        self.__dict__["playback_delivery"] = value
-
-    @property
-    def input_turn_lifecycle(self) -> InputTurnLifecycle:
-        return self._input_turn_state()
-
-    @input_turn_lifecycle.setter
-    def input_turn_lifecycle(self, value: InputTurnLifecycle) -> None:
-        self.__dict__["input_turn_lifecycle"] = value
-
     def playback_start_key(
         self,
         generation: int,
         order: int,
         session_id: Optional[str],
     ) -> tuple[int, int, str | None]:
-        return self._playback_state().key(generation, order, session_id)
+        return self.playback_delivery.key(generation, order, session_id)
 
     def _register_turn_speech_event(
         self,
@@ -607,7 +571,7 @@ class VoiceAssistant:
         subject_refs: list[str] | None = None,
         origin_session_id: str | None = None,
     ) -> dict[str, Any] | None:
-        return self._playback_state().register_turn_speech_event(
+        return self.playback_delivery.register_turn_speech_event(
             session_id=session_id,
             origin_session_id=origin_session_id,
             generation=generation,
@@ -639,7 +603,7 @@ class VoiceAssistant:
         self,
         session_id: str,
     ) -> list[dict[str, Any]]:
-        return self._playback_state().delivered_turn_speech_events(session_id)
+        return self.playback_delivery.delivered_turn_speech_events(session_id)
 
     def resolve_playback_start_waiter(
         self,
@@ -650,7 +614,7 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        resolved = self._playback_state().resolve_playback_start_waiter(
+        resolved = self.playback_delivery.resolve_playback_start_waiter(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -672,7 +636,7 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        for _, order, session_id in self._playback_state().resolve_all_playback_start_waiters(
+        for _, order, session_id in self.playback_delivery.resolve_all_playback_start_waiters(
             started=started,
             reason=reason,
         ):
@@ -683,7 +647,7 @@ class VoiceAssistant:
                 started,
                 reason,
             )
-        self._playback_state().resolve_all_playback_release_waiters(reason=reason)
+        self.playback_delivery.resolve_all_playback_release_waiters(reason=reason)
 
 
     async def wait_for_playback_start(
@@ -694,7 +658,7 @@ class VoiceAssistant:
         session_id: Optional[str],
         timeout_s: float,
     ) -> bool:
-        started = await self._playback_state().wait_for_playback_start(
+        started = await self.playback_delivery.wait_for_playback_start(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -717,7 +681,7 @@ class VoiceAssistant:
         session_id: str | None,
         reason: str,
     ) -> bool:
-        cancelled = self._playback_state().cancel_order_before_start(
+        cancelled = self.playback_delivery.cancel_order_before_start(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -780,21 +744,13 @@ class VoiceAssistant:
         return sid
 
     def normalize_tts_candidate(self, text: str) -> str:
-        text = (text or "").strip()
-        text = text.replace("```", " ").replace("`", " ").replace("**", " ")
-        text = re.sub(r"[*_#>\[\]{}|]+", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
+        text = strip_speech_markup(text)
         text = re.sub(r"^[-•]+\s*", "", text).strip()
         text = re.sub(r"\s+([,.;:!?])", r"\1", text)
         return text
 
     def is_valid_tts_text(self, text: str) -> bool:
-        text = self.normalize_tts_candidate(text)
-        if len(text) < 2:
-            return False
-        if re.fullmatch(r"\d+[\.)]?", text):
-            return False
-        return any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in text)
+        return has_speakable_content(self.normalize_tts_candidate(text), min_chars=2)
 
     def split_tts_text(self, text: str) -> list[str]:
         candidate = self.normalize_tts_candidate(text)
@@ -980,7 +936,7 @@ class VoiceAssistant:
         if playback_generation_at_start is None:
             return False, 0.0, 0.0
         if not started_during_playback:
-            playback_state = self._playback_state()
+            playback_state = self.playback_delivery
             last_generation = playback_state.last_completed_playback_generation
             playback_end_ms = playback_state.last_playback_end_monotonic_ms
             if (
@@ -1087,9 +1043,9 @@ class VoiceAssistant:
         from orchestrator.runtime.scheduler import current_execution_start
         execution_start = current_execution_start.get()
         if execution_start is not None:
-            self._playback_state().execution_starts[key] = execution_start
+            self.playback_delivery.execution_starts[key] = execution_start
         self.playback_delivery.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
-        self._playback_state().create_playback_release_waiter(
+        self.playback_delivery.create_playback_release_waiter(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -1234,7 +1190,7 @@ class VoiceAssistant:
                 timeout_ms = max(1000, int(raw_timeout_ms))
             except (TypeError, ValueError):
                 timeout_ms = 30000
-            return await self._playback_state().wait_for_playback_release(
+            return await self.playback_delivery.wait_for_playback_release(
                 generation=generation,
                 order=orders[-1],
                 session_id=session_id,
@@ -1269,7 +1225,7 @@ class VoiceAssistant:
                 }
 
             def current_status() -> str:
-                events = self._playback_state().turn_speech_events.get(
+                events = self.playback_delivery.turn_speech_events.get(
                     str(origin_session_id or session_id or ""),
                     [],
                 )
@@ -1306,13 +1262,13 @@ class VoiceAssistant:
                         orders[0],
                         session_id,
                     )
-                    self._playback_state().execution_starts[key] = execution_start
+                    self.playback_delivery.execution_starts[key] = execution_start
                     status_after_binding = current_status()
                     if status_after_binding in {
                         "playback_started",
                         "playback_completed",
                     }:
-                        self._playback_state().execution_starts.pop(key, None)
+                        self.playback_delivery.execution_starts.pop(key, None)
                         await execution_start.group.ready_after_observed_start(
                             execution_start.member
                         )
@@ -1432,9 +1388,9 @@ class VoiceAssistant:
             if fast_activity_id and fast_activity_id not in semantic_activity_ids:
                 semantic_activity_ids.append(fast_activity_id)
         reuse_args = None
-        async with self._playback_state().speech_submission_lock:
+        async with self.playback_delivery.speech_submission_lock:
             if semantic_activity_ids:
-                existing_event = self._playback_state().find_turn_speech_event_for_activities(
+                existing_event = self.playback_delivery.find_turn_speech_event_for_activities(
                     session_id=origin_session_id or session_id,
                     turn_id=(
                         str(metadata.get("turn_id") or session_id or "")
@@ -2257,11 +2213,10 @@ class VoiceAssistant:
             for goal_id in evidence.coaffected_goal_ids
             if goal_id not in excluded_goal_ids
         ]
-        provenance_fn = getattr(self.conversation_state, "goal_reentry_provenance", None)
-        if not sibling_goal_ids or not callable(provenance_fn):
+        if not sibling_goal_ids:
             return {}
         statuses: dict[str, str] = {}
-        for item in provenance_fn(sibling_goal_ids):
+        for item in self.conversation_state.goal_reentry_provenance(sibling_goal_ids):
             goal_id = str(item.get("goal_id") or "")
             source_text = str(item.get("source_text") or "").strip()
             try:
@@ -2548,7 +2503,7 @@ class VoiceAssistant:
             )
         planner_speech_events = [
             event
-            for event in self._playback_state().turn_speech_events.get(
+            for event in self.playback_delivery.turn_speech_events.get(
                 str(session_id or ""), []
             )
             if isinstance(event, dict)
@@ -4325,7 +4280,7 @@ class VoiceAssistant:
                 continue
             if not isinstance(result.output, dict):
                 continue
-            if await self._playback_state().wait_for_speech_completion(session_id, result.output):
+            if await self.playback_delivery.wait_for_speech_completion(session_id, result.output):
                 delivered_speech.append(speech)
         if not delivered_speech:
             self.session_log(
@@ -7104,7 +7059,7 @@ class VoiceAssistant:
         cancel_cognitive_work: bool = True,
     ) -> None:
         self.playback_delivery.playback_generation += 1
-        self._playback_state().cancel_output_duck()
+        self.playback_delivery.cancel_output_duck()
         self.resolve_all_playback_start_waiters(
             started=False,
             reason="interrupt",

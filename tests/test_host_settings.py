@@ -136,6 +136,23 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         default = HostSettingsSnapshot.from_env(project_root=Path("/tmp"), environ={})
         self.assertEqual(settings, default)
 
+    def test_numbers_share_the_boolean_empty_value_rule(self) -> None:
+        settings = HostSettingsSnapshot.from_env(
+            project_root=Path("/tmp"),
+            environ={"ORCH_CAPABILITY_MAX_CONCURRENCY": " "},
+        )
+        default = HostSettingsSnapshot.from_env(project_root=Path("/tmp"), environ={})
+        self.assertEqual(settings, default)
+        for raw, message in (("many", "must be an integer"), ("0", "must be >= 1")):
+            with self.subTest(raw=raw), self.assertRaisesRegex(
+                HostConfigurationError,
+                f"ORCH_CAPABILITY_MAX_CONCURRENCY {message}",
+            ):
+                HostSettingsSnapshot.from_env(
+                    project_root=Path("/tmp"),
+                    environ={"ORCH_CAPABILITY_MAX_CONCURRENCY": raw},
+                )
+
     def test_invalid_choice_fails_closed_instead_of_silent_default(self) -> None:
         with self.assertRaisesRegex(
             HostConfigurationError,

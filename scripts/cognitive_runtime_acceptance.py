@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate PR7 goal-driven runtime scenarios and retained operational evidence.
+"""Validate goal-driven runtime scenarios and retained operational evidence.
 
 This tool deliberately separates deterministic Level A scenarios, live-text
 operational evidence, and simulator execution evidence. It never upgrades one

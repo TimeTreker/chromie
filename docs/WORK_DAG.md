@@ -251,17 +251,11 @@ migrated at freeze revision 21.
 
 The Agent exposes deterministic WorkDAG/DAGEngine endpoints:
 
-- `POST /work-dags/validate`
-- `POST /work-dags/dry-run`
-- `POST /work-dags/execute-read-only`
 - `POST /work-dags/execute-planning`
-- `POST /work-dags/execute-guarded`
-- `POST /work-dags/confirmation-grants`
 - `POST /work-dags/{dag_id}/cancel`
-- `GET /work-dags/{dag_id}/trace`
 - `GET /work-dags/engine/status`
 
-The guarded execution and cancellation surfaces require the DAGEngine execution bearer token. Dry-run and diagnostics use the diagnostics token and fail closed when it is not configured.
+Cancellation requires the DAGEngine execution bearer token. Engine status uses the diagnostics token and fails closed when it is not configured.
 
 The execution modes are deterministic qualification/acceptance surfaces. They do not create separate semantic Planners. Direct operator/system/user fixtures may create standalone revision-1 DAGs for diagnostics, but only Planner may author a semantic revision after revision 1.
 

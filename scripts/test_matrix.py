@@ -94,6 +94,15 @@ GROUPS: dict[str, TestGroup] = {
                 sys.executable,
                 "scripts/general_ability_acceptance.py",
                 "--mode",
+                "check",
+                "--no-write",
+                "--scenario-root",
+                "scenarios/everyday",
+            ),
+            (
+                sys.executable,
+                "scripts/general_ability_acceptance.py",
+                "--mode",
                 "level-a",
                 "--no-write",
             ),
@@ -194,20 +203,7 @@ GROUPS: dict[str, TestGroup] = {
     "legacy-agent": TestGroup(
         "Dependency-light legacy Agent tests.",
         (
-            (
-                sys.executable,
-                "-c",
-                (
-                    "import inspect, runpy, sys; "
-                    "sys.path.insert(0, 'agent'); "
-                    "mods=[runpy.run_path('agent/tests/test_capability_registry.py'),"
-                    "runpy.run_path('agent/tests/test_work_dag_validator_engine.py')]; "
-                    "tests=[f for m in mods for n,f in m.items() "
-                    "if n.startswith('test_') and inspect.isfunction(f)]; "
-                    "[f() for f in tests]; "
-                    "print(f'{len(tests)} legacy Agent tests passed')"
-                ),
-            ),
+            (sys.executable, "scripts/run_legacy_agent_tests.py"),
         ),
     ),
     "all": TestGroup(

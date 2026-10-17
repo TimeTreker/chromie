@@ -154,6 +154,13 @@ class VocalProviderProvenance(BaseModel):
         return value
 
 
+def _normalize_claim_summary(value: str) -> str:
+    normalized = " ".join(value.strip().split())
+    if not normalized:
+        raise ValueError("claim_summary must not be empty")
+    return normalized
+
+
 class VocalModeEvidence(BaseModel):
     """Retained qualification evidence for one advertised vocal mode."""
 
@@ -178,13 +185,14 @@ class VocalModeEvidence(BaseModel):
             raise ValueError("artifact_refs must contain retained evidence")
         return result
 
-    @field_validator("claim_summary")
-    @classmethod
-    def normalize_claim_summary(cls, value: str) -> str:
-        normalized = " ".join(value.strip().split())
-        if not normalized:
-            raise ValueError("claim_summary must not be empty")
-        return normalized
+    normalize_claim_summary = field_validator("claim_summary")(_normalize_claim_summary)
+
+
+def _normalize_provider_id(value: str) -> str:
+    normalized = " ".join(value.strip().split())
+    if not normalized:
+        raise ValueError("provider_id must not be empty")
+    return normalized
 
 
 class VocalProviderDeclaration(BaseModel):
@@ -209,13 +217,7 @@ class VocalProviderDeclaration(BaseModel):
     mode_evidence: dict[VocalMode, VocalModeEvidence]
     contract_version: int = Field(default=1, ge=1)
 
-    @field_validator("provider_id")
-    @classmethod
-    def normalize_provider_id(cls, value: str) -> str:
-        normalized = " ".join(value.strip().split())
-        if not normalized:
-            raise ValueError("provider_id must not be empty")
-        return normalized
+    normalize_provider_id = field_validator("provider_id")(_normalize_provider_id)
 
     @field_validator("supported_modes", mode="before")
     @classmethod
@@ -331,13 +333,7 @@ class MediaOperationEvidence(BaseModel):
             raise ValueError("artifact_refs must contain retained evidence")
         return result
 
-    @field_validator("claim_summary")
-    @classmethod
-    def normalize_claim_summary(cls, value: str) -> str:
-        normalized = " ".join(value.strip().split())
-        if not normalized:
-            raise ValueError("claim_summary must not be empty")
-        return normalized
+    normalize_claim_summary = field_validator("claim_summary")(_normalize_claim_summary)
 
 
 class MediaProviderDeclaration(BaseModel):
@@ -364,13 +360,7 @@ class MediaProviderDeclaration(BaseModel):
     operation_evidence: dict[MediaOperation, MediaOperationEvidence]
     contract_version: int = Field(default=1, ge=1)
 
-    @field_validator("provider_id")
-    @classmethod
-    def normalize_provider_id(cls, value: str) -> str:
-        normalized = " ".join(value.strip().split())
-        if not normalized:
-            raise ValueError("provider_id must not be empty")
-        return normalized
+    normalize_provider_id = field_validator("provider_id")(_normalize_provider_id)
 
     @field_validator("supported_operations", "supported_media_kinds", mode="before")
     @classmethod
@@ -862,6 +852,10 @@ class CapabilityIdentityModel(BaseModel):
         return normalize_whitespace(value)
 
 
+def _reject_low_level_metadata(value: dict[str, Any]) -> dict[str, Any]:
+    return reject_forbidden_low_level_fields(value)
+
+
 class InteractionSpeech(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -890,10 +884,7 @@ class InteractionSpeech(BaseModel):
             raise ValueError("speech text must not be empty")
         return normalized
 
-    @field_validator("metadata")
-    @classmethod
-    def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return reject_forbidden_low_level_fields(value)
+    reject_low_level_metadata = field_validator("metadata")(_reject_low_level_metadata)
 
 
 class CapabilityRequest(CapabilityIdentityModel):
@@ -925,10 +916,7 @@ class CapabilityRequest(CapabilityIdentityModel):
             raise ValueError("identifier must not be empty")
         return normalized
 
-    @field_validator("args", "metadata")
-    @classmethod
-    def reject_low_level_payloads(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return reject_forbidden_low_level_fields(value)
+    reject_low_level_payloads = field_validator("args", "metadata")(_reject_low_level_metadata)
 
 
 class CapabilityResult(CapabilityIdentityModel):
@@ -946,10 +934,7 @@ class CapabilityResult(CapabilityIdentityModel):
     started_at: datetime | None = None
     finished_at: datetime | None = None
 
-    @field_validator("output", "metadata")
-    @classmethod
-    def reject_low_level_result_payloads(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return reject_forbidden_low_level_fields(value)
+    reject_low_level_result_payloads = field_validator("output", "metadata")(_reject_low_level_metadata)
 
 
 class CapabilityTraceEvent(BaseModel):
@@ -960,10 +945,7 @@ class CapabilityTraceEvent(BaseModel):
     message: str = ""
     data: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("data")
-    @classmethod
-    def reject_low_level_trace_data(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return reject_forbidden_low_level_fields(value)
+    reject_low_level_trace_data = field_validator("data")(_reject_low_level_metadata)
 
 
 class CapabilityTrace(CapabilityIdentityModel):
@@ -998,10 +980,7 @@ class InteractionResponse(BaseModel):
             raise ValueError("interaction_id must not be empty")
         return normalized
 
-    @field_validator("metadata")
-    @classmethod
-    def reject_low_level_metadata(cls, value: dict[str, Any]) -> dict[str, Any]:
-        return reject_forbidden_low_level_fields(value)
+    reject_low_level_metadata = field_validator("metadata")(_reject_low_level_metadata)
 
     @model_validator(mode="after")
     def propagate_confirmation_requirement(self) -> "InteractionResponse":

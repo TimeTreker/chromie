@@ -25,7 +25,6 @@ except ImportError:  # imported as scripts.release_provenance
 REQUIREMENT_FILES = (
     "agent/requirements.txt",
     "asr/requirements.txt",
-    "hardware/requirements.txt",
     "orchestrator/requirements.txt",
     "requirements-test.txt",
     "tts/requirements.txt",
@@ -434,6 +433,7 @@ def collect_provenance(
         "tts/Dockerfile",
         "tts/candidate_server.py",
         "tts/candidate_provider.py",
+        "tts/process_worker.py",
         "tts/streaming_worker.py",
         "tts_candidates/cosyvoice/Dockerfile",
         "tts_candidates/cosyvoice/provider_impl.py",

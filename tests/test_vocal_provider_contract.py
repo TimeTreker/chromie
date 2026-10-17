@@ -27,7 +27,7 @@ from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.capability_runtime import (
     LocalSpeechCapabilityProvider,
-    CapabilityRegistry as RuntimeCapabilityRegistry,
+    CapabilityDefinitionRegistry as RuntimeCapabilityRegistry,
     CapabilityRuntime,
     VocalPerformanceCapabilityProvider,
     local_speech_definition,

@@ -12,11 +12,13 @@ from multiprocessing.connection import Connection
 from typing import Any
 
 
+from process_worker import ProcessWorkerLifecycle
+
 logger = logging.getLogger(__name__)
 TERMINAL_TYPES = {"complete", "error"}
 
 
-class StreamingProcessWorker:
+class StreamingProcessWorker(ProcessWorkerLifecycle):
     """Keep one model in a child process and stream request events over a pipe.
 
     The target sends one ``ready`` object, then zero or more ``audio`` objects
@@ -65,10 +67,6 @@ class StreamingProcessWorker:
         self._worker_warmed = False
 
     @property
-    def is_alive(self) -> bool:
-        return self._process is not None and self._process.is_alive()
-
-    @property
     def worker_warmed(self) -> bool:
         return self._worker_warmed
 
@@ -84,11 +82,6 @@ class StreamingProcessWorker:
                 return "signal_then_bounded_drain_then_restart_worker"
             return "bounded_drain_then_restart_worker"
         return "terminate_and_restart_worker"
-
-    def _lock(self) -> asyncio.Lock:
-        if self._async_lock is None:
-            self._async_lock = asyncio.Lock()
-        return self._async_lock
 
     async def start(self) -> None:
         async with self._lock():
@@ -323,14 +316,6 @@ class StreamingProcessWorker:
         raise TimeoutError(
             f"{self._name} did not become ready within {self._startup_timeout_s:.1f}s"
         )
-
-    def _stop_sync(self) -> None:
-        if self.is_alive and self._connection is not None:
-            with suppress(BrokenPipeError, EOFError, OSError):
-                self._connection.send({"type": "shutdown"})
-                if self._connection.poll(2.0):
-                    self._connection.recv()
-        self._terminate_sync()
 
     def _terminate_sync(self) -> None:
         connection = self._connection

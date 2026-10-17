@@ -1,18 +1,6 @@
-"""Shared fakes and goal builders for Goal Association tests."""
+"""Shared goal builders for Goal Association tests."""
 
 from __future__ import annotations
-
-
-class FakeOllama:
-    def __init__(self, payload):
-        self.payload = payload
-        self.prompts = []
-
-    async def generate(self, prompt, **kwargs):
-        self.prompts.append((prompt, kwargs))
-        if isinstance(self.payload, Exception):
-            raise self.payload
-        return self.payload
 
 
 def intent_goal(description: str, output_mode: str, **extra) -> dict:

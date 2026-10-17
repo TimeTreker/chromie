@@ -24,27 +24,4 @@ python scripts/check_docs.py
 LOG_LEVEL=WARNING AGENT_LOG_LEVEL=WARNING AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL=WARNING \
   python -m pytest -q tests
 
-# The original Agent tests use plain pytest-style functions but do not depend on
-# pytest fixtures. Run them directly so the default suite stays dependency-light.
-PYTHONPATH=agent python - <<'PY'
-import inspect
-import runpy
-
-modules = [
-    runpy.run_path("agent/tests/test_capability_registry.py"),
-    runpy.run_path("agent/tests/test_work_dag_validator_engine.py"),
-]
-
-tests = [
-    function
-    for module in modules
-    for name, function in module.items()
-    if name.startswith("test_")
-    and inspect.isfunction(function)
-]
-
-for test in tests:
-    test()
-
-print(f"{len(tests)} legacy Agent tests passed")
-PY
+python scripts/run_legacy_agent_tests.py

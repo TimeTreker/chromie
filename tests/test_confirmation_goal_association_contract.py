@@ -8,6 +8,7 @@ from orchestrator.runtime.confirmation import ConfirmationDialogue
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.interaction import InteractionResponse
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class _AgentClient:
@@ -35,7 +36,7 @@ class _AgentClient:
 
 class ConfirmationGoalAssociationContractTests(unittest.IsolatedAsyncioTestCase):
     async def test_confirmation_uses_current_cognitive_work_request_contract(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = _AgentClient()
         assistant.goal_association_timeout_ms = 2500
         assistant.build_context = lambda _sid: {"history": [{"role": "user", "text": "old"}]}

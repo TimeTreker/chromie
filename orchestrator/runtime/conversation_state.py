@@ -52,14 +52,6 @@ from shared.chromie_contracts.semantic_task import (
 
 
 _DONE_TASK_STATUSES = {"done", "failed", "refused", "timed_out", "cancelled", "canceled", "expired", "superseded"}
-_TASK_RELATIONS = {
-    "new_task",
-    "continue_task",
-    "modify_task",
-    "close_task",
-    "side_conversation",
-    "clarify_task",
-}
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_TASK_STORE_PATH = ".chromie/conversation/task_contexts.json"
 _DEFAULT_DURABLE_MEMORY_PATH = ".chromie/memory/profile.json"

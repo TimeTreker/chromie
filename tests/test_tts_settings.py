@@ -77,8 +77,12 @@ class TTSServiceSettingsTests(unittest.TestCase):
                 TTSCandidateSettings.from_env({key: value})
         with self.assertRaisesRegex(TTSConfigurationError, "COSYVOICE3_FP16"):
             module.required_boolean("COSYVOICE3_FP16", True, {"COSYVOICE3_FP16": "2"})
+        self.assertEqual(
+            module.required_text("QWEN3_TTS_DTYPE", "bfloat16", {"QWEN3_TTS_DTYPE": " "}),
+            "bfloat16",
+        )
         with self.assertRaisesRegex(TTSConfigurationError, "QWEN3_TTS_DTYPE is required"):
-            module.required_text("QWEN3_TTS_DTYPE", "bfloat16", {"QWEN3_TTS_DTYPE": " "})
+            module.required_text("QWEN3_TTS_DTYPE", "", {"QWEN3_TTS_DTYPE": " "})
 
     def test_tts_runtime_has_no_direct_environment_reads(self) -> None:
         for path in [*(ROOT / "tts").glob("*.py"), *(ROOT / "tts_candidates").rglob("*.py")]:

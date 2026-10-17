@@ -28,6 +28,7 @@ from shared.chromie_contracts.interaction import (
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 _TEST_OUTPUT_SCHEMA = {
     "type": "object",
@@ -300,7 +301,7 @@ class CognitiveTurnLoopClosureTests(unittest.IsolatedAsyncioTestCase):
         runtime: _Runtime,
         response: InteractionResponse,
     ) -> tuple[VoiceAssistant, str, _EvidenceRecorder]:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.interaction_runtime = runtime
         assistant.playback_delivery = runtime.playback_delivery
         assistant.playback_delivery.playback_generation = 4

@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal, Union, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .text import normalize_whitespace
+from .text import normalize_unique_text_list as _normalize_ids, normalize_whitespace
 from .agent_skill import PlanAgentSkillProvenance
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 from .user_turn import UserTurnSourceSpan, user_turn_source_tokens
@@ -974,23 +974,6 @@ FastPlannerStreamFrame = Annotated[
     ],
     Field(discriminator="frame_type"),
 ]
-
-
-def _normalize_ids(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        value = [value]
-    if not isinstance(value, list):
-        raise ValueError("expected a list or string")
-    out: list[str] = []
-    seen: set[str] = set()
-    for item in value:
-        text = " ".join(str(item or "").strip().split())
-        if text and text not in seen:
-            seen.add(text)
-            out.append(text)
-    return out
 
 
 def _parameter_resolution_json_schema(schema: dict[str, Any]) -> None:

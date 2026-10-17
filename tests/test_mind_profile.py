@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import json
-import os
 import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
 
 from orchestrator.runtime.experience import ExperienceManager
+from orchestrator.runtime.host_settings import HostSettingsSnapshot
 from orchestrator.runtime.mind import MindManager
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
@@ -142,8 +141,12 @@ class MindProfileTests(unittest.TestCase):
                 "Use the configured name Nova and age 3 years old for direct identity questions."
             )
             path.write_text(json.dumps(payload), encoding="utf-8")
-            with patch.dict(os.environ, {"ORCH_MIND_PROFILE_PATH": str(path)}, clear=False):
-                manager = MindManager.from_env(project_root=Path(tmp))
+            manager = MindManager.from_settings(
+                HostSettingsSnapshot.from_env(
+                    project_root=Path(tmp),
+                    environ={"ORCH_MIND_PROFILE_PATH": str(path)},
+                ).mind
+            )
 
         self.assertEqual(manager.profile.identity.name, "Nova")
         self.assertEqual(manager.profile.identity.age_description, "3 years old")
@@ -165,12 +168,12 @@ class MindProfileTests(unittest.TestCase):
             SocialInteractionStyle(preset="custom")
 
     def test_mind_manager_applies_operator_style_preset_from_env(self) -> None:
-        with patch.dict(
-            os.environ,
-            {"ORCH_SOCIAL_INTERACTION_STYLE_PRESET": "reserved"},
-            clear=False,
-        ):
-            manager = MindManager.from_env()
+        manager = MindManager.from_settings(
+            HostSettingsSnapshot.from_env(
+                project_root=Path(__file__).resolve().parents[1],
+                environ={"ORCH_SOCIAL_INTERACTION_STYLE_PRESET": "reserved"},
+            ).mind
+        )
 
         self.assertEqual(manager.profile.social_interaction_style.preset, "reserved")
         self.assertIn(

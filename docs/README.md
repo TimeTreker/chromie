@@ -122,7 +122,6 @@ specialized document needs a real component, operator, or mechanical-contract ow
   - [Planner projection](../agent-skills/grounded-external-information/projections/fast_planner.md)
 - [Weather Information Skill](../agent-skills/weather-information/SKILL.md)
   - [Planner projection](../agent-skills/weather-information/projections/fast_planner.md)
-- [Legacy Hardware Daemon](../hardware/README.md)
 - [Hardware Profiles](../HARDWARE_PROFILES.md)
 
 ## Interaction and execution

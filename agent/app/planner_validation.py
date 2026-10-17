@@ -138,6 +138,21 @@ def information_acquisition_goal_ids(
     return eligible
 
 _NUMERIC_LITERAL_RE = re.compile(r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])")
+
+
+def _decimal_literal(value: Any) -> Decimal | None:
+    """Return the exact Decimal of a numeric literal value, or None."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal, str)):
+        return None
+    if isinstance(value, str) and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None:
+        return None
+    try:
+        return Decimal(str(value).strip())
+    except InvalidOperation:
+        return None
+
+
 _LIST_ENTITY_TYPES = frozenset({"list", "action_list"})
 _INFORMATION_TEMPORAL_ENTITY_TYPES = frozenset(
     {
@@ -2142,15 +2157,7 @@ def validate_explicit_numeric_parameter_grounding(
     if output.disposition not in {"execute", "mixed"}:
         return
 
-    def numeric(value: Any) -> Decimal | None:
-        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal, str)):
-            return None
-        if isinstance(value, str) and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None:
-            return None
-        try:
-            return Decimal(str(value).strip())
-        except InvalidOperation:
-            return None
+    numeric = _decimal_literal
 
     def resolution_location(resolution: PlanParameterResolution) -> str:
         """Render an unambiguous typed location for model repair feedback."""
@@ -2408,15 +2415,7 @@ def normalize_missing_numeric_parameter_provenance(
     resolutions = raw.get("parameter_resolutions")
     resolutions = resolutions if isinstance(resolutions, list) else []
 
-    def numeric(value: Any) -> Decimal | None:
-        if isinstance(value, bool) or not isinstance(value, (int, float, Decimal, str)):
-            return None
-        if isinstance(value, str) and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None:
-            return None
-        try:
-            return Decimal(str(value).strip())
-        except InvalidOperation:
-            return None
+    numeric = _decimal_literal
 
     def equal(left: Decimal, right: Decimal) -> bool:
         scale = max(abs(left), abs(right), Decimal(1))
@@ -2729,18 +2728,7 @@ def normalize_schema_default_parameter_provenance(
     or repairs values without authoritative catalog-default evidence.
     """
 
-    def numeric(value: Any) -> Decimal | None:
-        if isinstance(value, bool) or not isinstance(
-            value,
-            (int, float, Decimal, str),
-        ):
-            return None
-        if isinstance(value, str) and _NUMERIC_LITERAL_RE.fullmatch(value.strip()) is None:
-            return None
-        try:
-            return Decimal(str(value).strip())
-        except InvalidOperation:
-            return None
+    numeric = _decimal_literal
 
     goal_numbers: dict[str, set[Decimal]] = {}
     for goal in authoritative_goals:

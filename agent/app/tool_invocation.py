@@ -43,7 +43,6 @@ class ToolCallOutcome(BaseModel):
         return cls(status="failed_retryable" if retryable else "failed_fatal", output=output or {}, error=error)
 
 
-ToolHandler = Callable[[dict[str, Any]], dict[str, Any] | ToolCallOutcome]
 
 
 class ToolInvoker(Protocol):
@@ -78,42 +77,6 @@ class AsyncToolInvoker(Protocol):
         context: ToolInvocationContext | None = None,
     ) -> ToolCallOutcome:
         ...
-
-
-class FunctionToolInvoker:
-    """In-process tool registry for tests and local Chromie tools.
-
-    Real MCP transports can implement ToolInvoker later without changing the
-    WorkDAG schema or executor. Handlers receive already-resolved node args.
-    """
-
-    def __init__(self) -> None:
-        self._handlers: dict[str, ToolHandler] = {}
-
-    def register(self, tool_name: str, handler: ToolHandler) -> None:
-        if tool_name in self._handlers:
-            raise ValueError(f"duplicate tool handler: {tool_name}")
-        self._handlers[tool_name] = handler
-
-    def has_tool(self, tool_name: str) -> bool:
-        return tool_name in self._handlers
-
-    def invoke(self, tool_name: str, args: dict[str, Any]) -> ToolCallOutcome:
-        try:
-            handler = self._handlers[tool_name]
-        except KeyError:
-            return ToolCallOutcome.failed(f"no handler registered for {tool_name!r}", retryable=False)
-        try:
-            raw = handler(args)
-        except TimeoutError as exc:
-            return ToolCallOutcome(status="timeout", error=str(exc) or "tool timeout")
-        except Exception as exc:  # pragma: no cover - defensive normalization
-            return ToolCallOutcome.failed(str(exc) or exc.__class__.__name__, retryable=False)
-        if isinstance(raw, ToolCallOutcome):
-            return raw
-        if not isinstance(raw, dict):
-            return ToolCallOutcome.failed(f"handler {tool_name!r} returned {type(raw).__name__}, expected dict")
-        return ToolCallOutcome.success(raw)
 
 
 McpCall = Callable[[str, str, dict[str, Any], float], Awaitable[Any]]

@@ -38,14 +38,18 @@ Send one binary frame containing signed little-endian PCM16 mono samples at
 Successful response:
 
 ```json
-{"type": "final", "text": "hello", "duration": 1.24}
+{"type": "final", "sequence": 1, "text": "hello", "duration": 1.24}
 ```
 
 Failure response:
 
 ```json
-{"type": "error", "message": "..."}
+{"type": "error", "sequence": 1, "message": "..."}
 ```
+
+`sequence` numbers the binary utterances sent on one connection, starting at 1.
+A client must reject a reply for any other utterance (for example a late reply
+after its own timeout) and reconnect.
 
 The service converts PCM16 to float32 and performs one SenseVoice decode per
 binary message. Blocking recognition runs in a bounded executor, so health

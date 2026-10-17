@@ -52,49 +52,6 @@ from .schema import (
 logger = logging.getLogger("chromie.agent.user_meaning_interpreter.llm")
 
 
-_CONTEXT_OMIT_KEYS = {
-    # Correlation labels belong to request/log joins, never human meaning.
-    "conversation_id",
-    "session_id",
-    "turn_id",
-    "sid",
-    "candidate_capabilities",
-    "common_ability_catalog",
-    "common_ability_ids",
-    "full_ability_catalog",
-    "prompt_capabilities_common",
-    "prompt_capabilities_all",
-    "prompt_catalog_scope",
-    "capability_catalog_version",
-    "mind",
-    "core_principles",
-    "long_term_goals",
-    "experience_tuning_policy",
-    "conversation",
-    "history",
-    "task_contexts",
-    "active_task_contexts",
-    "active_task_snapshots",
-    "active_goal_snapshots",
-    "working_goal_memory",
-    "long_term_goal_memory",
-    "active_pending_tasks",
-    "goal_association_candidates",
-    "recent_goal_snapshots",
-    "current_task_context",
-    "gateway_context_snapshot",
-    # Runtime target identity/direction is Planner realization evidence. UMI may
-    # understand the current-turn person/addressee meaning, but must never copy
-    # an opaque target_ref or scene geometry into provider-neutral WHAT.
-    "active_user_target",
-    "planner_auxiliary_social_context",
-    "planner_target_evidence_context",
-    # The exact source wording is projected once in its dedicated provenance
-    # block.  Do not duplicate the full Gateway envelope as ambient context.
-    "user_turn_envelope",
-    "source_turn_provenance",
-}
-
 # These keys belong either to downstream lifecycle/HOW authority or to the retired
 # route/intent compatibility architecture. They are never semantic evidence for UMI.
 _FORBIDDEN_CONTEXT_KEYS = frozenset(

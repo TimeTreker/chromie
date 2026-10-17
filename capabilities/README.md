@@ -115,7 +115,7 @@ passive LLM task methods stored outside this executable capability directory.
 They cannot register a capability, provider, permission, or confirmation
 exemption.
 
-The existing typed manifest, live provider schema, `CapabilityRegistry`, Trusted
+The existing typed manifest, live provider schema, `CapabilityDefinitionRegistry`, Trusted
 Capability Runtime (`CapabilityRuntime`), and Soridormi validation remain the only
 execution-authoritative path. Live Chromie contracts use canonical
 `CapabilityRequest`, `CapabilityResult`, and `capability_id`; retired executable
@@ -187,7 +187,7 @@ Chromie currently has two related but distinct capability views:
 1. The Agent capability registry is a startup-loaded, static manifest view used
    to validate Planner-authored WorkDAG nodes, enforce DAGEngine execution policy, and
    invoke qualified provider operations. The registry does not plan DAG topology.
-2. The Host `CapabilityRegistry` is a runtime catalog of trusted named Capabilities
+2. The Host `CapabilityDefinitionRegistry` is a runtime catalog of trusted named Capabilities
    used by `InteractionResponse` and the host Trusted Capability Runtime.
 
 They share the principle that the model selects validated named capabilities,

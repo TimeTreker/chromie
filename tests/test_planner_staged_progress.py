@@ -47,6 +47,7 @@ from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.cognitive_runtime_test_support import FakeRuntime
 
 from tests.cognitive_work_test_support import PlannerActivationFixture, word_free_model_fixture, social_fixture_resolution, social_fixture_response
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 READ_SCHEMA = {
     "type": "object",
@@ -329,7 +330,7 @@ async def reenter(request, catalog, plan, adapter, response, bundle, raw):
             return await resolve(request, catalog, raw, "fast")
 
     client = Client()
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = client
     assistant.cognitive_runtime_policy = SimpleNamespace(
         planner_timeout_ms=3000, deliberative_timeout_ms=6000

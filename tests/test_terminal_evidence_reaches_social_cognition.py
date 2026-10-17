@@ -29,6 +29,7 @@ from shared.chromie_contracts.plan import (
 )
 from shared.chromie_contracts.social_cognition import SocialCognitionResolution
 from shared.chromie_contracts.tool_result import canonical_value_sha256
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 GOAL = "goal-weather"
 WEATHER = {"condition": "light rain", "temperature_c": 14}
@@ -94,7 +95,7 @@ class _Runtime:
 
 
 def _assistant(planner_result):
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.session_log = lambda *_args, **_kwargs: None
     assistant.cognitive_runtime = _Runtime()
     assistant.playback_delivery = SimpleNamespace(playback_generation=0)

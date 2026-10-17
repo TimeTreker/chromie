@@ -1055,7 +1055,6 @@ class VoiceInteractionAcceptanceTests(unittest.TestCase):
                     runtime_env_path=runtime_env,
                     output_dir=output_dir,
                     fallback_speaker_id="default",
-                    default_sample_rate=44100,
                     timeout_s=180.0,
                 )
 

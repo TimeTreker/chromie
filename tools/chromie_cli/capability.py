@@ -12,7 +12,7 @@ from typing import Any
 
 from shared.chromie_contracts.interaction import find_raw_controller_array_schema
 
-from .env import Diagnostic, diagnostics_payload, load_env, parse_bool
+from .env import Diagnostic, diagnostics_payload, load_env
 from .output import CommandResult, ExitCode
 
 
@@ -604,7 +604,7 @@ def _check_feature_gate_alignment(root: Path, manifest_path: Path) -> list[Diagn
     diagnostics: list[Diagnostic] = []
     snapshot = load_env(root)
     configured = snapshot.get("ORCH_SORIDORMI_MANIFEST")
-    soridormi_enabled = parse_bool(snapshot.get("ORCH_ENABLE_SORIDORMI_CAPABILITIES")) is True
+    soridormi_enabled = snapshot.bool_value("ORCH_ENABLE_SORIDORMI_CAPABILITIES")
     if soridormi_enabled and configured:
         configured_path = root / configured
         try:

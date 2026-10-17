@@ -199,7 +199,7 @@ Canonical terms:
 
 Chromie's canonical executable runtime uses `capability_id`, `capability_version`,
 `CapabilityRequest`, `CapabilityResult`, `CapabilityRuntime`, `CapabilityDefinition`,
-`CapabilityRegistry`, and `CapabilityProvider`. The retired executable names `skill_id`,
+`CapabilityDefinitionRegistry`, and `CapabilityProvider`. The retired executable names `skill_id`,
 `skill_version`, `SkillRequest`, `SkillResult`, `SkillRuntime`, `SkillDefinition`,
 `SkillRegistry`, and `SkillProvider` are not live Chromie contracts or compatibility aliases.
 Soridormi may still expose provider-local wire `skill_id`; its adapter translates that field

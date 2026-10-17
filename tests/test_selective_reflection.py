@@ -8,19 +8,7 @@ from agent.app.reflection import ReflectionResolver
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
 from shared.chromie_contracts.situation import CognitiveOpportunity
-
-
-class FakeOllama:
-    def __init__(self, payload: dict) -> None:
-        self.payload = payload
-        self.calls = 0
-        self.prompts: list[str] = []
-
-    async def generate(self, *args, **kwargs):
-        self.calls += 1
-        if args:
-            self.prompts.append(str(args[0]))
-        return self.payload
+from tests.model_fakes import FakeOllama
 
 
 def request_for(opportunity: CognitiveOpportunity) -> ReflectionRequest:
@@ -421,7 +409,7 @@ def test_reflection_prompt_surfaces_terminal_history_and_forbids_global_shortcut
 
     asyncio.run(ReflectionResolver(ollama).resolve(request))
 
-    prompt = ollama.prompts[-1]
+    prompt = ollama.prompt
     assert "Recent terminal Goal projections JSON" in prompt
     assert "goal-old" in prompt
     assert "never replan, clarify, correct, reopen" in prompt

@@ -717,7 +717,6 @@ Git provenance, or evidence claims.
 | `scenarios/cognitive_turn_loop/` | `integration/cognitive_turn_loop` |
 | `scenarios/cognitive_runtime/` | `integration/goal_driven_runtime` |
 | `scenarios/cognitive_core_dialogue/` | `integration/cognitive_core_dialogue` |
-| `tests/scenarios/` | module, integration, or historical-regression datasets according to behavior |
 | `scenarios/general_ability/` self-describing files | E2E ability cohorts and evidence qualification |
 | voice-milestone and MuJoCo acceptance paths | E2E audio/simulator cohorts |
 | Social Attention closure scenarios | `social_attention`, `style_matrix`, `user_preferences`, and regression cohorts |

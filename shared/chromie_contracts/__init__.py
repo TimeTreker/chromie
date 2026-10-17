@@ -51,7 +51,6 @@ from .core_interpretation import (
     CoreInterpretationUnavailable,
     PlannerReentryScope,
 )
-from .action import ActionCommand, ActionResult
 from .interaction import (
     CapabilityIdentityModel,
     OptionalCapabilityIdentityModel,
@@ -275,8 +274,6 @@ __all__ = [
     "DisclosedAgentSkillProjection",
     "SelectedAgentSkill",
     "MemoryUpdateProposal",
-    "ActionCommand",
-    "ActionResult",
     "InteractionResponse",
     "InteractionSpeech",
     "CapabilityIdentityModel",

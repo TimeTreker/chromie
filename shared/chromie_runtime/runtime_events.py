@@ -11,13 +11,14 @@ import json
 import logging
 import os
 import shutil
-import tempfile
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
+from .atomic_files import atomic_write_json as _atomic_write_json
+from .atomic_files import sync_directory as _sync_directory
 from .settings import RuntimePolicySettings
 
 RUNTIME_EVENT_SCHEMA_VERSION = 1
@@ -391,29 +392,3 @@ def _existing_event_result(
     return result
 
 
-def _atomic_write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    temporary_path = Path(temporary)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, sort_keys=True, indent=2)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
-        _sync_directory(path.parent)
-    finally:
-        temporary_path.unlink(missing_ok=True)
-
-
-def _sync_directory(path: Path) -> None:
-    if os.name == "nt":
-        return
-    descriptor = os.open(path, os.O_RDONLY)
-    try:
-        os.fsync(descriptor)
-    finally:
-        os.close(descriptor)

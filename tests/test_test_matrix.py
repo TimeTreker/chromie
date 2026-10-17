@@ -13,6 +13,13 @@ class TestMatrixCoverageTests(unittest.TestCase):
         level_a = next(command for command in commands if "level-a" in command)
         self.assertNotIn("--ability-class", level_a)
 
+    def test_general_ability_group_checks_the_everyday_live_library(self) -> None:
+        commands = GROUPS["general-ability"].commands
+        self.assertIn(
+            ("--mode", "check", "--no-write", "--scenario-root", "scenarios/everyday"),
+            [tuple(command[2:]) for command in commands],
+        )
+
     def test_local_combinations_include_cognitive_runtime(self) -> None:
         self.assertIn("cognitive-runtime", COMBOS["local-modules"])
         self.assertIn("cognitive-runtime", COMBOS["voice-mujoco-sim"])

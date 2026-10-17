@@ -11,7 +11,7 @@ from orchestrator.runtime.capability_runtime import (
     MockCapabilityProvider,
     RuntimeAuthorization,
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityResult,
     CapabilityRuntime,
     local_speech_definition,
@@ -416,7 +416,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_runtime_overlaps_speech_and_walk(self) -> None:
         response, walk = await self._response()
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(walk)
         runtime = CapabilityRuntime(registry, max_concurrency=3)
@@ -470,7 +470,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             _definition(f"test.output.{index}", group=f"group.{index}", resources=["shared"])
             for index in range(2)
         ]
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for definition in definitions:
             registry.register(definition)
         runtime = CapabilityRuntime(registry, max_concurrency=2)
@@ -550,7 +550,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     ))
                 if conflict == "serial":
                     definitions[0].can_run_parallel = False
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 for definition in definitions:
                     registry.register(definition)
                 runtime = CapabilityRuntime(registry, max_concurrency=3)
@@ -599,7 +599,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         cancellations.append(context.interaction_id)
                         await super().cancel(request, definition, context)
 
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 for index in range(2):
                     registry.register(_definition(
                         f"soridormi.member{index}", group=f"group{index}", resources=[f"resource{index}"],
@@ -681,7 +681,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         speech_definition = local_speech_definition()
         vocal_definition = vocal_performance_definition(declaration)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(speech_definition)
         registry.register(vocal_definition)
         runtime = CapabilityRuntime(registry, max_concurrency=2)
@@ -709,7 +709,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             await submit_and_wait_terminal(runtime, response)
 
     def test_soridormi_import_preserves_provider_body_lanes(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -774,7 +774,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                     output={"completed": True},
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for name, lane in [
             ("voice-a", "vocal"),
             ("body-a", "activity"),
@@ -828,7 +828,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                 starts[request.request_id] = time.monotonic()
                 return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
                     status="completed", provider_id=self.provider_id, output={"completed": True})
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for name, lane in [("voice", "vocal"), ("body", "activity")]:
             definition = _definition("test." + name, group=name, resources=[name])
             definition.metadata["execution_lane"] = lane
@@ -860,7 +860,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                         starts.append(request.request_id)
                         return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
                             status="completed", provider_id=self.provider_id, output={"completed": True})
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 for name, lane in [("voice", "vocal"), ("body", "activity")]:
                     definition = _definition("test." + name, group=name, resources=[name])
                     definition.metadata["execution_lane"] = lane
@@ -905,7 +905,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                 effects.append(request.request_id)
                 return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
                     provider_id=self.provider_id, status="completed", output={"completed": True})
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for name, lane in (("voice", "vocal"), ("body", "activity")):
             definition = _definition("test." + name, group=name, resources=[name])
             definition.metadata["execution_lane"] = lane
@@ -937,7 +937,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                         effects.append(request.request_id)
                         return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
                             provider_id=self.provider_id, status="completed", output={"completed": True})
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 requests = []
                 for name, lane in (("voice", "vocal"), ("body-a", "activity"), ("body-b", "activity")):
                     definition = _definition("test." + name, group=name, resources=[name])

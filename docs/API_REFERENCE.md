@@ -142,15 +142,11 @@ running.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health` | Return current model/runtime state, loaded capability sources, Planner availability, and WorkDAG diagnostic counters. |
-| `GET` | `/semantic-authority` | Return the machine-readable maintained single-authority matrix for Goal-driven `apply` and `report_only`. |
 | `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
 | `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic User Meaning Interpretation inside the Core. |
 | `GET` | `/agent-skills` | Return bounded owner-approved Agent Skill metadata summaries and configured package provenance only; no Skill body or projection text. |
-| `POST` | `/agent-skills/select` | Let the declared responsible Agent role make a typed model-authored no/one/multi-Skill decision from bounded approved summaries; this endpoint does not load projections, mutate Plans, or execute Capabilities. |
-| `POST` | `/agent-skills/disclose` | Load only exact projections from a validated selection under digest and prompt-budget checks; it does not mutate Plans or execute Capabilities. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named capabilities and refresh status. |
-| `POST` | `/capabilities/search` | Return a bounded model-neutral catalog view for inspection; it never scores language, suggests an ordinary route, or selects agents. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise LLM context for at most `limit` catalog entries (default `20`, capped at `64`); `text` is accepted at the interface but does not filter capabilities. |
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
 | `POST` | `/cognitive-activation` | Decide whether a trusted internal state transition should wake one of the exact existing authorities allowed by the Host scope. It cannot author Goal meaning, Work, wording, Capability selection, execution, or completion truth. |
@@ -190,7 +186,7 @@ contract accepts (`AgentSkillProjectionName`); the
 weather package declares the grounded method as its parent and remains passive
 despite referencing required/optional Capabilities.
 
-`POST /agent-skills/select` accepts the responsible Agent projection name, the
+The Agent Skill selection service accepts the responsible Agent projection name, the
 current user text, bounded Goal context, optional bounded context summaries, and
 an optional explicit candidate-ID set. The Host performs only structural
 discovery: it filters by declared projection, validates explicit IDs, sorts and
@@ -236,7 +232,7 @@ nonverbally or stay silent; neither communication nor catalogue visibility prove
 or authorizes the requested effect. Search scores are relevance signals for catalog
 inspection endpoints, not User Meaning Interpretation execution authorization.
 
-`POST /agent-skills/disclose` accepts a previously validated selection and loads
+The disclosure service accepts a previously validated selection and loads
 only its exact matching role projections. The Loader rechecks package content,
 applies per-projection/aggregate/count budgets, omits rather than truncates
 oversized content, and returns typed failures plus a disclosure digest. Only the
@@ -255,8 +251,6 @@ Important interaction-related endpoints are:
 |---|---|---|
 | `POST` | `/plan-advance` | Stream one complete Planner Work result or typed failure as NDJSON; no presentation prefix. One bounded catalog lookup may precede the Work decision. |
 | `POST` | `/goal-association` | Commit no Host state; return the model-authored canonical Goal association/segmentation proposal for Host application. |
-| `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
-| `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read capability requests already selected by the Goal-driven planner. |
 
 The maintained Goal-driven planning endpoints (`/plan-advance`, `/goal-association`,
@@ -771,14 +765,8 @@ that topology mechanically; it does not create replacement Work or user-facing m
 
 | Method | Path | Gate or authorization | Purpose |
 |---|---|---|---|
-| `POST` | `/work-dags/validate` | Always available | Validate WorkDAG structure, acyclicity, Capability references, and deterministic execution policy. |
-| `POST` | `/work-dags/dry-run` | Diagnostics bearer token | Produce a deterministic trace without remote side effects. |
-| `POST` | `/work-dags/execute-read-only` | `AGENT_ENABLE_READ_ONLY_DAG_EXECUTION=1` | Execute preflight-approved side-effect-free nodes. |
 | `POST` | `/work-dags/execute-planning` | `AGENT_ENABLE_PLANNING_DAG_EXECUTION=1` | Execute safe reads and `planning_only` provider operations in an already-authored WorkDAG. |
-| `POST` | `/work-dags/confirmation-grants` | Guarded execution enabled plus bearer token | Issue a short-lived, single-use grant bound to one WorkDAG and confirmed nodes. |
-| `POST` | `/work-dags/execute-guarded` | Guarded execution enabled plus bearer token | Execute authorized side effects; physical motion retains separate confirmation/safety proof requirements. |
 | `POST` | `/work-dags/{dag_id}/cancel` | DAGEngine execution bearer token | Cancel an active DAG or reserve a bounded cancel-before-start tombstone. |
-| `GET` | `/work-dags/{dag_id}/trace` | Diagnostics bearer token | Return the latest non-expired mechanical execution trace. |
 | `GET` | `/work-dags/engine/status` | Diagnostics bearer token | Return DAGEngine mode, active/waiting counters, and active DAG IDs. |
 
 Bearer format:
@@ -787,7 +775,7 @@ Bearer format:
 Authorization: Bearer <AGENT_DAG_ENGINE_EXECUTION_TOKEN>
 ```
 
-Dry-run, trace, and engine-status requests use `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN`.
+Engine-status requests use `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN`.
 When that variable is blank, Agent falls back to `AGENT_DAG_ENGINE_EXECUTION_TOKEN`;
 when both are blank, diagnostic endpoints return 503. Invalid or missing credentials
 return 401.
@@ -822,23 +810,6 @@ WorkDAG `$ref` arguments may read `<node>.output[.<field>]`, `<node>.error`, or
 topology; semantic replanning after changed reality belongs to Planner and normally
 produces a revised/new WorkDAG. Goal Association never edits the DAG directly; a Goal change is input to Planner. Retaining the current WorkDAG is a valid NO_CHANGE decision.
 
-## Hardware compatibility HTTP API — port 8095
-
-This is the legacy mock-action daemon, not the Soridormi robot boundary.
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/health` | Return mock driver and robot state. |
-| `GET` | `/state` | Return current mock robot state. |
-| `POST` | `/actions` | Execute a namespaced compatibility action. |
-| `GET` | `/actions/{action_id}` | Return an in-memory action result. |
-| `POST` | `/emergency_stop` | Set mock emergency-stop state. |
-| `POST` | `/reset_emergency_stop` | Clear mock emergency-stop state. |
-
-The daemon rejects `unsafe.*` actions and actions that still require
-confirmation. In this revision it always constructs `MockRobotDriver`; serial
-configuration variables do not select a production backend.
-
 ## ASR WebSocket protocol — port 9001
 
 The ASR service accepts WebSocket connections and two message forms:
@@ -847,9 +818,11 @@ The ASR service accepts WebSocket connections and two message forms:
   `{"type":"pong","service":"asr",...}` with backend, mode, model revision,
   and bounded-concurrency metadata.
 - Binary PCM16 mono audio at `ASR_SAMPLE_RATE` -> one JSON final result:
-  `{"type":"final","text":"...","duration":<seconds>}`.
+  `{"type":"final","sequence":<n>,"text":"...","duration":<seconds>}`.
 
-Failures return `{"type":"error","message":"..."}`. The host Orchestrator
+Failures return `{"type":"error","sequence":<n>,"message":"..."}`. `sequence`
+numbers the utterances sent on one connection from 1; clients reject a reply
+whose sequence is not the utterance they are waiting for and reconnect. The host Orchestrator
 performs VAD and sends complete utterance audio; this service does not stream
 partial transcripts. Blocking final-backend inference runs in a bounded
 executor, so health/ping handling remains responsive while a transcription is
@@ -867,7 +840,6 @@ Supported default-provider JSON messages:
 | Request type | Result |
 |---|---|
 | `health` or `ping` | `pong` with provider contract/declaration, immutable model identity, sample rate, worker readiness, cancellation counters, and `speakers` (`default` plus every catalog profile, currently `["default", "chromie_en", "chromie_mixed", "chromie_zh"]`). |
-| `list_speakers` | The same `speakers` list: `default` (a language-routed logical ID) plus the committed catalog profiles. |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
 A synthesis request includes `text`, optional `speaker_id`, optional

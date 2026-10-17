@@ -12,9 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import os
 import shutil
-import tempfile
 import threading
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -23,6 +21,11 @@ from typing import Any, Callable, Literal, Mapping, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from shared.chromie_runtime.atomic_files import (
+    atomic_write_bytes,
+    atomic_write_json,
+    json_document_bytes,
+)
 from shared.chromie_runtime.runtime_events import (
     RuntimeEventArtifact,
     persist_runtime_event,
@@ -730,44 +733,15 @@ class InteractionSessionEvidenceCollector:
             if path.read_bytes() != content:
                 raise ValueError(f"immutable artifact already exists with other bytes: {path}")
             return
-        descriptor, temporary = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-        )
-        temporary_path = Path(temporary)
-        try:
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary_path, path)
-        finally:
-            temporary_path.unlink(missing_ok=True)
+        atomic_write_bytes(path, content)
 
     @classmethod
     def _write_json_once(cls, path: Path, payload: Mapping[str, Any]) -> None:
-        content = (
-            json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
-        ).encode("utf-8")
-        cls._write_once(path, content)
+        cls._write_once(path, json_document_bytes(payload))
 
-    @classmethod
-    def _write_or_replace_json(cls, path: Path, payload: Mapping[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        content = (
-            json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
-        ).encode("utf-8")
-        descriptor, temporary = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-        )
-        temporary_path = Path(temporary)
-        try:
-            with os.fdopen(descriptor, "wb") as handle:
-                handle.write(content)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary_path, path)
-        finally:
-            temporary_path.unlink(missing_ok=True)
+    @staticmethod
+    def _write_or_replace_json(path: Path, payload: Mapping[str, Any]) -> None:
+        atomic_write_json(path, payload)
 
     @staticmethod
     def _remember_error(

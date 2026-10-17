@@ -14,7 +14,7 @@ planning, realtime safety, motion execution, body limitations, and recovery.
 
 Do not add one method per Soridormi skill here. New body skills should be
 published by Soridormi through ``soridormi.skill.list`` and then imported into
-Chromie's ``CapabilityRegistry`` dynamically.
+Chromie's ``CapabilityDefinitionRegistry`` dynamically.
 """
 
 import asyncio
@@ -47,7 +47,7 @@ from shared.chromie_contracts.soridormi_body_contract import (
 from .capability_runtime import (
     CapabilityDefinition,
     CapabilityExecutionContext,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     embodied_completion_evidence_policy,
 )
 
@@ -241,7 +241,7 @@ def _provider_value_reports(raw: dict[str, Any]) -> dict[str, Any]:
 
 
 def import_soridormi_capability_catalog(
-    registry: CapabilityRegistry,
+    registry: CapabilityDefinitionRegistry,
     provider_skills: list[dict[str, Any]],
     *,
     provider_id: str = "soridormi.mcp",
@@ -251,7 +251,7 @@ def import_soridormi_capability_catalog(
     """Translate Soridormi's wire skill catalog into canonical capabilities.
 
     ``skill_id`` belongs to the Soridormi provider protocol.  This adapter is
-    the only layer that interprets it.  The generic CapabilityRegistry receives
+    the only layer that interprets it.  The generic CapabilityDefinitionRegistry receives
     only canonical CapabilityDefinition objects and therefore remains
     provider/transport neutral.
     """

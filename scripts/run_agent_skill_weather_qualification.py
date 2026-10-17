@@ -14,21 +14,24 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
 try:
     from evidence_io import (
         read_json_object as _read_json,
+        run_id as _run_id,
         sha256_file as _sha256,
         utc_now as _utc_now,
+        write_json as _write_json,
     )
 except ImportError:  # imported as scripts.run_agent_skill_weather_qualification
     from scripts.evidence_io import (
         read_json_object as _read_json,
+        run_id as _run_id,
         sha256_file as _sha256,
         utc_now as _utc_now,
+        write_json as _write_json,
     )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,10 +60,6 @@ class Stage:
     name: str
     command: tuple[str, ...]
     artifacts: tuple[Path, ...]
-
-
-def _run_id() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _record(path: Path) -> dict[str, Any]:
@@ -97,11 +96,7 @@ def _paths(root: Path, runtime_identity: Path | None = None) -> Paths:
 
 def _write_state(paths: Paths, state: dict[str, Any]) -> None:
     state["updated_at"] = _utc_now()
-    paths.root.mkdir(parents=True, exist_ok=True)
-    paths.state.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    _write_json(paths.state, state)
 
 
 def _initial_state(paths: Paths, manifest: dict[str, Any]) -> dict[str, Any]:

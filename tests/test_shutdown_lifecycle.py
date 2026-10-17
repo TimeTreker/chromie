@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class _Closable:
@@ -23,7 +24,7 @@ class _HttpSession(_Closable):
 
 class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def test_shutdown_cancels_owned_tasks_clears_pending_input_and_closes_resources(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.active_synthesis_tasks = {
             asyncio.create_task(asyncio.Event().wait())
@@ -53,7 +54,7 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
         )
         assistant.playback_delivery.playback_task = asyncio.create_task(asyncio.Event().wait())
         duck_timeout_task = asyncio.create_task(asyncio.Event().wait())
-        assistant._playback_state().output_duck_timeout_task = duck_timeout_task
+        assistant.playback_delivery.output_duck_timeout_task = duck_timeout_task
         assistant.asr_ws = _Closable()
         assistant.http_session = _HttpSession()
         audio_closed: list[bool] = []
@@ -96,7 +97,7 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(audio_closed, [True])
 
     async def test_final_telemetry_failure_does_not_block_session_finalization(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.sessions = types.SimpleNamespace(
             finalized=[],

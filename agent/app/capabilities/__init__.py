@@ -5,7 +5,6 @@ from .catalog import (
     CapabilityCatalog,
     CapabilityMatch,
     CapabilityPromptTier,
-    CapabilitySearchRequest,
     CapabilitySearchResult,
 )
 from .models import (
@@ -34,7 +33,6 @@ from .validator import normalize_args_for_schema
 
 __all__ = [
     "CapabilitySearchResult",
-    "CapabilitySearchRequest",
     "CapabilityMatch",
     "CapabilityCatalog",
     "CapabilityPromptTier",

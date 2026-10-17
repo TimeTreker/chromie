@@ -24,7 +24,6 @@ sys.path.insert(0, str(ROOT / "tts"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 from candidate_provider import WorkerBackedCandidateProvider  # noqa: E402
-from prepare_tts_reference import build_metadata  # noqa: E402
 from provider import (  # noqa: E402
     TTSAudioChunk,
     TTSSynthesisCompleted,
@@ -922,24 +921,6 @@ class TtsCandidateProviderTests(unittest.IsolatedAsyncioTestCase):
                     },
                 ), self.assertRaisesRegex(RuntimeError, "metadata or SHA-256"):
                     module.reference_metadata()
-
-    def test_reference_metadata_binds_whole_wav_and_source_provider(self) -> None:
-        with tempfile.TemporaryDirectory() as temp_dir:
-            wav_path = Path(temp_dir) / "reference.wav"
-            wav_path.write_bytes(b"RIFF" + b"\x00" * 128)
-            metadata = build_metadata(
-                text="你好，Chromie。",
-                wav_path=wav_path,
-                health={"provider": fixture_capabilities().as_dict()},
-                result={
-                    "audio_bytes": 128,
-                    "audio_sha256": "0" * 64,
-                    "observed_audio_seconds": 1.0,
-                },
-            )
-        self.assertEqual(len(metadata["audio_sha256"]), 64)
-        self.assertEqual(metadata["source_provider"]["provider_id"], "candidate-fixture")
-        self.assertFalse(metadata["production_voice_approved"])
 
 
 if __name__ == "__main__":

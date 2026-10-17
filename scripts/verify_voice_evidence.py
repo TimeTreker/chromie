@@ -7,15 +7,14 @@ import argparse
 import json
 import re
 import shlex
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Sequence
 
 try:
-    from evidence_io import sha256_file as _sha256_file
+    from evidence_io import git_revision as _git_revision, sha256_file as _sha256_file
 except ImportError:  # imported as scripts.verify_voice_evidence
-    from scripts.evidence_io import sha256_file as _sha256_file
+    from scripts.evidence_io import git_revision as _git_revision, sha256_file as _sha256_file
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -456,18 +455,6 @@ def _validate_live_voice_turn(
     if not output_recordings:
         errors.append("Speech-only evidence has no correlated audible-output recording")
     return errors
-
-
-def _git_revision(root: Path = ROOT) -> str | None:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            cwd=root,
-            text=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-    except Exception:
-        return None
 
 
 def _version(root: Path = ROOT) -> str | None:

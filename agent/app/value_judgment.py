@@ -2,7 +2,7 @@
 
 One bounded model call. Inputs: the person's words, the accepted Responsibilities, what Chromie
 currently perceives, and the full owner-approved Stable Mind. The output states who is affected
-and the concern before the decision. The prompt is the v2 version qualified on frozen
+and the concern before the decision. The prompt is the one qualified on frozen
 production requests (`.chromie/acceptance/value-judgment-20261010/`: 11/11 risky unseen
 requests stopped).
 """

@@ -226,7 +226,7 @@ def request(text: str, *, goal_ids=None, goal_metadata=None):
         for goal_id in goal_ids
     ]
     return CognitiveWorkRequest(
-        sid="sid-pr3",
+        sid="sid-planner",
         text=text,
         language="zh-CN",
         responsibilities=[

@@ -4,6 +4,7 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry, parse_manifest_paths
+from shared.chromie_runtime.env_values import parse_bool
 from shared.chromie_contracts.interaction import CapabilityRequest, CapabilityResult
 from shared.chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
 
@@ -71,7 +72,11 @@ def local_agent_tool_definitions(
         manifest = configured.registry.get_agent(tool.agent_id)
         if manifest.transport.kind != "local_python":
             continue
-        if not _truthy(tool.llm_hints.get("interaction_executable")):
+        if not parse_bool(
+            tool.llm_hints.get("interaction_executable"),
+            name=f"{tool.name} llm_hints.interaction_executable",
+            default=False,
+        ):
             continue
         if tool.safety_class != "safe_read" or not tool.execution.side_effect_free:
             continue
@@ -120,12 +125,6 @@ def local_agent_tool_definitions(
             )
         )
     return definitions
-
-
-def _truthy(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 __all__ = ["AgentToolHandler", "AgentToolCapabilityProvider", "local_agent_tool_definitions"]

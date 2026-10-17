@@ -4,12 +4,10 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .text import normalize_whitespace
+from .text import normalize_unique_text_list as _normalize_unique_text_list, normalize_whitespace
 
-# Persisted identifiers. Soridormi's DAG contract names the same lanes
-# ``speaking_execution`` ("vocal" here) and ``activity_execution``; its
-# ``social_attention_proposal`` lane has no Chromie execution identifier because
-# Social Attention proposals never execute as a lane of their own.
+# Persisted identifiers. They match Soridormi's two DAG contract lanes,
+# ``vocal_execution`` and ``activity_execution``.
 ChromieExecutionLane = Literal[
     "vocal",
     "activity",
@@ -17,28 +15,10 @@ ChromieExecutionLane = Literal[
 LaneCoordinationRelation = Literal["parallel"]
 LaneCoordinationStartPolicy = Literal["best_effort_parallel", "prepared_start"]
 LaneCoordinationFailurePolicy = Literal["independent"]
-CHROMIE_PERSONAL_VOICE_RESOURCE = "chromie.voice"
 
 
 def _normalize_text(value: Any) -> Any:
     return normalize_whitespace(value)
-
-
-def _normalize_unique_text_list(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        value = [value]
-    if not isinstance(value, list):
-        raise ValueError("expected a list or string")
-    out: list[str] = []
-    seen: set[str] = set()
-    for item in value:
-        text = " ".join(str(item or "").strip().split())
-        if text and text not in seen:
-            seen.add(text)
-            out.append(text)
-    return out
 
 
 class LaneCoordinationGroup(BaseModel):

@@ -11,7 +11,7 @@ from .settings import (
     agent_service_settings as settings,
     user_meaning_interpreter_settings,
 )
-from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
+from .capabilities.catalog import CapabilityCatalog
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .agent_skills import (
     AgentSkillDisclosureService,
@@ -29,13 +29,7 @@ from .local_tool_execution import LocalToolExecutor
 from .cognitive_gateway import AttentionReviewer
 from .cognitive_activation import CognitiveActivationResolver
 
-from shared.chromie_contracts.agent_skill import (
-    AgentSkillDisclosureRequest,
-    AgentSkillDisclosureResolution,
-    AgentSkillRegistrySnapshot,
-    AgentSkillSelectionRequest,
-    AgentSkillSelectionResolution,
-)
+from shared.chromie_contracts.agent_skill import AgentSkillRegistrySnapshot
 from shared.chromie_contracts.core_interpretation import (
     CognitiveWorkRequest,
     CoreInterpretationResult,
@@ -71,20 +65,12 @@ from .cognitive_core.user_meaning_interpreter import (
 from .cognitive_core.user_meaning_interpreter.errors import InterpretationUnavailableError
 from .work_dag import (
     ExecutionTrace,
-    WorkDAG,
     WorkDAGCancelResponse,
-    WorkDAGConfirmationGrantRequest,
-    WorkDAGConfirmationGrantResponse,
-    WorkDAGDryRunRequest,
     WorkDAGExecuteRequest,
-    WorkDAGGuardedExecuteRequest,
     DAGEngineStatus,
     DAGEngineService,
-    WorkDAGValidationResponse,
 )
 from .tool_invocation import McpStreamableHttpInvoker
-
-from shared.chromie_contracts.semantic_authority import semantic_authority_route_matrix
 
 
 
@@ -492,16 +478,6 @@ async def health() -> HealthResponse:
     )
 
 
-@app.get("/semantic-authority")
-async def semantic_authority() -> dict[str, object]:
-    return {
-        "matching_turn_authority_required": True,
-        "claim_is_caller_authentication": False,
-        "claim_is_single_use_replay_protection": False,
-        "route_matrix": semantic_authority_route_matrix(),
-    }
-
-
 @app.post(
     "/cognitive-gateway/attention-review",
     response_model=AttentionReviewResult,
@@ -658,41 +634,6 @@ async def resolve_goal_association(request: CognitiveWorkRequest):
     return await goal_association_resolver.resolve(request)
 
 
-@app.post(
-    "/agent-skills/select",
-    response_model=AgentSkillSelectionResolution,
-)
-async def select_agent_skills(
-    request: AgentSkillSelectionRequest,
-) -> AgentSkillSelectionResolution:
-    """Let the declared Agent role author a typed optional Skill selection."""
-    if agent_skill_selection_service is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Agent Skill model selection is disabled",
-        )
-    try:
-        return await agent_skill_selection_service.select(request)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post(
-    "/agent-skills/disclose",
-    response_model=AgentSkillDisclosureResolution,
-)
-async def disclose_agent_skills(
-    request: AgentSkillDisclosureRequest,
-) -> AgentSkillDisclosureResolution:
-    """Load only exact role projections from a validated model selection."""
-    if not settings.agent_skill_progressive_disclosure_enabled:
-        raise HTTPException(
-            status_code=503,
-            detail="Agent Skill progressive disclosure is disabled",
-        )
-    return agent_skill_disclosure_service.disclose(request)
-
-
 @app.get("/agent-skills", response_model=AgentSkillRegistrySnapshot)
 async def agent_skills() -> AgentSkillRegistrySnapshot:
     """Return bounded metadata only; no Skill body or projection is disclosed."""
@@ -712,17 +653,6 @@ async def capability_catalog_snapshot(refresh: bool = False) -> dict[str, object
     return await capability_catalog.snapshot(refresh=refresh)
 
 
-@app.post("/capabilities/search", response_model=CapabilitySearchResult)
-async def capability_search(request: CapabilitySearchRequest) -> CapabilitySearchResult:
-    return await capability_catalog.search(
-        request.text,
-        language=request.language,
-        limit=request.limit,
-        refresh=request.refresh,
-        prefer_interaction_executable=request.prefer_interaction_executable,
-    )
-
-
 @app.get("/capabilities/llm-context")
 async def capability_llm_context(
     language: str = "en",
@@ -738,71 +668,10 @@ async def capability_llm_context(
     }
 
 
-@app.post("/work-dags/validate", response_model=WorkDAGValidationResponse)
-async def validate_work_dag(dag: WorkDAG) -> WorkDAGValidationResponse:
-    return work_dag_service.validate(dag)
-
-
-@app.post("/work-dags/dry-run", response_model=ExecutionTrace)
-async def dry_run_work_dag(
-    request: WorkDAGDryRunRequest,
-    authorization: str | None = Header(default=None),
-) -> ExecutionTrace:
-    require_dag_engine_diagnostics_auth(authorization)
-    try:
-        return work_dag_service.dry_run(request.dag, auto_confirm=request.auto_confirm)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post("/work-dags/execute-read-only", response_model=ExecutionTrace)
-async def execute_read_only_work_dag(request: WorkDAGExecuteRequest) -> ExecutionTrace:
-    try:
-        return await work_dag_service.execute_read_only(request.dag)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
 @app.post("/work-dags/execute-planning", response_model=ExecutionTrace)
 async def execute_planning_work_dag(request: WorkDAGExecuteRequest) -> ExecutionTrace:
     try:
         return await work_dag_service.execute_planning(request.dag)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post("/work-dags/execute-guarded", response_model=ExecutionTrace)
-async def execute_guarded_work_dag(
-    request: WorkDAGGuardedExecuteRequest,
-    authorization: str | None = Header(default=None),
-) -> ExecutionTrace:
-    require_dag_engine_execution_auth(authorization)
-    try:
-        return await work_dag_service.execute_guarded(
-            request.dag,
-            request.confirmation_grant,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post(
-    "/work-dags/confirmation-grants",
-    response_model=WorkDAGConfirmationGrantResponse,
-)
-async def create_work_dag_confirmation_grant(
-    request: WorkDAGConfirmationGrantRequest,
-    authorization: str | None = Header(default=None),
-) -> WorkDAGConfirmationGrantResponse:
-    require_dag_engine_execution_auth(authorization)
-    try:
-        return work_dag_service.issue_confirmation_grant(request)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
@@ -819,18 +688,6 @@ async def cancel_work_dag(
 ) -> WorkDAGCancelResponse:
     require_dag_engine_execution_auth(authorization)
     return work_dag_service.cancel_execution(dag_id)
-
-
-@app.get("/work-dags/{dag_id}/trace", response_model=ExecutionTrace)
-async def get_work_dag_trace(
-    dag_id: str,
-    authorization: str | None = Header(default=None),
-) -> ExecutionTrace:
-    require_dag_engine_diagnostics_auth(authorization)
-    trace = work_dag_service.get_trace(dag_id)
-    if trace is None:
-        raise HTTPException(status_code=404, detail=f"No WorkDAG trace found for {dag_id!r}")
-    return trace
 
 
 @app.get("/work-dags/engine/status", response_model=DAGEngineStatus)

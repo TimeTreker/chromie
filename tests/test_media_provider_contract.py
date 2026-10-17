@@ -21,7 +21,7 @@ from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoord
 from orchestrator.runtime.capability_runtime import (
     LocalSpeechCapabilityProvider,
     MediaPlaybackCapabilityProvider,
-    CapabilityRegistry as RuntimeCapabilityRegistry,
+    CapabilityDefinitionRegistry as RuntimeCapabilityRegistry,
     CapabilityRuntime,
     local_speech_definition,
     media_playback_definitions,

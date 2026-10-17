@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
-import os
 
 import websockets
 
@@ -12,19 +12,16 @@ logger = logging.getLogger(__name__)
 class ASRClient:
     """Tiny helper for the current Chromie ASR websocket protocol.
 
-    The existing ASR service accepts raw PCM16 mono audio bytes and returns a JSON
-    final message such as {"type": "final", "text": "..."}.
+    The ASR service accepts raw PCM16 mono audio bytes and returns a JSON final
+    message such as {"type": "final", "sequence": 1, "text": "..."}. The
+    sequence numbers the utterances sent on one connection.
     """
 
-    def __init__(self, url: str, timeout_ms: int | None = None):
+    def __init__(self, url: str, timeout_ms: int = 30000):
         self.url = url
-        resolved_timeout_ms = (
-            int(os.getenv("ORCH_ASR_TIMEOUT_MS", "30000"))
-            if timeout_ms is None
-            else timeout_ms
-        )
-        self.timeout_s = max(0.001, resolved_timeout_ms / 1000.0)
+        self.timeout_s = max(0.001, timeout_ms / 1000.0)
         self.ws = None
+        self._sequence = 0
 
     async def connect(self):
         self.ws = await websockets.connect(
@@ -34,6 +31,7 @@ class ASRClient:
             ping_interval=20,
             ping_timeout=20,
         )
+        self._sequence = 0
         return self.ws
 
     async def ensure_connected(self):
@@ -42,17 +40,31 @@ class ASRClient:
         return self.ws
 
     async def transcribe(self, audio: bytes, timeout: float | None = None) -> dict:
-        import asyncio
-
         ws = await self.ensure_connected()
-        await ws.send(audio)
-        raw = await asyncio.wait_for(
-            ws.recv(),
-            timeout=self.timeout_s if timeout is None else timeout,
-        )
-        return json.loads(raw)
+        self._sequence += 1
+        expected = self._sequence
+        completed = False
+        try:
+            await ws.send(audio)
+            raw = await asyncio.wait_for(
+                ws.recv(),
+                timeout=self.timeout_s if timeout is None else timeout,
+            )
+            result = json.loads(raw)
+            if result.get("sequence") != expected:
+                raise RuntimeError(
+                    f"ASR reply sequence {result.get('sequence')!r} "
+                    f"does not match utterance {expected}"
+                )
+            completed = True
+        finally:
+            if not completed:
+                # A timed-out or mismatched reply may still arrive later; never
+                # read it as the answer to the next utterance.
+                await self.close()
+        return result
 
     async def close(self):
-        if self.ws is not None:
-            await self.ws.close()
-            self.ws = None
+        ws, self.ws = self.ws, None
+        if ws is not None:
+            await ws.close()

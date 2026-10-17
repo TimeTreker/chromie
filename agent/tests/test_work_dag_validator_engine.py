@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any, Callable
+
 from app.capabilities.local import build_chromie_registry
 from app.capabilities.models import (
     AgentManifest,
@@ -229,8 +231,24 @@ def test_work_dag_service_rejects_invalid_graph_without_storing_trace() -> None:
 
     assert service.get_trace(graph.dag_id) is None
 
-from app.work_dag.executor import DAGToolEngine
-from app.tool_invocation import FunctionToolInvoker, ToolCallOutcome
+from app.tool_invocation import ToolCallOutcome
+
+
+class FunctionToolInvoker:
+    """In-process ToolInvoker test double: one plain handler per tool name."""
+
+    def __init__(self) -> None:
+        self._handlers: dict[str, Callable[[dict[str, Any]], Any]] = {}
+
+    def register(self, tool_name: str, handler: Callable[[dict[str, Any]], Any]) -> None:
+        self._handlers[tool_name] = handler
+
+    def invoke(self, tool_name: str, args: dict[str, Any]) -> ToolCallOutcome:
+        handler = self._handlers.get(tool_name)
+        if handler is None:
+            return ToolCallOutcome.failed(f"no handler registered for {tool_name!r}", retryable=False)
+        raw = handler(args)
+        return raw if isinstance(raw, ToolCallOutcome) else ToolCallOutcome.success(raw)
 
 
 def test_tool_executor_invokes_registered_handlers_and_resolves_refs() -> None:
@@ -249,7 +267,7 @@ def test_tool_executor_invokes_registered_handlers_and_resolves_refs() -> None:
     invoker.register("soridormi.skill.execute_plan", execute)
     invoker.register("chromie.report", lambda args: {"reported": True, "message": args["message"]})
 
-    trace = DAGToolEngine(_registry(), invoker).run(_motion_graph())
+    trace = DAGDryRunEngine(_registry(), tool_invoker=invoker).run(_motion_graph())
 
     assert trace.status == "success"
     assert observed["execute_plan_id"] == "real-plan-1"
@@ -281,7 +299,7 @@ def test_tool_executor_retries_retryable_failures() -> None:
         }
     )
 
-    trace = DAGToolEngine(build_chromie_registry(), invoker).run(graph)
+    trace = DAGDryRunEngine(build_chromie_registry(), tool_invoker=invoker).run(graph)
     result = trace.result_map()["listen"]
     assert trace.status == "success"
     assert result.attempts == 2

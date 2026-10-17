@@ -21,6 +21,7 @@ from pydantic.json_schema import JsonSchemaValue
 
 from shared.chromie_contracts.text import normalize_whitespace
 from shared.chromie_contracts.core_interpretation import CognitiveActivationRequest
+from shared.chromie_contracts.resource import REQUESTER_REFERENT_ID
 
 
 # Existing location-binding vocabulary shared by the decoder and Host validator.
@@ -62,26 +63,6 @@ GoalMediaOperation = Literal[
 ]
 _NUMERIC_LITERAL_RE = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"
-)
-_EXECUTION_CONTRACT_PROMPT = (
-    "Preserve the human-facing WHAT category from User Meaning Interpretation exactly. "
-    "Goal Association may refine semantic bindings, resource structure, references, "
-    "and canonical continuity, but it does not decide whether a Capability, provider, "
-    "execution lane, fresh Evidence, or Work is required. Use information when the "
-    "person wants Chromie to determine or provide information, whether that information "
-    "is already available to reasoning/context or must later be acquired. Use "
-    "stateful_effect only for a durable or future state change outside embodiment, such as "
-    "recording, scheduling, changing a setting, or sending later. Locomotion, posture, "
-    "gaze, gesture, physical manipulation, carrying, and handover use body_action even "
-    "when they change location or another lasting physical state; lifecycle "
-    "control of media uses media_playback; authored vocal performances use their exact "
-    "vocal mode. Ordinary directly authored conversation uses speech. Capability and "
-    "provider applicability are Planner concerns and must not be encoded into Goal "
-    "output_mode or metadata. A negative instruction that limits another outcome is a "
-    "constraint, not a separate Goal. A manner, mood, persona, or social-presentation "
-    "directive attached to another effect is expression framing, not an extra spoken "
-    "Goal. Coordination grammar still requires one Goal per independently satisfiable "
-    "observable outcome. Never invent an audible modality from style wording alone."
 )
 
 _GOAL_SEGMENTATION_IDENTITY_CONTRACT = (
@@ -151,6 +132,10 @@ class GoalAssociationModelRequirementChange(BaseModel):
         return self
 
 
+def _normalize_text(value: Any) -> Any:
+    return normalize_whitespace(value)
+
+
 class GoalAssociationModelAssociation(BaseModel):
     """Minimal model-facing continuity decision for an existing goal."""
 
@@ -196,10 +181,7 @@ class GoalAssociationModelAssociation(BaseModel):
         ),
     )
 
-    @field_validator("reason_summary", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_text = field_validator("reason_summary", mode="before")(_normalize_text)
 
     @field_validator(
         "source_responsibility_refs",
@@ -271,10 +253,7 @@ class GoalAssociationModelBinding(BaseModel):
     referent_id: str = ""
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
-    @field_validator("name", "entity_type", "value", "referent_id", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_text = field_validator("name", "entity_type", "value", "referent_id", mode="before")(_normalize_text)
 
     @model_validator(mode="after")
     def validate_semantic_value(self) -> "GoalAssociationModelBinding":
@@ -306,17 +285,7 @@ class GoalAssociationModelResolvedReference(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     reason_summary: str = ""
 
-    @field_validator(
-        "surface_form",
-        "entity_type",
-        "resolved_value",
-        "referent_id",
-        "reason_summary",
-        mode="before",
-    )
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_text = field_validator("surface_form", "entity_type", "resolved_value", "referent_id", "reason_summary", mode="before",)(_normalize_text)
 
 class GoalAssociationModelReferentUpdate(BaseModel):
     """Model-facing scoped discourse mutation; identifiers remain Host-owned."""
@@ -333,15 +302,7 @@ class GoalAssociationModelReferentUpdate(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     reason_summary: str = ""
 
-    @field_validator(
-        "entity_type",
-        "canonical_value",
-        "reason_summary",
-        mode="before",
-    )
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_text = field_validator("entity_type", "canonical_value", "reason_summary", mode="before",)(_normalize_text)
 
     @field_validator(
         "aliases",
@@ -379,20 +340,21 @@ class GoalAssociationModelReferentUpdate(BaseModel):
         return self
 
 
+def _normalize_text_value(value: Any) -> Any:
+    if value is None:
+        return None
+    return normalize_whitespace(value)
+
+
 class GoalAssociationModelResourceRecipient(BaseModel):
     """Canonical recipient meaning for one resource responsibility."""
 
     model_config = ConfigDict(extra="forbid")
 
-    description: str = Field(default="requester", min_length=1)
+    description: str = Field(default=REQUESTER_REFERENT_ID, min_length=1)
     referent_id: str | None = None
 
-    @field_validator("description", "referent_id", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        if value is None:
-            return None
-        return normalize_whitespace(value)
+    normalize_text = field_validator("description", "referent_id", mode="before")(_normalize_text_value)
 
 
 class GoalAssociationModelInformationSource(BaseModel):
@@ -411,12 +373,7 @@ class GoalAssociationModelInformationSource(BaseModel):
     referent_id: str | None = None
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
 
-    @field_validator("source_name", "referent_id", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        if value is None:
-            return None
-        return normalize_whitespace(value)
+    normalize_text = field_validator("source_name", "referent_id", mode="before")(_normalize_text_value)
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalAssociationModelInformationSource":
@@ -442,10 +399,7 @@ class GoalAssociationModelPhysicalSource(BaseModel):
         max_length=12,
     )
 
-    @field_validator("description", mode="before")
-    @classmethod
-    def normalize_description(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_description = field_validator("description", mode="before")(_normalize_text)
 
     @model_validator(mode="after")
     def validate_shape(self) -> "GoalAssociationModelPhysicalSource":
@@ -483,6 +437,10 @@ def _validate_model_resource_quantity(value: str) -> str:
     return value
 
 
+def _validate_quantity(value: str) -> str:
+    return _validate_model_resource_quantity(value)
+
+
 class GoalAssociationModelInformationResourceResponsibility(BaseModel):
     """Single-owner model-facing contract for grounded information acquisition."""
 
@@ -518,15 +476,9 @@ class GoalAssociationModelInformationResourceResponsibility(BaseModel):
     )
     delivery_mode: Literal["spoken_explanation", "structured_result"]
 
-    @field_validator("description", "quantity", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_text = field_validator("description", "quantity", mode="before")(_normalize_text)
 
-    @field_validator("quantity")
-    @classmethod
-    def validate_quantity(cls, value: str) -> str:
-        return _validate_model_resource_quantity(value)
+    validate_quantity = field_validator("quantity")(_validate_quantity)
 
     @model_validator(mode="after")
     def validate_scope(self) -> "GoalAssociationModelInformationResourceResponsibility":
@@ -575,15 +527,9 @@ class GoalAssociationModelPhysicalResourceResponsibility(BaseModel):
     )
     delivery_mode: Literal["physical_handover"]
 
-    @field_validator("description", "quantity", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_text = field_validator("description", "quantity", mode="before")(_normalize_text)
 
-    @field_validator("quantity")
-    @classmethod
-    def validate_quantity(cls, value: str) -> str:
-        return _validate_model_resource_quantity(value)
+    validate_quantity = field_validator("quantity")(_validate_quantity)
 
 
 GoalAssociationModelResourceResponsibility = Annotated[
@@ -833,10 +779,7 @@ class GoalSegmentationModelOutput(BaseModel):
     def validate_primary_relationships(cls, value: Any) -> Any:
         return validate_primary_goal_relationships(value)
 
-    @field_validator("reason_summary", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_text = field_validator("reason_summary", mode="before")(_normalize_text)
 
     @model_validator(mode="after")
     def validate_cognitive_requests(self):
@@ -913,10 +856,7 @@ class GoalAssociationModelOutput(BaseModel):
     def validate_primary_relationships(cls, value: Any) -> Any:
         return validate_primary_goal_relationships(value)
 
-    @field_validator("reason_summary", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> Any:
-        return normalize_whitespace(value)
+    normalize_text = field_validator("reason_summary", mode="before")(_normalize_text)
 
     @model_validator(mode="after")
     def validate_cognitive_requests(self):
