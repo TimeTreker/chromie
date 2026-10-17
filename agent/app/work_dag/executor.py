@@ -293,13 +293,3 @@ class DAGDryRunEngine:
     _record_result = staticmethod(record_node_result)
 
 
-class DAGToolEngine(DAGDryRunEngine):
-    """Execute a WorkDAG through a provided ToolInvoker.
-
-    This is still transport-neutral: the invoker may be a local Python registry,
-    a test double, or a future MCP client. Safety validation remains the same as
-    DAGDryRunEngine.
-    """
-
-    def __init__(self, registry: CapabilityRegistry, tool_invoker: ToolInvoker, *, auto_confirm: bool = True) -> None:
-        super().__init__(registry, auto_confirm=auto_confirm, tool_invoker=tool_invoker)

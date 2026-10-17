@@ -6,7 +6,7 @@ from .async_executor import (
     ReadOnlyDAGEngine,
     DAGExecutionProofs,
 )
-from .executor import DAGDryRunEngine, DAGToolEngine
+from .executor import DAGDryRunEngine
 from .models import (
     ExecutionEvent,
     ExecutionTrace,
@@ -28,7 +28,6 @@ from .validator import WorkDAGValidationReport, WorkDAGValidator
 
 __all__ = [
     "DAGDryRunEngine",
-    "DAGToolEngine",
     "ExecutionEvent",
     "ExecutionTrace",
     "WorkDAGValidationReport",
