@@ -25,6 +25,7 @@ from orchestrator.runtime.playback_transport import transport_for as playback_tr
 from orchestrator.runtime.session import now_ms, record_session_workflow_stage
 from shared.chromie_contracts.reflex import DEFAULT_REFLEX_FILTER
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
+from orchestrator.runtime import tts_echo
 
 logger = logging.getLogger(__name__)
 
@@ -343,7 +344,7 @@ class InputSessionRuntime:
                         )
                         if not playback_candidate:
                             host.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
-                        likely_echo, echo_ratio, echo_coverage = host._likely_tts_echo(
+                        likely_echo, echo_ratio, echo_coverage = tts_echo.likely_tts_echo(host,
                             user_text,
                             playback_generation_at_start=playback_generation_at_start,
                             started_during_playback=started_during_playback,

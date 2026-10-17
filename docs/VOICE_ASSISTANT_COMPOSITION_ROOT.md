@@ -43,6 +43,22 @@ The root currently composes, among other collaborators:
 - Cognitive Gateway/Core clients for admitted-turn cognition;
 - trusted execution providers and evidence stores.
 
+Host behavior that runs against the root lives in function modules under
+`orchestrator/runtime/` that take the `VoiceAssistant` as `host`:
+`routed_turn_host` (routed-turn intake), `cognitive_pipeline_host` (goal-driven
+runtime application, Goal state and named-Goal cancellation),
+`confirmation_host` (pending-confirmation staging and replies),
+`reflex_cancellation_host` (reflex cancellation and receipt reconciliation),
+`cognitive_outcome_host` (cognitive execution closure and outcome delivery),
+`planner_reentry_host` (Planner re-entry after terminal results and provider
+state), `interaction_dispatch_host` (detached dispatch and terminal consumers),
+`interaction_speech_host` (Capability Runtime speech scheduling), `tts_echo`
+(ASR echo detection), `tts_text.split_tts_text` and the startup greeting
+functions in `runtime_ready_greeting`. `VoiceAssistant` keeps thin methods only
+where other modules, tests or live checks bind or replace a seam on the
+instance. These modules gain no semantic authority; the Host semantic-authority
+policy guards apply to them as to `orchestrator.py`.
+
 `RuntimeReadyGreetingCoordinator` may dispatch only exact maintained Social
 Attention capabilities supplied by the Host. It cannot create a conversation
 turn, infer a person or room state, interpret user intent, weaken confirmation,

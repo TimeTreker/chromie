@@ -36,6 +36,8 @@ from shared.chromie_contracts.interaction import CapabilityRequest
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
 from tests.voice_assistant_test_support import bare_voice_assistant
+from orchestrator.runtime import runtime_ready_greeting
+from orchestrator.runtime import tts_echo
 
 
 class _SequenceOllama:
@@ -890,9 +892,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_wake_up_greeting_rejects_incomplete_clause(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "complete punctuated"):
-            VoiceAssistant._validate_runtime_ready_greeting_completion("六点半啦，我困了，你吃晚")
+            runtime_ready_greeting.validate_runtime_ready_greeting_completion("六点半啦，我困了，你吃晚")
         self.assertEqual(
-            VoiceAssistant._validate_runtime_ready_greeting_completion("嗨，我醒啦！"),
+            runtime_ready_greeting.validate_runtime_ready_greeting_completion("嗨，我醒啦！"),
             "嗨，我醒啦！",
         )
 
@@ -907,7 +909,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         request = SocialStartupGreetingRequest(
             request_id="startup-greeting:regression",
             language="zh-CN",
-            local_time=VoiceAssistant._runtime_ready_greeting_time_context(),
+            local_time=runtime_ready_greeting.runtime_ready_greeting_time_context(),
             context={"mind": default_mind_profile().prompt_context(max_chars=5000)},
         )
         prompt = social_startup_greeting_prompt(request)
@@ -955,7 +957,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ]
         }
 
-        likely, ratio, coverage = assistant._likely_tts_echo(
+        likely, ratio, coverage = tts_echo.likely_tts_echo(assistant,
             "我会先眨两下眼睛，再往前走15秒，刚才没成功。",
             playback_generation_at_start=4,
         )
@@ -974,7 +976,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ]
         }
 
-        likely, ratio, _ = assistant._likely_tts_echo(
+        likely, ratio, _ = tts_echo.likely_tts_echo(assistant,
             "Once upon a time along says why.",
             playback_generation_at_start=4,
         )
@@ -986,7 +988,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         assistant = bare_voice_assistant()
         assistant.playback_delivery.tts_text_by_generation = {5: ["我会先眨两下眼睛，再往前走15秒。"]}
 
-        likely, _, _ = assistant._likely_tts_echo(
+        likely, _, _ = tts_echo.likely_tts_echo(assistant,
             "停一下，我不是让你先眨眼。",
             playback_generation_at_start=5,
         )
@@ -1000,7 +1002,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         playback.last_completed_playback_generation = 8
         playback.last_playback_end_monotonic_ms = 1000.0
 
-        likely, ratio, coverage = assistant._likely_tts_echo(
+        likely, ratio, coverage = tts_echo.likely_tts_echo(assistant,
             "Okay, I'll do that for you.",
             playback_generation_at_start=8,
             started_during_playback=False,
@@ -1018,7 +1020,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         playback.last_completed_playback_generation = 8
         playback.last_playback_end_monotonic_ms = 1000.0
 
-        likely, _, _ = assistant._likely_tts_echo(
+        likely, _, _ = tts_echo.likely_tts_echo(assistant,
             "Okay, I'll do that for you.",
             playback_generation_at_start=8,
             started_during_playback=False,

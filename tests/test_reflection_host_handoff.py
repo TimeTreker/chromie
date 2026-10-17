@@ -16,6 +16,7 @@ from shared.chromie_contracts.reflection import ReflectionResolution
 from tests.test_cognitive_turn_loop_closure import (
     CognitiveTurnLoopClosureTests, _Runtime, _plan, _response,
 )
+from orchestrator.runtime import cognitive_outcome_host
 
 
 def episode(timeout_ms=125000, perspective='Curiosity deserves patient attention.'):
@@ -83,7 +84,7 @@ def test_ready_result_precedes_blocked_reflection_and_mind_crosses_real_request(
         prompt = ReflectionResolver(None)._prompt(request, request.opportunity)
         assert perspective in prompt
         assert 'worldview/values JSON:\nnull' not in prompt
-        host._schedule_outcome_reflection(response=response, plan=_plan(),
+        cognitive_outcome_host.schedule_outcome_reflection(host, response=response, plan=_plan(),
             bundle=ExecutionOutcomeBundle.model_validate(request.context['execution_outcome_bundle']),
             opportunities=[request.opportunity], session_id=values[1], generation=4)
         await asyncio.sleep(0)

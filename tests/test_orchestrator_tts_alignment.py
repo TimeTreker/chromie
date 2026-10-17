@@ -34,6 +34,10 @@ import orchestrator.runtime.playback_transport as playback_transport_module
 from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
 from shared.chromie_contracts.reflex import CancellationDispatchReceipt
+from orchestrator.runtime import cognitive_outcome_host
+from orchestrator.runtime import routed_turn_host
+from orchestrator.runtime import runtime_ready_greeting
+from orchestrator.runtime import tts_text
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
@@ -212,10 +216,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     def test_runtime_ready_greeting_clock_facts_follow_the_grounded_local_period(self) -> None:
         local_tz = timezone(timedelta(hours=8))
-        morning = VoiceAssistant._runtime_ready_greeting_time_context(
+        morning = runtime_ready_greeting.runtime_ready_greeting_time_context(
             datetime(2026, 8, 1, 7, 30, tzinfo=local_tz)
         )
-        evening = VoiceAssistant._runtime_ready_greeting_time_context(
+        evening = runtime_ready_greeting.runtime_ready_greeting_time_context(
             datetime(2026, 8, 1, 19, 0, tzinfo=local_tz)
         )
 
@@ -683,11 +687,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     def test_immediate_planner_speech_host_check_is_transport_only(self) -> None:
         self.assertEqual(
-            VoiceAssistant._safe_immediate_route_speech("I finished it."),
+            routed_turn_host.safe_immediate_route_speech("I finished it."),
             "I finished it.",
         )
         self.assertIsNone(
-            VoiceAssistant._safe_immediate_route_speech("soridormi.walk_forward")
+            routed_turn_host.safe_immediate_route_speech("soridormi.walk_forward")
         )
 
 
@@ -1349,7 +1353,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-        delivered = await assistant._record_successfully_delivered_speech(
+        delivered = await cognitive_outcome_host.record_successfully_delivered_speech(assistant,
             response,
             execution,
             session_id="sid-confirmation-failed",
@@ -1995,7 +1999,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             "Too fast. Walking normally. "
             "La la, tiny steps and circuits bright, I am walking through the light."
         )
@@ -2016,7 +2020,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             "Okay. I will check the route, then I will explain the next safe step."
         )
 
@@ -2036,7 +2040,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             "Hello. I am doing well and ready to help."
         )
 
@@ -2056,7 +2060,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             'I apologize, but your input "Yeah, so you guys" is incomplete. '
             "Could you please provide a full request or question so I can assist you?"
         )
@@ -2077,7 +2081,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             "Hello! I am functioning correctly and ready to assist you. "
             "How can I help you today?"
         )
@@ -2099,7 +2103,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             "Hello! I am doing well, thank you for asking. "
             "I am ready to help you with whatever you need."
         )
@@ -2121,7 +2125,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             "I can help you practice English, check simple ideas, plan small tasks, "
             "and keep you company while we work."
         )
@@ -2143,7 +2147,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text("你好。我可以帮你。")
+        chunks = tts_text.split_tts_text(assistant, "你好。我可以帮你。")
 
         self.assertEqual(chunks, ["你好。", "我可以帮你。"])
 
@@ -2162,7 +2166,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "北京今天雷雨伴冰雹，当前约31℃，最高31℃、最低25℃，"
             "体感约37℃，降水概率最高约100%，风速约5公里每小时。"
         )
-        chunks = assistant.split_tts_text(text)
+        chunks = tts_text.split_tts_text(assistant, text)
 
         self.assertGreater(len(chunks), 1)
         self.assertTrue(all(len(chunk) <= 36 for chunk in chunks))
@@ -2181,7 +2185,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         text = "很热，重庆现在约37℃，体感42℃，最高39℃。"
 
-        self.assertEqual(assistant.split_tts_text(text), [text])
+        self.assertEqual(tts_text.split_tts_text(assistant, text), [text])
 
     def test_failure_speech_contract_rejects_incomplete_sentence(self) -> None:
         assistant = bare_voice_assistant()
@@ -2212,7 +2216,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             "I am doing well and ready to help."
         )
 
@@ -2226,7 +2230,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(assistant,
             "I will explain the route carefully without creating another section."
         )
 

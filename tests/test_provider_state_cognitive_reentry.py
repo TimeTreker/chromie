@@ -6,6 +6,7 @@ from orchestrator.runtime.planner_reentry import (
 )
 from shared.chromie_contracts.interaction import InteractionResponse
 from tests.voice_assistant_test_support import bare_voice_assistant
+from orchestrator.runtime import planner_reentry_host
 
 
 def _response() -> InteractionResponse:
@@ -178,7 +179,7 @@ def test_restart_revalidation_uses_one_fresh_catalog_before_planner_reentry():
 
     host._planner_state_reentry_response = capture_planner_reentry
     host._apply_planner_reentry_response = apply_reentry
-    asyncio.run(host._revalidate_restored_goals_from_provider_state())
+    asyncio.run(planner_reentry_host.revalidate_restored_goals_from_provider_state(host))
 
     assert host.interaction_runtime.refresh_calls == 1
     assert len(captured) == 1

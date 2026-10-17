@@ -29,6 +29,18 @@ from check_runtime_exception_boundaries import (  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXCEPTIONS = Path("config/repository_policy_exceptions.json")
+# VoiceAssistant behavior implemented outside orchestrator.py, held to the
+# same Host semantic-authority guards as the composition root.
+VOICE_ASSISTANT_HOST_MODULES = (
+    "orchestrator/runtime/cognitive_outcome_host.py",
+    "orchestrator/runtime/cognitive_pipeline_host.py",
+    "orchestrator/runtime/confirmation_host.py",
+    "orchestrator/runtime/interaction_dispatch_host.py",
+    "orchestrator/runtime/interaction_speech_host.py",
+    "orchestrator/runtime/planner_reentry_host.py",
+    "orchestrator/runtime/reflex_cancellation_host.py",
+    "orchestrator/runtime/routed_turn_host.py",
+)
 
 RULE_PRODUCTION_ASSERT = "python.production_assert"
 RULE_SILENT_BROAD_EXCEPTION = "python.silent_broad_exception"
@@ -1023,6 +1035,8 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             "runtime configuration may not expose semantic phrase tables",
         ),
     }
+    for relative in VOICE_ASSISTANT_HOST_MODULES:
+        source_checks[relative] = source_checks["orchestrator/orchestrator.py"]
     for relative, (rule_id, tokens, message) in source_checks.items():
         path = root / relative
         if not path.is_file():
@@ -1048,6 +1062,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/cognitive_core/user_meaning_interpreter/schema.py",
         "agent/app/schema.py",
         "orchestrator/orchestrator.py",
+        *VOICE_ASSISTANT_HOST_MODULES,
         "orchestrator/runtime/confirmation.py",
         "orchestrator/runtime/conversation_state.py",
         "orchestrator/runtime/session.py",
