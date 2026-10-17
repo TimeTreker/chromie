@@ -15,7 +15,6 @@ import os
 import shutil
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -23,6 +22,7 @@ try:
     from evidence_io import (
         git_state as _git_state,
         read_json_object as _read_json,
+        run_id as _run_id,
         sha256_file as _sha256,
         utc_now as _utc_now,
         write_json as _write_json,
@@ -31,6 +31,7 @@ except ImportError:  # imported as scripts.run_target_evidence_closure
     from scripts.evidence_io import (
         git_state as _git_state,
         read_json_object as _read_json,
+        run_id as _run_id,
         sha256_file as _sha256,
         utc_now as _utc_now,
         write_json as _write_json,
@@ -42,10 +43,6 @@ DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "target_evidence_closure_v1.json"
 )
 DEFAULT_ROOT = ROOT / ".chromie" / "acceptance" / "target-evidence"
-
-
-def _run_id() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _artifact(path: Path) -> dict[str, Any]:

@@ -14,7 +14,6 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -24,8 +23,10 @@ if str(ROOT) not in sys.path:
 
 from scripts.evidence_io import (  # noqa: E402
     read_json_object as _read_json,
+    run_id as _run_id,
     sha256_file as _sha256,
     utc_now as _utc_now,
+    write_json as _write_json,
 )
 from scripts.generate_runtime_env import parse_env_file  # noqa: E402
 
@@ -61,10 +62,6 @@ class StageSpec:
     command: tuple[str, ...]
     artifacts: tuple[Path, ...]
     env_files: tuple[Path, ...] = ()
-
-
-def _run_id() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 def _artifact_record(path: Path) -> dict[str, Any]:
@@ -136,11 +133,7 @@ def _load_or_create_state(
 
 def _write_state(paths: WorkflowPaths, state: dict[str, Any]) -> None:
     state["updated_at"] = _utc_now()
-    paths.root.mkdir(parents=True, exist_ok=True)
-    paths.state.write_text(
-        json.dumps(state, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    _write_json(paths.state, state)
 
 
 def _stage_is_resumable(state: dict[str, Any], stage: StageSpec) -> bool:

@@ -3,9 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import json
-import os
-import tempfile
 import sys
 from collections import Counter
 from datetime import datetime, timezone
@@ -13,9 +10,9 @@ from pathlib import Path
 from typing import Any, Iterable
 
 try:
-    from evidence_io import read_json_object as _read_json
+    from evidence_io import read_json_object as _read_json, write_json as _write_json
 except ImportError:  # imported as scripts.summarize_inference_provider_evidence
-    from scripts.evidence_io import read_json_object as _read_json
+    from scripts.evidence_io import read_json_object as _read_json, write_json as _write_json
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -26,23 +23,6 @@ from shared.chromie_runtime.latency_evidence import distribution  # noqa: E402
 
 REPORT_TYPE = "chromie.inference_provider_contention_summary"
 REPORT_SCHEMA_VERSION = 2
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    temporary_path = Path(temporary)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
-    finally:
-        temporary_path.unlink(missing_ok=True)
 
 
 def _discover_sources(values: Iterable[str | Path]) -> list[Path]:

@@ -11,15 +11,22 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Iterable
 
 try:
-    from evidence_io import read_json_object as _read_json, sha256_file as _sha256
+    from evidence_io import (
+        git_revision as _git_revision,
+        read_json_object as _read_json,
+        sha256_file as _sha256,
+    )
 except ImportError:  # imported as scripts.verify_agent_skill_weather_qualification
-    from scripts.evidence_io import read_json_object as _read_json, sha256_file as _sha256
+    from scripts.evidence_io import (
+        git_revision as _git_revision,
+        read_json_object as _read_json,
+        sha256_file as _sha256,
+    )
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = (
@@ -40,18 +47,6 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"{path}:{line_number}: expected a JSON object")
         events.append(value)
     return events
-
-
-def _git_revision(root: Path = ROOT) -> str | None:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            cwd=root,
-            text=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-    except (OSError, subprocess.CalledProcessError):
-        return None
 
 
 def _events_for(
