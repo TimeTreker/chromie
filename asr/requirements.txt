@@ -4,3 +4,4 @@ sherpa-onnx==1.13.3 ; platform_machine == "aarch64"
 sherpa-onnx==1.13.3 ; platform_machine == "armv7l"
 websockets==16.0
 numpy==2.3.5
+soundfile==0.13.1
