@@ -34,6 +34,7 @@ from scipy import signal
 
 from model_sources import apply_model_sources, resolve_model_sources
 from settings import TTSServiceSettings
+from text_normalization import has_speakable_content, strip_speech_markup
 
 from cancellable_worker import RestartableProcessWorker
 from oute_provider import OuteTTSProvider, OuteTTSProviderConfig
@@ -161,10 +162,7 @@ def speaker_path_inside_dir(path: Path) -> Path:
 
 
 def normalize_tts_text(text: str) -> str:
-    text = (text or "").strip()
-    text = text.replace("```", " ").replace("`", " ").replace("**", " ")
-    text = re.sub(r"[*_#>\[\]{}|]+", " ", text)
-    text = re.sub(r"\s+", " ", text).strip()
+    text = strip_speech_markup(text)
 
     if len(text) > TTS_MAX_TEXT_CHARS:
         cut = text[:TTS_MAX_TEXT_CHARS]
@@ -183,12 +181,7 @@ def normalize_tts_text(text: str) -> str:
 
 
 def is_valid_tts_text(text: str) -> bool:
-    text = normalize_tts_text(text)
-    if len(text) < TTS_MIN_TEXT_CHARS:
-        return False
-    if re.fullmatch(r"\d+[\.)]?", text):
-        return False
-    return any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in text)
+    return has_speakable_content(normalize_tts_text(text), min_chars=TTS_MIN_TEXT_CHARS)
 
 
 def get_model_version():

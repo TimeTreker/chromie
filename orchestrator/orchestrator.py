@@ -210,6 +210,7 @@ from shared.chromie_runtime.llm_diagnostics import (
     ollama_completion_diagnostics,
     ollama_prompt_preflight_diagnostics,
 )
+from tts.text_normalization import has_speakable_content, strip_speech_markup
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -746,21 +747,13 @@ class VoiceAssistant:
         return sid
 
     def normalize_tts_candidate(self, text: str) -> str:
-        text = (text or "").strip()
-        text = text.replace("```", " ").replace("`", " ").replace("**", " ")
-        text = re.sub(r"[*_#>\[\]{}|]+", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
+        text = strip_speech_markup(text)
         text = re.sub(r"^[-•]+\s*", "", text).strip()
         text = re.sub(r"\s+([,.;:!?])", r"\1", text)
         return text
 
     def is_valid_tts_text(self, text: str) -> bool:
-        text = self.normalize_tts_candidate(text)
-        if len(text) < 2:
-            return False
-        if re.fullmatch(r"\d+[\.)]?", text):
-            return False
-        return any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in text)
+        return has_speakable_content(self.normalize_tts_candidate(text), min_chars=2)
 
     def split_tts_text(self, text: str) -> list[str]:
         candidate = self.normalize_tts_candidate(text)
