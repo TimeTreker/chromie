@@ -106,8 +106,10 @@ repeat history.
 Post-evidence factual speech must use `truth_stage=post_evidence` and cite exact admitted
 Evidence. Pre-evidence acknowledgements cite no terminal Evidence and cannot claim a
 result. If Planner authors new Capability Work, ordinary Capability schemas,
-authorization, confirmation, safety, privacy, resource and concurrency contracts still
-apply. An internal opportunity is never user confirmation.
+authorization, Value Judgment, confirmation, safety, privacy, resource and concurrency
+contracts still apply: a value-reviewed Capability or `value_review` speech not yet judged
+in the turn is judged before its effects start (VALUE-JUDGMENT-001), and one already judged
+in the turn reuses its verdict. An internal opportunity is never user confirmation.
 
 The re-entry calls the Planner once. Its terminal decision must preserve Evidence scope,
 epistemic strength, execution status, perspective, and sibling-Goal boundaries in its

@@ -1314,7 +1314,9 @@ independently turn the same terminal Evidence back into a requirement to repeat 
 completed Work. Planner, not a deterministic or model-backed post-execution composer,
 owns the semantic next-Work / respond / clarify / limitation decision. Social Cognition
 owns exact human-facing wording. Planner cannot treat the result as a new user turn,
-reassign it to another Goal, or add execution authority. Fast post-execution Evidence
+reassign it to another Goal, or add execution authority; new follow-up Work that uses a
+value-reviewed Capability not yet judged in the turn goes through Value Judgment before
+it starts (VALUE-JUDGMENT-001). Fast post-execution Evidence
 re-entry uses a dedicated minimal model-facing decision DTO that is deliberately disjoint
 from both `CanonicalPlan` and the ordinary Planner model DTO; Host deterministically lifts
 that validated decision back into the canonical Planner contract before the normal trusted
@@ -1402,7 +1404,9 @@ planned Work is recorded. Missing original Responsibility provenance or unavaila
 fresh provider truth fails closed and leaves the Goal recoverable for a later user
 turn; the Host does not reconstruct or guess a replacement Responsibility.
 
-Effectful Work produced by this re-entry still obeys the normal confirmation
+Effectful Work produced by this re-entry still obeys Value Judgment
+(VALUE-JUDGMENT-001: a reviewed Capability not yet judged in the turn is judged before
+it starts; one already judged reuses its verdict) and the normal confirmation
 boundary. Internal provider-state cognition cannot auto-confirm a body or other
 confirmation-requiring effect; if fresh Planner Work requires confirmation, the
 normal Confirmation Dialogue is staged again against the newly planned request.

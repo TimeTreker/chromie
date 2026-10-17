@@ -369,7 +369,11 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   proceed, ask, or decline with a reason. It never decides how, never selects or edits
   Capabilities, and never writes what Chromie says. Its inputs are the person's words, the
   accepted Responsibilities, the established Situation, and the full owner-approved Stable
-  Mind. It runs once per turn, and only when the final Plan would use a Capability on the
+  Mind. It runs on the turn's first Plan and again on any later Plan in the same turn
+  (Evidence, time, Situation, cancellation or restored-state re-entry) that adds a reviewed
+  effect not yet judged in that turn; a Capability or marked speech already judged in the
+  turn reuses its verdict and is not judged again. An effect is reviewed when the Plan
+  would use a Capability on the
   owner-editable value-review list (`capabilities/value_review.json`: fetching or moving
   objects, walking, approaching or touching people; never greetings, chat, information or
   expressive gestures), or realizes speech that UMI marked `value_review` (owner choice B,

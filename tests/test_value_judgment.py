@@ -366,3 +366,151 @@ def test_value_declined_goal_ends_like_a_limitation_without_a_semantic_version_b
     context = manager._task_contexts[-1]
     assert (context["status"], context["commitment_state"], context["plan_status"]) == ("refused", "failed", "value_declined")
     assert manager._semantic_goal_from_context(context).model_dump(mode="json") == before
+
+
+def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=frozenset({"soridormi.walk_forward"})):
+    """Evidence re-entry whose new Plan adds a walk ("if it's sunny, walk to the window")."""
+    from types import SimpleNamespace
+
+    from orchestrator.orchestrator import VoiceAssistant
+    from orchestrator.runtime.cognitive_runtime import (
+        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+    from tests.cognitive_runtime_test_support import FakeRuntime, walk_definition
+    from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_resolution
+
+    walk = CanonicalPlan(plan_id="plan-reentry-walk", planner_tier="fast", disposition="execute", coverage="complete",
+        confidence=0.95, goal_ids=["goal-1"], goal_summary="walk to the window",
+        steps=[{"step_id": "walk", "capability_id": "soridormi.walk_forward", "args": {"duration_s": 3.0},
+                "timing": "sequential", "source_goal_ids": ["goal-1"], "metadata": dict(planner_metadata or {})}],
+        goal_outcomes=[{"goal_id": "goal-1", "disposition": "execute", "coverage": "complete", "step_ids": ["walk"]}],
+        goal_satisfaction={"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-1"]})
+    source = judged_plan or CanonicalPlan(plan_id="plan-weather", planner_tier="fast", disposition="execute",
+        coverage="complete", confidence=0.95, goal_ids=["goal-1"], goal_summary="check the weather",
+        steps=[{"step_id": "weather", "capability_id": "chromie.weather.lookup", "args": {},
+                "timing": "sequential", "source_goal_ids": ["goal-1"]}],
+        goal_outcomes=[{"goal_id": "goal-1", "disposition": "execute", "coverage": "complete", "step_ids": ["weather"]}])
+
+    class Client(PlannerActivationFixture):
+        def __init__(self):
+            self.calls = []
+
+        async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+            return walk
+
+        async def resolve_value_judgment(self, session, *, request, **kwargs):
+            self.calls.append("value_judgment")
+            if isinstance(verdict, Exception):
+                raise verdict
+            return verdict
+
+        async def resolve_social_cognition(self, session, *, request, **kwargs):
+            return social_fixture_resolution(request, "OK.")
+
+    class Adapter(CanonicalPlanRuntimeAdapter):
+        async def build_social_cognition_response(self, **_kwargs):
+            return InteractionResponse(interaction_id="reentry-walk", status="ok")
+
+    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant.agent_client = Client()
+    assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000, deliberative_timeout_ms=6000)
+    assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
+        agent_client=assistant.agent_client, adapter=Adapter(FakeRuntime([walk_definition()])),
+        policy=CognitiveRuntimePolicy(mode="apply", value_review_capability_ids=reviewed))
+    assistant.session_log = lambda *_args, **_kwargs: None
+    assistant.build_context = lambda _sid: {"history": [], "mind": default_mind_profile().prompt_context()}
+    assistant._cognitive_core_authority_context = lambda context, **_kwargs: context
+
+    async def get_session():
+        return object()
+
+    assistant.get_http_session = get_session
+    response = asyncio.run(assistant._planner_state_reentry_response(
+        source_response=None, canonical_plan=source, user_request="If it's sunny, walk to the window.",
+        language="en-US", goal_ids=["goal-1"], evidence_goal_ids=["goal-1"], evidence_refs=["evidence-sunny"],
+        session_id=None, phase="capability_result_reentry",
+        context_updates={"trusted_terminal_evidence": [{"evidence_id": "evidence-sunny", "status": "completed"}]},
+        fast_workflow_stage="fast_planner_evidence_reentry", response_source="fast_planner_evidence_reentry",
+        responsibilities_override=[CognitiveResponsibilityProposal(local_ref="r1",
+            outcome="walk to the window if it is sunny", output_mode="stateful_effect", confidence=1.0)]))
+    assert response is not None
+    return assistant.agent_client, CanonicalPlan.model_validate(response.metadata["planner_reentry_plan"])
+
+
+@pytest.mark.parametrize("verdict,confirm,withheld", [
+    (judged("proceed"), False, False),
+    (judged("ask", "harm_risk", "child"), True, False),
+    (judged("decline", "harm_risk", "child"), False, True),
+    (RuntimeError("agent down"), False, True),
+])
+def test_reentry_plan_adding_a_reviewed_capability_is_judged_before_it_starts(verdict, confirm, withheld):
+    client, plan = reentry_walk(verdict)
+    assert client.calls == ["value_judgment"]
+    (walk,) = plan.steps
+    assert bool(walk.metadata.get("value_confirmation_required")) is confirm
+    assert bool(walk.metadata.get("value_withheld")) is withheld
+    assert plan.metadata["value_judgment"]["reviewed_capability_ids"] == ["soridormi.walk_forward"]
+    kinds = [need.kind for need in plan.communication_needs if need.owner == "runtime"]
+    assert kinds == (["confirmation"] if confirm else ["result"] if withheld else [])
+    if confirm:
+        (need,) = [need for need in plan.communication_needs if need.kind == "confirmation"]
+        assert need.facts["value_question"]["concern"] == "harm_risk"
+
+
+def test_reentry_reuses_a_verdict_given_earlier_in_the_same_turn():
+    earlier = apply_value_judgment(plan_with("soridormi.walk_forward"), {"soridormi.walk_forward"},
+                                   judged("decline", "harm_risk", "child"))
+    client, plan = reentry_walk(RuntimeError("must not be called"), judged_plan=earlier)
+    assert client.calls == []
+    (walk,) = plan.steps
+    assert walk.metadata["value_withheld"] is True
+    assert walk.metadata["value_judgment"]["decision"] == "decline"
+
+
+def test_reentry_without_a_reviewed_capability_never_calls_value_judgment():
+    client, plan = reentry_walk(RuntimeError("must not be called"), reviewed=frozenset({"soridormi.hug_gesture"}))
+    assert client.calls == []
+    assert "value_judgment" not in plan.steps[0].metadata
+
+
+def test_planner_authored_verdict_on_a_reentry_plan_is_not_a_verdict():
+    client, plan = reentry_walk(judged("decline", "harm_risk", "child"),
+                                planner_metadata={"value_judgment": {"decision": "proceed"}})
+    assert client.calls == ["value_judgment"]
+    assert plan.steps[0].metadata["value_withheld"] is True
+
+
+def test_turn_record_reuses_a_verdict_and_judges_only_new_reviewed_capabilities():
+    from orchestrator.runtime.cognitive_runtime import (
+        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+    from tests.cognitive_runtime_test_support import FakeRuntime
+
+    verdicts = [judged("proceed"), judged("decline", "consent", "another_adult")]
+    requests = []
+
+    class Client:
+        async def resolve_value_judgment(self, session, *, request, **kwargs):
+            requests.append(request)
+            return verdicts[len(requests) - 1]
+
+    coordinator = GoalDrivenRuntimeCoordinator(agent_client=Client(), adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([])),
+        policy=CognitiveRuntimePolicy(mode="apply", value_review_capability_ids=frozenset(
+            {"soridormi.walk_forward", "soridormi.hug_gesture"})))
+
+    def gate(plan):
+        return asyncio.run(coordinator.apply_value_judgment_gate(object(), sid="sid", text="t", plan=plan,
+            work_request=work_request(), goal_ids_by_responsibility={}, turn_id="turn-1"))
+
+    first = gate(plan_with("soridormi.walk_forward"))
+    assert len(requests) == 1 and first.steps[0].metadata["value_judgment"]["decision"] == "proceed"
+    again = gate(plan_with("soridormi.walk_forward"))
+    assert len(requests) == 1 and again.steps[0].metadata["value_judgment"]["decision"] == "proceed"
+    mixed = gate(plan_with("soridormi.walk_forward", "soridormi.hug_gesture"))
+    assert len(requests) == 2
+    walk, hug = mixed.steps
+    assert walk.metadata["value_judgment"]["decision"] == "proceed" and "value_withheld" not in walk.metadata
+    assert hug.metadata["value_withheld"] is True
+    assert mixed.metadata["value_judgment"]["decision"] == "decline"
+    assert mixed.metadata["value_judgment"]["reviewed_capability_ids"] == [
+        "soridormi.hug_gesture", "soridormi.walk_forward"]
+    (declined,) = [need for need in mixed.communication_needs if need.owner == "runtime"]
+    assert declined.facts["withheld_capability_ids"] == ["soridormi.hug_gesture"]

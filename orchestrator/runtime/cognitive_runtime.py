@@ -7,7 +7,7 @@ import hashlib
 import json
 import logging
 import time
-from collections import Counter, deque
+from collections import Counter, OrderedDict, deque
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -159,8 +159,21 @@ class CognitiveRuntimePolicy:
     value_review_capability_ids: frozenset[str] = frozenset()
 
 
+def value_judgment_verdict(result: ValueJudgmentResult) -> dict[str, Any]:
+    """The verdict a Value Judgment result gives; a failed judgment is a decline."""
+    judgment = result.judgment
+    return {
+        "status": result.status,
+        "decision": judgment.decision if judgment is not None else "decline",
+        "concern": judgment.concern if judgment is not None else "none",
+        "affected": judgment.affected if judgment is not None else "nobody_else",
+        "reason": judgment.reason if judgment is not None else "Chromie could not judge this request safely right now.",
+        "failure_class": result.failure_class,
+    }
+
+
 def apply_value_judgment(
-    plan: CanonicalPlan, reviewed_ids: set[str], result: ValueJudgmentResult,
+    plan: CanonicalPlan, reviewed_ids: set[str], result: ValueJudgmentResult | dict[str, Any],
     reviewed_need_ids: set[str] | frozenset[str] = frozenset(),
     reviewed_step_ids: set[str] | frozenset[str] = frozenset(),
 ) -> CanonicalPlan:
@@ -170,17 +183,9 @@ def apply_value_judgment(
     or a failed judgment withholds them, so Runtime refuses them before provider start.
     Speech UMI marked value_review (owner choice B, 2026-10-12) is reviewed through the
     answers and steps realizing it: ask or decline withholds such an answer this turn, so
-    Social Cognition may not say it.
+    Social Cognition may not say it. ``result`` may be a verdict already given in this turn.
     """
-    judgment = result.judgment
-    verdict = {
-        "status": result.status,
-        "decision": judgment.decision if judgment is not None else "decline",
-        "concern": judgment.concern if judgment is not None else "none",
-        "affected": judgment.affected if judgment is not None else "nobody_else",
-        "reason": judgment.reason if judgment is not None else "Chromie could not judge this request safely right now.",
-        "failure_class": result.failure_class,
-    }
+    verdict = dict(result) if isinstance(result, dict) else value_judgment_verdict(result)
     steps = []
     for step in plan.steps:
         metadata = dict(step.metadata)
@@ -2601,6 +2606,9 @@ class GoalDrivenRuntimeCoordinator:
         self._auxiliary_execution_tasks: set[asyncio.Task[Any]] = set()
         self._social_turns: dict[str, tuple[str, asyncio.Task[Any], str]] = {}
         self._social_dispatches: dict[str, str] = {}
+        # Value Judgment verdicts given in a turn, keyed "capability:<id>" or
+        # "responsibility:<UMI local_ref>", so a later Plan of the same turn reuses them.
+        self._turn_value_verdicts: OrderedDict[str, dict[str, dict[str, Any]]] = OrderedDict()
 
     async def cancel_social_interaction(self) -> None:
         """Deterministic output interruption invalidates pending SC and delivery."""
@@ -3143,6 +3151,185 @@ class GoalDrivenRuntimeCoordinator:
                 exc,
             )
             return
+
+    _TURN_VALUE_VERDICT_LIMIT = 256
+
+    @staticmethod
+    def _plan_value_verdicts(plan: CanonicalPlan | None) -> dict[str, dict[str, Any]]:
+        """Verdicts the Host already wrote onto an earlier Plan of the same turn."""
+        verdicts: dict[str, dict[str, Any]] = {}
+        if plan is None:
+            return verdicts
+        for step in plan.steps:
+            verdict = step.metadata.get("value_judgment")
+            if isinstance(verdict, dict) and verdict.get("decision"):
+                verdicts.setdefault(f"capability:{step.capability_id}", dict(verdict))
+        for need in plan.communication_needs:
+            verdict = need.facts.get("value_judgment")
+            if isinstance(verdict, dict) and verdict.get("decision"):
+                for ref in need.source_responsibility_refs:
+                    verdicts.setdefault(f"responsibility:{ref}", dict(verdict))
+        return verdicts
+
+    @staticmethod
+    def goal_ids_by_responsibility_projection(association: Any) -> dict[str, list[str]]:
+        """``_goal_ids_by_responsibility`` for a JSON Goal Association projection."""
+        mapped: dict[str, list[str]] = {}
+        if not isinstance(association, dict):
+            return mapped
+        rows = [(item.get("source_responsibility_refs"), item.get("target_goal_ids"))
+                for item in association.get("associations") or [] if isinstance(item, dict)]
+        rows += [(item.get("source_responsibility_refs"), [item.get("goal_id")])
+                 for item in association.get("new_goals") or [] if isinstance(item, dict)]
+        for refs, goal_ids in rows:
+            goals = [goal_id for value in goal_ids or [] if (goal_id := " ".join(str(value or "").split()))]
+            for value in refs or []:
+                if (ref := " ".join(str(value or "").split())) and goals:
+                    current = mapped.setdefault(ref, [])
+                    current.extend(goal_id for goal_id in goals if goal_id not in current)
+        return mapped
+
+    async def apply_value_judgment_gate(
+        self, session: Any, *, sid: str, text: str, plan: CanonicalPlan,
+        work_request: CognitiveWorkRequest, goal_ids_by_responsibility: dict[str, list[str]],
+        turn_id: str, judged_plan: CanonicalPlan | None = None,
+    ) -> CanonicalPlan:
+        """Value Judgment for any Plan of a turn, before its reviewed effects can start.
+
+        A Plan needs a verdict for every value-reviewed Capability it uses and every
+        answer or step realizing speech UMI marked value_review. A verdict already given
+        in the same turn (this coordinator's record, or the Host annotations on
+        ``judged_plan``) is reused; anything not yet judged takes one Value Judgment
+        call. Decline or a failed judgment withholds the effect, ask requires the
+        person's confirmation, and the Plan itself stands.
+        """
+        # Verdict annotations are Host-owned; a Planner-authored copy never counts.
+        if "value_judgment" in plan.metadata or any(
+                key in step.metadata for step in plan.steps for key in _VALUE_JUDGMENT_STEP_ANNOTATIONS) or any(
+                key in need.facts for need in plan.communication_needs for key in _VALUE_JUDGMENT_NEED_ANNOTATIONS):
+            plan = CanonicalPlan.model_validate({**plan.model_dump(),
+                "steps": [{**step.model_dump(), "metadata": {
+                    key: value for key, value in step.metadata.items() if key not in _VALUE_JUDGMENT_STEP_ANNOTATIONS}}
+                    for step in plan.steps],
+                "communication_needs": [{**need.model_dump(), "facts": {
+                    key: value for key, value in need.facts.items() if key not in _VALUE_JUDGMENT_NEED_ANNOTATIONS}}
+                    for need in plan.communication_needs],
+                "metadata": {key: value for key, value in plan.metadata.items() if key != "value_judgment"}})
+        if self.policy.mode != "apply":
+            return plan
+        reviewed_ids = {step.capability_id for step in plan.steps} & self.policy.value_review_capability_ids
+        flagged_refs = {item.local_ref for item in work_request.responsibilities if item.value_review}
+        goals_by_ref = {ref: set(goal_ids_by_responsibility.get(ref, [])) for ref in flagged_refs}
+        need_refs = {need.need_id: refs for need in plan.communication_needs if need.kind == "answer" and (refs := (
+            set(need.source_responsibility_refs) & flagged_refs
+            | {ref for ref, goals in goals_by_ref.items() if goals & set(need.source_goal_ids)}))}
+        step_refs = {step.step_id: refs for step in plan.steps if (refs := {
+            ref for ref, goals in goals_by_ref.items() if goals & set(step.source_goal_ids)})}
+        if not (reviewed_ids or need_refs or step_refs):
+            return plan
+        reviewed_refs = set().union(*need_refs.values(), *step_refs.values())
+        recorded = self._turn_value_verdicts.get(turn_id, {}) if turn_id else {}
+        known = {**self._plan_value_verdicts(judged_plan), **recorded}
+        keys = {f"capability:{cid}" for cid in reviewed_ids} | {f"responsibility:{ref}" for ref in reviewed_refs}
+        pending = sorted(keys - set(known))
+        if pending:
+            result = await self._observe_workflow_stage(
+                sid=sid,
+                stage="value_judgment",
+                input_payload={"user_text": text, "reviewed_capability_ids": sorted(reviewed_ids),
+                               "reviewed_answer_need_ids": sorted(need_refs),
+                               "value_review_responsibility_refs": sorted(flagged_refs),
+                               "judged_value_keys": pending,
+                               "reused_value_keys": sorted(keys - set(pending))},
+                operation=self._resolve_value_judgment(session, work_request),
+                metadata={"semantic_owner": "value_judgment", "communication_authority": False},
+            )
+            verdict = value_judgment_verdict(result)
+            known.update({key: verdict for key in pending})
+            if turn_id:
+                self._turn_value_verdicts.setdefault(turn_id, {}).update({key: verdict for key in pending})
+                self._turn_value_verdicts.move_to_end(turn_id)
+                while len(self._turn_value_verdicts) > self._TURN_VALUE_VERDICT_LIMIT:
+                    self._turn_value_verdicts.popitem(last=False)
+        # Apply each distinct verdict to what it judged; the most restrictive goes last,
+        # so the Plan-level record carries it.
+        severity = {"proceed": 0, "ask": 1, "decline": 2}
+        groups: dict[str, tuple[dict[str, Any], set[str], set[str], set[str]]] = {}
+        for key in sorted(keys):
+            verdict = known[key]
+            caps, needs, steps = groups.setdefault(json.dumps(verdict, sort_keys=True), (verdict, set(), set(), set()))[1:]
+            kind, _, value = key.partition(":")
+            if kind == "capability":
+                caps.add(value)
+            else:
+                needs.update(need_id for need_id, refs in need_refs.items() if value in refs)
+                steps.update(step_id for step_id, refs in step_refs.items() if value in refs)
+        reviewed_capability_ids: set[str] = set()
+        reviewed_answer_need_ids: set[str] = set()
+        withheld_answer_goal_ids: list[str] = []
+        for verdict, caps, needs, steps in sorted(groups.values(), key=lambda group: (
+                severity.get(str(group[0].get("decision")), 2), bool(group[2]))):
+            plan = apply_value_judgment(plan, caps, verdict, needs, steps)
+            record = plan.metadata["value_judgment"]
+            reviewed_capability_ids.update(record["reviewed_capability_ids"])
+            reviewed_answer_need_ids.update(record.get("reviewed_answer_need_ids") or [])
+            withheld_answer_goal_ids.extend(record.get("withheld_answer_goal_ids") or [])
+        record = {**plan.metadata["value_judgment"], "reviewed_capability_ids": sorted(reviewed_capability_ids)}
+        if reviewed_answer_need_ids:
+            record.update({"reviewed_answer_need_ids": sorted(reviewed_answer_need_ids),
+                           "withheld_answer_goal_ids": list(dict.fromkeys(withheld_answer_goal_ids))})
+        plan = plan.model_copy(update={"metadata": {**plan.metadata, "value_judgment": record}})
+        withheld_steps = [step for step in plan.steps if step.metadata.get("value_withheld")]
+        withheld_answers = [need for need in plan.communication_needs if need.facts.get("value_withheld")]
+        verdict = (withheld_steps[0].metadata["value_judgment"] if withheld_steps
+                   else withheld_answers[0].facts["value_judgment"] if withheld_answers else {})
+        if withheld_steps or (withheld_answers and verdict["decision"] == "decline"):
+            # Chromie's decline is known before dispatch: SC says it now, and the
+            # refused result never wakes the Planner to work around it.
+            plan = CanonicalPlan.model_validate({**plan.model_dump(),
+                "communication_needs": [*plan.communication_needs, SocialCommunicationNeed(
+                    need_id=communication_need_id(plan.plan_id, "value_declined"),
+                    owner="runtime", kind="result", reference_id=plan.plan_id,
+                    source_goal_ids=list(dict.fromkeys(
+                        [*(goal_id for step in withheld_steps for goal_id in step.source_goal_ids),
+                         *(goal_id for need in withheld_answers for goal_id in need.source_goal_ids)])),
+                    delivery_phase="immediate",
+                    facts={"value_declined": verdict,
+                           "withheld_capability_ids": [step.capability_id for step in withheld_steps],
+                           "withheld_answer_need_ids": [need.need_id for need in withheld_answers]},
+                )]})
+        elif withheld_answers:
+            # The answer waits on one fact; SC asks it now instead of answering.
+            plan = CanonicalPlan.model_validate({**plan.model_dump(),
+                "communication_needs": [*plan.communication_needs, SocialCommunicationNeed(
+                    need_id=communication_need_id(plan.plan_id, "value_question"),
+                    owner="runtime", kind="input", reference_id=plan.plan_id,
+                    source_goal_ids=list(dict.fromkeys(
+                        goal_id for need in withheld_answers for goal_id in need.source_goal_ids)),
+                    delivery_phase="immediate",
+                    facts={"value_question": verdict,
+                           "withheld_answer_need_ids": [need.need_id for need in withheld_answers]},
+                )]})
+        return plan
+
+    def with_runtime_confirmation_need(self, plan: CanonicalPlan) -> CanonicalPlan:
+        """Add the Runtime-owned confirmation need for steps that need the person's yes."""
+        confirmation_steps = [step for step in plan.steps
+            if not step.metadata.get("value_withheld")
+            and (self.adapter.interaction_runtime.capability_definition(step.capability_id).requires_confirmation
+                 or step.metadata.get("value_confirmation_required"))]
+        value_question = next((step.metadata["value_judgment"] for step in confirmation_steps
+            if step.metadata.get("value_confirmation_required")), None)
+        if confirmation_steps and not any(need.kind == "confirmation" for need in plan.communication_needs):
+            plan = CanonicalPlan.model_validate({**plan.model_dump(),
+                "communication_needs": [*plan.communication_needs, SocialCommunicationNeed(
+                    need_id=communication_need_id(plan.plan_id, "confirmation"), owner="runtime", kind="confirmation",
+                    reference_id=plan.plan_id, source_goal_ids=list(dict.fromkeys(
+                        goal_id for step in confirmation_steps for goal_id in step.source_goal_ids)),
+                    delivery_phase="pre_action", facts={"provider_confirmation_steps": [step.model_dump(mode="json") for step in confirmation_steps],
+                        **({"value_question": value_question} if value_question else {})},
+                )]})
+        return plan
 
     async def _resolve_value_judgment(
         self, session: Any, request: CognitiveWorkRequest,
@@ -5841,78 +6028,17 @@ class GoalDrivenRuntimeCoordinator:
 
             await self.adapter.interaction_runtime.ensure_capability_definitions([step.capability_id for step in terminal_plan.steps])
             # Value Judgment (owner amendment 2026-10-10): whether Chromie should act, never how.
-            # It runs once, only when the final Plan uses a value-reviewed Capability or realizes
-            # speech UMI marked value_review (choice B, 2026-10-12). Its verdict permits,
-            # questions or withholds those effects; the Plan itself stands.
-            value_judgment: ValueJudgmentResult | None = None
-            reviewed_ids = {step.capability_id for step in terminal_plan.steps} & self.policy.value_review_capability_ids
-            flagged_refs = {item.local_ref for item in work_request.responsibilities if item.value_review}
-            flagged_goals = {goal_id for ref, goal_ids in self._goal_ids_by_responsibility(association).items()
-                             if ref in flagged_refs for goal_id in goal_ids} if flagged_refs else set()
-            reviewed_need_ids = {need.need_id for need in terminal_plan.communication_needs
-                                 if need.kind == "answer" and (set(need.source_responsibility_refs) & flagged_refs
-                                                               or set(need.source_goal_ids) & flagged_goals)}
-            reviewed_step_ids = {step.step_id for step in terminal_plan.steps if set(step.source_goal_ids) & flagged_goals}
-            if (reviewed_ids or reviewed_need_ids or reviewed_step_ids) and self.policy.mode == "apply":
-                value_judgment = await self._observe_workflow_stage(
-                    sid=sid,
-                    stage="value_judgment",
-                    input_payload={"user_text": text, "reviewed_capability_ids": sorted(reviewed_ids),
-                                   "reviewed_answer_need_ids": sorted(reviewed_need_ids),
-                                   "value_review_responsibility_refs": sorted(flagged_refs)},
-                    operation=self._resolve_value_judgment(
-                        session, work_request.model_copy(update={"context": planning_context})
-                    ),
-                    metadata={"semantic_owner": "value_judgment", "communication_authority": False},
-                )
-                terminal_plan = apply_value_judgment(
-                    terminal_plan, reviewed_ids, value_judgment, reviewed_need_ids, reviewed_step_ids)
-                withheld_steps = [step for step in terminal_plan.steps if step.metadata.get("value_withheld")]
-                withheld_answers = [need for need in terminal_plan.communication_needs if need.facts.get("value_withheld")]
-                verdict = (withheld_steps[0].metadata["value_judgment"] if withheld_steps
-                           else withheld_answers[0].facts["value_judgment"] if withheld_answers else {})
-                if withheld_steps or (withheld_answers and verdict["decision"] == "decline"):
-                    # Chromie's decline is known before dispatch: SC says it now, and the
-                    # refused result never wakes the Planner to work around it.
-                    terminal_plan = CanonicalPlan.model_validate({**terminal_plan.model_dump(),
-                        "communication_needs": [*terminal_plan.communication_needs, SocialCommunicationNeed(
-                            need_id=communication_need_id(terminal_plan.plan_id, "value_declined"),
-                            owner="runtime", kind="result", reference_id=terminal_plan.plan_id,
-                            source_goal_ids=list(dict.fromkeys(
-                                [*(goal_id for step in withheld_steps for goal_id in step.source_goal_ids),
-                                 *(goal_id for need in withheld_answers for goal_id in need.source_goal_ids)])),
-                            delivery_phase="immediate",
-                            facts={"value_declined": verdict,
-                                   "withheld_capability_ids": [step.capability_id for step in withheld_steps],
-                                   "withheld_answer_need_ids": [need.need_id for need in withheld_answers]},
-                        )]})
-                elif withheld_answers:
-                    # The answer waits on one fact; SC asks it now instead of answering.
-                    terminal_plan = CanonicalPlan.model_validate({**terminal_plan.model_dump(),
-                        "communication_needs": [*terminal_plan.communication_needs, SocialCommunicationNeed(
-                            need_id=communication_need_id(terminal_plan.plan_id, "value_question"),
-                            owner="runtime", kind="input", reference_id=terminal_plan.plan_id,
-                            source_goal_ids=list(dict.fromkeys(
-                                goal_id for need in withheld_answers for goal_id in need.source_goal_ids)),
-                            delivery_phase="immediate",
-                            facts={"value_question": verdict,
-                                   "withheld_answer_need_ids": [need.need_id for need in withheld_answers]},
-                        )]})
-            confirmation_steps = [step for step in terminal_plan.steps
-                if not step.metadata.get("value_withheld")
-                and (self.adapter.interaction_runtime.capability_definition(step.capability_id).requires_confirmation
-                     or step.metadata.get("value_confirmation_required"))]
-            value_question = next((step.metadata["value_judgment"] for step in confirmation_steps
-                if step.metadata.get("value_confirmation_required")), None)
-            if confirmation_steps and not any(need.kind == "confirmation" for need in terminal_plan.communication_needs):
-                terminal_plan = CanonicalPlan.model_validate({**terminal_plan.model_dump(),
-                    "communication_needs": [*terminal_plan.communication_needs, SocialCommunicationNeed(
-                        need_id=communication_need_id(terminal_plan.plan_id, "confirmation"), owner="runtime", kind="confirmation",
-                        reference_id=terminal_plan.plan_id, source_goal_ids=list(dict.fromkeys(
-                            goal_id for step in confirmation_steps for goal_id in step.source_goal_ids)),
-                        delivery_phase="pre_action", facts={"provider_confirmation_steps": [step.model_dump(mode="json") for step in confirmation_steps],
-                            **({"value_question": value_question} if value_question else {})},
-                    )]})
+            # It runs on this first Plan and on any later Plan of the turn that adds a
+            # value-reviewed Capability or speech UMI marked value_review (choice B,
+            # 2026-10-12) not yet judged. Its verdict permits, questions or withholds those
+            # effects; the Plan itself stands.
+            terminal_plan = await self.apply_value_judgment_gate(
+                session, sid=sid, text=text, plan=terminal_plan,
+                work_request=work_request.model_copy(update={"context": planning_context}),
+                goal_ids_by_responsibility=self._goal_ids_by_responsibility(association),
+                turn_id=turn_id,
+            )
+            terminal_plan = self.with_runtime_confirmation_need(terminal_plan)
             known_work_ids = {item["activity_id"] for item in planning_context.get("existing_work_activities", [])}
             if set(terminal_plan.cancel_activity_ids) - known_work_ids:
                 raise ValueError("Planner cancellation names unknown Work")

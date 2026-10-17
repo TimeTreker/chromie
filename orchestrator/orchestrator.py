@@ -5882,6 +5882,16 @@ class VoiceAssistant:
         runtime_errors = await self.cognitive_runtime.adapter.validation_errors(replanned)
         if runtime_errors:
             raise ValueError("Runtime rejected state re-entry Plan: " + json.dumps(runtime_errors))
+        # Reviewed effects never start without a verdict: a re-entry Plan that adds a
+        # value-reviewed Capability or value_review speech not yet judged in this turn
+        # goes through Value Judgment, exactly as the turn's first Plan does.
+        replanned = await self.cognitive_runtime.apply_value_judgment_gate(
+            session, sid=sid, text=request.text, plan=replanned, work_request=request,
+            goal_ids_by_responsibility=self.cognitive_runtime.goal_ids_by_responsibility_projection(association),
+            turn_id=str(metadata.get("turn_id") or ""), judged_plan=canonical_plan,
+        )
+        if any(step.metadata.get("value_confirmation_required") for step in replanned.steps):
+            replanned = self.cognitive_runtime.with_runtime_confirmation_need(replanned)
         async with planning_runtime.planning_commit_scope(planning_snapshot):
             known_ids = {item["activity_id"] for item in context["existing_work_activities"]}
             if set(replanned.cancel_activity_ids) - known_ids:
