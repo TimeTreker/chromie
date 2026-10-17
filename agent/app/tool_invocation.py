@@ -95,9 +95,6 @@ class FunctionToolInvoker:
             raise ValueError(f"duplicate tool handler: {tool_name}")
         self._handlers[tool_name] = handler
 
-    def has_tool(self, tool_name: str) -> bool:
-        return tool_name in self._handlers
-
     def invoke(self, tool_name: str, args: dict[str, Any]) -> ToolCallOutcome:
         try:
             handler = self._handlers[tool_name]

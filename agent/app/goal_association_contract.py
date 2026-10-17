@@ -63,26 +63,6 @@ GoalMediaOperation = Literal[
 _NUMERIC_LITERAL_RE = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"
 )
-_EXECUTION_CONTRACT_PROMPT = (
-    "Preserve the human-facing WHAT category from User Meaning Interpretation exactly. "
-    "Goal Association may refine semantic bindings, resource structure, references, "
-    "and canonical continuity, but it does not decide whether a Capability, provider, "
-    "execution lane, fresh Evidence, or Work is required. Use information when the "
-    "person wants Chromie to determine or provide information, whether that information "
-    "is already available to reasoning/context or must later be acquired. Use "
-    "stateful_effect only for a durable or future state change outside embodiment, such as "
-    "recording, scheduling, changing a setting, or sending later. Locomotion, posture, "
-    "gaze, gesture, physical manipulation, carrying, and handover use body_action even "
-    "when they change location or another lasting physical state; lifecycle "
-    "control of media uses media_playback; authored vocal performances use their exact "
-    "vocal mode. Ordinary directly authored conversation uses speech. Capability and "
-    "provider applicability are Planner concerns and must not be encoded into Goal "
-    "output_mode or metadata. A negative instruction that limits another outcome is a "
-    "constraint, not a separate Goal. A manner, mood, persona, or social-presentation "
-    "directive attached to another effect is expression framing, not an extra spoken "
-    "Goal. Coordination grammar still requires one Goal per independently satisfiable "
-    "observable outcome. Never invent an audible modality from style wording alone."
-)
 
 _GOAL_SEGMENTATION_IDENTITY_CONTRACT = (
     "Owner-approved identity evidence names the first-person Chromie entity. Preserve "

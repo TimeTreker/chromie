@@ -43,24 +43,6 @@ def _canonical_source_binding_value(name: Any, value: Any) -> str:
     return normalized_value
 
 
-def _ordinary_source_binding_pairs(
-    request: CognitiveWorkRequest,
-) -> dict[str, set[tuple[str, str]]]:
-    return {
-        responsibility.local_ref: {
-            (
-                _normalized_binding_name(name),
-                _canonical_source_binding_value(name, value),
-            )
-            for name, value in responsibility.bindings.items()
-            if isinstance(value, (str, int, float, bool))
-            and _normalized_binding_name(name)
-            not in {"action", "activity", "effect", "outcome"}
-        }
-        for responsibility in request.responsibilities
-    }
-
-
 def normalize_resource_binding_branches(
     raw: dict[str, Any],
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:

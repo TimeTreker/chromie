@@ -26,7 +26,6 @@ ACCELERATOR_SAMPLE_MODULE = TraceModule(
 )
 
 _VALID_MODES = {"off", "session", "periodic"}
-_VALID_PROVIDERS = {"auto", "nvidia_smi", "off"}
 _NVIDIA_FIELDS = (
     "index",
     "uuid",

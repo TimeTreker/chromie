@@ -643,10 +643,6 @@ class CognitiveWorkRequest(BaseModel):
         return normalize_turn_text(str(value or ""))
 
     @property
-    def meaning_uncertainty_descriptions(self) -> list[str]:
-        return [item.description for item in self.meaning_uncertainties]
-
-    @property
     def meaning_uncertainty_refs(self) -> set[str]:
         return {item.local_ref for item in self.meaning_uncertainties}
 

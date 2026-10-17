@@ -79,21 +79,6 @@ class PlaybackDeliveryLifecycle:
     ) -> PlaybackKey:
         return (int(generation), int(order), session_id)
 
-    def reserve_order(
-        self,
-        *,
-        session_id: str | None,
-        is_stale: Callable[[int, str | None], bool],
-    ) -> tuple[int, int] | None:
-        """Reserve one synthesis order under the caller-held ``order_lock``."""
-
-        generation = self.playback_generation
-        if is_stale(generation, session_id):
-            return None
-        order = self.synthesis_order
-        self.synthesis_order += 1
-        return generation, order
-
     def create_playback_start_waiter(
         self,
         *,
