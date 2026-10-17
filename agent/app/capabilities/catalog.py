@@ -16,6 +16,7 @@ from shared.chromie_contracts.soridormi_body_contract import (
     without_body_frame_look_target,
 )
 from shared.chromie_contracts.semantic_capability import normalize_semantic_capability_facade
+from shared.chromie_runtime.env_values import parse_bool
 
 from .models import CapabilityRegistry, ToolCapability
 
@@ -856,16 +857,16 @@ class CapabilityCatalog:
         locked_tags = sorted(tags & SAFETY_LOCKED_PROMPT_TIER_TAGS)
         if locked_tags:
             return True, f"tag={locked_tags[0]} is safety-sensitive"
-        if cls._truthy(capability.hints.get("safety_sensitive")):
+        if cls._manifest_flag(capability.hints, "safety_sensitive", capability.capability_id):
             return True, "hint safety_sensitive=true"
-        if cls._truthy(capability.metadata.get("safety_sensitive")):
+        if cls._manifest_flag(capability.metadata, "safety_sensitive", capability.capability_id):
             return True, "metadata safety_sensitive=true"
         return False, None
 
     @classmethod
     def _prompt_tier_lock_flag(cls, payload: Mapping[str, Any]) -> bool:
         return any(
-            cls._truthy(payload.get(key))
+            cls._manifest_flag(payload, key, "capability")
             for key in (
                 "prompt_tier_locked",
                 "safety_sensitive",
@@ -878,15 +879,13 @@ class CapabilityCatalog:
         return reason or None
 
     @staticmethod
-    def _truthy(value: Any) -> bool:
-        if isinstance(value, bool):
-            return value
-        if value is None:
-            return False
-        return str(value).strip().lower() in {"1", "true", "yes", "on", "locked"}
+    def _manifest_flag(payload: Mapping[str, Any], key: str, owner: str) -> bool:
+        """Read one manifest boolean hint; an unknown value fails closed with an error."""
+
+        return parse_bool(payload.get(key), name=f"{owner} {key}", default=False)
 
     @classmethod
     def _interaction_executable_for_tool(cls, tool: ToolCapability) -> bool:
-        return tool.name == "chromie.speak" or cls._truthy(
-            tool.llm_hints.get("interaction_executable")
+        return tool.name == "chromie.speak" or cls._manifest_flag(
+            tool.llm_hints, "interaction_executable", tool.name
         )

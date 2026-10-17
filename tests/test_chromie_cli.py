@@ -1239,5 +1239,35 @@ class ChromieCliTests(unittest.TestCase):
         )
 
 
+
+class ChromieCliBooleanRuleTests(unittest.TestCase):
+    def test_cli_accepts_exactly_what_the_runtime_parser_accepts(self) -> None:
+        from tools.chromie_cli.env import EnvSnapshot, validate_config
+
+        def bool_failures(value: str) -> list[str]:
+            snapshot = EnvSnapshot(
+                root=Path("/tmp"),
+                values={"ORCH_ACTION_DRY_RUN": value},
+                sources=[],
+                runtime_file_used=False,
+                active_profile="test",
+            )
+            return [
+                item.code for item in validate_config(snapshot) if item.code == "invalid_bool"
+            ]
+
+        self.assertEqual(bool_failures(""), [])
+        self.assertEqual(bool_failures("ON"), [])
+        self.assertEqual(bool_failures("enabled"), ["invalid_bool"])
+        snapshot = EnvSnapshot(
+            root=Path("/tmp"),
+            values={"ORCH_ACTION_DRY_RUN": ""},
+            sources=[],
+            runtime_file_used=False,
+            active_profile="test",
+        )
+        self.assertTrue(snapshot.bool_value("ORCH_ACTION_DRY_RUN", default=True))
+
+
 if __name__ == "__main__":
     unittest.main()

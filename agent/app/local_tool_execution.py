@@ -23,6 +23,7 @@ from .clients.weather_client import (
     weather_code_text,
 )
 
+from shared.chromie_runtime.env_values import parse_bool
 from shared.chromie_contracts.json_schema import json_schema_validation_errors
 from shared.chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
 
@@ -131,7 +132,11 @@ class LocalToolExecutor:
         manifest = self.registry.get_agent(tool.agent_id)
         if manifest.transport.kind != "local_python":
             return "transport_not_local", "Capability is not a local Python tool"
-        if not _truthy(tool.llm_hints.get("interaction_executable")):
+        if not parse_bool(
+            tool.llm_hints.get("interaction_executable"),
+            name=f"{tool.name} llm_hints.interaction_executable",
+            default=False,
+        ):
             return "not_interaction_executable", "Capability is not approved for interaction execution"
         if tool.safety_class != "safe_read":
             return "unsafe_local_tool", "Only safe read-only local tools are accepted"
@@ -326,12 +331,6 @@ def _weather_output(
         "summary": format_weather_brief(report, language=language, units=units),
         "source": report.source,
     }
-
-
-def _truthy(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _validate_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> None:

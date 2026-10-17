@@ -13,7 +13,13 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from shared.chromie_contracts.mind import active_customer_mind_profile_path
-from shared.chromie_runtime.env_values import InvalidBooleanSetting, parse_bool
+from shared.chromie_runtime.env_values import (
+    InvalidBooleanSetting,
+    InvalidNumericSetting,
+    parse_bool,
+    parse_float,
+    parse_int,
+)
 
 
 class HostConfigurationError(ValueError):
@@ -44,21 +50,16 @@ def _int(
     minimum: int | None = None,
     maximum: int | None = None,
 ) -> int:
-    raw = values.get(name)
-    if raw is None:
-        value = default
-    else:
-        try:
-            value = int(str(raw).strip())
-        except ValueError as exc:
-            raise HostConfigurationError(
-                f"{name} must be an integer; got {raw!r}"
-            ) from exc
-    if minimum is not None and value < minimum:
-        raise HostConfigurationError(f"{name} must be >= {minimum}; got {value}")
-    if maximum is not None and value > maximum:
-        raise HostConfigurationError(f"{name} must be <= {maximum}; got {value}")
-    return value
+    try:
+        return parse_int(
+            values.get(name),
+            name=name,
+            default=default,
+            minimum=minimum,
+            maximum=maximum,
+        )
+    except InvalidNumericSetting as exc:
+        raise HostConfigurationError(str(exc)) from exc
 
 
 def _float(
@@ -69,21 +70,16 @@ def _float(
     minimum: float | None = None,
     maximum: float | None = None,
 ) -> float:
-    raw = values.get(name)
-    if raw is None:
-        value = default
-    else:
-        try:
-            value = float(str(raw).strip())
-        except ValueError as exc:
-            raise HostConfigurationError(
-                f"{name} must be a number; got {raw!r}"
-            ) from exc
-    if minimum is not None and value < minimum:
-        raise HostConfigurationError(f"{name} must be >= {minimum}; got {value}")
-    if maximum is not None and value > maximum:
-        raise HostConfigurationError(f"{name} must be <= {maximum}; got {value}")
-    return value
+    try:
+        return parse_float(
+            values.get(name),
+            name=name,
+            default=default,
+            minimum=minimum,
+            maximum=maximum,
+        )
+    except InvalidNumericSetting as exc:
+        raise HostConfigurationError(str(exc)) from exc
 
 
 
