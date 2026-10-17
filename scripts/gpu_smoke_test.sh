@@ -67,7 +67,7 @@ echo "Chromie GPU smoke test"
 echo "======================"
 echo "Dry run:             $DRY_RUN"
 echo "Start services:      $START_SERVICES"
-echo "Ollama generation:   $RUN_OLLAMA_GENERATE"
+echo "LLM generation:      $RUN_OLLAMA_GENERATE"
 echo "TTS synthesis:       $RUN_TTS_SYNTHESIS"
 echo "Timeout:             ${SMOKE_TIMEOUT_SECONDS}s"
 
@@ -192,10 +192,16 @@ check_container_gpu() {
 
 run_step "Verify GPU visibility in ASR container" check_container_gpu chromie-asr || true
 run_step "Verify GPU visibility in TTS container" check_container_gpu chromie-tts || true
-run_step "Verify GPU visibility in Ollama container" check_container_gpu chromie-llm || true
+LLM_PROVIDER="${AGENT_LLM_PROVIDER:-ollama}"
+echo "  llm_provider=$LLM_PROVIDER"
+run_step "Verify GPU visibility in LLM container ($LLM_PROVIDER)" check_container_gpu chromie-llm || true
 
 run_step "Check Agent HTTP health" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" http://127.0.0.1:8092/health || true
-run_step "Check Ollama model registry" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" http://127.0.0.1:11434/api/tags || true
+if [ "$LLM_PROVIDER" = "sglang" ]; then
+  run_step "Check SGLang served model list" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" http://127.0.0.1:30000/v1/models || true
+else
+  run_step "Check Ollama model registry" curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" http://127.0.0.1:11434/api/tags || true
+fi
 
 check_control_plane_http() {
   python3 scripts/control_plane_smoke.py \
@@ -269,12 +275,36 @@ print(json.dumps({
 PY
 }
 
-if [ "$RUN_OLLAMA_GENERATE" = "1" ]; then
+sglang_generate() {
+  python3 - <<'PY' | curl -fsS --max-time "$SMOKE_TIMEOUT_SECONDS" \
+    http://127.0.0.1:30000/v1/chat/completions \
+    -H 'Content-Type: application/json' \
+    --data-binary @- \
+    | python3 -c 'import json, sys; data=json.load(sys.stdin); response=str(((data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip(); assert response, data; print(response)'
+import json
+import os
+
+print(json.dumps({
+    "model": os.environ["AGENT_MODEL"],
+    "messages": [{"role": "user", "content": "Reply with exactly one word: ready"}],
+    "max_tokens": 8,
+    "temperature": 0.0,
+    "chat_template_kwargs": {"enable_thinking": False},
+}))
+PY
+}
+
+if [ "$RUN_OLLAMA_GENERATE" != "1" ]; then
+  skip "LLM generation disabled"
+elif [ "$LLM_PROVIDER" = "sglang" ]; then
+  run_step "Run one SGLang generation with the selected Agent model" sglang_generate || true
+  # SGLang serves only on CUDA, so a successful generation is the placement proof;
+  # there is no separate CPU-fallback state to inspect as with `ollama ps`.
+  skip "SGLang model GPU placement has no separate check (CUDA-only server)"
+else
   run_step "Run one Ollama generation with the selected Agent model" ollama_generate || true
   run_step "Confirm Ollama loaded the Agent model on GPU" \
     bash -c 'docker exec chromie-llm ollama ps | tee /dev/stderr | grep -qi gpu' || true
-else
-  skip "Ollama generation disabled"
 fi
 
 tts_synthesize() {

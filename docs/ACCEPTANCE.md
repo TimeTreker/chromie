@@ -824,10 +824,11 @@ identity or recovery timeout stops admission and retains the remaining cases as
 blocked. Unbound runs retain their existing case preflight but cannot establish
 this service-continuity evidence.
 
-Warm interaction cases retain two non-overlapping intervals: the accepted SC
-stage start to its complete decision (`max_warm_sc_decision_ms`), then that
-commitment to actual playback start (`max_warm_sc_to_playback_start_ms`). UMI
-remains a separately measured upstream interval. Silence is not a meaningful
+Warm interaction cases retain two non-overlapping intervals: the validated UMI
+handoff to the accepted SC commitment (`max_warm_sc_decision_ms`, gated on
+`umi_handoff_to_sc_commitment_ms`, so Host and queue wait count), then that
+commitment to actual playback start (`max_warm_sc_to_playback_start_ms`). SC
+stage duration (`sc_decision_ms`) and UMI duration remain separately recorded. Silence is not a meaningful
 spoken response and cannot satisfy a speaking-latency target. Do not subtract
 duration sums from absolute timestamps. Headless discard playback proves its
 transport only; audible-speaker claims require supervised speaker-enabled runs.
@@ -986,7 +987,8 @@ and [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md).
 ./scripts/start_services.sh
 ./scripts/compose.sh ps
 curl -fsS http://127.0.0.1:8092/health
-curl -fsS http://127.0.0.1:11434/api/tags
+curl -fsS http://127.0.0.1:30000/v1/models   # SGLang (both maintained profiles)
+# curl -fsS http://127.0.0.1:11434/api/tags  # Ollama (AGENT_LLM_PROVIDER=ollama)
 ./scripts/verify_tts_gpu.sh
 ```
 
@@ -997,7 +999,9 @@ START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
 ```
 
 This checks host/container GPU visibility, Compose health, Cognitive-Core-to-Agent
-round trip, ASR/TTS WebSockets, Ollama generation, model GPU placement, and
+round trip, ASR/TTS WebSockets, one generation from the configured
+`AGENT_LLM_PROVIDER` (SGLang `:30000` or Ollama `:11434`), Ollama model GPU
+placement (SGLang is CUDA-only and has no separate placement check), and
 optional non-empty TTS PCM generation. It does not evaluate microphone or
 speaker quality.
 
@@ -1114,7 +1118,6 @@ manifest loaded and run:
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --no-speaker
@@ -1127,7 +1130,6 @@ speech, and skills from the text exactly as it would after ASR. Add
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --expect-capability soridormi.walk_velocity \
@@ -1145,8 +1147,8 @@ left/right directly instead of expecting the provider's internal `yaw_radps` or
 fixing a speed the person did not request. Provider realization traces remain
 separate evidence; normalized observations do not invent measured heading changes.
 
-This runner defaults to the maintained goal-driven path; use
-`--no-cognitive-runtime` only for an explicitly labelled diagnostic fail-closed run. It
+This runner always uses the maintained goal-driven path; it has no option to
+select another path. It
 writes `cognitive_runtime_resolution.json`, `interaction_response.json`,
 `execution.json`, status snapshots, session events, recordings when enabled,
 and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. The summary
@@ -1289,7 +1291,6 @@ known ASR-style walk typo regression, run:
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "Wal forward for 15 seconds, quickly." \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --preview-only \

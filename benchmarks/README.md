@@ -663,10 +663,11 @@ Validate the profile manifest with:
 python -m benchmarks.e2e.validate --check
 ```
 
-Run a cohort through a maintained first-party adapter boundary with:
+Run a cohort through the first-party adapter boundary with an operator-supplied
+harness (no harness module ships in this repository):
 
 ```bash
-export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
+export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=<module>:<function>  # operator-supplied harness; or set CHROMIE_BENCHMARK_LIVE_SERVICE_URL
 python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_service_text \

@@ -112,9 +112,10 @@ def test_verdict_permits_questions_or_withholds_only_reviewed_effects(result, ex
 
 def test_owner_review_list_covers_objects_walking_and_people_not_gestures():
     ids = load_value_review_capability_ids(ROOT / VALUE_REVIEW_RELATIVE_PATH)
-    assert {"soridormi.acquire_and_deliver_resource", "soridormi.walk_forward", "soridormi.look_at_person",
-            "soridormi.hug_gesture"} <= ids
-    assert not ids & {"soridormi.nod_yes", "soridormi.wave_hand", "soridormi.blink_eyes", "chromie.weather.lookup"}
+    assert {"soridormi.acquire_and_deliver_resource", "soridormi.walk_forward", "soridormi.hug_gesture"} <= ids
+    # Gaze is an expressive gesture, which the Charter keeps off the review list.
+    assert not ids & {"soridormi.nod_yes", "soridormi.wave_hand", "soridormi.blink_eyes", "soridormi.look_at_person",
+                      "chromie.weather.lookup"}
 
 
 def test_withheld_effect_is_refused_before_any_provider_starts():

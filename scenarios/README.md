@@ -33,7 +33,7 @@ weather and similar lookups) declares `require_evidence_bound_claims`. Then ever
 failure update; otherwise the turn records `provenance:unsupported_evidence_claim`, a
 hard integrity failure. Receipts and questions make no result claim. Do not declare it
 on turns that also carry an ordinary social obligation; context-grounded answers stay legal there.
-Latency bounds use `max_warm_sc_decision_ms` and
+Latency bounds use `max_warm_sc_decision_ms` (UMI handoff to SC commitment) and
 `max_warm_sc_to_playback_start_ms`; SC computation and delivery remain separate.
 
 Create and validate scenarios with:
