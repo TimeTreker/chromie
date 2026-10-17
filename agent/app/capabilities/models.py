@@ -7,6 +7,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from shared.chromie_contracts.interaction import find_raw_controller_array_schema
+from shared.chromie_contracts.text import require_identifier
 
 SafetyClass = Literal[
     "safe_read",
@@ -108,13 +109,7 @@ class ToolCapability(BaseModel):
     default_failure_policy: FailurePolicy = Field(default_factory=FailurePolicy)
     llm_hints: dict[str, Any] = Field(default_factory=dict)
 
-    @field_validator("name", "agent_id")
-    @classmethod
-    def normalize_identifier(cls, value: str) -> str:
-        value = (value or "").strip()
-        if not value:
-            raise ValueError("identifier must not be empty")
-        return value
+    normalize_identifier = field_validator("name", "agent_id")(require_identifier)
 
     @model_validator(mode="after")
     def enforce_model_visibility_policy(self) -> "ToolCapability":

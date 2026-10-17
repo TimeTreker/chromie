@@ -44,3 +44,29 @@ def normalize_unique_text_list(value: Any) -> list[str]:
             seen.add(text)
             out.append(text)
     return out
+
+
+def compact_text(value: str, *, limit: int) -> str:
+    """Collapse whitespace and cut to ``limit`` characters, marking a cut with ``...``."""
+
+    text = " ".join((value or "").strip().split())
+    if len(text) > limit:
+        return text[:limit].rstrip() + "..."
+    return text
+
+
+def require_identifier(value: str) -> str:
+    """Strip an identifier field and reject a blank one."""
+
+    value = (value or "").strip()
+    if not value:
+        raise ValueError("identifier must not be empty")
+    return value
+
+
+def split_comma_separated(raw: str | None) -> list[str]:
+    """Split a comma-separated setting into its nonblank, stripped items."""
+
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]

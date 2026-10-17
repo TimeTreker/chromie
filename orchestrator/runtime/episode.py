@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
@@ -9,13 +8,17 @@ from uuid import uuid4
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    UserMeaningUncertainty,
+)
 from shared.chromie_contracts.interaction import CapabilityIdentityModel, InteractionResponse
 from shared.chromie_contracts.mind import MindProfile
+from shared.chromie_contracts.text import compact_text
 from shared.chromie_runtime.runtime_events import persist_runtime_event
 
 from .capability_runtime import CapabilityRuntimeResult
-
+from .journal_io import append_jsonl, float_or_none
 
 logger = logging.getLogger("chromie.orchestrator.episode")
 
@@ -23,12 +26,6 @@ logger = logging.getLogger("chromie.orchestrator.episode")
 def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
-
-def _compact_text(value: str, *, limit: int = 800) -> str:
-    text = " ".join((value or "").strip().split())
-    if len(text) > limit:
-        return text[:limit].rstrip() + "..."
-    return text
 
 if TYPE_CHECKING:
     from .host_settings import EpisodeSettings
@@ -63,7 +60,7 @@ class EpisodeAgentRecord(BaseModel):
     @field_validator("speech")
     @classmethod
     def compact_speech(cls, value: list[str]) -> list[str]:
-        return [_compact_text(item, limit=500) for item in value if item.strip()]
+        return [compact_text(item, limit=500) for item in value if item.strip()]
 
 
 class EpisodeCapabilityResultRecord(CapabilityIdentityModel):
@@ -79,7 +76,7 @@ class EpisodeCapabilityResultRecord(CapabilityIdentityModel):
     @field_validator("message")
     @classmethod
     def compact_message(cls, value: str) -> str:
-        return _compact_text(value, limit=500)
+        return compact_text(value, limit=500)
 
 
 class EpisodeExecutionRecord(BaseModel):
@@ -105,7 +102,7 @@ class EpisodeTurnRecord(BaseModel):
     @field_validator("user_text")
     @classmethod
     def compact_user_text(cls, value: str) -> str:
-        return _compact_text(value, limit=500)
+        return compact_text(value, limit=500)
 
 
 class EpisodeRecord(BaseModel):
@@ -145,7 +142,7 @@ class EpisodeEvaluation(BaseModel):
     @field_validator("summary")
     @classmethod
     def compact_summary(cls, value: str) -> str:
-        return _compact_text(value, limit=1000)
+        return compact_text(value, limit=1000)
 
 
 class EpisodeOfflineReview(BaseModel):
@@ -176,12 +173,12 @@ class EpisodeOfflineReview(BaseModel):
     @field_validator("summary", "root_cause")
     @classmethod
     def compact_review_text(cls, value: str) -> str:
-        return _compact_text(value, limit=1000)
+        return compact_text(value, limit=1000)
 
     @field_validator("strengths", "failure_tags", "learning_actions", "compact_memory_notes")
     @classmethod
     def compact_review_lists(cls, value: list[str]) -> list[str]:
-        return [_compact_text(item, limit=300) for item in value if item.strip()]
+        return [compact_text(item, limit=300) for item in value if item.strip()]
 
     @field_validator("auto_apply")
     @classmethod
@@ -305,7 +302,7 @@ class EpisodeRecorder:
             },
         )
         self._episodes[conversation_id] = episode
-        self._append_jsonl(self.log_path, episode.model_dump(mode="json"))
+        append_jsonl(self.log_path, episode.model_dump(mode="json"))
         self._emit_episode_event(
             episode=episode,
             response=response,
@@ -418,7 +415,7 @@ class EpisodeRecorder:
             turn_index=turn_index,
             user_text=str(context.get("user_text") or ""),
             user_meaning_interpretation=EpisodeUserMeaningInterpretationRecord(
-                confidence=self._float_or_none(
+                confidence=float_or_none(
                     context.get("user_meaning_interpretation_confidence")
                 ),
                 responsibilities=list(
@@ -434,7 +431,7 @@ class EpisodeRecorder:
                     for item in context.get("user_meaning_uncertainties", [])
                     if isinstance(item, dict)
                 ],
-                latency_ms=self._float_or_none(
+                latency_ms=float_or_none(
                     context.get("user_meaning_interpretation_latency_ms")
                 ),
             ),
@@ -453,7 +450,7 @@ class EpisodeRecorder:
                 ],
                 requires_confirmation=response.requires_confirmation,
                 reason=response.reason,
-                latency_ms=self._float_or_none(context.get("agent_latency_ms")),
+                latency_ms=float_or_none(context.get("agent_latency_ms")),
             ),
             execution=EpisodeExecutionRecord(
                 status=execution_status,
@@ -476,17 +473,3 @@ class EpisodeRecorder:
             },
         )
 
-    @staticmethod
-    def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
-
-    @staticmethod
-    def _float_or_none(value: Any) -> float | None:
-        if value is None:
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None

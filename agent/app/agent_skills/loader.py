@@ -48,6 +48,7 @@ from shared.chromie_contracts.agent_skill import (
     AgentSkillRegistrySnapshot,
     AgentSkillSummary,
 )
+from shared.chromie_contracts.text import split_comma_separated
 
 _METADATA_NAME = "skill.yaml"
 _SKILL_DOCUMENT_NAME = "SKILL.md"
@@ -120,12 +121,7 @@ class ConfiguredAgentSkillRegistry:
         )
 
 
-def parse_agent_skill_roots(raw: str | None) -> list[str]:
-    """Parse an explicit comma-separated list of Agent Skill roots."""
-
-    if not raw:
-        return []
-    return [item.strip() for item in raw.split(",") if item.strip()]
+parse_agent_skill_roots = split_comma_separated
 
 
 def _raise(

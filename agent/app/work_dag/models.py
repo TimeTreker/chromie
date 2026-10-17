@@ -5,6 +5,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from shared.chromie_contracts.text import require_identifier
+
 from ..capabilities.models import FailurePolicy
 
 WorkNodeRole = Literal["activity", "monitor", "confirmation", "report", "safety"]
@@ -65,13 +67,7 @@ class WorkNode(BaseModel):
     on_event: dict[str, FailurePolicy] = Field(default_factory=dict)
     condition: str | None = None
 
-    @field_validator("id", "capability_id")
-    @classmethod
-    def normalize_identifier(cls, value: str) -> str:
-        value = (value or "").strip()
-        if not value:
-            raise ValueError("identifier must not be empty")
-        return value
+    normalize_identifier = field_validator("id", "capability_id")(require_identifier)
 
     @field_validator("source_goal_ids", "depends_on", "during", mode="before")
     @classmethod
