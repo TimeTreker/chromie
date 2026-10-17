@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
 
 
@@ -237,7 +239,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(values["TTS_MODEL_SIZE"], "0.6B")
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
-        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "65536")
+        self.assertNotIn("TTS_COSYVOICE_OLLAMA_NUM_CTX", values)
+        self.assertEqual(values["AGENT_COGNITIVE_ACTIVATION_NUM_CTX"], "65536")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertEqual(values["OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT"], "1")
         self.assertEqual(values["OLLAMA_FLASH_ATTENTION"], "1")
@@ -336,9 +339,9 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             self.assertEqual(values[key], served_model, key)
             self.assertNotIn(":", values[key], key)
         self.assertEqual(values["OLLAMA_MODEL"], ollama_fallback_model)
-        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_MODEL"], ollama_fallback_model)
         self.assertEqual(values["TTS_COSYVOICE_COMPACT_COGNITION"], "0")
-        self.assertEqual(values["TTS_COSYVOICE_OLLAMA_NUM_CTX"], "49152")
+        self.assertNotIn("TTS_COSYVOICE_OLLAMA_NUM_CTX", values)
+        self.assertEqual(values["AGENT_COGNITIVE_ACTIVATION_NUM_CTX"], "49152")
         self.assertEqual(values["OLLAMA_MAX_LOADED_MODELS"], "1")
         self.assertEqual(values["OLLAMA_NUM_PARALLEL"], "1")
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", values)
@@ -638,9 +641,11 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_DELIBERATIVE_NUM_CTX: ${AGENT_DELIBERATIVE_NUM_CTX:-8192}",
         ):
             self.assertIn(fragment, agent)
-        tts = compose.split("  chromie-tts:", 1)[1].split("  chromie-llm:", 1)[0]
-        self.assertIn("CHROMIE_BUILD_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?", tts)
-        self.assertIn("TTS_CUDA_ARCH: ${TTS_CUDA_ARCH:?", tts)
+        tts = yaml.safe_load(compose)["services"]["chromie-tts"]
+        self.assertTrue(
+            tts["build"]["args"]["CHROMIE_BUILD_PROFILE"].startswith("${CHROMIE_ACTIVE_PROFILE:?")
+        )
+        self.assertTrue(tts["environment"]["TTS_CUDA_ARCH"].startswith("${TTS_CUDA_ARCH:?"))
         dockerfile = (ROOT / "tts" / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn('org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"', dockerfile)
         self.assertIn('org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}"', dockerfile)

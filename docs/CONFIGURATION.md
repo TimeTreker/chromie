@@ -84,10 +84,10 @@ environment in `build-provenance.json`, so a mutable local alias such as
 
 | Variable | Purpose |
 |---|---|
-| `CHROMIE_IMAGE_TAG` | Single tag value applied by Compose to the four repository-built service images. |
+| `CHROMIE_IMAGE_TAG` | Single tag value applied by Compose to the six repository-built service images: `chromie-asr`, `chromie-tts`, `chromie-tts-oute`, `chromie-tts-qwen3`, `chromie-agent` and, on SGLang profiles, `chromie-sglang`. |
 | `PYTHON_IMAGE` | Versioned Python base image for the Agent build. |
 | `OLLAMA_IMAGE` | Complete Ollama runtime image reference consumed directly by Compose. |
-| `ASR_CUDA_IMAGE`, `TTS_CUDA_IMAGE` | Versioned CUDA base images selected by the active profile/common configuration. |
+| `ASR_CUDA_IMAGE`, `TTS_CANDIDATE_CUDA_IMAGE`, `TTS_CUDA_IMAGE` | Versioned CUDA base images from the common configuration: ASR, the default CosyVoice3 and the Qwen3-TTS candidate images, and the OuteTTS evaluation image. |
 
 Model repository revisions are tracked in
 [`release/model-lock.json`](../release/model-lock.json). Profile-specific ASR
@@ -242,7 +242,7 @@ generated prompts must use a specific speaker.
 |---|---|
 | `ASR_URL` | `ws://127.0.0.1:9001` |
 | `TTS_URL` | `ws://127.0.0.1:5000` (CosyVoice); the launchers select `5001` for `oute` and `5002` for `qwen3`. |
-| `LLM_URL` | `http://127.0.0.1:11434/api/generate`. Ollama-native endpoint used only to generate ready-greeting speech when `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and no `ORCH_RUNTIME_READY_GREETING_TEXT` is configured. SGLang profiles publish no Ollama port, so set a greeting text there. |
+| `LLM_URL` | `http://127.0.0.1:11434/api/generate`. Ollama-native endpoint used only to generate ready-greeting speech when `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and no `ORCH_RUNTIME_READY_GREETING_TEXT` is configured. SGLang profiles publish no Ollama port, so the Host refuses to start with generated greeting speech when `AGENT_LLM_PROVIDER` is not `ollama`; set a greeting text there. |
 | `AGENT_URL` | `http://127.0.0.1:8092` |
 | `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
 | `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
@@ -262,7 +262,7 @@ written to the Agent and Orchestrator runtime overrides.
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED` | `1`; enables the focused pre-Core addressedness classifier. Disabled or unavailable review admits the turn and cannot block direct/unclear speech. |
-| `AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL` | Set explicitly by `.env.common` and every hardware profile (`qwen3:4b` on the Ollama profiles, which differs from the UMI model `qwen3.5:4b`); the code falls back to `AGENT_USER_MEANING_INTERPRETER_MODEL` only when the key is unset; the launcher-effective model identity must be retained with cognitive evidence. |
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL` | Set explicitly by `.env.common` and every hardware profile (`qwen3:4b` on the Ollama profiles; only `.env.common` and the default profile give UMI a different model, `qwen3.5:4b`); the code falls back to `AGENT_USER_MEANING_INTERPRETER_MODEL` only when the key is unset; the launcher-effective model identity must be retained with cognitive evidence. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS` | `2500`; bounded model-call deadline. Timeout and transport failure fail open to Core admission. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_MIN_SUPPRESSION_CONFIDENCE` | `0.72`; applies only to inactive ambient speech acts. It is not a normal-intent or capability threshold. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX` | `2048`; bounded engagement and latest-transcript context. |
@@ -443,7 +443,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_NUM_CTX` | Ollama context window for the bounded selection prompt; default `8192`. No repair prompt is sent. |
 | `AGENT_SKILL_SELECTION_NUM_PREDICT` | Structured output budget for the single selection call; default `512`. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live Provider named capabilities through the trusted manifest transport; default `30`. |
-| `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
+| `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. `.env.common` leaves it empty so Docker Compose supplies the mounted container path `/app/capabilities/prompt_tiers.json`; set it only to another path inside the Agent container. |
 | `capabilities/value_review.json` (file, not an env variable) | Owner-editable list of Capability IDs whose effects need a Value Judgment `proceed` verdict before dispatch (VALUE-JUDGMENT-001). The Orchestrator loads it at startup from the repository root; an invalid file fails startup. It keys on the Capability the Planner chose, never on the person's words. Current list: object fetch/move, walking, and `hug_gesture`; gaze such as `look_at_person` is an expressive gesture and is not reviewed. An empty policy list (test harnesses, replay corpora) means no value gate for Capabilities; speech UMI marks `value_review` is reviewed independently of this list. |
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum model-neutral catalog preview attached at the native interaction boundary; default `8`. It does not rank user language. |
@@ -679,7 +679,8 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `COSYVOICE3_SOURCE_REVISION`, `COSYVOICE3_MODEL_ID`, `COSYVOICE3_MODEL_REVISION` | Immutable default runtime and model locks. |
 | `COSYVOICE3_FP16` | Load the default model in half precision; default `1`. |
 | `COSYVOICE3_PROMPT_PREFIX` | Trusted prompt prefix prepended before the exact reference transcript. |
-| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget; default `1200` for the large offline model load. A CosyVoice worker warms every committed voice inside this budget before it reports ready, so TTS health `provider_health.ready` means warm; the launcher and the Host wait for it and do not warm TTS themselves. |
+| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget for every TTS service (CosyVoice3, Oute and Qwen3-TTS); default `1200` for the large offline model load. A CosyVoice worker warms every committed voice inside this budget before it reports ready, so TTS health `provider_health.ready` means warm; the launcher and the Host wait for it and do not warm TTS themselves. |
+| `TTS_PYTORCH_ALLOC_CONF` | PyTorch allocator setting forwarded as `PYTORCH_ALLOC_CONF` to every TTS service; default `expandable_segments:True`. |
 | `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Bounded drain before fail-closed worker restart after cancellation; default `3` seconds. |
 | `TTS_SPEAKER_ID` | `default` for CosyVoice/Qwen reference cloning. Oute may use installation-local profile IDs. |
 
@@ -891,7 +892,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `chromie-gemma4-12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
 | `AGENT_COGNITIVE_ACTIVATION_ENABLED` | `1` by default. Enables the narrow internal state-transition Activation model used before Goal-bound Planner or Goal-free SC re-entry. Disabling/unavailability fails closed; Runtime does not restore deterministic semantic wake routing. |
 | `AGENT_COGNITIVE_ACTIVATION_MODEL` | Defaults to `AGENT_FAST_PLANNER_MODEL`. It selects only among Host-supplied existing authorities; it owns no Goal, Work, wording, Capability, execution, or completion semantics. |
-| `AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS` / `AGENT_COGNITIVE_ACTIVATION_NUM_CTX` / `AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT` | Timeout defaults to the active `AGENT_FAST_PLANNER_TIMEOUT_MS` budget (`60000` ms if unset); context/output defaults: `8192` / `384`. An explicit activation timeout overrides inheritance. Bounded one-call activation transaction; no repair or Deep pass. Compose forwards all five `AGENT_COGNITIVE_ACTIVATION_*` keys to `chromie-agent`. |
+| `AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS` / `AGENT_COGNITIVE_ACTIVATION_NUM_CTX` / `AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT` | Timeout defaults to the active `AGENT_FAST_PLANNER_TIMEOUT_MS` budget (`60000` ms if unset); context/output defaults: `8192` / `384`; the SGLang profiles set the context to their shared-engine size (`65536` on RTX 5090, `49152` on RTX 4090 Laptop). An explicit activation timeout overrides inheritance. Bounded one-call activation transaction; no repair or Deep pass. Compose forwards all five `AGENT_COGNITIVE_ACTIVATION_*` keys to `chromie-agent`. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Fast Planner after UMI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -1077,7 +1078,9 @@ same `llm/sglang/Dockerfile` into one `chromie-sglang:${CHROMIE_IMAGE_TAG}` imag
 The provider-qualification overlays `docker-compose.sglang-qualification.yml`
 (`SGLANG_*`, `HF_TOKEN`; host port 30000) and `docker-compose.vllm-qualification.yml`
 (`VLLM_*`, `HF_TOKEN`; host port 8001, because 8000 is the paired Soridormi MCP
-default) are standalone and never selected by a hardware profile.
+default) are standalone and never selected by a hardware profile. The SGLang
+qualification overlay shares host port 30000 with the maintained SGLang `chromie-llm`, so
+run it on an Ollama profile or with that service stopped.
 
 The Compose owner pins Google Gemma4-12B-IT revision
 `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, served as `chromie-gemma4-12b`, with online FP8

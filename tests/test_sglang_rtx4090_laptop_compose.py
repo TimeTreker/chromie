@@ -62,7 +62,9 @@ def test_laptop_sglang_profile_uses_colon_free_served_alias() -> None:
     ):
         assert values[key] == values["AGENT_MODEL"]
     assert values["OLLAMA_MODEL"] == "qwen3.5:4b"
-    assert values["TTS_COSYVOICE_OLLAMA_MODEL"] == "qwen3.5:4b"
+    # Compact cognition is off on this profile, so it sets no compact model.
+    assert values["TTS_COSYVOICE_COMPACT_COGNITION"] == "0"
+    assert "TTS_COSYVOICE_OLLAMA_MODEL" not in values
 
 
 def test_laptop_sglang_service_keeps_base_service_identity_and_pinned_model() -> None:

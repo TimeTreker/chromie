@@ -4,4 +4,5 @@ sherpa-onnx==1.13.3 ; platform_machine == "aarch64"
 sherpa-onnx==1.13.3 ; platform_machine == "armv7l"
 websockets==16.0
 numpy==2.3.5
+# No server import: the in-container evaluator scripts/evaluate_asr_accuracy.py reads audio with it.
 soundfile==0.13.1

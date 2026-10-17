@@ -10,6 +10,8 @@ sys.path.insert(0, str(ROOT))
 
 from scripts.release_provenance import (
     collect_provenance,
+    declared_images,
+    effective_ollama_models,
     exact_requirement_errors,
     mutable_image_errors,
     model_lock_errors,
@@ -67,6 +69,47 @@ class ReleaseProvenanceTests(unittest.TestCase):
         self.assertEqual(gemma["source_model_id"], "google/gemma-4-12B-it")
         self.assertEqual(gemma["revision"], "707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7")
         self.assertEqual(gemma["quantization"], "fp8_online")
+
+    def test_declared_images_cover_default_tts_base_and_sglang_runtime(self) -> None:
+        env = source_environment(ROOT)
+        images = declared_images(ROOT, env)
+        self.assertIn(env["TTS_CANDIDATE_CUDA_IMAGE"], images)
+        self.assertIn(env["ASR_CUDA_IMAGE"], images)
+        self.assertNotIn(f"chromie-sglang:{env['CHROMIE_IMAGE_TAG']}", images)
+        sglang = declared_images(ROOT, {**env, "AGENT_LLM_PROVIDER": "sglang"})
+        self.assertIn(f"chromie-sglang:{env['CHROMIE_IMAGE_TAG']}", sglang)
+        self.assertNotIn(env["OLLAMA_IMAGE"], sglang)
+
+    def test_effective_ollama_models_follow_compact_cognition(self) -> None:
+        env = {
+            "AGENT_MODEL": "gemma4:e2b",
+            "OLLAMA_MODEL": "gemma4:e2b",
+            "AGENT_USER_MEANING_INTERPRETER_MODEL": "qwen3.5:4b",
+            "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
+            "AGENT_SKILL_SELECTION_MODEL": "qwen3:4b",
+            "TTS_COSYVOICE_OLLAMA_MODEL": "compact:model",
+        }
+        self.assertEqual(effective_ollama_models(env), ["compact:model", "qwen3:4b"])
+        uncompact = effective_ollama_models({**env, "TTS_COSYVOICE_COMPACT_COGNITION": "0"})
+        self.assertEqual(uncompact, ["gemma4:e2b", "qwen3.5:4b", "qwen3:4b"])
+        self.assertEqual(
+            effective_ollama_models({**env, "CHROMIE_TTS_BACKEND": "oute"}), uncompact
+        )
+
+    def test_ollama_role_models_must_be_locked(self) -> None:
+        def changed_profile(path):
+            values = parse_env(path)
+            if path.name == "default.env":
+                values["AGENT_GOAL_ASSOCIATION_MODEL"] = "unlocked:role"
+            return values
+
+        with mock.patch("scripts.release_provenance.parse_env", side_effect=changed_profile):
+            errors = model_lock_errors(ROOT)
+        self.assertTrue(any("role_models" in error and "unlocked:role" in error for error in errors), errors)
+
+        env = {**source_environment(ROOT), "TTS_COSYVOICE_OLLAMA_MODEL": "unlocked:compact"}
+        errors = model_lock_errors(ROOT, env)
+        self.assertTrue(any("unlocked:compact" in error for error in errors), errors)
 
     def test_maintained_asr_profiles_are_multilingual(self) -> None:
         for profile in sorted((ROOT / "env" / "profiles").glob("*.env")):
