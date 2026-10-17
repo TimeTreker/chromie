@@ -299,7 +299,7 @@ It first assigns one closed cancellation scope:
 | `Stop talking`, `别说了` | `output_only` | The host's shared audible-output resource plus interruptible speech requests in the bound interaction |
 | `Stop moving`, `停止移动` | `embodied_motion` | Current and queued requests explicitly declared to have a physical-motion effect |
 | Bare `Stop`, `Cancel`, `停止` | `current_interaction` | Every unfinished request in the foreground interaction; completed goals and unrelated remembered goals are unchanged |
-| Exact structured target selected by Core | `specific_goal` | Structured skill/effect requests whose committed `source_goal_ids` are wholly contained in the exact target set and whose plan identity matches |
+| Exact structured target identified by Goal Association | `specific_goal` | Structured skill/effect requests whose committed `source_goal_ids` are wholly contained in the exact target set and whose plan identity matches |
 | `Emergency stop`, `急停` | `global_emergency` | Every unfinished request and host interaction workflow plus a dispatch attempt through the dedicated Soridormi E-stop path |
 
 A compound output stop, such as “don't speak, nod twice,” applies cancellation
@@ -354,10 +354,11 @@ Pending confirmation has one approval token for the staged response. Fixed
 reflex behavior remains conservative: `output_only` preserves that token, while
 a motion stop revokes the whole token when any confirmed request is
 motion-bound or cannot be classified safely. Named `specific_goal` cancellation
-can narrow a pending multi-Goal confirmation. It rejects shared-owner steps,
-removes the targeted requests, creates an immutable child plan and fresh request
-identities for the preserved Goals, and replaces the old token only after the
-Conversation State cancellation transaction succeeds.
+of a Goal in a pending multi-Goal confirmation rejects shared-owner steps and
+revokes the whole token only after the Conversation State cancellation
+transaction succeeds. It creates no child plan, fresh request identities, or
+replacement wording for the preserved Goals; the cancellation Evidence re-enters
+the Planner, which decides their remaining Work.
 
 Exact isolation also depends on provider granularity. Current Soridormi motion
 cancellation is global-domain, so a specific physical target widens to

@@ -98,10 +98,10 @@ architecture/terminology freeze; it does not close #24/#32 or authorize a releas
 | Owner | Complete semantic responsibility | Authority it does not acquire |
 |---|---|---|
 | User Meaning Interpretation | Complete current-turn intent in natural language, source provenance, confidence, unresolved meaning, and bounded requests for which existing cognitive authorities should work next | Another role's semantic result, communication wording, Capability choice, Work planning |
-| Goal Association | Association of current Responsibilities with retained canonical Goal history, including supported continuity relationships and source-preserving updates to an existing Goal | Reinterpreting WHAT, model-authoring a new Goal from scratch, communication, Work compatibility |
+| Goal Association | Association of current Responsibilities with retained canonical Goal history, including supported continuity relationships, source-preserving updates to an existing Goal, deciding that a Responsibility starts a new Goal, and identifying which Goal(s) a cancel utterance targets | Reinterpreting or re-authoring WHAT (a new Goal's meaning is UMI's), communication, Work compatibility, deciding what happens to sibling Work |
 | Social Cognition | Whether, when and how to interact with people; exact grounded communication and bounded eligible social-expression Capability proposals | Reinterpreting UMI, changing Goals or Work, planning requested tasks, authorizing effects |
 | Planner | Capability selection, execution-input resolution, complete Work plans, dependencies, reuse/revision and planning limitations | Ordinary reply wording or review of Social Cognition's decision |
-| Host / Runtime / Providers | Admission, privacy, authorization, safety, compute/execution scheduling, exact lifecycle and Evidence; mechanically materializing Goal identity/fields from already accepted UMI WHAT when GA reports no retained association | Reinterpreting WHAT, deciding a Goal relationship, ordinary semantic communication, or action selection |
+| Host / Runtime / Providers | Admission, privacy, authorization, safety, compute/execution scheduling, exact lifecycle and Evidence; recording the new Goal GA decided exists, with identity/fields materialized mechanically from already accepted UMI WHAT; deterministically stopping the Work of the Goals GA identified as cancelled | Reinterpreting WHAT, deciding a Goal relationship or that a new Goal exists, ordinary semantic communication, or action selection |
 
 Social Cognition consumes one bounded, versioned view of existing truth: complete
 accepted UMI meaning and read-only source provenance; Goal/Work state only when it is already
@@ -328,9 +328,9 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   the current interaction may still have a short-lived interaction Goal and may still receive
   Planner HOW cognition when UMI requests it. GA performs bounded historical association only:
   it may associate the current Responsibility with a retained open Goal when accepted meaning
-  supports continuity, or report it unassociated. GA does **not** model-author a new Goal WHAT.
-  Trusted lifecycle code mechanically materializes Goal identity and semantic fields from the
-  accepted UMI Responsibility when no retained association exists, marking turn-scoped Goals as
+  supports continuity, or decide that it starts a new Goal. GA does **not** model-author a new
+  Goal WHAT. Trusted lifecycle code only records the new Goal GA decided exists, mechanically
+  materializing its identity and semantic fields from the accepted UMI Responsibility and marking turn-scoped Goals as
   interaction lifetime and longer obligations as working/persistent according to lifecycle
   policy. Social Cognition may complete conversational Responsibilities immediately and remains
   the sole wording owner. `continuity_scope` never wakes or suppresses Planner by itself. The
@@ -363,7 +363,9 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   such as a forecast read before a conditional action stays one Planner decision.
   Comparing, reusing, cancelling,
   replacing, or supplementing existing Work are Planner operations, not a mandatory
-  reconciliation stage or another semantic owner. Social Cognition owns ordinary
+  reconciliation stage or another semantic owner. A person's cancellation is the exception:
+  Goal Association identifies the target Goal(s), the Runtime stops their Work
+  deterministically, and the Planner then decides what happens to remaining sibling Work. Social Cognition owns ordinary
   communication; Planner supplies planning facts and input/confirmation needs without
   authoring a competing reply. UMI, GA, Social Cognition and Reflection keep their
   distinct semantic responsibilities; depth never
@@ -380,11 +382,14 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   would use a Capability on the
   owner-editable value-review list (`capabilities/value_review.json`: fetching or moving
   objects, walking, approaching or touching people; never greetings, chat, information or
-  expressive gestures), or realizes speech that UMI marked `value_review` (owner choice B,
-  2026-10-12: the request asks Chromie to tell someone something untrue as if true, or to
-  deceive or manipulate a person, including by pretending). UMI's mark is a fact about WHAT
-  is asked, not a verdict; such speech requests the Planner, and Social Cognition may only
-  acknowledge it neutrally until the verdict. Its output states who is affected and the concern before the
+  expressive gestures), or realizes a Responsibility that UMI marked `value_review` (owner
+  choice B, 2026-10-12: the request asks Chromie to tell someone something untrue as if true,
+  or to deceive or manipulate a person, including by pretending; owner decision 2026-10-17:
+  or doing or answering it could hurt, humiliate, frighten or endanger someone, whatever
+  Capability it uses). UMI currently marks only deception requests on speech; widening the
+  mark to other harmful requests is pending a UMI corpus re-freeze. UMI's mark is a fact
+  about WHAT is asked, not a verdict; such a Responsibility requests the Planner, and
+  Social Cognition may only acknowledge it neutrally until the verdict. Its output states who is affected and the concern before the
   decision. Effects of reviewed Capabilities wait for its verdict. On ask they need the
   person's confirmation, and Social Cognition asks the one question that settles the
   concern. On decline, or when the judgment fails or is unavailable, they never start on any
@@ -666,9 +671,9 @@ locations, observations and task outcomes do not enter UMI by default merely bec
 remembered; they remain Planner/world evidence unless a trusted Memory producer explicitly marks
 them meaning-relevant. Current explicit user wording outranks conflicting Memory. GA is the
 historical association authority and may compare the accepted current Responsibility against both
-working Goal memory and abstract long-term Goal memory. If no retained Goal matches, it reports
-the Responsibility unassociated; trusted lifecycle code, not GA's model, materializes any new Goal
-identity from UMI-owned WHAT. Planner receives relevant Responsibilities/Goals, current Work and
+working Goal memory and abstract long-term Goal memory. If no retained Goal matches, GA decides
+that the Responsibility starts a new Goal; trusted lifecycle code only records it, materializing
+its identity from UMI-owned WHAT. Planner receives relevant Responsibilities/Goals, current Work and
 Evidence, Situation/Interaction state, and the broader Planner-scoped Active Memory projection.
 Role projections are views over the same activated entries, not separate stores or owners.
 
@@ -815,8 +820,10 @@ Read the diagram with these boundaries:
   act and its exact semantic or planner-input provenance
   remain in Interaction Context so the next UMI can interpret the reply without
   transferring planning policy back into UMI.
-  Speech Goals may receive an explicit Social Cognition-authored clarification, unavailable,
-  or refusal outcome when their requested content cannot responsibly be supplied.
+  Speech Goals may receive a Planner clarification or unavailable outcome when their
+  requested content cannot be supplied; Social Cognition authors the wording. Whether the
+  content should be supplied at all is Value Judgment's (VALUE-JUDGMENT-001), and Social
+  Cognition communicates its decline.
   An independent completed speech outcome may coexist with such an outcome in a
   canonical mixed Plan without executable steps. Complete coverage means every
   Goal is accounted for, not that every Goal is satisfied. This owner-authorized
@@ -867,8 +874,10 @@ Read the diagram with these boundaries:
 - Goal Association remains the only canonical Responsibility/Goal-state authority.
   GA independently associates, creates, continues, corrects, merges, splits, or
   supersedes canonical Goals from the same UMI result without waiting for or
-  rewriting Planner output. It emits no `requires_replan`, Work-compatibility,
-  Capability, cancellation, or next-action decision. When a Canonical Goal commit
+  rewriting Planner output; the Host records what GA decided. For a cancel utterance GA
+  identifies which Goal(s) it targets; the Runtime then stops that Work deterministically
+  and immediately, and the Planner decides what happens to remaining sibling Work. GA
+  emits no `requires_replan`, Work-compatibility, Capability, or next-action decision. When a Canonical Goal commit
   materially changes the state relevant to retained or provisional Work, Planner may be
   re-entered with the committed Goal and the Trusted Runtime's actual
   queued/running/completed Work, then emits only the necessary HOW delta; Runtime validates and applies that lifecycle delta. This is a structural
@@ -1100,8 +1109,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    operational invariant. Normal conversation, social relevance, relationship-sensitive
    behavior, tool, memory, robot-action, and deep-thought intent must come from bounded model
    understanding and contract validation. When valid meaning cannot be
-   established, the Core returns a typed unavailable, clarification, or refusal
-   outcome; it never invents an ordinary lane.
+   established, the Core returns a typed unavailable or clarification outcome; it
+   never invents an ordinary lane. Refusal is Value Judgment's alone.
 8. **Simulation is the core embodied target.** Logical closure, failure
    handling, execution evidence, and recovery are proven against a qualified
    simulator. If a physical provider is commissioned, it must preserve the same
@@ -1310,11 +1319,13 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    A prohibited, unsafe, harmful, unavailable, or unconfirmed effect closes the
    affected Activity branch; it does not freeze Goal reasoning, safe information
    gathering, Social Attention, clarification, refusal, or safe alternative
-   reasoning. Basic effect and prohibition boundaries must be available to the one
-   Planner pass. Complex conflicts, uncertainty, alternatives, or broader value
-   reasoning are handled by clarification, Runtime confirmation or Social Cognition's
-   response, and none of them can weaken an already applicable safety or authorization
-   boundary.
+   reasoning. Basic effect boundaries must be available to the one Planner pass, which
+   reports a limitation (`unavailable`) and never refuses. Whether Chromie should act at
+   all, including broader value reasoning, is Value Judgment's alone
+   (VALUE-JUDGMENT-001); Soridormi reporting that the body cannot do something safely is
+   a limitation, not a refusal; Social Cognition communicates a decline. Uncertainty and
+   alternatives are handled by clarification or Runtime confirmation, and none of them
+   can weaken an already applicable safety or authorization boundary.
 29. **Social Attention is optional decoration of a semantic primary observable
    Activity, not a Goal, execution lane, or execution modality.** The anchor says
    what Chromie is doing—for example greet someone, tell a joke, walk toward a
@@ -1427,8 +1438,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    User Meaning Interpretation therefore carries its own Responsibility-coverage evidence
    in the primary WHAT result. Goal Association must conserve those accepted
    Responsibilities while owning only canonical Goal identity and continuity. A
-   candidate-aware GA result writes existing-Goal associations and independent new
-   Goals directly as two non-exclusive collections; every accepted Responsibility
+   candidate-aware GA result decides existing-Goal associations and independent new
+   Goals directly as two non-exclusive collections, which the Host records; every accepted Responsibility
    appears exactly once across their union. It has no separate mutually exclusive
    model-authored branch decision that can erase mixed continuity-plus-creation
    meaning. Planner must consume the committed Goals while owning only HOW. Neither

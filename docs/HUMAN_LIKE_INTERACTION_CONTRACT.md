@@ -62,10 +62,10 @@ only candidate.
 `continuity_scope=turn` means interaction lifetime, not "no Goal" and not "no Planner".
 A joke, greeting, direct answer, or ordinary chat can have a short-lived interaction Goal and
 Planner may still reason about HOW/`respond` when UMI requests it; Social Cognition remains the
-exact wording owner. Goal Association does not decide whether such a new Goal exists. GA only
-asks whether the current Responsibility associates with retained Goal history and what supported
-relationship holds. If no retained Goal matches, trusted lifecycle code mechanically materializes
-Goal identity from the UMI Responsibility, using interaction lifetime for turn-scoped meaning and
+exact wording owner. Goal Association decides whether the current Responsibility associates with
+retained Goal history and what supported relationship holds, or that it starts a new Goal. It
+never re-authors WHAT: trusted lifecycle code only records the new Goal, materializing its
+identity from the UMI Responsibility, using interaction lifetime for turn-scoped meaning and
 longer working/persistent lifetime when the Responsibility remains open. An utterance that truly
 continues, refines, corrects, cancels, resumes, or otherwise changes retained meaning is still
 associated by GA to that existing Goal rather than reinterpreted.
@@ -298,7 +298,8 @@ should be resolved. The same immutable UMI result starts Social Cognition, Fast 
 Association independently. SC owns a complete interaction decision; Planner owns
 one complete Work result and emits no presentation prefix. Deep User Meaning Interpretation is reserved for genuine consequential ambiguity
 in the person's intended outcome, scope, or referent; it is not an external-evidence
-lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
+lookup or parameter-completion strategy. GA alone decides the Goal creation or update; the
+Host records it.
 For a conversational Responsibility, UMI describes the communicative obligation or
 proposition and never the sentence Chromie will say; Social Cognition remains the
 only exact-wording owner. Absence of accepted assistant dialogue is represented once by the empty
@@ -1133,11 +1134,14 @@ Better:
 ## Physical action behavior
 
 Chromie proposes physical actions. Soridormi owns execution, realtime safety,
-perception, final refusal, and final modification authority.
+perception, and final modification authority. When the body cannot do something
+safely, Soridormi reports a limitation, not a refusal. Whether Chromie should act at
+all is Value Judgment's alone; the Planner never refuses (it reports `unavailable`),
+and Social Cognition communicates a decline.
 
 For physical commands, Chromie should preserve the semantic intent, produce a
 proposal when the capability exists, and let CapabilityRuntime and Soridormi validate,
-bound, confirm, or refuse. LLM confidence is not execution authorization.
+bound, confirm, or reject it as a limitation. LLM confidence is not execution authorization.
 
 Chromie must not say it has executed, will execute, or is sending a physical
 command unless the corresponding proposal and runtime state support that speech.

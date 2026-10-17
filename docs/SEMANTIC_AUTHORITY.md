@@ -62,9 +62,10 @@ directly: if the Planner path already gives SC that Evidence, that is the one SC
 communication; if Activation or the Planner chooses no further Work, SC still receives the
 Evidence for a Goal whose Responsibility asked for a result (Charter SPEECH-OWNER-001). Result contents cannot bypass those authorities or infer their own Goal. Confirmation/cancellation mechanisms likewise own
 only authorization/control facts and may not turn those facts into ordinary dialogue.
-Named-Goal cancellation records bounded `GoalCancellationEvidence` after deterministic
-dispatch/reconciliation and re-enters the same Planner state path used for trusted runtime
-Evidence. If cancellation invalidates a pending confirmation, Host revokes the stale token
+Goal Association identifies which Goal(s) a cancel utterance targets. Named-Goal
+cancellation then stops that Work deterministically, records bounded `GoalCancellationEvidence`
+after dispatch/reconciliation, and re-enters the same Planner state path used for trusted runtime
+Evidence, so the Planner decides what happens to remaining sibling Work. If cancellation invalidates a pending confirmation, Host revokes the stale token
 as a whole; it never invents a narrowed child Plan, replacement prompt, or sibling
 remainder speech. A later Planner pass may establish an answer Need, author genuinely new Work,
 reuse/cancel/replace current Work, wait, or emit no Activity; it must not repeat the
@@ -108,9 +109,9 @@ widen, narrow, or invent Responsibility meaning. No maintained `RouteDecision` o
 legacy Agent semantic compatibility surface remains on the Core path.
 
 WorkDAG does not add another semantic owner. Goal Association may associate/update retained
-canonical Goal truth but cannot model-author a fresh Goal interpretation or edit graph topology.
-Trusted lifecycle materialization of an unassociated Responsibility copies UMI-owned semantics
-without becoming another semantic owner. Planner alone may retain the current WorkDAG,
+canonical Goal truth or decide that a Responsibility starts a new Goal, but cannot model-author a
+fresh Goal interpretation or edit graph topology. Trusted lifecycle code only records that new
+Goal, copying UMI-owned semantics without becoming another semantic owner. Planner alone may retain the current WorkDAG,
 author its exact next revision, merge coherent planned Work, or create a new WorkDAG.
 DAGEngine advances execution state and reports Evidence only; normal node completion may
 continue mechanically without a Planner turn, while material invalidation re-enters Planner.

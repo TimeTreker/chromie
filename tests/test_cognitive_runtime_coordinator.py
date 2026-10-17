@@ -11,6 +11,8 @@ from types import SimpleNamespace
 from unittest import mock
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from orchestrator.runtime.cognitive_runtime import (
     CanonicalPlanRuntimeAdapter,
     CognitiveEvidenceRecorder,
@@ -2135,8 +2137,22 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "terminal_missing_ability",
         )
 
-    def test_fast_unavailable_and_refused_are_terminal_without_second_fast_call(self):
-        for disposition in ("unavailable", "refused"):
+    def test_fast_planner_advance_never_carries_a_refusal(self):
+        # Refusing is Value Judgment's; the Planner reports a limitation instead.
+        with self.assertRaises(ValidationError):
+            FastPlannerAdvance(
+                turn_id="turn-refused",
+                disposition="refused",
+                coverage="uncertain",
+                covered_responsibility_refs=["r1"],
+                activities=[],
+                confidence=0.95,
+                unresolved=["terminal bounded limitation"],
+                reason_summary="Fast Planner terminal refused decision.",
+            )
+
+    def test_fast_unavailable_is_terminal_without_second_fast_call(self):
+        for disposition in ("unavailable",):
             with self.subTest(disposition=disposition):
                 association = new_goal_association()
                 advance = FastPlannerAdvance(
@@ -2956,7 +2972,12 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         from tests.test_planner_canonical_contract import CanonicalPlanContractTests
         from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
 
-        for disposition in ("clarify", "unavailable", "refused"):
+        _, refused_raw = CanonicalPlanContractTests.speech_outcomes("unavailable", sibling=True)
+        refused_goal = next(iter(refused_raw["goal_outcomes"]))
+        refused_raw["goal_outcomes"][refused_goal]["disposition"] = "refused"
+        with self.assertRaises(ValueError):
+            PlannerModelOutput.model_validate(refused_raw)
+        for disposition in ("clarify", "unavailable"):
             with self.subTest(disposition=disposition):
                 _, raw = CanonicalPlanContractTests.speech_outcomes(disposition, sibling=True)
                 plan = CanonicalPlan.model_validate(materialize_planner_output(

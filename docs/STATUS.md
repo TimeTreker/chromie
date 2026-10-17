@@ -68,6 +68,9 @@ and the [checkpoint](../DEVELOPMENT_CHECKPOINT.md).
    geographic Evidence, and Goal/action/provenance coverage.
 5. Narrow current-revision voice proof and the default
    [target-evidence profile](TARGET_EVIDENCE_CLOSURE.md). Physical evidence stays supervised.
+6. Widen UMI's `value_review` mark from deception requests to other harmful requests
+   outside the Capability review list (owner decision 2026-10-17); pending a UMI corpus
+   re-freeze, since the UMI prompt and schema change every recorded replay request.
 
 ## Evidence interpretation
 

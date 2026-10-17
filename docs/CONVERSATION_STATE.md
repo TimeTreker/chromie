@@ -28,7 +28,8 @@ sessions, for example a command followed by "quickly please", "not that far",
 "did it finish?", and "continue". Goal Association decides whether a new
 input creates a new Goal, continues, modifies or closes an existing Goal, or is
 side conversation; User Meaning Interpretation only states its meaning (WHAT).
-The Host owns the final Goal write and safety state.
+For a cancel GA identifies the target Goal(s). The Host only records what GA
+decided (the final Goal write) and owns safety state.
 
 ## Stored state
 

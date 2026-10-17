@@ -76,7 +76,6 @@ from shared.chromie_contracts.plan import (
     PlannerInformationGap,
     PlannedCommunicativeAct,
     RespondGoalPlanOutcome,
-    RefusedGoalPlanOutcome,
     UnavailableGoalPlanOutcome,
     fast_planner_activity_request_id,
     validate_communicative_activity_identity,
@@ -4043,19 +4042,6 @@ class GoalDrivenRuntimeCoordinator:
                         rationale=(
                             advance.reason_summary
                             or "Fast Planner found no currently available way to satisfy this Goal."
-                        ),
-                    )
-                )
-            elif advance.disposition == "refused":
-                outcomes.append(
-                    RefusedGoalPlanOutcome(
-                        goal_id=goal_id,
-                        disposition="refused",
-                        coverage=advance.coverage,
-                        unresolved=unresolved,
-                        rationale=(
-                            advance.reason_summary
-                            or "Fast Planner refused this Goal without executable Work."
                         ),
                     )
                 )

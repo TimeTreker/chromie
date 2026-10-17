@@ -479,7 +479,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
             }
 
         texts = {"respond": "Hello.", "clarify": "Which sentence do you mean?",
-                 "unavailable": "I do not have the earlier sentence.", "refused": "I cannot supply that threat."}
+                 "unavailable": "I do not have the earlier sentence."}
         fulfilled = disposition == "respond"
         assessment = satisfaction(ids, fulfilled)
         if sibling and not fulfilled:

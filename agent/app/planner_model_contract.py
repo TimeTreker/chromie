@@ -17,6 +17,7 @@ from shared.chromie_contracts.plan import (
     PlannedGoalTimeCondition,
     SocialCommunicationNeed,
     communication_need_id,
+    reject_planner_refusal,
     PlanStepPurpose,
     PlanTiming,
     validate_acquisition_stage_isolation,
@@ -24,9 +25,10 @@ from shared.chromie_contracts.plan import (
 )
 
 PlannerTier = Literal["fast"]
-# Refusing is Value Judgment's decision; a Planner re-entry never refuses, and the
-# canonical validators reject a refused Planner disposition (live 2026-10-15: a
-# provider timeout re-entered as `refused` and the whole re-entry was discarded).
+# Refusing is Value Judgment's decision; the Planner never refuses on any pass, and
+# its model DTOs reject a refused disposition (live 2026-10-15: a provider timeout
+# re-entered as `refused` and the whole re-entry was discarded). A Planner that
+# cannot fulfil a Goal reports `unavailable` (a limitation) or `clarify`.
 PlannerReentryAction = Literal["respond", "execute", "clarify", "unavailable"]
 PlannerPlanRelation = Literal["exact", "safe_adjustment", "alternative"]
 
@@ -216,6 +218,11 @@ class PlannerModelGoalOutcome(BaseModel):
     precedes_step_ids: list[str] = Field(default_factory=list, max_length=64, description="This communication must finish BEFORE each listed Work step starts.")
     follows_step_ids: list[str] = Field(default_factory=list, max_length=64, description="This communication waits until AFTER each listed Work step finishes.")
 
+    @field_validator("disposition")
+    @classmethod
+    def reject_goal_refusal(cls, value: Any) -> Any:
+        return reject_planner_refusal(value)
+
     @model_validator(mode="after")
     def validate_outcome_shape(self) -> "PlannerModelGoalOutcome":
         if self.disposition == "execute" and (self.precedes_step_ids or self.follows_step_ids):
@@ -241,7 +248,7 @@ class PlannerModelGoalOutcome(BaseModel):
                 raise ValueError("clarify goal outcome requires an unresolved input need")
         elif self.step_ids:
             raise ValueError(
-                "unavailable and refused goal outcomes must not reference steps"
+                "unavailable goal outcomes must not reference steps"
             )
         return self
 
@@ -291,6 +298,11 @@ class PlannerModelOutput(BaseModel):
     plan_relation: PlannerPlanRelation = "exact"
     user_confirmation_required: bool = False
 
+    @field_validator("disposition")
+    @classmethod
+    def reject_plan_refusal(cls, value: Any) -> Any:
+        return reject_planner_refusal(value)
+
     @model_validator(mode="after")
     def validate_semantic_shape(self) -> "PlannerModelOutput":
         response_transport_steps = [
@@ -316,8 +328,8 @@ class PlannerModelOutput(BaseModel):
                 dispositions = {item.disposition for item in self.goal_outcomes.values()}
                 if not (
                     "respond" in dispositions
-                    and dispositions.intersection({"clarify", "unavailable", "refused"})
-                    and dispositions <= {"respond", "clarify", "unavailable", "refused"}
+                    and dispositions.intersection({"clarify", "unavailable"})
+                    and dispositions <= {"respond", "clarify", "unavailable"}
                 ):
                     raise ValueError("mixed output without steps requires response and limitation outcomes")
                 if self.user_confirmation_required or self.plan_relation != "exact":
@@ -771,7 +783,7 @@ def materialize_planner_output(
     current_step_ids = {step.step_id for step in model_output.steps}
     proved_steps = completed_step_evidence or {}
     for goal_id, outcome in model_output.goal_outcomes.items():
-        kind = {"respond": "answer", "clarify": "input", "unavailable": "result", "refused": "result"}.get(outcome.disposition)
+        kind = {"respond": "answer", "clarify": "input", "unavailable": "result"}.get(outcome.disposition)
         if kind is not None:
             facts = outcome.model_dump(mode="json", exclude_none=True)
             completed = {key: proved_steps[key] for key in outcome.follows_step_ids

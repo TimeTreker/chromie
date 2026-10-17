@@ -1502,22 +1502,24 @@ while a motion stop revokes the whole token when any confirmed request is
 motion-bound or cannot be classified safely. That synchronous revocation is
 committed with the broad runtime receipt in the same Conversation State
 transaction, so Goal state and confirmation records cannot independently claim
-different outcomes. Named `specific_goal` cancellation uses a narrower
-contract. The host removes only requests wholly owned by the
-target Goals, creates an immutable `confirmation_remainder` child plan for the
-unaffected Goals, gives its requests fresh identities, and installs a fresh
-single-use token only after the cancellation evidence and Goal-state transition
-commit. A request or plan step shared by targeted and preserved Goals is not
+different outcomes. Named `specific_goal` cancellation of a Goal in a pending
+multi-Goal confirmation revokes that token as a whole after the cancellation
+evidence and Goal-state transition commit. The host creates no narrowed child
+plan, replacement confirmation wording, or "continue the rest" sentence; the
+cancellation Evidence re-enters the Planner, which decides what still-open
+sibling Work should happen next and stages a fresh confirmation if that Work
+needs one. A request or plan step shared by targeted and preserved Goals is not
 separable and fails closed.
 
-For non-urgent named cancellation, the Core resolves semantic Goal IDs only.
+For non-urgent named cancellation, Goal Association identifies the target Goal
+IDs; the Core resolves semantic Goal IDs only.
 The trusted host maps those IDs to the exact active interaction, committed plan
 ID and fingerprint, then dispatches `specific_goal` to Trusted Capability Runtime. Goal state
 is mutated only after the host validates one exact receipt for every
 execution-bound target, including selected requests and any stale, shared-owner,
 non-interruptible, provider-failure, dispatch-failure, or provider-widening
 evidence. The validated target cancellation, coaffected Goal transitions, and
-confirmation-token replacement are committed through one Conversation State
+confirmation-token revocation are committed through one Conversation State
 transaction plus a compare-and-swap of the prepared token without an intervening
 await. State-only Goals may close without runtime dispatch. If runtime/provider
 cancellation was attempted but receipt reconciliation or durable Goal-state
@@ -1623,8 +1625,8 @@ The contract-first loop baseline is implemented:
 7. ordinary overlapping turns retain independent lifecycle identity, while
    explicitly cancelled, superseded, stale-output, or recovery-waiting turns
    retain their evidence and suppress only invalid late final speech;
-8. recoverable embodied failures use a separately fingerprinted,
-   confirmation-bound child plan.
+8. recoverable embodied failures and partially cancelled confirmations re-enter
+   the Planner from Evidence; the Host creates no child plan.
 
 The five Gateway responsibilities remain logically distinct even when co-deployed.
 The Core uses typed User Meaning Interpretation and `CognitiveWorkRequest` contracts; no
