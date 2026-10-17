@@ -190,7 +190,10 @@ evaluation evidence: they cannot replace candidate results, mutate Runtime state
 or feed a repair back into the current online decision.
 
 `GET /semantic-authority` exposes the maintained machine-readable authority
-matrix from the Agent service.
+matrix from the Agent service (`semantic_authority_route_matrix()`). It covers the
+three cognitive Runtime routes in the table above (`apply`, `report_only` and
+Goal-free Situation); the Gateway reflex and Agent-endpoint rows are pre-semantic or
+module-local and are documented here only.
 
 ## Retired semantic fallbacks
 
