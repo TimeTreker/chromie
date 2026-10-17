@@ -2972,22 +2972,22 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
     def test_mixed_speech_limitations_deliver_without_capability_work(self):
-        from tests.test_planner_canonical_contract import CanonicalPlanContractTests
+        from tests.planner_test_support import speech_outcomes
         from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
 
-        _, refused_raw = CanonicalPlanContractTests.speech_outcomes("unavailable", sibling=True)
+        _, refused_raw = speech_outcomes("unavailable", sibling=True)
         refused_goal = next(iter(refused_raw["goal_outcomes"]))
         refused_raw["goal_outcomes"][refused_goal]["disposition"] = "refused"
         with self.assertRaises(ValueError):
             PlannerModelOutput.model_validate(refused_raw)
         for disposition in ("clarify", "unavailable"):
             with self.subTest(disposition=disposition):
-                _, raw = CanonicalPlanContractTests.speech_outcomes(disposition, sibling=True)
+                _, raw = speech_outcomes(disposition, sibling=True)
                 plan = CanonicalPlan.model_validate(materialize_planner_output(
                     PlannerModelOutput.model_validate(raw), planner_tier="fast",
                     plan_id="mixed-speech", expected_goal_ids_for_turn=list(raw["goal_outcomes"]),
                 ))
-                work_request, _ = CanonicalPlanContractTests.speech_outcomes(disposition, sibling=True)
+                work_request, _ = speech_outcomes(disposition, sibling=True)
                 client = ScriptedClient(association=new_goal_association(), fast_plans=[])
                 coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
                     adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()), policy=CognitiveRuntimePolicy(mode="apply"))

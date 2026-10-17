@@ -40,19 +40,23 @@ from shared.chromie_contracts.plan import (
 )
 from shared.chromie_contracts.tool_result import canonical_value_sha256
 from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
-from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text, declared_activity_count
+from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_activity_count
 from tests.planner_test_support import (
     FakeCatalog,
     FakeOllama,
+    FullCatalog,
+    GranularResourceFakeCatalog,
+    ScriptedOllama,
     PlannerResolver,
     WeatherCatalog,
-    _streaming_document,
     _work_request,
     exact_satisfaction,
     execute_outcome,
     execute_step,
+    canonical_compound_body_case,
     multi_goal_plan,
     request,
+    speech_outcomes,
 )
 
 
@@ -79,34 +83,6 @@ def _stream_member_schemas(prompt):
         json.loads(rendered[presentation_start:presentation_end]),
         json.loads(rendered[terminal_start:terminal_end]),
     )
-
-
-class ScriptedOllama:
-    def __init__(self, responses):
-        self.responses = list(responses)
-        self.prompts = []
-
-    async def generate(self, prompt, **kwargs):
-        self.prompts.append((prompt, kwargs))
-        if not self.responses:
-            raise AssertionError("unexpected extra model call")
-        value = self.responses.pop(0)
-        if isinstance(value, Exception):
-            raise value
-        return declared_ability_needs(value, kwargs.get("response_format"))
-
-    async def generate_stream(self, prompt, **kwargs):
-        self.prompts.append((prompt, kwargs))
-        if not self.responses:
-            raise AssertionError("unexpected extra model call")
-        value = self.responses.pop(0)
-        if isinstance(value, Exception):
-            raise value
-        yield declared_ability_needs_text(_streaming_document(value), kwargs.get("response_format"))
-
-    @staticmethod
-    def _parse_json(text):
-        return json.loads(text)
 
 
 def _truth_certificate(
@@ -141,59 +117,6 @@ class MissingParallelMetadataCatalog(FakeCatalog):
             else item
             for item in self.items
         ]
-
-
-class GranularResourceCatalog(FakeCatalog):
-    def __init__(self):
-        super().__init__()
-        self.items.extend(
-            [
-                CatalogCapability(
-                    capability_id="soridormi.acquire_resource",
-                    agent_id="capability_agent",
-                    description="Acquire a physical resource.",
-                    input_schema={"type": "object", "properties": {}},
-                    available=True,
-                    interaction_executable=True,
-                    prompt_tier="common",
-                    hints={
-                        "semantic_scope": {
-                            "responsibility_type": "acquire_and_deliver_resource",
-                            "resource_kinds": ["physical_object"],
-                        },
-                        "resource_contract": {
-                            "plan_requires": [],
-                            "plan_provides": ["resource_acquired"],
-                            "completion_requires": ["resource_acquired"],
-                        },
-                    },
-                ),
-                CatalogCapability(
-                    capability_id="soridormi.deliver_resource",
-                    agent_id="capability_agent",
-                    description="Deliver an acquired physical resource.",
-                    input_schema={"type": "object", "properties": {}},
-                    available=True,
-                    interaction_executable=True,
-                    prompt_tier="common",
-                    hints={
-                        "semantic_scope": {
-                            "responsibility_type": "acquire_and_deliver_resource",
-                            "resource_kinds": ["physical_object"],
-                            "delivery_modes": ["physical_handover"],
-                        },
-                        "resource_contract": {
-                            "plan_requires": ["resource_acquired"],
-                            "plan_provides": ["resource_delivered"],
-                            "completion_requires": ["resource_delivered"],
-                        },
-                    },
-                ),
-            ]
-        )
-
-    async def prompt_entries(self, **kwargs):
-        return self.items
 
 
 class CompleteResourceCatalog(FakeCatalog):
@@ -965,8 +888,7 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
             )
 
     def test_simple_chat_can_be_complete_response(self):
-        from tests.test_planner_canonical_contract import CanonicalPlanContractTests, FullCatalog
-        run_request, raw = CanonicalPlanContractTests.speech_outcomes("respond")
+        run_request, raw = speech_outcomes("respond")
         plan = asyncio.run(PlannerResolver(FakeOllama(raw), FullCatalog()).resolve(run_request))
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual(plan.response_text, "")
@@ -1314,11 +1236,10 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
 
 class PlannerResolverTests(unittest.TestCase):
     def test_native_speech_schema_enforces_existing_cross_field_contract(self):
-        from tests.test_planner_canonical_contract import CanonicalPlanContractTests, FullCatalog
 
         for multiple in (False, True):
             with self.subTest(multiple=multiple):
-                run_request, raw = CanonicalPlanContractTests.speech_outcomes("clarify", multiple)
+                run_request, raw = speech_outcomes("clarify", multiple)
                 model = FakeOllama(raw)
                 asyncio.run(PlannerResolver(model, FullCatalog()).resolve(run_request))
                 schema = model.prompts[0][1]["response_format"]
@@ -1339,12 +1260,11 @@ class PlannerResolverTests(unittest.TestCase):
                             self.assertFalse(validator.is_valid(invalid))
 
     def test_retired_escalation_reason_is_rejected(self):
-        from tests.test_planner_canonical_contract import CanonicalPlanContractTests, FullCatalog
 
         for multiple in (False, True):
             for reason in ("", "Missing referenced content.", " "):
                 with self.subTest(multiple=multiple, reason=reason):
-                    run_request, raw = CanonicalPlanContractTests.speech_outcomes("clarify", multiple)
+                    run_request, raw = speech_outcomes("clarify", multiple)
                     raw["escalation_reason"] = reason
                     model = FakeOllama(raw)
                     plan = asyncio.run(PlannerResolver(model, FullCatalog()).resolve(run_request))
@@ -1355,12 +1275,11 @@ class PlannerResolverTests(unittest.TestCase):
                     self.assertEqual(plan.steps, [])
 
     def test_canonical_prompt_preserves_requested_language_for_each_goal_count(self):
-        from tests.test_planner_canonical_contract import CanonicalPlanContractTests, FullCatalog
 
         for language in ("en", "zh-CN", "es"):
             for multiple in (False, True):
                 with self.subTest(language=language, multiple=multiple):
-                    run_request, raw = CanonicalPlanContractTests.speech_outcomes("clarify", multiple)
+                    run_request, raw = speech_outcomes("clarify", multiple)
                     run_request = run_request.model_copy(update={"language": language})
                     model = FakeOllama(raw)
                     asyncio.run(PlannerResolver(model, FullCatalog()).resolve(run_request))
@@ -1369,14 +1288,13 @@ class PlannerResolverTests(unittest.TestCase):
                     self.assertEqual(len(model.prompts), 1)
 
     def test_independent_response_survives_speech_clarification_without_work(self):
-        from tests.test_planner_canonical_contract import CanonicalPlanContractTests, FullCatalog
 
         for language, question, greeting in (
             ("en", "Which sentence do you mean?", "Goodnight."),
             ("zh-CN", "你说的是哪句话？", "晚安。"),
         ):
             with self.subTest(language=language):
-                run_request, raw = CanonicalPlanContractTests.speech_outcomes("clarify", True)
+                run_request, raw = speech_outcomes("clarify", True)
                 unresolved = "The referenced content is not identified."
                 run_request = run_request.model_copy(update={
                     "language": language, "meaning_uncertainties": [
@@ -3881,7 +3799,7 @@ class PlannerResolverTests(unittest.TestCase):
 
         ollama = FakeOllama(raw)
         plan = asyncio.run(
-            PlannerResolver(ollama, GranularResourceCatalog()).resolve(
+            PlannerResolver(ollama, GranularResourceFakeCatalog()).resolve(
                 run_request.model_copy(update={"context": context})
             )
         )
@@ -6685,9 +6603,8 @@ class CanonicalContinuityDecoderTests(unittest.TestCase):
     time condition; Host rejected every such Plan."""
 
     def _schema(self):
-        from tests.test_planner_canonical_contract import FullCatalog, _canonical_compound_body_case
 
-        run_request, raw = _canonical_compound_body_case()
+        run_request, raw = canonical_compound_body_case()
         model = FakeOllama(raw)
         asyncio.run(PlannerResolver(model, FullCatalog()).resolve(run_request))
         return model.prompts[0][1]["response_format"], raw
