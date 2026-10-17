@@ -1050,7 +1050,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             async def resolve_cognitive_activation(self, session, *, request, timeout_ms):
                 return await allow_activation(session, request=request, timeout_ms=timeout_ms)
             async def resolve_social_cognition(self, session, *, request, **kwargs):
-                return await _social_result(request, replanned)
+                return await _social_result(request, original)
             called = False
 
             async def resolve_fast_plan(self, _session, *, request, timeout_ms):

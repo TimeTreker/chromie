@@ -32,6 +32,7 @@ from orchestrator.runtime.playback_transport import transport_for as playback_tr
 import orchestrator.runtime.playback_transport as playback_transport_module
 from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
+from shared.chromie_contracts.reflex import CancellationDispatchReceipt
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):

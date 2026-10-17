@@ -72,6 +72,8 @@ from .conversation_memory_provider import (
 )
 from .interaction_preflight import annotate_preflight_validation
 
+logger = logging.getLogger(__name__)
+
 SpeechScheduler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
 SpeechCancelScheduler = Callable[
     [CapabilityRequest, dict[str, Any]],

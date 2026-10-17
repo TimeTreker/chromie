@@ -25,6 +25,11 @@ unique, repository-relative, and present. Expanding the ratchet requires the new
 scope to pass before it is committed. Removing a checked path requires a separate
 reviewed architecture decision.
 
+The same runner also checks the whole Python tree for undefined names (`F821`),
+undefined `__all__` exports (`F822`) and redefined unused names (`F811`). These
+rules are listed in `TREE_WIDE_RULES` in `scripts/run_ruff.py` and have no
+scope list, so a new file is checked as soon as it exists.
+
 Ruff formatting is not part of this gate. Suppressions must be narrow and local;
 a blanket ignore list or `noqa` baseline is not an accepted migration strategy.
 

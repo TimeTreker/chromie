@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from .planner_grounding import _goal_binding_map
 from .planner_model_contract import is_planner_step_capability
 
-from shared.chromie_contracts.core_interpretation import PlannerReentryScope
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest, PlannerReentryScope
 from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
 from shared.chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
