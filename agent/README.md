@@ -178,8 +178,8 @@ Important endpoints include:
 - `POST /capabilities/search`
 - User Meaning Interpretation / cognitive-core endpoints
 - `POST /goal-association`
-- `POST /fast-advance`
-- `POST /fast-plan`
+- `POST /plan-advance`
+- `POST /plan`
 - `POST /value-judgment`
 - `POST /social-cognition` (shared interaction planning, including Goal-free Situation)
 - `POST /social-cognition/startup-greeting` (optional SC wake-up line)

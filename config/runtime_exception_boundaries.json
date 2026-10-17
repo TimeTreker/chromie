@@ -115,8 +115,8 @@
       ]
     },
     {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver._resolve",
+      "path": "agent/app/planner.py",
+      "symbol": "PlannerResolver._resolve",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
@@ -130,8 +130,8 @@
       ]
     },
     {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver.resolve",
+      "path": "agent/app/planner.py",
+      "symbol": "PlannerResolver.resolve",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
@@ -143,12 +143,12 @@
       ]
     },
     {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver.stream_advance",
+      "path": "agent/app/planner.py",
+      "symbol": "PlannerResolver.stream_advance",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent.fast_planner",
-      "contract": "Map primary Work and bounded capability lookup failures into a typed failure before any Activity is released. No partial plan or semantic repair is admitted. Required-context overflow makes no model call. SC owns communication. Regression: tests/test_intent_only_handoff.py and tests/test_fast_planner_streaming_commit.py.",
+      "contract": "Map primary Work and bounded capability lookup failures into a typed failure before any Activity is released. No partial plan or semantic repair is admitted. Required-context overflow makes no model call. SC owns communication. Regression: tests/test_intent_only_handoff.py and tests/test_planner_streaming_commit.py.",
       "review_status": "reviewed",
       "body_sha256": "52ec999e9c161732b5c220ab033eff2503719e0ab46d00716898705b00906630",
       "failure_signals": [

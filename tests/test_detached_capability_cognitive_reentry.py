@@ -126,7 +126,7 @@ class _AgentClient:
     def __init__(self) -> None:
         self.requests = []
 
-    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+    async def resolve_plan(self, _session, *, request, timeout_ms):
         del timeout_ms
         self.requests.append(request)
         evidence = request.context["trusted_terminal_evidence"][0]
@@ -311,7 +311,7 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
         adapter=CanonicalPlanRuntimeAdapter(coordinator),
         interaction_ledger=None,
     )
-    assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=1000)
+    assistant.cognitive_runtime_policy = SimpleNamespace(planner_timeout_ms=1000)
     assistant.active_interaction_task = None
     assistant.active_interaction_id = None
     assistant.active_interaction_tasks = {}
@@ -660,7 +660,7 @@ class _FollowUpProvider:
 
 
 class _FollowUpAgentClient(_AgentClient):
-    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+    async def resolve_plan(self, _session, *, request, timeout_ms):
         del timeout_ms
         self.requests.append(request)
         evidence = request.context["trusted_terminal_evidence"][0]
@@ -697,7 +697,7 @@ class _FollowUpAgentClient(_AgentClient):
                     "satisfied_goal_ids": goal_ids,
                 },
             )
-        return await super().resolve_fast_plan(
+        return await super().resolve_plan(
             _session,
             request=request,
             timeout_ms=1000,

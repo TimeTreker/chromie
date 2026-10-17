@@ -105,7 +105,7 @@ GROUPS: dict[str, TestGroup] = {
             _unittest(
                 "tests.test_goal_contracts",
                 "tests.test_goal_association_resolver",
-                "tests.test_fast_planner_resolver",
+                "tests.test_planner_resolver",
                 "tests.test_planner_canonical_contract",
                 "tests.test_goal_satisfaction_planning",
                 "tests.test_planner_communicative_activity",

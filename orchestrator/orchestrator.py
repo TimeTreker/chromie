@@ -252,8 +252,8 @@ class VoiceAssistant:
         self.addressedness_engagement_timeout_s = (
             session_settings.addressedness_engagement_timeout_s
         )
-        self.fast_planner_mode = cognition_settings.fast_planner_mode
-        self.fast_planner_timeout_ms = cognition_settings.fast_planner_timeout_ms
+        self.planner_mode = cognition_settings.planner_mode
+        self.planner_timeout_ms = cognition_settings.planner_timeout_ms
         self.deliberative_timeout_ms = cognition_settings.deliberative_timeout_ms
         self.goal_association_mode = cognition_settings.goal_association_mode
         self.goal_association_timeout_ms = (
@@ -482,7 +482,7 @@ class VoiceAssistant:
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
-            fast_planner_timeout_ms=self.fast_planner_timeout_ms,
+            planner_timeout_ms=self.planner_timeout_ms,
             deliberative_timeout_ms=self.deliberative_timeout_ms,
             value_review_capability_ids=load_value_review_capability_ids(
                 PROJECT_ROOT / VALUE_REVIEW_RELATIVE_PATH
@@ -5931,9 +5931,9 @@ class VoiceAssistant:
         # nothing re-plans its decision. Runtime never selects reasoning depth from
         # event type or a Host-authored readiness mode.
         replanned: CanonicalPlan | None = await resolve_reentry_plan(
-            self.agent_client.resolve_fast_plan(
+            self.agent_client.resolve_plan(
                 session, request=request,
-                timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+                timeout_ms=self.cognitive_runtime_policy.planner_timeout_ms,
             ), fast_workflow_stage, {"planner_pass": "fast"},
         )
 

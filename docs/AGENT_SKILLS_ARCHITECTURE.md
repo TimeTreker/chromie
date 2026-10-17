@@ -335,7 +335,7 @@ This keeps prompts small, makes selection observable, and avoids turning the
 entire Skill library into permanent system-prompt text.
 
 The current implementation completes this flow for one Agent role, the
-Planner (`fast_planner`, wired on `/fast-plan`). Social Cognition, UMI, Goal
+Planner (`fast_planner`, wired on `/plan`). Social Cognition, UMI, Goal
 Association and Value Judgment receive no Agent Skill projection; Social
 Cognition's plan projection drops `selected_agent_skills`. Skill guidance about
 answer wording therefore reaches only the word-free Planner, which can carry it

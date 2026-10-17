@@ -119,7 +119,7 @@ passing.
 
 ### Social Cognition interaction and independent Work — source implemented, qualification open
 
-`/fast-advance` emits one complete Work decision; `/social-cognition` authors
+`/plan-advance` emits one complete Work decision; `/social-cognition` authors
 interaction from the shared UMI result, canonical needs, Work/Evidence state or
 trusted Situation. GA/Work and SC proceed independently until a required
 confirmation or explicit ordering dependency must join.

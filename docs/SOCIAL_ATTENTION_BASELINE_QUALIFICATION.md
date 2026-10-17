@@ -43,7 +43,7 @@ Missing, duplicate, unexpected, or scope-mismatched results fail closed.
 ### Default model topology
 
 Social Attention has no model role of its own: its effective model is the Social
-Cognition model (the profile's `AGENT_FAST_PLANNER_MODEL`, or
+Cognition model (the profile's `AGENT_PLANNER_MODEL`, or
 `AGENT_DELIBERATIVE_MODEL` for deliberative Social Cognition). The maintained
 profiles and their models are defined in [Hardware Profiles](../HARDWARE_PROFILES.md).
 Qualification records launcher-effective component identities; a static

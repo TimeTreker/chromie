@@ -445,87 +445,6 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_FAST_PLANNER_ENABLED",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_FAST_PLANNER_MAX_CAPABILITIES",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_FAST_PLANNER_MODEL",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/profiles/default.env",
-        "env/profiles/jetson_agx_orin.env",
-        "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/jetson_thor.env",
-        "env/profiles/nvidia_ada.env",
-        "env/profiles/nvidia_blackwell.env",
-        "env/profiles/rtx4090.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_FAST_PLANNER_NUM_CTX",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/modes/qualification.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_FAST_PLANNER_NUM_PREDICT",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_FAST_PLANNER_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/modes/qualification.env",
-        "env/modes/services.env",
-        "env/modes/speech.env",
-        "env/modes/voice_mujoco.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "service_internal",
       "key": "AGENT_GOAL_ASSOCIATION_ENABLED",
       "owners": [
         ".env.common",
@@ -695,6 +614,87 @@
       "key": "AGENT_OLLAMA_URL",
       "owners": [
         "agent/app/settings.py"
+      ]
+    },
+    {
+      "boolean": true,
+      "category": "service_internal",
+      "key": "AGENT_PLANNER_ENABLED",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_PLANNER_MAX_CAPABILITIES",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_PLANNER_MODEL",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/profiles/default.env",
+        "env/profiles/jetson_agx_orin.env",
+        "env/profiles/jetson_orin_nano_super.env",
+        "env/profiles/jetson_thor.env",
+        "env/profiles/nvidia_ada.env",
+        "env/profiles/nvidia_blackwell.env",
+        "env/profiles/rtx4090.env",
+        "env/profiles/rtx4090_laptop.env",
+        "env/profiles/rtx5090.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_PLANNER_NUM_CTX",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/modes/qualification.env",
+        "env/profiles/rtx4090_laptop.env",
+        "env/profiles/rtx5090.env",
+        "env/validation/architecture.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_PLANNER_NUM_PREDICT",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/profiles/rtx4090_laptop.env",
+        "env/profiles/rtx5090.env",
+        "env/validation/architecture.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_PLANNER_TIMEOUT_MS",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
+        "env/validation/architecture.env"
       ]
     },
     {
@@ -2518,29 +2518,6 @@
     {
       "boolean": true,
       "category": "profile_constant",
-      "key": "ORCH_FAST_PLANNER_MODE",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "ORCH_FAST_PLANNER_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "env/modes/qualification.env",
-        "env/modes/services.env",
-        "env/modes/speech.env",
-        "env/modes/voice_mujoco.env",
-        "env/validation/architecture.env",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
       "key": "ORCH_GOAL_ASSOCIATION_MODE",
       "owners": [
         ".env.common",
@@ -2740,6 +2717,29 @@
       "owners": [
         "orchestrator/.env.local.example",
         "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": true,
+      "category": "profile_constant",
+      "key": "ORCH_PLANNER_MODE",
+      "owners": [
+        ".env.common",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "ORCH_PLANNER_TIMEOUT_MS",
+      "owners": [
+        ".env.common",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
+        "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },

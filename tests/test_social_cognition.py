@@ -1375,7 +1375,7 @@ async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
                 disposition="silence", activities=[], reason_summary="No useful acknowledgement now.", model_call_count=1)
         async def resolve_goal_association(self, session, **kwargs):
             return body_goal_association()
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             await sc_started.wait()
             advance = FastPlannerAdvance(turn_id=request.sid, disposition="execute", coverage="complete",
                 covered_responsibility_refs=["r1"], confidence=1, activities=[{
@@ -1441,7 +1441,7 @@ async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
                 }])
         async def resolve_goal_association(self, session, **kwargs):
             return new_goal_association()
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             advance = FastPlannerAdvance(turn_id=request.sid, disposition="respond", coverage="complete",
                 covered_responsibility_refs=["r1"], confidence=1, activities=[{
                     "role": "complete_response", "activity_id": "greeting", "rationale": "Ordinary greeting is supported by current context.",
@@ -1957,7 +1957,7 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
                 update={"non_goal_responsibility_refs": ["hello"]},
             )
 
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             await social_started.wait()
             planner_failed.set()
             if failure == "planner_exception":

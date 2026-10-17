@@ -193,7 +193,7 @@ def _stream_advance_from_canonical_plan(
     """Project legacy test fixtures onto the one-call streamed Fast contract.
 
     Runtime tests historically used ``unavailable`` as a sentinel that forced a
-    second ``/fast-plan`` call.  The maintained contract now treats the streamed
+    second ``/plan`` call.  The maintained contract now treats the streamed
     terminal result as authoritative unless canonical state actually changes.
     This helper keeps those fixtures about their intended Planner result instead
     of preserving the retired retry protocol.
@@ -345,7 +345,7 @@ class ScriptedClient:
         )
         self.calls: list[str] = []
 
-    async def stream_fast_advance(self, *args, **kwargs):
+    async def stream_plan_advance(self, *args, **kwargs):
         self.calls.append("stream")
         if not self.fast_advances:
             raise AssertionError("unexpected Fast Planner stream")
@@ -376,7 +376,7 @@ class ScriptedClient:
         self.calls.append("association")
         return self.association
 
-    async def resolve_fast_plan(self, *args, **kwargs):
+    async def resolve_plan(self, *args, **kwargs):
         self.calls.append("fast")
         return self.fast_plans.pop(0)
 

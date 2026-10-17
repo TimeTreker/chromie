@@ -435,7 +435,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for the single primary Agent Skill selection call; default `10000`. No model repair or reselection is performed. Explicit qualification mode raises it to `120000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
-| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for the Planner (`/fast-plan`), the only role with a declared projection; default `1`. |
+| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for the Planner (`/plan`), the only role with a declared projection; default `1`. |
 | `AGENT_SKILL_PROJECTION_MAX_CHARS` | Maximum UTF-8 character count for one disclosed projection; default `3000`. Oversized content is omitted, never truncated. |
 | `AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS` | Maximum aggregate disclosed projection characters for one Agent boundary; default `6000`. |
 | `AGENT_SKILL_PROJECTION_COUNT_LIMIT` | Maximum selected projections disclosed to one Agent boundary; default `4`. |
@@ -888,8 +888,8 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
 | `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `chromie-gemma4-12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
 | `AGENT_COGNITIVE_ACTIVATION_ENABLED` | `1` by default. Enables the narrow internal state-transition Activation model used before Goal-bound Planner or Goal-free SC re-entry. Disabling/unavailability fails closed; Runtime does not restore deterministic semantic wake routing. |
-| `AGENT_COGNITIVE_ACTIVATION_MODEL` | Defaults to `AGENT_FAST_PLANNER_MODEL`. It selects only among Host-supplied existing authorities; it owns no Goal, Work, wording, Capability, execution, or completion semantics. |
-| `AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS` / `AGENT_COGNITIVE_ACTIVATION_NUM_CTX` / `AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT` | Timeout defaults to the active `AGENT_FAST_PLANNER_TIMEOUT_MS` budget (`60000` ms if unset); context/output defaults: `8192` / `384`. An explicit activation timeout overrides inheritance. Bounded one-call activation transaction; no repair or Deep pass. Compose forwards all five `AGENT_COGNITIVE_ACTIVATION_*` keys to `chromie-agent`. |
+| `AGENT_COGNITIVE_ACTIVATION_MODEL` | Defaults to `AGENT_PLANNER_MODEL`. It selects only among Host-supplied existing authorities; it owns no Goal, Work, wording, Capability, execution, or completion semantics. |
+| `AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS` / `AGENT_COGNITIVE_ACTIVATION_NUM_CTX` / `AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT` | Timeout defaults to the active `AGENT_PLANNER_TIMEOUT_MS` budget (`60000` ms if unset); context/output defaults: `8192` / `384`. An explicit activation timeout overrides inheritance. Bounded one-call activation transaction; no repair or Deep pass. Compose forwards all five `AGENT_COGNITIVE_ACTIVATION_*` keys to `chromie-agent`. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Planner after UMI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -919,15 +919,15 @@ mapping, word-form normalization, resource-alignment workflow, coverage certific
 or certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; retained standalone diagnostic observer only. Goal Association is an integrated stage in the maintained Goal-driven Runtime and is never a fallback semantic authority. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around the 60-second Agent Goal Association watchdog. |
-| `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Planner endpoint. |
-| `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. |
-| `AGENT_FAST_PLANNER_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the one structured streaming Planner invocation. The stream carries only a `terminal` or a typed `failure` frame, so timeout ownership is the complete terminal result. |
+| `AGENT_PLANNER_ENABLED` | `1`; exposes the advisory Planner endpoint. |
+| `AGENT_PLANNER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. |
+| `AGENT_PLANNER_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the one structured streaming Planner invocation. The stream carries only a `terminal` or a typed `failure` frame, so timeout ownership is the complete terminal result. |
 There is one Planner (PLANNER-AUTHORITY-001): its depth comes from need-first library search, Evidence re-entry or clarification, never from a second planner pass. Model self-reported confidence is telemetry, never a standalone threshold. The Planner's own commitment bar is 0.75 prospective satisfaction (code constant `MINIMUM_PLAN_SATISFACTION`); a Plan below it becomes an honest limitation.
-| `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |
-| `AGENT_FAST_PLANNER_NUM_PREDICT` | `2048`; flat semantic planner-DTO JSON budget sized from live compound and multi-goal output evidence. |
-| `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
-| `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
-| `ORCH_FAST_PLANNER_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around full Fast planning. |
+| `AGENT_PLANNER_NUM_CTX` | `8192`; bounded Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |
+| `AGENT_PLANNER_NUM_PREDICT` | `2048`; flat semantic planner-DTO JSON budget sized from live compound and multi-goal output evidence. |
+| `AGENT_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
+| `ORCH_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Planning is integrated into the unified runtime. |
+| `ORCH_PLANNER_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around full planning. |
 
 The settings below configure the shared deliberative model used by Social
 Cognition's deep client and Reflection. Deep User Meaning Interpretation does not
@@ -945,7 +945,7 @@ use it: both Fast and Deep UMI use `AGENT_USER_MEANING_INTERPRETER_MODEL`.
 There is no independent response-composition or tool-result-interpretation
 model, endpoint, timeout, or profile role. Social Cognition owns Communicative Activity
 wording. Host-bound terminal Capability Evidence re-enters the Planner through the
-existing bounded `AGENT_FAST_PLANNER_*` budget.
+existing bounded `AGENT_PLANNER_*` budget.
 
 Canonical planning sends an exact flat `PlannerModelOutput`-derived schema to
 Ollama. The model does not author the canonical plan identity, schema version,

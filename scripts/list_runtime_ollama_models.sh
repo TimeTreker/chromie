@@ -42,8 +42,8 @@ fi
 if is_enabled "${AGENT_GOAL_ASSOCIATION_ENABLED:-1}"; then
   append_model "${AGENT_GOAL_ASSOCIATION_MODEL:-}"
 fi
-if is_enabled "${AGENT_FAST_PLANNER_ENABLED:-1}"; then
-  append_model "${AGENT_FAST_PLANNER_MODEL:-}"
+if is_enabled "${AGENT_PLANNER_ENABLED:-1}"; then
+  append_model "${AGENT_PLANNER_MODEL:-}"
 fi
 if is_enabled "${AGENT_DELIBERATIVE_ENABLED:-1}"; then
   append_model "${AGENT_DELIBERATIVE_MODEL:-}"

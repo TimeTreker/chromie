@@ -120,7 +120,7 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
             frame
             async for frame in AgentClient(
                 "http://agent.local"
-            ).stream_fast_advance(
+            ).stream_plan_advance(
                 session,  # type: ignore[arg-type]
                 request=CognitiveWorkRequest(
                     sid="turn-fast",
@@ -143,7 +143,7 @@ class AgentClientTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(frames[0].advance.activities, [])
         self.assertEqual(
             session.posts[0]["url"],
-            "http://agent.local/fast-advance",
+            "http://agent.local/plan-advance",
         )
         self.assertAlmostEqual(session.posts[0]["timeout"].total, 1.9)
 

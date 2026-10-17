@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from agent.app import fast_planner, planner_prompt
+from agent.app import planner, planner_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
 from agent.app.planner_context import planner_goal_context
 from benchmarks.datasets.fast_planner_daily_life.qualification import StaticCatalog
@@ -36,7 +36,7 @@ def test_planner_prompt_module_stays_projection_only() -> None:
 def test_planner_resolver_does_not_reown_prompt_mechanics() -> None:
     for resolver, removed in (
         (
-            fast_planner.FastPlannerResolver,
+            planner.PlannerResolver,
             (
                 "_first_response_truth_system_prompt",
                 "_first_response_truth_prompt",
@@ -215,7 +215,7 @@ def test_whole_request_budget_rejection_prevents_generation_and_partial_commit(t
     with patch("agent.app.clients.ollama_client.httpx.AsyncClient") as http:
         if tier == "stream":
             async def stream():
-                return [frame async for frame in fast_planner.FastPlannerResolver(model, catalog, num_ctx=4096).stream_advance(request)]
+                return [frame async for frame in planner.PlannerResolver(model, catalog, num_ctx=4096).stream_advance(request)]
             frames = asyncio.run(stream())
             assert len(frames) == 1 and isinstance(frames[0], FastPlannerStreamFailure)
             assert frames[0].failure_stage == "before_commit"
@@ -223,7 +223,7 @@ def test_whole_request_budget_rejection_prevents_generation_and_partial_commit(t
             assert frames[0].failure_domain == "llm_budget"
             assert frames[0].retryable is False
         else:
-            resolver = fast_planner.FastPlannerResolver(model, catalog, num_ctx=4096)
+            resolver = planner.PlannerResolver(model, catalog, num_ctx=4096)
             result = asyncio.run(resolver.resolve(request))
             assert result.goal_ids == [f"goal-{index}" for index in range(8)]
             assert result.steps == [] and result.response_text == ""

@@ -52,10 +52,10 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                 "OLLAMA_NUM_CTX": "4096",
                 "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.5",
                 "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "1024",
-                "AGENT_FAST_PLANNER_MODEL": "fast-model",
-                "AGENT_FAST_PLANNER_NUM_CTX": "12288",
-                "AGENT_FAST_PLANNER_NUM_PREDICT": "512",
-                "AGENT_FAST_PLANNER_TIMEOUT_MS": "7000",
+                "AGENT_PLANNER_MODEL": "fast-model",
+                "AGENT_PLANNER_NUM_CTX": "12288",
+                "AGENT_PLANNER_NUM_PREDICT": "512",
+                "AGENT_PLANNER_TIMEOUT_MS": "7000",
             },
         )
 

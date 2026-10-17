@@ -30,7 +30,7 @@ QUALITY_HEALTH_FIELDS = (
     "goal_association_model",
 )
 FAST_HEALTH_FIELDS = (
-    "fast_planner_model",
+    "planner_model",
 )
 
 
@@ -191,12 +191,12 @@ def _configured_fast_model(environ: Mapping[str, str] | None = None) -> str | No
     """Return the fast Planner model the active runtime profile configures.
 
     The live text path loads the generated runtime environment before each turn,
-    so this reads the profile's own ``AGENT_FAST_PLANNER_MODEL`` rather than a
+    so this reads the profile's own ``AGENT_PLANNER_MODEL`` rather than a
     hard-coded model name.
     """
 
     env = os.environ if environ is None else environ
-    value = str(env.get("AGENT_FAST_PLANNER_MODEL") or "").strip()
+    value = str(env.get("AGENT_PLANNER_MODEL") or "").strip()
     return value or None
 
 

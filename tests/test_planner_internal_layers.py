@@ -7,7 +7,7 @@ import json
 from benchmarks.datasets.fast_planner_daily_life import qualification as fast_qualification
 
 from agent.app import (
-    fast_planner,
+    planner,
     planner_context,
     planner_fallback,
     planner_fast_validation,
@@ -172,23 +172,23 @@ def test_planner_fallback_is_mechanical_materialization_only() -> None:
 
 
 def test_planner_and_prompt_depend_on_real_planner_layer_owners() -> None:
-    assert fast_planner.canonical_plan_response_schema is (
+    assert planner.canonical_plan_response_schema is (
         planner_schema.canonical_plan_response_schema
     )
-    assert fast_planner.validate_planner_model_output is (
+    assert planner.validate_planner_model_output is (
         planner_validation.validate_planner_model_output
     )
-    assert fast_planner.planner_goal_context is planner_context.planner_goal_context
-    assert fast_planner.normalize_common_planner_output is (
+    assert planner.planner_goal_context is planner_context.planner_goal_context
+    assert planner.normalize_common_planner_output is (
         planner_validation.normalize_common_planner_output
     )
-    assert fast_planner.qualify_planner_capability_payload is (
+    assert planner.qualify_planner_capability_payload is (
         planner_validation.qualify_planner_capability_payload
     )
-    assert fast_planner.qualify_fast_canonical_plan is (
+    assert planner.qualify_fast_canonical_plan is (
         planner_fast_validation.qualify_fast_canonical_plan
     )
-    assert fast_planner.materialize_planner_output is (
+    assert planner.materialize_planner_output is (
         planner_model_contract.materialize_planner_output
     )
     assert planner_fallback.materialize_planner_failure.__module__ == ("agent.app.planner_fallback")
@@ -197,7 +197,7 @@ def test_planner_and_prompt_depend_on_real_planner_layer_owners() -> None:
 
 def test_resolvers_contain_only_planner_lifecycle_methods() -> None:
     fast_methods = {
-        name for name, value in vars(fast_planner.FastPlannerResolver).items() if callable(value)
+        name for name, value in vars(planner.PlannerResolver).items() if callable(value)
     }
     assert fast_methods == {
         "__init__",
@@ -210,7 +210,7 @@ def test_resolvers_contain_only_planner_lifecycle_methods() -> None:
 def test_planner_resolver_does_not_reown_schema_mechanics() -> None:
     for resolver, removed in (
         (
-            fast_planner.FastPlannerResolver,
+            planner.PlannerResolver,
             (
                 "_truth_certificate_schema",
                 "_first_response_schema",
@@ -237,7 +237,7 @@ def test_planner_resolver_does_not_reown_schema_mechanics() -> None:
         for name in removed:
             assert not hasattr(resolver, name)
 
-    assert fast_planner.fast_streaming_advance_response_schema is (
+    assert planner.fast_streaming_advance_response_schema is (
         planner_schema.fast_streaming_advance_response_schema
     )
 

@@ -27,7 +27,7 @@ authorization, delivery, cancellation, safety and Evidence production.
 
 The old 204-case coverage includes ordinary Communicative Activity authorship and
 optional social decoration as Planner duties. Those duties have retired. The old
-streaming presentation target is not the current Work-only `/fast-advance` contract.
+streaming presentation target is not the current Work-only `/plan-advance` contract.
 Input GA projections and targets also retain earlier fields. The historical
 “current-production-shaped” claim is withdrawn.
 

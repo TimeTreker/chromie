@@ -537,7 +537,7 @@ if (( SKIP_GPU_LOAD == 0 )); then
     source .env.runtime
     set +a
   fi
-  LOAD_MODEL="${AGENT_MODEL:-${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}}"
+  LOAD_MODEL="${AGENT_MODEL:-${AGENT_PLANNER_MODEL:-qwen3:4b}}"
   LOAD_PROVIDER="${AGENT_LLM_PROVIDER:-ollama}"
   LOAD_LOG="$LOG_ROOT/gpu_load-${LOAD_PROVIDER}_background.log"
   (

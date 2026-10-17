@@ -19,7 +19,7 @@ from agent.app.cognitive_identity import (
     owner_approved_personality_context,
     owner_approved_stable_mind_context,
 )
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from tests.cognitive_work_test_support import cognitive_work_request
@@ -163,7 +163,7 @@ class CognitiveIdentityContextTests(unittest.TestCase):
         )
 
     def test_planner_prompt_carries_the_owner_approved_identity(self) -> None:
-        FastPlannerResolver(_Dummy(), _Dummy())
+        PlannerResolver(_Dummy(), _Dummy())
         fast_prompt = planner_prompt.fast_plan_prompt(
             self.request,
             [],
@@ -187,7 +187,7 @@ class CognitiveIdentityContextTests(unittest.TestCase):
     ) -> None:
         changed = self.request.model_copy(update={"text": "第二个问题"})
         goal = GoalAssociationResolver(_Dummy())
-        fast = FastPlannerResolver(_Dummy(), _Dummy())
+        fast = PlannerResolver(_Dummy(), _Dummy())
         pairs = (
             (
                 ga_prompt.layered_prompt(

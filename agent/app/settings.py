@@ -270,14 +270,14 @@ class Settings(BaseModel):
     cognitive_activation_model: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_COGNITIVE_ACTIVATION_MODEL",
-            os.getenv("AGENT_FAST_PLANNER_MODEL", "qwen3:4b"),
+            os.getenv("AGENT_PLANNER_MODEL", "qwen3:4b"),
         )
     )
     cognitive_activation_timeout_ms: int = Field(
         default_factory=lambda: int(
             os.getenv(
                 "AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS",
-                os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "60000"),
+                os.getenv("AGENT_PLANNER_TIMEOUT_MS", "60000"),
             )
         ),
         ge=100,
@@ -320,23 +320,23 @@ class Settings(BaseModel):
     goal_association_num_predict: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_NUM_PREDICT", "512")), ge=128, le=4096
     )
-    fast_planner_enabled: bool = Field(
+    planner_enabled: bool = Field(
         default_factory=lambda: parse_bool(
-            os.getenv("AGENT_FAST_PLANNER_ENABLED"), name="AGENT_FAST_PLANNER_ENABLED", default=True
+            os.getenv("AGENT_PLANNER_ENABLED"), name="AGENT_PLANNER_ENABLED", default=True
         )
     )
-    fast_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_FAST_PLANNER_MODEL", "qwen3:4b"))
-    fast_planner_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_TIMEOUT_MS", "60000")), ge=100, le=120000
+    planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_PLANNER_MODEL", "qwen3:4b"))
+    planner_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_PLANNER_TIMEOUT_MS", "60000")), ge=100, le=120000
     )
-    fast_planner_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_CTX", "8192")), ge=2048, le=131072
+    planner_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_PLANNER_NUM_CTX", "8192")), ge=2048, le=131072
     )
-    fast_planner_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_NUM_PREDICT", "2048")), ge=128, le=4096
+    planner_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_PLANNER_NUM_PREDICT", "2048")), ge=128, le=4096
     )
-    fast_planner_max_capabilities: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_MAX_CAPABILITIES", "24")), ge=1, le=64
+    planner_max_capabilities: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_PLANNER_MAX_CAPABILITIES", "24")), ge=1, le=64
     )
     # The deliberative model service shared by Social Cognition's deep path and Reflection.
     deliberative_enabled: bool = Field(

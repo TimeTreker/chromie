@@ -165,13 +165,13 @@ def parse_fast_work_document(buffer: str) -> dict[str, Any]:
     return value
 
 
-class FastPlannerResolver:
+class PlannerResolver:
     """Fast planning with common contracts, need-first and one library search."""
 
     TRACE_MODULE = TraceModule(
         name="agent.fast_planner",
         component_type="planner",
-        implementation="FastPlannerResolver",
+        implementation="PlannerResolver",
         schema_version=1,
     )
 
@@ -317,7 +317,7 @@ class FastPlannerResolver:
             else:
                 raise PlannerDTOContractError("Capability search budget exhausted before a Plan")
             advance = FastPlannerAdvance(turn_id=turn_id, **output.model_dump(exclude={"responsibility_decisions"}), metadata={
-                "semantic_authority": "fast_planner_model", "phase": "responsibility_work_plan",
+                "semantic_authority": "planner_model", "phase": "responsibility_work_plan",
                 "responsibility_decisions": authored_decisions,
                 **({"repeated_activity_normalization": repeated_activity_repairs} if repeated_activity_repairs else {}),
                 "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,

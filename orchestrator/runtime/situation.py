@@ -845,7 +845,7 @@ async def resolve_goal_free_situation_response(
         session,
         request=request,
         timeout_ms=max(
-            host.cognitive_runtime_policy.fast_planner_timeout_ms,
+            host.cognitive_runtime_policy.planner_timeout_ms,
             host.cognitive_runtime_policy.deliberative_timeout_ms,
         ),
     )

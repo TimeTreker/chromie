@@ -263,8 +263,8 @@ class CognitionSettings:
     enable_agent: bool
     enable_interaction_response: bool
     enable_soridormi_capabilities: bool
-    fast_planner_mode: str
-    fast_planner_timeout_ms: int
+    planner_mode: str
+    planner_timeout_ms: int
     deliberative_timeout_ms: int
     goal_association_mode: str
     goal_association_timeout_ms: int
@@ -554,14 +554,14 @@ class HostSettingsSnapshot:
                 enable_soridormi_capabilities=_bool(
                     values, "ORCH_ENABLE_SORIDORMI_CAPABILITIES", False
                 ),
-                fast_planner_mode=_choice(
+                planner_mode=_choice(
                     values,
-                    "ORCH_FAST_PLANNER_MODE",
+                    "ORCH_PLANNER_MODE",
                     "off",
                     {"off", "report_only"},
                 ),
-                fast_planner_timeout_ms=_int(
-                    values, "ORCH_FAST_PLANNER_TIMEOUT_MS", 65000, minimum=100
+                planner_timeout_ms=_int(
+                    values, "ORCH_PLANNER_TIMEOUT_MS", 65000, minimum=100
                 ),
                 deliberative_timeout_ms=_int(
                     values, "ORCH_DELIBERATIVE_TIMEOUT_MS", 125000, minimum=100

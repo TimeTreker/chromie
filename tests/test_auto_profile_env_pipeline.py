@@ -18,7 +18,7 @@ MODEL_KEYS = (
     "OLLAMA_MODEL",
     "AGENT_USER_MEANING_INTERPRETER_MODEL",
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
-    "AGENT_FAST_PLANNER_MODEL",
+    "AGENT_PLANNER_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
     "AGENT_DELIBERATIVE_MODEL",
 )
@@ -247,14 +247,14 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
             "AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX",
             "AGENT_GOAL_ASSOCIATION_NUM_CTX",
-            "AGENT_FAST_PLANNER_NUM_CTX",
+            "AGENT_PLANNER_NUM_CTX",
             "AGENT_DELIBERATIVE_NUM_CTX",
         ):
             self.assertEqual(values[key], "65536", key)
         self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "65536")
         self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_NUM_PREDICT"], "2048")
-        self.assertEqual(values["AGENT_FAST_PLANNER_NUM_PREDICT"], "4096")
+        self.assertEqual(values["AGENT_PLANNER_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_DELIBERATIVE_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(manifest["active_profile"], "rtx5090")
@@ -329,7 +329,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_MODEL",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
             "AGENT_GOAL_ASSOCIATION_MODEL",
-            "AGENT_FAST_PLANNER_MODEL",
+            "AGENT_PLANNER_MODEL",
             "AGENT_DELIBERATIVE_MODEL",
             "AGENT_SKILL_SELECTION_MODEL",
         ):
@@ -359,7 +359,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         for key in (
             "OLLAMA_CONTEXT_LENGTH",
             "OLLAMA_NUM_CTX",
-            "AGENT_FAST_PLANNER_NUM_CTX",
+            "AGENT_PLANNER_NUM_CTX",
             "AGENT_DELIBERATIVE_NUM_CTX",
         ):
             self.assertEqual(values[key], "49152", key)
@@ -373,7 +373,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         # Retained complete re-entry requests, including source Plan and terminal
         # Evidence, must fit without reducing their output allowance or margin.
         for context_key, input_chars, output_tokens in (
-            ("AGENT_FAST_PLANNER_NUM_CTX", 62557, 2048),
+            ("AGENT_PLANNER_NUM_CTX", 62557, 2048),
             ("AGENT_DELIBERATIVE_NUM_CTX", 72056, 4096),
         ):
             with self.subTest(context_key=context_key):
@@ -398,11 +398,11 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS"], "2500")
         self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "60000")
-        self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "60000")
+        self.assertEqual(values["AGENT_PLANNER_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_DELIBERATIVE_TIMEOUT_MS"], "120000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "65000")
-        self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "65000")
+        self.assertEqual(values["ORCH_PLANNER_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_DELIBERATIVE_TIMEOUT_MS"], "125000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "300000")
         self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "3500")
@@ -416,10 +416,10 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
             "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
             "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
-            "AGENT_FAST_PLANNER_TIMEOUT_MS",
+            "AGENT_PLANNER_TIMEOUT_MS",
             "AGENT_DELIBERATIVE_TIMEOUT_MS",
             "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
-            "ORCH_FAST_PLANNER_TIMEOUT_MS",
+            "ORCH_PLANNER_TIMEOUT_MS",
             "ORCH_DELIBERATIVE_TIMEOUT_MS",
             "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
             "ORCH_TTS_PLAYBACK_START_TIMEOUT_MS",
@@ -477,12 +477,12 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_EXTERNAL_INFORMATION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_WEATHER_TIMEOUT_S"], "120")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_PLANNER_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DELIBERATIVE_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_DELIBERATIVE_NUM_CTX"], "40960")
         self.assertEqual(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
-        self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "150000")
+        self.assertEqual(values["ORCH_PLANNER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_DELIBERATIVE_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "900000")
         self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "120000")
@@ -530,7 +530,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             root = self._minimal_root(directory)
             (root / ".env.local").write_text(
                 "CHROMIE_HARDWARE_PROFILE=rtx4090_laptop\n"
-                "AGENT_FAST_PLANNER_MODEL=stale-goal-interpreter-model\n"
+                "AGENT_PLANNER_MODEL=stale-goal-interpreter-model\n"
                 "LOG_LEVEL=DEBUG\n",
                 encoding="utf-8",
             )
@@ -547,16 +547,16 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             manifest = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertIn("[env][warning] Ignoring .env.local values", result.stderr)
-        self.assertIn("AGENT_FAST_PLANNER_MODEL", result.stderr)
+        self.assertIn("AGENT_PLANNER_MODEL", result.stderr)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
         self.assertEqual(values["CHROMIE_HARDWARE_PROFILE"], "rtx5090")
-        self.assertNotEqual(values["AGENT_FAST_PLANNER_MODEL"], "stale-goal-interpreter-model")
+        self.assertNotEqual(values["AGENT_PLANNER_MODEL"], "stale-goal-interpreter-model")
         self.assertEqual(values["LOG_LEVEL"], "DEBUG")
         self.assertEqual(
             set(manifest["ignored_local_overrides"]),
             {
                             "CHROMIE_HARDWARE_PROFILE",
-                "AGENT_FAST_PLANNER_MODEL",
+                "AGENT_PLANNER_MODEL",
             },
         )
         self.assertFalse(manifest["strict_local_conflicts"])
@@ -565,7 +565,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self._minimal_root(directory)
             (root / ".env.local").write_text(
-                "AGENT_FAST_PLANNER_MODEL=stale-goal-interpreter-model\n",
+                "AGENT_PLANNER_MODEL=stale-goal-interpreter-model\n",
                 encoding="utf-8",
             )
             system_info = root / "system.env"
@@ -587,7 +587,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = self._minimal_root(directory)
             local_path = root / ".env.local"
-            local_path.write_text("AGENT_FAST_PLANNER_MODEL=stale-one\n", encoding="utf-8")
+            local_path.write_text("AGENT_PLANNER_MODEL=stale-one\n", encoding="utf-8")
             system_info = root / "system.env"
             self._system_info(
                 system_info,
@@ -599,13 +599,13 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             self._generate(root, system_info)
             first = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
-            local_path.write_text("AGENT_FAST_PLANNER_MODEL=stale-two\n", encoding="utf-8")
+            local_path.write_text("AGENT_PLANNER_MODEL=stale-two\n", encoding="utf-8")
             self._generate(root, system_info)
             second = json.loads((root / ".chromie" / "runtime_profile.json").read_text())
 
         self.assertEqual(first["fingerprint"], second["fingerprint"])
-        self.assertEqual(first["ignored_local_overrides"], ["AGENT_FAST_PLANNER_MODEL"])
-        self.assertEqual(second["ignored_local_overrides"], ["AGENT_FAST_PLANNER_MODEL"])
+        self.assertEqual(first["ignored_local_overrides"], ["AGENT_PLANNER_MODEL"])
+        self.assertEqual(second["ignored_local_overrides"], ["AGENT_PLANNER_MODEL"])
 
     def test_profile_cuda_arch_must_match_detected_hardware(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -632,7 +632,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "CHROMIE_ACTIVE_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?",
             "CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?",
             "CHROMIE_COGNITIVE_BUDGET_PROFILE: ${CHROMIE_COGNITIVE_BUDGET_PROFILE:-interactive}",
-            "AGENT_FAST_PLANNER_MODEL: ${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}",
+            "AGENT_PLANNER_MODEL: ${AGENT_PLANNER_MODEL:-qwen3:4b}",
             "AGENT_DELIBERATIVE_MODEL: ${AGENT_DELIBERATIVE_MODEL:-gemma4:e2b}",
             "AGENT_DELIBERATIVE_TIMEOUT_MS: ${AGENT_DELIBERATIVE_TIMEOUT_MS:-120000}",
             "AGENT_DELIBERATIVE_NUM_CTX: ${AGENT_DELIBERATIVE_NUM_CTX:-8192}",
@@ -715,8 +715,8 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_MODEL": "shared-fast",
             "AGENT_GOAL_ASSOCIATION_ENABLED": "1",
             "AGENT_GOAL_ASSOCIATION_MODEL": "shared-fast",
-            "AGENT_FAST_PLANNER_ENABLED": "1",
-            "AGENT_FAST_PLANNER_MODEL": "shared-fast",
+            "AGENT_PLANNER_ENABLED": "1",
+            "AGENT_PLANNER_MODEL": "shared-fast",
             "AGENT_DELIBERATIVE_ENABLED": "0",
         }
 

@@ -832,7 +832,7 @@ def materialize_planner_output(
         metadata.update(
             {
                 "model_contract": "FastPlannerMultiGoalPlanOutput",
-                "semantic_authority": "fast_planner_model",
+                "semantic_authority": "planner_model",
                 "model_authored_steps": True,
                 "model_authored_step_ids": True,
                 "model_authored_step_ownership": True,

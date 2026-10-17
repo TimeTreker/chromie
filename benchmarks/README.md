@@ -536,7 +536,7 @@ state for multi-turn cases, no speaker, and preview-only execution. It therefore
 exercises routing, Goal Association, planning, and response composition without
 executing proposed effects. It also verifies the quality-model identity exposed
 by Agent health and that the Planner model matches the active runtime
-profile's `AGENT_FAST_PLANNER_MODEL`. The runner writes
+profile's `AGENT_PLANNER_MODEL`. The runner writes
 `normalized.json`, `run.json`, and `review/review-bundle.json`. Give that review
 bundle to Codex or another declared LLM/human reviewer, fill the generated
 `review-template.json`, and apply the retained semantic verdict with
