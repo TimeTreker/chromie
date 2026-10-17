@@ -306,7 +306,7 @@ class GranularResourceCatalog(FullCatalog):
 def request(text="往前走15秒，然后眨眼。", *, goal_ids=None) -> CognitiveWorkRequest:
     goal_ids = list(goal_ids or ["goal-action"])
     return cognitive_work_request(
-        sid="sid-pr4",
+        sid="sid-canonical-plan",
         text=text,
         language="zh-CN",
         context={

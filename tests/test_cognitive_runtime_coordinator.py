@@ -797,13 +797,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     ):
         del intent
         core, envelope = admitted_core(
-            text, sid="sid-pr7", language="zh-CN", responsibilities=responsibilities
+            text, sid="sid-goal-runtime", language="zh-CN", responsibilities=responsibilities
         )
         return asyncio.run(
             coordinator.resolve(
                 object(),
                 text=text,
-                sid="sid-pr7",
+                sid="sid-goal-runtime",
                 core_interpretation=core,
                 context={"history": [], "active_goal_snapshots": []},
                 history=[],
@@ -1906,7 +1906,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         observed: list[tuple[str, dict]] = []
 
         def retain_stage(sid: str, **stage: object) -> None:
-            self.assertEqual(sid, "sid-pr7")
+            self.assertEqual(sid, "sid-goal-runtime")
             observed.append((str(stage["stage"]), dict(stage)))
 
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -1957,7 +1957,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         }
 
         interaction = coordinator._interaction_context(
-            sid="sid-pr7", context=context, goal_ids=[],
+            sid="sid-goal-runtime", context=context, goal_ids=[],
         )
 
         self.assertEqual(interaction["already_spoken"], [])
@@ -1971,7 +1971,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         ledger.record_playback_event(
             {
                 "event_id": "speech-existing",
-                "session_id": "sid-pr7",
+                "session_id": "sid-goal-runtime",
                 "turn_id": "turn-1",
                 "status": "playback_completed",
                 "text": "你好。",
@@ -2348,7 +2348,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         core, envelope = admitted_core(
             "move over there",
-            sid="sid-pr7",
+            sid="sid-goal-runtime",
             language="en-US",
             meaning_uncertainties=["which destination 'there' refers to"],
         )
@@ -2356,7 +2356,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coordinator.resolve(
                 object(),
                 text="move over there",
-                sid="sid-pr7",
+                sid="sid-goal-runtime",
                 core_interpretation=core,
                 context={"history": [], "active_goal_snapshots": []},
                 history=[],
@@ -3511,7 +3511,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 await asyncio.sleep(0)
                 await committed.wait()
                 yield FastPlannerStreamFailure(
-                    turn_id="sid-pr7",
+                    turn_id="sid-goal-runtime",
                     failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",
@@ -3523,7 +3523,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         client = Client()
 
         def apply_goal_state(_association, *, sid, user_text, source):
-            self.assertEqual(sid, "sid-pr7")
+            self.assertEqual(sid, "sid-goal-runtime")
             self.assertEqual(user_text, "hello")
             self.assertEqual(
                 source,
@@ -3577,7 +3577,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 self.calls.append("stream")
                 await asyncio.sleep(0)
                 yield FastPlannerStreamFailure(
-                    turn_id="sid-pr7",
+                    turn_id="sid-goal-runtime",
                     failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",
@@ -3632,7 +3632,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 self.calls.append("stream")
                 await asyncio.sleep(0)
                 yield FastPlannerStreamFailure(
-                    turn_id="sid-pr7",
+                    turn_id="sid-goal-runtime",
                     failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",

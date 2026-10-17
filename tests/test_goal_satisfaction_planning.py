@@ -58,7 +58,7 @@ class Catalog:
 
 def request(text: str, *, goal_ids: list[str]) -> CognitiveWorkRequest:
     return cognitive_work_request(
-        sid="sid-pr5",
+        sid="sid-goal-satisfaction",
         text=text,
         language="zh-CN",
         context={

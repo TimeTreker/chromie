@@ -138,7 +138,7 @@ def request(
 ) -> CognitiveWorkRequest:
     outcomes = list(responsibility_outcomes or [text])
     return CognitiveWorkRequest(
-        sid="sid-pr2",
+        sid="sid-goal-association",
         text=text,
         language=language,
         responsibilities=[
