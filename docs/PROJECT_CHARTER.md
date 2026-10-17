@@ -397,10 +397,9 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   choice B, 2026-10-12: the request asks Chromie to tell someone something untrue as if true,
   or to deceive or manipulate a person, including by pretending; owner decision 2026-10-17:
   or doing or answering it could hurt, humiliate, frighten or endanger someone, whatever
-  Capability it uses). UMI currently marks only deception requests on speech; widening the
-  mark to other harmful requests is pending a UMI corpus re-freeze. UMI's mark is a fact
-  about WHAT is asked, not a verdict; such a Responsibility requests the Planner, and
-  Social Cognition may only acknowledge it neutrally until the verdict. While such a marked
+  Capability it uses). UMI's mark is a fact about WHAT is asked, not a verdict; such a
+  Responsibility requests the Planner, and Social Cognition may only acknowledge it
+  neutrally until the verdict. While such a marked
   Responsibility waits, its whole turn receives only that acknowledgement at ingress and
   sibling speech is answered after the verdict through its Planner need, because a
   sibling reply can promise the reviewed content (live 2026-10-16); this is the one

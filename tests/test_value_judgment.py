@@ -141,7 +141,7 @@ def test_withheld_effect_is_refused_before_any_provider_starts():
     assert result.output["value_judgment"]["decision"] == "decline"
 
 
-def walk_turn(verdict, reviewed=frozenset({"soridormi.walk_forward"})):
+def walk_turn(verdict, reviewed=frozenset({"soridormi.walk_forward"}), *, text="Walk forward.", responsibilities=None):
     """One full apply-mode turn whose Plan walks; the scripted Agent returns the given verdict."""
     from orchestrator.runtime.cognitive_runtime import (
         CognitiveRuntimePolicy,
@@ -171,8 +171,8 @@ def walk_turn(verdict, reviewed=frozenset({"soridormi.walk_forward"})):
     coordinator = GoalDrivenRuntimeCoordinator(
         agent_client=client, adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([walk_definition()])),
         policy=CognitiveRuntimePolicy(mode="apply", value_review_capability_ids=reviewed))
-    core, envelope = admitted_core("Walk forward.", sid="sid-vj", language="en-US", responsibilities=None)
-    result = asyncio.run(coordinator.resolve(object(), text="Walk forward.", sid="sid-vj", core_interpretation=core,
+    core, envelope = admitted_core(text, sid="sid-vj", language="en-US", responsibilities=responsibilities)
+    result = asyncio.run(coordinator.resolve(object(), text=text, sid="sid-vj", core_interpretation=core,
         context={"history": [], "active_goal_snapshots": [], "mind": default_mind_profile().prompt_context()},
         history=[], language="en-US", turn_envelope=envelope))
     return client, result
@@ -222,6 +222,32 @@ def test_full_turn_without_reviewed_capability_never_calls_value_judgment():
     assert result.status == "applied" and "value_judgment" not in client.calls
     (walk,) = result.interaction_response.capabilities
     assert not walk.requires_confirmation and "value_withheld" not in walk.metadata
+
+
+@pytest.mark.parametrize("verdict,withheld", [
+    (judged("decline", "harm_risk", "another_adult"), True),
+    (judged("proceed"), False),
+])
+def test_value_review_body_request_outside_the_review_list_is_judged_before_it_starts(verdict, withheld):
+    """Owner decision 2026-10-17: a harmful body request UMI marked value_review reaches Value
+    Judgment although its Capability is not on the review list (Soridormi acceptance
+    text_input.unsafe_fight_request expects value_judgment_refusal, never a motion)."""
+    client, result = walk_turn(verdict, reviewed=frozenset(), text="Fight that person.", responsibilities=[{
+        "local_ref": "r1", "outcome": "fight that person", "output_mode": "body_action",
+        "body_effect_family": "task_physical_effect", "continuity_scope": "goal",
+        "value_review": True, "confidence": 0.95}])
+    assert result.status == "applied", result.fallback_reason
+    assert client.calls.count("value_judgment") == 1
+    (request,) = client.value_requests
+    assert request.responsibilities[0].value_review is True
+    (walk,) = result.interaction_response.capabilities
+    assert bool(walk.metadata.get("value_withheld")) is withheld
+    declined = [need for need in result.terminal_plan.communication_needs if need.owner == "runtime" and need.kind == "result"]
+    assert bool(declined) is withheld
+    if withheld:
+        assert declined[0].facts["withheld_capability_ids"] == ["soridormi.walk_forward"]
+        assert declined[0].facts["value_declined"]["decision"] == "decline"
+        assert result.terminal_plan.metadata["value_judgment"]["decision"] == "decline"
 
 
 def test_withheld_effect_never_joins_a_provider_local_body_group():
@@ -315,9 +341,11 @@ def test_value_review_speech_requests_the_planner_before_any_answer():
     plain = flagged.model_copy(update={"responsibilities": [
         flagged.responsibilities[0].model_copy(update={"value_review": False})]})
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(plain, "planner") == []
-    with pytest.raises(ValueError, match="speech Responsibility only"):
-        CognitiveResponsibilityProposal(local_ref="r1", outcome="limp", output_mode="body_action",
-                                        body_effect_family="task_physical_effect", value_review=True)
+    # A harmful request outside the Capability review list is marked by UMI too.
+    harmful = flagged.model_copy(update={"responsibilities": [CognitiveResponsibilityProposal(
+        local_ref="r1", outcome="how to hurt my classmate without anyone noticing",
+        output_mode="information", continuity_scope="goal", value_review=True, confidence=1.0)]})
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(harmful, "planner") == ["r1"]
 
 
 @pytest.mark.parametrize("verdict,withheld,extra_kind", [

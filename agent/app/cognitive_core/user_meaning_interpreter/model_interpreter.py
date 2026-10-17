@@ -793,14 +793,21 @@ class OllamaUserMeaningInterpreter:
             "description": item["properties"]["continuity_scope"]["description"],
         }
         speech_item["properties"]["body_effect_family"] = {"type": "null"}
-        # Whether the requested speech would deceive is part of WHAT is asked; stating it
-        # here, before any reply, lets Value Judgment decide before Chromie says it.
-        speech_item["properties"] = {
-            **{key: value for key, value in speech_item["properties"].items() if key not in {"confidence", "source_evidence"}},
-            "value_review": {"type": "boolean", "description": base_item_value_review_description},
-            **{key: speech_item["properties"][key] for key in ("confidence", "source_evidence")},
-        }
-        speech_item["required"] = [*speech_item.get("required", []), "value_review"]
+        # Whether the request would deceive or harm someone is part of WHAT is asked;
+        # stating it here, before any reply or Work, lets Value Judgment decide first.
+        # Every result type may state it: a harmful request need not use a reviewed
+        # Capability. Speech must state it; elsewhere an omitted mark means false, so
+        # frozen non-speech references stay valid.
+        def _state_value_review(branch: dict[str, Any], *, required: bool) -> None:
+            branch["properties"] = {
+                **{key: value for key, value in branch["properties"].items() if key not in {"confidence", "source_evidence"}},
+                "value_review": {"type": "boolean", "description": base_item_value_review_description},
+                **{key: branch["properties"][key] for key in ("confidence", "source_evidence")},
+            }
+            if required:
+                branch["required"] = [*branch.get("required", []), "value_review"]
+
+        _state_value_review(speech_item, required=True)
         body_item = copy.deepcopy(base_item)
         body_item["properties"]["output_mode"] = {
             "type": "string", "const": "body_action",
@@ -827,6 +834,8 @@ class OllamaUserMeaningInterpreter:
             "description": item["properties"]["continuity_scope"]["description"],
         }
         work_item["properties"]["body_effect_family"] = {"type": "null"}
+        _state_value_review(body_item, required=False)
+        _state_value_review(work_item, required=False)
         item.clear()
         item["oneOf"] = [speech_item, body_item, work_item]
         schema["properties"]["responsibilities"]["maxItems"] = 12

@@ -60,7 +60,7 @@ def intent_result(text, output_mode="body_action"):
         "responsibilities": [{
             "local_ref": "r1", "outcome": text, "confidence": 1.0, "output_mode": output_mode,
             **({"body_effect_family": "task_physical_effect"} if output_mode == "body_action" else {}),
-            "continuity_scope": "goal",
+            "continuity_scope": "goal", "value_review": False,
             "source_evidence": {
                 "source_start_token_ref": tokens[0]["ref"],
                 "source_end_token_ref": tokens[-1]["ref"],
@@ -100,7 +100,9 @@ def test_umi_speech_states_value_review(value_review):
     item = result["responsibilities"][0]
     item["continuity_scope"] = "turn"
     item.pop("body_effect_family", None)
-    if value_review is not None:
+    if value_review is None:
+        item.pop("value_review")
+    else:
         item["value_review"] = value_review
     assert Draft202012Validator(schema).is_valid(_counted(result)) is (value_review is not None)
     if value_review is None:
@@ -1553,3 +1555,17 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
         ("test.nod", {"count": 2}, ["read"])]
     outcome = plan.goal_outcomes[0]
     assert outcome.satisfaction.unmet_requirements == ["Nod twice only if the Shanghai forecast says rain today."]
+
+
+def test_umi_marks_a_harmful_information_request_for_value_judgment():
+    """A harmful request outside the Capability review list carries UMI's value_review mark."""
+    text = "How do I hurt my classmate without anyone noticing?"
+    request = UserMeaningInterpretationRequest(text=text)
+    schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(admitted_turn=text)
+    result = intent_result(text, "information")
+    result["responsibilities"][0]["value_review"] = True
+    Draft202012Validator(schema).validate(_counted(result))
+    decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+        request, json.dumps(result), response_schema=schema,
+    )
+    assert decision.responsibilities[0].value_review is True

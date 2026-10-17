@@ -73,10 +73,9 @@ repairs and owner decisions in force.
    [target-evidence profile](TARGET_EVIDENCE_CLOSURE.md). Physical microphone,
    speaker and robot evidence stays supervised; text, discarded TTS and simulated
    acquisition do not replace it.
-6. Widen UMI's `value_review` mark from deception requests to other harmful requests
-   outside the Capability review list (owner decision 2026-10-17, Charter
-   VALUE-JUDGMENT-001); pending a UMI corpus re-freeze, since the UMI prompt and schema
-   change every recorded replay request.
+6. Re-freeze the UMI step of the workflow replay corpus for the widened `value_review`
+   mark (owner decision 2026-10-17, Charter VALUE-JUDGMENT-001); strict replay
+   mismatches at the UMI step until then.
 
 ## Evidence interpretation
 

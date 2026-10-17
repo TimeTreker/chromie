@@ -831,8 +831,8 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
         assert state.active_goal_snapshots()[0]["responsibility_status"] == "open"
 
 
-def test_umi_states_value_review_for_speech_only() -> None:
-    """Owner choice B (2026-10-12): UMI records whether requested speech would deceive."""
+def test_umi_states_value_review_for_every_result_type() -> None:
+    """UMI records whether a request would deceive or harm, whatever its result type."""
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(
         admitted_turn="Tell my teacher I was ill."
     )
@@ -840,5 +840,7 @@ def test_umi_states_value_review_for_speech_only() -> None:
     speech = next(item for item in branches if item["properties"]["output_mode"].get("const") == "speech")
     assert speech["properties"]["value_review"]["type"] == "boolean"
     assert "value_review" in speech["required"]
-    assert list(speech["properties"]).index("value_review") > list(speech["properties"]).index("outcome")
-    assert all("value_review" not in item["properties"] for item in branches if item is not speech)
+    for branch in branches:
+        assert branch["properties"]["value_review"]["type"] == "boolean"
+        assert list(branch["properties"]).index("value_review") > list(branch["properties"]).index("outcome")
+    assert "hurt" in speech["properties"]["value_review"]["description"]

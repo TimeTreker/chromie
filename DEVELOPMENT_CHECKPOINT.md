@@ -67,13 +67,11 @@ replay at the delivery revision: pytest 3,948 passed + 5 skipped (`xgrammar` not
   nothing false about her nature (Charter and interaction contract).
 - An unsettled referent is resolved from the conversation when possible, otherwise
   Chromie asks the person.
-- Value Judgment reviews speech that UMI marks `value_review` (deception requests;
-  owner choice B, 2026-10-12, Charter VALUE-JUDGMENT-001); `protect_children` is not in
-  the Stable Mind (owner undecided).
-- The `value_review` mark also covers a request whose doing or answering could hurt,
+- Value Judgment reviews a Responsibility that UMI marks `value_review`: a deception
+  request (owner choice B, 2026-10-12) or a request whose doing or answering could hurt,
   humiliate, frighten or endanger someone, whatever Capability it uses (owner decision
-  2026-10-17, Charter VALUE-JUDGMENT-001). UMI does not mark these yet; the widening
-  waits for a UMI corpus re-freeze (Status open work).
+  2026-10-17, Charter VALUE-JUDGMENT-001); `protect_children` is not in the Stable Mind
+  (owner undecided).
 - Soridormi calls describe body targets in one format: person by referent (the
   current speaker is the reserved `"requester"`), object by description, place by
   cited name; Soridormi resolves the physical target, Chromie never sends look

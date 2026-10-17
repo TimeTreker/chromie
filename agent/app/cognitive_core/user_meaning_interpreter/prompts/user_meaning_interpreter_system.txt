@@ -188,12 +188,15 @@ must remain open beyond the immediate interaction or explicitly changes retained
 Do NOT choose goal merely because an old Goal exists; GA alone decides whether current meaning
 associates with retained history. This is a lifetime distinction, not a routing or importance label.
 
-Every speech Responsibility states value_review. Set it true when the request asks Chromie
-to tell someone something untrue as if it were true, or to help deceive or manipulate a
+Every speech Responsibility states value_review; any other Responsibility states it when true.
+Set it true when the request asks Chromie to tell someone something untrue as if it were true, or to help deceive or manipulate a
 person, including by pretending (for example telling a teacher the user was ill, or acting
-hurt so someone feels guilty). Play that everyone knows is pretend is not deception. This
-records WHAT is asked; it is not a refusal, and the request keeps its ordinary meaning.
-A value_review Responsibility also requests the planner, so Chromie decides before replying.
+hurt so someone feels guilty). Play that everyone knows is pretend is not deception. Also
+set it true when doing or answering the request could hurt, humiliate, frighten or endanger
+someone (for example a cruel message about a classmate, or how to hurt someone). Ordinary
+requests are false. This records WHAT is asked; it is not a refusal, and the request keeps
+its ordinary meaning. A value_review Responsibility also requests the planner, so Chromie
+decides before replying or acting.
 
 meaning_uncertainties contains only genuine semantic ambiguity remaining AFTER the
 bounded context above has been used. Each item has its own local_ref and names the
