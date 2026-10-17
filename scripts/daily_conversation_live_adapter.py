@@ -187,19 +187,40 @@ def _structural_invariants(
     }
 
 
+def _configured_fast_model(environ: Mapping[str, str] | None = None) -> str | None:
+    """Return the fast Planner model the active runtime profile configures.
+
+    The live text path loads the generated runtime environment before each turn,
+    so this reads the profile's own ``AGENT_FAST_PLANNER_MODEL`` rather than a
+    hard-coded model name.
+    """
+
+    env = os.environ if environ is None else environ
+    value = str(env.get("AGENT_FAST_PLANNER_MODEL") or "").strip()
+    return value or None
+
+
 def _observation(
-    request: Mapping[str, Any], summaries: Sequence[Mapping[str, Any]], case_dir: Path
+    request: Mapping[str, Any],
+    summaries: Sequence[Mapping[str, Any]],
+    case_dir: Path,
+    *,
+    expected_fast_model: str | None = None,
 ) -> dict[str, Any]:
     scenario = request["scenario"]
     run_profile = request["run"]
     expected_model = run_profile.get("model")
+    if expected_fast_model is None:
+        expected_fast_model = _configured_fast_model()
     health = _agent_health(summaries[-1]) if summaries else {}
     quality_models = {name: health.get(name) for name in QUALITY_HEALTH_FIELDS}
     fast_models = {name: health.get(name) for name in FAST_HEALTH_FIELDS}
     quality_model_match = bool(expected_model) and all(
         value == expected_model for value in quality_models.values()
     )
-    fast_model_match = all(value == "qwen3:4b" for value in fast_models.values())
+    fast_model_match = bool(expected_fast_model) and all(
+        value == expected_fast_model for value in fast_models.values()
+    )
     delivered_turns = [[item.get("text", "") for item in _speech(summary)] for summary in summaries]
     latency_ms = sum(
         float(summary.get("timings_ms", {}).get("total_ms") or 0.0) for summary in summaries
@@ -216,7 +237,7 @@ def _observation(
             "delivered_speech_by_turn": delivered_turns,
             "semantic_turn_records": [_semantic_turn_record(summary) for summary in summaries],
             "quality_model_health": quality_models,
-            "fixed_fast_model_health": fast_models,
+            "configured_fast_model_health": fast_models,
             "semantic_verdict": "pending_llm_review",
         },
         "auxiliary_behavior": {
@@ -234,8 +255,8 @@ def _observation(
                 "kind": "model_topology",
                 "expected_quality_model": expected_model,
                 "quality_model_match": quality_model_match,
-                "fixed_fast_model": "qwen3:4b",
-                "fixed_fast_model_match": fast_model_match,
+                "configured_fast_model": expected_fast_model,
+                "configured_fast_model_match": fast_model_match,
             },
             {
                 "kind": "live_runtime",

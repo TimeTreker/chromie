@@ -8,7 +8,7 @@ Run maintained file-backed scenarios through the Benchmark Suite entrypoint:
 
 ```bash
 python -m benchmarks.scenarios check
-python -m benchmarks.scenarios run --suite dialogue --no-write
+python -m benchmarks.scenarios run --suite cognitive_core_dialogue --no-write
 ```
 
 Run behavior-quality gates through the discovered general-ability scenario library:
@@ -50,7 +50,7 @@ python scripts/scenario_author.py validate-all
 To ask an LLM for reviewed candidate scenarios, generate a constrained prompt:
 
 ```bash
-python scripts/scenario_author.py prompt --suite interaction --count 20 \
+python scripts/scenario_author.py prompt --suite user_meaning_interpretation --count 20 \
   --focus "normal social requests, ambiguous movement, and discourse markers"
 ```
 
@@ -77,8 +77,6 @@ unknown. This changes acceptance comparisons only, never the execution request.
 scenarios/
   user_meaning_interpretation/  User Meaning Interpretation module and scripted-model recovery scenarios
   cognitive_core_dialogue/  Multi-turn Cognitive Core replay scenarios
-  interaction/      InteractionRuntime scenarios
-  dialogue/         Multi-turn InteractionRuntime conversation scenarios
   cognitive_runtime/ Goal-driven planning and coordinated-response scenarios
   cognitive_turn_loop/ Deterministic outcome-closure and cancellation scenarios
   general_ability/ Self-describing staged live-text scenarios
@@ -101,9 +99,10 @@ behavior belongs in maintained suites that exercise the current typed owners dir
 
 User Meaning Interpretation fixtures may use `stub.llm_script` instead of one final
 `stub.llm_decision`. The scenario runner then executes the real bounded
-`OllamaUserMeaningInterpreter.route()` normalization and validation transaction while
-replacing only external model completions. A script contains one primary stage.
-When that accepted result retains genuine consequential `unresolved` meaning, it
+`OllamaUserMeaningInterpreter.interpret_user_meaning()` normalization and validation
+transaction while replacing only external model completions. A script contains one primary
+stage. When that accepted result retains a genuine consequential `meaning_uncertainties`
+entry, it
 may contain one source-based `user_meaning_interpretation_deep` stage; an invalid primary
 or Deep DTO fails closed without a same-authority repair stage:
 
@@ -113,28 +112,45 @@ or Deep DTO fails closed without a same-authority repair stage:
     {
       "stage": "user_meaning_interpretation",
       "decision": {
-        "confidence": 0.85,
+        "confidence": 0.78,
         "responsibilities": [
           {
             "local_ref": "r1",
-            "outcome": "identify the referenced object",
-            "bindings": {"entity": "that"},
-            "output_mode": "information",
-            "confidence": 0.75,
-            "relationship": "new",
-            "target_goal_ids": [],
+            "outcome": "Can you move over there a little?",
+            "confidence": 0.78,
+            "output_mode": "body_action",
+            "body_effect_family": "task_physical_effect",
+            "continuity_scope": "goal",
             "source_evidence": {
               "source_start_token_ref": "t0",
-              "source_end_token_ref": "t1"
+              "source_end_token_ref": "t7"
             }
           }
         ],
-        "unresolved": ["which object 'that' denotes"]
+        "meaning_uncertainties": [
+          {
+            "local_ref": "u1",
+            "kind": "other",
+            "description": "The intended destination is not identified.",
+            "responsibility_refs": ["r1"]
+          }
+        ],
+        "cognitive_requests": [
+          {
+            "authority": "planner",
+            "responsibility_refs": ["r1"],
+            "reason_summary": "Explicit authored fixture requests the existing cognitive owner."
+          }
+        ]
       }
     }
   ]
 }
 ```
+
+Responsibilities carry no Goal identity or relationship (`relationship`,
+`target_goal_ids`) and no `bindings`: Goal Association and the Planner own those.
+See `user_meaning_interpretation/ambiguous_move_there.json` for the full fixture.
 
 Standalone User Meaning Interpretation scenarios may also set `stub.context` to replay bounded host
 request context, such as `interaction_engagement`. This context is passed to
@@ -142,9 +158,7 @@ the real User Meaning Interpretation pipeline; it must be a JSON object and shou
 minimum fields needed to reproduce the boundary under test.
 
 `cognitive_core_dialogue` scenarios run ordered Cognitive Core turns with one bounded
-conversation-state snapshot. A turn may set `run_interaction=true` to pass the
-final User Meaning Interpretation decision through the dependency-light native InteractionRuntime
-and assert emitted skills and arguments. This is deterministic Level A replay,
+conversation-state snapshot. This is deterministic Level A replay,
 not a live-model, microphone, simulator, or robot claim.
 
 ## Everyday live cohort

@@ -71,7 +71,7 @@ Options:
   --benchmark-timeout SECONDS Deterministic benchmark timeout (default: 1800)
   --e2e-timeout SECONDS       Per closed-loop run timeout (default: 2400)
   --tts-repeat N              TTS benchmark repetitions (default: 8)
-  --gpu-load-requests N       Ollama requests during contention (default: 20)
+  --gpu-load-requests N       LLM requests (SGLang or Ollama) during contention (default: 20)
   --semantic-reviewers PATH   Opt in to external multi-LLM semantic adjudication
   --semantic-reviewer ID      Select one configured reviewer (repeatable)
   --sanitize-archive          Also create a credential- and identity-redacted upload copy
@@ -538,14 +538,24 @@ if (( SKIP_GPU_LOAD == 0 )); then
     set +a
   fi
   LOAD_MODEL="${AGENT_MODEL:-${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}}"
-  LOAD_LOG="$LOG_ROOT/gpu_load-ollama_background.log"
+  LOAD_PROVIDER="${AGENT_LLM_PROVIDER:-ollama}"
+  LOAD_LOG="$LOG_ROOT/gpu_load-${LOAD_PROVIDER}_background.log"
   (
     set -e
     for index in $(seq 1 "$GPU_LOAD_REQUESTS"); do
-      curl -fsS http://127.0.0.1:11434/api/generate \
-        -H 'Content-Type: application/json' \
-        -d "{\"model\":\"$LOAD_MODEL\",\"prompt\":\"Give one concise family scheduling suggestion number $index.\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":256}}" \
-        >/dev/null
+      prompt="Give one concise family scheduling suggestion number $index."
+      if [[ "$LOAD_PROVIDER" == "sglang" ]]; then
+        # SGLang profiles publish only the OpenAI-compatible API on :30000.
+        curl -fsS http://127.0.0.1:30000/v1/chat/completions \
+          -H 'Content-Type: application/json' \
+          -d "{\"model\":\"$LOAD_MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"$prompt\"}],\"max_tokens\":256,\"chat_template_kwargs\":{\"enable_thinking\":false}}" \
+          >/dev/null
+      else
+        curl -fsS http://127.0.0.1:11434/api/generate \
+          -H 'Content-Type: application/json' \
+          -d "{\"model\":\"$LOAD_MODEL\",\"prompt\":\"$prompt\",\"stream\":false,\"think\":false,\"options\":{\"num_predict\":256}}" \
+          >/dev/null
+      fi
     done
   ) > "$LOAD_LOG" 2>&1 &
   OLLAMA_LOAD_PID=$!
@@ -570,7 +580,7 @@ if (( SKIP_GPU_LOAD == 0 )); then
   OLLAMA_LOAD_PID=""
   load_started="$STARTED_UTC"
   load_completed="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  record_result gpu_load "Ollama background load" "$load_code" "$load_started" "$load_completed" "${LOAD_LOG#$RESULT_ROOT/}"
+  record_result gpu_load "LLM background load ($LOAD_PROVIDER)" "$load_code" "$load_started" "$load_completed" "${LOAD_LOG#$RESULT_ROOT/}"
 
   python3 - "$RESULT_ROOT/tts-idle.json" "$RESULT_ROOT/tts-shared-gpu.json" "$RESULT_ROOT/tts-comparison.json" <<'PY' || true
 import json
