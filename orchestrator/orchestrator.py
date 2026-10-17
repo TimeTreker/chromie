@@ -2245,11 +2245,10 @@ class VoiceAssistant:
             for goal_id in evidence.coaffected_goal_ids
             if goal_id not in excluded_goal_ids
         ]
-        provenance_fn = getattr(self.conversation_state, "goal_reentry_provenance", None)
-        if not sibling_goal_ids or not callable(provenance_fn):
+        if not sibling_goal_ids:
             return {}
         statuses: dict[str, str] = {}
-        for item in provenance_fn(sibling_goal_ids):
+        for item in self.conversation_state.goal_reentry_provenance(sibling_goal_ids):
             goal_id = str(item.get("goal_id") or "")
             source_text = str(item.get("source_text") or "").strip()
             try:
