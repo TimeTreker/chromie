@@ -36,7 +36,7 @@
   "language": "zh-CN",
   "trusted_target_context": {
     "source": "live_perception",
-    "target_ref": "current_speaker",
+    "target_ref": "requester",
     "relative_direction": "front",
     "confidence": 1.0,
     "evidence_refs": ["scenario:look_while_blinking_twice:current_speaker_front"]

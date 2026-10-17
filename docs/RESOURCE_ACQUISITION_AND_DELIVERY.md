@@ -20,8 +20,11 @@ argument realization and capability selection. See the current
 The information-provider adapter `chromie.external_information.retrieve` is
 implemented but disabled until `AGENT_EXTERNAL_INFORMATION_ENABLED=1` and an
 exact provider endpoint is configured. Soridormi physical resource delivery is
-a live named-skill contract: Chromie imports it automatically when Soridormi
+a live named-skill contract in simulation: Chromie imports it automatically when Soridormi
 advertises `acquire_and_deliver_resource` with a matching physical-resource semantic scope through `soridormi.skill.list`.
+Chromie describes the resource, place and recipient in the agreed
+[body target format](EXECUTION_LANES_AND_COORDINATION.md#body-target-descriptions);
+Soridormi finds them and reports a typed non-completion when it cannot.
 
 ## Human responsibility
 
@@ -116,7 +119,7 @@ separate technical surface without changing Chromie's Mind.
   },
   "recipient": {
     "description": "requester",
-    "referent_id": null
+    "referent_id": "requester"
   },
   "delivery_mode": "physical_handover"
 }
@@ -147,11 +150,17 @@ Information example:
   },
   "recipient": {
     "description": "requester",
-    "referent_id": null
+    "referent_id": "requester"
   },
   "delivery_mode": "spoken_explanation"
 }
 ```
+
+The recipient's `referent_id` is the reserved `"requester"` for the person who made
+the request, a known discourse referent for someone else, or `null` when only the
+description names them. A recipient whose description is the reserved `requester`
+binds to that referent; Chromie never sends a Host discourse ID or `null` for the
+current speaker.
 
 `responsibility_type=acquire_and_deliver_resource` plus `resource.kind` is the
 canonical semantic discriminator. The removed `responsibility_variant` field is not
@@ -166,9 +175,9 @@ Those belong downstream.
 
 Physical resource planning consumes Chromie's **current Situation**, not a blank world and
 not a hidden provider-owned second brain. Soridormi owns sensor/device reads, detection,
-tracking, localization and execution-local physical details; Chromie owns the revisable
-Situation interpretation, relevance to Goals, Memory activation, semantic target choice,
-and Planner HOW reasoning.
+tracking, localization and resolving which physical object, place or person matches
+Chromie's description; Chromie owns the revisable Situation interpretation, relevance to
+Goals, Memory activation, the description of what it wants, and Planner HOW reasoning.
 
 The default sequence is:
 
@@ -194,8 +203,10 @@ reasonably resolve the missing semantic information or when the user must disamb
 intent.
 
 `provider_resolved` remains an execution-bound source state, not permission for Soridormi
-to reinterpret the Goal. When no authoritative source binding exists, the provider may
-resolve execution-local source details, while semantic target choice remains Chromie's.
+to reinterpret the Goal. Chromie says what it wants; Soridormi resolves the physical
+target from its perception. When the scene does not show one target matching the
+description, Soridormi reports a typed not-found or ambiguous non-completion instead of
+substituting a different object or place.
 
 ## Goal Association ownership
 
@@ -312,8 +323,8 @@ an unbound source is instead realized as `{"status":"unknown"}` in its required
 provider argument. That provider-owned input is not a missing user input and
 has no citation. Otherwise the unbound source is only `{"status":"known"}` plus cited
 evidence of where. The Fast Planner never retypes a location, distance or direction
-into it; the provider resolves the place itself and trusted code keeps the cited
-surface. If the person said where, the citation is the token span; Host materializes the
+into it; the provider resolves the place itself, reporting a typed non-completion when
+it cannot, and trusted code keeps the cited surface. If the person said where, the citation is the token span; Host materializes the
 exact quote as the canonical `source_quote`. If the current Situation observed it, the
 citation is `argument_sources.source={"situation_interpretation_ref": <interpretation_id>}`.
 The decoder offers only these shapes. Host admits a Situation citation only for a
@@ -535,7 +546,10 @@ A complete provider-scoped capability may advertise:
         "type": "object",
         "properties": {
           "description": {"type": "string", "minLength": 1},
-          "referent_id": {"type": ["string", "null"]}
+          "referent_id": {
+            "type": ["string", "null"],
+            "description": "\"requester\" for the person who made this request; null for anyone else."
+          }
         },
         "required": ["description"],
         "additionalProperties": false
@@ -588,10 +602,11 @@ second semantic world model. The split is:
 
 - Soridormi owns sensor/device access and provider-local perception mechanics such as
   camera/depth reads, detection, tracking, localization, navigation feedback, grasp
-  pose and trajectory control.
+  pose and trajectory control, and resolving which physical object, place or person
+  matches Chromie's description.
 - Chromie owns the cognitive Situation assembled from trusted typed observations,
-  relevance to current Goals, Memory activation, staleness/uncertainty, target choice
-  and Planner reasoning over those facts.
+  relevance to current Goals, Memory activation, staleness/uncertainty, the
+  description of what it wants and Planner reasoning over those facts.
 - the Planner consumes the bounded `Goal + Situation + Active Memory +
   Evidence + current Work` cognitive context. It does not receive raw image streams,
   SLAM internals or unbounded detector output.
@@ -600,7 +615,7 @@ second semantic world model. The split is:
   When no suitable current source is known, `source.status=provider_resolved` means
   only that the selected provider may perform bounded local search/perception required
   by that capability. It must not reinterpret the human Goal or silently substitute a
-  semantically different resource.
+  semantically different resource; a target it cannot find is a typed non-completion.
 - Active Perception remains Planner-owned information-acquisition Work when cognition
   needs a deliberate new observation. Ambient trusted perception may update Situation
   independently and be available before a user turn reaches Planner.
@@ -644,6 +659,12 @@ evidence may include:
   }
 }
 ```
+
+A typed not-found or ambiguous target is `completed: false` with a summary (and its
+reason code when Soridormi gives one). The adapter returns it as a failed result
+carrying that reason, never as completion; Chromie tells the person what was not
+found. Explicit numeric values the person states reach Soridormi unchanged; Soridormi
+may refuse one outside its limits as a limitation but never silently runs another.
 
 Chromie's adapter validates only the `completion_requires` declared by the exact
 capability that produced a result. Goal completion is stricter: the complete Plan and

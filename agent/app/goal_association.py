@@ -36,6 +36,7 @@ from shared.chromie_contracts.goal import (
     stable_goal_operation_id,
 )
 from shared.chromie_contracts.resource import (
+    REQUESTER_REFERENT_ID,
     AcquireAndDeliverResource,
     ResourceDescriptor,
     ResourceRecipient,
@@ -1003,6 +1004,7 @@ class GoalAssociationResolver:
                 recipient_referent_id = resource_item.recipient.referent_id
                 if (
                     recipient_referent_id
+                    and recipient_referent_id != REQUESTER_REFERENT_ID
                     and recipient_referent_id not in existing_referents
                     and recipient_referent_id not in introduced_by_value.values()
                 ):

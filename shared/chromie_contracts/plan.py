@@ -111,6 +111,21 @@ GoalOutcomeDisposition = Literal[
     "unavailable",
     "refused",
 ]
+# The Planner never refuses: whether Chromie should act is Value Judgment's
+# (VALUE-JUDGMENT-001). A Planner that cannot fulfil a Goal reports a limitation
+# (`unavailable`) or a real input gap (`clarify`). `refused` stays in the canonical
+# record types above for stored state, but every Planner-authored DTO rejects it.
+# The check is a validator rather than a narrower Literal so the decoder schemas,
+# which already never offer `refused`, stay byte-identical.
+def reject_planner_refusal(value: Any) -> Any:
+    if value == "refused":
+        raise ValueError(
+            "the Planner never refuses; report unavailable or clarify "
+            "(refusing is Value Judgment's)"
+        )
+    return value
+
+
 PlanTiming = Literal["sequential", "parallel"]
 PlanStepPurpose = Literal["achieve_effect", "acquire_information"]
 AuxiliaryActivityAnchorKind = Literal[
@@ -753,6 +768,11 @@ class FastPlannerAdvance(BaseModel):
     def normalize_advance_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
 
+    @field_validator("disposition")
+    @classmethod
+    def reject_advance_refusal(cls, value: Any) -> Any:
+        return reject_planner_refusal(value)
+
     @field_validator("covered_responsibility_refs", "unresolved", mode="before")
     @classmethod
     def normalize_advance_lists(cls, value: Any) -> list[str]:
@@ -788,10 +808,9 @@ class FastPlannerAdvance(BaseModel):
         if self.coverage != "complete" and self.disposition not in {
             "clarify",
             "unavailable",
-            "refused",
         }:
             raise ValueError(
-                "non-complete Fast Planner output must clarify, report unavailable, or refuse"
+                "non-complete Fast Planner output must clarify or report unavailable"
             )
         activity_ids = [item.activity_id for item in self.activities]
         if len(activity_ids) != len(set(activity_ids)):
@@ -881,6 +900,11 @@ class FastPlannerAdvanceModelOutput(BaseModel):
     @classmethod
     def normalize_output_text(cls, value: Any) -> Any:
         return normalize_whitespace(value)
+
+    @field_validator("disposition")
+    @classmethod
+    def reject_output_refusal(cls, value: Any) -> Any:
+        return reject_planner_refusal(value)
 
 
 

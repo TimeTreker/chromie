@@ -60,9 +60,11 @@ or re-entering Planner. Speech still requires confirmed playback before it enter
 heard dialogue. The admitted user-turn ID remains the delivery correlation when
 available; the distinct SC request ID remains the inference/snapshot identity.
 For Soridormi expression, the provider recognizes the Runtime-validated SC source
-and semantic owner. Its existing transport preflight still requires a low-risk,
-non-motion Capability, no confirmation requirement from request/definition/fresh
-body plan, and successful safety monitoring; this never fabricates user consent.
+and semantic owner. Its existing transport preflight still requires a skill
+Soridormi declares a low-risk expressive gesture (a nod, look or bow may move the
+body; locomotion, manipulation and delivery never qualify), no confirmation
+requirement from request/definition/fresh body plan, and successful safety
+monitoring; this never fabricates user consent.
 Grouped SC decorations retain optional-member status. Goal-free Situation ingress
 retains its own observation identity. Later Goal
 binding therefore cannot hide early speech or expression from the same turn.
@@ -139,8 +141,11 @@ turn-loop, delegation, observation, outcome-reconciliation, and final-response
 boundary between them. The host closes effectful cognitive turns through immutable plan/request/result
 correlation, per-Goal reconciliation, Goal-state updates, typed Evidence, and bounded
 Planner re-entry. Result meaning is not composed by Host: trusted terminal truth returns
-to Planner for Work revision and scoped communication needs, then to SC for
-interaction or silence. Automated contract evidence exists; retained provider-backed and live robot
+to Planner for Work revision and scoped communication needs, and reaches SC for
+interaction or silence. SC receives it through the Planner's Plan when the Planner revises
+Work, and directly, with a Runtime result Need, when Activation or the Planner chooses no
+further Work for a Goal whose Responsibility asked for a result; either way there is
+exactly one SC communication for that Evidence. Automated contract evidence exists; retained provider-backed and live robot
 evidence remains open and is owned by [STATUS.md](STATUS.md).
 
 ## Bounded addressedness before Core semantics
@@ -150,11 +155,12 @@ evidence, and a bounded recent-dialogue projection. That projection contains adm
 user dialogue plus assistant dialogue; Gateway-suppressed room speech may remain bounded
 input evidence but is not fed back as if Chromie had accepted it into the conversation.
 Recent exchange is context, not an automatic addressedness grant: a temporary
-user-authored rule such as "wait until I say Chromie" can suppress ambient nearby speech
-while allowing a later explicitly addressed turn. The Attention model makes one primary
-judgment. An internally contradictory output receives at most one schema-constrained
-repair; malformed, unavailable, or still-contradictory review fails open to ordinary Core
-cognition. There is no open-ended Attention critic or suppression-review chain.
+user-authored rule such as "wait until I say Chromie" makes ambient nearby speech
+unaddressed while allowing a later explicitly addressed turn. Attention Review makes one
+model call and suppresses only confident unaddressed ambient speech while engagement is
+inactive; malformed, low-confidence, contradictory, or unavailable review fails open to
+ordinary Core cognition with no repair or second call
+([Gateway §4.3](COGNITIVE_GATEWAY.md#43-attention-review--注意审查)).
 
 The executable loop applies `TURN-GOAL-BOUNDARY-001`, `PLANNER-AUTHORITY-001`, and `ASYNC-COGNITION-001`; these names refer to Charter invariants, not additional stages.
 
@@ -382,7 +388,9 @@ Evidence, provider state, due-time state, restored provider truth, cancellation,
 first form a bounded `CognitiveActivationContext` with exact provenance and the authorities
 structurally legal for that ingress. One narrow model decision may request an existing owner or
 no cognition. Runtime cannot replace that decision with `if event -> Planner/SC`. Goal-bound
-activation starts Fast Planner; only Fast may escalate to Deep. Goal-free Situation activation
+activation starts Fast Planner; only Fast may escalate to Deep. Activation gates Work
+reconsideration only: terminal Capability Evidence for a Goal whose Responsibility asked for
+a result reaches SC directly when no Planner communication of it follows. Goal-free Situation activation
 starts primary SC; only SC may request its deeper pass. Invalid or unavailable Activation fails
 closed and never fabricates progress.
 
@@ -1308,7 +1316,9 @@ independently turn the same terminal Evidence back into a requirement to repeat 
 completed Work. Planner, not a deterministic or model-backed post-execution composer,
 owns the semantic next-Work / respond / clarify / limitation decision. Social Cognition
 owns exact human-facing wording. Planner cannot treat the result as a new user turn,
-reassign it to another Goal, or add execution authority. Fast post-execution Evidence
+reassign it to another Goal, or add execution authority; new follow-up Work that uses a
+value-reviewed Capability not yet judged in the turn goes through Value Judgment before
+it starts (VALUE-JUDGMENT-001). Fast post-execution Evidence
 re-entry uses a dedicated minimal model-facing decision DTO that is deliberately disjoint
 from both `CanonicalPlan` and the ordinary Planner model DTO; Host deterministically lifts
 that validated decision back into the canonical Planner contract before the normal trusted
@@ -1396,7 +1406,9 @@ planned Work is recorded. Missing original Responsibility provenance or unavaila
 fresh provider truth fails closed and leaves the Goal recoverable for a later user
 turn; the Host does not reconstruct or guess a replacement Responsibility.
 
-Effectful Work produced by this re-entry still obeys the normal confirmation
+Effectful Work produced by this re-entry still obeys Value Judgment
+(VALUE-JUDGMENT-001: a reviewed Capability not yet judged in the turn is judged before
+it starts; one already judged reuses its verdict) and the normal confirmation
 boundary. Internal provider-state cognition cannot auto-confirm a body or other
 confirmation-requiring effect; if fresh Planner Work requires confirmation, the
 normal Confirmation Dialogue is staged again against the newly planned request.
@@ -1492,22 +1504,24 @@ while a motion stop revokes the whole token when any confirmed request is
 motion-bound or cannot be classified safely. That synchronous revocation is
 committed with the broad runtime receipt in the same Conversation State
 transaction, so Goal state and confirmation records cannot independently claim
-different outcomes. Named `specific_goal` cancellation uses a narrower
-contract. The host removes only requests wholly owned by the
-target Goals, creates an immutable `confirmation_remainder` child plan for the
-unaffected Goals, gives its requests fresh identities, and installs a fresh
-single-use token only after the cancellation evidence and Goal-state transition
-commit. A request or plan step shared by targeted and preserved Goals is not
+different outcomes. Named `specific_goal` cancellation of a Goal in a pending
+multi-Goal confirmation revokes that token as a whole after the cancellation
+evidence and Goal-state transition commit. The host creates no narrowed child
+plan, replacement confirmation wording, or "continue the rest" sentence; the
+cancellation Evidence re-enters the Planner, which decides what still-open
+sibling Work should happen next and stages a fresh confirmation if that Work
+needs one. A request or plan step shared by targeted and preserved Goals is not
 separable and fails closed.
 
-For non-urgent named cancellation, the Core resolves semantic Goal IDs only.
+For non-urgent named cancellation, Goal Association identifies the target Goal
+IDs; the Core resolves semantic Goal IDs only.
 The trusted host maps those IDs to the exact active interaction, committed plan
 ID and fingerprint, then dispatches `specific_goal` to Trusted Capability Runtime. Goal state
 is mutated only after the host validates one exact receipt for every
 execution-bound target, including selected requests and any stale, shared-owner,
 non-interruptible, provider-failure, dispatch-failure, or provider-widening
 evidence. The validated target cancellation, coaffected Goal transitions, and
-confirmation-token replacement are committed through one Conversation State
+confirmation-token revocation are committed through one Conversation State
 transaction plus a compare-and-swap of the prepared token without an intervening
 await. State-only Goals may close without runtime dispatch. If runtime/provider
 cancellation was attempted but receipt reconciliation or durable Goal-state
@@ -1613,8 +1627,8 @@ The contract-first loop baseline is implemented:
 7. ordinary overlapping turns retain independent lifecycle identity, while
    explicitly cancelled, superseded, stale-output, or recovery-waiting turns
    retain their evidence and suppress only invalid late final speech;
-8. recoverable embodied failures use a separately fingerprinted,
-   confirmation-bound child plan.
+8. recoverable embodied failures and partially cancelled confirmations re-enter
+   the Planner from Evidence; the Host creates no child plan.
 
 The five Gateway responsibilities remain logically distinct even when co-deployed.
 The Core uses typed User Meaning Interpretation and `CognitiveWorkRequest` contracts; no

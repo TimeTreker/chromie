@@ -1056,6 +1056,255 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(outcome["resource_acquired"])
         self.assertTrue(outcome["resource_delivered"])
 
+    @staticmethod
+    def _look_at_person_skill() -> dict[str, Any]:
+        return {
+            "skill_id": "look_at_person",
+            "description": "Look at a described person.",
+            "available": True,
+            "requires_confirmation": False,
+            "parameters_schema": {
+                "type": "object",
+                "properties": {
+                    "target_ref": {"type": "string"},
+                    "target_yaw_rad": {"type": "number", "default": 0.0},
+                    "target_pitch_rad": {"type": "number", "default": 0.0},
+                    "duration_s": {"type": "number", "minimum": 0.2, "maximum": 10.0},
+                },
+                "required": ["target_ref", "target_yaw_rad"],
+                "additionalProperties": False,
+            },
+        }
+
+    async def test_look_target_body_coordinates_never_cross_the_contract(self) -> None:
+        """Chromie describes whom to look at; Soridormi resolves where that is."""
+
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [self._look_at_person_skill()])
+        definition = registry.get("soridormi.look_at_person")
+        assert definition is not None
+        self.assertEqual(
+            set(definition.input_schema["properties"]), {"target_ref", "duration_s"}
+        )
+        self.assertEqual(definition.input_schema["required"], ["target_ref"])
+
+        invoker = _RecordingInvoker()
+        provider = SoridormiCapabilityProvider(invoker)
+        context = CapabilityExecutionContext(
+            interaction_id="look", trace=CapabilityTrace(
+                interaction_id="look", request_id="look-1",
+                capability_id="soridormi.look_at_person", provider_id="soridormi.mcp",
+            ),
+        )
+        result = await provider.execute(
+            CapabilityRequest(
+                request_id="look-1",
+                capability_id="soridormi.look_at_person",
+                args={"target_ref": "requester", "target_yaw_rad": 0.0},
+            ),
+            definition,
+            context,
+        )
+        self.assertEqual(
+            (result.status, result.reason_code),
+            ("failed", "body_frame_target_not_semantic"),
+        )
+        self.assertEqual(invoker.calls, [])
+
+    async def test_look_at_me_targets_the_requester(self) -> None:
+        """"Look at me" names the current speaker; Soridormi resolves where they are."""
+
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [self._look_at_person_skill()])
+        definition = registry.get("soridormi.look_at_person")
+        assert definition is not None
+        for target_ref, expected in (
+            ("me", "requester"), ("current_speaker", "requester"),
+            ("requester", "requester"), ("Alice", "Alice"),
+        ):
+            with self.subTest(target_ref=target_ref):
+                invoker = _RecordingInvoker()
+                await SoridormiCapabilityProvider(invoker).execute(
+                    CapabilityRequest(
+                        request_id="look-me",
+                        capability_id="soridormi.look_at_person",
+                        args={"target_ref": target_ref},
+                    ),
+                    definition,
+                    CapabilityExecutionContext(
+                        interaction_id="look", trace=CapabilityTrace(
+                            interaction_id="look", request_id="look-me",
+                            capability_id="soridormi.look_at_person",
+                            provider_id="soridormi.mcp",
+                        ),
+                    ),
+                )
+                planned = next(
+                    args for tool, args, _ in invoker.calls
+                    if tool == "soridormi.skill.create_plan"
+                )
+                self.assertEqual(planned["parameters"]["target_ref"], expected)
+
+    async def test_current_speaker_recipient_is_sent_as_requester(self) -> None:
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [{
+            "skill_id": "acquire_and_deliver_resource",
+            "available": True,
+            "requires_confirmation": False,
+            "parameters_schema": {
+                "type": "object",
+                "properties": {
+                    "resource": {"type": "object"},
+                    "source": {"type": "object"},
+                    "recipient": {"type": "object"},
+                },
+                "additionalProperties": False,
+            },
+        }])
+        definition = registry.get("soridormi.acquire_and_deliver_resource")
+        assert definition is not None
+        for recipient, expected in (
+            ({"description": "requester"}, {"description": "requester", "referent_id": "requester"}),
+            (
+                {"description": "requester", "referent_id": None},
+                {"description": "requester", "referent_id": "requester"},
+            ),
+            ({"description": "Alice", "referent_id": None}, {"description": "Alice", "referent_id": None}),
+        ):
+            with self.subTest(recipient=recipient):
+                invoker = _RecordingInvoker(overrides={
+                    "soridormi.skill.execute_plan": ToolCallOutcome.success({
+                        "completed": True,
+                        "skill_id": "acquire_and_deliver_resource",
+                        "resource_outcome": {
+                            "responsibility_type": "acquire_and_deliver_resource",
+                            "resource_kind": "physical_object",
+                            "resource_acquired": True,
+                            "resource_delivered": True,
+                        },
+                    }),
+                })
+                await SoridormiCapabilityProvider(invoker).execute(
+                    CapabilityRequest(
+                        request_id="fetch-1",
+                        capability_id="soridormi.acquire_and_deliver_resource",
+                        args={
+                            "resource": {"kind": "physical_object", "description": "water"},
+                            "source": {"status": "unknown"},
+                            "recipient": recipient,
+                        },
+                    ),
+                    definition,
+                    CapabilityExecutionContext(
+                        interaction_id="fetch", trace=CapabilityTrace(
+                            interaction_id="fetch", request_id="fetch-1",
+                            capability_id="soridormi.acquire_and_deliver_resource",
+                            provider_id="soridormi.mcp",
+                        ),
+                    ),
+                )
+                planned = next(
+                    args for tool, args, _ in invoker.calls
+                    if tool == "soridormi.skill.create_plan"
+                )
+                self.assertEqual(planned["parameters"]["recipient"], expected)
+
+    async def test_typed_not_found_is_a_limitation_not_completion(self) -> None:
+        summary = "Soridormi did not observe the requester, so it did not look."
+        invoker = _RecordingInvoker(overrides={
+            "soridormi.skill.execute_plan": ToolCallOutcome.success({
+                "completed": False, "skill_id": "nod_yes", "mode": "sim",
+                "no_motion": True, "reason_code": "target_not_found", "summary": summary,
+            }),
+        })
+        execution = await submit_and_wait_terminal(self._runtime(invoker),
+            InteractionResponse(capabilities=[
+                {"request_id": "nod-1", "capability_id": "soridormi.nod_yes", "args": {"count": 1}}
+            ]),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids={"nod-1"}, safety_monitor_active=True,
+            ),
+        )
+        result = execution.results[0]
+        self.assertEqual(
+            (execution.status, result.status, result.reason_code, result.message),
+            ("failed", "failed", "target_not_found", summary),
+        )
+        self.assertFalse(result.output["completed"])
+
+        # An activity member whose status says completed but whose own evidence says
+        # it did not complete is not completion.
+        request = CapabilityRequest(request_id="look-1", capability_id="soridormi.nod_yes")
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [{"skill_id": "nod_yes", "available": True}])
+        definition = registry.get("soridormi.nod_yes")
+        [member] = SoridormiCapabilityProvider(_RecordingInvoker())._member_results_from_activity(
+            [(request, definition, None)],
+            {"status": "completed", "member_results": {"look-1": {
+                "status": "completed", "completed": False,
+                "reason_code": "target_not_found", "summary": summary,
+            }}},
+            activity_id="act-1",
+            coordination_id="coord-1",
+        )
+        self.assertEqual((member.status, member.reason_code), ("failed", "target_not_found"))
+
+    def test_sc_decoration_admits_declared_expressive_gestures_not_locomotion(self) -> None:
+        """Social Cognition covers gestures; walking is never decoration."""
+
+        def definition_for(item: dict[str, Any]):
+            registry = CapabilityRegistry()
+            import_soridormi_capability_catalog(registry, [{
+                "available": True,
+                "requires_confirmation": False,
+                "parameters_schema": {"type": "object"},
+                **item,
+            }])
+            return registry.get(f"soridormi.{item['skill_id']}")
+
+        def concurrency(ability_class: str, coupling: str, resource: str) -> dict[str, Any]:
+            return {"concurrency": {
+                "ability_class": ability_class,
+                "control_coupling": coupling,
+                "write_resources": [resource],
+            }}
+
+        request = CapabilityRequest(
+            request_id="sc-gesture", capability_id="soridormi.nod_yes",
+            requires_confirmation=False, metadata={
+                "source": "social_cognition_auxiliary_activity",
+                "semantic_owner": "social_cognition", "auxiliary_plan_activity": True,
+            },
+        )
+        plan = {"requires_confirmation": False}
+        gesture = {"effects": ["physical_motion"], "safety_class": "physical_motion"}
+        for name, item, eligible in [
+            ("nod_overlay", {"skill_id": "nod_yes", **gesture,
+                **concurrency("subtle_expression", "body_command_overlay", "body.head_pose")}, True),
+            ("bow_standalone", {"skill_id": "bow", **gesture,
+                **concurrency("subtle_expression", "standalone_body_motion", "body.primary_motion")}, True),
+            ("look_low_risk", {"skill_id": "look_at_person", "effects": ["social_expression"],
+                "safety_class": "low_risk_action"}, True),
+            ("undeclared_motion", {"skill_id": "nod_yes", **gesture}, False),
+            ("walk", {"skill_id": "walk_forward", **gesture,
+                **concurrency("locomotion_whole_body", "primary_body_controller", "body.base")}, False),
+            ("walk_claiming_low_risk", {"skill_id": "walk_forward",
+                "effects": ["physical_motion"], "safety_class": "low_risk_action",
+                **concurrency("locomotion_whole_body", "primary_body_controller", "body.base")}, False),
+            ("delivery", {"skill_id": "acquire_and_deliver_resource",
+                "effects": ["physical_motion", "resource_delivery"], "safety_class": "physical_motion",
+                **concurrency("subtle_expression", "standalone_body_motion", "body.primary_motion")}, False),
+        ]:
+            with self.subTest(name=name):
+                definition = definition_for(item)
+                self.assertEqual(
+                    SoridormiCapabilityProvider._trusted_named_skill_preflight(
+                        request.model_copy(update={"capability_id": definition.capability_id}),
+                        definition, plan,
+                    ),
+                    eligible,
+                )
+
 
 if __name__ == "__main__":
     unittest.main()

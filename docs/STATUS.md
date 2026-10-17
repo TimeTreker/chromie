@@ -11,7 +11,7 @@ single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | One Planner ([PLANNER-AUTHORITY-001](PROJECT_CHARTER.md)): need-first Work begins with `ability_needs`; a non-fitting need triggers one Agent library search and one more plan; with no usable Capability the Planner reports an honest `unavailable` limitation. The Deep Planner, `/deep-plan` and escalation are retired. Value Judgment (VALUE-JUDGMENT-001, `POST /value-judgment`) reviews a turn once when its final Plan uses a Capability listed in `capabilities/value_review.json`; `ask` adds a confirmation, `decline` or any failure withholds the reviewed effects before provider start. Social Cognition owns every user-facing Communicative Activity; while a turn waits for Value Judgment, ingress admits only an acknowledgement. An information Responsibility with citable current perception may be answered from that cited observation. Latest repair on `main`: UMI lists Responsibilities in word order and ends a reply to news where the sharing ends. |
+| Implementation | One Planner ([PLANNER-AUTHORITY-001](PROJECT_CHARTER.md)): need-first Work begins with `ability_needs`; a non-fitting need triggers one Agent library search and one more plan; with no usable Capability the Planner reports an honest `unavailable` limitation. The Deep Planner, `/deep-plan` and escalation are retired. Value Judgment (VALUE-JUDGMENT-001, `POST /value-judgment`) reviews the turn's first Plan, and any later re-entry Plan in the turn that adds a not-yet-judged Capability listed in `capabilities/value_review.json` (an already judged one reuses its verdict); `ask` adds a confirmation, `decline` or any failure withholds the reviewed effects before provider start. Social Cognition owns every user-facing Communicative Activity; while a turn waits for Value Judgment, ingress admits only an acknowledgement. An information Responsibility with citable current perception may be answered from that cited observation. Latest repair on `main`: UMI lists Responsibilities in word order and ends a reply to news where the sharing ends. |
 | Automatic verification | Last recorded canonical gate (`./scripts/run_tests.sh`, clean worktree, latest delivery): pytest 3,845 passed + 5 skipped, benchmarks 169, legacy Agent tests 20, policies, docs and test ownership pass. Workflow corpus freeze 41 (`a36b1ebf…`); strict replay 6,000/6,000 with zero model calls. The replay corpus runs with an empty value-review list, so it has no Value Judgment coverage. |
 | Target validation | Everyday live-text cohort `scenarios/everyday/` (70 cases: 15-case `must_pass` smoke stage, then `core` and `challenge`) on Soridormi MuJoCo. Latest live runs on `rootcause18-20261016`: smoke 15/15 mechanical; core stopped at 4/55 on a hard UMI 503 that the latest repair addresses but which is not yet live. Core and challenge have not completed. Not qualified. No current-revision supervised physical audio or robot evidence (one historical physical voice turn is recorded in [Acceptance](ACCEPTANCE.md)). |
 | Deployment state | `chromie-agent:latest` = `rootcause18-20261016`; `rootcause19-20261016` (latest repair) built, not deployed. LLM serving uses SGLang per the maintained [hardware profiles](../HARDWARE_PROFILES.md). No release. Exact identities and commands: [Handoff](../HANDOFF.md). |
@@ -37,7 +37,7 @@ This describes current intended ownership, not full conformance; see the open wo
 
 | Existing owner | Source state and current proof limit |
 | --- | --- |
-| [Gateway](COGNITIVE_GATEWAY.md) / Host admission | Deterministic protective controls and immutable admitted turn exist. The Attention same-authority finding is unreviewed. Physical audio admission needs source-bound proof. |
+| [Gateway](COGNITIVE_GATEWAY.md) / Host admission | Deterministic protective controls and immutable admitted turn exist. Attention Review makes one call and suppresses only confident inactive ambient speech. Physical audio admission needs source-bound proof. |
 | [Turn lifecycle](COGNITIVE_TURN_LOOP.md) / Cognitive Runtime | Concurrent SC and GA/Work, exact identity, cancellation, prerequisite joins and Evidence re-entry exist. Text admission chronology is repaired and mechanically proved; native coverage and latency remain open. |
 | [Semantic authorities](SEMANTIC_AUTHORITY.md) / UMI, GA, Planner, Value Judgment, SC | Source ownership migration is implemented; preserved original wording is authoritative. Native coverage remains unqualified. |
 | [Agent Skills](AGENT_SKILLS_ARCHITECTURE.md) / Planner and registry | Semantic methods, Capability contracts and need-first library search exist. Frozen references are not independent native-model qualification. |
@@ -63,11 +63,14 @@ and the [checkpoint](../DEVELOPMENT_CHECKPOINT.md).
    perceived-answer turn; replays and unit tests cover them.
 3. Constrained Planner decoding runs about 12-15 tokens/s in grammar-heavy regions,
    so a second Planner pass can miss the turn deadline.
-4. Review the Attention same-authority and SC fresh-turn silence findings; qualify
+4. Review the SC fresh-turn silence finding; qualify
    Schema/DTO/native grammar, SC context budget and latency, provider scene and
    geographic Evidence, and Goal/action/provenance coverage.
 5. Narrow current-revision voice proof and the default
    [target-evidence profile](TARGET_EVIDENCE_CLOSURE.md). Physical evidence stays supervised.
+6. Widen UMI's `value_review` mark from deception requests to other harmful requests
+   outside the Capability review list (owner decision 2026-10-17); pending a UMI corpus
+   re-freeze, since the UMI prompt and schema change every recorded replay request.
 
 ## Evidence interpretation
 

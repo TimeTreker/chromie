@@ -959,11 +959,11 @@ Level A routing evidence must continue to prove:
   not depend on model output;
 - semantic ambient suppression is isolated to a structured addressedness and
   speech-act contract, requires inactive host engagement plus high confidence,
-  cannot authorize effects, suppresses only explicitly ambient acts, and fails
-  open to the original route on direct-question/request contradictions; one
-  schema-constrained model repair may correct an internally contradictory
-  `addressed=false` directed/unclear pair, but deterministic code must not
-  invent the ambient label;
+  cannot authorize effects, suppresses only explicitly ambient acts, makes one
+  model call, and fails open to the original route on invalid, low-confidence,
+  or contradictory output (including an `addressed=false` directed/unclear
+  pair) without a repair call; deterministic code must not invent the ambient
+  label;
 - the retained
   `user_meaning_interpretation/inactive_direct_weather_question_false_addressedness` scenario
   replays the inactive host context, grounded weather-tool decision, and false

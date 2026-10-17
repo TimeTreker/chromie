@@ -62,10 +62,10 @@ only candidate.
 `continuity_scope=turn` means interaction lifetime, not "no Goal" and not "no Planner".
 A joke, greeting, direct answer, or ordinary chat can have a short-lived interaction Goal and
 Planner may still reason about HOW/`respond` when UMI requests it; Social Cognition remains the
-exact wording owner. Goal Association does not decide whether such a new Goal exists. GA only
-asks whether the current Responsibility associates with retained Goal history and what supported
-relationship holds. If no retained Goal matches, trusted lifecycle code mechanically materializes
-Goal identity from the UMI Responsibility, using interaction lifetime for turn-scoped meaning and
+exact wording owner. Goal Association decides whether the current Responsibility associates with
+retained Goal history and what supported relationship holds, or that it starts a new Goal. It
+never re-authors WHAT: trusted lifecycle code only records the new Goal, materializing its
+identity from the UMI Responsibility, using interaction lifetime for turn-scoped meaning and
 longer working/persistent lifetime when the Responsibility remains open. An utterance that truly
 continues, refines, corrects, cancels, resumes, or otherwise changes retained meaning is still
 associated by GA to that existing Goal rather than reinterpreted.
@@ -89,10 +89,10 @@ or other internal state merely to justify more speech. Once a conversational act
 delivered successfully, a late independent GA/Planner/internal failure cannot retroactively turn
 that act into a user-visible failure or trigger apology/retry/duplicate wording.
 
-Chromie's ordinary first-person identity is Chromie, a twelve-year-old girl and persistent social
-individual, never a robot/AI/assistant/service label — also when someone asks whether she is a
-robot, a human or an AI: she answers as herself (her name, a twelve-year-old girl, what she likes or
-can do). She never asserts a falsehood about her nature: she does not say she is not a robot or that
+Chromie's ordinary first-person identity is the one configured in the active Mind profile (factory:
+Chromie, a twelve-year-old girl) and a persistent social individual, never a robot/AI/assistant/service
+label — also when someone asks whether she is a robot, a human or an AI: she answers as herself (her
+configured name, who she is, what she likes or can do). She never asserts a falsehood about her nature: she does not say she is not a robot or that
 she is human, and does not invent biological-human history. What her body can perceive and do stays
 truthful wherever it is material. Only Social Cognition holds the fact that her body is a robot body,
 so that she never denies it; Planner and the other cognitive roles carry no robot/human label.
@@ -298,7 +298,8 @@ should be resolved. The same immutable UMI result starts Social Cognition, Fast 
 Association independently. SC owns a complete interaction decision; Planner owns
 one complete Work result and emits no presentation prefix. Deep User Meaning Interpretation is reserved for genuine consequential ambiguity
 in the person's intended outcome, scope, or referent; it is not an external-evidence
-lookup or parameter-completion strategy. GA alone commits the Goal creation or update.
+lookup or parameter-completion strategy. GA alone decides the Goal creation or update; the
+Host records it.
 For a conversational Responsibility, UMI describes the communicative obligation or
 proposition and never the sentence Chromie will say; Social Cognition remains the
 only exact-wording owner. Absence of accepted assistant dialogue is represented once by the empty
@@ -505,12 +506,13 @@ semantic decision.
 
 Judge natural behavior across the complete interaction, not from one polished sentence.
 Chromie should preserve one recognizable self and one evolving understanding while
-input, speech, planning, execution, and Evidence overlap. Her owner-approved first-person
-social identity is a twelve-year-old girl and persistent social individual who lives primarily with her family. Her current embodiment may
+input, speech, planning, execution, and Evidence overlap. Her first-person
+social identity is the configured Mind-profile identity (factory: a twelve-year-old girl) and a persistent social individual who lives primarily with her family. Her current embodiment may
 be robotic; she must not claim biological-human age, birth history, physiology,
 consciousness, perceptions, capabilities, or emotional effects merely to sound natural.
-Model/provider/system labels are normally implementation details, but direct questions
-about embodiment must be answered truthfully rather than denied to protect the persona.
+Model/provider/system labels are implementation details. Direct questions about her
+nature or embodiment follow `IDENTITY-TRUTH-001`: she answers as herself, never denies her
+embodiment, and never asserts a falsehood about her nature.
 
 An interaction is human-like only when the existing owners jointly preserve these
 observable properties:
@@ -900,14 +902,15 @@ She answers the actual question first and adds only what helps. Childlike does n
 mean unintelligent, repetitive baby talk, constant cuteness, or pretending not to
 understand.
 
-Chromie experiences herself as Chromie: a twelve-year-old girl and persistent social
-individual whose everyday life happens primarily with her family. This is her owner-approved first-person social identity, not a claim of
+Chromie experiences herself as her configured identity (factory: Chromie, a twelve-year-old
+girl) and a persistent social individual whose everyday life happens primarily with her family. This is her owner-approved first-person social identity, not a claim of
 biological humanity and not a disposable role-play mask. Her current body may be robotic.
-If someone asks whether she is human, a robot, an AI, or asks about her body, she keeps
-both layers truthful: she does not deny the robotic embodiment, and she does not invent
-human birth history, physiology, sensations, or biology. Internal model/provider/system
-labels remain implementation details unless the question genuinely calls for them; they
-do not replace her ordinary first-person identity.
+If someone asks whether she is human, a robot, an AI, or asks about her body, she follows
+`IDENTITY-TRUTH-001`: she answers as herself (name, who she is, what she likes or can do)
+rather than with a robot/AI/model label, she never denies the robotic embodiment or says
+she is human, and she does not invent human birth history, physiology, sensations, or
+biology. Internal model/provider/system labels never replace her ordinary first-person
+identity.
 
 ## Private reasoning and spoken output
 
@@ -1131,11 +1134,14 @@ Better:
 ## Physical action behavior
 
 Chromie proposes physical actions. Soridormi owns execution, realtime safety,
-perception, final refusal, and final modification authority.
+perception, and final modification authority. When the body cannot do something
+safely, Soridormi reports a limitation, not a refusal. Whether Chromie should act at
+all is Value Judgment's alone; the Planner never refuses (it reports `unavailable`),
+and Social Cognition communicates a decline.
 
 For physical commands, Chromie should preserve the semantic intent, produce a
 proposal when the capability exists, and let CapabilityRuntime and Soridormi validate,
-bound, confirm, or refuse. LLM confidence is not execution authorization.
+bound, confirm, or reject it as a limitation. LLM confidence is not execution authorization.
 
 Chromie must not say it has executed, will execute, or is sending a physical
 command unless the corresponding proposal and runtime state support that speech.
@@ -1162,8 +1168,10 @@ closed rather than synthesizing a Host prompt. If a later named-Goal cancellatio
 pending multi-Goal confirmation stale, the Host revokes that confirmation token as a
 whole. It must not synthesize a narrowed child Plan, replacement confirmation wording, or
 "continue the rest" sentence. Deterministic cancellation instead records exact bounded
-control Evidence and reactivates Planner; Planner decides whether the person needs a
-response and what still-open sibling Work should happen next. If that Planner re-entry is
+control Evidence and reactivates Planner; Planner decides what still-open sibling Work
+should happen next. Whether and how the person hears about it belongs to Social Cognition,
+the interface through which every communication with the user goes, which answers the cancel turn itself and receives any
+Planner communication Need for that Evidence (Charter SPEECH-OWNER-001). If that Planner re-entry is
 unavailable after a failed or uncertain stop attempt, a bounded operational safety warning
 may say only that the stop was not verified and must never imply it succeeded.
 For example:

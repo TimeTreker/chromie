@@ -142,7 +142,9 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.source, "cognitive_gateway.attention_review_model")
         self.assertEqual(client.calls, 1)
 
-    async def test_bare_chinese_greeting_primary_false_negative_is_repaired(self) -> None:
+    async def test_bare_chinese_greeting_false_negative_admits_without_second_call(
+        self,
+    ) -> None:
         client = _Client(
             results=[
                 {
@@ -163,28 +165,14 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.disposition, "admit")
         self.assertEqual(result.speech_act, "greeting")
-        self.assertEqual(result.source, "cognitive_gateway.attention_review_model_repair")
-        self.assertEqual(client.calls, 2)
-
-    async def test_bare_chinese_greeting_fails_open_if_repair_remains_wrong(self) -> None:
-        wrong = {
-            "addressed": False,
-            "speech_act": "ambient_report",
-            "confidence": 0.98,
-        }
-        client = _Client(results=[wrong, wrong])
-        reviewer = AttentionReviewer(client)
-
-        result = await reviewer.review(self.request("你好。"))
-
-        self.assertEqual(result.disposition, "admit")
-        self.assertEqual(result.speech_act, "greeting")
         self.assertEqual(result.confidence, 0.0)
         self.assertEqual(result.source, "cognitive_gateway.attention_review_fail_open")
         self.assertIn("surface_direct_address:bare_greeting", result.reason)
-        self.assertEqual(client.calls, 2)
+        self.assertEqual(client.calls, 1)
 
-    async def test_question_form_false_ambient_label_is_repaired(self) -> None:
+    async def test_question_form_false_ambient_label_admits_without_second_call(
+        self,
+    ) -> None:
         client = _Client(
             results=[
                 {
@@ -205,25 +193,34 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.disposition, "admit")
         self.assertEqual(result.speech_act, "question")
-        self.assertEqual(result.source, "cognitive_gateway.attention_review_model_repair")
-        self.assertEqual(client.calls, 2)
+        self.assertEqual(result.source, "cognitive_gateway.attention_review_fail_open")
+        self.assertIn("surface_direct_address:question_form", result.reason)
+        self.assertEqual(client.calls, 1)
 
-    async def test_high_confidence_unaddressed_unclear_fragment_repairs_then_fails_open(
+    async def test_unaddressed_directed_speech_act_admits_without_second_call(
         self,
     ) -> None:
         client = _Client(
-            results=[
-                {
-                    "addressed": False,
-                    "speech_act": "unclear",
-                    "confidence": 0.90,
-                },
-                {
-                    "addressed": False,
-                    "speech_act": "unclear",
-                    "confidence": 0.93,
-                },
-            ]
+            {"addressed": False, "speech_act": "request", "confidence": 0.95}
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(self.request("Bring the cup over here"))
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.source, "cognitive_gateway.attention_review_fail_open")
+        self.assertIn("unaddressed_direct_speech_act:request", result.reason)
+        self.assertEqual(client.calls, 1)
+
+    async def test_high_confidence_unaddressed_unclear_fragment_admits_in_one_call(
+        self,
+    ) -> None:
+        client = _Client(
+            {
+                "addressed": False,
+                "speech_act": "unclear",
+                "confidence": 0.90,
+            }
         )
         reviewer = AttentionReviewer(client)
 
@@ -232,10 +229,39 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.disposition, "admit")
         self.assertEqual(result.speech_act, "unclear")
         self.assertEqual(result.source, "cognitive_gateway.attention_review_fail_open")
-        self.assertIn("after one repair", result.reason)
-        self.assertEqual(client.calls, 2)
+        self.assertIn("unaddressed_unclear", result.reason)
+        self.assertEqual(client.calls, 1)
 
-    async def test_recent_exchange_with_temporary_address_rule_is_reviewed_once(self) -> None:
+    async def test_low_confidence_inactive_ambient_is_admitted(self) -> None:
+        client = _Client(
+            {"addressed": False, "speech_act": "ambient_report", "confidence": 0.6}
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(self.request("The train arrived at noon."))
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertIn("addressed_or_low_confidence", result.reason)
+        self.assertEqual(client.calls, 1)
+
+    async def test_invalid_model_output_admits_without_second_call(self) -> None:
+        client = _Client(
+            results=[
+                {"addressed": False, "speech_act": "ambient_report"},
+                {"addressed": False, "speech_act": "ambient_report", "confidence": 0.99},
+            ]
+        )
+        reviewer = AttentionReviewer(client)
+
+        result = await reviewer.review(self.request("The train arrived at noon."))
+
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.source, "cognitive_gateway.attention_review_fail_open")
+        self.assertEqual(client.calls, 1)
+
+    async def test_recent_exchange_is_never_suppressed_even_under_temporary_address_rule(
+        self,
+    ) -> None:
         client = _Client(
             {
                 "addressed": False,
@@ -259,12 +285,13 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
 
         result = await reviewer.review(request)
 
-        self.assertEqual(result.disposition, "suppress")
+        self.assertEqual(result.disposition, "admit")
+        self.assertEqual(result.speech_act, "ambient_report")
+        self.assertEqual(result.source, "cognitive_gateway.attention_review_model")
+        self.assertIn("engagement_active", result.reason)
         self.assertEqual(client.calls, 1)
-        prompt = client.result  # keep fake result untouched; inspect generated prompt below
-        del prompt
 
-    async def test_active_task_is_context_not_automatic_semantic_admission(self) -> None:
+    async def test_active_task_admits_confident_ambient_narration(self) -> None:
         client = _Client(
             {
                 "addressed": False,
@@ -282,7 +309,8 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        self.assertEqual(result.disposition, "suppress")
+        self.assertEqual(result.disposition, "admit")
+        self.assertIn("engagement_active", result.reason)
         self.assertEqual(client.calls, 1)
 
     async def test_active_exchange_reply_cannot_be_marked_unaddressed(self) -> None:
@@ -308,7 +336,7 @@ class CognitiveGatewayAttentionReviewTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.disposition, "admit")
         self.assertEqual(result.source, "cognitive_gateway.attention_review_fail_open")
-        self.assertEqual(client.calls, 2)
+        self.assertEqual(client.calls, 1)
 
     async def test_model_failure_is_fail_open(self) -> None:
         reviewer = AttentionReviewer(_Client(error=TimeoutError("slow")))

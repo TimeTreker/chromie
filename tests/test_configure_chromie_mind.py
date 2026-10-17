@@ -106,3 +106,63 @@ def test_customer_reset_is_recoverable(tmp_path: Path, capsys: object) -> None:
     assert result["status"] == "reset_to_factory_default"
     assert not output.exists()
     assert Path(result["recoverable_archive"]).is_file()
+
+
+def test_shipped_env_layers_keep_customer_profile_and_its_social_style(
+    tmp_path: Path,
+    capsys: object,
+) -> None:
+    from scripts.generate_runtime_env import parse_env_file
+
+    output = tmp_path / ".chromie" / "mind" / "active_profile.json"
+    main(
+        [
+            "--base-profile",
+            str(FACTORY),
+            "--output",
+            str(output),
+            "--name",
+            "Nova",
+            "--social-style",
+            "reserved",
+            "--apply",
+        ]
+    )
+    capsys.readouterr()  # type: ignore[attr-defined]
+
+    shipped_layers = [
+        ROOT / ".env.common",
+        *sorted((ROOT / "env" / "profiles").glob("*.env")),
+        *sorted((ROOT / "env" / "modes").glob("*.env")),
+    ]
+    for layer in shipped_layers:
+        values = parse_env_file(layer)
+        assert "ORCH_MIND_PROFILE_PATH" not in values, layer
+        assert "ORCH_SOCIAL_INTERACTION_STYLE_PRESET" not in values, layer
+
+    common = dict(parse_env_file(ROOT / ".env.common"))
+    settings = HostSettingsSnapshot.from_env(project_root=tmp_path, environ=common)
+    assert settings.mind.profile_path == output.resolve()
+    manager = MindManager.from_settings(settings.mind)
+    assert manager.profile.identity.name == "Nova"
+    assert manager.profile.social_interaction_style.preset == "reserved"
+
+    output.unlink()
+    factory_copy = tmp_path / "config" / "mind" / "chromie_default.json"
+    factory_copy.parent.mkdir(parents=True)
+    factory_copy.write_text(FACTORY.read_text(encoding="utf-8"), encoding="utf-8")
+    factory_settings = HostSettingsSnapshot.from_env(project_root=tmp_path, environ=common)
+    assert factory_settings.mind.profile_path == factory_copy.resolve()
+    assert MindManager.from_settings(factory_settings.mind).profile.identity.name == "Chromie"
+
+
+def test_operator_social_style_override_applies_only_when_set(tmp_path: Path) -> None:
+    settings = HostSettingsSnapshot.from_env(
+        project_root=ROOT,
+        environ={
+            "ORCH_MIND_PROFILE_PATH": str(FACTORY),
+            "ORCH_SOCIAL_INTERACTION_STYLE_PRESET": "neutral",
+        },
+    )
+    assert settings.mind.profile_path == FACTORY.resolve()
+    assert MindManager.from_settings(settings.mind).profile.social_interaction_style.preset == "neutral"

@@ -31,11 +31,18 @@ from shared.chromie_contracts.interaction import (
     CapabilityRequest, CapabilityResult, CapabilityTraceEvent,
 )
 from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
+from shared.chromie_contracts.resource import REQUESTER_REFERENT_ID, requester_recipient
 from shared.chromie_contracts.semantic_capability import (
     normalize_semantic_capability_facade,
     realize_semantic_capability_args,
 )
-from shared.chromie_contracts.soridormi_body_contract import normalize_soridormi_body_contract
+from shared.chromie_contracts.soridormi_body_contract import (
+    ABILITY_CLASS_SUBTLE_EXPRESSION,
+    BODY_FRAME_LOOK_TARGET_FIELDS,
+    CONTROL_COUPLING_PRIMARY,
+    normalize_soridormi_body_contract,
+    without_body_frame_look_target,
+)
 
 from .capability_runtime import (
     CapabilityDefinition,
@@ -45,6 +52,52 @@ from .capability_runtime import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# Effects that make a body skill more than an expressive gesture. A Social
+# Cognition decoration may move the head or body expressively; it never walks,
+# manipulates objects or delivers a resource.
+_NON_EXPRESSIVE_EFFECTS = frozenset(
+    {"locomotion", "object_manipulation", "resource_delivery"}
+)
+
+
+# Gaze skills whose person target Soridormi resolves from ``target_ref``.
+REQUESTER_GAZE_CAPABILITY_IDS = frozenset({"soridormi.look_at_person"})
+# Ways a plan may name the current speaker as a gaze target.
+_SPEAKER_TARGET_REFS = frozenset(
+    {"", REQUESTER_REFERENT_ID, "me", "user", "speaker", "current_speaker", "the requester"}
+)
+
+
+def _described_target_args(args: dict[str, Any], *, capability_id: str = "") -> dict[str, Any]:
+    """Return provider args with the agreed target description format applied.
+
+    The current speaker is the reserved ``referent_id="requester"``; a gaze at
+    the person without another named target ("look at me") is
+    ``target_ref="requester"``. Other descriptions and explicit referents are
+    passed exactly as authored.
+    """
+
+    if capability_id in REQUESTER_GAZE_CAPABILITY_IDS:
+        target_ref = str(args.get("target_ref") or "").strip()
+        if target_ref.casefold() in _SPEAKER_TARGET_REFS and target_ref != REQUESTER_REFERENT_ID:
+            args = {**args, "target_ref": REQUESTER_REFERENT_ID}
+    recipient = args.get("recipient")
+    if not isinstance(recipient, dict):
+        return args
+    bound = requester_recipient(recipient)
+    return args if bound is recipient else {**args, "recipient": bound}
+
+
+def _body_frame_look_target_error(args: dict[str, Any]) -> str | None:
+    supplied = sorted(BODY_FRAME_LOOK_TARGET_FIELDS & set(args))
+    if not supplied:
+        return None
+    return (
+        "Chromie describes look targets semantically; Soridormi resolves body "
+        "coordinates. Refusing body-frame arguments: " + ", ".join(supplied)
+    )
 
 
 SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA: dict[str, Any] = {
@@ -164,7 +217,7 @@ def import_soridormi_capability_catalog(
             capability_id=capability_id,
             provider_input_schema=provider_input_schema,
         )
-        input_schema = (
+        input_schema = without_body_frame_look_target(
             dict(semantic_facade["input_schema"])
             if semantic_facade
             else dict(provider_input_schema)
@@ -301,14 +354,25 @@ class SoridormiCapabilityProvider:
             or request.capability_id.removeprefix("soridormi.")
         )
         semantic_facade = definition.metadata.get("semantic_facade")
+        coordinate_error = _body_frame_look_target_error(request.args)
+        if coordinate_error:
+            return CapabilityResult(
+                request_id=request.request_id,
+                capability_id=request.capability_id,
+                capability_version=definition.version,
+                status="failed",
+                provider_id=self.provider_id,
+                reason_code="body_frame_target_not_semantic",
+                message=coordinate_error,
+            )
         try:
-            provider_args = realize_semantic_capability_args(
+            provider_args = _described_target_args(realize_semantic_capability_args(
                 request.args,
                 facade=semantic_facade,
                 provider_input_schema=definition.metadata.get("provider_input_schema")
                 or definition.input_schema,
                 capability_id=request.capability_id,
-            )
+            ), capability_id=request.capability_id)
         except ValueError as exc:
             return CapabilityResult(
                 request_id=request.request_id,
@@ -440,7 +504,8 @@ class SoridormiCapabilityProvider:
         # A declared non-completion is evidence like a completion: both expose only the
         # declared adapter fields, so the person can be told why (live 2026-10-14: a
         # failed fetch reached re-entry only as schema_invalid and was spoken as "a fatal
-        # schema error"). Soridormi's full payload stays diagnostic metadata.
+        # schema error"). Soridormi's full payload stays diagnostic metadata. A typed
+        # provider reason (for example a target it did not find) is kept as the reason.
         return CapabilityResult(
             request_id=request.request_id,
             capability_id=request.capability_id,
@@ -453,7 +518,12 @@ class SoridormiCapabilityProvider:
                 if completed
                 else {"provider_output": self._canonical_provider_output(executed.output, request=request)}
             ),
-            reason_code=None if completed else "execution_incomplete",
+            reason_code=(
+                None
+                if completed
+                else self._typed_non_completion_reason(executed.output)
+                or "execution_incomplete"
+            ),
             message=(
                 ""
                 if completed
@@ -503,14 +573,22 @@ class SoridormiCapabilityProvider:
             # provider-local args, never the semantic facade (live 2026-10-12:
             # a grouped curve_walk sent semantic ``direction`` and failed).
             semantic_facade = definition.metadata.get("semantic_facade")
+            coordinate_error = _body_frame_look_target_error(request.args)
+            if coordinate_error:
+                return self._group_terminal_results(
+                    items,
+                    status="failed",
+                    reason_code="body_frame_target_not_semantic",
+                    message=f"{request.capability_id}: {coordinate_error}",
+                )
             try:
-                provider_args = realize_semantic_capability_args(
+                provider_args = _described_target_args(realize_semantic_capability_args(
                     request.args,
                     facade=semantic_facade,
                     provider_input_schema=definition.metadata.get("provider_input_schema")
                     or definition.input_schema,
                     capability_id=request.capability_id,
-                )
+                ), capability_id=request.capability_id)
             except ValueError as exc:
                 return self._group_terminal_results(
                     items,
@@ -894,7 +972,9 @@ class SoridormiCapabilityProvider:
                 )
                 continue
             raw_status = str(raw.get("status") or "").strip()
-            completed = raw.get("completed") is True or raw_status == "completed"
+            completed = raw.get("completed") is True or (
+                raw_status == "completed" and raw.get("completed") is not False
+            )
             cancelled = raw.get("cancelled") is True or raw_status == "cancelled"
             status = "completed" if completed else "cancelled" if cancelled else "failed"
             upstream_skill_id = str(
@@ -938,6 +1018,56 @@ class SoridormiCapabilityProvider:
         return results
 
     @staticmethod
+    def _typed_non_completion_reason(output: dict[str, Any]) -> str | None:
+        reason = output.get("reason_code")
+        if not isinstance(reason, str):
+            return None
+        reason = reason.strip()
+        if not reason or not reason.replace("_", "").isalnum() or not reason.islower():
+            return None
+        return reason
+
+    @staticmethod
+    def _expressive_gesture(definition_metadata: dict[str, Any]) -> bool:
+        """Whether Soridormi declares a low-risk expressive (non-locomotion) skill.
+
+        Social Cognition decoration covers gestures: a nod, a look or a bow is an
+        expressive motion. Soridormi declares that either as
+        ``safety_class=low_risk_action`` without a physical-motion effect, or as a
+        ``subtle_expression`` ability on the subtle-expression body lane. Locomotion,
+        whole-body control, manipulation and delivery are never decoration.
+        """
+
+        safety_class = str(definition_metadata.get("safety_class") or "").strip()
+        effects = {
+            str(value).strip()
+            for value in definition_metadata.get("effects", [])
+            if str(value).strip()
+        }
+        ability_class = str(definition_metadata.get("ability_class") or "").strip()
+        body_lane = str(definition_metadata.get("body_lane") or "").strip()
+        control_coupling = str(
+            definition_metadata.get("control_coupling") or ""
+        ).strip()
+        if effects & _NON_EXPRESSIVE_EFFECTS:
+            return False
+        if control_coupling == CONTROL_COUPLING_PRIMARY or body_lane in {
+            "locomotion",
+            "whole_body",
+            "safety",
+        }:
+            return False
+        if ability_class and ability_class != ABILITY_CLASS_SUBTLE_EXPRESSION:
+            return False
+        if safety_class == "low_risk_action" and "physical_motion" not in effects:
+            return True
+        return bool(
+            ability_class == ABILITY_CLASS_SUBTLE_EXPRESSION
+            and body_lane == "subtle_expression"
+            and safety_class in {"low_risk_action", "physical_motion"}
+        )
+
+    @staticmethod
     def _trusted_named_skill_preflight(
         request: CapabilityRequest,
         definition: CapabilityDefinition,
@@ -953,7 +1083,8 @@ class SoridormiCapabilityProvider:
         * Soridormi's freshly created plan says ``requires_confirmation=false``;
         * the live named-skill definition and committed request agree;
         * the request came from either a goal-grounded canonical plan or a reviewed
-          SC-owned auxiliary activity; and
+          SC-owned auxiliary activity whose skill Soridormi declares a low-risk
+          expressive gesture (never locomotion); and
         * Soridormi's safety monitor has already accepted the motion.
 
         This is not a fabricated ``confirmed=true`` claim.  The execution context
@@ -968,18 +1099,12 @@ class SoridormiCapabilityProvider:
         )
         source = str(metadata.get("source") or "").strip()
         safety_class = str(definition_metadata.get("safety_class") or "").strip()
-        effects = {
-            str(value).strip()
-            for value in definition_metadata.get("effects", [])
-            if str(value).strip()
-        }
 
         reviewed_auxiliary = bool(
             source == "social_cognition_auxiliary_activity"
             and metadata.get("semantic_owner") == "social_cognition"
             and metadata.get("auxiliary_plan_activity") is True
-            and safety_class == "low_risk_action"
-            and "physical_motion" not in effects
+            and SoridormiCapabilityProvider._expressive_gesture(definition_metadata)
         )
         canonical_goal_action = bool(
             source == "goal_driven_canonical_plan"

@@ -238,12 +238,49 @@ class ResourceSource(BaseModel):
         return self
 
 
+REQUESTER_REFERENT_ID = "requester"
+"""Reserved person referent for the person who made the current request.
+
+Body providers resolve the physical person from their own perception; Chromie
+only names whom it means. Soridormi requires exactly this literal for the current
+speaker, so a Host-generated discourse ID never stands in for the requester.
+"""
+
+
+def requester_recipient(value: Any) -> Any:
+    """Bind the reserved ``requester`` description to its reserved referent.
+
+    The contract's own default recipient is ``description="requester"``. Its
+    referent is the reserved :data:`REQUESTER_REFERENT_ID`, not ``null``; any other
+    description or an explicit referent is left exactly as authored.
+    """
+
+    if not isinstance(value, dict):
+        return value
+    description = normalize_whitespace(
+        value.get("description", REQUESTER_REFERENT_ID) or ""
+    )
+    if (
+        description.casefold() == REQUESTER_REFERENT_ID
+        and value.get("referent_id") in (None, "")
+    ):
+        return {**value, "referent_id": REQUESTER_REFERENT_ID}
+    return value
+
+
 class ResourceRecipient(BaseModel):
-    """Who should receive the resource after acquisition."""
+    """Who should receive the resource after acquisition.
+
+    ``referent_id`` is :data:`REQUESTER_REFERENT_ID` for the current speaker, a
+    known discourse referent for someone else, or ``null`` when only the
+    description identifies the recipient. The retained ``description="requester"``
+    default is bound to that referent by :func:`requester_recipient` at the body
+    provider boundary.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    description: str = Field(default="requester", min_length=1)
+    description: str = Field(default=REQUESTER_REFERENT_ID, min_length=1)
     referent_id: str | None = None
 
     @field_validator("description", "referent_id", mode="before")

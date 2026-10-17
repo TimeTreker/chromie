@@ -67,6 +67,11 @@ SC receives the following in its primary interaction request:
 Candidate projection is mechanical. A candidate must be available, executable,
 confirmation-free, parallel-capable with declared concurrency metadata, free of
 model-facing low-level motor fields, and explicitly tagged for the behavior domain.
+Gestures are part of SC's communication: a nod, a look or a bow is an eligible
+motion expression when Soridormi declares it a low-risk expressive skill
+(`safety_class=low_risk_action` without a physical-motion effect, or a
+`subtle_expression` ability). Locomotion, whole-body control, manipulation and
+delivery are never decoration.
 Provider, backend, calibration, controller, joint, and actuator identity are not
 shown to the model.
 
@@ -140,7 +145,11 @@ Target priority is:
 3. no targeted behavior.
 
 Installation coordinates and calibration are not semantic target evidence.
-Soridormi resolves an accepted semantic target for the active embodiment.
+Chromie describes the target in the agreed
+[body target format](EXECUTION_LANES_AND_COORDINATION.md#body-target-descriptions)
+(the current speaker is `"requester"`) and never sends body-frame yaw/pitch;
+Soridormi resolves the person from its perception for the active embodiment. A
+target it cannot find is a typed non-completion, never a straight-ahead look.
 
 Recent accepted and terminal auxiliary evidence may be projected into a later
 SC call to support restraint and variety. It does not create a global

@@ -831,7 +831,7 @@ a structured `{"text": ...}` envelope. Only that validated field can reach TTS;
 raw prose, malformed JSON, truncated output, and any separate `thinking` field are
 retained only as bounded observability metadata and never spoken.
 
-Prompts ask the model to speak as Chromie, the owner-approved twelve-year-old person,
+Prompts ask the model to speak as the configured Mind-profile identity (factory: Chromie, a twelve-year-old girl),
 rather than as a backend model. If the first draft uses a stock model disclaimer
 such as "as an AI" or "I do not have personal opinions", the Agent retries once
 and asks the model to choose the right natural answer mode: factual answer,

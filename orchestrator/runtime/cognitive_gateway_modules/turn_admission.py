@@ -58,20 +58,6 @@ class TurnAdmission:
             admission="reflex_and_admit",
         )
 
-    def for_confirmation(self, capture: GatewayTurnCapture) -> UserTurnEnvelope:
-        return self._envelope(
-            capture,
-            snapshot=None,
-            reflex=self._continued_reflex(capture),
-            attention=AttentionFinding(
-                disposition="admit",
-                source="orchestrator.confirmation_dialogue",
-                confidence=1.0,
-                reason="input is evaluated against a pending confirmation",
-            ),
-            admission="admit",
-        )
-
     def for_direct(
         self,
         capture: GatewayTurnCapture,

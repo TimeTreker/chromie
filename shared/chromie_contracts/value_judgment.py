@@ -3,7 +3,8 @@
 Value Judgment answers only whether Chromie should act on a request: proceed, ask, or
 decline with a reason. It never decides how, never selects or edits Capabilities and never
 writes what Chromie says. It runs only for Plans that would use a value-reviewed
-Capability (the owner-editable list below).
+Capability (the owner-editable list below), on the turn's first Plan and on any later Plan
+of the turn that adds one not yet judged.
 """
 from __future__ import annotations
 
@@ -40,7 +41,7 @@ class ValueJudgmentModelOutput(BaseModel):
 
 
 class ValueJudgmentResult(BaseModel):
-    """One judgment for one turn; a failed judgment withholds reviewed effects (fail closed)."""
+    """One judgment for what a Plan adds unjudged in its turn; a failed judgment withholds reviewed effects (fail closed)."""
 
     model_config = ConfigDict(extra="forbid")
 

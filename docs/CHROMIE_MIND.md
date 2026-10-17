@@ -115,11 +115,17 @@ Concrete identity and personality values live in
 `ChromieIdentity` defines required fields and validation; concrete profile values are
 configuration rather than hardcoded conversational answers.
 
-The maintained runtime selects the profile with:
+The maintained runtime selects the profile automatically: the customer profile
+`.chromie/mind/active_profile.json` when present, otherwise the factory profile
+`config/mind/chromie_default.json`. The shipped environment layers do not set
+`ORCH_MIND_PROFILE_PATH` or `ORCH_SOCIAL_INTERACTION_STYLE_PRESET`; both are optional
+operator overrides (see [Configuration](#configuration)).
 
-```bash
-ORCH_MIND_PROFILE_PATH=config/mind/chromie_default.json
-```
+The factory identity is Chromie, a twelve-year-old girl. A customer may configure her
+name, pronouns, family role, and social style through the Mind profile, and
+`IDENTITY-TRUTH-001` in the [Project Charter](PROJECT_CHARTER.md) applies to whatever
+identity is configured: she speaks only as herself, never as a robot, AI, model,
+assistant, or service, and never asserts a falsehood about her nature.
 
 An owner may change the configured name, age, pronouns, self-description,
 identity-answer guidance, or personality expression without changing Python source.
@@ -149,11 +155,12 @@ Attention where applicable. It describes tendencies, not gesture tables, relatio
 truth, or body truth. Its `initiative` field constrains optional auxiliary expression; it
 does not itself authorize goal-free Core speech/action. Self-initiated social behavior must
 instead be justified by current Situation, relationship/Memory context, privacy,
-consequence, and normal authorization policy. Ordinary deployments may select a reviewed
-preset:
+consequence, and normal authorization policy. The active profile's own style is used by
+default; the factory profile uses `courteous`, and customer setup may choose another
+reviewed preset. An operator may force a reviewed preset over the active profile's style:
 
 ```bash
-ORCH_SOCIAL_INTERACTION_STYLE_PRESET=courteous  # neutral / reserved also supported
+ORCH_SOCIAL_INTERACTION_STYLE_PRESET=courteous  # optional; neutral / reserved also supported
 ```
 
 - `courteous` more readily acknowledges meaningful social turn-taking with subtle
@@ -232,7 +239,7 @@ episode logs into prompts or mutate runtime policy automatically.
 |---|---|---|
 | `ORCH_MIND_PROFILE_PATH` | customer active profile when present, otherwise `config/mind/chromie_default.json` | Explicit operator override for the complete MindProfile JSON. Relative paths resolve from the repository root. |
 | `ORCH_MIND_CONTEXT_MAX_CHARS` | `1600` | Maximum bounded Mind summary/projection size used by runtime context. |
-| `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` | unset | Optional reviewed `courteous`, `neutral`, or `reserved` Social Interaction Style override. |
+| `ORCH_SOCIAL_INTERACTION_STYLE_PRESET` | unset (the active profile's own style) | Optional reviewed `courteous`, `neutral`, or `reserved` operator override of the active profile's Social Interaction Style. |
 | `ORCH_ENABLE_EXPERIENCE_JOURNAL` | `1` | Enable local experience/proposal JSONL writes. |
 | `ORCH_EXPERIENCE_LOG_PATH` | `.chromie/experience/experience.jsonl` | Durable local experience journal path. |
 | `ORCH_MIND_PROPOSAL_LOG_PATH` | `.chromie/experience/mind_update_proposals.jsonl` | Human-review proposal journal path. |

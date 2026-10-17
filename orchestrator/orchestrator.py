@@ -3195,15 +3195,6 @@ class VoiceAssistant:
                 self.maybe_session_done(session_id)
                 return
 
-        if not residual_semantic_input:
-            confirmation_envelope = gateway.for_confirmation(turn_capture)
-            if await self._handle_confirmation_reply(
-                user_text,
-                session_id,
-                turn_envelope=confirmation_envelope,
-            ):
-                return
-
         if reflex_outcome.action == "ignore":
             turn_envelope = gateway.for_suppression(turn_capture)
             record_cognitive_gateway_evidence(
@@ -3386,6 +3377,17 @@ class VoiceAssistant:
                 if state is not None:
                     state["llm_done"] = True
                 self.maybe_session_done(session_id)
+                return
+
+            # A pending confirmation is resolved only by input the Gateway has
+            # admitted. Noise/filler ignored by the reflex and room speech that
+            # Attention Review suppressed returned above, so neither can reach
+            # the model call that approves or denies a pending action.
+            if await self._handle_confirmation_reply(
+                user_text,
+                session_id,
+                turn_envelope=turn_envelope,
+            ):
                 return
 
         context["user_turn_envelope"] = turn_envelope.model_dump(mode="json")
@@ -5880,6 +5882,16 @@ class VoiceAssistant:
         runtime_errors = await self.cognitive_runtime.adapter.validation_errors(replanned)
         if runtime_errors:
             raise ValueError("Runtime rejected state re-entry Plan: " + json.dumps(runtime_errors))
+        # Reviewed effects never start without a verdict: a re-entry Plan that adds a
+        # value-reviewed Capability or value_review speech not yet judged in this turn
+        # goes through Value Judgment, exactly as the turn's first Plan does.
+        replanned = await self.cognitive_runtime.apply_value_judgment_gate(
+            session, sid=sid, text=request.text, plan=replanned, work_request=request,
+            goal_ids_by_responsibility=self.cognitive_runtime.goal_ids_by_responsibility_projection(association),
+            turn_id=str(metadata.get("turn_id") or ""), judged_plan=canonical_plan,
+        )
+        if any(step.metadata.get("value_confirmation_required") for step in replanned.steps):
+            replanned = self.cognitive_runtime.with_runtime_confirmation_need(replanned)
         async with planning_runtime.planning_commit_scope(planning_snapshot):
             known_ids = {item["activity_id"] for item in context["existing_work_activities"]}
             if set(replanned.cancel_activity_ids) - known_ids:
@@ -6110,6 +6122,153 @@ class VoiceAssistant:
         _resolution, response = resolved
         return response
 
+    async def _requested_result_evidence_social_response(
+        self,
+        *,
+        source_response: InteractionResponse,
+        plan: CanonicalPlan,
+        session_id: str | None,
+        language: str,
+        user_request: str,
+        evidence: list[ToolResultEvidence],
+        goal_ids: list[str],
+        extra_context: dict[str, Any],
+    ) -> InteractionResponse | None:
+        """Give SC terminal Evidence for a result the person asked to be told.
+
+        Every communication with the user goes through Social Cognition. When Activation or
+        the Planner chose no next Work for terminal Evidence whose Goal carries an
+        ``information`` Responsibility, SC still receives that Evidence directly
+        with one Runtime result Need and decides how to communicate it (speech,
+        gesture, gaze). The Planner path already invokes SC itself, so this runs
+        only when that path produced nothing.
+        """
+
+        if not evidence or not goal_ids:
+            return None
+        result_goal_ids: list[str] = []
+        responsibilities: dict[str, CognitiveResponsibilityProposal] = {}
+        for goal_id in goal_ids:
+            goal_responsibilities = [
+                item
+                for item in planner_reentry_responsibilities(
+                    source_response=source_response, goal_ids=[goal_id],
+                )
+                if item.output_mode == "information"
+            ]
+            if goal_responsibilities:
+                result_goal_ids.append(goal_id)
+                for item in goal_responsibilities:
+                    responsibilities.setdefault(item.local_ref, item)
+        if not result_goal_ids:
+            return None
+        evidence_refs = [item.evidence_id for item in evidence]
+        turn_envelope = (
+            source_response.metadata.get("user_turn_envelope")
+            if isinstance(source_response.metadata, dict)
+            else None
+        )
+        normalized_input = (
+            turn_envelope.get("normalized_input")
+            if isinstance(turn_envelope, dict)
+            else None
+        )
+        turn_id = str(
+            (turn_envelope or {}).get("turn_id")
+            or source_response.metadata.get("turn_id")
+            or session_id
+            or "terminal-requested-result"
+        )
+        source_turn = {
+            "turn_id": turn_id,
+            "original_text": (
+                str(normalized_input.get("text") or "").strip()
+                if isinstance(normalized_input, dict)
+                else user_request
+            ),
+        }
+        interaction_ledger = getattr(self.cognitive_runtime, "interaction_ledger", None)
+        interaction_context = (
+            interaction_ledger.context(
+                session_id, goal_ids=result_goal_ids, turn_id=turn_id
+            ).model_dump(mode="json")
+            if interaction_ledger is not None
+            else {
+                "events": [],
+                "already_spoken": [],
+                "pending_speech": [],
+                "prior_delivered_speech": [],
+            }
+        )
+        status = aggregate_execution_status([item.status for item in evidence])
+        need = SocialCommunicationNeed(
+            need_id=communication_need_id(plan.plan_id, "requested_result_evidence"),
+            owner="runtime",
+            kind="result",
+            source_goal_ids=result_goal_ids,
+            source_responsibility_refs=list(responsibilities),
+            reference_id=plan.plan_id,
+            facts={
+                "status": status,
+                "result_kind": "requested_information",
+                "required_result_update": True,
+            },
+            delivery_phase="immediate",
+            after_step_ids=[item.step_id for item in plan.steps],
+        )
+        request = SocialCognitionRequest(
+            request_id=(
+                "sc:terminal-result:"
+                + hashlib.sha256(
+                    f"{plan.plan_id}:{','.join(evidence_refs)}".encode("utf-8")
+                ).hexdigest()[:96]
+            ),
+            trigger="evidence",
+            source_refs=list(evidence_refs),
+            language=language,
+            responsibilities=list(responsibilities.values()),
+            source_turn=source_turn,
+            goal_ids=list(result_goal_ids),
+            evidence_refs=list(evidence_refs),
+            communication_needs=[need],
+            context={
+                "interaction_context": interaction_context,
+                "trusted_terminal_evidence": [
+                    item.model_dump(mode="json") for item in evidence
+                ],
+                **{
+                    key: extra_context[key]
+                    for key in ("trusted_execution_outcome", "goal_statuses")
+                    if key in extra_context
+                },
+                "work_result": {
+                    "status": status,
+                    "result_kind": "requested_information",
+                    "evidence_refs": list(evidence_refs),
+                },
+            },
+        )
+        self.session_log(
+            session_id,
+            "terminal_evidence_social_cognition: goals=%s evidence=%s reason=no_planner_communication",
+            ",".join(result_goal_ids),
+            len(evidence_refs),
+        )
+        generation = int(self.playback_delivery.playback_generation)
+        resolved = await self.cognitive_runtime.resolve_social_interaction(
+            await self.get_http_session(),
+            request=request,
+            session_id=str(session_id or "terminal-requested-result"),
+            snapshot_is_current=lambda: not self._outcome_response_is_stale(
+                generation=generation, session_id=session_id
+            ),
+            primary_plan=plan,
+        )
+        if resolved is None:
+            return None
+        _resolution, response = resolved
+        return response
+
     async def _plan_evidence_bound_capability_result_response(
         self,
         *,
@@ -6283,8 +6442,10 @@ class VoiceAssistant:
                 repeat_check_context=extra_context,
             )
             if planner_response is not None:
+                # resolve_plan_interaction already gave SC this exact Evidence
+                # (trigger=evidence): one SC communication, never a second one.
                 return planner_response
-            return await self._optional_completed_resource_social_response(
+            resource_response = await self._optional_completed_resource_social_response(
                 source_response=source_response,
                 bundle=bundle,
                 plan=plan,
@@ -6294,6 +6455,20 @@ class VoiceAssistant:
                 evidence_refs=evidence_refs,
                 goal_ids=goal_ids,
                 selected_execution_evidence=selected_execution_evidence,
+            )
+            if resource_response is not None:
+                return resource_response
+            # Activation/Planner chose no next Work. Terminal Evidence still reaches
+            # SC directly, so a result the person asked for is never dropped.
+            return await self._requested_result_evidence_social_response(
+                source_response=source_response,
+                plan=plan,
+                session_id=session_id,
+                language=language,
+                user_request=user_request,
+                evidence=evidence,
+                goal_ids=goal_ids,
+                extra_context=extra_context,
             )
         except Exception as exc:
             self.session_log(
@@ -7513,10 +7688,11 @@ class VoiceAssistant:
             separators=(",", ":"),
         )
         return (
-            "Chromie has just woken up and can now hear and talk with her family. "
-            "She is a twelve-year-old girl who lives with her family and has her own interests. Write exactly one complete, "
-            "very short greeting she naturally says after waking up. Sound like a "
-            "smart, warm twelve-year-old girl, not a device, service agent, or adult professional. "
+            "The person described by the owner-approved identity JSON below has just woken up "
+            "and can now hear and talk with her family; she lives with her family and has her own interests. "
+            "Write exactly one complete, very short greeting she naturally says after waking up. "
+            "Sound like that configured identity (factory: a smart, warm twelve-year-old girl), "
+            "not a device, service agent, or adult professional. "
             f"Speak only in {language}. "
             "Do not explain the task, analyze the request, expose reasoning, or mention "
             "the prompt. Do not mention readiness, startup, initialization, systems, "
@@ -7524,7 +7700,7 @@ class VoiceAssistant:
             "introduce yourself, repeat your name or age, or ask what help is required. "
             "Use the supplied local period only as quiet grounding, not as a command "
             "to announce the time of day. Prefer the spontaneous first-person delight "
-            "of a twelve-year-old who has just opened her eyes at home, such as naturally showing that "
+            "of someone who has just opened her eyes at home, such as naturally showing that "
             "she is awake and looking forward to being together. Do not default to a "
             "formal morning, afternoon, or evening salutation. Do not quote the exact "
             "clock time, calendar date, or weekday. "

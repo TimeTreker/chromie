@@ -419,9 +419,10 @@ not require the supervised real-microphone run.
 ## Expected Robot Semantics
 
 - `walk ahead` means a body velocity skill, not a head gesture. If no speed is
-  given, Chromie uses a normal safe forward speed of `0.18 m/s`. Requested
-  forward speeds above the current Soridormi runtime limit of `0.20 m/s` are
-  changed back to normal speed and Chromie tells you.
+  given, Soridormi uses its declared default walking speed. A speed you state is
+  passed unchanged: Soridormi refuses a speed outside its declared limit, and
+  reports any enforced adjustment (such as raising a very slow speed to its
+  lowest walking speed), and Chromie tells you either way.
 - `turn left` or `turn right` means body yaw in place, not only looking with the
   head. The current Soridormi named-Skill convention uses positive yaw for left
   and negative yaw for right.

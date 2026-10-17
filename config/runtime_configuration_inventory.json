@@ -2653,10 +2653,9 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "ORCH_MIND_PROFILE_PATH",
       "owners": [
-        ".env.common",
         "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/mind.py"
       ]
@@ -2920,10 +2919,9 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "ORCH_SOCIAL_INTERACTION_STYLE_PRESET",
       "owners": [
-        ".env.common",
         "orchestrator/runtime/host_settings.py",
         "orchestrator/runtime/mind.py"
       ]
@@ -4074,9 +4072,9 @@
     "category_counts": {
       "acceptance_override": 30,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 120,
+      "profile_constant": 118,
       "public_choice": 9,
-      "service_internal": 230
+      "service_internal": 232
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,

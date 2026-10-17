@@ -541,7 +541,8 @@ The initial implementation must therefore:
   contracts;
 - prevent Skill packages from adding tools, providers, permissions, or
   confirmation exemptions;
-- keep physical safety and refusal authority in Soridormi;
+- keep physical safety in Soridormi, which reports what the body cannot do
+  safely as a limitation, and refusal authority in Value Judgment;
 - keep deterministic operational reflexes outside Skill selection;
 - make loaded Skill IDs and projections observable.
 

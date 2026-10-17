@@ -993,6 +993,32 @@
               },
               "summary": {
                 "type": "string"
+              },
+              "value_adjustments": {
+                "type": "array",
+                "description": "Explicit requested values Soridormi does not execute as requested, such as a forward speed below the lowest walking speed or a recovered delivery pace. Execution limits stay enforced; each adjustment is a typed limitation the caller reports instead of claiming the requested value.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "parameter": {
+                      "type": "string"
+                    },
+                    "requested": {},
+                    "applied": {},
+                    "reason": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "parameter",
+                    "requested",
+                    "applied",
+                    "reason"
+                  ]
+                }
               }
             },
             "required": [
@@ -1102,6 +1128,72 @@
               "return_outcome": {
                 "type": "object",
                 "description": "Simulator recipient distances before and after returning."
+              },
+              "target_resolution": {
+                "type": "object",
+                "description": "How Soridormi resolved the physical target the caller described. role is gaze_target, resource, recipient, or source; status is resolved, not_observed, ambiguous, outside_head_range, perception_unavailable, or not_resolved (a cited place). Any status other than resolved comes with completed=false and a summary naming what was not found; Soridormi never substitutes a default direction or the nearest keyword match.",
+                "properties": {
+                  "role": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "target_ref": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "referent_id": {
+                    "type": "string"
+                  },
+                  "place": {
+                    "type": "string"
+                  },
+                  "object_ref": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "relative_direction": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "role",
+                  "status"
+                ]
+              },
+              "value_adjustments": {
+                "type": "array",
+                "description": "Explicit requested values Soridormi does not execute as requested, such as a forward speed below the lowest walking speed or a recovered delivery pace. Execution limits stay enforced; each adjustment is a typed limitation the caller reports instead of claiming the requested value.",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "parameter": {
+                      "type": "string"
+                    },
+                    "requested": {},
+                    "applied": {},
+                    "reason": {
+                      "type": "string"
+                    },
+                    "summary": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "parameter",
+                    "requested",
+                    "applied",
+                    "reason"
+                  ]
+                }
               }
             },
             "required": [
@@ -1577,7 +1669,7 @@
           },
           "llm_hints": {
             "when_to_use": "Use after the authoritative planner has selected exact body skills that must run concurrently. Do not include speech here.",
-            "speech_boundary": "Chromie's Speaking Execution Lane owns speech and singing; link peer execution with coordination_id only."
+            "speech_boundary": "Chromie's Vocal Execution Lane owns speech and singing; link peer execution with coordination_id only."
           }
         },
         {
@@ -4352,10 +4444,13 @@
     "chromie_concurrency_model": {
       "cognitive_core": "single_authoritative_mind",
       "lanes": [
-        "social_attention_proposal",
-        "speaking_execution",
+        "vocal_execution",
         "activity_execution"
       ],
+      "behavior_domains": {
+        "social_attention": "social_cognition"
+      },
+      "expression_author": "social_cognition",
       "runtime_coordinator": "chromie",
       "speech_owner": "chromie",
       "body_provider": "soridormi"
@@ -4368,9 +4463,11 @@
     },
     "rules": [
       "Soridormi tools do not implement Chromie speech, TTS, ASR, or user confirmation.",
-      "The Social-Attention Proposal Lane proposes only; it does not author speech, own Goals, authorize body actions, or operate actuators.",
-      "The Speaking Execution Lane and Activity Execution Lane are peer execution lanes beneath one Cognitive Core.",
-      "Chromie's authoritative planner selects exact body skills before the Activity Execution Lane calls soridormi.activity.compile.",
+      "Social Attention is a behavior domain owned by Chromie's Social Cognition and expressed through the Activity Execution Lane; it is not a third lane, owns no Goals, and operates no actuators.",
+      "The Vocal Execution Lane and Activity Execution Lane are the two peer execution lanes beneath one Cognitive Core.",
+      "Chromie's Planner selects exact body skills, and Social Cognition authors optional social expression, before the Activity Execution Lane calls soridormi.activity.compile; Soridormi decides only body-level how, such as gait and trajectory.",
+      "Chromie names physical targets semantically (target_ref or recipient referent_id \"requester\" for the current speaker, objects by description, places by cited name); Soridormi resolves them from its own perception and reports a typed target_resolution instead of a default direction or the nearest keyword match.",
+      "Soridormi reports any explicit requested value it does not execute as requested in value_adjustments; execution limits stay enforced.",
       "Speech or singing is never a Soridormi activity member; Chromie coordinates peer execution through coordination_id.",
       "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
       "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
@@ -4439,6 +4536,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "33b8a135527e65379ca66505d766afea22ddceeb"
+    "upstream_commit": "7d7d23d320325fb0460a581f6902d8a69e5c8333"
   }
 }

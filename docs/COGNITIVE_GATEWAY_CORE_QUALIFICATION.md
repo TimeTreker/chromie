@@ -76,13 +76,15 @@ both enforce this contract after cognition; the expectation is never passed to
 the model.
 
 The paired MuJoCo runner retains its exact `AttentionReviewRequest` and
-`AttentionReviewResult` before Core admission. A suppression candidate must be
-independently reconsidered inside the existing model-owned Attention Review;
-only two agreeing, schema-valid, high-confidence ambient judgments may discard
-an inactive turn. Disagreement, invalid reconsideration, or review failure
-admits the turn for ordinary Core semantics. The Host does not recognize action
-phrases, question punctuation, or otherwise replace the model's addressedness
-judgment.
+`AttentionReviewResult` before Core admission. Attention Review makes one
+model call; only a schema-valid, high-confidence unaddressed ambient judgment
+with inactive engagement may discard a turn
+([Gateway §4.3](COGNITIVE_GATEWAY.md#43-attention-review--注意审查)). Invalid,
+low-confidence, or self-contradictory output and review failure admit the turn
+for ordinary Core semantics without a second call. Bounded surface cues (bare
+greeting, trailing question mark, bare wake name) can only admit a turn whose
+model output contradicts them; the Host does not recognize action phrases or
+otherwise replace the model's addressedness judgment.
 
 The Host also does not inspect response wording to decide whether speech claims
 an embodied effect. It validates the existing typed effect-proposal counts and

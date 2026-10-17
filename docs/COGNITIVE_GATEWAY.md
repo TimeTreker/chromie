@@ -135,19 +135,25 @@ the Core. It is an interaction policy, not an intent classifier. It may suppress
 only bounded, high-confidence ambient speech when engagement is inactive and
 policy permits suppression.
 
-The primary Attention model owns addressedness and speech act using the admitted
-transcript and bounded engagement/context. Direct or unresolved usable input,
-malformed output, unavailability and failed review retain the fail-open admission
-contract. Suppression requires a qualified high-confidence inactive ambient result;
-Attention Review cannot authorize an effect.
+The Attention model owns addressedness and speech act using the admitted
+transcript and bounded engagement/context. Attention Review makes exactly one
+model call per turn. It discards a turn only when that call is schema-valid,
+at or above the suppression confidence threshold, classifies the input as
+unaddressed ambient speech (`ambient_report`, `dictation`, `narration`, or a
+contextless `reply`), and Host engagement is not active (no recent exchange,
+active work, or other in-flight turn). Every other outcome admits the turn:
+directed or unclear speech, low confidence, active engagement, malformed or
+self-contradictory output, unavailability, and failed review. There is no
+second, repair, or reconsideration call; wrongly ignoring a person is the worse
+mistake. Attention Review cannot authorize an effect.
 
-Current implementation uses greeting/question/wake-name surface cues to detect
-contradictions and calls the same model again to reclassify. That path violates
-Charter principles 30–31 and must not be treated as an allowed semantic repair.
-This is an open finding in [Status](STATUS.md#current-open-work);
-implementation qualification remains open. Ordinary phrase cues cannot become a
-second semantic authority. Gateway-suppressed room speech stays bounded input
-evidence and is excluded from accepted recent dialogue.
+Self-contradictory output includes an unaddressed directed speech act and output
+that contradicts bounded surface cues (a bare greeting, a trailing question mark,
+or the bare wake name). Those cues can only admit a turn; they never suppress one
+or become a second semantic authority. A pending confirmation is resolved only
+by a turn that the ignore reflex passed and Attention Review admitted.
+Gateway-suppressed room speech stays bounded input evidence and is excluded from
+accepted recent dialogue.
 
 ### 4.4 Context Assembly / 上下文组装
 
@@ -293,7 +299,7 @@ It first assigns one closed cancellation scope:
 | `Stop talking`, `别说了` | `output_only` | The host's shared audible-output resource plus interruptible speech requests in the bound interaction |
 | `Stop moving`, `停止移动` | `embodied_motion` | Current and queued requests explicitly declared to have a physical-motion effect |
 | Bare `Stop`, `Cancel`, `停止` | `current_interaction` | Every unfinished request in the foreground interaction; completed goals and unrelated remembered goals are unchanged |
-| Exact structured target selected by Core | `specific_goal` | Structured skill/effect requests whose committed `source_goal_ids` are wholly contained in the exact target set and whose plan identity matches |
+| Exact structured target identified by Goal Association | `specific_goal` | Structured skill/effect requests whose committed `source_goal_ids` are wholly contained in the exact target set and whose plan identity matches |
 | `Emergency stop`, `急停` | `global_emergency` | Every unfinished request and host interaction workflow plus a dispatch attempt through the dedicated Soridormi E-stop path |
 
 A compound output stop, such as “don't speak, nod twice,” applies cancellation
@@ -348,10 +354,11 @@ Pending confirmation has one approval token for the staged response. Fixed
 reflex behavior remains conservative: `output_only` preserves that token, while
 a motion stop revokes the whole token when any confirmed request is
 motion-bound or cannot be classified safely. Named `specific_goal` cancellation
-can narrow a pending multi-Goal confirmation. It rejects shared-owner steps,
-removes the targeted requests, creates an immutable child plan and fresh request
-identities for the preserved Goals, and replaces the old token only after the
-Conversation State cancellation transaction succeeds.
+of a Goal in a pending multi-Goal confirmation rejects shared-owner steps and
+revokes the whole token only after the Conversation State cancellation
+transaction succeeds. It creates no child plan, fresh request identities, or
+replacement wording for the preserved Goals; the cancellation Evidence re-enters
+the Planner, which decides their remaining Work.
 
 Exact isolation also depends on provider granularity. Current Soridormi motion
 cancellation is global-domain, so a specific physical target widens to
