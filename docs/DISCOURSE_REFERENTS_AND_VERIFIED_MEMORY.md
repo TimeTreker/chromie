@@ -18,20 +18,27 @@ Chromie's cognitive stages have distinct responsibilities:
    deterministic protective reflexes, and supplies bounded context evidence. It
    does not choose semantic work or decide what `那边`, `那里`, `there`, or another
    reference means.
-2. **Goal Association** uses the current user meaning, scoped discourse
-   referents, focus, active or bounded recent terminal Goal bindings, and
-   recent dialogue to resolve references and create explicit Goal bindings.
-3. **Host conversation state** validates and stores the LLM-authored typed
+2. **User Meaning Interpretation (UMI)** resolves what an indirect expression
+   means at human level from recent accepted dialogue, salient discourse
+   entities, active Goal meaning and Memory, and carries the resolved value into
+   WHAT (for example `location=内乡`). It sees no canonical Goal or referent IDs.
+3. **Goal Association** links that resolution to canonical identity: for an
+   indirect expression it copies the supplied `referent_id` into
+   `resolved_references`, whose value must equal that referent's canonical value
+   (a mismatch rejects), and it associates the Responsibility with open Goals.
+   GA does not author or change the bound value; new Goal bindings are inherited
+   from UMI.
+4. **Host conversation state** validates and stores the LLM-authored typed
    referent/focus mutations, IDs, provenance, and bounded persistence. It does
    not contain phrase rules or choose a semantic referent.
-4. **Planner** receives resolved Goal bindings and decides whether to
+5. **Planner** receives resolved Goal bindings and decides whether to
    retrieve one exact verified prior result or execute a fresh read.
-5. **Social Cognition** authors the exact natural pre-result Communicative
+6. **Social Cognition** authors the exact natural pre-result Communicative
    Activity from the Planner's communication Need. It may say that Chromie is checking a source or retrieving a
    recently checked result, but cannot state the result before trusted Evidence.
-6. **Host Evidence binding** joins the exact request/result to its existing
-   Goal and reactivates Fast Planner, which authors any still-useful grounded
-   answer without fabricating another user turn.
+7. **Host Evidence binding** joins the exact request/result to its existing
+   Goal and reactivates Planner for any further Work and Social Cognition, which
+   authors any still-useful grounded answer, without fabricating another user turn.
 
 Tool-result memory is never reference-resolution authority.
 
@@ -46,11 +53,11 @@ low- or high-confidence decision.
 
 Goal references are generic, not location-specific. A phrase such as “the last
 task I told you” is associated by the same Goal Association LLM against bounded
-active, recoverable, or recent terminal Goals and dialogue context. The Host
+open Goals (including restored ones) and dialogue context. The Host
 does not contain a phrase map for “last task,” “that one,” “那里,” or any other
-normal semantic reference. A `continue` or `reference` association to a terminal
-Goal records continuity without reopening or changing its terminal lifecycle
-state. Operational follow-up phrase settings may preserve context across idle
+normal semantic reference. Recent terminal Goals are history only: they are
+never association targets, so a follow-up about one becomes a new Goal that
+names it in `related_goal_ids`, and its terminal lifecycle state is unchanged. Operational follow-up phrase settings may preserve context across idle
 time, but they never select a Goal.
 
 ## Why there is no global `current_location`
@@ -101,10 +108,13 @@ For:
 
 > 不是重庆，是一个地名叫内乡。
 
-Goal Association may emit a model-authored correction:
+UMI carries the corrected meaning in its Responsibility `r1` (WHAT with
+`location=内乡`). Because the Chongqing Goal is terminal, Goal Association reports
+`r1` as a new Goal related to it and emits a model-authored referent correction:
 
 ```json
 {
+  "associations": [],
   "referent_updates": [
     {
       "operation": "correct",
@@ -116,19 +126,16 @@ Goal Association may emit a model-authored correction:
   ],
   "new_goals": [
     {
-      "description": "确认用户纠正的地点是内乡。",
-      "bindings": [
-        {
-          "name": "location",
-          "entity_type": "location",
-          "value": "内乡",
-          "confidence": 1.0
-        }
-      ]
+      "source_responsibility_refs": ["r1"],
+      "related_goal_ids": ["goal_chongqing_weather"],
+      "supersedes_goal_ids": []
     }
   ]
 }
 ```
+
+New Goal rows carry only source refs and Goal relationships; trusted code copies
+the Goal's description and bindings from the UMI Responsibility.
 
 The Host generates the new referent ID, stores Neixiang as foreground, and
 moves only the explicitly superseded Chongqing discourse referent to
@@ -141,10 +148,14 @@ For:
 
 > 今天那边下雨了没有？
 
-Goal Association receives the foreground Neixiang referent and emits:
+UMI resolves `那边` from the foreground Neixiang context and emits Responsibility
+`r1` with WHAT bindings `location=内乡` and `date=today`. Goal Association receives
+the foreground Neixiang referent and links the indirect expression to it:
 
 ```json
 {
+  "associations": [],
+  "referent_updates": [],
   "resolved_references": [
     {
       "surface_form": "那边",
@@ -157,26 +168,17 @@ Goal Association receives the foreground Neixiang referent and emits:
   ],
   "new_goals": [
     {
-      "description": "查询今天内乡是否下雨。",
-      "bindings": [
-        {
-          "name": "location",
-          "entity_type": "location",
-          "value": "内乡",
-          "referent_id": "ref_neixiang",
-          "confidence": 1.0
-        },
-        {
-          "name": "date",
-          "entity_type": "date",
-          "value": "today",
-          "confidence": 1.0
-        }
-      ]
+      "source_responsibility_refs": ["r1"],
+      "related_goal_ids": [],
+      "supersedes_goal_ids": []
     }
   ]
 }
 ```
+
+If UMI's value and the referent's canonical value disagree, GA cannot link them:
+a `resolved_references` value that does not match the supplied referent rejects
+the GA result rather than choosing between the two.
 
 Downstream planners receive `location=内乡`; they do not reinterpret `那边`.
 A deterministic provenance validator rejects any executable step that claims
@@ -208,8 +210,8 @@ only:
 - age/provenance;
 - source Goal and plan IDs.
 
-The index contains no result facts. When one entry exactly matches every
-resolved material Goal binding and is fresh enough, the Planner may execute:
+The index contains no result facts. When one entry matches every resolved
+material Goal binding and is fresh enough, the Planner may execute:
 
 ```json
 {
@@ -226,9 +228,15 @@ resolved material Goal binding and is fresh enough, the Planner may execute:
 }
 ```
 
-The host-runtime provider performs exact value matching and returns the prior
-trusted data only after execution. It does not search loosely and does not
-resolve references.
+Planner validation requires `material_args` to contain every authoritative Goal
+binding without contradicting it, and to select exactly one index entry with the
+same `evidence_id` and `tool_id`. The host-runtime provider then checks that each
+`material_args` key is present in the stored request arguments with an equal
+value (strings compared after case-folding and whitespace collapse; stored
+arguments not named in `material_args` are not compared), that the stored
+result completed, and that its age is within `max_age_s` (Planner-chosen, schema
+range 1-86400 s, default 900). It returns the prior trusted data only after
+execution. It does not search loosely and does not resolve references.
 
 If the index contains only `location=重庆`, it is not a match for the Neixiang
 Goal. The Planner must use a fresh weather lookup for Neixiang instead.
@@ -237,9 +245,9 @@ Goal. The Planner must use a fresh weather lookup for Neixiang instead.
 
 The verified-memory index proves only identity, arguments, freshness, and
 provenance. It is never answer evidence. Separately, conversation state may
-retain a bounded assistant turn only when the post-execution Planner's
+retain a bounded assistant turn only when Social Cognition's post-Evidence
 speech was actually delivered and the Host marks it with its source Goal and
-Canonical Plan IDs. Fast Planner may use this delivered
+Canonical Plan IDs. Planner and SC may use this delivered
 evidence-bound dialogue to interpret or restate the same completed Goal without
 reopening it or repeating the external read.
 
@@ -278,7 +286,8 @@ Examples of valid model-authored meaning include:
 - fresh read: “我查一下内乡今天有没有下雨。”
 - exact memory retrieval: “我刚才好像查过内乡，我把结果找出来看看。”
 
-Only the post-execution interpreter may state weather facts.
+Only Social Cognition's post-Evidence Communicative Activity may state weather
+facts, and only from trusted Evidence.
 
 ## Invariants
 
@@ -297,8 +306,8 @@ Only the post-execution interpreter may state weather facts.
 
 ## Provider location recognition does not change discourse authority
 
-After Goal Association has resolved a weather location, the canonical binding is
-immutable. For example, `河南省内乡县` stays the tool argument even when a provider
+Once a weather location is bound on the canonical Goal (resolved by UMI, linked to
+its referent by Goal Association), the binding is immutable. For example, `河南省内乡县` stays the tool argument even when a provider
 geocoder cannot match that full administrative string. The weather adapter may
 query bounded equivalent forms such as the locality name and may use supplied
 province/country fields to qualify candidates. These are retrieval mechanics for

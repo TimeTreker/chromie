@@ -615,8 +615,9 @@ and storage limits but does not infer what a user wants remembered.
 Durable entries are removed only by expiry or an explicitly consented forget or
 clear mutation.
 
-Goal Association resolves references before planning and emits typed Goal
-bindings plus scoped referent/focus updates. Tool-result contents are excluded
+User Meaning Interpretation resolves references into WHAT before planning; Goal
+Association links indirect references to exact scoped referents and emits
+referent/focus updates; new Goal bindings are inherited from UMI. Tool-result contents are excluded
 from that boundary. Planners may reuse a prior verified result only by executing
 `chromie.memory.retrieve_verified_tool_result` with an exact evidence ID,
 original tool ID, and material arguments that match the resolved Goal bindings.

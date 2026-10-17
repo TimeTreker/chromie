@@ -748,7 +748,7 @@ the grounding/action substrate around that Mind state.
 The executable turn state machine in this document records committed milestones;
 it must not be mistaken for a wall-clock cognition pipeline. Meaningful new
 Evidence may revise Situation, make an open Goal actionable, invalidate a Work
-assumption, complete/reopen a responsibility, or justify deeper cognition. The
+assumption, complete a responsibility or leave it open, or justify deeper cognition. The
 reaction may be none, deterministic/local, fast, slow, or overlapping fast
 progress plus slower reasoning. Open Goals wait for relevant state change rather
 than being polled by a background thought loop.
@@ -762,9 +762,10 @@ delivered speech are never rewritten; correction proceeds forward.
 The same separation applies to lifecycle. `planning`, `waiting_for_user`,
 confirmation, `scheduled`, `running`, retry/recovery, provider failure, and
 timeout are Work/runtime conditions. They are not the target Goal lifecycle
-truth. An `ExecutionOutcome` records what happened in execution; a Goal closes or
-reopens only through Responsibility reconciliation against its current meaning
-and trusted evidence.
+truth. An `ExecutionOutcome` records what happened in execution; a Goal closes
+only through Responsibility reconciliation against its current meaning and trusted
+evidence. A terminal Goal is not reopened by later conversation: a correction of a
+closed outcome becomes a new Goal related to it.
 
 Some later sections still describe the currently implemented Task/Goal lifecycle
 projection using workflow labels such as `waiting`, `recoverable`, `failed`, or
@@ -924,7 +925,15 @@ per-goal prospective outcomes. Deterministic
 code checks schemas, capability
 availability, source-effect bounds, resources, confirmation requirements, and
 forbidden low-level controls. Validation cannot invent missing meaning or
-rewrite the plan into a nearby action.
+rewrite the plan into a nearby action. Two mechanical normalizations are the only
+changes to a Planner-authored Plan (`agent/app/planner_fast_validation.py`, recorded
+as repairs): an Activity repeated identically, down to its `activity_id`, is kept
+once (`drop_repeated_identical_activities`); and after validation, duplicate
+Activities of one idempotent, side-effect-free Capability with the same Responsibility
+ownership and the same effective arguments (after declared defaults) are collapsed to
+one, with `depends_on` references to a removed twin redirected to the retained one
+(`collapse_redundant_idempotent_read_activities`). Effectful, non-idempotent or
+differently-argued Work is never touched.
 
 The Planner owns complete bounded capability work. A terminal Plan whose
 Goal grounding, exact Capability, arguments, deterministic safety/authorization, and
@@ -1143,7 +1152,9 @@ Only that bounded observation may reach Core reconciliation, replanning, or
 SC-authored result communication. The retained audit record preserves the validation and
 projection decision plus a content digest under the evidence-retention policy;
 it does not make raw secrets model-visible. Schema failure, projection failure,
-or an empty required observation fails closed as `observation_unavailable`.
+or an empty required observation fails closed with the typed `ModelObservationStatus`
+(`schema_unavailable`, `schema_invalid`, `too_large` or `sensitive`; only `available`
+reaches cognition as a payload).
 Trusted terminal status may still be recorded, but the Core cannot invent the
 missing payload or make a claim that depends on it. A provider's declared
 non-completion (for Soridormi `completed: false` with a summary, such as a
@@ -1166,12 +1177,12 @@ Outcome reconciliation is a Core stage after execution. It:
 Streaming changes scheduling, not authority. Raw model-token deltas, partial JSON,
 private reasoning, and incomplete sentences are not speech contracts and must never
 reach TTS. In maintained cognitive apply, User Meaning Interpretation does not author speech.
-The first early speech contract is an independently worded, typed Fast-Planner
-Communicative Act.
+The first early speech contract is a typed Social Cognition Communicative Act; the
+Planner authors no words.
 The Host may schedule that Activity as soon as its provider-free claim/effect boundaries,
 turn correlation, cancellation generation, and Vocal transport contract validate; it
 need not wait for Goal Association or unrelated later response fields. Goal
-Interpretation has no parallel early-speech contract beside Fast Planner Activity.
+Interpretation and Planner have no parallel early-speech contract beside SC's Activity.
 
 Current-turn Communicative-Act reuse is correlated by the exact speech-event
 ID together with its turn, structured stage, purpose, commitment, source Goal
@@ -1277,14 +1288,11 @@ satisfied. Speech such as "I'm starting" requires committed execution state;
 planning output alone is insufficient.
 
 Pre-execution speech is never execution evidence and never closes an effectful
-goal. Planning may carry a prospective `response_text` alongside
-executable steps when that text represents a still-needed conversational delta.
-When a structurally valid Fast Plan escalates for a separate validation defect, the
-source-authored candidate may be retained only as an undelivered advisory to Deep
-Planning; retention makes no truth claim, is never delivery evidence, and must be
-reconsidered against the Interaction Ledger and current Plan authority;
-`chromie.speak` still does not become a task-plan leaf. Planner uses the Plan and
-Interaction Context to author, reuse, or omit that exact Communicative Activity
+goal. A Plan carries no `response_text` or Communicative Acts (the Host rejects a
+Planner-authored communicative decision); it may carry communication Needs alongside
+executable steps when a conversational delta is still needed.
+`chromie.speak` does not become a task-plan leaf. Social Cognition uses the Need, the
+Plan and Interaction Context to author, reuse, or omit the exact Communicative Activity
 according to what is actually new; the Host validates but does not rewrite it. A
 non-effectful conversational turn
 may move directly to `READY_TO_RESPOND`; its Core-owned answer is final for that

@@ -249,7 +249,8 @@ result set. This truth boundary is evidence-owned, not phrase-owned.
 
 A provider-reported `completed` status is not sufficient to complete a Goal. When a
 Capability has a declared output schema, completion evidence must pass that schema and
-its trust boundary before the reconciler may mark the bound Goal complete. A schema-invalid
+its trust boundary before the reconciler may mark the bound Goal complete; an
+information Goal additionally closes only on delivery of the evidence-bound answer. A schema-invalid
 observation is failed evidence, not degraded success. Provider and consumer schemas must
 therefore evolve together.
 
@@ -654,9 +655,11 @@ storage exposed back to cognition only through bounded, more summarized/abstract
 **Active Memory** is not a third store or retention tier: it is the small relevance-activated
 projection of working and long-term Memory that is currently on Chromie's mind. A context
 change may therefore deactivate an otherwise newer memory without deleting it. For example,
-a Beijing hotel object-location memory can remain durable after Chromie is in a Chongqing
+a Beijing hotel object-location memory can remain retained after Chromie is in a Chongqing
 hotel while no longer entering ordinary current planning; stable preferences may remain active
-when relevant across both contexts.
+when relevant across both contexts. Today only consent-bound profile Memory and unfinished
+Goals have a durable owner, so such a world/object fact is Working Memory bounded by its TTL
+and is lost at restart until a durable owner with consent and retention rules exists.
 
 Storage lifetime and activation do not create semantic authority: a long-term item is not more
 true merely because it is durable, an active item is not necessarily current physical fact, and

@@ -20,16 +20,19 @@ Chromie uses related identifiers with different lifetimes:
 - `task_context`: the prompt-facing working memory for one task.
 
 A new SID does not automatically start a new conversation. The store keeps the
-conversation identifier until a reset phrase, configured topic boundary, hard
-idle expiry, or process restart.
+conversation identifier until hard idle expiry (only when no active Goal or
+pending work remains) or process restart. There is no reset-phrase or
+topic-boundary path (see [Boundaries and reset behavior](#boundaries-and-reset-behavior)).
 
 A new task is not the same thing as a new SID. One task can include many
 sessions, for example a command followed by "quickly please", "not that far",
-"did it finish?", and "continue". Goal Association decides whether a new
-input creates a new Goal, continues, modifies or closes an existing Goal, or is
-side conversation; User Meaning Interpretation only states its meaning (WHAT).
-For a cancel GA identifies the target Goal(s). The Host only records what GA
-decided (the final Goal write) and owns safety state.
+"did it finish?", and "continue". User Meaning Interpretation states the input's
+meaning (WHAT). Goal Association decides how each Responsibility relates to open
+Goals: it continues, modifies, confirms, cancels, pauses or resumes one, or it is
+unassociated and becomes a new Goal (optionally superseding named open Goals). For
+a cancel GA identifies the target Goal(s). Trusted lifecycle code materializes a
+new Goal's identity and WHAT mechanically from UMI; the Host commits the Goal write
+and owns safety state.
 
 ## Stored state
 
@@ -62,15 +65,18 @@ memory store.
 Conversation state does not expose one global `current_location`. Multiple
 task-, Goal-, and conversation-scoped referents can coexist, so a navigation
 destination, a Chongqing weather task, and a Neixiang place discussion do not
-overwrite one another. Goal Association resolves expressions such as `那边`
-from current user meaning, scoped referents/focus, active Goal bindings, and
-recent dialogue. The Host only validates and stores the typed model result.
+overwrite one another. User Meaning Interpretation resolves what expressions such
+as `那边` mean from recent dialogue, salient referents and active Goal meaning, and
+carries the value into WHAT; Goal Association links the indirect expression to the
+exact canonical referent ID (`resolved_references`), and the value must match.
+The Host only validates and stores the typed model results.
 Verified tool evidence is not allowed to decide reference meaning.
 
 Operational reset/follow-up phrase settings affect only whether bounded context is
 retained across an idle boundary. They never resolve a pronoun, choose a task, or
-associate a Goal. Expressions such as “the last task I told you” are resolved by
-Goal Association from active/recoverable Goals and dialogue semantics.
+associate a Goal. Expressions such as “the last task I told you” are associated by
+Goal Association with open Goals (including ones restored after restart) and dialogue
+semantics; recent terminal Goals are related history only.
 
 Prior tool results are reused only through the explicit read-only
 `chromie.memory.retrieve_verified_tool_result` capability. Planners receive a
@@ -154,7 +160,8 @@ Recent completed tasks are retained briefly so follow-up questions such as
 "did it finish?" can still be answered, then pruned from prompt context.
 
 If durable task memory is enabled, unfinished task contexts are saved locally
-and restored as `recoverable` task contexts. Physical or robot-action tasks must
+and restored as open Goals whose task (Work) status is `recoverable`;
+`recoverable` is a Work condition, not a Goal lifecycle state. Physical or robot-action tasks must
 require fresh user confirmation after restart; Chromie must never resume body
 motion blindly after power loss.
 
@@ -162,18 +169,21 @@ motion blindly after power loss.
 
 Preferred names:
 
+Defaults (`orchestrator/runtime/host_settings.py`, matching `.env.common`):
+
 ```env
 ORCH_ENABLE_CONVERSATION_STATE=1
-ORCH_CONVERSATION_ID=
+ORCH_CONVERSATION_ID=local_default
 ORCH_CONVERSATION_MAX_TURNS=12
-ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS=1200
-ORCH_CONVERSATION_MAX_CONTEXT_CHARS=6000
+ORCH_CONVERSATION_TURN_MAX_TEXT_CHARS=260
+ORCH_CONVERSATION_MAX_CONTEXT_CHARS=2200
 ORCH_CONVERSATION_MAX_PENDING_TASKS=8
 ORCH_CONVERSATION_MAX_TOOL_EVIDENCE=8
+ORCH_CONVERSATION_MAX_MEMORY_ENTRIES=24
 ORCH_CONVERSATION_MAX_DISCOURSE_REFERENTS=24
 ORCH_CONVERSATION_MAX_DISCOURSE_FOCUS=8
-ORCH_CONVERSATION_IDLE_TIMEOUT_SEC=300
-ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC=1800
+ORCH_CONVERSATION_IDLE_TIMEOUT_SEC=180
+ORCH_CONVERSATION_HARD_IDLE_TIMEOUT_SEC=900
 ORCH_CONVERSATION_COMPLETED_TASK_RETENTION_SEC=180
 ORCH_ENABLE_TASK_CONTEXT_STORE=0
 ORCH_TASK_CONTEXT_STORE_PATH=.chromie/conversation/task_contexts.json
@@ -182,8 +192,8 @@ ORCH_TASK_CONTEXT_STORE_PATH=.chromie/conversation/task_contexts.json
 
 Conversation boundaries are deliberately non-semantic in the Host. It applies
 the hard-idle timeout and typed control state; it does not use reset or follow-up
-phrases, pronoun lists, or new-topic starters. Goal Association owns those
-meanings. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a bounded conversation-state value but does not authorize phrase-based soft-idle splitting.
+phrases, pronoun lists, or new-topic starters, and no model-owned
+conversation-control path is enabled yet. `ORCH_CONVERSATION_IDLE_TIMEOUT_SEC` remains a bounded conversation-state value but does not authorize phrase-based soft-idle splitting.
 
 The former `ORCH_CONTEXT_*` aliases are removed. Exact maintained settings and defaults are documented in [`CONFIGURATION.md`](CONFIGURATION.md).
 
@@ -193,8 +203,10 @@ Conversation state now exposes an explicit two-tier cognitive projection while r
 existing storage/privacy owners. Working Memory is process-local RAM state. Long-term Memory is
 only what an existing durable owner already permits: explicit-consent protected profile Memory
 and, when `ORCH_ENABLE_TASK_CONTEXT_STORE=1`, unfinished canonical Goals persisted for restart
-continuity. Durable Goal state is reloaded as recoverable and must be revalidated before new
-Work; physical execution never resumes blindly.
+continuity. Durable Goal state is reloaded as an open Goal with `recoverable` Work status and
+must be revalidated before new Work; physical execution never resumes blindly. Other world or
+object facts (for example where something was delivered) have no durable owner today: they live
+in Working Memory with its TTL and are lost at restart.
 
 The model-facing long-term Goal surface is intentionally abstract: it keeps canonical Goal
 identity and stable human outcome/constraints needed by GA, while omitting transient execution
