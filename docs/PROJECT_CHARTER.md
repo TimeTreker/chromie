@@ -894,7 +894,7 @@ Read the diagram with these boundaries:
   Missing, failed, stale or mismatched Evidence establishes neither branch. No Host
   predicate interpreter, extra semantic reviewer or score inflation is permitted.
 - Goal Association remains the only canonical Responsibility/Goal-state authority.
-  GA independently associates, creates, continues, corrects, merges, splits, or
+  GA independently associates, creates, continues, corrects, or
   supersedes canonical Goals from the same UMI result without waiting for or
   rewriting Planner output; the Host records what GA decided. For a cancel utterance GA
   identifies which Goal(s) it targets; the Runtime then stops that Work deterministically
@@ -1138,8 +1138,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    simulator. If a physical provider is commissioned, it must preserve the same
    contracts and pass its own additional safety qualification, but that optional
    deployment is not a Chromie completion gate.
-9. **Evidence is part of the product.** Implemented, automatically verified,
-   target validated, and release ready are separate states.
+9. **Evidence is part of the product.** Implementation, automatic verification,
+   target validation, and deployment state are separate axes; release readiness is a
+   separate verdict outside them.
 10. **Optional physical rollout is progressive and provider-owned.** When a
    physical deployment is pursued, shadow, dry-run, bounded single-skill,
    supervised multi-skill, and broader autonomy are distinct Soridormi/provider
@@ -1639,8 +1640,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    that Fast path; it is not semantic evidence that Deep should repair the same Plan.
 
    **Cognitive depth is Responsibility-local.** Independent Responsibilities in one turn
-   need not share a single depth or wall-clock barrier (the one exception is speech UMI
-   marked `value_review`; see VALUE-JUDGMENT-001). Once a Responsibility has canonical
+   need not share a single depth or wall-clock barrier (the one exception is a
+   Responsibility UMI marked `value_review`; see VALUE-JUDGMENT-001). Once a Responsibility has canonical
    Goal grounding, a terminal valid Plan may execute while a genuinely uncertain
    remaining Responsibility waits for clarification or Evidence re-entry. Before
    GA finishes, only validated side-effect-free safe reads and realized
@@ -1834,20 +1835,20 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 
 43. **Planner is the sole WorkDAG semantic mutation authority; DAGEngine advances execution mechanically.** A Chromie-level `WorkDAG` is a revisioned directed acyclic representation of Planner-authored planned Work, not another cognitive owner. Planner owns node selection, Capability choice, arguments, Goal ownership, dependency/concurrency topology, and any bounded fallback/retry policy committed in that DAG. Goal Association may change canonical Goal continuity but must never edit WorkDAG directly; changed Goal truth creates a Planner opportunity. `DAGEngine` may validate acyclicity/contracts, enforce monotonic `dag_id`/`revision` identity, calculate readiness, dispatch permitted parallel nodes, advance dependency state, enforce committed policy, propagate cancellation, inherit already-completed immutable nodes across the next valid revision, and record execution facts. Normal node completion therefore continues mechanically without another Planner call. It may not invent replacement Work, choose alternative Capabilities, rewrite completed history, author a recovery plan, produce engine-authored next-action guidance, interpret outcomes into user-facing meaning, or speak. Material failure or a changed Goal/Situation returns Evidence to the same Planner, which may choose NO_CHANGE or author the next/new WorkDAG. Provider-local DAGs/controllers remain valid implementation details behind their advertised Capability boundaries.
 
-44. **Every delivery commit must carry an exact next-session checkpoint and handoff.**
-   Before creating or pushing a delivery commit, update both
-   `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in that same commit. The checkpoint
-   owns the stable resume boundary: active issue, implemented contract, evidence
-   status, open blockers, claim boundary, and ordered next work. The handoff owns the
-   volatile operational snapshot: base/revision context, branch, retained artifact
-   paths, exact commands, runtime/profile identities, known dirty or failing state,
-   and cross-machine bootstrap instructions. Both are current-state documents: each
-   delivery replaces their current sections rather than appending a dated entry, and
-   superseded commands are removed; history stays in Git and `CHANGELOG.md`. Neither
-   file may claim a gate, live behavior, or clean tree that was not actually observed. A commit or push without
-   both updated owners is incomplete even when the code itself is correct. The next
-   coding agent must be able to resume from the committed pair without reconstructing
-   hidden chat history.
+44. **Every delivery commit must carry exact next-session status, checkpoint and handoff.**
+   Before creating or pushing a delivery commit, update `docs/STATUS.md`,
+   `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in that same commit. Status owns the
+   four-axis current state and the single ordered open-work list, blockers included.
+   The checkpoint owns the stable resume boundary: active issue, implemented contract,
+   repairs and owner decisions in force, evidence limits and claim boundary. The
+   handoff owns the volatile operational snapshot: revision context, branch, retained
+   artifact paths, exact commands and runtime/profile identities. All three are
+   current-state documents: each delivery replaces their current sections rather than
+   appending a dated entry, and superseded commands are removed; history stays in Git
+   and `CHANGELOG.md`. No file may claim a gate, live behavior, or clean tree that was
+   not actually observed. A commit or push without the three updated owners is
+   incomplete even when the code itself is correct. The next coding agent must be able
+   to resume from the committed files without reconstructing hidden chat history.
 
 ### One personal voice; resources constrain coexistence
 

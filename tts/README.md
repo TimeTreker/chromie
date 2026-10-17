@@ -233,6 +233,6 @@ or audible artifacts. See
 ## Speaker-reference authoring
 
 For the optional Oute bilingual-reference workflow, see the
-[Chromie Bilingual Speaker Guide](../CHROMIE_BILINGUAL_SPEAKER_GUIDE.md).
+[Chromie Bilingual Speaker Guide](../docs/BILINGUAL_SPEAKER_GUIDE.md).
 The default CosyVoice path continues to use the versioned references under
 `assets/tts/voices/`.

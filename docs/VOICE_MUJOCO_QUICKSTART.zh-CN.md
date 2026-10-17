@@ -36,16 +36,9 @@ cd ../soridormi
 
 ## Chromie 音频设置
 
-第一次使用时：
-
-```bash
-cd ../chromie
-conda create -n Chromie python=3.11 -y
-conda activate Chromie
-./scripts/install_orchestrator_deps.sh
-cp -n orchestrator/.env.local.example orchestrator/.env.local
-python orchestrator/list_devices.py
-```
+第一次使用时，在 Chromie 仓库根目录按
+[运行手册的主机音频步骤](../CHROMIE_RUNBOOK.md#4-configure-and-start-host-audio)
+创建 Conda 环境、安装 Orchestrator 依赖、复制 `orchestrator/.env.local` 并列出音频设备。
 
 可以在 `orchestrator/.env.local` 中填写：
 
@@ -143,9 +136,9 @@ Stop.
 Chromie 容器日志：
 
 ```bash
-docker compose --env-file .env.runtime logs -f chromie-asr
-docker compose --env-file .env.runtime logs -f chromie-agent
-docker compose --env-file .env.runtime logs -f chromie-tts
+./scripts/compose.sh logs -f chromie-asr
+./scripts/compose.sh logs -f chromie-agent
+./scripts/compose.sh logs -f chromie-tts
 ```
 
 Soridormi MCP 日志：

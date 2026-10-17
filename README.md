@@ -183,7 +183,7 @@ Retained target evidence additionally proves:
 
 - complete the everyday live-text cohort and repair its failures at their
   owners (see [Status](docs/STATUS.md#current-open-work));
-- clean full-matrix generated-speech acceptance after the post-merge fixes;
+- clean current-revision full-matrix generated-speech acceptance;
 - positive Agent Skill selection with trustworthy real provider-backed weather
   execution and follow-up conversation;
 - a reviewed SC-owned social expression live baseline;
@@ -367,16 +367,6 @@ documented in
 
 ## Read next
 
-- [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
-- [Status](docs/STATUS.md): current implementation and evidence
-- [Roadmap](ROADMAP.md): delivery order and exit criteria
-- [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point
-- [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md): behavior-change rules
-- [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md): input, reflex, attention, and turn-admission boundary
-- [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md): Core-managed delegation, evidence reconciliation, and final-response lifecycle
-- [Agent Skills Architecture](docs/AGENT_SKILLS_ARCHITECTURE.md): Agent, Agent Skill, Plan, and Capability boundaries
-- [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md): current source-bound evidence workflow
-- [Acceptance](docs/ACCEPTANCE.md): evidence levels and claim limits
-- [Operations Runbook](CHROMIE_RUNBOOK.md): startup and recovery
-- [User Manual](docs/USER_MANUAL.md): current simulator operation
-- [Documentation Index](docs/README.md): owner for every documentation fact
+Follow the [core reading path](docs/README.md#core-reading-path) in the
+Documentation Index, which owns the one ordered reading list. Operators also use
+the [User Manual](docs/USER_MANUAL.md) for current simulator operation.

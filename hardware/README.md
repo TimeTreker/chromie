@@ -2,8 +2,8 @@
 
 This directory contains Chromie's legacy host-side compatibility daemon. It
 supports the original `AgentResult.actions` path and GPU-free control-plane
-tests. It is not the primary embodiment boundary for the current alpha
-interaction architecture.
+tests. It is not the primary embodiment boundary for the current interaction
+architecture.
 
 New robot-body behavior must be exposed as validated named skills through the
 host Trusted Capability Runtime and Soridormi MCP. Soridormi owns embodied planning,

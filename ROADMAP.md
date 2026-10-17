@@ -56,8 +56,9 @@ source-complete. Remaining order:
 
 1. **Everyday live-cohort root-cause repairs (active Issue).** Run the
    `scenarios/everyday/` cohort against Soridormi MuJoCo, judge every case and
-   repair each failure at its earliest responsible owner. Scope and next steps:
-   [checkpoint](DEVELOPMENT_CHECKPOINT.md).
+   repair each failure at its earliest responsible owner. Scope:
+   [checkpoint](DEVELOPMENT_CHECKPOINT.md); next steps:
+   [Status open work](docs/STATUS.md#current-open-work).
 2. **Semantic transaction simplification and generalization.** Source-span
    provenance, semantic-artifact lineage, the SC model-view diet and the
    provider-declared semantic Capability facade substrate are implemented.

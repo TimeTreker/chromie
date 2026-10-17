@@ -6,14 +6,10 @@ refactors.
 
 ## Before editing
 
-Read:
-
-1. `docs/PROJECT_CHARTER.md`
-2. `docs/STATUS.md`
-3. `ROADMAP.md`
-4. `DEVELOPMENT_CHECKPOINT.md`
-5. the relevant component README
-6. `docs/ACCEPTANCE.md` for the evidence level affected by the change
+Read the [core reading path](docs/README.md#core-reading-path) (owned by the
+Documentation Index), then the relevant component README and the
+[Acceptance](docs/ACCEPTANCE.md) section for the evidence level affected by the
+change.
 
 For commit, push, publication, or project handoff work, also follow the
 [Chromie delivery-handoff skill](.agents/skills/chromie-delivery-handoff/SKILL.md).
@@ -84,7 +80,7 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
 - Treat defect analysis, implementation, explanation, and verification as one
   deliverable. A patch without a causal explanation is incomplete, even when
   the code is correct.
-- Before a delivery commit is created or pushed, update
+- Before a delivery commit is created or pushed, update `docs/STATUS.md`,
   `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in the same commit. Record the exact
   scope, observed validation state, blockers, retained evidence, revision/profile
   identity, and next commands by replacing their current sections (never append a
@@ -166,9 +162,11 @@ After all selected cases finish, collect one post-cohort bundle:
 Review the aggregate summary, every deterministic and semantic case (including
 mechanical passes), and the single correlated bundle together. Group failures
 by earliest responsible boundary before choosing a source change; do not treat
-every utterance as an independent bug. A hard safety, provenance,
-service-integrity, or safe-idle failure may terminate the run, but the retained
-result is then an incomplete cohort, not a passing subset.
+every utterance as an independent bug. A hard integrity failure stops the run, as
+the runner does ([Acceptance](docs/ACCEPTANCE.md)): safety or safe-idle,
+provenance or Goal omission, service, structured Runtime/model-contract,
+LLM-integrity or harness failure. The retained result is then an incomplete
+cohort, not a passing subset.
 
 After aggregate diagnosis, a focused case is appropriate for validating one
 proposed fix. Then run its ability class and the complete cohort again on the

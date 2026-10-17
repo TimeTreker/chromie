@@ -539,11 +539,12 @@ remained exactly 5,091 tokens. Do not retain that flag as a Chromie optimization
 This proves physical SGLang + CosyVoice co-residency on the 16 GB laptop, but **does not qualify
 the topology for Chromie cognition**. The maintained laptop UMI request budget is 16K and other
 semantic roles retain 32K request budgets; 5,091 tokens cannot represent that deployment. Do not
-trade away the two-request concurrency requirement merely to make the canary fit, because
-foreground progress while Deep remains active is the reason for evaluating SGLang.
+trade away the maintained concurrent-request requirement merely to make the canary fit, because
+foreground progress while deliberative work remains active is the reason for evaluating SGLang.
 
 The next laptop gate is therefore a quantized SGLang-served model/artifact comparison. Hold the
-semantic contracts, `max_running_requests=2`, resident TTS, priority semantics, and target context
+semantic contracts, the maintained three-request topology (`max_running_requests=3`, see
+[Configuration](CONFIGURATION.md)), resident TTS, priority semantics, and target context
 topology fixed while changing only the exact model artifact/runtime quantization. Resource fit must
 be proven before running semantic-role promotion. Only after a candidate has a production-sized
 context pool should the frozen UMI semantic cohort and then protocol-5 contention/lease/revocation

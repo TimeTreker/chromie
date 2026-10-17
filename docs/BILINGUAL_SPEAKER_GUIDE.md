@@ -1,7 +1,7 @@
 # Chromie Bilingual OuteTTS Speaker Guide
 
 This guide applies only to the optional OuteTTS backend (`chromie-tts-oute`, a
-low-resource fallback; see [TTS](tts/README.md)). The maintained default,
+low-resource fallback; see [TTS](../tts/README.md)). The maintained default,
 CosyVoice3, installs its reference voice with `scripts/tts_reference.py` instead.
 It creates an OuteTTS speaker profile that works better for both English and Chinese. OuteTTS can synthesize both languages, but the speaker
 reference strongly affects accent, tone, and pronunciation. A clean bilingual

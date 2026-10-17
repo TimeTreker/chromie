@@ -533,7 +533,7 @@ python scripts/run_daily_conversation_benchmark.py \
 The live adapter receives each normalized scenario on standard input and uses
 the maintained Host text path with cognitive-runtime apply, shared conversation
 state for multi-turn cases, no speaker, and preview-only execution. It therefore
-exercises routing, Goal Association, planning, and response composition without
+exercises User Meaning Interpretation, Goal Association, planning, and Social Cognition without
 executing proposed effects. It also verifies the quality-model identity exposed
 by Agent health and that the fast Planner model matches the active runtime
 profile's `AGENT_FAST_PLANNER_MODEL`. The runner writes

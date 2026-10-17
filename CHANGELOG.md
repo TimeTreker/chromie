@@ -22,12 +22,14 @@ remains available in Git history.
   orders Responsibility spans; an unsettled referent is clarified, never reported
   as a limitation; information already perceived is answered from the cited
   observation; SC receives a request without agreeing before its Work is decided;
-  a turn waiting for Value Judgment admits only an acknowledgement; the local
-  clock is a common-tier read.
+  while a speech Responsibility UMI marked `value_review` waits for Value
+  Judgment, its turn admits only an acknowledgement; the local clock is a
+  common-tier read.
 - Owner identity direction (2026-10-14): Chromie answers as herself and never
   calls herself a robot, AI or device, without false claims about her nature.
 - Status, checkpoint and handoff are current-state documents; per-delivery
-  history is no longer appended to them.
+  history is no longer appended to them. Status holds the single ordered
+  open-work list (2026-10-17).
 
 ### One Planner: Deep Planner retired (2026-10-11)
 

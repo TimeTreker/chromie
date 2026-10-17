@@ -18,9 +18,9 @@ correct the lower-authority document.
 | root-cause rules for natural, grounded behavior | [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) |
 | evidence levels, validation requirements and claim limits | [Acceptance](ACCEPTANCE.md) |
 | delivery order and Issue/evidence exit criteria | [Roadmap](../ROADMAP.md) |
-| implementation, automatic verification, target validation, deployment state | [Current Status](STATUS.md) |
+| implementation, automatic verification, target validation, deployment state, ordered open work | [Current Status](STATUS.md) |
 | coordinated source-bound target-evidence workflow and profiles | [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md) |
-| active Issue, resume point, owner decisions in force and next work | [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) |
+| active Issue, resume point, repairs and owner decisions in force, claim boundary | [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) |
 | exact deploy/run commands, runtime identities and private evidence paths | [Handoff](../HANDOFF.md) |
 | operation, startup, inspection, and recovery | [Runbook](../CHROMIE_RUNBOOK.md) |
 | environment and generated-runtime configuration | [Configuration](CONFIGURATION.md) |
