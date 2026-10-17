@@ -56,6 +56,55 @@ class TestOwnershipTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertIn("may not inspect Python implementation text", findings[0].message)
 
+    def test_detector_finds_indirect_python_source_reads(self) -> None:
+        sources = {
+            "getsource": "import inspect\ndef test_x():\n    inspect.getsource(test_x)\n",
+            "helper": (
+                "from pathlib import Path\n"
+                "def _text(path):\n    return Path(path).read_text()\n"
+                "def test_x():\n    _text('agent/app/runtime.py')\n"
+            ),
+            "glob_loop": (
+                "from pathlib import Path\n"
+                "def test_x():\n"
+                "    for path in sorted(Path('agent').rglob('*.py')):\n"
+                "        path.read_text()\n"
+            ),
+            "named_path": (
+                "from pathlib import Path\n"
+                "SOURCE = Path('orchestrator') / 'runtime.py'\n"
+                "def test_x():\n    SOURCE.read_text()\n"
+            ),
+            "module_file": (
+                "from pathlib import Path\nimport json\n"
+                "def test_x():\n    Path(json.__file__).read_text()\n"
+            ),
+        }
+        for form, source in sources.items():
+            with self.subTest(form=form), tempfile.TemporaryDirectory() as temp_dir:
+                root = Path(temp_dir)
+                (root / "tests").mkdir()
+                (root / "tests" / "test_probe.py").write_text(source, encoding="utf-8")
+                self.assertIn(
+                    "tests/test_probe.py", ownership.discover_python_source_readers(root)
+                )
+
+    def test_detector_ignores_non_source_reads(self) -> None:
+        source = (
+            "from pathlib import Path\nimport importlib.util\n"
+            "SCRIPT = Path('scripts') / 'tool.py'\n"
+            "spec = importlib.util.spec_from_file_location('tool', SCRIPT)\n"
+            "def test_x(tmp_path):\n"
+            "    names = [p.name for p in Path('shared').rglob('*.py')]\n"
+            "    Path('docs/README.md').read_text()\n"
+            "    (tmp_path / 'probe.json').read_text()\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "tests").mkdir()
+            (root / "tests" / "test_probe.py").write_text(source, encoding="utf-8")
+            self.assertEqual(ownership.discover_python_source_readers(root), {})
+
     def test_reviewed_artifact_contract_is_allowed(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
