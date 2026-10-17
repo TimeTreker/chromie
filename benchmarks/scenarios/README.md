@@ -14,7 +14,7 @@ python -m benchmarks.scenarios check
 Run the maintained file-backed suites through the Benchmark entrypoint:
 
 ```bash
-python -m benchmarks.scenarios run --suite dialogue --no-write
+python -m benchmarks.scenarios run --suite cognitive_core_dialogue --no-write
 ```
 
 `scripts/scenario_runner.py`, `scripts/scenario_author.py`, and the general

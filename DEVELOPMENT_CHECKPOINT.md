@@ -64,7 +64,8 @@ passed + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership).
   nothing false about her nature (Charter and interaction contract).
 - An unsettled referent is resolved from the conversation when possible, otherwise
   Chromie asks the person.
-- Value Judgment does not review speech-only deception; `protect_children` is not in
+- Value Judgment reviews speech that UMI marks `value_review` (deception requests;
+  owner choice B, 2026-10-12, Charter VALUE-JUDGMENT-001); `protect_children` is not in
   the Stable Mind (owner undecided).
 - UMI never authors `bindings`; Planner alone extracts Capability parameters.
 

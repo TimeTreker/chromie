@@ -61,13 +61,16 @@ existing source-bound development evidence:
   WorkDAG/Evidence re-entry, Level-A general-ability, and deterministic provider-fault
   gates;
 - retained `general_ability_acceptance --mode live-text --execute --assertion-scope full`
-  evidence for the directory-discovered current-revision interaction cases; and
+  evidence for the manifest-pinned current-revision interaction cases
+  (`interaction_behavior_cases` in `target_evidence_closure_v1.json`); and
 - the live Soridormi provider fault matrix with safe-idle and terminal-latency checks.
 
 The retained interaction set covers Chinese and English effectful turns, cancellation,
 provider-backed weather/Evidence re-entry, multi-goal body/conversation behavior,
 continuity across turns, duplicate-effect cardinality checks, and the declared warm
-Fast-Planner/playback budgets where a case owns those thresholds. Source WorkDAG revision
+UMI-handoff-to-SC-commitment/playback budgets where a case owns those thresholds.
+Cases added under `scenarios/general_ability/` are not collected until they are added
+to that manifest list. Source WorkDAG revision
 and no-redispatch invariants remain deterministic gates because a live interaction does
 not become more authoritative by inventing a special fault solely to exercise graph
 revision.
@@ -135,7 +138,7 @@ python scripts/run_target_evidence_closure.py collect-provider-faults \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp
 ```
 
-`collect-interaction-behavior` always uses the directory-discovered case set, `execute`,
+`collect-interaction-behavior` always uses the manifest-pinned case set, `execute`,
 `assertion-scope=full`, the Goal-driven runtime, and supervised confirmation grants. A
 preview-only, dirty, different-revision, or user-outcome-only report is mechanically
 ineligible for this track. `collect-provider-faults` requires Soridormi's declared hidden
@@ -269,12 +272,17 @@ different entity or Goal cannot be relabelled.
 
 ## Social Attention baseline
 
-Configure the first-party deployed-service adapter before collection, for
-example:
+The repository ships the `live_service_text` adapter boundary
+(`benchmarks/manifests/e2e_adapters.json`), not a deployed-service harness. Before
+collection, point it at an operator-supplied harness by setting exactly one of:
 
 ```bash
-export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
+export CHROMIE_BENCHMARK_LIVE_SERVICE_URL=<harness-http-url>
+# or
+export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=<module>:<function>
 ```
+
+Without one, `collect-social` cannot run and this track stays incomplete.
 
 Collect all reviewed launcher-effective mode/style slices and build the hard-gate
 qualification report in one command:

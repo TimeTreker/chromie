@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from scripts.daily_conversation_live_adapter import (
+    _configured_fast_model,
+    _observation,
     _safe_id,
     _semantic_turn_record,
     _structural_invariants,
@@ -77,3 +81,41 @@ def test_daily_conversation_live_adapter_retains_goal_and_plan_semantics() -> No
     assert record["goal_association"]["new_goals"][0]["description"] == "walk"
     assert record["planner_metadata"]["deep_planner_invoked"] is True
     assert record["proposed_skills"][0]["timing"] == "parallel"
+
+
+def _health_observation(tmp_path: Path, *, fast_model: str, expected_fast_model: str | None):
+    evidence_dir = tmp_path / "turn"
+    evidence_dir.mkdir()
+    (evidence_dir / "agent_health.json").write_text(
+        '{"model": "chromie-gemma4-12b", "goal_association_model": "chromie-gemma4-12b", '
+        f'"fast_planner_model": "{fast_model}"}}',
+        encoding="utf-8",
+    )
+    request = {
+        "scenario": {"id": "daily.v1.case", "inputs": {"text": "Hi"}, "expectations": {}},
+        "run": {"model": "chromie-gemma4-12b"},
+    }
+    summary = {"ok": True, "evidence_dir": str(evidence_dir), "interaction_response": {}}
+    return _observation(request, [summary], tmp_path, expected_fast_model=expected_fast_model)
+
+
+def test_daily_conversation_live_adapter_uses_the_configured_fast_model(tmp_path: Path) -> None:
+    # A maintained SGLang profile serves its own fast Planner model, not qwen3:4b.
+    observation = _health_observation(
+        tmp_path, fast_model="chromie-gemma4-12b", expected_fast_model="chromie-gemma4-12b"
+    )
+    topology = next(item for item in observation["evidence"] if item["kind"] == "model_topology")
+    assert topology["configured_fast_model_match"] is True
+    assert observation["primary_task_passed"] is None
+
+
+def test_daily_conversation_live_adapter_fails_a_fast_model_mismatch(tmp_path: Path) -> None:
+    observation = _health_observation(
+        tmp_path, fast_model="qwen3:4b", expected_fast_model="chromie-qwen35-4b"
+    )
+    assert observation["primary_task_passed"] is False
+
+
+def test_daily_conversation_live_adapter_reads_the_profile_fast_model() -> None:
+    assert _configured_fast_model({"AGENT_FAST_PLANNER_MODEL": " chromie-qwen35-4b "}) == "chromie-qwen35-4b"
+    assert _configured_fast_model({}) is None

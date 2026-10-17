@@ -165,7 +165,7 @@ an action from the user phrase or scenario ID.
 Example model-only run:
 
 ```bash
-export CHROMIE_BENCHMARK_LIVE_MODEL_CALLABLE=qualification_harness.live_model:invoke
+export CHROMIE_BENCHMARK_LIVE_MODEL_CALLABLE=<module>:<function>  # operator-supplied harness; or set CHROMIE_BENCHMARK_LIVE_MODEL_URL
 
 python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
@@ -191,7 +191,7 @@ python -m benchmarks.e2e \
 Example deployed-service run adds provider and hardware identity:
 
 ```bash
-export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
+export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=<module>:<function>  # operator-supplied harness; or set CHROMIE_BENCHMARK_LIVE_SERVICE_URL
 
 python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \

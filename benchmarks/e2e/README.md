@@ -71,7 +71,7 @@ python -m benchmarks.e2e \
 Run the maintained deployed-text adapter boundary:
 
 ```bash
-export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
+export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=<module>:<function>  # operator-supplied harness; or set CHROMIE_BENCHMARK_LIVE_SERVICE_URL
 
 python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
@@ -104,7 +104,8 @@ Qualification adapters may return `social_attention_lifecycle` inside the
 observation. Proposal, Host materialization, Provider acceptance, Provider
 completion, and safe idle are recorded as separate facts. The E2E runner reports
 their distributions but does not choose an action or change Runtime policy.
-The proposal must come from the containing Planner result; this lifecycle
+The proposal must come from the containing Social Cognition act
+(`SocialCommunicativeAct.auxiliary_activities[]`); this lifecycle
 surface does not imply a separate Social Attention model or endpoint.
 
 Use `--cohort`, `--style`, `--mode`, `--language`, `--invariant`, and

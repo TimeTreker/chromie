@@ -193,7 +193,10 @@ def test_identity_delivery_requires_goal_completion_without_planner_work(
             "stage": "social_cognition", "status": "accepted", "output": social,
             "started_elapsed_ms": 0, "finished_elapsed_ms": decision_ms,
             "duration_ms": decision_ms,
-        }], "workflow_events": [{"event": "playback_start", "elapsed_ms": decision_ms + 100}]},
+        }], "workflow_events": [
+            {"event": "text_check_user_meaning_interpretation_done", "elapsed_ms": 0},
+            {"event": "playback_start", "elapsed_ms": decision_ms + 100},
+        ]},
     }
     if status is not None:
         summary["final_goal_snapshots"] = [{
@@ -202,7 +205,7 @@ def test_identity_delivery_requires_goal_completion_without_planner_work(
     errors = validate_live_text_result(case, summary, assertion_scope="full")
     assert not any("terminal Plan omitted" in error for error in errors), errors
     assert any("Goal" in error for error in errors) is (status != "satisfied"), errors
-    assert any("decision exceeded target" in error for error in errors) is (decision_ms > 2000), errors
+    assert any("commitment exceeded target" in error for error in errors) is (decision_ms > 2000), errors
     assert (errors == []) == (status == "satisfied" and decision_ms <= 2000), errors
 
 
@@ -695,6 +698,22 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         errors = validate_live_text_result(case, unreconciled_summary)
         self.assertTrue(
             any("Work reconciliation did not run" in item for item in errors),
+            errors,
+        )
+
+        queued_summary = json.loads(json.dumps(summary))
+        # SC itself takes 600 ms, but it started 1.5 s after the UMI handoff:
+        # the warm budget is handoff-to-commitment, so the queue wait counts.
+        queued_summary["session_state"]["workflow_events"][1]["elapsed_ms"] = 0.0
+        queued_summary["session_state"]["cognitive_workflow_stages"][0].update(
+            {"started_elapsed_ms": 1500.0, "finished_elapsed_ms": 2100.0}
+        )
+        errors = validate_live_text_result(case, queued_summary)
+        queued_derived = queued_summary["social_response_timing_evidence"]["derived"]
+        self.assertEqual(queued_derived["sc_decision_ms"], 600.0)
+        self.assertEqual(queued_derived["umi_handoff_to_sc_commitment_ms"], 2100.0)
+        self.assertTrue(
+            any("UMI handoff to Social Cognition commitment exceeded" in item for item in errors),
             errors,
         )
 

@@ -29,7 +29,10 @@ See [Hybrid oracle execution](CHROMIE_BENCHMARK_SUITE.md#73-hybrid-oracle-execut
 Forbidden architecture is owned by dependency-light AST or structured policy
 checks, primarily `scripts/check_repository_policies.py`. Tests should exercise
 the policy checker with synthetic violating trees instead of checking that one
-particular source string is absent.
+particular source string is absent. The registry may still list a reviewed
+`architecture_policy` source-reader where a structural boundary has no policy
+rule yet; it currently holds two, for the VoiceAssistant input-session and
+playback-transport extractions.
 
 ## Generated-artifact contract tests
 
@@ -67,5 +70,6 @@ and stale approvals. It is part of `./scripts/run_tests.sh`.
 
 The registry is not a blanket baseline. New user/runtime behavior must use
 executable assertions; new forbidden architecture belongs in the repository
-policy checker; only genuine generated-artifact contracts may be added to the
-registry.
+policy checker; only genuine generated-artifact contracts, or a reviewed
+`architecture_policy` reader whose boundary has no policy rule yet, may be added to
+the registry. `scripts/check_test_ownership.py` accepts exactly these two categories.

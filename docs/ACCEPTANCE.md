@@ -6,11 +6,13 @@ milestones and component notes.
 ## Current owner acceptance — 2026-09-15
 
 The owner reports personally testing the microphone and ASR and accepts those
-components for the current work. Their qualification is closed on that manual
-acceptance; repeating microphone/ASR testing is not a prerequisite to continued
-engineering or fine-tuning preparation unless a new regression is reproduced.
-The report supplies no revision-bound automated artifact, so it is recorded as
-owner acceptance rather than a fabricated harness pass. Its scope is microphone
+components for the current work. Repeating microphone/ASR testing is therefore not
+a prerequisite to continued engineering or fine-tuning preparation unless a new
+regression is reproduced. The report supplies no revision-bound automated artifact,
+so it is recorded as owner acceptance rather than a fabricated harness pass, and it
+qualifies no revision: the narrow current-revision voice proof, target validation
+and any later revision that changes VAD, ASR or audio-device code still need
+retained, revision-bound evidence. Its scope is microphone
 and ASR; it does not clear the separately observed SC generation failure or the
 incomplete injected-text model/Runtime cohort. See the current
 [checkpoint](../DEVELOPMENT_CHECKPOINT.md) for those remaining failures.
@@ -580,6 +582,10 @@ The everyday live cohort `scenarios/everyday` (owner, 2026-10-15) is the current
 `must_pass` smoke cases, 50 `core` and 5 `challenge` (70 total), every utterance an everyday
 sentence. Select it with `--scenario-root scenarios/everyday`; the script default remains
 `scenarios/general_ability`. Its smoke stage runs first; a hard smoke failure stops core and challenge (no `--keep-going`).
+It is the owner's live behavior target and the active Issue's cohort. It is a different
+claim from current-revision qualification: the target-evidence closure interaction track
+runs the manifest-pinned `scenarios/general_ability` cases (Phase 6 below) and never the
+everyday cohort. Report each pass under its own claim; neither substitutes for the other.
 
 The general-ability live cohort has three ordered stages: 55 `must_pass`, 16 `core`, and 8
 `challenge` cases (79 total). The owner removed the spelling-error probe
@@ -647,7 +653,8 @@ The live general-ability runner defaults to `--assertion-scope user-outcome`.
 This scope evaluates stable observable behaviors, speech truthfulness, execution
 receipts, final safety, and LLM-call integrity while retaining route and planner
 path differences as diagnostics. Use `--assertion-scope full` only when the
-internal path itself is the claim. See
+internal path itself is the claim, as in the current-revision target-evidence
+interaction track. See
 [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md).
 
 ### Generalization and continuous-episode qualification
@@ -824,11 +831,12 @@ identity or recovery timeout stops admission and retains the remaining cases as
 blocked. Unbound runs retain their existing case preflight but cannot establish
 this service-continuity evidence.
 
-Warm interaction cases retain two non-overlapping intervals: the accepted SC
-stage start to its complete decision (`max_warm_sc_decision_ms`), then that
-commitment to actual playback start (`max_warm_sc_to_playback_start_ms`). UMI
-remains a separately measured upstream interval. Silence is not a meaningful
-spoken response and cannot satisfy a speaking-latency target. Do not subtract
+Warm interaction cases retain two non-overlapping intervals: the validated UMI
+handoff to the accepted SC commitment (`max_warm_sc_decision_ms`, gated on
+`umi_handoff_to_sc_commitment_ms`, so Host and queue wait count), then that
+commitment to actual playback start (`max_warm_sc_to_playback_start_ms`). SC
+stage duration (`sc_decision_ms`) and UMI duration remain separately recorded. A valid silence decision ends the
+first interval and has no playback interval; it never counts as a spoken response. Do not subtract
 duration sums from absolute timestamps. Headless discard playback proves its
 transport only; audible-speaker claims require supervised speaker-enabled runs.
 
@@ -862,9 +870,13 @@ The target is at least a 35 percent median reduction without weakening any
 execution or evidence boundary. This relative target is a regression goal; it does
 not replace the absolute warm targets in Charter INTERACTION-LATENCY-001.
 
-The explicit `qualification` operator mode (`env/modes/qualification.env`), not a
-hardware profile, owns the qualification time budgets: 120 seconds per Agent cognitive stage, 150 seconds per host stage,
-and 900 seconds for the complete cognitive pipeline. The live runner therefore
+The qualification operator mode (`env/modes/qualification.env`) sets the time
+budgets on either maintained hardware profile: 120 seconds per Agent cognitive
+stage, 150 seconds per host stage, and 900 seconds for the complete cognitive
+pipeline (`ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS`). The architecture-validation overlay
+(`env/validation/architecture.env`) keeps its own 600-second pipeline budget
+([User-outcome acceptance](USER_OUTCOME_ACCEPTANCE.md#qualification-budgets)); each
+run is judged against the budget of the configuration it retained. The live runner therefore
 defaults to a 1200-second outer case timeout. Do not reduce these values while
 validating LLM capability and end-to-end architecture; optimize latency only
 after retaining successful warm-run evidence.
@@ -987,7 +999,8 @@ and [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md).
 ./scripts/start_services.sh
 ./scripts/compose.sh ps
 curl -fsS http://127.0.0.1:8092/health
-curl -fsS http://127.0.0.1:11434/api/tags
+curl -fsS http://127.0.0.1:30000/v1/models   # SGLang (both maintained profiles)
+# curl -fsS http://127.0.0.1:11434/api/tags  # Ollama (AGENT_LLM_PROVIDER=ollama)
 ./scripts/verify_tts_gpu.sh
 ```
 
@@ -998,7 +1011,9 @@ START_SERVICES=1 RUN_TTS_SYNTHESIS=1 ./scripts/gpu_smoke_test.sh
 ```
 
 This checks host/container GPU visibility, Compose health, Cognitive-Core-to-Agent
-round trip, ASR/TTS WebSockets, Ollama generation, model GPU placement, and
+round trip, ASR/TTS WebSockets, one generation from the configured
+`AGENT_LLM_PROVIDER` (SGLang `:30000` or Ollama `:11434`), Ollama model GPU
+placement (SGLang is CUDA-only and has no separate placement check), and
 optional non-empty TTS PCM generation. It does not evaluate microphone or
 speaker quality.
 
@@ -1145,7 +1160,7 @@ fixing a speed the person did not request. Provider realization traces remain
 separate evidence; normalized observations do not invent measured heading changes.
 
 This runner always uses the maintained goal-driven path; it has no option to
-disable the cognitive runtime. It
+select another path. It
 writes `cognitive_runtime_resolution.json`, `interaction_response.json`,
 `execution.json`, status snapshots, session events, recordings when enabled,
 and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. The summary
@@ -1411,7 +1426,7 @@ invokes General Ability with `--execute`, `--assertion-scope full`, Goal-driven 
 `apply`, and the retained runtime identity. The track requires Chinese and English
 effectful cases, cancellation, provider-backed weather/Evidence re-entry, multi-goal mixed
 body/conversation behavior, follow-up continuity, duplicate-effect cardinality checks, and
-the declared warm 2s SC-decision / 3s SC-commitment-to-playback-start budgets where a retained case owns
+the declared warm 2s UMI-handoff-to-SC-commitment / 3s playback-start budgets where a retained case owns
 those thresholds. The track is injected-text/simulator evidence; it does not claim a
 physical microphone or audible speaker.
 
@@ -1626,7 +1641,9 @@ plays through the speaker; no human pronunciation is graded. Use
 Chinese cases are evaluated primarily with character error rate; English cases
 use word error rate. Workflow playback is compared with the exact speech that
 Chromie actually delivered during the same turn, not with a hard-coded model
-answer. Separate manifest terms check the intended response outcome. This keeps
+answer. The intended response outcome is a declared semantic dimension of each
+workflow case's hybrid `oracle_policy`, packaged for semantic review rather than
+matched against manifest terms. This keeps
 ASR in the role of an automated audio observer rather than making a human
 accent part of the release gate.
 
@@ -1909,7 +1926,7 @@ and only `supervised` adds human speech and operator observations.
 | Barge-in | Interrupt while speaking | Active old-session playback linked to the new interrupt session, deterministic interrupt route, and no old-session playback after interruption completes. |
 | Body cancellation | Confirm, then interrupt a cancellable simulated skill | Bound approval, host-observed Trusted Capability Runtime cancellation, host interruption completion, and post-cancellation safe-idle/no-active-task status. This does not claim a provider cancel RPC unless a provider event explicitly records one. |
 | Stop/emergency | Explicit stop during active work | Deterministic operational route linked to the active prior session, with no later old-session output or completed work. |
-| Follow-up | “Remember … blue,” then ask for the color | Same conversation ID, both intended ASR utterances, and completed second-response output containing `blue`. |
+| Follow-up | “Remember … blue,” then ask for the color | Same conversation ID, both intended ASR utterances, and completed second-response output containing `blue`. The case is English-only and `blue` is the recalled fact value, so this is a deterministic recall check, not a phrase-list judgment of intent or naturalness. |
 
 The confirmation rows (body skill, refusal, body cancellation) need a body request that
 actually requires confirmation under the per-request rule in

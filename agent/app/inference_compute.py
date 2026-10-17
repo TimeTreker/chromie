@@ -42,7 +42,7 @@ _PURPOSE_COMPUTE_CLASS: dict[str, CognitionComputeClass] = {
     "fast_planner": CognitionComputeClass.INTERACTIVE,
     "value_judgment": CognitionComputeClass.INTERACTIVE,
     "social_cognition": CognitionComputeClass.REALTIME,
-    "social_cognition_deep": CognitionComputeClass.REALTIME,
+    "social_cognition_deep": CognitionComputeClass.DELIBERATIVE,
     "situational_cognition": CognitionComputeClass.INTERACTIVE,
     "goal_association": CognitionComputeClass.CONTINUITY,
     "user_meaning_interpreter_deep": CognitionComputeClass.INTERPRETATION,

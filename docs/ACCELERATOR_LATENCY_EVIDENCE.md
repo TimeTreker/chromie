@@ -214,11 +214,12 @@ On 2026-09-14, after dual-engine resource probes, the owner explicitly selected
 one resident Gemma 12B SGLang instance shared by all cognition roles. SC, UMI, GA
 and Planner retain independent semantic authority and request context. The order
 is SC > UMI > GA > Fast Planner > deliberative Work > background, mapped by the
-default step to 500/400/300/200/100/0. Depth does not lower SC/UMI urgency.
+default step to 500/400/300/200/100/0. Depth does not lower UMI urgency; bounded Deep SC
+keeps the Charter's deliberative class.
 Here "deliberative Work" means the `DELIBERATIVE` compute class only. The configuration
 names `AGENT_DELIBERATIVE_MODEL` and `ORCH_DELIBERATIVE_TIMEOUT_MS` select a model and a
-Host deadline, not a compute class: Deep SC stays `REALTIME` and Deep UMI stays
-`INTERPRETATION` (`agent/app/inference_compute.py`).
+Host deadline, not a compute class. Compute class comes from the call purpose: Deep SC
+uses `DELIBERATIVE` and Deep UMI stays `INTERPRETATION` (`agent/app/inference_compute.py`).
 SGLang must actually preempt and resume lower-priority requests; a priority field
 alone is not sufficient evidence. The two-instance Qwen/Gemma experiments are
 retained as failed/unqualified candidates, not the maintained topology.
