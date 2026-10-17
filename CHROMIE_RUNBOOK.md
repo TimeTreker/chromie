@@ -322,7 +322,7 @@ curl -fsS http://127.0.0.1:8092/capabilities | python -m json.tool
 curl -fsS http://127.0.0.1:11434/api/tags | python -m json.tool
 ```
 
-WorkDAG dry-run, trace, and DAGEngine diagnostics require a bearer token. Use
+DAGEngine status diagnostics require a bearer token. Use
 the configured diagnostics token, or the execution token when the diagnostics
 token is blank:
 

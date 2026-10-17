@@ -188,14 +188,6 @@ class CapabilitySearchResult(BaseModel):
     live_refresh_error: str | None = None
 
 
-class CapabilitySearchRequest(BaseModel):
-    text: str
-    language: str = "auto"
-    limit: int = Field(default=8, ge=1, le=32)
-    refresh: bool = False
-    prefer_interaction_executable: bool = True
-
-
 class CapabilityInvoker(Protocol):
     async def invoke(self, tool_name: str, arguments: dict[str, Any], *, context: Any = None) -> Any: ...
 

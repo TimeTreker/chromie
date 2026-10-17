@@ -16,12 +16,10 @@ from .models import (
     WorkNode,
 )
 from .service import (
-    WorkDAGDryRunRequest,
     WorkDAGExecuteRequest,
     WorkDAGCancelResponse,
     WorkDAGConfirmationGrantRequest,
     WorkDAGConfirmationGrantResponse,
-    WorkDAGGuardedExecuteRequest,
     DAGEngineStatus,
     DAGEngineService,
     WorkDAGValidationResponse,
@@ -44,10 +42,8 @@ __all__ = [
     "WorkDAGCancelResponse",
     "WorkDAGConfirmationGrantRequest",
     "WorkDAGConfirmationGrantResponse",
-    "WorkDAGDryRunRequest",
     "WorkDAGExecuteRequest",
     "DAGExecutionProofs",
-    "WorkDAGGuardedExecuteRequest",
     "DAGEngineStatus",
     "DAGEngineService",
     "WorkDAGValidationResponse",

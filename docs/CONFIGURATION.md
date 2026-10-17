@@ -430,7 +430,7 @@ retained. See
 | `AGENT_USE_LLM` | Enable LLM-backed conversation/planning; default `1`. |
 | `AGENT_CAPABILITY_MANIFESTS` | Comma-separated files/directories. Common host env leaves this empty for safe imports; the Agent container defaults to `/app/capabilities/soridormi.json`. |
 | `AGENT_SKILL_ROOTS` | Comma-separated explicitly approved read-only Agent Skill roots. The maintained Agent container defaults to `/app/agent-skills`, mounted from repository `agent-skills/` with `:ro`. Startup loads bounded metadata summaries only and fails closed on unsafe, unapproved, duplicate, digest-mismatched, or path-escaping packages. |
-| `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. `/agent-skills/select` exposes the independent contract, and maintained Agent boundaries use the same service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |
+| `AGENT_SKILL_SELECTION_ENABLED` | Enable model-authored Agent Skill selection; default `1`. Maintained Agent boundaries use the selection service when progressive disclosure is enabled. If disabled, selection degrades to optional no-Skill. |
 | `AGENT_SKILL_SELECTION_MODEL` | Ollama model used by the responsible Agent-role selection boundary; default `qwen3:4b`. |
 | `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for the single primary Agent Skill selection call; default `10000`. No model repair or reselection is performed. Explicit qualification mode raises it to `120000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
@@ -476,8 +476,8 @@ unconfirmed cross-language name fails closed; it does not authorize substitution
 If none match, the tool returns typed
 `location_not_found`.
 | `AGENT_DAG_ENGINE_MAX_CONCURRENCY` | Process-local WorkDAG bound; default `4`, range 1–64. |
-| `AGENT_DAG_ENGINE_EXECUTION_TOKEN` | Secret bearer token for grants, guarded execution, and cancellation. |
-| `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN` | Bearer token for dry-run, trace, and DAGEngine diagnostics. A blank value falls back to `AGENT_DAG_ENGINE_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |
+| `AGENT_DAG_ENGINE_EXECUTION_TOKEN` | Secret bearer token for WorkDAG cancellation. |
+| `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN` | Bearer token for DAGEngine status diagnostics. A blank value falls back to `AGENT_DAG_ENGINE_EXECUTION_TOKEN`; when both are blank, those endpoints return 503. |
 | `AGENT_DAG_ENGINE_TRACE_MAX_ENTRIES` | Maximum in-memory retained traces; default `128`. Least-recently-used entries are evicted first. |
 | `AGENT_DAG_ENGINE_TRACE_TTL_SEC` | Retained-trace lifetime; default `900` seconds. |
 | `AGENT_DAG_ENGINE_GRANT_MAX_ENTRIES` | Maximum in-memory unconsumed confirmation grants; default `128`. Expired grants are purged before issue/consume. |

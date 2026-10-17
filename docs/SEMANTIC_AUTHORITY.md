@@ -190,8 +190,8 @@ Offline semantic qualification may review retained primary results under the
 evaluation evidence: they cannot replace candidate results, mutate Runtime state,
 or feed a repair back into the current online decision.
 
-`GET /semantic-authority` exposes the maintained machine-readable authority
-matrix from the Agent service (`semantic_authority_route_matrix()`). It covers the
+`semantic_authority_route_matrix()` (checked by `scripts/semantic_authority_audit.py`)
+is the maintained machine-readable authority matrix. It covers the
 three cognitive Runtime routes in the table above (`apply`, `report_only` and
 Goal-free Situation); the Gateway reflex and Agent-endpoint rows are pre-semantic or
 module-local and are documented here only.

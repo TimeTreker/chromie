@@ -173,18 +173,16 @@ WorkDAG endpoints are deterministic validation/execution infrastructure. The ret
 Important endpoints include:
 
 - `GET /health`
-- `GET /semantic-authority`
 - `GET /capabilities`
 - `GET /capabilities/catalog`
-- `POST /capabilities/search`
 - User Meaning Interpretation / cognitive-core endpoints
 - `POST /goal-association`
 - `POST /fast-advance`
 - `POST /fast-plan`
 - `POST /value-judgment`
 - `POST /social-cognition` (shared interaction planning, including Goal-free Situation)
-- Agent Skill selection/disclosure endpoints
-- WorkDAG validate/dry-run/guarded execution/trace diagnostics
+- `GET /agent-skills`
+- WorkDAG planning execution, cancellation and DAGEngine status
 
 See [`../docs/API_REFERENCE.md`](../docs/API_REFERENCE.md) for the exact maintained API surface.
 
