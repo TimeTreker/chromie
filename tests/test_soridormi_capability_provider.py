@@ -772,6 +772,46 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.metadata["provider_output"]["segments_run"], 0)
         self.assertNotIn("skill_id", result.metadata["provider_output"])
 
+    async def test_typed_target_resolution_and_value_adjustments_reach_evidence(self) -> None:
+        """Soridormi's typed not-found and adjusted-value reports stay in the
+        model-readable output, so Chromie never claims the requested value."""
+        from jsonschema import Draft202012Validator
+        from orchestrator.runtime.soridormi_capability_provider import (
+            SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA,
+        )
+
+        adjustment = {
+            "parameter": "vx_mps", "requested": 0.05, "applied": 0.12,
+            "reason": "min_forward_walk_speed", "summary": "walks at 0.12 m/s",
+        }
+        resolution = {"role": "gaze_target", "status": "resolved", "target_ref": "requester"}
+        invoker = _RecordingInvoker(
+            overrides={
+                "soridormi.skill.execute_plan": ToolCallOutcome.success({
+                    "completed": True, "skill_id": "nod_yes", "mode": "sim", "no_motion": False,
+                    "recommendation_only": False, "summary": "done",
+                    "value_adjustments": [adjustment], "target_resolution": resolution,
+                })
+            }
+        )
+
+        execution = await submit_and_wait_terminal(self._runtime(invoker),
+            InteractionResponse(
+                capabilities=[
+                    {"request_id": "nod-1", "capability_id": "soridormi.nod_yes", "args": {"count": 1}}
+                ]
+            ),
+            authorization=RuntimeAuthorization(
+                confirmed_request_ids={"nod-1"},
+                safety_monitor_active=True,
+            ),
+        )
+
+        output = execution.results[0].output
+        self.assertEqual(output["value_adjustments"], [adjustment])
+        self.assertEqual(output["target_resolution"], resolution)
+        self.assertTrue(Draft202012Validator(SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA).is_valid(output))
+
     async def test_execute_rejects_mismatched_provider_identity(self) -> None:
         invoker = _RecordingInvoker(
             overrides={

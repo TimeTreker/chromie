@@ -166,8 +166,13 @@ another, it reports a typed not-found or ambiguous non-completion (`completed:
 false` with its reason) instead of looking straight ahead or picking a near
 keyword match. Chromie treats that as a limitation it tells the person about,
 never as completion. Explicit numeric values the person states are passed
-unchanged; Soridormi may refuse a value outside its limits and report that
-limitation, but it never silently runs a different value.
+unchanged; Soridormi may refuse a value outside its limits, or run an adjusted
+value inside them (for example a forward speed below its lowest walking speed
+runs at that lowest speed), but it never does so silently: it reports each
+adjustment in `value_adjustments` (parameter, requested, applied, reason). The
+Soridormi adapter keeps `value_adjustments` and `target_resolution` in the
+capability result output, so the evidence Chromie speaks from states the applied
+value, not the requested one.
 
 A gaze at the speaker without another named person ("look at me") is sent as
 `target_ref="requester"`. Until Soridormi can perceive people, its simulator
