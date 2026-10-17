@@ -4,19 +4,30 @@ Status: current normative documentation-governance contract
 
 ## One owner per current fact
 
+Authorities are listed in precedence order and match the `authorities` list in
+`config/documentation_authority.json` one to one. When documents disagree,
+correct the lower-authority document.
+
 | Fact class | Authoritative owner |
 |---|---|
 | stable mission, brain/body boundary, engineering principles, non-goals | [Project Charter](PROJECT_CHARTER.md) |
+| interaction input, protective reflexes, attention review and turn admission | [Cognitive Gateway](COGNITIVE_GATEWAY.md) |
+| admitted-turn lifecycle through delegation, Evidence re-entry and communication | [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md) |
+| Goal continuity, planning, validation and interaction principles | [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) |
+| Agent, Agent Skill, Plan and Capability boundaries | [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) |
+| root-cause rules for natural, grounded behavior | [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) |
+| evidence levels, validation requirements and claim limits | [Acceptance](ACCEPTANCE.md) |
 | delivery order and Issue/evidence exit criteria | [Roadmap](../ROADMAP.md) |
 | implementation, automatic verification, target validation, deployment state | [Current Status](STATUS.md) |
 | coordinated source-bound target-evidence workflow and profiles | [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md) |
-| current resume point and immediate commands | [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) |
+| active Issue, resume point, owner decisions in force and next work | [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) |
+| exact deploy/run commands, runtime identities and private evidence paths | [Handoff](../HANDOFF.md) |
 | operation, startup, inspection, and recovery | [Runbook](../CHROMIE_RUNBOOK.md) |
 | environment and generated-runtime configuration | [Configuration](CONFIGURATION.md) |
 | HTTP, WebSocket, and typed interface contracts | [API Reference](API_REFERENCE.md) |
 | vulnerability, secret, and physical-safety policy | [Security Policy](../SECURITY.md) |
-| notable current changes | [Changelog](../CHANGELOG.md) |
 | complete documentation navigation | [Documentation Index](README.md) |
+| notable changes | [Changelog](../CHANGELOG.md) |
 
 Lower-authority documents link to these owners instead of restating full current
 claims. Component documents own local implementation details only.
@@ -41,7 +52,9 @@ A passing unit test does not establish target validation or release readiness.
 ## Historical material
 
 Detailed historical narrative belongs in Git history after current facts have
-been consolidated into their owners. In-tree historical archives are not part
+been consolidated into their owners. Status, checkpoint and handoff are
+current-state documents: a delivery replaces their current sections and never
+appends a dated entry; a notable change gets a short CHANGELOG entry. In-tree historical archives are not part
 of the maintained documentation surface and must not be cited as current
 authority.
 

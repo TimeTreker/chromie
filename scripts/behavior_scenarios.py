@@ -1620,12 +1620,12 @@ async def evaluate_cognitive_turn_loop_scenario(
                 second_started.set()
             events.append(f"completed:{session_id}")
 
-        assistant.active_turn_task = None
-        assistant.active_turn_tasks = {}
-        assistant.active_reflex_task = None
-        assistant.concurrent_protective_reflex_tasks = set()
+        assistant.input_turn_lifecycle.active_turn_task = None
+        assistant.input_turn_lifecycle.active_turn_tasks = {}
+        assistant.input_turn_lifecycle.active_reflex_task = None
+        assistant.input_turn_lifecycle.concurrent_protective_reflex_tasks = set()
         assistant._protective_reflex_failure = False
-        assistant._pending_turn_after_reflex = deque()
+        assistant.input_turn_lifecycle.pending_turn_after_reflex = deque()
         assistant.sessions = _Sessions()
         assistant.handle_routed_text = MethodType(handle, assistant)
         assistant.session_log = lambda *args, **kwargs: None
@@ -1636,7 +1636,7 @@ async def evaluate_cognitive_turn_loop_scenario(
             "Check the first person's request.",
             "sid-first",
         )
-        first_task = assistant.active_turn_task
+        first_task = assistant.input_turn_lifecycle.active_turn_task
         if first_task is None:
             raise AssertionError("first routed turn was not launched")
         await asyncio.wait_for(first_started.wait(), timeout=1.0)
@@ -1645,7 +1645,7 @@ async def evaluate_cognitive_turn_loop_scenario(
             "Handle the second person's independent request.",
             "sid-second",
         )
-        second_task = assistant.active_turn_task
+        second_task = assistant.input_turn_lifecycle.active_turn_task
         if second_task is None or second_task is first_task:
             raise AssertionError("second routed turn was not launched independently")
         await asyncio.wait_for(second_started.wait(), timeout=1.0)
@@ -1656,7 +1656,7 @@ async def evaluate_cognitive_turn_loop_scenario(
         release_first.set()
         await asyncio.gather(first_task, return_exceptions=True)
         await asyncio.sleep(0)
-        active_turns = getattr(assistant, "active_turn_tasks", {})
+        active_turns = assistant.input_turn_lifecycle.active_turn_tasks
         actual = {
             "first_started": first_started.is_set(),
             "second_started": second_started.is_set(),
@@ -1756,7 +1756,7 @@ async def evaluate_cognitive_turn_loop_scenario(
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.interaction_runtime = runtime
     assistant.playback_delivery = runtime.playback_delivery
-    assistant.playback_generation = 7
+    assistant.playback_delivery.playback_generation = 7
     assistant.sessions = sessions
     assistant.conversation_state = manager
     assistant.cognitive_evidence = evidence
@@ -1836,9 +1836,9 @@ async def evaluate_cognitive_turn_loop_scenario(
     cancellation_receipt = None
     if runtime.mode == "stale_final":
         runtime.on_effectful_done = lambda: setattr(
-            assistant,
+            assistant.playback_delivery,
             "playback_generation",
-            assistant.playback_generation + 1,
+            assistant.playback_delivery.playback_generation + 1,
         )
 
     async def launch_detached_result_task() -> asyncio.Task[CapabilityRuntimeResult]:
@@ -1872,7 +1872,7 @@ async def evaluate_cognitive_turn_loop_scenario(
             stop_capture,
             context={"active_goal_snapshots": plan.goal_ids},
         )
-        assistant.playback_generation += 1
+        assistant.playback_delivery.playback_generation += 1
         cancellation_receipt = await runtime.cancel_scope(
             CancellationDirective(
                 source_turn_id=stop_envelope.turn_id,

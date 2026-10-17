@@ -161,14 +161,14 @@ async def apply_pending_input_device_change(host: Any) -> bool:
         return False
 
     dropped_frames = 0
-    while not host.mic_queue.empty():
+    while not host.input_turn_lifecycle.mic_queue.empty():
         try:
-            host.mic_queue.get_nowait()
+            host.input_turn_lifecycle.mic_queue.get_nowait()
             dropped_frames += 1
         except asyncio.QueueEmpty:
             break
     host.vad.reset()
-    host._vad_leftover = b""
+    host.input_turn_lifecycle.vad_leftover = b""
     duck_state = host._playback_state()
     if duck_state.output_duck_generation is not None:
         # Local import avoids making the audio-device policy own playback
@@ -180,8 +180,8 @@ async def apply_pending_input_device_change(host: Any) -> bool:
             session_id=duck_state.output_duck_session_id,
             reason="input_device_change",
         )
-    host._vad_segment_started_during_playback = False
-    host._vad_segment_playback_generation = None
+    host.input_turn_lifecycle.vad_segment_started_during_playback = False
+    host.input_turn_lifecycle.vad_segment_playback_generation = None
     set_input_device_params(host, params)
     logger.info(
         "Audio input switched to OS default: name=%s device=%r rate=%s "
@@ -204,9 +204,9 @@ async def apply_pending_output_device_change(host: Any) -> bool:
     if params is None:
         return False
 
-    async with host.output_write_lock:
-        async with host.output_stream_lock:
-            stream = host.output_stream
+    async with host.playback_delivery.output_write_lock:
+        async with host.playback_delivery.output_stream_lock:
+            stream = host.playback_delivery.output_stream
             if stream is not None:
 
                 def stop_and_close() -> None:
@@ -226,8 +226,8 @@ async def apply_pending_output_device_change(host: Any) -> bool:
                         )
 
                 await asyncio.to_thread(stop_and_close)
-                if host.output_stream is stream:
-                    host.output_stream = None
+                if host.playback_delivery.output_stream is stream:
+                    host.playback_delivery.output_stream = None
             set_output_device_params(host, params)
     logger.info(
         "Audio output switched to OS default: name=%s device=%r rate=%s "

@@ -5,36 +5,11 @@ authoritative home and other documents should link to it rather than repeat it.
 
 ## Authority order
 
-The machine-readable ownership map and archive rules are defined in [Documentation Authority](DOCUMENTATION_AUTHORITY.md).
-
-1. [Project Charter](PROJECT_CHARTER.md) - stable mission, ownership, principles,
-   and non-goals.
-2. [Cognitive Gateway](COGNITIVE_GATEWAY.md) - authoritative target boundary
-   for interaction input, protective reflexes, attention review, context
-   assembly, and turn admission.
-3. [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md) - executable manager-owned
-   turn lifecycle from admission through delegation, outcome reconciliation,
-   and final response.
-4. [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) -
-   cognitive constitution for goal continuity, multi-goal planning, validation, and interaction.
-5. [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) -
-   Agent, Agent Skill, Plan, Capability, discovery, and authority boundaries.
-6. [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md) -
-   root-cause rules for natural, grounded robot behavior and valid interaction
-   evidence.
-7. [Current Status](STATUS.md) - implementation, automated verification, target
-   validation, and release readiness.
-8. [Roadmap](../ROADMAP.md) - milestone order and exit criteria.
-9. [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) - short resume point.
-10. [Latest Handoff](../HANDOFF.md) - volatile cross-machine execution snapshot;
-    the checkpoint remains authoritative.
-11. [Operations Runbook](../CHROMIE_RUNBOOK.md) - commands and recovery.
-12. [Configuration](CONFIGURATION.md), [API](API_REFERENCE.md), and
-   [Acceptance](ACCEPTANCE.md) - interface and evidence details.
-13. Component documents - local implementation boundaries.
-14. Decision documents - rationale for an established design.
-
-When documents disagree, correct the lower-authority document.
+The authority list, its precedence order and the archive rules are owned by
+[Documentation Authority](DOCUMENTATION_AUTHORITY.md), which mirrors the
+machine-readable `config/documentation_authority.json`. Component documents and
+decision documents rank below every listed authority. When documents disagree,
+correct the lower-authority document.
 
 ## Document ownership
 
@@ -45,15 +20,13 @@ When documents disagree, correct the lower-authority document.
 | What admits interaction input before semantic cognition? | `docs/COGNITIVE_GATEWAY.md` |
 | What lifecycle carries one admitted turn through execution evidence and a final response? | `docs/COGNITIVE_TURN_LOOP.md` |
 | What exists and what evidence is retained? | `docs/STATUS.md` |
-| What milestone is next and what closes it? | `ROADMAP.md` |
-| Where should development resume? | `DEVELOPMENT_CHECKPOINT.md` |
-| What exact cross-machine commands, runtime identities, and private evidence paths resume the current checkpoint? | `HANDOFF.md` as a volatile snapshot; `DEVELOPMENT_CHECKPOINT.md` remains the resume authority |
+| What delivery line is next and what closes it? | `ROADMAP.md` |
+| What is the active Issue and where should development resume? | `DEVELOPMENT_CHECKPOINT.md` |
+| What exact commands, runtime identities, and private evidence paths resume the current checkpoint? | `HANDOFF.md` |
 | How do I install, run, inspect, or recover it? | `CHROMIE_RUNBOOK.md` |
 | What does an environment variable mean? | `docs/CONFIGURATION.md` |
 | What endpoints and contracts exist? | `docs/API_REFERENCE.md` |
-| What retained trace artifacts can the CLI inspect? | `docs/RUNTIME_OBSERVABILITY.md` |
-| How do Runtime Trace, Runtime Events, Episodes, and Scenario Candidates relate? | `docs/RUNTIME_OBSERVABILITY.md` |
-| What common contract must runtime trace items obey? | `docs/RUNTIME_OBSERVABILITY.md` |
+| What trace artifacts exist, how do Runtime Trace, Events, Episodes and Scenario Candidates relate, and what contract must trace items obey? | `docs/RUNTIME_OBSERVABILITY.md` |
 | How should a module add trace instrumentation? | `docs/RUNTIME_OBSERVABILITY_OPERATIONS.md` |
 | How are accelerator observations, retained latency reports, and regression gates produced? | `docs/ACCELERATOR_LATENCY_EVIDENCE.md` |
 | How is foreground-priority LLM runtime contention qualified without changing semantic authority? | `docs/ACCELERATOR_LATENCY_EVIDENCE.md` |
@@ -64,15 +37,13 @@ When documents disagree, correct the lower-authority document.
 | Where is current Agent Skill delivery work tracked? | `ROADMAP.md` and `docs/STATUS.md` |
 | How is the goal-driven runtime enabled, observed, evidenced, and rolled back? | `docs/COGNITIVE_RUNTIME_ROLLOUT.md` |
 | How is the active Gateway/Core migration qualified against live services and MuJoCo? | `docs/COGNITIVE_GATEWAY_CORE_QUALIFICATION.md` |
-| What governs terminal Fast Planner multi-goal planning? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` and `docs/API_REFERENCE.md` |
+| What governs multi-goal Planner Work? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md`, `docs/WORK_DAG.md` and `docs/API_REFERENCE.md` |
 | Which component owns semantic planning for each entrypoint? | `docs/SEMANTIC_AUTHORITY.md` |
 | What development process is required for interaction behavior? | `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What method governs semantic model-role qualification and any evidenced prompt optimization? | `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` |
 | What causal explanation, prompt/output inspection, and LLM-versus-workflow attribution must accompany every defect fix? | `CONTRIBUTING.md`, grounded in `docs/PROJECT_CHARTER.md`; interaction-specific detail lives in `docs/SCENARIO_DRIVEN_DEVELOPMENT.md` |
 | What architecture organizes module, integration, E2E, stress, and regression evaluation? | `docs/CHROMIE_BENCHMARK_SUITE.md` |
-| Which tests use exact fixture truth and which require reviewed semantic judgment? | `docs/CHROMIE_BENCHMARK_SUITE.md` Section 7.3 |
-| Where is remaining benchmark delivery work tracked? | `ROADMAP.md` |
-| Which structural simplification and evidence work remains? | `ROADMAP.md` |
+| Where is remaining benchmark, structural and evidence work tracked? | `ROADMAP.md` |
 | How are maintained runtime failures classified and made explicit? | `docs/RUNTIME_FAILURE_PATHS.md` |
 | Which stable source, architecture, Agent Skill, contract, and local deployment rules are executable? | `docs/REPOSITORY_ENGINEERING_POLICIES.md` |
 | Which Python static-analysis ratchets are active? | `docs/STATIC_ANALYSIS.md` |
@@ -89,10 +60,8 @@ When documents disagree, correct the lower-authority document.
 | How are embodiment-independent, personality-driven language and body cues planned? | `docs/SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md` |
 | How do Vocal and Activity coordinate while SC-owned Social Attention decorates behavior? | `docs/EXECUTION_LANES_AND_COORDINATION.md` |
 | How is behavior testing reconstructed around general abilities? | `docs/GENERAL_ABILITY_TEST_RECONSTRUCTION.md` |
-| How are semantic goals preserved and revised across turns? | `docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md` |
 | How are references such as “那边” scoped and how may verified prior results be retrieved? | `docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md` |
 | How do I operate the current simulator workflow? | `docs/USER_MANUAL.md` |
-| Where should a new collaborator resume? | `DEVELOPMENT_CHECKPOINT.md` |
 | How are development artifacts packaged? | `docs/RELEASE.md` |
 | What changed? | `CHANGELOG.md` |
 
@@ -114,28 +83,24 @@ in order:
 - [Latest Handoff](../HANDOFF.md)
 - [Cognitive Gateway](COGNITIVE_GATEWAY.md)
 - [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
-- [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md)
 - [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
 - [Acceptance and Evidence](ACCEPTANCE.md)
 - [Target Evidence Closure](TARGET_EVIDENCE_CLOSURE.md)
 - [Operations Runbook](../CHROMIE_RUNBOOK.md)
 - [Documentation Authority](DOCUMENTATION_AUTHORITY.md)
 
+This list matches `core_reading_path` in `config/documentation_authority.json`.
 Use the catalog below only for the component or evidence boundary being
-changed. Listing a document here does not by itself justify keeping it; the
-queued documentation-surface Issue will require a real component, operator, or
-mechanical-contract owner.
+changed. Listing a document here does not by itself justify keeping it; a
+specialized document needs a real component, operator, or mechanical-contract owner.
 
 ## Architecture and runtime
 
 - [Runtime Observability Contract](RUNTIME_OBSERVABILITY.md)
 - [Runtime Observability Operations](RUNTIME_OBSERVABILITY_OPERATIONS.md)
-
 - [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md)
 - [Cognitive Integrity Events](COGNITIVE_INTEGRITY_EVENTS.md)
 - [Chromie Data Loop: Interaction Evidence and Scenario Candidates](SCENARIO_CANDIDATE_DATA_LOOP.md)
-- [Cognitive Gateway](COGNITIVE_GATEWAY.md)
-- [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Benchmark Suite](../benchmarks/README.md)
 - [Benchmark E2E Adapter Contract](../benchmarks/e2e/README.md)
 - [Reviewed Social Attention Dataset](../benchmarks/datasets/social_attention/README.md)
@@ -162,18 +127,13 @@ mechanical-contract owner.
 
 ## Interaction and execution
 
-- [Cognitive Gateway](COGNITIVE_GATEWAY.md)
-- [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md)
 - [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)
-- [Benchmark Suite](../benchmarks/README.md)
-- [Stress Benchmark Workloads](../benchmarks/stress/README.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
 - [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
 - [Semantic Model-Role Qualification and Prompt Optimization Method](LLM_PROMPT_QUALIFICATION_METHOD.md)
-- [Chromie Semantic Transaction Qualification Skill](../.agents/skills/qualify-chromie-semantic-transaction/SKILL.md): coding-agent entrypoint for applying the owned method
 - [Chromie Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md)
 - [Benchmark Scenario Migration and Continuous Review](BENCHMARK_SCENARIO_MIGRATION_AND_MINING.md)
 - [Maintained Scenario Migration](../benchmarks/scenarios/README.md)
@@ -186,16 +146,15 @@ mechanical-contract owner.
 - [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
 - [Execution Lanes and Coordination](EXECUTION_LANES_AND_COORDINATION.md)
 - [Social Attention Baseline Qualification](SOCIAL_ATTENTION_BASELINE_QUALIFICATION.md)
-- [Chromie Mind, Principles, and Experience](chromie_mind.md)
+- [Chromie Mind, Principles, and Experience](CHROMIE_MIND.md)
 - [Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md)
 - [Experience-To-Ability Learning](EXPERIENCE_TO_ABILITY_LEARNING.md)
 - [Memory Extraction and Prompt Context](MEMORY_EXTRACTION.md)
 - [Adding Agent and Tool Capabilities](ADDING_AGENT_CAPABILITIES.md)
-- [WorkDAG and DAGEngine](work_dag.md)
-- [Trace Schema](RUNTIME_OBSERVABILITY.md)
+- [WorkDAG and DAGEngine](WORK_DAG.md)
 - [SenseVoice ASR](SENSEVOICE_ASR.md)
-- [DAGEngine Concurrency](dag_engine_concurrency.md)
-- [Conversation State](conversation_state.md)
+- [Conversation State](CONVERSATION_STATE.md)
+- [Resource Acquisition and Delivery](RESOURCE_ACQUISITION_AND_DELIVERY.md)
 - [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md)
 
 ## Operations and release
@@ -206,12 +165,8 @@ mechanical-contract owner.
 - [Deployment](DEPLOYMENT.md)
 - [Voice-to-MuJoCo Quick Start (Chinese)](VOICE_MUJOCO_QUICKSTART.zh-CN.md)
 - [User Manual](USER_MANUAL.md)
-- [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md)
-- [Latest Handoff](../HANDOFF.md)
-- [Operations Runbook](../CHROMIE_RUNBOOK.md)
 - [Configuration Reference](CONFIGURATION.md)
 - [API Reference](API_REFERENCE.md)
-- [Acceptance and Evidence](ACCEPTANCE.md)
 - [Behavior Scenario Fixtures](../scenarios/README.md)
 - [Reference Robot Commissioning Checklist](ROBOT_COMMISSIONING.md)
 - [Reference Robot Candidate Files](../commissioning/README.md)
@@ -235,7 +190,6 @@ mechanical-contract owner.
 - [Semantic Transaction Qualification Skill](../.agents/skills/qualify-chromie-semantic-transaction/SKILL.md): executable entrypoint for frozen-transaction qualification and evidenced owner repair
 - [Chromie Delivery Handoff Skill](../.agents/skills/chromie-delivery-handoff/SKILL.md): Git delivery workflow for keeping the checkpoint and handoff truthful
 - [Chromie Patch Git Commands Skill](../.agents/skills/chromie-patch-git-commands/SKILL.md): copy-ready review, commit, and push handoff commands
-- [Architecture Audit](../ARCHITECTURE_AUDIT.md): current design/source audit, 2026-10-04, with failed local gates and controlled workflow evidence; not a normative authority
 
 ## Update rules
 
@@ -257,5 +211,3 @@ Run:
 python scripts/check_docs.py
 ./scripts/run_tests.sh
 ```
-
-- [Resource Acquisition and Delivery](RESOURCE_ACQUISITION_AND_DELIVERY.md): provider-neutral physical and information resource Goals, peer Provider contracts, and completion evidence.

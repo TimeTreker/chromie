@@ -34,6 +34,10 @@ from orchestrator.runtime.playback_transport import (  # noqa: E402
 from orchestrator.runtime.shutdown_lifecycle import (  # noqa: E402
     shutdown_voice_assistant,
 )
+from scripts.evidence_io import (  # noqa: E402
+    read_json_object as _read_json,
+    write_json as _write_json,
+)
 from scripts.interaction_text_mujoco_check import (  # noqa: E402
     required_speech_delivery_errors,
 )
@@ -49,21 +53,6 @@ DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "acceptance" / "cognitive-gateway-core
 
 def _acceptance_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return payload
-
-
-def _write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _text_sha256(value: str) -> str:

@@ -21,7 +21,6 @@ import argparse
 import asyncio
 import ast
 import getpass
-import hashlib
 import importlib.util
 import json
 import os
@@ -45,6 +44,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from orchestrator.audio_injection import encode_audio_packet
+from scripts.evidence_io import sha256_file as _sha256_file  # noqa: E402
 from scripts.acceptance_audio import (
     AudioFixture,
     HostSpeakerPlayer,
@@ -991,14 +991,6 @@ def write_json(path: Path, payload: Any) -> None:
         json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
         encoding="utf-8",
     )
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def write_bundle_manifest(evidence_dir: Path) -> None:

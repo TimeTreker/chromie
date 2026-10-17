@@ -7,6 +7,22 @@ from shared.chromie_runtime.settings import RuntimePolicySettings
 
 
 class RuntimePolicySettingsTests(unittest.TestCase):
+    def test_boolean_settings_reject_unrecognized_values(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError, "CHROMIE_RUNTIME_TRACE_EMIT_EVENTS must be a boolean"
+        ):
+            RuntimePolicySettings.from_env(
+                {"CHROMIE_RUNTIME_TRACE_EMIT_EVENTS": "enabled"}
+            )
+        settings = RuntimePolicySettings.from_env(
+            {
+                "CHROMIE_RUNTIME_TRACE_EMIT_EVENTS": "on",
+                "CHROMIE_RUNTIME_TRACE_EVENT_ALWAYS_EMIT_ABANDONED": "",
+            }
+        )
+        self.assertTrue(settings.trace_emit_events)
+        self.assertTrue(settings.trace_event_always_emit_abandoned)
+
     def test_typed_runtime_policy_parsing(self) -> None:
         settings = RuntimePolicySettings.from_env(
             {

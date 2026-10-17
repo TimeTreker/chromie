@@ -82,7 +82,7 @@ python -m benchmarks.stress.validate --check
 Run a stress workload:
 
 ```bash
-python -m benchmarks.stress.run \
+python -m benchmarks.stress \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --workload repetition_cooldown_pressure \
   --command "python scripts/my_e2e_adapter.py" \

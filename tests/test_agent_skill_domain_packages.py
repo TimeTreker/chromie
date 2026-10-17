@@ -14,18 +14,11 @@ from agent.app.agent_skills import (
 from agent.app.capabilities.local import build_chromie_registry
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 
-try:
-    from chromie_contracts import (
-        AgentSkillDisclosureRequest,
-        AgentSkillSelectionRequest,
-        CanonicalPlan,
-    )
-except ImportError:  # pragma: no cover - repository test path
-    from shared.chromie_contracts import (
-        AgentSkillDisclosureRequest,
-        AgentSkillSelectionRequest,
-        CanonicalPlan,
-    )
+from shared.chromie_contracts import (
+    AgentSkillDisclosureRequest,
+    AgentSkillSelectionRequest,
+    CanonicalPlan,
+)
 
 
 ROOT = Path(__file__).resolve().parents[1]

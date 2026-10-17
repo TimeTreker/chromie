@@ -12,13 +12,9 @@ hardware commissioning.
 
 ## Current implementation status
 
-The daemon currently instantiates `HardwareService()` with `MockRobotDriver`.
-Although `HARDWARE_DRIVER` and serial-related environment names/files exist in
-the repository, `daemon.py` does not select a serial or production driver. In
-this revision, every daemon launch therefore uses the mock driver.
-
-Do not treat the presence of serial adapter code or configuration names as
-hardware acceptance evidence.
+The daemon always instantiates `HardwareService()` with `MockRobotDriver`; there
+is no serial or production driver. Its action wire contract is
+`shared/chromie_contracts/action.py`, shared with the host `ActionClient`.
 
 ## HTTP API
 
@@ -53,18 +49,12 @@ pip install -r hardware/requirements.txt
 python -m hardware.daemon
 ```
 
-Configuration actually consumed by `daemon.py`:
+Configuration consumed by `daemon.py`:
 
 ```env
 HARDWARE_HOST=127.0.0.1
 HARDWARE_PORT=8095
-HARDWARE_DRIVER=mock
 ```
-
-`HARDWARE_DRIVER` is reported as deployment intent but is not currently wired
-to driver selection. `HARDWARE_SERIAL_PORT`, `HARDWARE_SERIAL_BAUD`, and
-`HARDWARE_ACTION_TIMEOUT_MS` should not be documented as active daemon behavior
-until implementation selects and uses them.
 
 ## Example mock action
 

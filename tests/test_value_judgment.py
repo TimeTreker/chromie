@@ -142,7 +142,7 @@ def walk_turn(verdict, reviewed=frozenset({"soridormi.walk_forward"})):
     """One full apply-mode turn whose Plan walks; the scripted Agent returns the given verdict."""
     from orchestrator.runtime.cognitive_runtime import (
         CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
-    from tests.test_cognitive_runtime_pr7 import (
+    from tests.cognitive_runtime_test_support import (
         FakeRuntime, ScriptedClient, admitted_core, body_goal_association, walk_definition)
 
     class Client(ScriptedClient):
@@ -252,7 +252,7 @@ def speech_turn(verdict, *, value_review=True):
     """Turn-local speech UMI marked value_review (owner choice B, 2026-10-12)."""
     from orchestrator.runtime.cognitive_runtime import (
         CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime, ScriptedClient, admitted_core, body_goal_association
+    from tests.cognitive_runtime_test_support import FakeRuntime, ScriptedClient, admitted_core, body_goal_association
 
     class Client(ScriptedClient):
         async def resolve_value_judgment(self, session, *, request, **kwargs):

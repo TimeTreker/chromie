@@ -16,17 +16,15 @@ import sys
 from pathlib import Path
 from typing import Any, Iterable
 
+try:
+    from evidence_io import read_json_object as _read_json, sha256_file as _sha256
+except ImportError:  # imported as scripts.verify_agent_skill_weather_qualification
+    from scripts.evidence_io import read_json_object as _read_json, sha256_file as _sha256
+
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MANIFEST = (
     ROOT / "benchmarks" / "manifests" / "agent_skill_weather_qualification_v1.json"
 )
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return payload
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -42,14 +40,6 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
             raise ValueError(f"{path}:{line_number}: expected a JSON object")
         events.append(value)
     return events
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _git_revision(root: Path = ROOT) -> str | None:

@@ -21,47 +21,25 @@ from ...clients.sglang_protocol import (
 from ...inference_compute import user_meaning_interpreter_compute_class
 from ...settings import agent_service_settings
 
-try:
-    from chromie_contracts.memory import role_memory_context
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.memory import role_memory_context
+from shared.chromie_contracts.memory import role_memory_context
 
-try:
-    from chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
+from shared.chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
 
 
-try:
-    from chromie_contracts.core_interpretation import responsibility_binding_material_value
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import responsibility_binding_material_value
+from shared.chromie_contracts.core_interpretation import responsibility_binding_material_value
 
 
-try:
-    from chromie_runtime.ollama_non_thinking import (
-        OllamaNonThinkingViolation,
-        enforce_non_thinking_ollama_response,
-    )
-    from chromie_runtime.llm_diagnostics import (
-        log_llm_call_evidence,
-        new_llm_call_id,
-        ollama_completion_diagnostics,
-        ollama_prompt_preflight_diagnostics,
-    )
-    from chromie_runtime.log_colors import colorize_for_cli
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_runtime.ollama_non_thinking import (
-        OllamaNonThinkingViolation,
-        enforce_non_thinking_ollama_response,
-    )
-    from shared.chromie_runtime.llm_diagnostics import (
-        log_llm_call_evidence,
-        new_llm_call_id,
-        ollama_completion_diagnostics,
-        ollama_prompt_preflight_diagnostics,
-    )
-    from shared.chromie_runtime.log_colors import colorize_for_cli
+from shared.chromie_runtime.ollama_non_thinking import (
+    OllamaNonThinkingViolation,
+    enforce_non_thinking_ollama_response,
+)
+from shared.chromie_runtime.llm_diagnostics import (
+    log_llm_call_evidence,
+    new_llm_call_id,
+    ollama_completion_diagnostics,
+    ollama_prompt_preflight_diagnostics,
+)
+from shared.chromie_runtime.log_colors import colorize_for_cli
 
 from ...prompt_projection import bounded_json, required_json
 from .errors import InterpretationUnavailableError

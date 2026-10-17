@@ -23,18 +23,18 @@ class _HttpSession(_Closable):
 class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
     async def test_shutdown_cancels_owned_tasks_clears_pending_input_and_closes_resources(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
-        assistant.active_synthesis_tasks = {
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.active_synthesis_tasks = {
             asyncio.create_task(asyncio.Event().wait())
         }
-        assistant.active_asr_task = asyncio.create_task(asyncio.Event().wait())
-        assistant.active_turn_task = asyncio.create_task(asyncio.Event().wait())
-        assistant.active_reflex_task = asyncio.create_task(asyncio.Event().wait())
-        assistant.concurrent_protective_reflex_tasks = {
+        assistant.input_turn_lifecycle.active_asr_task = asyncio.create_task(asyncio.Event().wait())
+        assistant.input_turn_lifecycle.active_turn_task = asyncio.create_task(asyncio.Event().wait())
+        assistant.input_turn_lifecycle.active_reflex_task = asyncio.create_task(asyncio.Event().wait())
+        assistant.input_turn_lifecycle.concurrent_protective_reflex_tasks = {
             asyncio.create_task(asyncio.Event().wait())
         }
-        assistant._pending_turn_after_reflex.append(("later", "sid-later"))
-        assistant._pending_vad_audio = b"partial"
+        assistant.input_turn_lifecycle.pending_turn_after_reflex.append(("later", "sid-later"))
+        assistant.input_turn_lifecycle.pending_vad_audio = b"partial"
         assistant.output_abort_tasks = {
             asyncio.create_task(asyncio.Event().wait())
         }
@@ -50,7 +50,7 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
         assistant.audio_device_monitor_task = asyncio.create_task(
             asyncio.Event().wait()
         )
-        assistant.playback_task = asyncio.create_task(asyncio.Event().wait())
+        assistant.playback_delivery.playback_task = asyncio.create_task(asyncio.Event().wait())
         duck_timeout_task = asyncio.create_task(asyncio.Event().wait())
         assistant._playback_state().output_duck_timeout_task = duck_timeout_task
         assistant.asr_ws = _Closable()
@@ -63,17 +63,17 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
         output_closed: list[bool] = []
 
         owned_tasks = {
-            *assistant.active_synthesis_tasks,
-            assistant.active_asr_task,
-            assistant.active_turn_task,
-            assistant.active_reflex_task,
-            *assistant.concurrent_protective_reflex_tasks,
+            *assistant.playback_delivery.active_synthesis_tasks,
+            assistant.input_turn_lifecycle.active_asr_task,
+            assistant.input_turn_lifecycle.active_turn_task,
+            assistant.input_turn_lifecycle.active_reflex_task,
+            *assistant.input_turn_lifecycle.concurrent_protective_reflex_tasks,
             *assistant.output_abort_tasks,
             *assistant.active_cognitive_runtime_tasks,
             *assistant.observability_tasks,
             assistant.session_idle_sweeper_task,
             assistant.audio_device_monitor_task,
-            assistant.playback_task,
+            assistant.playback_delivery.playback_task,
             duck_timeout_task,
         }
 
@@ -87,8 +87,8 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(0)
 
         self.assertTrue(all(task.cancelled() for task in owned_tasks))
-        self.assertEqual(list(assistant._pending_turn_after_reflex), [])
-        self.assertIsNone(assistant._pending_vad_audio)
+        self.assertEqual(list(assistant.input_turn_lifecycle.pending_turn_after_reflex), [])
+        self.assertIsNone(assistant.input_turn_lifecycle.pending_vad_audio)
         self.assertEqual(output_closed, [True])
         self.assertTrue(assistant.asr_ws.closed)
         self.assertTrue(assistant.http_session.closed)
@@ -96,7 +96,7 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_final_telemetry_failure_does_not_block_session_finalization(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
+        assistant.playback_delivery.playback_start_waiters = {}
         assistant.sessions = types.SimpleNamespace(
             finalized=[],
             finalize_active_sessions=lambda *, reason: assistant.sessions.finalized.append(reason),
@@ -115,7 +115,7 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
         assistant.output_abort_tasks = set()
         assistant.observability_tasks = set()
         assistant.session_idle_sweeper_task = None
-        assistant.playback_task = None
+        assistant.playback_delivery.playback_task = None
         assistant.asr_ws = None
         assistant.http_session = None
         assistant.audio_mgr = types.SimpleNamespace(close=lambda: None)

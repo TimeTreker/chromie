@@ -10,7 +10,6 @@ scope; supervised physical evidence is a separate, stricter profile.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import shutil
@@ -20,6 +19,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+try:
+    from evidence_io import (
+        git_state as _git_state,
+        read_json_object as _read_json,
+        sha256_file as _sha256,
+        utc_now as _utc_now,
+        write_json as _write_json,
+    )
+except ImportError:  # imported as scripts.run_target_evidence_closure
+    from scripts.evidence_io import (
+        git_state as _git_state,
+        read_json_object as _read_json,
+        sha256_file as _sha256,
+        utc_now as _utc_now,
+        write_json as _write_json,
+    )
+
 ROOT = Path(__file__).resolve().parents[1]
 os.environ.setdefault("CHROMIE_OPERATOR_MODE", "qualification")
 DEFAULT_MANIFEST = (
@@ -28,35 +44,8 @@ DEFAULT_MANIFEST = (
 DEFAULT_ROOT = ROOT / ".chromie" / "acceptance" / "target-evidence"
 
 
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
-
-
 def _run_id() -> str:
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return payload
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _artifact(path: Path) -> dict[str, Any]:
@@ -68,18 +57,6 @@ def _artifact(path: Path) -> dict[str, Any]:
         "sha256": _sha256(resolved),
         "size_bytes": resolved.stat().st_size,
     }
-
-
-def _git_state(root: Path = ROOT) -> dict[str, Any]:
-    revision = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=root, text=True
-    ).strip()
-    dirty = bool(
-        subprocess.check_output(
-            ["git", "status", "--porcelain"], cwd=root, text=True
-        ).strip()
-    )
-    return {"revision": revision, "dirty": dirty}
 
 
 def _root(value: Path | None, *, existing: bool) -> Path:
@@ -727,7 +704,6 @@ def _pending_review(
     return review_path
 
 
-
 def _social_attention_pairs(dataset_path: Path) -> list[tuple[str, str]]:
     payload = _read_json(dataset_path.expanduser().resolve())
     scenarios = payload.get("scenarios")
@@ -785,7 +761,7 @@ def collect_social(args: argparse.Namespace) -> int:
         command = [
             args.python,
             "-m",
-            "benchmarks.e2e.run",
+            "benchmarks.e2e",
             "--normalized",
             str(normalized),
             "--profile",

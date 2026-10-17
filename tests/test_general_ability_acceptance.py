@@ -1723,6 +1723,24 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
 
         self.assertEqual(code, 0)
 
+    def test_everyday_live_cohort_validates_as_a_staged_library(self) -> None:
+        everyday = DEFAULT_LIVE_SCENARIO_ROOT.parent / "everyday"
+        summary = library_summary(load_scenario_library(everyday))
+
+        self.assertTrue(summary["ok"], summary["errors"])
+        self.assertEqual(summary["errors"], [])
+        stages = summary["stages"]
+        self.assertEqual([stage["id"] for stage in stages], ["must_pass", "core", "challenge"])
+        self.assertTrue(stages[0]["stop_later_stages_on_hard_failure"])
+        self.assertTrue(all(stage["case_count"] > 0 for stage in stages))
+        self.assertEqual(
+            summary["live_text_case_count"],
+            sum(stage["case_count"] for stage in stages),
+        )
+        with redirect_stdout(StringIO()):
+            code = main(["--mode", "check", "--no-write", "--scenario-root", str(everyday)])
+        self.assertEqual(code, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

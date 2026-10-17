@@ -11,23 +11,10 @@ from typing import Any, Literal, Protocol
 from pydantic import BaseModel, Field
 from ..prompt_projection import bounded_json
 
-try:
-    from chromie_contracts.soridormi_body_contract import (
-        normalize_soridormi_body_contract,
-    )
-except ModuleNotFoundError as exc:  # Repository-checkout fallback.
-    if exc.name != "chromie_contracts":
-        raise
-    from shared.chromie_contracts.soridormi_body_contract import (
-        normalize_soridormi_body_contract,
-    )
-
-try:
-    from chromie_contracts.semantic_capability import normalize_semantic_capability_facade
-except ModuleNotFoundError as exc:  # Repository-checkout fallback.
-    if exc.name != "chromie_contracts":
-        raise
-    from shared.chromie_contracts.semantic_capability import normalize_semantic_capability_facade
+from shared.chromie_contracts.soridormi_body_contract import (
+    normalize_soridormi_body_contract,
+)
+from shared.chromie_contracts.semantic_capability import normalize_semantic_capability_facade
 
 from .models import CapabilityRegistry, ToolCapability
 

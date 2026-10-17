@@ -342,7 +342,7 @@ regression boundary.
 
 ## Implementation Plan
 
-### Phase 0: Document the loop
+### Document the loop
 
 Status: this document.
 
@@ -353,7 +353,7 @@ Deliverables:
 - make clear that LLM judgment proposes tests but does not replace deterministic
   regression checks.
 
-### Phase 1: Episode records
+### Episode records
 
 Status: implemented as rolling per-`conversation_id` JSONL snapshots written by
 `EpisodeRecorder`.
@@ -373,7 +373,7 @@ Behavior:
 - write `.chromie/experience/episodes.jsonl`;
 - keep writes best-effort so realtime voice cannot crash.
 
-### Phase 2: Deepthinking evaluator
+### Deepthinking evaluator
 
 Status: implemented as an offline evaluator CLI with deterministic contract
 precheck, optional deepthinking scoring, an offline review journal, and
@@ -399,7 +399,7 @@ Behavior:
 - write compact reviewed memory notes and owner-review-only update proposals
   without injecting raw episode logs into prompts.
 
-### Phase 3: Scenario candidate generation
+### Scenario candidate generation
 
 Status: implemented in the evaluator CLI with `--candidate-dir`.
 
@@ -422,7 +422,7 @@ Behavior:
 - default to `goal interpreter` only when the failure is Responsibility/meaning interpretation itself;
 - mark every generated file as `requires_human_review=true`.
 
-### Phase 4: Promotion and regression gate
+### Promotion and regression gate
 
 Status: implemented through the Benchmark mining workflow. A separate review
 record is bound to the immutable candidate fingerprint before promotion.
@@ -449,7 +449,7 @@ Behavior:
 - print the exact Benchmark scenario command to reproduce it;
 - never commit, edit Prompts, change Runtime policy, or grant release qualification.
 
-### Phase 5: Scenario-run report scoring
+### Scenario-run report scoring
 
 Let scenario suites write episode-like records too. A failed or weak scenario
 run should be reviewable by the same evaluator.

@@ -19,13 +19,12 @@ class AgentImageImportLayoutTests(unittest.TestCase):
         env["PYTHONPATH"] = os.pathsep.join(
             (
                 str(ROOT / "agent"),
-                str(ROOT / "shared"),
             )
         )
         script = "\n".join(
             (
                 "from app.capabilities.catalog import CapabilityCatalog",
-                "from chromie_contracts.soridormi_body_contract import (",
+                "from shared.chromie_contracts.soridormi_body_contract import (",
                 "    normalize_soridormi_body_contract,",
                 ")",
                 "assert CapabilityCatalog.__name__ == 'CapabilityCatalog'",
@@ -34,6 +33,13 @@ class AgentImageImportLayoutTests(unittest.TestCase):
         )
 
         with tempfile.TemporaryDirectory() as directory:
+            # The image copies shared/chromie_* under /app/shared.
+            (Path(directory) / "shared").mkdir()
+            for package in ("chromie_contracts", "chromie_runtime"):
+                (Path(directory) / "shared" / package).symlink_to(
+                    ROOT / "shared" / package, target_is_directory=True
+                )
+            env["PYTHONPATH"] = os.pathsep.join((str(ROOT / "agent"), directory))
             result = subprocess.run(
                 [sys.executable, "-c", script],
                 cwd=directory,
@@ -57,7 +63,7 @@ class AgentImageImportLayoutTests(unittest.TestCase):
         dockerfile = (ROOT / "agent" / "Dockerfile").read_text(encoding="utf-8")
 
         self.assertIn(
-            "COPY shared/chromie_contracts ./chromie_contracts",
+            "COPY shared/chromie_contracts ./shared/chromie_contracts",
             dockerfile,
         )
         self.assertIn(
@@ -65,7 +71,7 @@ class AgentImageImportLayoutTests(unittest.TestCase):
             dockerfile,
         )
         self.assertIn(
-            "from chromie_contracts.soridormi_body_contract import",
+            "from shared.chromie_contracts.soridormi_body_contract import",
             dockerfile,
         )
 

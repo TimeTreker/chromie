@@ -25,10 +25,10 @@ idle expiry, or process restart.
 
 A new task is not the same thing as a new SID. One task can include many
 sessions, for example a command followed by "quickly please", "not that far",
-"did it finish?", and "continue". The User Meaning Interpreter model should propose whether a new
-input creates a new task, continues a task, modifies a task, closes a task, or
-is side conversation. The host task manager owns the final task write and safety
-state.
+"did it finish?", and "continue". Goal Association decides whether a new
+input creates a new Goal, continues, modifies or closes an existing Goal, or is
+side conversation; User Meaning Interpretation only states its meaning (WHAT).
+The Host owns the final Goal write and safety state.
 
 ## Stored state
 
@@ -119,7 +119,7 @@ preference, fact, or durable memory instruction from keywords or raw text. Keyed
 entries with the same `scope`, `kind`, and `key` revise the retained entry.
 
 This is separate from the durable mind and experience layer documented in
-[`chromie_mind.md`](chromie_mind.md). Session memory tracks the current
+[`CHROMIE_MIND.md`](CHROMIE_MIND.md). Session memory tracks the current
 conversation; the mind profile carries owner-approved principles and long-term
 goals, and the experience journal records outcomes for human-reviewed tuning.
 

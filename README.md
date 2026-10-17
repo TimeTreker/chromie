@@ -13,7 +13,7 @@ treats communication with people as a primary cognitive responsibility with
 independent value. It separates ordinary communication from Planner's Work
 planning while preserving UMI understanding, GA continuity and trusted execution.
 SC is integrated into ordinary turns, required communication, result re-entry and
-trusted Situation wakes. Work Planner returns tasks and communication Needs;
+trusted Situation wakes. The Planner returns Work and communication Needs;
 SC returns grounded interaction or silence. See [current evidence](docs/STATUS.md#social-cognition-migration)
 and the [shared lifecycle](docs/COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle).
 
@@ -176,13 +176,13 @@ Retained target evidence additionally proves:
   cancellation, Goal reconciliation, and safe-idle recovery;
 - clean generated-speech VAD/ASR/Gateway/Core/TTS/playback and interruption; and
 - one supervised physical microphone -> ASR -> cognition -> TTS -> audible
-  speaker turn.
+  speaker turn on its historical revision; no current-revision physical evidence
+  is retained.
 
 ## Open implementation and qualification work
 
-- resolve the design/source authority conflicts and restore the failing local
-  gate documented in the [project audit](ARCHITECTURE_AUDIT.md);
-- fix text-tool user admission chronology before using multi-turn comparison scores;
+- complete the everyday live-text cohort and repair its failures at their
+  owners (see [Status](docs/STATUS.md#current-open-work));
 - clean full-matrix generated-speech acceptance after the post-merge fixes;
 - positive Agent Skill selection with trustworthy real provider-backed weather
   execution and follow-up conversation;
@@ -369,7 +369,7 @@ documented in
 
 - [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
 - [Status](docs/STATUS.md): current implementation and evidence
-- [Roadmap](ROADMAP.md): active Issue and delivery order
+- [Roadmap](ROADMAP.md): delivery order and exit criteria
 - [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point
 - [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md): behavior-change rules
 - [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md): input, reflex, attention, and turn-admission boundary
@@ -380,4 +380,3 @@ documented in
 - [Operations Runbook](CHROMIE_RUNBOOK.md): startup and recovery
 - [User Manual](docs/USER_MANUAL.md): current simulator operation
 - [Documentation Index](docs/README.md): owner for every documentation fact
-- [Architecture Audit](ARCHITECTURE_AUDIT.md): current design/source audit, 2026-10-04, with failed local gates and controlled workflow evidence; not a normative authority

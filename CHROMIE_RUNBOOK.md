@@ -51,7 +51,8 @@ not set `CHROMIE_HARDWARE_PROFILE` in `.env.local` or on a launcher command.
 
 `./scripts/start_services.sh` is the low-level Docker service launcher. It first
 refreshes hardware detection and `.env.runtime`, validates Compose, builds or
-starts ASR, TTS, Ollama, User Meaning Interpretation, and Agent, and then verifies that containers
+starts `chromie-asr`, the selected TTS service, `chromie-llm` and `chromie-agent`
+(User Meaning Interpretation runs inside the Agent), and then verifies that containers
 and the TTS CUDA build match the detected profile. It also compares the running
 Agent app, shared contracts/runtime and Agent Skills with the checkout using
 content digests. A healthy container with old source fails this check before the
@@ -135,7 +136,23 @@ python scripts/agent_skill_digest.py agent-skills/<package>
 Directory presence, a valid digest, or a declared Capability dependency never
 registers or authorizes a Capability.
 
-## 3. Prepare Ollama
+## 3. Prepare the LLM service
+
+The profile's `AGENT_LLM_PROVIDER` selects the `chromie-llm` backend. Both
+maintained profiles (`rtx5090`, `rtx4090_laptop`) use **SGLang**: their
+`CHROMIE_COMPOSE_OVERRIDE_FILES` overlay replaces `chromie-llm` with a pinned
+SGLang server image built from `llm/sglang/Dockerfile` (`BUILD=1
+./scripts/start_services.sh` and `./scripts/deploy_chromie.sh` build it). The
+RTX 4090 Laptop overlay downloads the pinned weights into the Hugging Face cache
+on first start; the RTX 5090 overlay runs with `HF_HUB_OFFLINE=1`, so pre-populate
+`hf_cache` with the pinned Gemma revision first. No `ollama pull` is needed:
+
+```bash
+./scripts/compose.sh logs -f chromie-llm   # wait for the server to report ready
+./scripts/show_profile.sh                   # served model names per role
+```
+
+Profiles with `AGENT_LLM_PROVIDER=ollama` use Ollama instead:
 
 ```bash
 ./scripts/compose.sh exec chromie-llm ollama list
@@ -187,36 +204,22 @@ assume the project root.
 
 ## 5. Select the interaction mode
 
-### Maintained voice path
-
 The Orchestrator always admits usable turns through Cognitive Gateway and sends
-semantic interpretation to the Agent-owned Goal-Driven Cognitive Core:
+semantic interpretation to the Agent-owned Goal-Driven Cognitive Core. The
+interaction and Soridormi feature gates are owned by the operator mode, not by
+`.env.local`; select the mode through the launcher:
 
-```env
-ORCH_ENABLE_AGENT=1
-ORCH_ENABLE_INTERACTION_RESPONSE=1
-ORCH_COGNITIVE_RUNTIME_MODE=apply
-```
+| Mode | Launcher | Soridormi Capabilities |
+| --- | --- | --- |
+| `services` | `./scripts/start_services.sh` | none (Docker services only) |
+| `speech` | `./scripts/start_orchestrator.sh` | disabled (speech-only) |
+| `voice_mujoco` | `./scripts/start_chromie.sh` | enabled against the Soridormi MCP |
+| `qualification` | qualification tooling | enabled |
 
-### Structured speech-only path
+Each mode's gates are defined in `env/modes/<mode>.env`.
 
-```env
-ORCH_ENABLE_INTERACTION_RESPONSE=1
-ORCH_ENABLE_SORIDORMI_CAPABILITIES=0
-ORCH_COGNITIVE_RUNTIME_MODE=apply
-```
-
-### Structured MuJoCo path
-
-```env
-ORCH_ENABLE_INTERACTION_RESPONSE=1
-ORCH_ENABLE_SORIDORMI_CAPABILITIES=1
-ORCH_COGNITIVE_RUNTIME_MODE=apply
-ORCH_SORIDORMI_MANIFEST=capabilities/soridormi.json
-SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp
-```
-
-Restart the Orchestrator after changing host feature gates.
+Set `CHROMIE_OPERATOR_MODE` only to override a launcher's default for one
+process. Restart the Orchestrator after changing mode.
 
 
 ## 5.1 Start the complete voice-to-MuJoCo path

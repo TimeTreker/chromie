@@ -495,7 +495,7 @@ async def test_planner_owns_new_future_readiness_without_gi_time_fields(fault):
     goal_id = association.new_goals[0].goal_id
     assert not association.new_goals[0].object.get("bindings")
     request.context["goal_association_resolution"] = association.model_dump(mode="json")
-    raw = json.loads(Path("benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
+    raw = json.loads((Path(__file__).resolve().parents[1] / "benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
     raw = json.loads(json.dumps(raw).replace("${goal}", goal_id))
     condition = raw["time_conditions"][0]
     condition["source_quote"] = due
@@ -545,7 +545,7 @@ async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path)
     assert association.resolution_status == "resolved", association.metadata
     request.context["goal_association_resolution"] = association.model_dump(mode="json")
     future, ready = [goal.goal_id for goal in association.new_goals]
-    raw = json.loads(Path("benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
+    raw = json.loads((Path(__file__).resolve().parents[1] / "benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
     raw = json.loads(json.dumps(raw).replace("${goal}", future))
     raw.pop("ability_needs", None)  # The resolver removes the need-first prefix before DTO validation.
     raw.update(disposition="mixed", steps=[{"step_id": "blink-now", "capability_id": "test.blink",
@@ -585,7 +585,7 @@ async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path)
         )
         from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
         from orchestrator.runtime.conversation_state import ConversationStateManager
-        from tests.test_cognitive_runtime_pr7 import FakeRuntime
+        from tests.cognitive_runtime_test_support import FakeRuntime
         from tests.capability_runtime_test_support import submit_and_wait_terminal
         from tests.cognitive_work_test_support import social_fixture_response
 
@@ -642,7 +642,7 @@ async def test_index_visibility_does_not_authorize_unavailable_or_locked_work(av
 
 @pytest.mark.asyncio
 async def test_canonical_fast_need_search_retains_original_intent_and_one_semantic_result():
-    from tests.test_fast_planner_pr3 import execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
+    from tests.fast_planner_test_support import execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
     request = request_for("turn left by 45 degrees")
     request.context["goal_association_resolution"] = {"new_goals": [{
         "goal_id": "g", "description": request.text, "metadata": {"output_mode": "body_action"},

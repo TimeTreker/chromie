@@ -55,14 +55,35 @@ if [ "${CHROMIE_TTS_BACKEND:-cosyvoice3}" = "cosyvoice3" ] && [ "${TTS_COSYVOICE
   export AGENT_MODEL="$COSYVOICE_BRAIN_MODEL"
   export AGENT_GOAL_ASSOCIATION_MODEL="$COSYVOICE_BRAIN_MODEL"
   export AGENT_FAST_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_DEEP_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_DELIBERATIVE_MODEL="$COSYVOICE_BRAIN_MODEL"
   export OLLAMA_MODEL="$COSYVOICE_BRAIN_MODEL"
   export OLLAMA_MAX_LOADED_MODELS=1
-  export TTS_URL="${TTS_URL:-ws://127.0.0.1:5000}"
-  export TTS_SPEAKER_ID="${TTS_SPEAKER_ID:-default}"
-  export ORCH_TTS_CONCURRENCY=1
   echo "[orchestrator] CosyVoice shared-GPU cognition: $COSYVOICE_BRAIN_MODEL"
 fi
+
+# Each TTS backend publishes its own host port (docker-compose.yml); mirror the
+# start_chromie.sh selection so a manual start_services.sh + start_orchestrator.sh
+# run reaches the provider that is actually running.
+case "${CHROMIE_TTS_BACKEND:-cosyvoice3}" in
+  cosyvoice|cosyvoice3)
+    export TTS_URL="${TTS_URL:-ws://127.0.0.1:5000}"
+    export TTS_SPEAKER_ID="${TTS_SPEAKER_ID:-default}"
+    export ORCH_TTS_CONCURRENCY=1
+    ;;
+  oute|outetts)
+    export TTS_URL="${TTS_URL:-ws://127.0.0.1:5001}"
+    export TTS_SPEAKER_ID="${TTS_SPEAKER_ID:-default}"
+    ;;
+  qwen|qwen3|qwen3-tts)
+    export TTS_URL="${TTS_URL:-ws://127.0.0.1:5002}"
+    export TTS_SPEAKER_ID="${TTS_SPEAKER_ID:-default}"
+    export ORCH_TTS_CONCURRENCY=1
+    ;;
+  *)
+    echo "[orchestrator][error] Unsupported CHROMIE_TTS_BACKEND=${CHROMIE_TTS_BACKEND:-}" >&2
+    exit 2
+    ;;
+esac
 
 
 CHROMIE_CONDA_ENV="${CHROMIE_CONDA_ENV:-Chromie}"

@@ -32,20 +32,6 @@
       ]
     },
     {
-      "path": "agent/app/clients/hardware_client.py",
-      "symbol": "HardwareClient.health",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "agent",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "1d9337b31d0a33f6e65334535785cc754feb790e5f6f36389d5863dbb59150d6",
-      "failure_signals": [
-        "diagnostic",
-        "return"
-      ]
-    },
-    {
       "path": "agent/app/clients/ollama_client.py",
       "symbol": "OllamaClient._generate",
       "ordinal": 1,

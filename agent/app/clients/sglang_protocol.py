@@ -6,10 +6,7 @@ from typing import Any
 
 from ..inference_compute import CognitionComputeClass, compute_rank
 
-try:
-    from chromie_contracts.json_schema import expose_intersection_shapes
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.json_schema import expose_intersection_shapes
+from shared.chromie_contracts.json_schema import expose_intersection_shapes
 
 
 def sglang_priority(

@@ -5,16 +5,10 @@ from typing import Any
 
 from pydantic import ValidationError
 
-try:
-    from chromie_contracts.cognitive_activation import (
-        CognitiveActivationContext,
-        CognitiveActivationDecision,
-    )
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.cognitive_activation import (
-        CognitiveActivationContext,
-        CognitiveActivationDecision,
-    )
+from shared.chromie_contracts.cognitive_activation import (
+    CognitiveActivationContext,
+    CognitiveActivationDecision,
+)
 
 from .clients.ollama_client import OllamaClient
 

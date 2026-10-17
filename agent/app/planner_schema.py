@@ -5,30 +5,17 @@ from datetime import datetime
 from itertools import combinations, product
 from typing import Any
 
-try:
-    from chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
-    from chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty, responsibility_binding_material_value
-    from chromie_contracts.interaction import (
-        VOCAL_MODES,
-        VOCAL_PERFORMANCE_CAPABILITY_ID,
-    )
-    from chromie_contracts.plan import (
-        responsibility_outcome_source_tokens,
-        FastPlannerAdvanceModelOutput,
-        GOAL_SATISFACTION_SCORE_BANDS,
-    )
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
-    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty, responsibility_binding_material_value
-    from shared.chromie_contracts.interaction import (
-        VOCAL_MODES,
-        VOCAL_PERFORMANCE_CAPABILITY_ID,
-    )
-    from shared.chromie_contracts.plan import (
-        responsibility_outcome_source_tokens,
-        FastPlannerAdvanceModelOutput,
-        GOAL_SATISFACTION_SCORE_BANDS,
-    )
+from shared.chromie_contracts.user_turn import user_turn_source_span_schema, user_turn_source_tokens
+from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, UserMeaningUncertainty, responsibility_binding_material_value
+from shared.chromie_contracts.interaction import (
+    VOCAL_MODES,
+    VOCAL_PERFORMANCE_CAPABILITY_ID,
+)
+from shared.chromie_contracts.plan import (
+    responsibility_outcome_source_tokens,
+    FastPlannerAdvanceModelOutput,
+    GOAL_SATISFACTION_SCORE_BANDS,
+)
 
 from .planner_validation import _capability_acquires_information
 from .planner_fast_validation import fast_capability_acquires_information
@@ -1775,7 +1762,7 @@ def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
     visit(schema)
 
 
-# Fast/Deep Planner pass-specific constrained-decoder schemas. These functions
+# Planner pass-specific constrained-decoder schemas. These functions
 # project an already-owned Planner contract; they do not invoke a model or choose HOW.
 
 

@@ -11,34 +11,19 @@ from pydantic import ValidationError
 from .loader import AgentSkillLoadError, AgentSkillRegistry
 from .selection import AgentSkillSelectionService
 
-try:
-    from chromie_contracts.agent_skill import (
-        AgentSkillDisclosureFailure,
-        AgentSkillDisclosureRequest,
-        AgentSkillDisclosureResolution,
-        AgentSkillProjectionName,
-        AgentSkillSelectionGoalContext,
-        AgentSkillSelectionRequest,
-        AgentSkillSelectionResolution,
-        DisclosedAgentSkillProjection,
-        PlanAgentSkillProvenance,
-    )
-    from chromie_contracts.plan import CanonicalPlan
-    from chromie_contracts.core_interpretation import CognitiveWorkRequest
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.agent_skill import (
-        AgentSkillDisclosureFailure,
-        AgentSkillDisclosureRequest,
-        AgentSkillDisclosureResolution,
-        AgentSkillProjectionName,
-        AgentSkillSelectionGoalContext,
-        AgentSkillSelectionRequest,
-        AgentSkillSelectionResolution,
-        DisclosedAgentSkillProjection,
-        PlanAgentSkillProvenance,
-    )
-    from shared.chromie_contracts.plan import CanonicalPlan
-    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_contracts.agent_skill import (
+    AgentSkillDisclosureFailure,
+    AgentSkillDisclosureRequest,
+    AgentSkillDisclosureResolution,
+    AgentSkillProjectionName,
+    AgentSkillSelectionGoalContext,
+    AgentSkillSelectionRequest,
+    AgentSkillSelectionResolution,
+    DisclosedAgentSkillProjection,
+    PlanAgentSkillProvenance,
+)
+from shared.chromie_contracts.plan import CanonicalPlan
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 
 logger = logging.getLogger("chromie.agent.agent_skills.disclosure")

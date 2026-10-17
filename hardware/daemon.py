@@ -1,21 +1,15 @@
 from __future__ import annotations
 
 import os
-from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import ORJSONResponse
 
-try:
-    from .schema import ActionCommand, ActionResult, HealthResponse, RobotState
-    from .service import HardwareService
-except ImportError:  # pragma: no cover - direct script launch
-    from schema import ActionCommand, ActionResult, HealthResponse, RobotState
-    from service import HardwareService
+from .schema import ActionCommand, ActionResult, HealthResponse, RobotState
+from .service import HardwareService
 
 SERVICE_NAME = "chromie-hardware"
-HARDWARE_DRIVER = os.getenv("HARDWARE_DRIVER", "mock").strip().lower()
 HARDWARE_HOST = os.getenv("HARDWARE_HOST", "127.0.0.1")
 HARDWARE_PORT = int(os.getenv("HARDWARE_PORT", "8095"))
 
@@ -70,4 +64,4 @@ async def reset_emergency_stop() -> RobotState:
 
 
 if __name__ == "__main__":
-    uvicorn.run("daemon:app", host=HARDWARE_HOST, port=HARDWARE_PORT, reload=False)
+    uvicorn.run(app, host=HARDWARE_HOST, port=HARDWARE_PORT, reload=False)

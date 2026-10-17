@@ -23,12 +23,8 @@ from .clients.weather_client import (
     weather_code_text,
 )
 
-try:
-    from chromie_contracts.json_schema import json_schema_validation_errors
-    from chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.json_schema import json_schema_validation_errors
-    from shared.chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
+from shared.chromie_contracts.json_schema import json_schema_validation_errors
+from shared.chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
 
 logger = logging.getLogger("chromie.agent.local_tool_execution")
 

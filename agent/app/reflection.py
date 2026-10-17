@@ -11,22 +11,13 @@ from .cognitive_identity import (
     STABLE_MIND_SEMANTIC_CONTRACT,
     bounded_stable_mind_json,
 )
-try:
-    from chromie_contracts.reflection import (
-        ReflectionRequest,
-        ReflectionAction,
-        ReflectionMemoryCandidate,
-        ReflectionResolution,
-    )
-    from chromie_contracts.situation import CognitiveOpportunity
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.reflection import (
-        ReflectionRequest,
-        ReflectionAction,
-        ReflectionMemoryCandidate,
-        ReflectionResolution,
-    )
-    from shared.chromie_contracts.situation import CognitiveOpportunity
+from shared.chromie_contracts.reflection import (
+    ReflectionRequest,
+    ReflectionAction,
+    ReflectionMemoryCandidate,
+    ReflectionResolution,
+)
+from shared.chromie_contracts.situation import CognitiveOpportunity
 
 
 class ReflectionModelOutput(BaseModel):

@@ -378,7 +378,7 @@ BUILD=1 python scripts/closed_loop_e2e.py \
 Review `summary.json`, `semantic-review-bundle.json`, and every per-case result
 in the printed output directory. A mechanically successful run still needs an
 evidence-grounded semantic verdict for natural, truthful, Chromie-like behavior.
-Follow [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#72-daily-life-generated-voice-repair-loop)
+Follow [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md#73-daily-life-generated-voice-repair-loop)
 for diagnosis and reruns.
 
 This checks TTS -> ASR directly and then injects text into the complete cognitive
@@ -438,11 +438,10 @@ not require the supervised real-microphone run.
   speech uses a short original line and still applies the same walking safety
   normalization. Chromie waits until that speech is actually audible before
   starting the body walk, so the song and walk overlap.
-- Chat-only turns may include optional Planner-authored Social Attention in
+- A Social Cognition act may include optional Social Attention in
   `auxiliary_activities[]`. There is no independent Social Attention mode or model;
   Runtime validates or suppresses the exact proposal. These semantics do not select a
-  simulator or physical body. The older `AGENT_EXPRESSIVE_BODY_CUES`
-  name is only a compatibility alias.
+  simulator or physical body.
 - Compound requests should preserve order unless a safety or validation rule
   refuses the request.
 

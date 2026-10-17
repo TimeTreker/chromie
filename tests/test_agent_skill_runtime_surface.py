@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -95,7 +96,7 @@ class AgentSkillRuntimeSurfaceTests(unittest.TestCase):
 
             completed = subprocess.run(
                 [
-                    "python",
+                    sys.executable,
                     str(ROOT / "scripts" / "agent_skill_digest.py"),
                     str(package),
                 ],

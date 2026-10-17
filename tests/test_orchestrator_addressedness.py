@@ -62,7 +62,7 @@ class OrchestratorAddressednessTests(unittest.TestCase):
                 return False
 
         assistant = self._assistant()
-        assistant.active_turn_tasks = {_InFlightTask(): "sid-first"}
+        assistant.input_turn_lifecycle.active_turn_tasks = {_InFlightTask(): "sid-first"}
 
         context = assistant._interaction_engagement_context(
             {

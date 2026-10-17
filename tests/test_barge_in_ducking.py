@@ -58,7 +58,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
         assistant.min_rms = 120.0
         assistant.barge_in_min_rms = 350.0
         assistant.asr_ws = _Asr(asr_text)
-        assistant._tts_text_by_generation = {
+        assistant.playback_delivery.tts_text_by_generation = {
             3: ["Chromie is reading the current response aloud."]
         }
         logs: list[tuple[str | None, str]] = []
@@ -83,7 +83,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
         assistant, old_session_id, logs = self._assistant(asr_text="unused")
         assistant.vad = _StartOnlyVad()
         assistant.frame_duration_ms = 30
-        assistant._vad_leftover = b""
+        assistant.input_turn_lifecycle.vad_leftover = b""
 
         def reject_completed_utterance(*args: Any, **kwargs: Any) -> None:
             del args, kwargs
@@ -99,7 +99,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
 
         state = assistant._playback_state()
         self.assertTrue(state.output_duck_matches(3, old_session_id))
-        self.assertEqual(assistant.playback_generation, 3)
+        self.assertEqual(assistant.playback_delivery.playback_generation, 3)
         self.assertTrue(
             any(
                 sid == old_session_id
@@ -143,7 +143,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(assistant.sessions.current_sid, old_session_id)
-        self.assertEqual(assistant.playback_generation, 3)
+        self.assertEqual(assistant.playback_delivery.playback_generation, 3)
         self.assertFalse(assistant._playback_state().output_duck_matches(3, old_session_id))
         self.assertEqual(invalidations, [])
         self.assertEqual(routes, [])
@@ -163,7 +163,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
             cancel_cognitive_work: bool = True,
         ) -> None:
             invalidations.append(cancel_cognitive_work)
-            self.playback_generation += 1
+            self.playback_delivery.playback_generation += 1
             self._playback_state().cancel_output_duck()
 
         async def abort_output(self: VoiceAssistant) -> None:
@@ -199,7 +199,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(invalidations, [False])
         self.assertEqual(len(aborts), 1)
         self.assertEqual(routes, [("Stop talking.", new_session_id)])
-        self.assertEqual(assistant.playback_generation, 4)
+        self.assertEqual(assistant.playback_delivery.playback_generation, 4)
         self.assertIsNone(assistant._playback_state().output_duck_generation)
         self.assertTrue(
             any(
@@ -226,7 +226,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
             timeout=0.1,
         )
 
-        self.assertEqual(assistant.playback_generation, 3)
+        self.assertEqual(assistant.playback_delivery.playback_generation, 3)
         self.assertTrue(
             any(
                 "playback_duck_released:" in message
@@ -238,8 +238,8 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
     async def test_device_duck_aborts_then_restarts_the_same_stream(self) -> None:
         assistant, old_session_id, _logs = self._assistant(asr_text="unused")
         assistant.audio_output_mode = "device"
-        assistant.output_write_lock = asyncio.Lock()
-        assistant.output_stream_lock = asyncio.Lock()
+        assistant.playback_delivery.output_write_lock = asyncio.Lock()
+        assistant.playback_delivery.output_stream_lock = asyncio.Lock()
 
         class _Stream:
             aborts = 0
@@ -252,7 +252,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
                 self.starts += 1
 
         stream = _Stream()
-        assistant.output_stream = stream
+        assistant.playback_delivery.output_stream = stream
         state = assistant._playback_state()
         state.begin_output_duck(
             generation=3,
@@ -273,7 +273,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(stream.aborts, 1)
         self.assertEqual(stream.starts, 1)
-        self.assertIs(assistant.output_stream, stream)
+        self.assertIs(assistant.playback_delivery.output_stream, stream)
         self.assertIsNone(state.output_duck_generation)
 
 

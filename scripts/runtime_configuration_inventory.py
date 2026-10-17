@@ -17,6 +17,19 @@ INVENTORY_PATH = ROOT / "config" / "runtime_configuration_inventory.json"
 KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]*$")
 COMPOSE_KEY_RE = re.compile(r"\$\{([A-Z][A-Z0-9_]*)(?::[-?+][^}]*)?\}")
 ENV_LINE_RE = re.compile(r"^(?:export\s+)?([A-Z][A-Z0-9_]*)=")
+SHELL_READ_RE = re.compile(r"\$\{?([A-Z][A-Z0-9_]*)")
+SOURCE_ROOTS = (
+    "agent",
+    "asr",
+    "hardware",
+    "orchestrator",
+    "scripts",
+    "shared",
+    "tools",
+    "tts",
+    "tts_candidates",
+)
+IGNORED_PARTS = {"__pycache__", ".git", ".venv", "venv"}
 SERVICE_ROOTS = {"agent", "asr", "hardware", "tts"}
 BOOL_TRUE = {"1", "true", "yes", "on"}
 BOOL_FALSE = {"0", "false", "no", "off"}
@@ -131,29 +144,64 @@ def discover(root: Path = ROOT) -> tuple[set[str], dict[str, set[str]], dict[str
             owners[key].add(relative)
             env_sources[key].add(relative)
 
-    source_paths: list[Path] = []
-    for top in ("agent", "asr", "hardware", "orchestrator", "scripts", "shared", "tts"):
-        source_paths.extend(
-            path
-            for path in (root / top).rglob("*.py")
-            if not any(
-                part in {"__pycache__", ".git", ".venv", "venv"}
-                for part in path.parts
-            )
-        )
-    for path in sorted(source_paths):
+    for path in _python_sources(root):
         relative = path.relative_to(root).as_posix()
         for key in python_env_keys(path):
             owners[key].add(relative)
 
-    for path in (root / "docker-compose.yml", *sorted(root.glob("compose*.yaml"))):
-        if not path.is_file():
-            continue
+    for path in _compose_files(root):
         relative = path.relative_to(root).as_posix()
         for key in compose_env_keys(path):
             owners[key].add(relative)
 
     return set(owners), owners, env_sources
+
+
+def _python_sources(root: Path) -> list[Path]:
+    paths: list[Path] = []
+    for top in SOURCE_ROOTS:
+        paths.extend(
+            path
+            for path in (root / top).rglob("*.py")
+            if not any(part in IGNORED_PARTS for part in path.parts)
+        )
+    return sorted(paths)
+
+
+def _compose_files(root: Path) -> list[Path]:
+    return sorted(
+        path
+        for path in (*root.glob("docker-compose*.yml"), *root.glob("compose*.yaml"))
+        if path.is_file()
+    )
+
+
+def shell_env_reads(root: Path) -> set[str]:
+    keys: set[str] = set()
+    for path in sorted((root / "scripts").rglob("*.sh")):
+        if any(part in IGNORED_PARTS for part in path.parts):
+            continue
+        keys.update(SHELL_READ_RE.findall(path.read_text(encoding="utf-8")))
+    return keys
+
+
+def unread_env_keys(
+    root: Path,
+    owners_by_key: dict[str, set[str]],
+    env_sources_by_key: dict[str, set[str]],
+    allowed: set[str],
+) -> list[str]:
+    """Return env-file keys that no Python, Compose, or shell source reads."""
+
+    shell_reads = shell_env_reads(root)
+    unread: list[str] = []
+    for key, env_sources in sorted(env_sources_by_key.items()):
+        if not env_sources or key in allowed or key in shell_reads:
+            continue
+        if owners_by_key.get(key, set()) - env_sources:
+            continue
+        unread.append(key)
+    return unread
 
 
 def _is_boolean_key(key: str, env_sources: dict[str, set[str]], root: Path) -> bool:
@@ -239,6 +287,15 @@ def build_inventory(root: Path = ROOT) -> dict:
             )
 
     keys, owners_by_key, env_sources_by_key = discover(root)
+    env_only = surface.get("env_file_only_keys") or {}
+    if not isinstance(env_only, dict):
+        raise ConfigurationInventoryError("env_file_only_keys must map keys to reasons")
+    unread = unread_env_keys(root, owners_by_key, env_sources_by_key, set(env_only))
+    if unread:
+        raise ConfigurationInventoryError(
+            "env files define keys that no Python, Compose, or shell source reads; "
+            f"delete them or wire a reader: {', '.join(unread)}"
+        )
     entries = []
     counts: dict[str, int] = defaultdict(int)
     for key in sorted(keys):

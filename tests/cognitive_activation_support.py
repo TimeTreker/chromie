@@ -24,7 +24,3 @@ async def allow_activation(_session, *, request, timeout_ms=None):
     del timeout_ms
     return activation_decision(request, *request.allowed_authorities)
 
-
-async def suppress_activation(_session, *, request, timeout_ms=None):
-    del timeout_ms
-    return activation_decision(request)

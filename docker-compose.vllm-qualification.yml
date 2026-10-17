@@ -6,7 +6,8 @@ services:
     gpus: all
     ipc: host
     ports:
-      - "127.0.0.1:8000:8000"
+      # Host port 8001: 8000 is the paired Soridormi MCP default.
+      - "127.0.0.1:8001:8000"
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
       HF_HOME: /root/.cache/huggingface

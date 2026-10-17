@@ -38,28 +38,16 @@ _UniqueKeySafeLoader.add_constructor(
 )
 
 
-try:
-    from chromie_contracts.agent_skill import (
-        AgentSkillDocument,
-        AgentSkillLoadFailure,
-        AgentSkillLoadFailureReason,
-        AgentSkillMetadata,
-        AgentSkillProjection,
-        AgentSkillProjectionName,
-        AgentSkillRegistrySnapshot,
-        AgentSkillSummary,
-    )
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.agent_skill import (
-        AgentSkillDocument,
-        AgentSkillLoadFailure,
-        AgentSkillLoadFailureReason,
-        AgentSkillMetadata,
-        AgentSkillProjection,
-        AgentSkillProjectionName,
-        AgentSkillRegistrySnapshot,
-        AgentSkillSummary,
-    )
+from shared.chromie_contracts.agent_skill import (
+    AgentSkillDocument,
+    AgentSkillLoadFailure,
+    AgentSkillLoadFailureReason,
+    AgentSkillMetadata,
+    AgentSkillProjection,
+    AgentSkillProjectionName,
+    AgentSkillRegistrySnapshot,
+    AgentSkillSummary,
+)
 
 _METADATA_NAME = "skill.yaml"
 _SKILL_DOCUMENT_NAME = "SKILL.md"

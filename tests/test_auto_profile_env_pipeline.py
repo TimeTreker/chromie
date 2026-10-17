@@ -20,7 +20,7 @@ MODEL_KEYS = (
     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
     "AGENT_FAST_PLANNER_MODEL",
     "AGENT_GOAL_ASSOCIATION_MODEL",
-    "AGENT_DEEP_PLANNER_MODEL",
+    "AGENT_DELIBERATIVE_MODEL",
 )
 
 
@@ -229,7 +229,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertIn("Auto-detected hardware profile: rtx5090", result.stdout)
         self.assertEqual(values["CHROMIE_ACTIVE_PROFILE"], "rtx5090")
         self.assertEqual(values["CHROMIE_HOST_TIMEZONE"], "Asia/Shanghai")
-        for key in (*MODEL_KEYS, "AGENT_TASK_CONTINUITY_MODEL", "AGENT_SKILL_SELECTION_MODEL"):
+        for key in (*MODEL_KEYS, "AGENT_SKILL_SELECTION_MODEL"):
             self.assertEqual(values[key], "chromie-gemma4-12b", key)
         self.assertEqual(
             values["ASR_MODEL_REVISION"],
@@ -248,14 +248,14 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX",
             "AGENT_GOAL_ASSOCIATION_NUM_CTX",
             "AGENT_FAST_PLANNER_NUM_CTX",
-            "AGENT_DEEP_PLANNER_NUM_CTX",
+            "AGENT_DELIBERATIVE_NUM_CTX",
         ):
             self.assertEqual(values[key], "65536", key)
         self.assertEqual(values["AGENT_SKILL_SELECTION_NUM_CTX"], "65536")
         self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_NUM_PREDICT"], "2048")
         self.assertEqual(values["AGENT_FAST_PLANNER_NUM_PREDICT"], "4096")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_PREDICT"], "4096")
+        self.assertEqual(values["AGENT_DELIBERATIVE_NUM_PREDICT"], "4096")
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         self.assertEqual(manifest["active_profile"], "rtx5090")
         self.assertEqual(manifest["active_operator_mode"], "speech")
@@ -295,7 +295,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "65536",
         )
         self.assertEqual(
-            manifest["cognitive_budgets"]["AGENT_DEEP_PLANNER_NUM_PREDICT"],
+            manifest["cognitive_budgets"]["AGENT_DELIBERATIVE_NUM_PREDICT"],
             "4096",
         )
         self.assertEqual(
@@ -330,8 +330,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
             "AGENT_GOAL_ASSOCIATION_MODEL",
             "AGENT_FAST_PLANNER_MODEL",
-            "AGENT_DEEP_PLANNER_MODEL",
-            "AGENT_TASK_CONTINUITY_MODEL",
+            "AGENT_DELIBERATIVE_MODEL",
             "AGENT_SKILL_SELECTION_MODEL",
         ):
             self.assertEqual(values[key], served_model, key)
@@ -361,26 +360,25 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "OLLAMA_CONTEXT_LENGTH",
             "OLLAMA_NUM_CTX",
             "AGENT_FAST_PLANNER_NUM_CTX",
-            "AGENT_DEEP_PLANNER_NUM_CTX",
+            "AGENT_DELIBERATIVE_NUM_CTX",
         ):
             self.assertEqual(values[key], "49152", key)
         for key in (
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX",
             "AGENT_GOAL_ASSOCIATION_NUM_CTX",
-            "AGENT_TASK_CONTINUITY_NUM_CTX",
             "AGENT_SKILL_SELECTION_NUM_CTX",
         ):
             self.assertEqual(values[key], "32768", key)
         self.assertEqual(values["AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS"], "2048")
         # Retained complete re-entry requests, including source Plan and terminal
         # Evidence, must fit without reducing their output allowance or margin.
-        for role, input_chars, output_tokens in (
-            ("FAST", 62557, 2048),
-            ("DEEP", 72056, 4096),
+        for context_key, input_chars, output_tokens in (
+            ("AGENT_FAST_PLANNER_NUM_CTX", 62557, 2048),
+            ("AGENT_DELIBERATIVE_NUM_CTX", 72056, 4096),
         ):
-            with self.subTest(reentry_role=role):
+            with self.subTest(context_key=context_key):
                 options = {
-                    "num_ctx": int(values[f"AGENT_{role}_PLANNER_NUM_CTX"]),
+                    "num_ctx": int(values[context_key]),
                     "num_predict": output_tokens,
                 }
                 diagnostics = ollama_prompt_preflight_diagnostics(
@@ -401,11 +399,11 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "60000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "60000")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_DELIBERATIVE_TIMEOUT_MS"], "120000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "65000")
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "65000")
-        self.assertEqual(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"], "125000")
+        self.assertEqual(values["ORCH_DELIBERATIVE_TIMEOUT_MS"], "125000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "300000")
         self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "3500")
 
@@ -419,10 +417,10 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
             "AGENT_GOAL_ASSOCIATION_TIMEOUT_MS",
             "AGENT_FAST_PLANNER_TIMEOUT_MS",
-            "AGENT_DEEP_PLANNER_TIMEOUT_MS",
+            "AGENT_DELIBERATIVE_TIMEOUT_MS",
             "ORCH_GOAL_ASSOCIATION_TIMEOUT_MS",
             "ORCH_FAST_PLANNER_TIMEOUT_MS",
-            "ORCH_DEEP_PLANNER_TIMEOUT_MS",
+            "ORCH_DELIBERATIVE_TIMEOUT_MS",
             "ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS",
             "ORCH_TTS_PLAYBACK_START_TIMEOUT_MS",
         }
@@ -480,12 +478,12 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertEqual(values["AGENT_WEATHER_TIMEOUT_S"], "120")
         self.assertEqual(values["AGENT_GOAL_ASSOCIATION_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_FAST_PLANNER_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_TIMEOUT_MS"], "120000")
-        self.assertEqual(values["AGENT_DEEP_PLANNER_NUM_CTX"], "40960")
+        self.assertEqual(values["AGENT_DELIBERATIVE_TIMEOUT_MS"], "120000")
+        self.assertEqual(values["AGENT_DELIBERATIVE_NUM_CTX"], "40960")
         self.assertEqual(values["ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_FAST_PLANNER_TIMEOUT_MS"], "150000")
-        self.assertEqual(values["ORCH_DEEP_PLANNER_TIMEOUT_MS"], "150000")
+        self.assertEqual(values["ORCH_DELIBERATIVE_TIMEOUT_MS"], "150000")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS"], "900000")
         self.assertEqual(values["ORCH_TTS_PLAYBACK_START_TIMEOUT_MS"], "120000")
         self.assertEqual(values["AGENT_TIMEOUT_MS"], "240000")
@@ -499,7 +497,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "900000",
         )
         self.assertEqual(
-            manifest["cognitive_budgets"]["AGENT_DEEP_PLANNER_NUM_CTX"],
+            manifest["cognitive_budgets"]["AGENT_DELIBERATIVE_NUM_CTX"],
             "40960",
         )
         self.assertEqual(
@@ -635,9 +633,9 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "CHROMIE_RUNTIME_ENV_FINGERPRINT: ${CHROMIE_RUNTIME_ENV_FINGERPRINT:?",
             "CHROMIE_COGNITIVE_BUDGET_PROFILE: ${CHROMIE_COGNITIVE_BUDGET_PROFILE:-interactive}",
             "AGENT_FAST_PLANNER_MODEL: ${AGENT_FAST_PLANNER_MODEL:-qwen3:4b}",
-            "AGENT_DEEP_PLANNER_MODEL: ${AGENT_DEEP_PLANNER_MODEL:-gemma4:e2b}",
-            "AGENT_DEEP_PLANNER_TIMEOUT_MS: ${AGENT_DEEP_PLANNER_TIMEOUT_MS:-120000}",
-            "AGENT_DEEP_PLANNER_NUM_CTX: ${AGENT_DEEP_PLANNER_NUM_CTX:-8192}",
+            "AGENT_DELIBERATIVE_MODEL: ${AGENT_DELIBERATIVE_MODEL:-gemma4:e2b}",
+            "AGENT_DELIBERATIVE_TIMEOUT_MS: ${AGENT_DELIBERATIVE_TIMEOUT_MS:-120000}",
+            "AGENT_DELIBERATIVE_NUM_CTX: ${AGENT_DELIBERATIVE_NUM_CTX:-8192}",
         ):
             self.assertIn(fragment, agent)
         tts = compose.split("  chromie-tts:", 1)[1].split("  chromie-llm:", 1)[0]
@@ -719,7 +717,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_GOAL_ASSOCIATION_MODEL": "shared-fast",
             "AGENT_FAST_PLANNER_ENABLED": "1",
             "AGENT_FAST_PLANNER_MODEL": "shared-fast",
-            "AGENT_DEEP_PLANNER_ENABLED": "0",
+            "AGENT_DELIBERATIVE_ENABLED": "0",
         }
 
         result = subprocess.run(

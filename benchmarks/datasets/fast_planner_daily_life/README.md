@@ -61,5 +61,4 @@ a Fast candidate Plan. Missing/timeout/truncated results remain failures.
 Historical staged-acquisition and future-readiness target revisions remain in Git
 and evidence; they are not current-pipeline passes. Offline surrogate inference is
 not deployed SGLang, audible voice, real acquisition, simulator or robot qualification,
-and same-model review is not independent review. See the
-[project audit](../../../ARCHITECTURE_AUDIT.md) for reproduced boundaries.
+and same-model review is not independent review.

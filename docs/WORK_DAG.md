@@ -186,6 +186,31 @@ Provider suggestions are evidence about what the provider reported. They are not
 
 There is deliberately no `outcome_summary` and no `residual_replan` layer. Planner owns post-Evidence meaning and replanning.
 
+## Concurrency
+
+DAGEngine may dispatch multiple ready nodes concurrently only when all relevant
+Capability execution contracts permit it. Concurrency is a mechanical property of
+an already Planner-authored WorkDAG: DAGEngine does not decide that two activities
+"should" be parallel; it evaluates whether committed ready nodes may safely overlap.
+
+A node can enter a parallel wave only when:
+
+- all committed dependencies are satisfied;
+- it is not blocked by a failed dependency or dormant fallback edge;
+- the Capability declares parallel execution support where required;
+- exclusive-resource groups do not conflict;
+- guarded physical execution satisfies confirmation and safety-monitor proof;
+- cancellation has not invalidated the DAG/node.
+
+Otherwise DAGEngine serializes or blocks mechanically; it does not change Work
+meaning to create concurrency. Parallel sibling failure follows the failure policy
+authored in the WorkDAG or declared by the Capability's deterministic default
+contract, and DAGEngine may cancel siblings when that policy requires it.
+
+Resource arbitration is process-local. It is not a distributed scheduler and does
+not claim provider-global ownership; provider-local controllers remain
+authoritative for their own physical/runtime resources.
+
 ## Planner-facing capability boundary
 
 For the current implementation, Planner may choose the Capability:
@@ -198,23 +223,23 @@ with a fully authored `dag` argument. This is an execution boundary, not delegat
 
 A future canonical Plan representation may make WorkDAG first-class rather than nesting it under an execution Capability. That is a representation decision only; it must not change the authority rule above.
 
-### Planner Work is WorkDAG topology (Fast and Deep)
+### Planner Work is WorkDAG topology
 
-Since 2026-10-09 (owner decision), each Fast Capability Activity carries `depends_on`: the
+Since 2026-10-09 (owner decision), each Planner Capability Activity carries `depends_on`: the
 activity_ids of earlier Activities that must finish first. There is no per-Activity
 parallel/sequential label. Requested sequence is a dependency; requested simultaneity is
 no dependency. Host validates the references, which only cite earlier Activities, so the
 graph is acyclic. It checks typed UMI `before`/`after` as dependency paths, and
 `parallel_with` as the same execution group.
 
-The Fast Host derives execution groups with DAGEngine wave semantics. An Activity's wave
+The Host derives execution groups with DAGEngine wave semantics. An Activity's wave
 is one past its deepest dependency. A wave's members start together while the
 Capability contracts allow it; a conflicting member starts the next group in list order.
 The canonical Plan records `depends_on` and `execution_group` per step, and Runtime never
 merges adjacent groups. Physical nodes overlap when their resources do not conflict (see
 the Charter).
 
-Deep, multi-goal Fast and Evidence re-entry steps (`PlannerModelStep`, including `new_work`)
+Multi-goal and Evidence re-entry steps (`PlannerModelStep`, including `new_work`)
 author the same `depends_on`. A step may also cite completed retained Work, which counts
 as already satisfied. The canonical materialization derives each step's timing and
 `execution_group` from the dependencies and the Capability contracts

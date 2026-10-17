@@ -58,7 +58,7 @@ In particular:
 
 - User Meaning Interpretation owns provider-neutral Responsibility meaning only;
 - Goal Association owns canonical Goal identity and continuity;
-- Fast and Deep are cognition depths/passes of the same Planner HOW authority;
+- one Planner owns HOW; Value Judgment reviews value-relevant effects;
 - SC owns ordinary Communicative Acts and their exact wording;
 - SC may select optional Social Attention expression in the same result, or choose none;
 - Runtime/Providers own effect realization and lifecycle facts; and
@@ -253,7 +253,7 @@ PYTHONPATH=. python -m pytest -q \
   tests/test_cognitive_identity_context.py \
   tests/test_user_meaning_interpreter_llm_prompt.py \
   tests/test_planner_prompt_module.py \
-  tests/test_social_attention_current.py
+  tests/test_social_cognition.py
 ```
 
 Full gate:

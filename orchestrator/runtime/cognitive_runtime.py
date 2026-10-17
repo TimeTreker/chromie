@@ -152,9 +152,8 @@ class CognitiveRuntimePolicy:
     mode: CognitiveRuntimeMode = "off"
     goal_association_timeout_ms: int = 3500
     fast_planner_timeout_ms: int = 3000
-    # Deliberative deadline for Social Cognition and Reflection; the name predates the
-    # retired Deep Planner (2026-10-11).
-    deep_planner_timeout_ms: int = 10000
+    # Deliberative deadline for Social Cognition and Reflection.
+    deliberative_timeout_ms: int = 10000
     # Capabilities whose effects need a Value Judgment proceed verdict before dispatch
     # (owner-editable capabilities/value_review.json). Empty means no value gate.
     value_review_capability_ids: frozenset[str] = frozenset()
@@ -963,25 +962,6 @@ class CanonicalPlanRuntimeAdapter:
             }
         )
 
-
-    def is_pure_safe_read_plan(self, plan: CanonicalPlan) -> bool:
-        if plan.disposition != "execute" or not plan.steps:
-            return False
-        try:
-            definitions = [
-                self.interaction_runtime.capability_definition(step.capability_id)
-                for step in plan.steps
-            ]
-        except ValueError:
-            return False
-        return all(
-            definition.available
-            and not definition.requires_confirmation
-            and str((definition.metadata or {}).get("safety_class") or "")
-            == "safe_read"
-            and (definition.metadata or {}).get("side_effect_free") is True
-            for definition in definitions
-        )
 
     async def validation_errors(self, plan: CanonicalPlan) -> list[dict[str, Any]]:
         async with runtime_tracer.span(
@@ -2873,7 +2853,7 @@ class GoalDrivenRuntimeCoordinator:
                 sid=session_id, stage="social_cognition", input_payload=request,
                 operation=self.agent_client.resolve_social_cognition(
                     session, request=request,
-                    timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deep_planner_timeout_ms),
+                    timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deliberative_timeout_ms),
                 ),
             )
             result.validate_request(request)
@@ -2923,7 +2903,7 @@ class GoalDrivenRuntimeCoordinator:
         async def resolve() -> SocialCognitionResolution:
             result = await self.agent_client.resolve_social_cognition(
                 session, request=request,
-                timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deep_planner_timeout_ms),
+                timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deliberative_timeout_ms),
             )
             result.validate_request(request)
             metadata["model_call_count"] = result.model_call_count

@@ -72,15 +72,15 @@ Review conformance defects; this rollout does not grant exceptions for them.
 
 ### `off`
 
-The PR7 unified pipeline is not called. Existing User Meaning Interpreter, Agent, and trusted
+The unified pipeline is not called. Existing User Meaning Interpreter, Agent, and trusted
 ordinary cognition fails closed rather than entering another semantic path.
 
 Use this mode only to disable the Goal-driven Runtime for diagnostics or fault isolation.
 
 ### `report_only`
 
-The unified pipeline runs as an observer and records Goal associations, Fast/Deep
-planning, the terminal `CanonicalPlan`, SC communication projection, failures, and stage
+The unified pipeline runs as an observer and records Goal associations, Planner
+Work, the terminal `CanonicalPlan`, SC communication projection, failures, and stage
 latency. It has no authority to commit user-visible speech, Goal state, confirmation,
 or effects. This mode is diagnostic only.
 
@@ -120,7 +120,7 @@ The defaults are:
 ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS=300000
 ORCH_GOAL_ASSOCIATION_TIMEOUT_MS=65000
 ORCH_FAST_PLANNER_TIMEOUT_MS=65000
-ORCH_DEEP_PLANNER_TIMEOUT_MS=125000  # deliberative SC/Reflection deadline (historical name)
+ORCH_DELIBERATIVE_TIMEOUT_MS=125000  # deliberative SC/Reflection deadline
 ```
 
 These development watchdogs bound one admitted semantic workflow while the selected
@@ -366,30 +366,9 @@ python scripts/general_ability_acceptance.py \
 
 These scenarios are dependency-light Level A evidence only.
 
-### Fast Planner multi-goal contract optimization
-
-The July 17, 2026 operator-supplied live-text simulator diagnostic passed
-the four-case daily-life matrix only after Deep Planner recovery. Every Fast
-Planner attempt recorded a model-contract failure rather than a valid
-terminal result or semantic escalation. This is successful end-to-end
-recovery, not successful Fast Planner operation.
-
-The first implementation used one plan-shaped envelope with an optional inner
-terminal map. Five warm runs produced 20/20 Fast contract failures, mandatory
-Deep recovery, a 22.87-second median cognitive runtime, and only 3.9 percent
-improvement over the 23.79-second baseline. The revised implementation in
-[Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-requires a complete model-authored semantic plan with every authoritative goal
-outcome, step cross-reference, and satisfaction field decoder-required. The host
-no longer compiles semantic plan fields. Automated evidence is green; repeated
-warm live-text simulator evidence must be rerun. Rollout must preserve the existing
-one-way authority path and shared trusted validator. Existing `report_only`,
-lane gates, and `AGENT_FAST_PLANNER_ENABLED` provide observation and rollback;
-a new semantic authority or partial-execution fallback is not permitted.
-
 ## 14. Live-text rollout procedure
 
-### Phase 0 — baseline
+### Baseline
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=off
@@ -397,7 +376,7 @@ ORCH_COGNITIVE_RUNTIME_MODE=off
 
 Retain current compatibility behavior and known scenario results.
 
-### Phase 1 — report-only
+### Report-only
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=report_only
@@ -424,7 +403,7 @@ Review:
 - response Goal coverage;
 - latency and fallback causes.
 
-### Phase 2 — apply non-embodied capabilities
+### Apply non-embodied capabilities
 
 ```env
 ORCH_COGNITIVE_RUNTIME_MODE=apply
@@ -432,7 +411,7 @@ ORCH_COGNITIVE_RUNTIME_MODE=apply
 
 Retain successful and failure cases while only the non-embodied provider set is enabled.
 
-### Phase 3 — enable trusted Soridormi capabilities in simulator
+### Enable trusted Soridormi capabilities in simulator
 
 Keep `ORCH_COGNITIVE_RUNTIME_MODE=apply` and enable the reviewed Soridormi provider
 through the maintained simulator operator mode. Do not use this phase as physical
@@ -440,7 +419,7 @@ hardware qualification; retain exact Chromie/Soridormi revisions and provider co
 
 ## 15. Cognitive text-to-MuJoCo procedure
 
-The text-to-MuJoCo checker uses the unified PR8 authority path by default:
+The text-to-MuJoCo checker uses the unified authority path by default:
 
 ```bash
 python scripts/interaction_text_mujoco_check.py \
@@ -497,7 +476,7 @@ Before widening the enabled provider/capability surface, review:
 
 ## 18. Exit criteria
 
-PR7 implementation is automatically verified when:
+The runtime implementation is automatically verified when:
 
 - the unified pipeline supports `off`, `report_only`, and `apply`;
 - apply is lane-gated and rollback-safe;

@@ -14,17 +14,17 @@ import json
 import socket
 import subprocess
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
+
+try:
+    from evidence_io import git_state as _git_state, utc_now as _utc_now
+except ImportError:  # imported as scripts.runtime_exposure_evidence
+    from scripts.evidence_io import git_state as _git_state, utc_now as _utc_now
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PORTS = (5000, 8092, 9001, 11434)
 LOOPBACK_HOSTS = {"127.0.0.1", "::1"}
-
-
-def _utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _write(path: Path | None, payload: dict[str, Any]) -> None:
@@ -41,18 +41,6 @@ def _read(path: Path) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError(f"{path}: expected a JSON object")
     return payload
-
-
-def _git_state(root: Path = ROOT) -> dict[str, Any]:
-    revision = subprocess.check_output(
-        ["git", "rev-parse", "HEAD"], cwd=root, text=True
-    ).strip()
-    dirty = bool(
-        subprocess.check_output(
-            ["git", "status", "--porcelain"], cwd=root, text=True
-        ).strip()
-    )
-    return {"revision": revision, "dirty": dirty}
 
 
 def _tcp_probe(host: str, port: int, timeout_s: float) -> dict[str, Any]:

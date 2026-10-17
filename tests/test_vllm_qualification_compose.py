@@ -26,7 +26,7 @@ def test_vllm_qualification_compose_is_real_isolated_service() -> None:
     assert service["image"] == (
         "${VLLM_IMAGE:?VLLM_IMAGE must be set to a pinned vLLM image or digest}"
     )
-    assert service["ports"] == ["127.0.0.1:8000:8000"]
+    assert service["ports"] == ["127.0.0.1:8001:8000"]
     assert "depends_on" not in service
 
 

@@ -126,7 +126,7 @@
             "then": null
           },
           "llm_hints": {
-            "when_to_use": "Use before planning or executing robot movement."
+            "when_to_use": "Use when the person asks for current robot status, mode, safety, active-task or idle-state information, or when trusted Runtime diagnostics need an explicit status observation. Do not use as Planner preflight for ordinary movement; Soridormi Runtime and safety gates own execution readiness."
           }
         },
         {
@@ -579,6 +579,9 @@
             "type": "object",
             "properties": {
               "completed": {
+                "type": "boolean"
+              },
+              "reset_detected": {
                 "type": "boolean"
               },
               "summary": {
@@ -1070,6 +1073,9 @@
               "completed": {
                 "type": "boolean"
               },
+              "reset_detected": {
+                "type": "boolean"
+              },
               "skill_id": {
                 "type": "string"
               },
@@ -1084,6 +1090,18 @@
               },
               "summary": {
                 "type": "string"
+              },
+              "resource_outcome": {
+                "type": "object",
+                "description": "Provider evidence for acquire_and_deliver_resource skills; omitted for unrelated named skills."
+              },
+              "approach_outcome": {
+                "type": "object",
+                "description": "Simulator observation distances before and after walking."
+              },
+              "return_outcome": {
+                "type": "object",
+                "description": "Simulator recipient distances before and after returning."
               }
             },
             "required": [
@@ -1559,7 +1577,7 @@
           },
           "llm_hints": {
             "when_to_use": "Use after the authoritative planner has selected exact body skills that must run concurrently. Do not include speech here.",
-            "speech_boundary": "Chromie's Vocal Execution Lane owns personal voice output; link peer execution with coordination_id only."
+            "speech_boundary": "Chromie's Speaking Execution Lane owns speech and singing; link peer execution with coordination_id only."
           }
         },
         {
@@ -4325,7 +4343,6 @@
       "soridormi.safety.emergency_stop"
     ],
     "default_short_motion_sequence": [
-      "soridormi.robot.get_status",
       "soridormi.motion.create_plan",
       "chromie.ask_confirmation",
       "soridormi.safety.monitor_motion during soridormi.motion.execute_plan",
@@ -4335,13 +4352,13 @@
     "chromie_concurrency_model": {
       "cognitive_core": "single_authoritative_mind",
       "lanes": [
-        "vocal_execution",
+        "social_attention_proposal",
+        "speaking_execution",
         "activity_execution"
       ],
       "runtime_coordinator": "chromie",
       "speech_owner": "chromie",
-      "body_provider": "soridormi",
-      "social_attention": "background_social_decoration"
+      "body_provider": "soridormi"
     },
     "soridormi_concurrency_model": {
       "primary_locomotion_members": "zero_or_one",
@@ -4351,13 +4368,14 @@
     },
     "rules": [
       "Soridormi tools do not implement Chromie speech, TTS, ASR, or user confirmation.",
-      "Background Social Attention may propose only optional small body decoration; it does not author speech, own Goals, become an execution lane, or operate actuators.",
-      "Vocal and Activity are the two peer execution lanes beneath one Cognitive Core; accepted Social Attention decoration executes through Activity.",
+      "The Social-Attention Proposal Lane proposes only; it does not author speech, own Goals, authorize body actions, or operate actuators.",
+      "The Speaking Execution Lane and Activity Execution Lane are peer execution lanes beneath one Cognitive Core.",
       "Chromie's authoritative planner selects exact body skills before the Activity Execution Lane calls soridormi.activity.compile.",
-      "Speech or singing is never a Soridormi Activity member; Chromie coordinates Vocal/Activity overlap through coordination_id, while same-provider body overlap is compiled from the actual parallel Activity batch.",
+      "Speech or singing is never a Soridormi activity member; Chromie coordinates peer execution through coordination_id.",
       "Chromie must use chromie.ask_confirmation before physical-motion execution unless the action is stop/cancel/emergency_stop.",
       "Chromie must cover soridormi.motion.execute_plan with soridormi.safety.monitor_motion.",
       "Chromie must use soridormi.motion.create_plan before soridormi.motion.execute_plan.",
+      "soridormi.robot.get_status is observational and is not a mandatory movement preflight; Soridormi Runtime and safety checks own execution readiness.",
       "Chromie must cover soridormi.skill.execute_plan with soridormi.safety.monitor_motion.",
       "Chromie must use soridormi.skill.create_plan before soridormi.skill.execute_plan.",
       "Chromie must use soridormi.activity.compile before soridormi.activity.execute.",
@@ -4421,9 +4439,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "fa8080d2a4a5e1c47a1c77a1748aa65e6dec4d83",
-    "upstream_tool_commits": {
-      "soridormi.robot.observe_scene": "fc8c6f61013640e09bb5de978c59e9ce04423f6d"
-    }
+    "upstream_commit": "33b8a135527e65379ca66505d766afea22ddceeb"
   }
 }

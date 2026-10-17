@@ -40,7 +40,7 @@ from shared.chromie_contracts import CognitiveWorkRequest
 from shared.chromie_contracts.reflex import CancellationDirective
 from shared.chromie_contracts.interaction import CapabilityResult
 from tests.capability_runtime_test_support import submit_and_wait_terminal
-from tests.test_cognitive_runtime_pr7 import FakeRuntime
+from tests.cognitive_runtime_test_support import FakeRuntime
 from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_response, social_fixture_resolution
 
 

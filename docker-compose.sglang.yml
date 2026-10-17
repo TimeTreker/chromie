@@ -2,7 +2,8 @@
 # so Agent health dependencies, lifecycle and diagnostics follow the chosen LLM.
 services:
   chromie-llm:
-    image: chromie-sglang:gemma4-fp8
+    # One image for every SGLang profile: both overlays build llm/sglang/Dockerfile.
+    image: chromie-sglang:${CHROMIE_IMAGE_TAG:?CHROMIE_IMAGE_TAG must be set}
     build:
       context: ./llm/sglang
       dockerfile: Dockerfile

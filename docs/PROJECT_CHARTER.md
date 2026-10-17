@@ -1780,8 +1780,10 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    status, open blockers, claim boundary, and ordered next work. The handoff owns the
    volatile operational snapshot: base/revision context, branch, retained artifact
    paths, exact commands, runtime/profile identities, known dirty or failing state,
-   and cross-machine bootstrap instructions. Neither file may claim a gate, live
-   behavior, or clean tree that was not actually observed. A commit or push without
+   and cross-machine bootstrap instructions. Both are current-state documents: each
+   delivery replaces their current sections rather than appending a dated entry, and
+   superseded commands are removed; history stays in Git and `CHANGELOG.md`. Neither
+   file may claim a gate, live behavior, or clean tree that was not actually observed. A commit or push without
    both updated owners is incomplete even when the code itself is correct. The next
    coding agent must be able to resume from the committed pair without reconstructing
    hidden chat history.

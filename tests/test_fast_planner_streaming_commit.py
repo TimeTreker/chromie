@@ -12,7 +12,7 @@ from agent.app.planner_schema import fast_streaming_advance_response_schema
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveStageFailure, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput, FastPlannerStreamFailure, FastPlannerStreamTerminal
-from tests.test_cognitive_runtime_pr7 import admitted_core, new_goal_association, respond_plan
+from tests.cognitive_runtime_test_support import admitted_core, new_goal_association, respond_plan
 from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_ability_needs_text
 
 class _Catalog:

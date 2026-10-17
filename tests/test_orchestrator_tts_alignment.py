@@ -44,9 +44,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_fast_first_speech_enters_current_turn_context_only_after_playback(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
-        assistant._turn_speech_events = {}
-        assistant._turn_speech_event_by_playback_key = {}
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.turn_speech_events = {}
+        assistant.playback_delivery.turn_speech_event_by_playback_key = {}
         assistant.normalize_tts_candidate = MethodType(
             lambda self, text: " ".join(str(text).strip().split()),
             assistant,
@@ -56,7 +56,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             assistant,
         )
         key = assistant.playback_start_key(3, 7, "sid-fast")
-        assistant.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
+        assistant.playback_delivery.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
 
         event = assistant._register_turn_speech_event(session_id='sid-fast', generation=3, orders=[7], text='好呀，我帮你看看。', stage='fast_first', purpose='acknowledge_and_check', commitment='checking_only', fast_activity_id='progress_weather')
 
@@ -203,8 +203,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.runtime_ready_greeting_timeout_ms = 1000
         assistant.audio_input_mode = "device"
         assistant.audio_output_mode = "device"
-        assistant.playback_start_waiters = {}
-        assistant.next_playback_order = 0
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.next_playback_order = 0
         scheduled_texts: list[tuple[str, str | None]] = []
 
         assistant.normalize_tts_candidate = MethodType(
@@ -235,12 +235,12 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             scheduled_texts.append((text, session_id))
             key = self.playback_start_key(0, 0, session_id)
             waiter = asyncio.get_running_loop().create_future()
-            self.playback_start_waiters[key] = waiter
+            self.playback_delivery.playback_start_waiters[key] = waiter
 
             async def complete() -> None:
                 await asyncio.sleep(0)
                 waiter.set_result(True)
-                self.next_playback_order = 1
+                self.playback_delivery.next_playback_order = 1
 
             asyncio.create_task(complete())
             return {
@@ -258,7 +258,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             scheduled_texts,
             [("嗨，我醒啦！", None)],
         )
-        self.assertEqual(assistant.next_playback_order, 1)
+        self.assertEqual(assistant.playback_delivery.next_playback_order, 1)
 
     async def test_runtime_ready_greeting_generation_uses_python_310_compatible_timeout(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
@@ -811,12 +811,12 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.sessions = SessionTracker(enabled=True)
         stale_session_id = assistant.sessions.create()
         current_session_id = assistant.sessions.create()
-        assistant.order_lock = asyncio.Lock()
-        assistant.synthesis_order = 1
-        assistant.playback_generation = 7
-        assistant.active_synthesis_tasks = set()
-        assistant.playback_start_waiters = {}
-        assistant._tts_text_by_generation = {}
+        assistant.playback_delivery.order_lock = asyncio.Lock()
+        assistant.playback_delivery.synthesis_order = 1
+        assistant.playback_delivery.playback_generation = 7
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.tts_text_by_generation = {}
         scheduled: list[tuple[int, str | None, str]] = []
 
         def session_log(
@@ -854,14 +854,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "current turn speech",
             current_session_id,
         )
-        pending = list(assistant.active_synthesis_tasks)
+        pending = list(assistant.playback_delivery.active_synthesis_tasks)
         if pending:
             await asyncio.gather(*pending)
 
         self.assertEqual(stale, {"scheduled": False, "reason": "stale_playback"})
         self.assertTrue(current["scheduled"])
         self.assertEqual(current["order"], 1)
-        self.assertEqual(assistant.synthesis_order, 2)
+        self.assertEqual(assistant.playback_delivery.synthesis_order, 2)
         self.assertEqual(
             scheduled,
             [(1, current_session_id, "current turn speech")],
@@ -886,9 +886,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_interaction_speech_reuses_existing_turn_audio_without_resynthesis(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
-        assistant._turn_speech_events = {}
-        assistant._turn_speech_event_by_playback_key = {}
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.turn_speech_events = {}
+        assistant.playback_delivery.turn_speech_event_by_playback_key = {}
         assistant.session_log = MethodType(
             lambda self, sid, message, *args: None,
             assistant,
@@ -936,9 +936,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
-        assistant._turn_speech_events = {}
-        assistant._turn_speech_event_by_playback_key = {}
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.turn_speech_events = {}
+        assistant.playback_delivery.turn_speech_event_by_playback_key = {}
         assistant.session_log = MethodType(
             lambda self, sid, message, *args: None,
             assistant,
@@ -986,9 +986,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_same_communicative_activity_auto_reuses_audio_without_transport_identity(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
-        assistant._turn_speech_events = {}
-        assistant._turn_speech_event_by_playback_key = {}
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.turn_speech_events = {}
+        assistant.playback_delivery.turn_speech_event_by_playback_key = {}
         assistant.session_log = MethodType(
             lambda self, sid, message, *args: None,
             assistant,
@@ -1035,9 +1035,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_undelivered_fast_communicative_act_is_fulfilled_once_by_reused_stage(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
-        assistant._turn_speech_events = {}
-        assistant._turn_speech_event_by_playback_key = {}
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.turn_speech_events = {}
+        assistant.playback_delivery.turn_speech_event_by_playback_key = {}
         assistant.session_log = MethodType(
             lambda self, sid, message, *args: None,
             assistant,
@@ -1055,7 +1055,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             key = self.playback_start_key(3, 6, session_id)
             waiter = asyncio.get_running_loop().create_future()
             waiter.set_result(True)
-            self.playback_start_waiters[key] = waiter
+            self.playback_delivery.playback_start_waiters[key] = waiter
             return {
                 "scheduled": True,
                 "generation": 3,
@@ -1232,13 +1232,13 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_input_barge_in_does_not_cancel_body_before_routing(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_generation = 0
-        assistant.playback_start_waiters = {}
-        assistant.active_synthesis_tasks = set()
-        assistant.pending_audio = {0: (0, b"audio", 48000, "old-sid", None)}
-        assistant.playback_queue = asyncio.Queue()
-        assistant.next_playback_order = 4
-        assistant.synthesis_order = 7
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.pending_audio = {0: (0, b"audio", 48000, "old-sid", None)}
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.next_playback_order = 4
+        assistant.playback_delivery.synthesis_order = 7
         logs: list[str] = []
         aborts = 0
 
@@ -1267,18 +1267,18 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.session_log = MethodType(session_log, assistant)
         assistant.active_interaction_task = asyncio.create_task(asyncio.sleep(60))
         synthesis_task = asyncio.create_task(asyncio.sleep(60))
-        assistant.active_synthesis_tasks.add(synthesis_task)
-        await assistant.playback_queue.put((0, 0, b"queued", 48000, "old-sid", None))
+        assistant.playback_delivery.active_synthesis_tasks.add(synthesis_task)
+        await assistant.playback_delivery.playback_queue.put((0, 0, b"queued", 48000, "old-sid", None))
 
         try:
             await assistant.interrupt_output(new_session_id="new-sid")
             await asyncio.sleep(0)
 
-            self.assertEqual(assistant.playback_generation, 1)
-            self.assertEqual(assistant.pending_audio, {})
-            self.assertTrue(assistant.playback_queue.empty())
-            self.assertEqual(assistant.next_playback_order, 0)
-            self.assertEqual(assistant.synthesis_order, 0)
+            self.assertEqual(assistant.playback_delivery.playback_generation, 1)
+            self.assertEqual(assistant.playback_delivery.pending_audio, {})
+            self.assertTrue(assistant.playback_delivery.playback_queue.empty())
+            self.assertEqual(assistant.playback_delivery.next_playback_order, 0)
+            self.assertEqual(assistant.playback_delivery.synthesis_order, 0)
             self.assertEqual(aborts, 1)
             self.assertTrue(synthesis_task.cancelled())
             self.assertFalse(assistant.active_interaction_task.cancelled())
@@ -1352,7 +1352,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
         assistant.interaction_runtime = _Runtime()
-        assistant.playback_generation = 0
+        assistant.playback_delivery.playback_generation = 0
         assistant.active_cognitive_runtime_tasks = {}
         assistant._consume_detached_non_cognitive_dispatch = MethodType(
             consume_non_cognitive, assistant
@@ -1413,7 +1413,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             return dispatch.immediate_execution
 
         assistant.interaction_runtime = _Runtime()
-        assistant.playback_generation = 0
+        assistant.playback_delivery.playback_generation = 0
         assistant.active_cognitive_runtime_tasks = {}
         assistant.reset_playback_ordering = MethodType(
             lambda self: asyncio.sleep(0), assistant
@@ -1486,7 +1486,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.session_log = MethodType(session_log, assistant)
         assistant.maybe_session_done = MethodType(maybe_session_done, assistant)
         assistant.interaction_runtime = _Runtime()
-        assistant.playback_generation = 0
+        assistant.playback_delivery.playback_generation = 0
         assistant.active_cognitive_runtime_tasks = {}
         assistant._consume_detached_non_cognitive_dispatch = MethodType(
             consume_non_cognitive, assistant
@@ -1556,11 +1556,11 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
-        assistant.order_lock = asyncio.Lock()
-        assistant.synthesis_order = 0
-        assistant.playback_generation = 0
-        assistant.active_synthesis_tasks = set()
-        assistant.playback_start_waiters = {}
+        assistant.playback_delivery.order_lock = asyncio.Lock()
+        assistant.playback_delivery.synthesis_order = 0
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.playback_start_waiters = {}
         assistant.tts_text_chunking_enabled = True
         assistant.tts_chunk_chars = 80
         assistant.tts_min_chunk_chars = 40
@@ -1605,18 +1605,18 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(result["scheduled"])
         self.assertTrue(result["playback_started"])
         self.assertEqual(result["order"], 0)
-        self.assertEqual(assistant.playback_start_waiters, {})
+        self.assertEqual(assistant.playback_delivery.playback_start_waiters, {})
 
     async def test_playback_barrier_timeout_cancels_all_late_audio_chunks(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
-        assistant.order_lock = asyncio.Lock()
-        assistant.synthesis_order = 0
-        assistant.playback_generation = 0
-        assistant.active_synthesis_tasks = set()
-        assistant.playback_start_waiters = {}
-        assistant.cancelled_playback_orders = set()
+        assistant.playback_delivery.order_lock = asyncio.Lock()
+        assistant.playback_delivery.synthesis_order = 0
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.cancelled_playback_orders = set()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_chunk_chars = 20
         assistant.tts_min_chunk_chars = 1
@@ -1663,7 +1663,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 },
             }
         )
-        pending = list(assistant.active_synthesis_tasks)
+        pending = list(assistant.playback_delivery.active_synthesis_tasks)
         if pending:
             await asyncio.gather(*pending)
 
@@ -1684,17 +1684,17 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
             self.assertTrue(consumed)
         self.assertEqual(played, [])
-        self.assertEqual(assistant.cancelled_playback_orders, set())
+        self.assertEqual(assistant.playback_delivery.cancelled_playback_orders, set())
 
     async def test_interaction_speech_splits_long_text_into_ordered_chunks(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
-        assistant.order_lock = asyncio.Lock()
-        assistant.synthesis_order = 0
-        assistant.playback_generation = 0
-        assistant.active_synthesis_tasks = set()
-        assistant.playback_start_waiters = {}
+        assistant.playback_delivery.order_lock = asyncio.Lock()
+        assistant.playback_delivery.synthesis_order = 0
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.playback_start_waiters = {}
         assistant.tts_text_chunking_enabled = True
         assistant.tts_chunk_chars = 20
         assistant.tts_min_chunk_chars = 1
@@ -1737,7 +1737,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 },
             }
         )
-        pending = list(assistant.active_synthesis_tasks)
+        pending = list(assistant.playback_delivery.active_synthesis_tasks)
         if pending:
             await asyncio.gather(*pending)
 
@@ -1756,9 +1756,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_interaction_speech_registers_delivered_turn_evidence(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
-        assistant._turn_speech_events = {}
-        assistant._turn_speech_event_by_playback_key = {}
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.turn_speech_events = {}
+        assistant.playback_delivery.turn_speech_event_by_playback_key = {}
         assistant.normalize_tts_candidate = MethodType(
             lambda self, text: " ".join(str(text).strip().split()),
             assistant,
@@ -1773,7 +1773,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             text: str,
             session_id: str | None,
         ) -> dict[str, Any]:
-            self.playback_start_waiters[
+            self.playback_delivery.playback_start_waiters[
                 self.playback_start_key(4, 9, session_id)
             ] = asyncio.get_running_loop().create_future()
             return {
@@ -1835,16 +1835,16 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
-        assistant.order_lock = asyncio.Lock()
-        assistant.synthesis_order = 0
-        assistant.playback_generation = 0
-        assistant.playback_start_waiters = {}
-        assistant.active_synthesis_tasks = set()
-        assistant.playback_queue = asyncio.Queue()
-        assistant.playback_task = None
-        assistant.pending_audio = {}
-        assistant.next_playback_order = 0
-        assistant.synthesis_semaphore = asyncio.Semaphore(1)
+        assistant.playback_delivery.order_lock = asyncio.Lock()
+        assistant.playback_delivery.synthesis_order = 0
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.playback_task = None
+        assistant.playback_delivery.pending_audio = {}
+        assistant.playback_delivery.next_playback_order = 0
+        assistant.playback_delivery.synthesis_semaphore = asyncio.Semaphore(1)
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 40
         assistant.tts_chunk_chars = 80
@@ -1890,7 +1890,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             sid: str | None,
         ) -> None:
             del audio_bytes, source_rate, generation, sid
-            order = self.host.next_playback_order
+            order = self.host.playback_delivery.next_playback_order
             events.append(("playback_start", order))
             if order == 0:
                 first_playback_started.set()
@@ -1955,12 +1955,12 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
             await asyncio.wait_for(first_playback_started.wait(), timeout=1.0)
             await asyncio.wait_for(second_request_started.wait(), timeout=1.0)
-            pending = list(assistant.active_synthesis_tasks)
+            pending = list(assistant.playback_delivery.active_synthesis_tasks)
             if pending:
                 await asyncio.gather(*pending)
-            await assistant.playback_queue.put((None, None, None, None, None, None))
-            if assistant.playback_task is not None:
-                await asyncio.wait_for(assistant.playback_task, timeout=1.0)
+            await assistant.playback_delivery.playback_queue.put((None, None, None, None, None, None))
+            if assistant.playback_delivery.playback_task is not None:
+                await asyncio.wait_for(assistant.playback_delivery.playback_task, timeout=1.0)
         finally:
             if original_connect is None:
                 delattr(playback_transport_module.websockets, "connect")
@@ -1978,14 +1978,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
-        assistant.playback_generation = 0
-        assistant.playback_start_waiters = {}
-        assistant.active_synthesis_tasks = set()
-        assistant.playback_queue = asyncio.Queue()
-        assistant.playback_task = None
-        assistant.pending_audio = {}
-        assistant.next_playback_order = 0
-        assistant.synthesis_semaphore = asyncio.Semaphore(1)
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.playback_task = None
+        assistant.playback_delivery.pending_audio = {}
+        assistant.playback_delivery.next_playback_order = 0
+        assistant.playback_delivery.synthesis_semaphore = asyncio.Semaphore(1)
         assistant.tts_url = "ws://tts"
         assistant.speaker_id = "default"
         assistant.tts_ws_retries = 1
@@ -2088,9 +2088,9 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.wait_for(playback_started.wait(), timeout=1.0)
             self.assertFalse(synthesis.done())
             await asyncio.wait_for(synthesis, timeout=1.0)
-            await assistant.playback_queue.put((None, None, None, None, None, None))
-            if assistant.playback_task is not None:
-                await asyncio.wait_for(assistant.playback_task, timeout=1.0)
+            await assistant.playback_delivery.playback_queue.put((None, None, None, None, None, None))
+            if assistant.playback_delivery.playback_task is not None:
+                await asyncio.wait_for(assistant.playback_delivery.playback_task, timeout=1.0)
         finally:
             if original_connect is None:
                 delattr(playback_transport_module.websockets, "connect")
@@ -2107,14 +2107,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
-        assistant.playback_generation = 0
-        assistant.playback_start_waiters = {}
-        assistant.active_synthesis_tasks = set()
-        assistant.playback_queue = asyncio.Queue()
-        assistant.playback_task = None
-        assistant.pending_audio = {}
-        assistant.next_playback_order = 0
-        assistant.synthesis_semaphore = asyncio.Semaphore(1)
+        assistant.playback_delivery.playback_generation = 0
+        assistant.playback_delivery.playback_start_waiters = {}
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.playback_delivery.playback_queue = asyncio.Queue()
+        assistant.playback_delivery.playback_task = None
+        assistant.playback_delivery.pending_audio = {}
+        assistant.playback_delivery.next_playback_order = 0
+        assistant.playback_delivery.synthesis_semaphore = asyncio.Semaphore(1)
         assistant.tts_url = "ws://tts"
         assistant.speaker_id = "default"
         assistant.tts_ws_retries = 2
@@ -2179,7 +2179,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 playback_transport_module.websockets.connect = original_connect
 
         self.assertEqual(attempts, 2)
-        self.assertEqual(assistant.playback_queue.qsize(), 1)
+        self.assertEqual(assistant.playback_delivery.playback_queue.qsize(), 1)
 
     async def test_tts_splitter_groups_tiny_fragments_without_swallowing_long_chunk(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

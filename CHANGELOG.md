@@ -5,7 +5,56 @@ remains available in Git history.
 
 ## Unreleased
 
-### P3 audit continuation
+### Everyday live cohort and root-cause repairs (2026-10-13 to 2026-10-16)
+
+- Added the everyday live-text cohort `scenarios/everyday/` (70 cases: a 15-case
+  `must_pass` smoke stage that gates `core` and `challenge`) and repaired each
+  live failure at its owner: UMI decides meaning uncertainty before meaning and
+  orders Responsibility spans; an unsettled referent is clarified, never reported
+  as a limitation; information already perceived is answered from the cited
+  observation; SC receives a request without agreeing before its Work is decided;
+  a turn waiting for Value Judgment admits only an acknowledgement; the local
+  clock is a common-tier read.
+- Owner identity direction (2026-10-14): Chromie answers as herself and never
+  calls herself a robot, AI or device, without false claims about her nature.
+- Status, checkpoint and handoff are current-state documents; per-delivery
+  history is no longer appended to them.
+
+### One Planner: Deep Planner retired (2026-10-11)
+
+- Retired the Deep Planner, `/deep-plan`, Fast-to-Deep escalation and their
+  settings (PLANNER-AUTHORITY-001). A Responsibility with no usable Capability
+  ends in an honest streamed `unavailable` limitation; conditional composition
+  keeps the dependent action in one Plan (2026-10-12).
+
+### Value Judgment (2026-10-11)
+
+- Added Value Judgment (VALUE-JUDGMENT-001, `POST /value-judgment`): one call per
+  apply-mode turn whose final Plan uses a Capability listed in
+  `capabilities/value_review.json`. `proceed` leaves effects free, `ask` adds a
+  confirmation carrying `value_question`, and `decline`, a failed judgment or an
+  unreachable endpoint withholds the reviewed effects before provider start.
+  Stable Mind adds `respect_others_property`, `respect_privacy` and
+  `act_lawfully_and_honestly`, and the Planner projection keeps every core
+  principle.
+
+### Need-first Planner and WorkDAG topology (2026-10-09 to 2026-10-10)
+
+- Planner Work begins with `ability_needs`; a non-fitting need triggers one Agent
+  library (BM25) search and one more plan with at most eight contracts.
+- Planner Activities carry `depends_on`; Host derives execution groups with
+  DAGEngine wave semantics.
+- The SGLang image backports XGrammar int32 FSM rule IDs so large Planner
+  grammars compile, and bounds grammar retention (2026-10-12).
+
+### Social Cognition owns communication
+
+- Social Cognition authors every user-facing Communicative Activity, including
+  the first receipt; the Planner returns Work and communication Needs only. This
+  supersedes the earlier entry below that moved the first Communicative Activity
+  under Fast Planner.
+
+### Goal Association execution projection removal
 
 - Removed the remaining Goal-Association execution projection: `information` and
   `stateful_effect` now survive unchanged from User Meaning Interpretation into canonical Goals,

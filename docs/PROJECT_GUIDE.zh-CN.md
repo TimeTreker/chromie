@@ -35,9 +35,9 @@ SC 也可理解为面向人的交流与互动规划：读取同一套目标，�
 表达包含语言、文字和能力允许的身体动作；用户明确要求的动作仍是 Planner
 负责的目标任务。快速交流的推理调度优先级高于普通行动规划，深思仍使用有界预算。
 
-独立 SC 接口、上下文与输出契约、Runtime 校验和高优先级调用已经实现；
-普通对话仍由旧 Planner 路径生成交流内容，完整迁移尚未完成。隔离的原生模型
-场景已验证，但尚不能据此宣称默认对话已接入 SC 或响应更快。详见
+SC 已接入普通对话、必需交流、结果回流和可信环境唤醒：所有面向用户的
+Communicative Activity 都由 SC 生成，Planner 只返回 Work 和交流需求，旧的
+Planner 生成话语路径已退役。当前版本的端到端与延迟验证仍未完成。详见
 [权威定义](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)、
 [迁移时序](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle)和
 [当前状态](STATUS.md#social-cognition-migration)。下文的已实现功能和历史证据
@@ -64,12 +64,12 @@ Soridormi 负责：
 
 ## 当前状态
 
-可复现的本地标准测试门禁已经恢复。任何门禁声明都必须引用一次新的
+本地标准测试门禁通过；任何门禁声明都必须引用一次新的
 `./scripts/run_tests.sh` 的精确输出，不在概览中维护容易过期的固定测试数量。
-与当前源码一致的最小真实语音闭环 strict verifier 已实现；当前保留的物理输入
-已经到达 VAD/ASR，但尚未产生包含要求含义的可理解语句，因此不能宣称物理语音
-闭环已通过。当前优先级是完成不要求物理语音的
-`source_bound_development` 证据闭环。在该证据关闭前，除直接修复或明确的
+与当前源码一致的最小真实语音闭环 strict verifier 已实现；历史版本上保留过一次
+受监督的物理麦克风到扬声器回合，但当前版本没有物理语音证据。当前优先级是
+everyday 实时文本 cohort 的根因修复（见 [检查点](../DEVELOPMENT_CHECKPOINT.md)），
+之后是当前版本语音证据和默认目标证据闭环。在此之前，除直接修复或明确的
 安全/来源阻塞外，不新增功能架构、运行开关或术语。仓库使用
 `development` 作为中性开发身份，当前没有版本发布或公开分发计划。
 
@@ -110,26 +110,24 @@ Chromie 的实时可执行合同只使用 `capability_id`；Soridormi 的 wire `
 该架构已经实现：当前输出和实时输入使用 canonical `capability_id`；仓库拥有只读 Loader、模型选择、按 Agent 职责投影、Plan
 provenance，以及 grounded external information 与 weather 两个方法包。真实
 模型选择和 Provider-backed weather 仍需保留当前版本的目标证据。详见
-[Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md) 和
 [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)。
 
 ## 开发主线
 
-- **当前架构基线**：主 authority seam 已固定为 `User Meaning Interpretation →
-  Responsibility evidence → Fast Planner 快速推进 →（可立即执行的安全 Activity）
-  和/或 Goal Association → 需要持久连续性时建立
-  Canonical Goal → canonical planning → Work/Primary Activity → realization → Provider
-  → Evidence`。UMI 的 Fast/Deep 只有认知深度/上下文/推理预算差异，authority 和输出
-  相同；均不得写回复文本、创建 Work/Activity、选择 lane/Capability/Plan。Planner
-  是唯一的 HOW owner（Deep Planner 已于 2026-10-11 退役），GA 仍唯一拥有 canonical Goal continuity。
+- **当前架构基线**：同一轮被接纳的含义（UMI 的 Responsibility / WHAT）同时进入
+  Social Cognition、Goal Association 与 Planner：SC 决定是否、何时、如何交流；
+  GA 唯一拥有 canonical Goal continuity；唯一的 Planner 负责 HOW 与 Work
+  （先声明 ability_needs，必要时检索能力库后再规划一次，Deep Planner 已退役）；
+  Value Judgment 审查列入审查清单的效果；Trusted Capability Runtime 与 Provider
+  执行并产生 Evidence，Evidence 再回流到 Planner 与 SC。UMI 的快速/深度两档只有
+  认知深度差异，均不得写回复文本、创建 Work/Activity 或选择 Capability。
 - **下一阶段设计**：Epistemic Qualification 只负责“证据是否足以建立某个事实”，
   Forward Adaptation 只允许有界的未来认知上下文；二者都不是新的 owner。在线
-  Reflection 不得修改共享 Fast/Deep 策略、Stable Mind、全局 prompt/model、授权或
+  Reflection 不得修改共享认知深度策略、Stable Mind、全局 prompt/model、授权或
   Capability 语义，也不得学习 phrase→Capability / pattern→always-or-never-Deep
   这种 shortcut。
-- **当前 Issue**：完成默认 `source_bound_development` 证据闭环；保留与当前
-  revision 绑定的 Gateway/Core、Agent Skill 与 weather、Social Attention、
-  配对 MuJoCo 以及第二台机器 LAN 证据。
+- **当前 Issue**：everyday 实时文本 cohort（`scenarios/everyday/`）的根因修复，
+  见 [检查点](../DEVELOPMENT_CHECKPOINT.md)。
 - **开放证据**：干净的 live-text、active cancellation、MuJoCo safe-idle、
   人工语义审核和来源身份必须按目标 profile 一起判断，历史成功不能代替当前证据。
 - **已完成工程边界**：Host typed settings、playback/input lifecycle、受支持配置

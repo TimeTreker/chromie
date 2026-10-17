@@ -18,8 +18,9 @@ python scripts/check_repository_policies.py
 ```
 
 The maintained `scripts/run_tests.sh` entrypoint runs this command, and GitHub
-Actions runs that same entrypoint. `scripts/benchmark_check.sh` also invokes the
-canonical gate so benchmark work cannot bypass architecture policy.
+Actions runs that same entrypoint. A standalone `scripts/benchmark_check.sh` run also
+invokes the canonical gate so benchmark work cannot bypass architecture policy;
+`run_tests.sh` passes `--skip-policy-check` because it already ran the gate.
 
 The checker is dependency-light. It uses the Python AST, JSON, the maintained
 Compose source checker, and the existing removed-Router guard. It does not call a

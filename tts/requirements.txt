@@ -1,8 +1,8 @@
 outetts==0.4.4
+# No direct import: outetts speaker creation aligns transcripts with Whisper.
 openai-whisper==20250625
 websockets==16.0
 numpy==2.3.5
 scipy==1.17.0
 soundfile==0.13.1
 huggingface-hub==0.31.4
-python-dotenv==1.2.2

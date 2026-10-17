@@ -11,6 +11,11 @@ import shlex
 import sys
 from typing import Any, Sequence
 
+try:
+    from evidence_io import write_json as _write_json
+except ImportError:  # imported as scripts.run_daily_conversation_benchmark
+    from scripts.evidence_io import write_json as _write_json
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -30,14 +35,6 @@ SCENARIO_GLOB = "scenarios/**/*.json"
 def _default_output_dir() -> Path:
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     return Path(".chromie/benchmarks/daily-conversation") / timestamp
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
 
 
 def _scenario_paths(dataset_dir: Path) -> list[Path]:

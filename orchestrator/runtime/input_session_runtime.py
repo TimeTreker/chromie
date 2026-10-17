@@ -120,22 +120,22 @@ class InputSessionRuntime:
         host = self.host
         if status:
             logger.warning("Microphone status: %s", status)
-        if host.loop is None:
+        if host.input_turn_lifecycle.loop is None:
             return
         audio = indata.copy()
 
         def enqueue_audio():
-            if host.mic_queue.full():
+            if host.input_turn_lifecycle.mic_queue.full():
                 try:
-                    host.mic_queue.get_nowait()
+                    host.input_turn_lifecycle.mic_queue.get_nowait()
                 except asyncio.QueueEmpty:
                     pass
             try:
-                host.mic_queue.put_nowait(audio)
+                host.input_turn_lifecycle.mic_queue.put_nowait(audio)
             except asyncio.QueueFull:
                 pass
 
-        host.loop.call_soon_threadsafe(enqueue_audio)
+        host.input_turn_lifecycle.loop.call_soon_threadsafe(enqueue_audio)
 
     async def handle_vad_audio(
         self,
@@ -194,7 +194,7 @@ class InputSessionRuntime:
                 host.is_playing_audio,
                 started_during_playback,
                 playback_generation_at_start,
-                host.playback_generation,
+                host.playback_delivery.playback_generation,
             )
             await self._release_playback_duck(
                 generation=playback_generation_at_start,
@@ -774,36 +774,36 @@ class InputSessionRuntime:
         frame_bytes_target = int(
             host.target_asr_rate * host.frame_duration_ms / 1000
         ) * 2
-        buffered = host._vad_leftover + pcm_16k
+        buffered = host.input_turn_lifecycle.vad_leftover + pcm_16k
         offset = 0
         while offset + frame_bytes_target <= len(buffered):
             frame = buffered[offset : offset + frame_bytes_target]
             offset += frame_bytes_target
             started, ended, vad_audio = host.vad.process_chunk(frame)
             if started:
-                host._vad_segment_started_during_playback = bool(
+                host.input_turn_lifecycle.vad_segment_started_during_playback = bool(
                     host.is_playing_audio
                 )
-                host._vad_segment_playback_generation = host.playback_generation
+                host.input_turn_lifecycle.vad_segment_playback_generation = host.playback_delivery.playback_generation
                 logger.info(
                     "VAD detected voice: playing=%s playback_generation=%s",
-                    host._vad_segment_started_during_playback,
-                    host._vad_segment_playback_generation,
+                    host.input_turn_lifecycle.vad_segment_started_during_playback,
+                    host.input_turn_lifecycle.vad_segment_playback_generation,
                 )
-                if host._vad_segment_started_during_playback:
+                if host.input_turn_lifecycle.vad_segment_started_during_playback:
                     await self._begin_playback_duck(
-                        generation=host._vad_segment_playback_generation,
+                        generation=host.input_turn_lifecycle.vad_segment_playback_generation,
                         session_id=getattr(host, "session_id", None),
                     )
             if ended and vad_audio:
                 started_during_playback = bool(
-                    host._vad_segment_started_during_playback
+                    host.input_turn_lifecycle.vad_segment_started_during_playback
                 )
                 playback_generation_at_start = (
-                    host._vad_segment_playback_generation
+                    host.input_turn_lifecycle.vad_segment_playback_generation
                 )
-                host._vad_segment_started_during_playback = False
-                host._vad_segment_playback_generation = None
+                host.input_turn_lifecycle.vad_segment_started_during_playback = False
+                host.input_turn_lifecycle.vad_segment_playback_generation = None
                 if getattr(host.vad, "last_end_reason", None) == "max_duration":
                     logger.warning(
                         "VAD force-closed and discarded an overlong utterance: duration_limit_ms=%s bytes=%s",
@@ -827,19 +827,19 @@ class InputSessionRuntime:
                     )
             elif ended:
                 await self._release_playback_duck(
-                    generation=host._vad_segment_playback_generation,
+                    generation=host.input_turn_lifecycle.vad_segment_playback_generation,
                     session_id=host._playback_state().output_duck_session_id,
                     reason="empty_vad_end",
                 )
-                host._vad_segment_started_during_playback = False
-                host._vad_segment_playback_generation = None
-        host._vad_leftover = buffered[offset:]
+                host.input_turn_lifecycle.vad_segment_started_during_playback = False
+                host.input_turn_lifecycle.vad_segment_playback_generation = None
+        host.input_turn_lifecycle.vad_leftover = buffered[offset:]
         await asyncio.sleep(0)
 
     async def mic_stream(self):
         host = self.host
         logger.info("Opening microphone with sounddevice")
-        host.loop = asyncio.get_running_loop()
+        host.input_turn_lifecycle.loop = asyncio.get_running_loop()
         while True:
             await apply_pending_input_device_change(host)
             sd = _sounddevice()
@@ -864,7 +864,7 @@ class InputSessionRuntime:
                     while not host._input_device_change_event.is_set():
                         try:
                             audio = await asyncio.wait_for(
-                                host.mic_queue.get(),
+                                host.input_turn_lifecycle.mic_queue.get(),
                                 timeout=0.5,
                             )
                         except asyncio.TimeoutError:
@@ -963,9 +963,9 @@ class InputSessionRuntime:
             host.sessions.sample_active_resources(
                 event_loop_lag_ms=event_loop_lag_ms,
                 attributes={
-                    "playback_queue_depth": host.playback_queue.qsize(),
-                    "mic_queue_depth": host.mic_queue.qsize(),
-                    "active_synthesis_tasks": len(host.active_synthesis_tasks),
+                    "playback_queue_depth": host.playback_delivery.playback_queue.qsize(),
+                    "mic_queue_depth": host.input_turn_lifecycle.mic_queue.qsize(),
+                    "active_synthesis_tasks": len(host.playback_delivery.active_synthesis_tasks),
                 },
             )
             await sample_accelerator_resources(host, reason="periodic")

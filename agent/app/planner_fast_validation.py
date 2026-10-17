@@ -14,50 +14,27 @@ from typing import Any
 
 from pydantic import ValidationError
 
-try:
-    from chromie_contracts.core_interpretation import (
-        CognitiveResponsibilityProposal,
-        CognitiveWorkRequest,
-        responsibility_binding_material_value,
-    )
-    from chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
-    from chromie_contracts.user_turn import (
-        canonical_literal_user_turn_source_span, resolve_user_turn_source_span,
-        user_turn_source_span_contains,
-    )
-    from chromie_contracts.plan import (
-        argument_source_span,
-        FastPlannerResponseNeed,
-        FastPlannerUnavailableNeed,
-        CanonicalPlan,
-        FastPlannerAdvanceModelOutput,
-        FastPlannerResponsibilityArgumentSource,
-        FastPlannerSituationArgumentSource,
-        FastPlannerProgressAct,
-        validate_communicative_activity_identity,
-    )
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.core_interpretation import (
-        CognitiveResponsibilityProposal,
-        CognitiveWorkRequest,
-        responsibility_binding_material_value,
-    )
-    from shared.chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
-    from shared.chromie_contracts.user_turn import (
-        canonical_literal_user_turn_source_span, resolve_user_turn_source_span,
-        user_turn_source_span_contains,
-    )
-    from shared.chromie_contracts.plan import (
-        argument_source_span,
-        FastPlannerResponseNeed,
-        FastPlannerUnavailableNeed,
-        CanonicalPlan,
-        FastPlannerAdvanceModelOutput,
-        FastPlannerResponsibilityArgumentSource,
-        FastPlannerSituationArgumentSource,
-        FastPlannerProgressAct,
-        validate_communicative_activity_identity,
-    )
+from shared.chromie_contracts.core_interpretation import (
+    CognitiveResponsibilityProposal,
+    CognitiveWorkRequest,
+    responsibility_binding_material_value,
+)
+from shared.chromie_contracts.interaction import VOCAL_MODES, VOCAL_PERFORMANCE_CAPABILITY_ID
+from shared.chromie_contracts.user_turn import (
+    canonical_literal_user_turn_source_span, resolve_user_turn_source_span,
+    user_turn_source_span_contains,
+)
+from shared.chromie_contracts.plan import (
+    argument_source_span,
+    FastPlannerResponseNeed,
+    FastPlannerUnavailableNeed,
+    CanonicalPlan,
+    FastPlannerAdvanceModelOutput,
+    FastPlannerResponsibilityArgumentSource,
+    FastPlannerSituationArgumentSource,
+    FastPlannerProgressAct,
+    validate_communicative_activity_identity,
+)
 
 from .capabilities.validator import validate_args_for_schema
 from .planner_context import planner_goal_execution_requirements, situation_source_observations
@@ -441,29 +418,6 @@ def planner_validation_error_items(
         seen.add(key)
         unique.append(item)
     return unique
-
-
-def planner_validation_error_json(
-    exc: Exception,
-    *,
-    raw: Any,
-    planner_tier: PlannerTier = "fast",
-    expected_goal_ids_for_turn: list[str],
-    limit: int = 10000,
-    include_canonical_plan_diagnostics: bool = True,
-) -> str:
-    from .prompt_projection import bounded_json
-
-    return bounded_json(
-        planner_validation_error_items(
-            exc,
-            raw=raw,
-            planner_tier=planner_tier,
-            expected_goal_ids_for_turn=expected_goal_ids_for_turn,
-            include_canonical_plan_diagnostics=(include_canonical_plan_diagnostics),
-        ),
-        limit,
-    )
 
 
 @dataclass(frozen=True)

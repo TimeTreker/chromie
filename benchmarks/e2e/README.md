@@ -61,7 +61,7 @@ Evidence items require `kind`, `source`, `correlation_id`, and a status from
 Replay a retained E2E observation:
 
 ```bash
-python -m benchmarks.e2e.run \
+python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile replay_text \
   --replay-file /path/to/e2e-replay.json \
@@ -73,7 +73,7 @@ Run the maintained deployed-text adapter boundary:
 ```bash
 export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
 
-python -m benchmarks.e2e.run \
+python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_service_text \
   --adapter live_service_text \

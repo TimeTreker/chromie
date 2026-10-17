@@ -9,10 +9,7 @@ from collections.abc import Awaitable, Callable
 
 from pydantic import BaseModel, Field
 
-try:
-    from chromie_runtime import ResourceArbiter
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_runtime import ResourceArbiter
+from shared.chromie_runtime import ResourceArbiter
 
 from ..capabilities.models import CapabilityRegistry
 from ..soridormi_task_client import SoridormiTaskMonitoringInvoker

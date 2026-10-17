@@ -218,14 +218,6 @@ class CognitiveGateway:
         )
 
     @staticmethod
-    def _bounded_confidence(value: Any, *, fallback: Any) -> float:
-        try:
-            resolved = float(value if value is not None else fallback)
-        except (TypeError, ValueError):
-            resolved = 0.0
-        return max(0.0, min(1.0, resolved))
-
-    @staticmethod
     def metadata(envelope: UserTurnEnvelope) -> dict[str, Any]:
         return {
             USER_TURN_ENVELOPE_CONTEXT_KEY: envelope.model_dump(mode="json"),

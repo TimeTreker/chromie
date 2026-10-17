@@ -16,8 +16,8 @@ from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from agent.app import goal_association_prompt as ga_prompt
 from agent.app import planner_prompt
 from tests.cognitive_work_test_support import cognitive_work_request
-from tests.test_goal_association_pr2 import FakeOllama, create_goals, intent_goal
-from tests.test_fast_planner_pr3 import FakeOllama as PlannerOllama, execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
+from tests.goal_association_test_support import FakeOllama, create_goals, intent_goal
+from tests.fast_planner_test_support import FakeOllama as PlannerOllama, execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 
 
@@ -219,7 +219,7 @@ async def test_fast_query_location_cites_span_of_own_intent_and_original_source(
     # A required free-text query input must cite its span: the decoder cannot
     # enforce literal copies, and a translated city ("Beijing" for 北京) stays
     # provable. Host still rejects same-script values the cited words lack.
-    from tests.test_fast_planner_pr3 import WeatherCatalog, FastPlannerResolver as StreamingResolver
+    from tests.fast_planner_test_support import WeatherCatalog, FastPlannerResolver as StreamingResolver
     from shared.chromie_contracts.user_turn import user_turn_source_tokens
 
     tokens = user_turn_source_tokens(text)
@@ -239,7 +239,7 @@ async def test_fast_query_location_cites_span_of_own_intent_and_original_source(
         joined = [t for t in tokens if t["surface"] in cited]
         argument_sources = {"location": {"source_start_token_ref": joined[0]["ref"],
                                          "source_end_token_ref": joined[-1]["ref"]}}
-    from tests.test_fast_planner_pr3 import FakeOllama as StreamingFakeOllama
+    from tests.fast_planner_test_support import FakeOllama as StreamingFakeOllama
     candidate = StreamingFakeOllama({
         "disposition": "execute", "coverage": "complete",
         "covered_responsibility_refs": ["r1"], "activities": [{
@@ -277,8 +277,8 @@ async def test_fast_query_location_cites_span_of_own_intent_and_original_source(
 async def test_weather_location_context_derives_from_grounded_location(
     location_context, accepted,
 ):
-    from tests.test_fast_planner_pr3 import WeatherCatalog, FastPlannerResolver as StreamingResolver
-    from tests.test_fast_planner_pr3 import FakeOllama as StreamingFakeOllama
+    from tests.fast_planner_test_support import WeatherCatalog, FastPlannerResolver as StreamingResolver
+    from tests.fast_planner_test_support import FakeOllama as StreamingFakeOllama
 
     text = "重庆今天天气怎么样？"
     request = CognitiveWorkRequest(
@@ -393,7 +393,7 @@ def test_canonical_literal_provenance_preserves_goal_ownership_and_explicit_bind
 
 @pytest.mark.asyncio
 async def test_fast_weather_collapses_duplicate_read_after_default_cleanup() -> None:
-    from tests.test_fast_planner_pr3 import (
+    from tests.fast_planner_test_support import (
         FakeOllama as StreamingFakeOllama,
         FastPlannerResolver as StreamingResolver,
     )

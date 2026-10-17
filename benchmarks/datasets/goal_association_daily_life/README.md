@@ -70,6 +70,6 @@ Every case remains `training_eligible=false`. A valid JSON/DTO is not independen
 semantic, native-model, Agent HTTP, voice, simulator or robot evidence.
 The old qualification replay failures occur before such claims can be made.
 Use the [project qualification method](../../../docs/LLM_PROMPT_QUALIFICATION_METHOD.md)
-and [audit](../../../ARCHITECTURE_AUDIT.md) before preparing new target-blind cohorts.
+and [Status](../../../docs/STATUS.md) before preparing new target-blind cohorts.
 The manifest binds the reconciled scenario digest. Linked-reference contract changes
 require owner authorization; never erase the original relationship to obtain a pass.

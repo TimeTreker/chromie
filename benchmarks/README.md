@@ -295,8 +295,8 @@ once when due. `relative_readiness` anchors five elapsed minutes to the trusted 
 instant. Ambiguous local time asks for missing details and emits no timer. These close
 the offline contract in [#60](https://github.com/TimeTreker/chromie/issues/60). Operational stop leaves
 the unmet Goal open; semantic cancellation closes the cancelled Goal and prevents
-later wake. See [acceptance scope](../docs/ACCEPTANCE.md) and the
-[audit](../ARCHITECTURE_AUDIT.md) for actual module I/O, defects and evidence limits.
+later wake. See [acceptance scope](../docs/ACCEPTANCE.md) and
+[Status](../docs/STATUS.md) for evidence limits.
 
 The resource-conflict family requires a specific shared-resource diagnostic for two
 Goals; an unrelated refusal does not pass it. Provider timeout cases inject terminal
@@ -455,11 +455,12 @@ input normalization, protective reflex, attention review, context assembly, and
 turn admission. Goal interpretation, planning, capability selection, and response
 composition remain downstream in the Goal-Driven Cognitive Core.
 
-The legacy `scenarios/goal_interpretation/` and `scenarios/cognitive_core_dialogue/` paths are retained
-for source compatibility and historical comparison. Inventory classifies them as
-`goal_interpretation` and `cognitive_core_dialogue` datasets; their directory names define
-the current architecture. New benchmark component profiles must not reintroduce a
-removed first-class Router boundary.
+The `scenarios/user_meaning_interpretation/` and `scenarios/cognitive_core_dialogue/`
+scenario directories hold User Meaning Interpretation and Core dialogue cases;
+inventory tags them as the `goal_interpretation` and `cognitive_core_dialogue`
+datasets. New
+benchmark component profiles must not reintroduce a removed first-class Router
+boundary.
 
 ## Reviewed Social Attention dataset v1
 
@@ -666,7 +667,7 @@ Run a cohort through a maintained first-party adapter boundary with:
 
 ```bash
 export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
-python -m benchmarks.e2e.run \
+python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_service_text \
   --adapter live_service_text \
@@ -698,7 +699,7 @@ sample count. Optional Social Attention lifecycle evidence distinguishes proposa
 Host materialization, Provider acceptance/completion, and safe idle.
 
 This is a logical behavior-domain track. Its adapter must exercise the ordinary
-Planner result and observe `auxiliary_activities[]`; it must not call or
+Social Cognition result and observe `auxiliary_activities[]`; it must not call or
 emulate a separate Social Attention semantic endpoint. The benchmark `off`,
 `report_only`, and `on` values are qualification conditions implemented by candidate
 availability/execution observation, not product runtime switches.
@@ -747,7 +748,7 @@ python -m benchmarks.stress.validate --check
 Run one workload with:
 
 ```bash
-python -m benchmarks.stress.run \
+python -m benchmarks.stress \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --workload long_session_social_attention \
   --command "python scripts/my_e2e_adapter.py" \
@@ -813,8 +814,9 @@ See [Benchmark Scenario Migration and Continuous Review](../docs/BENCHMARK_SCENA
 ## Primary Goal Interpretation screen
 
 `scripts/qualify_inference_provider.py --goal-interpreter-probe` defaults to
-`manifests/goal_interpreter_primary_v2.json`. Its 24 individual scenario files under
-`datasets/goal_interpreter_primary/scenarios/` retain the earlier 16 probes plus eight
+`manifests/goal_interpreter_primary_v2.json`. Its 23 individual scenario files under
+`datasets/goal_interpreter_primary/scenarios/` retain 15 of the earlier 16 probes (the
+spelling-error probe `ambiguous_bare_referent` was removed) plus eight
 surface/language/modality contrasts. The loader validates each reference through the
 canonical dynamic Schema and Host and binds a deterministic scenario-tree digest.
 References stay out of inference packets. The grader checks exact minimal source spans,

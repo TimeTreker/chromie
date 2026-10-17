@@ -337,7 +337,7 @@ class TargetEvidenceClosureTests(unittest.TestCase):
             ):
                 result = closure.collect_social(args)
             self.assertEqual(result, 0)
-            e2e = [item for item in commands if "benchmarks.e2e.run" in item]
+            e2e = [item for item in commands if "benchmarks.e2e" in item]
             self.assertEqual(len(e2e), 11)
             pairs = {(item[item.index("--mode") + 1], item[item.index("--style") + 1]) for item in e2e}
             self.assertIn(("on", "courteous"), pairs)

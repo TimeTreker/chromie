@@ -491,7 +491,7 @@ knowledge that is not represented as an acquisition resource may remain directly
 Local/private/device/sensor state without a supplied trusted observation or Provider remains
 epistemically unknown; a generic web or weather source is not silently promoted into authority.
 
-Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Planner prompt construction, the typed streaming presentation/truth contract, system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. There is one Planner resolver (PLANNER-AUTHORITY-001).
+Planner implementation may separate prompt/projection mechanics without creating another planning authority. `agent/app/planner_prompt.py` owns bounded Planner prompt construction (one complete Work DTO, no presentation wording), system prompts, model-facing capability compaction, and layered-prompt assembly only; `planner_context.py` owns the read-only raw catalog-to-Planner payload projection. Neither layer can invoke a model, validate or materialize a Plan, mutate Goal/Work state, authorize effects, or own response delivery. There is one Planner resolver (PLANNER-AUTHORITY-001).
 
 The Planner model contract is likewise internally layered rather than centralized in one catch-all module. `planner_model_contract.py` owns model DTOs, typed model-envelope errors, stable Plan IDs, and canonical materialization; `planner_context.py` owns read-only Goal/Evidence/Situation/Gateway projection and raw Capability payload projection; `planner_grounding.py` owns canonical material and binding comparison; `planner_schema.py` owns constrained-decoder schema construction, including the canonical and streamed Planner schemas; `planner_validation.py` owns deterministic validation; `planner_fast_validation.py` owns reuse, commitment and fail-safe validation mechanics; and `planner_fallback.py` may only mechanically materialize an unavailable limitation or a fail-closed failure that the enclosing Planner lifecycle has already selected. The model-assisted same-owner communication and coverage audit module is removed under Charter principles 30–31. The former `planner_contract.py` compatibility surface is also removed. The Planner resolver retains the primary model invocation and HOW lifecycle decisions but does not re-own these mechanics. Every executable model step must explicitly author its `timing`; Host materialization may not infer missing timing as sequential. None of these layers is an independent planning authority: they do not write Goals, authorize effects, own Runtime state, or decide user-facing HOW outside the enclosing Planner lifecycle.
 
@@ -601,7 +601,7 @@ as reopening it.
 
 Online Reflection is bounded advisory cognition, not online self-modification. It may
 supply future Situation/Memory context through the normal owners, but may not directly
-change Stable Mind, shared prompts or model weights, global Fast/Deep policy,
+change Stable Mind, shared prompts or model weights, global cognition-depth policy,
 authorization/safety policy, Capability semantics, or cache a semantic decision such
 as phrase→Capability or pattern→always/never-Deep. Trusted policy caps both **scope**
 (what future cognition may consume the proposal) and **lifetime** (how long it may
@@ -617,10 +617,10 @@ history to make the old turn look correct.
 ### Reconstructability is an architecture test
 
 The maintained `semantic_authority_audit.py` also treats bounded cognition as a
-machine-checkable authority contract. It guards the Fast/Deep invocation budgets,
+machine-checkable authority contract. It guards the Planner and UMI invocation budgets,
 forbids Host same-turn semantic replanning, keeps Response and Tool Result on one
 writer plus immutable truth proof, keeps Response Goal coverage Host-derived, and
-keeps Social Attention/Reflection on one authoring call. The audit intentionally does
+keeps Social Attention (inside Social Cognition) and Reflection on one authoring call. The audit intentionally does
 not freeze exact prompt text or incidental call sequence; it protects authority and
 budgets so deleted recovery workflows cannot silently grow back.
 
@@ -3630,217 +3630,7 @@ The following patterns violate this architecture:
 - implementation-component identity replacing Chromie's speaking identity; and
 - unlimited active-goal, belief, observation, or conversation context.
 
-## 19. Implementation record
-
-This constitution was implemented through staged PR1-PR9 work. The stage
-descriptions below are an implementation record, not a statement that the
-maintained runtime still runs those components as independent report-only
-observers. Each stage began with retained scenarios and did not claim
-later-stage behavior.
-
-PR1-PR9 established the Goal-Driven Cognitive Core and closed one admitted
-effectful turn through evidence-bound final response. The subsequent Gateway
-work completed the five-module admission boundary and removed the independent
-User Meaning Interpreter service. Target live behavior remains a separate evidence
-claim tracked by the current status and qualification documents.
-
-### PR1 — Goal contracts and continuity projection
-
-Deliver:
-
-- shared `SemanticGoal`, `GoalSet`, `GoalRelationship`, and version contracts;
-- bounded active-goal projection;
-- compatibility mapping from current semantic-task contracts;
-- replay-safe operation IDs;
-- no runtime behavior change by default.
-
-Exit criteria:
-
-- contract tests;
-- active-goal projection tests;
-- compatibility fixtures;
-- documentation and dependency-light suite pass.
-
-### PR2 — Goal association and segmentation
-
-Deliver:
-
-- model endpoint that associates a turn with existing goals;
-- independent new-goal segmentation;
-- natural ambiguity clarification proposal;
-- report-only comparison against current routing/task proposals.
-
-Exit criteria:
-
-- coffee modification scenario;
-- “cancel that” ambiguity scenario;
-- multi-goal memory/coffee/weather scenario;
-- no phrase/recency decision rules.
-
-### PR3 — Canonical plan and Fast Planner
-
-Deliver:
-
-- shared canonical-plan schema;
-- fast coverage decision: complete, partial, uncertain;
-- direct simple chat and common-skill planning;
-- partial coverage always escalates;
-- common catalog remains an accelerator, not a boundary.
-
-Exit criteria:
-
-- simple blink direct plan;
-- simple chat response;
-- walk-and-blink cannot narrow to walking;
-- identical validator path for fast plans.
-
-### PR4 — Terminal Deep Planner and bounded DTO regeneration
-
-Historical: the Deep Planner was retired on 2026-10-11 (section 8.2).
-
-Deliver:
-
-- full-registry deep planning;
-- exact, safe-adjustment, alternative, clarification, unavailable, refused;
-- structured validator rejection feedback;
-- mechanical DTO regeneration only;
-- explicit no-return-to-fast invariant.
-
-Exit criteria:
-
-- conditional and composed plans;
-- resource conflict alternative;
-- mechanical DTO-regeneration exhaustion behavior;
-- no planner recursion.
-
-### PR5 — Parameter resolution and goal satisfaction
-
-Deliver:
-
-- consequence-aware parameter-source decisions;
-- structured information gaps;
-- goal satisfaction/coverage report;
-- natural specific clarification;
-- resume original goal after a later answer.
-
-Exit criteria:
-
-- low-consequence blink default scenario;
-- material movement-duration clarification scenario;
-- observation-derived parameter scenario;
-- no internal schema wording reaches users.
-
-### PR6 — Response and social interaction plans
-
-Deliver:
-
-- SC interaction across multiple Goal/Work owners;
-- validated response commitments;
-- SC-owned optional social expression;
-- target-evidence and resource-conflict validation;
-- latency-bounded optional behavior.
-
-Exit criteria:
-
-- attention and no-attention scenarios;
-- live-target override scenario;
-- long task acknowledgement without false completion;
-- social behavior excluded from user tasks.
-
-### PR7 — Runtime migration and retained evidence
-
-Implementation status: the unified runtime, lane-gated rollout, rollback,
-operational evidence recorder, classified acceptance tooling, and cognitive
-text-to-MuJoCo entry point are implemented and automatically verified. Retained
-live-text and MuJoCo target evidence remain open and must be collected on the
-intended deployment.
-
-Deliver:
-
-- staged `off`, `report_only`, and `apply` rollout;
-- lane-gated application with compatibility and fail-closed fallback policy;
-- migration from task continuity to atomic Goal continuity application;
-- trusted host terminal validation after planning, with no Host-owned semantic replan;
-- complete dependency-light cognitive runtime scenarios;
-- operational evidence classification and rollback;
-- live-text and MuJoCo evidence collection entry points.
-
-Exit criteria:
-
-- all dependency-light tests pass;
-- cognitive scenario library passes;
-- apply records are written only after trusted preparation and atomic Goal
-  state application;
-- retained live-text and simulator evidence are reviewed before target behavior
-  is claimed;
-- no release claim exceeds collected evidence.
-
-Operational details are maintained in
-[Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md).
-
-### PR8 — Single semantic authority and model-facing contract hardening
-
-Implementation status: the unified Goal-driven runtime is the only maintained
-semantic architecture. Retired Agent `/run`/`/interaction`, CapabilityAgent,
-route/intent, and emergency semantic fallback surfaces have been removed. Goal
-Association uses the exact model-facing schema while the Host constructs canonical
-persistence objects.
-
-Exit criteria:
-
-- authoritative turns do not fall through to a second semantic planner;
-- UMI owns WHAT without route/intent/Capability/Activity leakage;
-- Planner owns HOW and exact Communicative Activities;
-- model-facing Goal Association values are schema constrained and receive at
-  most one mechanical DTO repair before deterministic conservation validation;
-- contract exhaustion fails closed;
-- automated authority and schema-boundary checks pass;
-- retained live-text and MuJoCo evidence is reviewed before target behavior is claimed.
-
-### PR9 — Cognitive turn closure
-
-Implementation status: integrated in the host manager path with focused
-automated contract and host-integration coverage. Retained provider-backed
-live-text, simulator, microphone, dedicated E-stop/safe-idle, and physical
-robot evidence remains open.
-
-This stage closes the two contract gaps around PR1-PR8 without redesigning its
-semantic planners:
-
-- a versioned `UserTurnEnvelope` is the preserved Gateway-to-Core input;
-- a compatibility adapter preserves bounded User Meaning Interpreter and Agent data
-  contracts inside the Core without restoring a service or fallback authority;
-- a deterministic `ExecutionOutcomeBundle` joins exact canonical
-  step/skill/arguments/timing, committed requests/schema identity, and trusted
-  runtime results/traces to exact goal IDs;
-- outcome reconciliation updates goal state from evidence rather than
-  prospective planner output;
-- terminal execution truth is correlated into Evidence and re-enters the same Planner,
-  which owns response, follow-up Work, revision, clarification, wait, or silence;
-- cancellation and newer-turn preemption preserve trusted outcome evidence while stale
-  Planner communication/effects remain suppressed; and
-- recoverable body failures expose only bounded provider-declared retryability facts; Host
-  does not synthesize retry child Plans or recovery prompts.
-
-Exit criteria:
-
-- original input, reflex, attention, admission, and context provenance survive
-  the Gateway/Core boundary;
-- exact admitted wording remains available to UMI, GA, Planner, and scoped Planner
-  re-entry as read-only provenance without creating another persisted source or moving
-  WHAT/continuity/HOW authority;
-- success, partial failure, refusal, timeout, cancellation, and missing results
-  are distinct per-goal outcomes;
-- unknown plan, goal, step, request, or evidence references fail closed;
-- provider output is model-visible only after declared-schema validation and
-  bounded low-level-field filtering;
-- effectful interactions produce at most one post-execution final response;
-- response-composition failure retains evidence and emits no unvalidated
-  completion claim;
-- no automated test is reported as live provider, simulator, microphone, or
-  physical-robot evidence.
-
-## 20. Architecture evolution rules
+## 19. Architecture evolution rules
 
 The maintained Goal-driven Runtime has no Goal-Interpretation route/intent compatibility
 projection and no fallback into a second legacy semantic pipeline. Historical APIs or
@@ -3866,7 +3656,7 @@ Evolution rules:
 - remove obsolete compatibility surfaces rather than preserving dual authorities when a
   maintained caller has migrated.
 
-## 21. Observability
+## 20. Observability
 
 The cognitive loop should record, without exposing private model reasoning:
 
@@ -3894,7 +3684,7 @@ claims and must come from retained runs.
 Logs show state transitions, decisions, authority, and evidence—not hidden
 chain-of-thought.
 
-## 22. Non-goals
+## 21. Non-goals
 
 This architecture does not claim:
 
@@ -3914,7 +3704,7 @@ This architecture does not claim:
 - that a numerical confidence/satisfaction score alone can authorize progress; or
 - production physical-robot readiness.
 
-## 23. Review checklist
+## 22. Review checklist
 
 Every cognition-related change should answer:
 
@@ -3947,7 +3737,7 @@ Every cognition-related change should answer:
 14. Which retained general-ability scenario fails before the change, and what
     evidence supports the resulting source/target claim?
 
-## 24. Definition of architectural success
+## 23. Definition of architectural success
 
 Chromie satisfies this architecture when:
 

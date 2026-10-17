@@ -5,14 +5,8 @@ from typing import Any
 
 from .clients.ollama_client import llm_failure_metadata
 from .planner_context import planner_goal_context
-try:
-    from chromie_contracts.core_interpretation import CognitiveWorkRequest
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-try:
-    from chromie_contracts.plan import CanonicalPlan, SocialCommunicationNeed, communication_need_id
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.plan import CanonicalPlan, SocialCommunicationNeed, communication_need_id
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_contracts.plan import CanonicalPlan, SocialCommunicationNeed, communication_need_id
 
 logger = logging.getLogger("chromie.agent.planner_fallback")
 

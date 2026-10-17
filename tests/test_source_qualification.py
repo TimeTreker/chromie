@@ -11,7 +11,7 @@ from scripts.run_source_qualification import Gate, SourceQualificationError, loa
 
 class SourceQualificationTests(unittest.TestCase):
     def test_contract_has_unique_gates_and_explicit_target_exclusions(self) -> None:
-        gates, exclusions = load_contract(Path("config/source_qualification.json"))
+        gates, exclusions = load_contract((Path(__file__).resolve().parents[1] / "config/source_qualification.json"))
         self.assertEqual(len(gates), len({gate.gate_id for gate in gates}))
         gate_ids = {gate.gate_id for gate in gates}
         self.assertIn("mypy", gate_ids)
@@ -24,7 +24,7 @@ class SourceQualificationTests(unittest.TestCase):
         self.assertIn("release qualification", exclusions)
 
     def test_every_declared_python_test_target_exists(self) -> None:
-        gates, _exclusions = load_contract(Path("config/source_qualification.json"))
+        gates, _exclusions = load_contract((Path(__file__).resolve().parents[1] / "config/source_qualification.json"))
         missing = sorted(
             argument
             for gate in gates

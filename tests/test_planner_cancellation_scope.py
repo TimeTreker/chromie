@@ -21,7 +21,7 @@ from benchmarks.datasets.fast_planner_daily_life.qualification import (
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-from tests.test_cognitive_runtime_pr7 import FakeRuntime
+from tests.cognitive_runtime_test_support import FakeRuntime
 
 
 def case_request(language, control, available=True):

@@ -115,13 +115,13 @@ class PlaybackTransport:
 
     async def ensure_output_stream(self):
         host = self.host
-        if host.output_stream is not None:
+        if host.playback_delivery.output_stream is not None:
             return
-        async with host.output_stream_lock:
-            if host.output_stream is not None:
+        async with host.playback_delivery.output_stream_lock:
+            if host.playback_delivery.output_stream is not None:
                 return
             sd = _sounddevice()
-            host.output_stream = sd.OutputStream(
+            host.playback_delivery.output_stream = sd.OutputStream(
                 samplerate=host.output_rate,
                 channels=host.output_channels,
                 dtype="int16",
@@ -129,7 +129,7 @@ class PlaybackTransport:
                 latency=host.output_latency,
                 blocksize=host.output_params.get("blocksize", 0),
             )
-            host.output_stream.start()
+            host.playback_delivery.output_stream.start()
             logger.info(
                 "Output stream opened: device=%s rate=%s channels=%s latency=%s",
                 host.output_device,
@@ -150,9 +150,9 @@ class PlaybackTransport:
             return None
         pause_error = ""
         if host.audio_output_mode == "device":
-            async with host.output_write_lock:
-                async with host.output_stream_lock:
-                    stream = host.output_stream
+            async with host.playback_delivery.output_write_lock:
+                async with host.playback_delivery.output_stream_lock:
+                    stream = host.playback_delivery.output_stream
                     if (
                         stream is not None
                         and state.output_duck_matches(generation, session_id)
@@ -196,9 +196,9 @@ class PlaybackTransport:
             return False
         resume_error = ""
         if host.audio_output_mode == "device":
-            async with host.output_write_lock:
-                async with host.output_stream_lock:
-                    stream = host.output_stream
+            async with host.playback_delivery.output_write_lock:
+                async with host.playback_delivery.output_stream_lock:
+                    stream = host.playback_delivery.output_stream
                     if (
                         stream is not None
                         and state.output_duck_matches(generation, session_id)
@@ -243,11 +243,11 @@ class PlaybackTransport:
 
     async def abort_output_stream(self):
         host = self.host
-        async with host.output_write_lock:
-            async with host.output_stream_lock:
-                if host.output_stream is None:
+        async with host.playback_delivery.output_write_lock:
+            async with host.playback_delivery.output_stream_lock:
+                if host.playback_delivery.output_stream is None:
                     return
-                stream = host.output_stream
+                stream = host.playback_delivery.output_stream
 
                 def abort_and_close() -> None:
                     try:
@@ -268,30 +268,30 @@ class PlaybackTransport:
                 try:
                     await asyncio.to_thread(abort_and_close)
                 finally:
-                    if host.output_stream is stream:
-                        host.output_stream = None
+                    if host.playback_delivery.output_stream is stream:
+                        host.playback_delivery.output_stream = None
 
     async def close_output_stream(self):
         host = self.host
-        async with host.output_write_lock:
-            async with host.output_stream_lock:
-                if host.output_stream is None:
+        async with host.playback_delivery.output_write_lock:
+            async with host.playback_delivery.output_stream_lock:
+                if host.playback_delivery.output_stream is None:
                     return
                 try:
-                    host.output_stream.stop()
+                    host.playback_delivery.output_stream.stop()
                 except Exception as exc:
                     logger.debug(
                         "Best-effort output stream stop failed during close: %s",
                         exc,
                     )
                 try:
-                    host.output_stream.close()
+                    host.playback_delivery.output_stream.close()
                 except Exception as exc:
                     logger.debug(
                         "Best-effort output stream close failed: %s",
                         exc,
                     )
-                host.output_stream = None
+                host.playback_delivery.output_stream = None
 
     async def play_audio(self, audio_bytes: bytes, source_rate: Optional[int], generation: int, session_id: Optional[str]):
         host = self.host
@@ -327,7 +327,7 @@ class PlaybackTransport:
             session_id=session_id,
         )
         await self.ensure_output_stream()
-        stream = host.output_stream
+        stream = host.playback_delivery.output_stream
         if stream is None:
             raise RuntimeError("Output stream is not available")
         frames_per_chunk = max(1, int(host.output_rate * host.playback_chunk_ms / 1000))
@@ -340,8 +340,8 @@ class PlaybackTransport:
                 await self.abort_output_stream()
                 raise asyncio.CancelledError("Playback interrupted by newer session")
             chunk = output[offset : offset + frames_per_chunk]
-            async with host.output_write_lock:
-                if host.output_stream is not stream:
+            async with host.playback_delivery.output_write_lock:
+                if host.playback_delivery.output_stream is not stream:
                     raise asyncio.CancelledError("Output stream changed during playback")
                 if host.is_stale_playback(generation, session_id):
                     raise asyncio.CancelledError("Playback interrupted by newer session")
@@ -359,16 +359,16 @@ class PlaybackTransport:
                 order,
                 reason,
                 generation,
-                host.playback_generation,
+                host.playback_delivery.playback_generation,
                 host.session_id,
             )
             return
-        await host.playback_queue.put((generation, order, b"", host.default_tts_rate, session_id, reason))
+        await host.playback_delivery.playback_queue.put((generation, order, b"", host.default_tts_rate, session_id, reason))
 
     async def playback_worker(self):
         host = self.host
         while True:
-            item = await host.playback_queue.get()
+            item = await host.playback_delivery.playback_queue.get()
             if not item:
                 continue
             generation = item[0]
@@ -391,8 +391,8 @@ class PlaybackTransport:
                 )
                 host.session_log(session_id, "playback_drop_stale_before_order: order=%s", order)
                 continue
-            if order != host.next_playback_order:
-                host.pending_audio[order] = (generation, audio, source_rate, session_id, skip_reason)
+            if order != host.playback_delivery.next_playback_order:
+                host.playback_delivery.pending_audio[order] = (generation, audio, source_rate, session_id, skip_reason)
                 continue
             try:
                 played = await self.play_one_order(
@@ -406,11 +406,11 @@ class PlaybackTransport:
                     reason="playback_order_terminal",
                 )
             if played:
-                host.next_playback_order += 1
-            while host.next_playback_order in host.pending_audio:
-                ng, na, nsr, nsid, nreason = host.pending_audio.pop(host.next_playback_order)
+                host.playback_delivery.next_playback_order += 1
+            while host.playback_delivery.next_playback_order in host.playback_delivery.pending_audio:
+                ng, na, nsr, nsid, nreason = host.playback_delivery.pending_audio.pop(host.playback_delivery.next_playback_order)
                 if host.is_stale_playback(ng, nsid):
-                    pending_order = host.next_playback_order
+                    pending_order = host.playback_delivery.next_playback_order
                     host.resolve_playback_start_waiter(
                         ng,
                         pending_order,
@@ -424,9 +424,9 @@ class PlaybackTransport:
                         session_id=nsid,
                         reason="stale_pending_order",
                     )
-                    host.next_playback_order += 1
+                    host.playback_delivery.next_playback_order += 1
                     continue
-                pending_order = host.next_playback_order
+                pending_order = host.playback_delivery.next_playback_order
                 try:
                     played = await self.play_one_order(
                         ng, pending_order, na, nsr, nsid, nreason
@@ -439,7 +439,7 @@ class PlaybackTransport:
                         reason="playback_order_terminal",
                     )
                 if played:
-                    host.next_playback_order += 1
+                    host.playback_delivery.next_playback_order += 1
                 else:
                     break
 
@@ -449,7 +449,7 @@ class PlaybackTransport:
         completed = False
         try:
             key = host.playback_start_key(generation, order, session_id)
-            cancelled_orders = getattr(host, "cancelled_playback_orders", set())
+            cancelled_orders = host.playback_delivery.cancelled_playback_orders
             if key in cancelled_orders:
                 cancelled_orders.discard(key)
                 if isinstance(audio, ProviderPcmStream):
@@ -550,7 +550,7 @@ class PlaybackTransport:
                     if isinstance(audio, ProviderPcmStream):
                         audio.cancel(skip_reason)
                     return True
-                if host.is_stale_playback(generation, session_id) or key in host.cancelled_playback_orders:
+                if host.is_stale_playback(generation, session_id) or key in host.playback_delivery.cancelled_playback_orders:
                     return False
             audio_ms = (len(initial_audio) / (source_rate * 2)) * 1000.0 if source_rate else 0.0
             host.sessions.trace_mark(
@@ -647,7 +647,7 @@ class PlaybackTransport:
             return
         if host.is_stale_playback(generation, session_id):
             return
-        async with host.synthesis_semaphore:
+        async with host.playback_delivery.synthesis_semaphore:
             request_id = f"{session_id}-{order}"
             tts_start_ms = now_ms()
             max_attempts = max(1, host.tts_ws_retries)
@@ -674,7 +674,7 @@ class PlaybackTransport:
                                     state = host.sessions.state.get(session_id or "")
                                     if state is not None:
                                         state["queued_tts"] = int(state.get("queued_tts", 0)) + 1
-                                    await host.playback_queue.put(
+                                    await host.playback_delivery.playback_queue.put(
                                         (generation, order, stream, source_rate, session_id, None)
                                     )
                                     first_pcm_latency_ms = now_ms() - tts_start_ms

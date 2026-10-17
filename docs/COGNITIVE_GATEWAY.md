@@ -144,7 +144,7 @@ Attention Review cannot authorize an effect.
 Current implementation uses greeting/question/wake-name surface cues to detect
 contradictions and calls the same model again to reclassify. That path violates
 Charter principles 30–31 and must not be treated as an allowed semantic repair.
-The [project audit](../ARCHITECTURE_AUDIT.md) retains the two-call reproduction;
+This is an open finding in [Status](STATUS.md#current-open-work);
 implementation qualification remains open. Ordinary phrase cues cannot become a
 second semantic authority. Gateway-suppressed room speech stays bounded input
 evidence and is excluded from accepted recent dialogue.

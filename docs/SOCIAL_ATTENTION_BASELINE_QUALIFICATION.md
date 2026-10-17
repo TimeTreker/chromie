@@ -11,10 +11,9 @@ semantic decisions into the Host Runtime.
 > Thinking belongs to the LLM. Benchmark evaluates intelligence; it must not
 > implement intelligence.
 
-The same primary Fast or Deep Planner result that authors the Main Activity
-remains responsible for any optional Social Attention proposal in
-`auxiliary_activities[]`. The Host validates and materializes only that exact
-proposal. The Provider accepts, rejects, and executes embodiment-specific work.
+Social Cognition owns optional Social Attention: a Social Cognition
+communicative act may carry an optional proposal in its `auxiliary_activities[]`.
+The Host validates and materializes only that exact proposal. The Provider accepts, rejects, and executes embodiment-specific work.
 Benchmark only selects scenarios, records identity and evidence, checks declared
 deterministic boundaries, and preserves review artifacts.
 
@@ -43,14 +42,11 @@ Missing, duplicate, unexpected, or scope-mismatched results fail closed.
 
 ### Default model topology
 
-The RTX 5090 hardware profile declares `qwen3.5:9b` for User Meaning Interpretation,
-Fast Planning, and terminal Evidence re-entry; Goal Association and Deep Planning
-use `gemma4:12b`. Social Attention has no model role of its own: its effective
-model is the Fast or Deep Planner model that authored the containing Plan. The
-profile explicitly opts out of CosyVoice compact cognition and keeps
-two Ollama models resident. Other profiles may retain the one-model compact
-topology when their committed profile leaves that setting enabled. Qualification
-therefore records launcher-effective component identities; a static
+Social Attention has no model role of its own: its effective model is the Social
+Cognition model (the profile's `AGENT_FAST_PLANNER_MODEL`, or
+`AGENT_DELIBERATIVE_MODEL` for deliberative Social Cognition). The maintained
+profiles and their models are defined in [Hardware Profiles](../HARDWARE_PROFILES.md).
+Qualification records launcher-effective component identities; a static
 hardware-profile name is not sufficient evidence.
 
 ### Social Attention runtime entrances
@@ -60,29 +56,21 @@ The authoritative goal-driven path is:
 ```text
 Cognitive Gateway
 → Goal-Driven Cognitive Core
-→ Fast/Deep Planner primary result
-  ├─ Goal-owned Main Activities
+→ Social Cognition communicative act
   └─ optional auxiliary_activities[]
-→ Host commits and launches the Main Activity
-→ Host exact validation/materialization of the attached auxiliary proposal
+→ Host exact validation/materialization of the attached proposal
 → Provider acceptance/completion
 ```
 
-The primary Planner receives the Main Activity context, owner-approved Social
-Interaction Style, bounded recent-decoration evidence, target evidence, and the
-reviewed live Capability set in the same invocation. Candidate preparation keeps
-the auxiliary enum structurally separate from primary Capability selection. The
-Plan contract rejects a duplicate primary Capability; the Host repeats catalog,
-target-freshness, duplicate-primary, and resource-conflict checks before the
-Trusted Capability Runtime.
-
-Every auxiliary Activity is attached to one concrete observable Main Activity and
-retains that Activity ID. An empty list remains valid. Host commit and primary
-launch precede auxiliary scheduling; confirmation-held or rejected primary work
-does not schedule its decoration. A stale proposal is suppressed rather than
-retargeted or replaced. The maintained live-service harness must prove that the
-goal-driven Runtime acquired the turn and that the containing Fast/Deep Plan was
-the proposal source.
+Social Cognition receives the interaction context, owner-approved Social
+Interaction Style, bounded recent-decoration evidence, target evidence and the
+reviewed expression Capabilities in the same invocation. The Host repeats
+catalog, target-freshness, duplicate-primary and resource-conflict checks before
+the Trusted Capability Runtime. An empty list remains valid; a stale proposal is
+suppressed rather than retargeted or replaced. Decoration never completes a Goal.
+The maintained live-service harness must prove that the goal-driven Runtime
+acquired the turn and that the containing Social Cognition act was the proposal
+source.
 
 ### Evidence and execution profiles
 
@@ -160,8 +148,7 @@ least:
 - runtime topology, provider revision, hardware profile, and sample count;
 - evidence profile and operator identity where supervision is required.
 
-For example, compact cognition may override a profile-declared Fast Planner
-model. The Benchmark report must record the resolved model actually used.
+For example, compact cognition may override a profile-declared model. The Benchmark report must record the resolved model actually used.
 
 ## First-party adapter boundary
 
@@ -180,21 +167,21 @@ Example model-only run:
 ```bash
 export CHROMIE_BENCHMARK_LIVE_MODEL_CALLABLE=qualification_harness.live_model:invoke
 
-python -m benchmarks.e2e.run \
+python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_model_text \
   --adapter live_model_text \
   --dataset social_attention \
-  --model qwen3:4b \
-  --effective-model fast_planner=qwen3:4b \
-  --prompt-revision planner-activity-prompt-v1 \
+  --model <resolved-model> \
+  --effective-model social_cognition=<resolved-model> \
+  --prompt-revision <prompt-revision> \
   --code-revision <commit-sha> \
   --mind-profile <approved-profile-revision> \
   --social-style courteous \
   --social-attention-mode on \
   --style courteous \
   --mode on \
-  --semantic-authority-owner fast_planner \
+  --semantic-authority-owner social_cognition \
   --runtime-topology launcher-effective-compact-cognition \
   --sample-count 1 \
   --run-id social-attention-live-model-on-courteous \
@@ -206,18 +193,18 @@ Example deployed-service run adds provider and hardware identity:
 ```bash
 export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
 
-python -m benchmarks.e2e.run \
+python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_service_text \
   --adapter live_service_text \
   --dataset social_attention \
   --provider-revision <provider-revision> \
   --hardware-profile rtx5090 \
-  --semantic-authority-owner goal_driven_cognitive_core.planner \
+  --semantic-authority-owner goal_driven_cognitive_core.social_cognition \
   --runtime-topology cognitive-runtime-apply \
   --code-revision <commit-sha> \
   --prompt-revision <prompt-revision> \
-  --effective-model fast_planner=<resolved-model> \
+  --effective-model social_cognition=<resolved-model> \
   --mind-profile <approved-profile-revision> \
   --social-style courteous \
   --social-attention-mode on \
@@ -291,21 +278,13 @@ remain reviewed qualitative dimensions.
 
 ## Closure state and remaining evidence
 
-The Planner-owned behavior design is implemented in the current amendment and is
-not source-qualified until the canonical gates pass. Focused source tests cover
-primary-result identity, independent auxiliary candidate binding, Goal isolation,
-anchor validity, optional compatible decoration, duplicate/resource rejection,
-post-primary scheduling, confirmation-held suppression, style, and evidence
-grounding.
-
-Formal target qualification is not closed. Retained reports produced through the
-retired independent Planner/endpoint/worker path are historical diagnostics only;
-they do not qualify the new primary Planner prompt/schema or Host scheduling
-boundary.
+Formal target qualification is not closed. Reports produced through the retired
+Planner-authored decoration path are historical diagnostics only; they do not
+qualify the Social Cognition prompt/schema or Host scheduling boundary.
 
 To close formal qualification, connect the first-party adapter contract to the
-authoritative Planner-backed cognitive-runtime harness, commit/rebuild the exact source, retain
-the 128-case homogeneous mode/style bundle, and complete fingerprint-bound human
+authoritative cognitive-runtime harness, retain the 128-case homogeneous
+mode/style bundle on the exact source, and complete fingerprint-bound human
 review. The same fixed scenarios can then support model comparison, stress
 distribution, selected MuJoCo evidence, earliest-error classification, and
 reviewed regression promotion.

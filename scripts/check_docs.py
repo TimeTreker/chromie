@@ -12,6 +12,7 @@ import ast
 import json
 import re
 import sys
+import unicodedata
 from pathlib import Path
 from urllib.parse import unquote
 
@@ -137,8 +138,12 @@ NUMBERED_STEP_TOKEN_RE = re.compile(
     r"(?<![A-Za-z0-9])step(?:\s+|[_-]?)(?:0|[1-9][0-9]*)(?![A-Za-z0-9])",
     re.IGNORECASE,
 )
+# Development-order tokens in file or directory names: milestone (m3), step,
+# pull-request (pr7), stage, review round (r4), phase, and PSM numbering. A
+# token must be delimited by a path separator, ".", "_" or "-" on both sides so
+# semantic names such as qwen3, rtx4090 or sglang_v2 are not matched.
 NUMBERED_PHASE_PATH_RE = re.compile(
-    r"(?:^|[._/-])(?:m|step)(?:0|[1-9][0-9]*)(?=$|[._/-])",
+    r"(?:^|[._/-])(?:m|step|pr|stage|r|phase|psm)[_-]?(?:0|[1-9][0-9]*)(?=$|[._/-])",
     re.IGNORECASE,
 )
 ABANDONED_RELEASE_VERSION_RE = re.compile(
@@ -265,11 +270,75 @@ def is_external_or_anchor(target: str) -> bool:
     )
 
 
+MARKDOWN_HEADING_RE = re.compile(r"^(#{1,6})\s+(.*?)\s*#*\s*$")
+HTML_ANCHOR_RE = re.compile(r"<a\s+(?:name|id)=\"([^\"]+)\"")
+
+
+def heading_slug(heading: str) -> str:
+    """Return the GitHub-style anchor slug for one Markdown heading."""
+
+    value = re.sub(r"<[^>]+>", "", heading.strip().lower())
+    value = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", value).replace("`", "")
+    slug = []
+    for char in value:
+        category = unicodedata.category(char)
+        if char == " ":
+            slug.append("-")
+        elif char in "-_" or category[0] in "LN" or category in {"Mn", "Mc"}:
+            slug.append(char)
+    return "".join(slug)
+
+
+_ANCHOR_CACHE: dict[Path, set[str]] = {}
+
+
+def markdown_anchors(path: Path) -> set[str]:
+    cached = _ANCHOR_CACHE.get(path)
+    if cached is not None:
+        return cached
+    anchors: set[str] = set()
+    counts: dict[str, int] = {}
+    in_fence = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.lstrip().startswith(("```", "~~~")):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        heading = MARKDOWN_HEADING_RE.match(line)
+        if heading:
+            slug = heading_slug(heading.group(2))
+            seen = counts.get(slug, 0)
+            counts[slug] = seen + 1
+            anchors.add(slug if seen == 0 else f"{slug}-{seen}")
+        anchors.update(HTML_ANCHOR_RE.findall(line))
+    _ANCHOR_CACHE[path] = anchors
+    return anchors
+
+
+def link_fragment(raw: str) -> str:
+    value = raw.strip()
+    if value.startswith("<") and value.endswith(">"):
+        value = value[1:-1]
+    value = value.split(" ", 1)[0]
+    if "#" not in value:
+        return ""
+    return unquote(value.split("#", 1)[1]).lower()
+
+
 def check_local_links(errors: list[str]) -> None:
     for source in markdown_files():
         text = source.read_text(encoding="utf-8")
         for match in MARKDOWN_LINK_RE.finditer(text):
             raw = match.group(1).strip()
+            fragment = link_fragment(raw)
+            if raw.startswith("#"):
+                if fragment and fragment not in markdown_anchors(source):
+                    line = text.count("\n", 0, match.start()) + 1
+                    errors.append(
+                        f"{source.relative_to(ROOT)}:{line}: missing anchor: {raw}"
+                    )
+                continue
             if is_external_or_anchor(raw):
                 continue
             target = normalized_link_target(raw)
@@ -287,6 +356,11 @@ def check_local_links(errors: list[str]) -> None:
                 line = text.count("\n", 0, match.start()) + 1
                 errors.append(
                     f"{source.relative_to(ROOT)}:{line}: missing local link target: {raw}"
+                )
+            elif fragment and resolved.suffix == ".md" and fragment not in markdown_anchors(resolved):
+                line = text.count("\n", 0, match.start()) + 1
+                errors.append(
+                    f"{source.relative_to(ROOT)}:{line}: missing anchor in local link: {raw}"
                 )
 
 
@@ -920,7 +994,7 @@ def main() -> int:
     print(
         "Documentation checks passed: "
         f"{len(markdown_files())} Markdown files, project direction, "
-        "local links, semantic project naming, current focus, API routes, "
+        "local links and anchors, semantic project naming, current focus, API routes, "
         "runtime configuration coverage and safety defaults, "
         "reproducible development artifact inputs, and documentation authority."
     )

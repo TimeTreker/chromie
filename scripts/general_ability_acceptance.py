@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import fcntl
-import hashlib
 import json
 import os
 import sys
@@ -26,6 +25,10 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.evidence_io import (  # noqa: E402
+    sha256_file as _sha256_file,
+    write_json as _write_json,
+)
 from scripts.interaction_text_mujoco_check import (  # noqa: E402
     parse_expected_arg,
     run_check,
@@ -1590,22 +1593,6 @@ def _selected_level_a_keys(classes: list[AbilityClass], only_cases: set[str]) ->
         if missing:
             raise ValueError(f"unknown selected case(s): {', '.join(sorted(missing))}")
     return keys
-
-
-def _write_json(path: Path, payload: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _load_json_object(path: Path) -> dict[str, Any]:

@@ -12,6 +12,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+try:
+    from evidence_io import read_json_object as _read_json
+except ImportError:  # imported as scripts.summarize_inference_provider_evidence
+    from scripts.evidence_io import read_json_object as _read_json
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -21,13 +26,6 @@ from shared.chromie_runtime.latency_evidence import distribution  # noqa: E402
 
 REPORT_TYPE = "chromie.inference_provider_contention_summary"
 REPORT_SCHEMA_VERSION = 2
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return payload
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -124,8 +122,6 @@ def _metric_values(samples: list[dict[str, Any]], *path: str) -> list[float]:
             continue
         values.append(float(current))
     return values
-
-
 
 
 def _scaled_metric_values(

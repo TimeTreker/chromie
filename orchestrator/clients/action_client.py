@@ -4,12 +4,8 @@ import logging
 
 import aiohttp
 
+from shared.chromie_contracts.action import ActionCommand, ActionResult, ActionStatus
 from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
-
-try:
-    from schemas.action import ActionCommand, ActionResult
-except ImportError:  # pragma: no cover
-    from orchestrator.schemas.action import ActionCommand, ActionResult
 
 logger = logging.getLogger(__name__)
 
@@ -52,18 +48,18 @@ class ActionClient:
                         id=action.id,
                         target=action.target,
                         type=action.type,
-                        status="failed",
+                        status=ActionStatus.FAILED,
                         message=f"HTTP {resp.status}: {body[:500]}",
                     )
                 result = ActionResult.model_validate_json(body)
-                span.set_attribute("result_status", result.status)
+                span.set_attribute("result_status", result.status.value)
                 runtime_tracer.mark(
                     module=self.TRACE_MODULE,
                     name="action_acknowledged",
                     kind="milestone",
                     attributes={
                         "action_id": action.id,
-                        "status": result.status,
+                        "status": result.status.value,
                     },
                 )
                 first_motion_ms = result.result.get("first_motion_ms")

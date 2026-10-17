@@ -137,8 +137,8 @@ reliability analysis.
 ## Interaction-response latency slices
 
 This section defines the remaining instrumentation and qualification
-requirements for grounded-response latency. Direct/Fast/Deep path
-classification and Deep invocation reasons are implemented. TTS request,
+requirements for grounded-response latency. Request-path classification is
+implemented. TTS request,
 first-PCM, and playback timing exists in retained session evidence, but a
 correlated first-valid-speech-commitment trace boundary is still missing; these
 slices cannot support an end-to-end latency claim until that boundary and the
@@ -149,10 +149,9 @@ separate:
 
 - direct non-effectful conversation, classified as a direct path with no
   planner invocation or planner-tier value;
-- complete bounded capability work, with a terminal Fast plan;
-- uncertain, complex, or dependency-heavy work, and work whose safety/resource
-  reasoning requires the wider planning boundary, with a recorded Deep Planner
-  reason.
+- complete bounded capability work, with one terminal Planner pass;
+- work whose first Planner pass declares a non-fitting ability need, with the
+  library search and the second Planner pass recorded.
 
 For each class, retained traces must distinguish:
 
@@ -162,7 +161,7 @@ For each class, retained traces must distinguish:
 - TTS request to first PCM chunk;
 - first PCM chunk to `first_audio_playback`;
 - total `first_user_observable_latency_ms`;
-- Goal Association, Fast/Deep Planner, Planner communication validation, execution
+- Goal Association, Planner, Social Cognition, Value Judgment, execution
   start, terminal evidence, and final playback timing where applicable;
 - model queue/evaluation time and contract-repair count and duration;
 - request purpose, queue wait, resident model/resource state, and any compute

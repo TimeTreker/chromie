@@ -5,10 +5,7 @@ from datetime import datetime, timezone
 import re
 from typing import Any
 
-try:
-    from chromie_contracts.resource import AcquireAndDeliverResource, resource_semantic_bindings
-except ImportError:  # pragma: no cover
-    from shared.chromie_contracts.resource import AcquireAndDeliverResource, resource_semantic_bindings
+from shared.chromie_contracts.resource import AcquireAndDeliverResource, resource_semantic_bindings
 
 _NUMERIC_LITERAL_RE = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?![\d.])"

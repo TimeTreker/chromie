@@ -59,7 +59,7 @@ def _memory_prompt_visible(
 ) -> bool:
     """Apply conservative disclosure policy before Memory reaches a model prompt.
 
-    Legacy entries preserve the pre-PSM-2 behavior. Privacy-aware relational entries
+    Entries without privacy metadata keep the original disclosure behavior. Privacy-aware relational entries
     default to ``unknown`` and therefore stay out of ordinary model context until an
     owner supplies an explicit disclosure scope. ``shared_with_audience`` requires the
     caller to resolve the complete current audience; an empty/partial audience never
@@ -565,7 +565,7 @@ class ProtectedDurableMemoryStore:
                 or entry.persistence_policy != "durable_with_explicit_consent"
                 or entry.consent_basis != "explicit_current_turn"
                 or not entry.key
-                # PSM-2 keeps third-party/social relationship Memory session-scoped.
+                # Privacy-scoped relational Memory keeps third-party/social relationships session-scoped.
                 # Durable relational retention needs a separately qualified principal,
                 # deletion, consent, and privacy policy rather than piggybacking on the
                 # owner's ordinary profile-memory consent surface.

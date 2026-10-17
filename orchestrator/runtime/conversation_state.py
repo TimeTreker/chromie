@@ -23,60 +23,32 @@ from orchestrator.runtime.memory import (
 if TYPE_CHECKING:
     from orchestrator.runtime.host_settings import ConversationSettings
 
-try:
-    from chromie_contracts.discourse import (
-        DiscourseReferent,
-        DiscourseReferentUpdate,
-        ResolvedDiscourseReference,
-    )
-    from chromie_contracts.goal import (
-        ActiveGoalSnapshot,
-        GoalAssociationResolution,
-        stable_goal_operation_id,
-    )
-    from chromie_contracts.execution_outcome import (
-        ExecutionOutcomeBundle,
-        execution_outcome_fingerprint,
-        goal_completion_qualification_summary,
-    )
-    from chromie_contracts.situation import CognitiveOpportunity, GoalTimeCondition
-    from chromie_contracts.reflex import CancellationDispatchReceipt
-    from chromie_contracts.reflection import ReflectionResolution
-    from chromie_contracts.plan import CanonicalPlan, PlannerInformationGap
-    from chromie_contracts.semantic_task import (
-        InformationGap,
-        SemanticGoal,
-        apply_goal_meaning_update,
-        SemanticTaskOperation,
-        TaskContextSnapshot,
-    )
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.discourse import (
-        DiscourseReferent,
-        DiscourseReferentUpdate,
-        ResolvedDiscourseReference,
-    )
-    from shared.chromie_contracts.goal import (
-        ActiveGoalSnapshot,
-        GoalAssociationResolution,
-        stable_goal_operation_id,
-    )
-    from shared.chromie_contracts.execution_outcome import (
-        ExecutionOutcomeBundle,
-        execution_outcome_fingerprint,
-        goal_completion_qualification_summary,
-    )
-    from shared.chromie_contracts.situation import CognitiveOpportunity, GoalTimeCondition
-    from shared.chromie_contracts.reflex import CancellationDispatchReceipt
-    from shared.chromie_contracts.reflection import ReflectionResolution
-    from shared.chromie_contracts.plan import CanonicalPlan, PlannerInformationGap
-    from shared.chromie_contracts.semantic_task import (
-        InformationGap,
-        SemanticGoal,
-        apply_goal_meaning_update,
-        SemanticTaskOperation,
-        TaskContextSnapshot,
-    )
+from shared.chromie_contracts.discourse import (
+    DiscourseReferent,
+    DiscourseReferentUpdate,
+    ResolvedDiscourseReference,
+)
+from shared.chromie_contracts.goal import (
+    ActiveGoalSnapshot,
+    GoalAssociationResolution,
+    stable_goal_operation_id,
+)
+from shared.chromie_contracts.execution_outcome import (
+    ExecutionOutcomeBundle,
+    execution_outcome_fingerprint,
+    goal_completion_qualification_summary,
+)
+from shared.chromie_contracts.situation import CognitiveOpportunity, GoalTimeCondition
+from shared.chromie_contracts.reflex import CancellationDispatchReceipt
+from shared.chromie_contracts.reflection import ReflectionResolution
+from shared.chromie_contracts.plan import CanonicalPlan, PlannerInformationGap
+from shared.chromie_contracts.semantic_task import (
+    InformationGap,
+    SemanticGoal,
+    apply_goal_meaning_update,
+    SemanticTaskOperation,
+    TaskContextSnapshot,
+)
 
 
 _DONE_TASK_STATUSES = {"done", "failed", "refused", "timed_out", "cancelled", "canceled", "expired", "superseded"}
@@ -3253,17 +3225,6 @@ class ConversationStateManager:
             if text:
                 out.append(text)
         return out
-
-    def _merge_string_list(self, current: Any, new_items: Any, *, max_items: int = 8) -> list[str]:
-        merged: list[str] = []
-        seen: set[str] = set()
-        for item in [*self._string_list(current), *self._string_list(new_items)]:
-            key = item.lower()
-            if key in seen:
-                continue
-            seen.add(key)
-            merged.append(self._compact_text(item, limit=180))
-        return merged[-max_items:]
 
     def _prune_completed_tasks(self, now_ms: float | None = None) -> None:
         if not self._pending_tasks:

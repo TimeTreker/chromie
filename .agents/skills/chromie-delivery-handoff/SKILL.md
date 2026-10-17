@@ -36,8 +36,11 @@ without hidden chat history.
 6. For a Skill-only or agent-tooling-only delivery that changes none of those project
    facts, preserve both files byte-for-byte and state that the project resume point is
    unchanged.
-7. Review both diffs before committing. Remove stale success claims, stale hashes,
-   superseded commands, and wording that converts automated evidence into live evidence.
+7. Replace the current sections of both files (and the current table in
+   `docs/STATUS.md`); never append a dated delivery entry. Add a short
+   `CHANGELOG.md` entry for a notable change. Review both diffs before committing and
+   remove stale success claims, stale hashes, superseded commands, and wording that
+   converts automated evidence into live evidence.
 8. For a project-relative delivery, stage both handoff owners with the user-authorized
    change. Refuse to create the delivery commit if either file is missing from the staged
    diff or contradicts known evidence. For a non-project tooling delivery, refuse to stage

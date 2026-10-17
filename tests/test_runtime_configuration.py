@@ -45,7 +45,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(settings.cognition.user_meaning_interpreter_timeout_ms, 9000)
         self.assertEqual(settings.cognition.goal_association_timeout_ms, 65000)
         self.assertEqual(settings.cognition.fast_planner_timeout_ms, 65000)
-        self.assertEqual(settings.cognition.deep_planner_timeout_ms, 125000)
+        self.assertEqual(settings.cognition.deliberative_timeout_ms, 125000)
         self.assertEqual(settings.cognition.runtime_timeout_ms, 300000)
         self.assertEqual(settings.model_generation.keep_alive, "24h")
 
@@ -227,7 +227,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         )
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=chromie-qwen35-4b", profile)
         self.assertIn("AGENT_FAST_PLANNER_MODEL=chromie-qwen35-4b", profile)
-        self.assertIn("AGENT_DEEP_PLANNER_MODEL=chromie-qwen35-4b", profile)
+        self.assertIn("AGENT_DELIBERATIVE_MODEL=chromie-qwen35-4b", profile)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", profile)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
@@ -237,7 +237,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertNotIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT", profile)
         self.assertIn("OLLAMA_FLASH_ATTENTION=1", profile)
         self.assertIn("OLLAMA_KV_CACHE_TYPE=q8_0", profile)
-        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", profile)
+        self.assertIn("AGENT_DELIBERATIVE_NUM_PREDICT=4096", profile)
 
         rtx5090 = (ROOT / "env" / "profiles" / "rtx5090.env").read_text(
             encoding="utf-8"
@@ -248,7 +248,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_USER_MEANING_INTERPRETER_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=chromie-gemma4-12b", rtx5090)
-        self.assertIn("AGENT_DEEP_PLANNER_MODEL=chromie-gemma4-12b", rtx5090)
+        self.assertIn("AGENT_DELIBERATIVE_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_FAST_PLANNER_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_SKILL_SELECTION_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", rtx5090)
@@ -264,7 +264,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX=65536", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_NUM_CTX=65536", rtx5090)
         self.assertNotIn("AGENT_TOOL_RESULT_INTERPRETER_NUM_CTX", rtx5090)
-        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT=4096", rtx5090)
+        self.assertIn("AGENT_DELIBERATIVE_NUM_PREDICT=4096", rtx5090)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_NUM_PREDICT", rtx5090)
         self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS=2048", rtx5090)
 
@@ -394,15 +394,15 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", services)
         self.assertIn("context_fallback=$COSYVOICE_BRAIN_NUM_CTX", services)
         self.assertIn(
-            '${AGENT_DEEP_PLANNER_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}',
+            '${AGENT_DELIBERATIVE_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}',
             services,
         )
         self.assertNotIn(
-            'EFFECTIVE_DEEP_PLANNER_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"',
+            'EFFECTIVE_DELIBERATIVE_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"',
             launcher,
         )
         self.assertNotIn(
-            'export AGENT_DEEP_PLANNER_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"',
+            'export AGENT_DELIBERATIVE_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"',
             services,
         )
         self.assertNotIn("AGENT_TOOL_RESULT_INTERPRETER_MODEL", services)
@@ -473,7 +473,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL", verifier)
         self.assertIn("OLLAMA_CONTEXT_LENGTH", verifier)
         self.assertIn("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", verifier)
-        self.assertIn("AGENT_DEEP_PLANNER_NUM_PREDICT", verifier)
+        self.assertIn("AGENT_DELIBERATIVE_NUM_PREDICT", verifier)
         self.assertNotIn('check_value "$name"', verifier)
 
     def test_start_chromie_logs_effective_cognitive_model_roles(self) -> None:
@@ -489,7 +489,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "User Meaning Interpretation": "EFFECTIVE_AGENT_USER_MEANING_INTERPRETER_MODEL",
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
             "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
-            "Deep Planner": "EFFECTIVE_DEEP_PLANNER_MODEL",
+            "Deliberative": "EFFECTIVE_DELIBERATIVE_MODEL",
         }
         for role, variable in expected_roles.items():
             with self.subTest(role=role):

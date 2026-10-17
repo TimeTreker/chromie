@@ -107,7 +107,7 @@ All risky or incomplete execution paths are default-off.
 | `ORCH_ADDRESSEDNESS_GATE_ENABLED` | `1` | Supply bounded host engagement evidence to Cognitive Gateway. High-confidence unaddressed ambient speech may be suppressed by Gateway Attention Review; stop/cancel and unusable audio remain deterministic. |
 | `ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC` | `45` | Keep natural follow-ups addressed after the last accepted exchange. Active tasks also keep engagement open; Gateway-suppressed ambient turns do not refresh the exchange window. |
 | `AGENT_LLM_PROVIDER` | `ollama` | Model transport selected at Agent composition. RTX 5090 selects `sglang` in its hardware profile; other profiles retain their declared provider. This does not change UMI/Planner semantic authority or establish behavior qualification. |
-| `AGENT_SGLANG_URL` | `http://chromie-llm-sglang-qualification:30000/v1` | OpenAI-compatible SGLang base URL used only when `AGENT_LLM_PROVIDER=sglang`. |
+| `AGENT_SGLANG_URL` | `http://chromie-llm:30000/v1` (the profile-selected SGLang `chromie-llm` service) | OpenAI-compatible SGLang base URL used only when `AGENT_LLM_PROVIDER=sglang`. |
 | `AGENT_SGLANG_PRIORITY_STEP` | `100` | Operational translation step from provider-neutral compute ranks to SGLang request priority. |
 | `SGLANG_MAX_TOTAL_TOKENS` | `32768` | Qualification Compose shared KV-cache cap, independent of per-request context. Positive token count parsed by SGLang; the laptop AWQ profile retains two request slots and proves two 16K inputs. Larger caps require renewed speech-headroom qualification. |
 | `ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED` | `0` | Host-owned shared-GPU speech arbitration. When enabled, real Vocal delivery pauses the qualified SGLang engine and foreground input revokes that pause before UMI. |
@@ -177,8 +177,7 @@ lifetime, not foreground service delay. Development use does not qualify promoti
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared `qwen3.5:4b` SGLang engine; RTX 5090 similarly assigns all reasoning roles to one shared `chromie-gemma4-12b` SGLang FP8 engine. ASR and TTS retain their specialized models. Each hardware profile owns its own model artifact and memory/context budget; source selection does not by itself qualify live contention or speech headroom. |
-| `CHROMIE_TTS_BACKEND` | `cosyvoice3` by default; explicit alternatives are `oute` and `qwen3`. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy; `.env.common` default `1`. With the default CosyVoice backend, `1` makes `start_services.sh`, `start_orchestrator.sh` and `start_chromie.sh` replace every role model with `TTS_COSYVOICE_OLLAMA_MODEL` and keep one resident Ollama model; `start_services.sh` records the effective values in `.chromie/services.compact-cognition.env` so `verify_runtime_profile.sh` checks the containers it started. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared `qwen3.5:4b` SGLang engine; RTX 5090 similarly assigns all reasoning roles to one shared `chromie-gemma4-12b` SGLang FP8 engine. ASR and TTS retain their specialized models. Each hardware profile owns its own model artifact and memory/context budget; source selection does not by itself qualify live contention or speech headroom. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
 source-controlled `assets/tts/voices` catalog before service creation.
@@ -242,8 +241,8 @@ generated prompts must use a specific speaker.
 | Variable | Typical host value |
 |---|---|
 | `ASR_URL` | `ws://127.0.0.1:9001` |
-| `TTS_URL` | `ws://127.0.0.1:5000` |
-| `LLM_URL` | `http://127.0.0.1:11434/api/generate` |
+| `TTS_URL` | `ws://127.0.0.1:5000` (CosyVoice); the launchers select `5001` for `oute` and `5002` for `qwen3`. |
+| `LLM_URL` | `http://127.0.0.1:11434/api/generate`. Ollama-native endpoint used only to generate ready-greeting speech when `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and no `ORCH_RUNTIME_READY_GREETING_TEXT` is configured. SGLang profiles publish no Ollama port, so set a greeting text there. |
 | `AGENT_URL` | `http://127.0.0.1:8092` |
 | `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
 | `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
@@ -287,7 +286,6 @@ Capabilities, or delegate HOW.
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_USER_MEANING_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `chromie-gemma4-12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
-| `AGENT_DEEP_PLANNER_MODEL` | Existing profile-owned Deep cognition model. The maintained source also reuses this identity for at most one source-based Deep User Meaning Interpretation escalation with the same WHAT-only schema, only when Fast UMI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to UMI. |
 | `AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` | Common fallback `5400`; interactive `services`/`speech`/`voice_mujoco` modes use `60000`, while explicit qualification mode uses `120000`. This is the per-invocation watchdog for one complete WHAT-only Fast interpretation or one allowed source-based Deep UMI interpretation; human-facing latency remains separately measured and is not used as a cognition kill switch. An invalid primary or Deep DTO fails closed without a same-authority repair call. |
 | `AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX` | `16384`; conservative prompt/schema budget for user meaning plus semantic continuity. The maintained UMI request still excludes Capability catalog entries and canonical lifecycle IDs. |
@@ -295,7 +293,7 @@ Capabilities, or delegate HOW.
 | `AGENT_USER_MEANING_INTERPRETER_LLM_KEEP_ALIVE` | `24h`; keeps the warmed interpretation model resident. |
 | `AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP` | `1`; warm the User Meaning Interpreter model during Agent startup. |
 | `AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS` | `60000`; startup warm budget. Explicit qualification mode raises it to `120000`. Warm failure is logged and does not create a fallback semantic authority. |
-| `AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. |
+| `AGENT_USER_MEANING_INTERPRETER_LOG_LEVEL` / `LOG_LEVEL` | Component/global logging level. Compose forwards `LOG_LEVEL` to the Agent, ASR and every TTS container. |
 | `CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW` / `AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW` | `0`; opt-in raw model-output diagnostics. |
 | `CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT` / `AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT` | `0`; opt-in bounded prompt diagnostics. |
 | `CHROMIE_CLI_COLOR` | `auto`; cognitive-model diagnostic color policy. |
@@ -332,7 +330,7 @@ The maintained factory profile at `config/mind/chromie_default.json` carries the
 principles require owner approval and are not changed by experience. The
 experience journal can support future prompt, test, strategy, and long-term-goal
 tuning, but proposals are never auto-applied. See
-[`chromie_mind.md`](chromie_mind.md).
+[`CHROMIE_MIND.md`](CHROMIE_MIND.md).
 
 `episodes.jsonl` is an append-only observability artifact. The realtime Host
 writes it only after an interaction has produced a response/execution record; it
@@ -493,7 +491,6 @@ Do not commit a real execution token. Manifest strings may use required
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` | Common fallback `9000`; interactive `services`/`speech`/`voice_mujoco` modes use `65000`, while explicit qualification mode uses `150000`. It must exceed `AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
-| `ORCH_AGENT_TIMEOUT_MS` | Generic Host-to-Agent fallback timeout. Hardware profiles do not own it; explicit operator/validation modes may override it when collecting qualification evidence. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
 | `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
@@ -631,8 +628,6 @@ See [Scoped Discourse Referents and Verified Tool Memory](DISCOURSE_REFERENTS_AN
 |---|---:|
 | `ORCH_CAPABILITY_MAX_CONCURRENCY` | `8` total Runtime slots. With a limit above one, one slot is reserved for Vocal and at most `limit - 1` admit Activity work; `1` serializes all work. Resource and provider limits still apply. |
 | `ORCH_SORIDORMI_MANIFEST` | `capabilities/soridormi.json`. |
-| `SORIDORMI_MCP_URL` | Required when the manifest is materialized and live calls are enabled. |
-| `SORIDORMI_REPO` | Optional checkout path recorded by live-text and voice/MuJoCo acceptance. Checkout revision and dirty state are diagnostic declarations only; endpoint-reported source identity is separate. |
 
 Trusted Capability Runtime uses a process-local scheduler. It enforces imported
 Soridormi resource names and exclusive groups across submissions; the provider's
@@ -685,9 +680,6 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `COSYVOICE3_PROMPT_PREFIX` | Trusted prompt prefix prepended before the exact reference transcript. |
 | `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget; default `1200` for the large offline model load. A CosyVoice worker warms every committed voice inside this budget before it reports ready, so TTS health `provider_health.ready` means warm; the launcher and the Host wait for it and do not warm TTS themselves. |
 | `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Bounded drain before fail-closed worker restart after cancellation; default `3` seconds. |
-| `ORCH_TTS_CONCURRENCY` | `1` for the singleton CosyVoice worker. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | `1` by default; use one compact resident Ollama model while CosyVoice shares the GPU. |
-| `TTS_COSYVOICE_OLLAMA_MODEL` | Compact shared-GPU model; default `qwen3:4b`. |
 | `TTS_SPEAKER_ID` | `default` for CosyVoice/Qwen reference cloning. Oute may use installation-local profile IDs. |
 
 Promote the existing AI-generated voices once when creating the catalog:
@@ -717,13 +709,14 @@ the default CosyVoice image:
 - `TTS_GGUF_REPO`, `TTS_GGUF_REVISION`, `TTS_QUANTIZATION`,
   `TTS_CONTEXT_SIZE`, and `TTS_MAX_LENGTH`;
 - `TTS_SAMPLE_RATE`, `TTS_TEMPERATURE`, `TTS_REPETITION_PENALTY`,
-  `TTS_WORKER_COUNT`, and `TTS_AUDIO_CODEC_DEVICE`;
+  `TTS_WORKER_COUNT`, `TTS_AUDIO_CODEC_DEVICE`, and `MIN_TTS_GENERATION_LENGTH`;
 - `SPEAKER_DIR`, `TTS_SPEAKER_ALIGNMENT_DEVICE`, and
   `TTS_SPEAKER_TRANSCRIPT_MIN_SIMILARITY`.
 
 Qwen3-TTS uses `QWEN3_TTS_SOURCE_REVISION`, `QWEN3_TTS_MODEL_ID`,
 `QWEN3_TTS_MODEL_REVISION`, `QWEN3_TTS_DEVICE`, `QWEN3_TTS_DTYPE`, and
-`QWEN3_TTS_ATTENTION`. It uses the committed `chromie_mixed` reference and the same transport contract.
+`QWEN3_TTS_ATTENTION`, plus `TTS_TRANSPORT_CHUNK_MS` (default `120`), the PCM chunk
+size the candidate server streams to the Host. It uses the committed `chromie_mixed` reference and the same transport contract.
 
 For a common isolated comparison:
 
@@ -806,8 +799,7 @@ Key controls:
 
 Important variables include `OLLAMA_MODEL`, `OLLAMA_KEEP_ALIVE`,
 `OLLAMA_LOAD_TIMEOUT`, `OLLAMA_MAX_LOADED_MODELS`, `OLLAMA_NUM_PARALLEL`, `OLLAMA_CONTEXT_LENGTH`,
-`OLLAMA_NUM_CTX`, `OLLAMA_NUM_PREDICT`, `OLLAMA_TEMPERATURE`, and
-`OLLAMA_TOP_P`. Hardware profiles own the normal model and context defaults.
+`OLLAMA_NUM_CTX`, and `OLLAMA_NUM_PREDICT`. Hardware profiles own the normal model and context defaults.
 Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
 `OLLAMA_NUM_PARALLEL=1`, which lets distinct role models stay resident when memory
 allows without increasing per-model parallel KV-cache pressure. The RTX 4090 Laptop
@@ -847,17 +839,14 @@ Chromie's own preference, or brief honest uncertainty.
 
 ## Legacy hardware daemon
 
-`HARDWARE_HOST`, `HARDWARE_PORT`, and `HARDWARE_DRIVER` are read by the daemon,
-but the current service constructs only `MockRobotDriver`. Serial port and baud
-variables are not a supported production-selection mechanism in this revision.
+`HARDWARE_HOST` and `HARDWARE_PORT` are read by the daemon. It always
+constructs `MockRobotDriver`; there is no driver selection.
 
 ## Acceptance-script controls
 
 - GPU smoke: `DRY_RUN`, `START_SERVICES`, `RUN_TTS_SYNTHESIS`,
   `RUN_OLLAMA_GENERATE`, `SMOKE_TIMEOUT_SECONDS`, `TTS_SMOKE_TEXT`,
   `TTS_SMOKE_SPEAKER`.
-- Supervised target acceptance: `SUPERVISED_ACCEPTANCE=1`, `TARGET_ACCEPTANCE_DRY_RUN`,
-  `TARGET_ACCEPTANCE_EVIDENCE_ROOT`, `TARGET_ACCEPTANCE_ID`, `TARGET_ACCEPTANCE_EVIDENCE_DIR`.
 - Voice acceptance uses CLI flags on `scripts/voice_acceptance.py`.
   `--mode synthetic` is the fully automatic default; `--mode virtual-mic`
   exercises a PulseAudio/PipeWire monitor source; `--mode acoustic` plays
@@ -903,7 +892,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `chromie-gemma4-12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
 | `AGENT_COGNITIVE_ACTIVATION_ENABLED` | `1` by default. Enables the narrow internal state-transition Activation model used before Goal-bound Planner or Goal-free SC re-entry. Disabling/unavailability fails closed; Runtime does not restore deterministic semantic wake routing. |
 | `AGENT_COGNITIVE_ACTIVATION_MODEL` | Defaults to `AGENT_FAST_PLANNER_MODEL`. It selects only among Host-supplied existing authorities; it owns no Goal, Work, wording, Capability, execution, or completion semantics. |
-| `AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS` / `AGENT_COGNITIVE_ACTIVATION_NUM_CTX` / `AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT` | Timeout defaults to the active `AGENT_FAST_PLANNER_TIMEOUT_MS` budget (`60000` ms if unset); context/output defaults: `8192` / `384`. An explicit activation timeout overrides inheritance. Bounded one-call activation transaction; no repair or Deep pass. |
+| `AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS` / `AGENT_COGNITIVE_ACTIVATION_NUM_CTX` / `AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT` | Timeout defaults to the active `AGENT_FAST_PLANNER_TIMEOUT_MS` budget (`60000` ms if unset); context/output defaults: `8192` / `384`. An explicit activation timeout overrides inheritance. Bounded one-call activation transaction; no repair or Deep pass. Compose forwards all five `AGENT_COGNITIVE_ACTIVATION_*` keys to `chromie-agent`. |
 | `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Fast Planner after UMI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
@@ -945,21 +934,17 @@ There is one Planner (PLANNER-AUTHORITY-001): its depth comes from need-first li
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
 | `ORCH_FAST_PLANNER_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around full Fast planning. |
 
-The Deep Planner was retired on 2026-10-11 and `ORCH_DEEP_PLANNER_MODE`,
-`AGENT_DEEP_PLANNER_MAX_CAPABILITIES` and `AGENT_DEEP_PLANNER_MIN_GOAL_SATISFACTION` were
-removed. The settings below keep their historical names but no longer configure a
-Planner: they configure the shared deliberative model used by Social Cognition's deep
-client, Deep User Meaning Interpretation and Reflection. Renaming them is a recorded
-follow-up.
+The settings below configure the shared deliberative model used by Social
+Cognition's deep client, Deep User Meaning Interpretation and Reflection.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_DEEP_PLANNER_ENABLED` | `1`; enables the deliberative clients (Social Cognition deep client, Reflection). |
-| `AGENT_DEEP_PLANNER_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. The deliberative model identity. |
-| `AGENT_DEEP_PLANNER_TIMEOUT_MS` | `120000` in maintained development modes; workflow-completion watchdog for one deliberative model call. |
-| `AGENT_DEEP_PLANNER_NUM_CTX` | `8192`; deliberative context (Social Cognition uses the larger of this and the Planner context). Qualification mode and the architecture-validation overlay use `40960`. |
-| `AGENT_DEEP_PLANNER_NUM_PREDICT` | `1024`; deliberative output budget. |
-| `ORCH_DEEP_PLANNER_TIMEOUT_MS` | `125000` in maintained development modes; Host deadline for Social Cognition, Reflection and Goal-free Situation cognition calls (the larger of this and the Planner deadline). |
+| `AGENT_DELIBERATIVE_ENABLED` | `1`; enables the deliberative clients (Social Cognition deep client, Reflection). |
+| `AGENT_DELIBERATIVE_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. The deliberative model identity. The maintained source also reuses this identity for at most one source-based Deep User Meaning Interpretation escalation with the same WHAT-only schema, only when Fast UMI retains genuine consequential ambiguity in intended outcome, scope, Goal relation, or referent. It is never used for execution-input or evidence-source policy, and reuse grants no Planner authority to UMI. |
+| `AGENT_DELIBERATIVE_TIMEOUT_MS` | `120000` in maintained development modes; workflow-completion watchdog for one deliberative model call. |
+| `AGENT_DELIBERATIVE_NUM_CTX` | `8192`; deliberative context (Social Cognition uses the larger of this and the Planner context). Qualification mode and the architecture-validation overlay use `40960`. |
+| `AGENT_DELIBERATIVE_NUM_PREDICT` | `1024`; deliberative output budget. |
+| `ORCH_DELIBERATIVE_TIMEOUT_MS` | `125000` in maintained development modes; Host deadline for Social Cognition, Reflection and Goal-free Situation cognition calls (the larger of this and the Planner deadline). |
 
 There is no independent response-composition or tool-result-interpretation
 model, endpoint, timeout, or profile role. Social Cognition owns Communicative Activity
@@ -1086,13 +1071,14 @@ The detected `env/profiles/rtx5090.env` selects `docker-compose.sglang.yml`; the
 Laptop profile selects `docker-compose.sglang-rtx4090-laptop.yml`. Both use the existing
 Compose override setting and keep the same `chromie-llm` service identity. The 5090 owner
 pins Gemma4-12B FP8/64K while the laptop owner pins Qwen3.5-4B AWQ/49K; their resource
-budgets and model artifacts are deliberately separate.
+budgets and model artifacts are deliberately separate, but both overlays build the
+same `llm/sglang/Dockerfile` into one `chromie-sglang:${CHROMIE_IMAGE_TAG}` image.
+`AGENT_SGLANG_URL` defaults to this `chromie-llm` service.
 
-The detected `env/profiles/rtx5090.env` selects `docker-compose.sglang.yml` through
-the existing Compose override setting. The existing `chromie-llm` service becomes
-SGLang, so Agent health dependencies and shutdown still follow one service owner.
-The former `sglang_rtx5090_candidate` validation overlay was consolidated into this
-hardware profile; it is no longer a supported validation-profile name.
+The provider-qualification overlays `docker-compose.sglang-qualification.yml`
+(`SGLANG_*`, `HF_TOKEN`; host port 30000) and `docker-compose.vllm-qualification.yml`
+(`VLLM_*`, `HF_TOKEN`; host port 8001, because 8000 is the paired Soridormi MCP
+default) are standalone and never selected by a hardware profile.
 
 The Compose owner pins Google Gemma4-12B-IT revision
 `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, served as `chromie-gemma4-12b`, with online FP8
@@ -1106,7 +1092,10 @@ preemption trials and three synthetic speech pause/resume/recovery trials passed
 because of retained Schema/Host and semantic failures. See the current checkpoint for
 raw evidence; provider timing is not physical voice or complete interaction evidence.
 
-Build the pinned image with `docker build -t chromie-sglang:gemma4-fp8 llm/sglang`.
+Both SGLang overlays build this one image as `chromie-sglang:${CHROMIE_IMAGE_TAG}`
+(`./scripts/compose.sh build chromie-llm`; `deploy_chromie.sh` and
+`BUILD=1 ./scripts/start_services.sh` add it automatically when
+`AGENT_LLM_PROVIDER=sglang`).
 The image builds XGrammar 0.2.1's native library from exact source revision
 `5b4e9ce9e72524037ae24ecd831b9b6604d2eb48` with one parser repair: the
 unexpanded-rule marker is -2, outside the nonnegative expression-ID domain and

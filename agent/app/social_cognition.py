@@ -21,22 +21,13 @@ from .cognitive_identity import (
 from .planner_context import auxiliary_social_capability_payloads, auxiliary_social_prompt_context
 from .prompt_projection import required_json
 
-try:
-    from chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
-    from chromie_contracts.social_cognition import (
-        SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
-        must_say_now_need_ids, value_review_responsibility_refs, value_withheld_need_ids,
-    )
-    from chromie_contracts.text import normalize_whitespace
-    from chromie_contracts.user_turn import user_turn_prohibits_speech
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
-    from shared.chromie_contracts.social_cognition import (
-        SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
-        must_say_now_need_ids, value_review_responsibility_refs, value_withheld_need_ids,
-    )
-    from shared.chromie_contracts.text import normalize_whitespace
-    from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
+from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
+from shared.chromie_contracts.social_cognition import (
+    SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
+    must_say_now_need_ids, value_review_responsibility_refs, value_withheld_need_ids,
+)
+from shared.chromie_contracts.text import normalize_whitespace
+from shared.chromie_contracts.user_turn import user_turn_prohibits_speech
 
 
 SOCIAL_COGNITION_WORK_STATE_PROMPT = (

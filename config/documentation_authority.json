@@ -5,8 +5,20 @@
       "role": "mission_architecture"
     },
     {
+      "path": "docs/COGNITIVE_GATEWAY.md",
+      "role": "gateway_boundary"
+    },
+    {
+      "path": "docs/COGNITIVE_TURN_LOOP.md",
+      "role": "turn_lifecycle"
+    },
+    {
       "path": "docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md",
       "role": "canonical_cognitive_architecture"
+    },
+    {
+      "path": "docs/AGENT_SKILLS_ARCHITECTURE.md",
+      "role": "agent_skills_architecture"
     },
     {
       "path": "docs/HUMAN_LIKE_INTERACTION_CONTRACT.md",
@@ -31,6 +43,10 @@
     {
       "path": "DEVELOPMENT_CHECKPOINT.md",
       "role": "resume_point"
+    },
+    {
+      "path": "HANDOFF.md",
+      "role": "operational_snapshot"
     },
     {
       "path": "CHROMIE_RUNBOOK.md",

@@ -11,6 +11,11 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+try:
+    from evidence_io import git_revision as _git_revision, read_json_object as _read_json
+except ImportError:  # imported as scripts.runtime_trace_latency
+    from scripts.evidence_io import git_revision as _git_revision, read_json_object as _read_json
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -19,13 +24,6 @@ from shared.chromie_runtime.latency_evidence import (  # noqa: E402
     build_latency_report,
     evaluate_latency_gate,
 )
-
-
-def _read_json(path: Path) -> dict[str, Any]:
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(payload, dict):
-        raise ValueError(f"{path}: expected a JSON object")
-    return payload
 
 
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
@@ -43,18 +41,6 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
         os.replace(temporary_path, path)
     finally:
         temporary_path.unlink(missing_ok=True)
-
-
-def _git_revision() -> str | None:
-    try:
-        return subprocess.check_output(
-            ["git", "rev-parse", "HEAD"],
-            cwd=ROOT,
-            text=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-    except Exception:
-        return None
 
 
 def _git_dirty() -> bool | None:

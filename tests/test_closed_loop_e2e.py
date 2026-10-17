@@ -103,7 +103,7 @@ class ClosedLoopE2ETests(unittest.TestCase):
         self.assertEqual(case.text, "Remember that my test color is blue.")
 
     def test_daily_voice_manifest_references_canonical_scenarios(self) -> None:
-        manifest_path = Path("benchmarks/manifests/daily_life_voice_e2e_v1.json")
+        manifest_path = (Path(__file__).resolve().parents[1] / "benchmarks/manifests/daily_life_voice_e2e_v1.json")
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
         cases = parse_cases(
             payload,
@@ -214,7 +214,7 @@ class ClosedLoopE2ETests(unittest.TestCase):
                 self.assertEqual(PipeWireMonitorCapture.discover_target(), "95")
 
     def test_default_manifest_exists_and_is_bilingual(self) -> None:
-        path = Path("benchmarks/manifests/closed_loop_e2e_v1.json")
+        path = (Path(__file__).resolve().parents[1] / "benchmarks/manifests/closed_loop_e2e_v1.json")
         payload = json.loads(path.read_text(encoding="utf-8"))
         languages = {
             row["language"].split("-", 1)[0]
@@ -293,7 +293,7 @@ class ClosedLoopE2ETests(unittest.TestCase):
         self.assertEqual(normalized["inputs"]["turns"], ["How do you help?"])
 
     def test_daily_review_bundle_retains_canonical_behavior_boundaries(self) -> None:
-        manifest_path = Path("benchmarks/manifests/daily_life_voice_e2e_v1.json")
+        manifest_path = (Path(__file__).resolve().parents[1] / "benchmarks/manifests/daily_life_voice_e2e_v1.json")
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
         case = parse_cases(
             payload,

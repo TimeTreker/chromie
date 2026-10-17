@@ -151,7 +151,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
         goal_satisfaction=satisfaction,
     )
 
-    from tests.test_cognitive_runtime_pr7 import work_fixture
+    from tests.cognitive_runtime_test_support import work_fixture
     from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_resolution
 
     class Client(PlannerActivationFixture):
@@ -172,7 +172,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
     assistant.agent_client = Client()
     assistant.cognitive_runtime_policy = SimpleNamespace(
         fast_planner_timeout_ms=3000,
-        deep_planner_timeout_ms=6000,
+        deliberative_timeout_ms=6000,
     )
     assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
         agent_client=assistant.agent_client,

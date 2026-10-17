@@ -916,7 +916,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         assistant.min_rms = 120.0
         assistant.barge_in_min_rms = 350.0
         assistant.is_playing_audio = False
-        assistant.playback_generation = 2
+        assistant.playback_delivery.playback_generation = 2
         created: list[str] = []
 
         def create_session(self: VoiceAssistant) -> str:
@@ -936,7 +936,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_tts_echo_match_rejects_concatenated_robot_speech(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant._tts_text_by_generation = {
+        assistant.playback_delivery.tts_text_by_generation = {
             4: [
                 "我会先眨两下眼睛，再往前走15秒。",
                 "刚才没成功。",
@@ -954,7 +954,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_tts_echo_match_uses_best_chunk_for_asr_distortion(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant._tts_text_by_generation = {
+        assistant.playback_delivery.tts_text_by_generation = {
             4: [
                 "Once upon a time, a long,",
                 "long time ago, the Moon was very lonely in the big, dark sky.",
@@ -972,7 +972,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_tts_echo_match_keeps_real_barge_in(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant._tts_text_by_generation = {5: ["我会先眨两下眼睛，再往前走15秒。"]}
+        assistant.playback_delivery.tts_text_by_generation = {5: ["我会先眨两下眼睛，再往前走15秒。"]}
 
         likely, _, _ = assistant._likely_tts_echo(
             "停一下，我不是让你先眨眼。",
@@ -983,7 +983,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_tts_echo_match_catches_exact_post_playback_acoustic_tail(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant._tts_text_by_generation = {8: ["Okay, I'll do that for you."]}
+        assistant.playback_delivery.tts_text_by_generation = {8: ["Okay, I'll do that for you."]}
         playback = assistant._playback_state()
         playback.last_completed_playback_generation = 8
         playback.last_playback_end_monotonic_ms = 1000.0
@@ -1001,7 +1001,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_tts_echo_match_does_not_suppress_late_user_repeat(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant._tts_text_by_generation = {8: ["Okay, I'll do that for you."]}
+        assistant.playback_delivery.tts_text_by_generation = {8: ["Okay, I'll do that for you."]}
         playback = assistant._playback_state()
         playback.last_completed_playback_generation = 8
         playback.last_playback_end_monotonic_ms = 1000.0

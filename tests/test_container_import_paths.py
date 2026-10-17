@@ -36,11 +36,11 @@ class ContainerImportPathTests(unittest.TestCase):
                 _copy_tree(source, app_root / "app")
                 _copy_tree(
                     ROOT / "shared" / "chromie_contracts",
-                    app_root / "chromie_contracts",
+                    app_root / "shared" / "chromie_contracts",
                 )
                 _copy_tree(
                     ROOT / "shared" / "chromie_runtime",
-                    app_root / "chromie_runtime",
+                    app_root / "shared" / "chromie_runtime",
                 )
 
                 env = os.environ.copy()
@@ -59,7 +59,7 @@ class ContainerImportPathTests(unittest.TestCase):
 
     def test_agent_dockerfile_copies_runtime_package(self) -> None:
         dockerfile = (ROOT / "agent" / "Dockerfile").read_text()
-        self.assertIn("COPY shared/chromie_runtime ./chromie_runtime", dockerfile)
+        self.assertIn("COPY shared/chromie_runtime ./shared/chromie_runtime", dockerfile)
 
     def test_semantic_authority_audit_runs_from_repository_root(self) -> None:
         result = subprocess.run(

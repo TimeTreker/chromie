@@ -1,468 +1,22 @@
 # Chromie Current Status
 
-## Current delivery — UMI spans: a reply to news ends where the sharing ends; runs 6-7, 2026-10-16
+This file is the single current-state owner for implementation, verification,
+target validation and deployment status. It holds current facts only; replace a
+row when it changes. Per-delivery history belongs in Git history and
+[CHANGELOG](../CHANGELOG.md); private run notes stay with their evidence under
+`.chromie/acceptance/*/README.md`. The current focus remains the Goal-driven
+single-authority architecture.
+
+## Current state
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | On `961fc1a5d`: the UMI prompt says Responsibilities are listed in word order, each ending at a later token, and a reply to news or feelings ends where the sharing ends (one example). |
-| Automatic verification | Recorded UMI replays: "我考了满分！快跟我一起庆祝一下！" equal ends 4/4 → reply ends at t5 4/4; eight compound and information controls unchanged or better (time and water+time stay `information`). Freeze 41 (`a36b1ebf…`, every UMI request recaptured, no reply re-authored, 0 failures); strict replay 6,000/6,000 zero model calls; canonical gate in clean worktree `scratchpad/gate32` (pytest 3,845 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
-| Target validation | Run 6 smoke on `rootcause18`: 15/15 mechanical ("你是说牛奶瓶还是水瓶呀？"). Run 7 core stopped at 4/55 on the celebrate UMI 503 (hard). This repair is not yet live. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause18-20261016`. `rootcause19-20261016` (`2d3e917e…`, 125 files identical, digest `7c33fc6132d09d56`) built, not deployed. No release. |
-
-Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Run 6 … run 7").
-
-## Previous delivery — An unsettled referent is clarified, never a limitation (D); run 5 smoke, 2026-10-16
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `1f7bb73bc`: on turns with UMI meaning uncertainty the Planner prompt says which thing is meant is never an ability need or a limitation (clarify unless an ability is missing); the streamed decoder requires a clarify state's Activity and lets an `unresolved_meaning` gap cite only the exact UMI wording. |
-| Automatic verification | Offline current-Planner replays of the run-5 "把那个拿给我" turn: unavailable → clarify with a clarification 6/6; controls history "那个" clarify 4/4, thirsty deliver 3/3. Regression `test_unsettled_referent_is_clarified_with_a_gap_citing_umi_wording` (red on HEAD for both decoder cases); strict replay 6,000/6,000 zero model calls (no request changed); canonical gate in clean worktree `scratchpad/gate31` (pytest 3,845 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
-| Target validation | Run 5 smoke on `rootcause17`: mechanical 14/15 (bring_that asked as a `respond` act after an `unavailable` decision); homework sibling repair live. This repair is not yet live. Not qualified. |
-| Deployment state | `rootcause18-20261016` (`f15411c1…`, 125 files identical, digest `180cd0d00f6fcb79`), deployed by the owner and measured as runs 6-7. No release. |
-
-Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Run 5").
-
-## Previous delivery — A turn waiting for Value Judgment answers nothing directly; run 4 smoke, 2026-10-16
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `a28bcf759`: while any Responsibility of a turn waits for Value Judgment, the SC decoder offers that turn only an acknowledgement at ingress and Host rejects any other act; sibling speech is answered after Value Judgment through its Planner need. `body_nod_zh` makes speech optional. |
-| Automatic verification | Regression `test_a_turn_waiting_for_value_judgment_answers_no_sibling_directly` (red on HEAD); strict replay 6,000/6,000 zero model calls; canonical gate in clean worktree `scratchpad/gate30` (pytest 3,842 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership); scenario check 70 cases. |
-| Target validation | Run 4 smoke on `rootcause16`: mechanical 14/15 (silent nod); B/E live ("嗯，我看看。" then the limitation or answer); homework judged fail — a sibling reply promised the lie before VJ declined (6/6 in replay with or without E). This repair is not yet live. Not qualified. |
-| Deployment state | `rootcause17-20261016` (`b2a67642…`, 125 files identical, digest `e1e800e2eef7a021`), deployed by the owner and measured as run 5. No release. |
-
-Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Run 4").
-
-## Previous delivery — Information answered from perception (B); a receipt that does not agree (E), 2026-10-16
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `79e26919c`: an information Responsibility with citable current perception states `observed_refs` before its decision; only a non-empty list opens `answer_from_perception`, which Host binds as a cited response Need (current established perception only). SC receives a fresh request or question with a receipt that does not agree before its Work is decided and shares in news. |
-| Automatic verification | Offline current-Planner replays on recorded turns: "家里还有水吗？" 4/4 answered from the seen water (was a fetch); time 4/4 clock, weather 4/4 lookup, nod + weekday 4/4, thirsty 4/4 deliver. SC replays: neutral receipt on 6 of 10 task turns 3/3 each, good news "太棒了！" 3/3, chat controls unchanged. Regression red on HEAD; Level A unaffected; strict replay 6,000/6,000 zero model calls on freeze 40 (no recorded request changed); canonical gate in clean worktree `scratchpad/gate29` (pytest 3,841 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
-| Target validation | Not live yet (the deployed Agent is `rootcause14`; `rootcause15`, with the clock fix, was never deployed). Known: "去那边等我" still acknowledged "好的。"; the time question sometimes delegates to deliberative SC. Not qualified. |
-| Deployment state | `rootcause16-20261016` (`4e2c2595…`, 125 files identical, digest `643bc027d7828a4f`; includes the clock fix), deployed by the owner and measured as run 4. No release. |
-
-Evidence: `.chromie/acceptance/everyday-20261016/` (README.md, "Repairs B and E").
-
-## Previous delivery — Clock in the common tier (effective); scenario corrections; everyday runs 2-3, 2026-10-16
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `e1d14b8ec`: the local clock provider declares `prompt_tier: common` (the owner preset alone never took effect because a provider declaration wins). `clarify_go_there_zh` and `clarify_remind_later_zh` accept an honest limitation (no go-to-a-place or reminder ability exists). |
-| Automatic verification | Clock regression red on HEAD; strict replay 6,000/6,000 zero model calls (no corpus change); canonical gate in clean worktree `scratchpad/gate28` (pytest 3,835 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership); scenario check 70 cases. |
-| Target validation | Run 2 (`rootcause14`): smoke 15/15 mechanical ("那个" fix live: Chromie asks which bottle); history case failed (information question answered by fetching). Run 3 core: stopped at 13/55 on a hard Planner timeout (`mix_nod_weekday_zh`, clock missing from the first pass). This repair is not yet live. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause14-20261016`. `rootcause15-20261016` (`529d7a25…`, 125 files identical, digest `a9e639daa055a708`) built, not deployed. No release. |
+| Implementation | One Planner ([PLANNER-AUTHORITY-001](PROJECT_CHARTER.md)): need-first Work begins with `ability_needs`; a non-fitting need triggers one Agent library search and one more plan; with no usable Capability the Planner reports an honest `unavailable` limitation. The Deep Planner, `/deep-plan` and escalation are retired. Value Judgment (VALUE-JUDGMENT-001, `POST /value-judgment`) reviews a turn once when its final Plan uses a Capability listed in `capabilities/value_review.json`; `ask` adds a confirmation, `decline` or any failure withholds the reviewed effects before provider start. Social Cognition owns every user-facing Communicative Activity; while a turn waits for Value Judgment, ingress admits only an acknowledgement. An information Responsibility with citable current perception may be answered from that cited observation. Latest repair on `main`: UMI lists Responsibilities in word order and ends a reply to news where the sharing ends. |
+| Automatic verification | Last recorded canonical gate (`./scripts/run_tests.sh`, clean worktree, latest delivery): pytest 3,845 passed + 5 skipped, benchmarks 169, legacy Agent tests 20, policies, docs and test ownership pass. Workflow corpus freeze 41 (`a36b1ebf…`); strict replay 6,000/6,000 with zero model calls. The replay corpus runs with an empty value-review list, so it has no Value Judgment coverage. |
+| Target validation | Everyday live-text cohort `scenarios/everyday/` (70 cases: 15-case `must_pass` smoke stage, then `core` and `challenge`) on Soridormi MuJoCo. Latest live runs on `rootcause18-20261016`: smoke 15/15 mechanical; core stopped at 4/55 on a hard UMI 503 that the latest repair addresses but which is not yet live. Core and challenge have not completed. Not qualified. No current-revision supervised physical audio or robot evidence (one historical physical voice turn is recorded in [Acceptance](ACCEPTANCE.md)). |
+| Deployment state | `chromie-agent:latest` = `rootcause18-20261016`; `rootcause19-20261016` (latest repair) built, not deployed. LLM serving uses SGLang per the maintained [hardware profiles](../HARDWARE_PROFILES.md). No release. Exact identities and commands: [Handoff](../HANDOFF.md). |
 
 Evidence: `.chromie/acceptance/everyday-20261016/` (README.md).
-
-## Previous delivery — Everyday smoke repair: UMI keeps an unsettled "那个" uncertain, 2026-10-16
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `c942172ae`: UMI decodes `meaning_uncertainties` before its Responsibilities and `confidence` after them; its prompt says a bare demonstrative names a perceived object only when the conversation or trusted target evidence singles it out. `ctrl_stop_walk_zh` expects a cancelled walk; new core case `multi_that_water_zh` (70 everyday cases). |
-| Automatic verification | Recorded-call replays: bare "那个"/"这个"/cup+book 4/4 each uncertain (base 1/18); 36/42 recorded run-1/run-15 UMI turns unchanged, the rest reviewed; regression red on HEAD; Level A 45/45; freeze 40 (`3008707a…`, no reply re-authored, 6,000 + 5 recaptured, 0 failures) strict replay 6,000/6,000 zero model calls; canonical gate in clean worktree `scratchpad/gate27` (pytest 3,835 + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership). |
-| Target validation | Everyday run 1 (`rootcause13`): smoke 13/15, core and challenge stopped by the smoke gate. This repair is not yet live. A "那个" the previous turn named is also flagged by UMI (replay 4/4); resolving it is left to Goal Association, unmeasured. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause13-20261015`. `rootcause14-20261016` (`4fe9d3d4…`, 125 files identical, digest `def53b3786935f97`) built, not deployed. No release. |
-
-Evidence: `.chromie/acceptance/everyday-20261016/` (README.md).
-
-## Previous delivery — Everyday live cohort in the repo; clock common tier, 2026-10-15
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `773ad886c`: `scenarios/everyday` (69 everyday live-text cases, 16 classes; 15-case smoke stage gating core and challenge); `chromie.clock.local` in the owner-preset common prompt tier (not effective: the clock's provider declared `rare`, which wins over the preset; corrected 2026-10-16). |
-| Automatic verification | Harness loader accepts all 69 everyday cases; strict replay 6,000/6,000 zero model calls with the clock tier; canonical gate (pytest 3,834 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Not run live (owner: coverage first). Focused run 16: 6/12. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause12-20261015`; `rootcause13-20261015` built, not deployed. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Focused run 16 repair, 2026-10-15
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `5526e71cb`: in a streamed state where every Responsibility was decided work and one Activity is written, that Activity cites every Responsibility. |
-| Automatic verification | Umbrella request replays 6/6 ok (two runs); regression red on HEAD; freeze 39 strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,834 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Focused run 16 (`rootcause12`, 12 recently failed cases): mechanical 6/12; thirsty and the weather follow-up's "明天" fixed live. This repair is not yet live. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause12-20261015`. `rootcause13-20261015` built, not deployed. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Run-15 repairs, 2026-10-15
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `5b29ea29b`: the single-Goal canonical decoder offers no `respond` for an effectful Goal; canonical `time_conditions` follow `ability_needs`, so readiness is stated before any outcome. |
-| Automatic verification | Recorded canonical request replays: nod again and thirsty waiting misuse 6/6 → correct execute 6/6; regressions red on HEAD; freeze 39 (`70725d90…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,833 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 15 (`rootcause11`, everyday cohort): mechanical 27/33, judged 24 / 2 / 7. Focused run 16 on these repairs: 6/12 (12 recently failed cases). Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause12-20261015`, deployed 2026-10-15. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Run-14 repairs, 2026-10-15
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `ad4dfcf96`: SC never offers an answer Value Judgment withheld for binding; each streamed Planner Activity names its Responsibilities before its Capability and args. |
-| Automatic verification | Recorded live request replays: withheld-answer binding failure 1/6 → 0/6, umbrella binding 5/6 → 6/6 (two runs); regressions red on HEAD; freeze 38 strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,831 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 14 (`rootcause10`, everyday cohort): mechanical 26/33, judged 26 / 1 / 6. Run 15 on these repairs: 27/33, judged 24 / 2 / 7. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause11-20261015`, deployed 2026-10-15. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Run-13 repairs, 2026-10-15
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `ce42d576d`: any error after Work gives the operational notice; a Planner scope extension supersedes the speculative Plan; SC neither confirms nor denies being a robot/human/AI and tells an internal cause with no reason. |
-| Automatic verification | Recorded run-13 request replays: robot denial 8/8 → 0/8, internal-cause leak 6/6 → 0/6; regressions red on HEAD (notice inner/outer, scope extension); freeze 38 (`7310d690…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,829 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 13 (`rootcause9`, everyday cohort): mechanical 28/33, judged 26 / 1 / 6. Run 14 on these repairs: 26/33, judged 26 / 1 / 6. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause10-20261015`, deployed 2026-10-15. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Live run 12; SC words survive the exact-words join, 2026-10-15
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `0ead8031f`: SC act text is whitespace-normalized like every transport stage, so the exact-words join compares the same words. |
-| Automatic verification | Regression red on HEAD; freeze 37 verified unchanged; Level A 45/45; canonical gate (pytest 3,827 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 12 (`rootcause8`, everyday cohort): mechanical 30/33, judged 25 / 2 / 6; run-11 repairs verified live. Run 13 on this repair: 28/33, judged 26 / 1 / 6. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause9-20261015`, deployed 2026-10-15. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Run-11 repairs, 2026-10-15
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `941f09796`: Planner re-entry never refuses (VJ owns refusal); the post-handover need is immediate; SC acts bind needs before words; Planner rationales never state words or what Chromie is; one Activity serving several Responsibilities lists each. |
-| Automatic verification | Recorded run-11 request replays: required SC limitation bound 0/6 → 14/14, 10 SC calls all bound; Planner rationale body label 6/6 → 0/6; umbrella binding 2/6 → 6/6; three regressions red on HEAD; freeze 37 (`40e08784…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,824 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 12 (`rootcause8`): mechanical 30/33, judged 25 / 2 / 6 (run 11: 23 / 2 / 8). Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause8-20261015`, deployed 2026-10-15. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Repeated Activities; Planner-free identity, 2026-10-14
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `4ed5a5143`: the streamed Planner states `activity_count` before an exact-length `activities` array and is told an information request is one read answered by SC after Evidence; shared identity projections carry no robot/human label and only the SC prompt holds the robot-body fact, so she never denies it. |
-| Automatic verification | Recorded streamed Planner request replay: repeat-prone 0/24 (base 14/24), all 92 recorded 0/92 (base 5/92); SC identity replay: robot question 4/4 answered as Chromie without a label or denial; freeze 36 (`0ce191dc…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,820 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 11 on `rootcause7`: 26/33 mechanical, judged 23 / 2 / 8 (identity question answered as Chromie). Not qualified. |
-| Deployment state | `rootcause7-20261014` deployed 2026-10-15. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Owner identity direction, 2026-10-14
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `95a8ee5aa`: Chromie never calls herself a robot/AI/device, including when asked, answers as herself and asserts nothing false about her nature (Charter, interaction contract, Stable Mind, personalization projection, SC prompt changed together on the owner's direction). |
-| Automatic verification | Recorded SC request replay with the new identity texts: robot question 6/6 answered as Chromie without a robot label or denial (baseline 5/5 "I'm a robot…"); controls unchanged; freeze 35 (`dd3a9059…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,819 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 10 (everyday cohort, `rootcause5-20261014`): mechanical 29/33, judged 23 pass / 4 partial / 6 fail against the owner's identity direction. These changes are not yet live (run 11 pending). Not qualified. |
-| Deployment state | Committed by the owner as `4ed5a5143`; `rootcause6-20261014` deployed. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Run-9 repairs: truthful limitation and identity speech, 2026-10-14
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `c101d8272`: SC answers a direct robot question with its robot body; the Planner names a limitation's missing ability and a re-entry clarify need as a short fact; a Soridormi declared non-completion keeps only the declared adapter fields. Soridormi (separate repo): an unobserved or ambiguous delivery target is a declared `completed: false` outcome. The owner rejected the robot-body answer (2026-10-14); it is the next change. |
-| Automatic verification | Recorded-request replays (identity denial 8/8 → 0/6; limitation `missing` items/dependencies → abilities; re-entry need sentence → short fact); one new regression red on HEAD / green; freeze 34 (`c6862ab5…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,819 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 9 (everyday cohort, `rootcause4-20261013`): mechanical 30/33, judged 24 / 5 / 4. Run 10 on these repairs: mechanical 29/33, judged 23 / 4 / 6 against the owner's later identity direction. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause5-20261014`, deployed by the owner. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Run-8 repairs: Planner decoder/DTO agreement, 2026-10-13
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `1d432208b` plus the run-7 repairs: a streamed mixed result may hold only a response or a clarification beside a Host-added limitation, and an omitted response need is projected from its `answer` decision; every exposed canonical shape offers native per-disposition Goal outcomes; a re-entry clarify names its unresolved input need in the decoder, compact DTO and prompt. Soridormi (separate repo, uncommitted): requester recipient referent and all-around scene markers. |
-| Automatic verification | Four regressions red on the deployed sources / green now; freeze 33 (`c6b4abb6…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,818 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Run 8 (everyday cohort, `rootcause3-20261013`): mechanical 26/33, judged 21 / 6 / 6. Run 9 on these repairs: mechanical 30/33, judged 24 pass / 5 partial / 4 fail. Not qualified. |
-| Deployment state | Delivered as `c101d8272`; `rootcause4-20261013` deployed by the owner. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Run-7 cluster repairs, 2026-10-13
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `1d432208b`: SC projects addressed-need bindings and answers at ingress only turn-local speech; UMI requires only span ends and Host derives starts (spans partition the turn); the streamed Planner offers a target-requiring Capability only with a trusted target and pins it. |
-| Automatic verification | New regressions red before / green after; recorded UMI replay 38/38 accepted; freeze 32 (`d88f05bd…`), strict replay 6,000/6,000 zero model calls; Level A 45/45; canonical gate (pytest 3,814 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Live run 8 (everyday cohort): mechanical 26/33, judged 21 pass / 6 partial / 6 fail. |
-| Deployment state | `chromie-agent:rootcause3-20261013` deployed by the owner. No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Run-5 root-cause repairs, 2026-10-13
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | On `ff9e87417` (Planner limitation contracts and conditional composition B, 2026-10-12): the weather provider retries a stalled read within a 7 s lookup budget below the 8 s Capability timeout; a GA Planner or SC request over unchanged meaning joins the cognition already running (Charter: an identity-only GA join needs no model call); every Goal of a Host-qualified Planner limitation carries a result need; UMI keeps a condition inside its effect, types changing-fact questions as information and requested expressive acts as body expressions, and cites non-overlapping spans; SC speaks the request's language and states changing facts only from Evidence; the Planner names needs as requested results, treats an unstated manner as a partial fit, and adds no decoration or closing posture. |
-| Automatic verification | Four regressions red before / green after (weather stall, GA coalescing, limitation result need, SC reply language). Recorded-request replays against the live model: UMI 11/20 → 20/20 (probe 23/28 → 42/42), SC Chinese replies in English 12/31 → 0/32, Planner targets 20/38 → 27/38 and run 5 44/50 → 46/50. Freeze 30 (`75bc4811…`), strict replay 6,000/6,000 with zero model calls, Level A 45/45, canonical gate (pytest 3,809 + 5 skipped, benchmarks 169, legacy 20). |
-| Target validation | Live run 6 (contract cohort) on `rootcause-20261013`: mechanical 31/35, judged 24 pass / 6 partial / 5 fail (run 5: 24 / 3 / 8). Live run 7 (33 everyday cases) on `rootcause2-20261013`: mechanical 22/33, judged 20 pass / 5 partial / 8 fail. Not qualified. |
-| Deployment state | `chromie-agent:latest` = `rootcause2-20261013` (source-verified). No release. |
-
-Evidence: `.chromie/acceptance/remaining-defects-20261013/` (README.md).
-
-## Previous delivery — Deep Planner retired (stage B), 2026-10-11
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | One Planner (PLANNER-AUTHORITY-001): Deep resolver, `/deep-plan`, escalate/continuations and three settings removed; honest `unavailable` limitation (streamed Activity, canonical per-Goal outcome); commitment bar 0.75; structural defects fail closed; need-first search covers contracts the Goal filter hid. Pushed with open items (conditional composition, multi-Responsibility mixed limitation, SC silence on a limitation). |
-| Automatic verification | Worktree suite 3,924 passed; canonical gate passed on `227aceb03`; corpus freeze 23 (`17adda34…`) strict replay 6,000/6,000 with zero model calls; behavior scenarios 15/15. |
-| Target validation | Live text + MuJoCo: library lookup 9/10 (before 0/10); simple limitation honest on the Planner side after `7eb9ee1fc`; conditional composition 0/4 and multi-Responsibility mixed limitation 0/4 (Deep failed these live before too); SC silent on 2/3 limitation results. Not qualified. |
-| Deployment state | `chromie-agent:latest` = the stage B image on this host; rollback `vj-3f19ecf0d`. No release. |
-
-Evidence: `.chromie/acceptance/deep-removal-20261011/` (README.md).
-
-## Previous delivery — Value Judgment (VALUE-JUDGMENT-001), 2026-10-11
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Owner-approved draft (2026-10-10, `.chromie/acceptance/value-judgment-20261010/VALUE_JUDGMENT_DRAFT.md`). Stable Mind 0.9.0 adds `respect_others_property`, `respect_privacy` and `act_lawfully_and_honestly` (`protect_children` not added; owner undecided). The Planner prompt keeps every core principle (`PLANNER_STABLE_MIND_MAX_CHARS`; the old bound kept 4 of 10). New Agent `POST /value-judgment`: one call (Fast Planner model, `value_judgment.primary`) over the person's words, accepted Responsibilities, established Situation and the full Stable Mind. It returns affected, concern, decision and reason, and fails closed. The Orchestrator calls it once per apply-mode turn, only when the final Plan uses a Capability in `capabilities/value_review.json`. proceed leaves the effects free. ask adds Runtime confirmation and a confirmation need carrying `value_question`. decline, a failed judgment or an unreachable endpoint withholds the reviewed effects; Runtime refuses them before provider start (`value_judgment_declined`). SC prompt unchanged; SC sees the reason code, the verdict reason and `value_question`. The Deep Planner is not yet removed (stage B). |
-| Automatic verification | `tests/test_value_judgment.py` (16): resolver from the full mind; fail-closed (incomplete, unknown decision, service error, no mind); verdict annotation per decision; review-list content; withheld effect refused with no provider call; full apply-mode turns for proceed, ask, decline and an unreachable endpoint; no call when no reviewed Capability is planned. Stable Mind and Planner-projection regressions. Canonical gate: see HANDOFF. Corpus gap: the replay corpus runs with an empty review list, so it has no value-gate coverage. |
-| Target validation | Pre-implementation frozen evidence (v2 prompt): 11/11 risky unseen requests stopped, 2/5 over-cautious asks. Live run 1 on `cfafb7d9b` stopped after 2 of 36 cases on an evidence-lineage failure (fixed; see the checkpoint); the gate asked about a phone of unknown owner, but SC asked a location question. Run 2 (36 cases) was incomplete: the Soridormi runner crashed at case 23. In the 22 judged cases, one declined delivery still executed through the grouped body path, and SC asked the wrong question or none in 3 of 4 `ask` cases. Both are fixed (see the checkpoint); a frozen SC qualification improved the right question from 1/7 to 7/7. Run 3 on `3f19ecf0d` (36 cases; split into two invocations because the Soridormi runner exits about 25 minutes into a scene): no effect started without a gate; 8 value declines refused with polite first-person reasons; 3 value questions asked the right fact; median 1.82 s per gated turn. Open: speech-only deception is not reviewed (owner decision). |
-| Deployment state | `chromie-agent:latest` = `vj-3f19ecf0d` on this host (rollback `pre-value-judgment-20261011`); `chromie-llm` `03ad9e33`. Local commits only, not pushed. No release. |
-
-Evidence: `.chromie/acceptance/value-judgment-20261010/` (design) and `.chromie/acceptance/value-judgment-impl-20261011/` (implementation).
-
-## Previous delivery — Need-first Planner (stage A), 2026-10-10
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Owner-approved Charter amendment (PLANNER-AUTHORITY-001, need-first Planner, principles 28, 33 and 34): one Planner; depth is acquired context, not a second planner. Fast Work begins with `ability_needs`: each needed ability once, its closest loaded Capability, a restatement of what that Capability does, and `fits`. On a non-fitting need the streaming Host stops reading, the Agent BM25-searches the library with the Planner's wording (usable, unrestricted entries only), and the Planner plans once more with at most eight contracts. The non-streaming path discards its first pass. With no usable match, the Planner's own outcome stands. The old `requested_capability_ids` lookup is removed. Stage B (Deep removal; honest unavailable instead of escalation) is not yet implemented, so Deep still runs on Fast escalation. |
-| Automatic verification | Focused regressions: search then one plan; no match; unloaded citation; second unmet (no second search); invented citation; locked or unavailable entries never loaded; non-streaming path; unfit loaded Capability searches instead of substituting; the Host stops reading mid-stream; turn-ineligible results trigger no second call; BM25 ranking. Corpus freeze 22 (3,300 Fast and 2,000 Deep requests recaptured; Fast outputs declare fitting needs). Strict replay 6,000/6,000 with zero model calls and freeze-21 verdicts unchanged. Canonical gate: see HANDOFF. |
-| Target validation | Pre-implementation frozen evidence only (`.chromie/acceptance/skill-lookup-20261010/`): on unseen requests the target skill was chosen 8/8 with need-first plus search (current contract 1/8). No live cohort on this code yet. |
-| Deployment state | `chromie-agent:latest` = `stageA-78fb2b871` (stage A, clean; rollback `pre-need-first-20261010`); `chromie-llm` = `03ad9e33` (XGrammar #652). Stage A was seen working live: an unmet need was searched and executed (value-judgment evidence below). No release. |
-
-Evidence: `.chromie/acceptance/need-first-20261010/` (README.md).
-
-## Previous delivery — SGLang image: XGrammar int32 rule IDs, 2026-10-10
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | `llm/sglang/Dockerfile` applies the C++ part of upstream XGrammar #652 to the pinned 0.2.1 native build. FSM edges stored rule IDs as int16; Planner decoders compile to 29k–41k rules, and past 32767 a reference wraps. A cached compile then fails `grammar_functor.cc:2369` (HTTP 400 before inference); uncached, it segfaults. The image build adds a 39,900-rule regression through the patched backend. No Chromie runtime, prompt, Schema or contract change. |
-| Automatic verification | Reproduced on the upstream 0.2.1 wheel and both Chromie images. Compiled rules: 34,170 and 41,111 fail; 29,058 and 5,467 pass. Upstream #963 alone segfaults; #652 alone compiles all 25 retained failing and passing schemas. Image-build tests pass. Fresh-lifetime native replays on the new image versus the old one: 22/22 live Fast requests and 56/56 Deep requests byte-identical. 15 former HTTP 400 requests now decode. |
-| Target validation | No live cohort on the new image yet. A report-only skill-lookup cohort (22 cases, old image, clean `main` 03f4e7e20) found that the Fast library lookup never fired: 0/10 library-skill requests correct, all substituted. With the correct contract preloaded, 9/10 were Host-accepted, and on the new image 10/10 decode. |
-| Deployment state | `chromie-llm` = `chromie-sglang:gemma4-fp8` = `03ad9e33` (also tagged `xgr652-20261010`; rollback `pre-xgr652-20261010` = `b419ac92`). `chromie-agent:latest` = `main-03f4e7e20` (rollback `pre-skill-lookup-20261010`). The laptop profile image builds from the same Dockerfile but was not rebuilt or qualified. No release. |
-
-Evidence: `.chromie/acceptance/skill-lookup-20261010/` (README.md; image arms `arm_*_xgr652`);
-`.chromie/acceptance/workdag-deep-20261009/deep_baseline_xgr652`; bundle
-`/home/chromie/Downloads/chromie_debug_bundle_20261010_095029.tar.gz` (skill-lookup live).
-
-## Previous delivery — Deep Planner Work is WorkDAG dependency topology, 2026-10-09
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Owner-approved convergence of the Deep path. `PlannerModelStep` (Deep, multi-goal Fast, Evidence re-entry `new_work`) authors `depends_on` (earlier step_ids or completed retained Work), not a `timing` label. Host materialization (`schedule_planner_steps`) validates references and derives timing and `execution_group` with the same DAGEngine wave and resource-split function as Fast. A resource `plan_requires` must come from a dependency ancestor. The decoder no longer strips `parallel` for non-parallel Capabilities (`nonparallel_capability_ids` removed); conflicting resources serialize. Host fallback Plans keep explicit timing. |
-| Automatic verification | Clean-worktree gate exit 0 (169/4,040/5 skips/1,065 subtests/20 legacy; policies, docs and test ownership 0). Strict replay 6,000/6,000 with zero model calls on the exact patch, corpora re-frozen at revision 21 (`plan_conflicting_resource` now expects completion with serialization). Frozen native Deep contrast (56 requests, fresh SGLang lifetimes) in progress at commit time, not adjudicated. |
-| Target validation | Not run for this patch. Last live evidence is the Fast WorkDAG rev7 (6/12). |
-| Deployment state | `chromie-agent:latest` = `workdag-deps-20261009` (Fast only; this patch is not deployed). No release. |
-
-Evidence: `.chromie/acceptance/workdag-deep-20261009/`.
-
-## Previous delivery — Fast Work is WorkDAG dependency topology, 2026-10-09
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Owner-approved WorkDAG convergence for the Fast path. A Fast Capability Activity authors `depends_on` (earlier activity_ids), not a `timing` label. Host validates references (acyclic by construction), checks typed UMI `before`/`after` as dependency paths and `parallel_with` as one execution group, and derives execution groups with DAGEngine wave semantics (dependency waves split where Capability resources conflict). Canonical steps record `depends_on`/`execution_group`; Runtime never merges adjacent groups. Charter/AGENTS corrected (owner): physical nodes run concurrently when they have no dependency and their resources do not conflict. Deep Plans unchanged. |
-| Automatic verification | Red→green regressions: execution groups (look ∥ blink, deliver ∥ blink ∥ wave, conflicting walks serialized, walk → nod with independent blink); adjacent groups kept apart in canonical steps and Runtime; later/unknown dependency fails closed; typed order/concurrency on dependencies; chained duplicate reads collapse. Strict replay 6,000/6,000 (zero model calls). Clean-worktree gate 169/4,040/5 skips/1,065 subtests/20 legacy. Frozen contrast (37 requests, fresh SGLang lifetimes) reproduces 37/37 with 0 invalid dependencies; near-tie plan flips both ways (b15 better; s12, "去那边等我" worse). |
-| Target validation | Live 12 cases (fresh lifetime): 6/12 pass. Delivery ∥ blink ran concurrently (identical start/end); walk → nod → turn, look → blink and nod → shake ran in order; no lone-parallel failure (6/16 retained plans before). Failures: "看着我三秒，同时眨两下眼睛" chained look → blink (ran both, not simultaneously; Planner semantics, unchanged by a focused rewording); invented clarification in walk → turn; UMI overlapping spans (HTTP 503) ×2; GA merged walk + sing; Soridormi could not pick among several water bottles. |
-| Deployment state | `chromie-agent:latest` = `workdag-deps-20261009` (rollback `pre-workdag-deps-20261009`). Dirty-source diagnostic identity; no release. |
-
-Evidence: `.chromie/acceptance/provider-source-branches-20261009/` (README.md); bundle
-`/home/chromie/Downloads/chromie_debug_bundle_20261009_190505.tar.gz`.
-
-## Previous delivery — Perception can ground a provider-owned resource source, 2026-10-09
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Owner-approved option A plus "trust what you see". An unbound provider-owned resource `source` is `{"status":"unknown"}` with no citation, or `{"status":"known"}` with a cited span or a current Situation observation (`situation_interpretation_ref`). The decoder encodes this as `oneOf` branches; native decoders ignored the old `if`/`then`. Host admits only established, perception-grounded observations of this turn, and rejects observed numbers cited to the person's words. The Plan records `observed_context`. Fast prompt guidance appears only when the qualified catalog has a provider-owned source; the Situation part only when something is observed. The text harness now runs ambient perception (`08f018296`), proven live. |
-| Automatic verification | 18 targeted regressions (red on `08f018296`); canonical gate in a clean worktree exit 0 (169/4,031/5 skips/1,065 subtests/20 legacy); strict replay 6,000/6,000 with zero model calls. Frozen native contrast over 37 retained requests, each arm on a fresh SGLang lifetime: rev6 reproduces 37/37 across a restart; weather and speech are byte-identical to the baseline. When water was visible, 4/4 cite the observation; b15 cites the milk it sees (owner rule). Remaining: milk cited for water when only milk is visible (3/3, synthetic), and "known" plus "sure" when nothing is observed (7/9, legacy no-Situation captures). |
-| Target validation | Live water cohort on rev6 (fresh SGLang lifetime): 4/4 delivery turns cite the correct observation (milk for milk, water for water, even with both visible); no user words cited for an observed place. 1/4 cases pass end to end. The other 3 fail on a pre-existing contract (a lone `parallel` auxiliary Activity; Host needs a group of 2 or more), seen in bundles since 2026-10-07. Case 1 also missed a TTS start. |
-| Deployment state | `chromie-agent:latest` = `situation-source-rev6-20261009` (rollback `pre-situation-source-20261009`). SGLang image changed by the parallel memory session (`b419ac92…`, output-neutral on a fresh restart). Greedy outputs depend on server-lifetime history, so a contrast arm needs its own restart. Dirty-source diagnostic identity; no release. |
-
-Evidence: `.chromie/acceptance/provider-source-branches-20261009/` (README.md); bundle
-`/home/chromie/Downloads/chromie_debug_bundle_20261009_144736.tar.gz`.
-
-## Previous delivery — Information-query free text must cite its source span, 2026-10-08
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Owner-approved option A. For `acquire_information` Capabilities, the Fast decoder now requires an `argument_sources` span for required free-text inputs (weather `location`), as it already did for numbers. The Host checks that a same-script cited value appears in its span; cross-script renderings (`北京`→`Beijing`) remain allowed. Authored text (vocal/speak) and enum strings keep their existing paths. Prompt unchanged. |
-| Automatic verification | Frozen native contrast over all 20 retained weather requests. The baseline repeated identically; candidate Schema errors were 0. Genuine weather cases accepted by Host provenance went from 10/16 to 16/16, and all 56 candidate citations pass the new Host check. New decoder-level regression red→green; weather literal contract test updated, with negatives (other city, prefix, sibling) still rejected. Strict replay 6,000/6,000 with zero model calls (no recapture); canonical gate 169/4,011/5 skips/1,065 subtests/20 legacy. |
-| Target validation | Agent rebuilt (source `8b820086…`). Same 13 weather/clock live cases: 8/13 automatic passes (4/13 before). 10/11 weather questions got correct grounded answers, including Beijing (previously rejected). Two failed only the SC 2 s latency target. 内乡县 was mistranslated and the provider failed. Date/time questions are still routed to weather lookup and now fail at the provider instead of the Host (separate clock-choice defect). |
-| Deployment state | `chromie-agent:latest` rebuilt from the Oct 7 base with current `agent/app`; the previous image is tagged `chromie-agent:pre-string-provenance-20261008`. Dirty-source diagnostic identity; no release. |
-
-Evidence: `.chromie/acceptance/string-input-provenance-20261008/`; bundle
-`/home/chromie/Downloads/chromie_debug_bundle_20261008_174448.tar.gz`.
-
-## Previous delivery — SC answers ordered after body Work are spoken again, 2026-10-08
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | The interaction coordinator's exemption for context-grounded speech ordered after Work (not a result claim) now accepts the trusted `social_cognition` source as well as the legacy Planner source. The Sep 14 SC split changed that source without updating the exemption, so every such SC answer was dropped as "result speech for re-entry". Result-claim speech remains deferred to terminal Evidence. |
-| Automatic verification | New SC-source coordinator regression red→green; strict replay 6,000/6,000 with zero model calls; `multi_goal_daily_life` Level A 10/10; canonical gate 169/4,007/5 skips/1,065 subtests/20 legacy. |
-| Target validation | Live `multi_goal_daily_life` class (simulator executed), 5/6 automatic passes. "你好！" after the nod and the joke after the blink are now actually played; neither was before. The remaining failure is the known TTS start deadline: the initial "Got it." took 4,786 ms to first PCM against 3,500 ms, was cancelled, and SC reported delivery failure. |
-| Deployment state | Host-side change; Agent source unchanged; dirty-source diagnostic identity. |
-
-Evidence: `.chromie/acceptance/after-work-speech-20261008/`; bundle
-`/home/chromie/Downloads/chromie_debug_bundle_20261008_162840.tar.gz`.
-
-## Previous delivery — GA-triggered Planner revision no longer erases a valid first plan, 2026-10-08
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Owner decision implemented at the existing Cognitive Runtime owner, per Charter lines 559-585/725. A successful GA-requested plan supersedes the UMI plan (newer continuity state). A failed GA plan no longer cancels or erases a valid UMI plan for the same Responsibilities. A failed UMI plan waits for a requested GA plan. Both failures are retained as diagnostics. No new model call, authority, switch or prompt change. |
-| Automatic verification | Four new regressions (revision exception, revision contract failure, first-plan failure rescued, both fail) are red on the original source and green now. The existing supersession test is unchanged. The Oct 7 late-failure test now fails both plans so its delivered-response containment stays covered. Strict replay 6,000/6,000 with zero model calls; canonical gate passes. |
-| Target validation | Live retained race episodes (water ×2, "把那个拿给我"): the GA-revision path ran once (water "sure"). Both plans were rejected by Planner provenance/readiness validation, so the turn failed honestly. The old code would have failed earlier without waiting for the GA plan. Keeping a valid first plan is proven only by regression tests so far. 0/3 automatic passes; all failures are Planner provenance or LLM transport. |
-| Deployment state | Host-side change; Agent source unchanged; dirty-source diagnostic identity; no rebuild, promotion or release. |
-
-Evidence: `.chromie/acceptance/ga-revision-containment-20261008/`; bundle
-`/home/chromie/Downloads/chromie_debug_bundle_20261008_160823.tar.gz`.
-
-## Previous delivery — SC act identity no longer copies Planner Work IDs, 2026-10-08
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Host projection of Fast Planner communicative Needs into SC `facts` omits the Planner `activity_id`; it remains encoded in `need_id` and step order. SC owns act identity; no prompt, Schema, model or authority change. |
-| Automatic verification | Frozen native contrast of all 16 retained SC requests that carried the fact (baseline repeated, stable): Planner ID copied 7→0, delivered words re-authored under a new ID 4→0, Schema errors 0→0. One request (c11) now leaves its need pending in silence instead of reusing the delivered act. Unit regression red→green; strict replay 6,000/6,000 with zero model calls; canonical gate 169/4,003/5 skips/1,063 subtests/20 legacy. |
-| Target validation | Live simulator run of 11 former duplicate cases: 34 SC calls, 0 copied IDs, 0 duplicate replays, 7 correct delivered-ID reuses; 3/11 automatic passes. Remaining failures are Planner contract failures (water ×3, identity, reminder) and SC latency (5.2–10.0 s vs 2 s). A pre-existing defect surfaced: SC speech ordered after body Work (`final` phase) is authored but never played; an A/B on the original code reproduces it. |
-| Deployment state | Host-side change; Agent source unchanged (`2b4f2298…` verified). Dirty-source diagnostic identity; no rebuild, promotion or release. |
-
-Evidence: `.chromie/acceptance/sc-act-identity-20261008/`; bundle
-`/home/chromie/Downloads/chromie_debug_bundle_20261008_153201.tar.gz`.
-
-## Previous delivery — Evidence-bound claim oracle, 2026-10-08
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Acceptance-only: scenarios declaring `require_evidence_bound_claims` (13 clock/weather lookup turns) turn an SC `respond`/`inform` act without Evidence refs or an addressed Host need into hard `provenance:unsupported_evidence_claim`. Production runtime, prompts, Schemas and the workflow freeze are unchanged. |
-| Automatic verification | Original harness fails the 6 new evidence-bound regressions; patched harness passes 40 focused tests. Canonical gate passes 169 benchmark, 4,002 main, 5 skips, 1,063 subtests, 20 legacy. Evidence-class Level A 6/6. Retroactive re-score of 713 retained flagged-turn summaries (19 contain SC acts) flags only the Oct 7 fabricated date. |
-| Target validation | Dirty-source diagnostic simulator run of the 13 declared cases: 4/13 automatic pass, 0 unsupported-claim hits across 24 SC acts. 7 cases fail at Fast Planner `weather.lookup.location` provenance, including clock questions routed to weather lookup; 1 SC delivery failure; 1 weather provider failure. The Oct 7 fabrication did not recur because UMI typed the question `information` this time (it typed `speech/turn` on Oct 7). |
-| Deployment state | Agent packaged source matched checkout (`2b4f2298…`); the harness change is host-side only. No rebuild, promotion or release. |
-
-Evidence: `.chromie/acceptance/evidence-bound-claims-20261008/`; bundle
-`/home/chromie/Downloads/chromie_debug_bundle_20261008_134254.tar.gz`.
-
-## Previous in-progress isolation, 2026-10-07
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Dirty UMI accepted-effect context/prompt repair, equivalent default array projection, retained Planner decoder title through readiness/lookup, typed late SC request failure containment, and retained initial delivery/Goal completion across silent state re-entry. Unsafe relocation of decision alternatives withdrawn. UMI compound, Planner semantic/provenance and same-scope invocation failures remain open. |
-| Automatic verification | Current focused 42 tests/85 subtests pass; exact native grammar preserves SC silent-need restrictions and compiles corrected Fast. Native Fast replay HTTP 200/complete JSON still fails Schema/semantics. Accepted-effect UMI14 passes limited scope. Frozen25 compound baseline/candidates remain unqualified. Final6000+5 request capture preserves non-request data; freeze20 strict6000 and gate169/3991/5skip/1063subtests/20legacy pass before the latest silent-state/closure fix; current44 focused/85subtests and adjacent8 pass; final gate169/3993/5skip/1063subtests/20legacy, strict6000/6000 and Level A30 distinct cases/six classes pass. Latest SC ID namespace contrast supports context ambiguity but is not broadly qualified or applied. Historical freeze19 gate passed but tested withdrawn projection. |
-| Target validation | Bound aggregate stopped first compound case: relation-only overlapping UMI output (1/79). Focused water stopped at greeting: late SC422 after speech caused generic apology; subsequent water turns unrun. Corrected Agent bound aggregate executed three simulator actions but TTS missed playback-start deadline; focused water repeats greeting under new SC ID and loses completed thirst response to later silence before a Planner DTO failure. Latest Host retention/closure proof pending. No supervised physical audio/robot evidence. |
-| Deployment state | Agent rebuilt from existing dependencies and packaged source verified as2b4f2298… before diagnostic live runs; voice_mujoco retained. Native field-order experiment hit global host OOM; LLM automatically recovered, requiring fresh identity binding. Fixed Gemma4-12B, owner-authorized in-progress Git delivery; no promotion, release or qualification. |
-
-Private evidence: `.chromie/acceptance/water-context-repair-20261007/`.
-One bundle per stop: `171342` aggregate, `172100` greeting and `173617` provider OOM
-under `/home/chromie/Downloads/chromie_debug_bundle_20261007_<time>.tar.gz`.
-See [audit](../ARCHITECTURE_AUDIT.md), [checkpoint](../DEVELOPMENT_CHECKPOINT.md)
-and [handoff](../HANDOFF.md) for actual module I/O and resume order.
-
-Updated: 2026-10-08. Current focus: Goal-driven single-authority architecture,
-canonical local verification, current-revision voice proof and default target-evidence closure.
-The [project audit](../ARCHITECTURE_AUDIT.md) records design/source conflicts and
-actual module I/O; it does not amend authority or establish full qualification.
-
-## Previous verification snapshot — water acceptance, 2026-10-07
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | UMI's open-ended-help prompt preserves one need/help Responsibility; SGLang GA wire schema bounds ownership rows by current source-ref count; SC requires a fresh terminal-failure result act and avoids a false repeat request. Canonical Host authority is unchanged. New live water-acceptance failures at UMI and Fast Planner remain unrepaired. |
-| Automatic verification | Direct recorded GA 3/3 and SC 5/5 Schema/Host replays, focused 68 tests, four relevant Level A classes 22/22 and frozen workflow replay 6,000/6,000 pass. Final `./scripts/run_tests.sh` exited 0 (169 benchmark, 3,983 main, five environment skips, 1,023 subtests, 20 legacy Agent); policy and docs checks pass. Same-model and Level A evidence do not prove live general behavior. |
-| Target validation | A diagnostic deployed text cohort attempted all 79 cases: 13 automatic passes, 66 failures, 59 integrity failures, and all 79 retained for semantic review. Agent service loss and identity change left `cohort_complete=false` and `qualification_complete=false`. The first thirst turn offered help, but subsequent accepted water requests failed at UMI or Planner. No supervised microphone, speaker or physical robot proof. |
-| Deployment state | Current dirty source was built into the Agent for the diagnostic text run; port 8092 became unavailable mid-cohort and later recovered/recreated. Outage cause is unknown. No release, promotion or stable fixed-identity qualification. |
-
-Private evidence: `.chromie/acceptance/ga-duplicate-20261007/` and
-`.chromie/acceptance/sc-internal-failure-20261007/`; originating bundle:
-`/home/chromie/Downloads/chromie_debug_bundle_20261007_110927.tar.gz`.
-The earlier UMI open-ended-help patch is included in this delivery revision.
-Diagnostic evidence: `.chromie/acceptance/thirst-offer-20261007/`; bundle:
-`/home/chromie/Downloads/chromie_debug_bundle_20261007_121723.tar.gz`.
-
-## Previous patch — open-ended help interpretation, 2026-10-07
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | UMI prompt preserves one open-ended help Responsibility when a reported need qualifies the request; SC still owns wording and Planner owns HOW. The primary semantic split in live text SID `a87066b5` was the earliest observed failure. No model/profile, Schema, DTO, Host or authority changed. |
-| Automatic verification | Frozen eight-case English/Chinese direct-model contrast: baseline 6/8 and selected prompt 8/8 Schema/Host valid. Request-only freeze revision 17 preserves 6,000 non-request records; full strict replay 6,000/6,000 and focused workflow tests 104/104 pass. Robust-intent Level A 8/8, UMI focused 44/44, benchmarks 169/169, main tests 3,981 with five skips/1,023 subtests and legacy Agent 20/20 pass. Policy, ownership, static, configuration, runtime and docs checks pass. The single `run_tests.sh` invocation did not complete successfully in this session; its components were run separately after preserving stale local freeze files and recapturing requests. |
-| Target validation | The originating English request is mechanically accepted by the selected model/prompt transaction. The Chinese open-ended help output remains in English despite Host acceptance; bilingual semantic qualification is open. Current-revision deployed Host, live voice, audible/physical and default-target proof were not run. Previous 79-case native cohorts remain historical and incomplete as below. |
-| Deployment state | The active operator text console and its pre-patch `chromie-agent:latest` service were left running. Direct SGLang model calls used the current prompt and retained production request/Schema; no Agent rebuild, service restart or promotion occurred. |
-
-Private evidence: `.chromie/acceptance/umi-help-split-20261007/`; originating
-bundle: `/home/chromie/Downloads/chromie_debug_bundle_20261007_093607.tar.gz`.
-See [checkpoint](../DEVELOPMENT_CHECKPOINT.md) and [handoff](../HANDOFF.md) for
-the exact resume sequence and evidence limits.
-
-## Previous verification and deployment state — 2026-10-05
-
-| Axis | Current evidence |
-| --- | --- |
-| Implementation | Owner-confirmed principle30 is enforced: UMI preserves complete WHAT and cannot author bindings; Planner owns parameter extraction and contextual provenance. Provider perception and GA/SC/Host authority remain. Memory projections now preserve historical creation/update times and sources. Earlier Charter sparse-binding prose is reconciled with principle30. Model/profile and initial activation ownership are unchanged. |
-| Automatic verification | Frozen20 Schema/Host and exact-wire pinned decoder20/20 pass; UMI1496/Fast204 references valid, focused215+84 tests pass, Level A19/19. Request-only6000+5 captures conserve every non-request field. Strict6000/6000 replay passes with zero inference. Canonical169 benchmarks,3981 main tests/5 environment skips/1023 subtests and20 legacy tests pass; policy/ownership/pinned static/configuration/docs pass. |
-| Target validation | Baseline79:22 automatic pass/57 fail, review6 pass/10 partial/61 fail/2 insufficient. Changed-source79:13 automatic pass/66 fail, review5 pass/7 partial/67 fail. All cases attempted/zero skipped; blocked followups leave cohort/qualification incomplete.86 native UMI outputs have zero binding keys; activation/meaning failures remain. No overall behavior gain, independent, current voice, audible/physical or default-target qualification. |
-| Deployment state | Agent-only source imagebc6577e4… preserves original dependency layers; packaged/host source8140dcc3… matches before/after. Profile/environment/model unchanged. Native source/services fixed within each aggregate. A pre-cohort grammar probe caused LLM OOM/automatic recovery; fresh native identity binds the recovered service. No release/promotion; TTS dependency rebuild remains unqualified. |
-
-Current repair evidence: `.chromie/acceptance/umi-no-bindings-20261005/`.
-Changed-source bundle: `/home/chromie/Downloads/chromie_debug_bundle_20261005_192414.tar.gz`.
-All79 cases were reviewed, including automatic passes. Milk retains ahead/about50meters
-but has no initial Planner request; no resource provider is invoked. Walk3s/right-turn2s
-completes in simulation but cites the walk duration as the turn-duration source, so
-semantic provenance fails. Quote validity alone does not qualify parameter mapping.
-Historical Memory projection is proved outside current sight, with original time/source;
-actual search, action persistence and resource acquisition remain unproved.
-
-Previous local proof: `.chromie/acceptance/ga-history-fixture-audit-20261005/`:70
-upstream historical-description input/target type repairs, with all1500 material
-comparisons preserving original meaning, prior Goals and identity choices. Complete
-reference validation1500, focused22 and canonical169 benchmark/3968 main tests pass.
-No production UMI correction or native inference was performed.
-
-Retained workflow proof: `.chromie/acceptance/workflow-contract-audit-20261005/`:
-strict aggregate6000/6000, focused120, complete canonical gate passing. Original83
-failures were stale replay records before inference, not model ability failures.
-All6000 scenario probes and5 prototypes retain their original semantic/provider/fault
-assertions and prior Goals. Frozen source bytes and strict recovery guards are retained;
-review is non-independent Level A, not native qualification.
-
-Previous native proof: `.chromie/acceptance/planner-compound-contract-20261004T140758Z/count-scope/source-schema/`.
-The full native cohort is complete at the case-admission level; failures blocked
-some later turns, so neither cohort-complete nor qualification-complete is claimed.
-All79 summaries, exact primary packets, same-agent review and immutable runtime
-identity are retained. That historical cohort's single bundle is
-`/home/chromie/Downloads/chromie_debug_bundle_20261005_003209.tar.gz`.
-Its case SID923cce48 retains count2 binding and all3 requested completed body
-results; SID0b0cdc27 retains right-direction source t11:t12 and completed walk/turn.
-The direct-stop case has no execution/stop evidence after an unrequested idle was
-planned. A planned observation or acknowledgement alone is never completion.
-Earlier GA/media, compound and count runs are historical in Handoff/audit, not
-substitutes for this revision. Later status-document consolidation is a documentation
-only delta from the frozen full-tree identity; packaged Agent source stays fixed.
-
-Two owner-local SC language prompt candidates were rejected, with language4/8
-baseline,4/8 system-policy and3/8 output-contract-footer. Each cohort had eight
-mechanically accepted primary outputs with unchanged model/context/Schema.
-`.chromie/acceptance/sc-language-policy-20261004T125029Z/adjudication.json`
-retains all24 outputs and exact source rollback, including inherited changes.
-Correct language input is confirmed; intrinsic ability versus prompt/context/profile
-reliability is not isolated. No runtime translator or second semantic decision.
-
-The original blink call confirms an UMI primary Planner-request omission, not
-an intrinsic ability limit. Later successful blink calls use the same model and
-system/Schema/options but different timestamp/context; they do not prove GA caused
-UMI to improve. UMI keeps initial activation and GA/Host do not compensate.
-Automatic acknowledgment or safe idle alone does not prove task fulfillment.
-
-Historical October1 three-model scores and earlier17/79 provider-fix run remain
-bound to their original source identities in Handoff/audit. Superseded admission
-chronology has since been repaired; accepted-water Work still fails. Do not turn
-those historical comparisons into current model ranking or release evidence.
 
 ## Social Cognition migration
 
@@ -474,51 +28,49 @@ A fresh addressed turn wakes SC mechanically; UMI requests only non-standing
 cognition. Planner is model-selected; Runtime cannot infer activation from task words.
 GA output does not author new Goal meaning: Host preserves exact UMI WHAT when
 materializing identity-only `new_goals` rows. `turn` is Goal lifetime, not a no-Goal routing rule.
+UMI preserves complete WHAT and cannot author bindings; Planner owns parameter
+extraction and contextual provenance.
 
-This describes current intended ownership, not full conformance. The audit found
-UMI binding conflict is repaired under the owner-confirmed principle 30 boundary;
-complete WHAT remains UMI-owned and Planner owns parameter extraction. Attention
-same-authority semantic repair and SC fresh-turn silence restrictions still need review.
-No amendment to permit UMI parameter extraction was made in this audit.
+This describes current intended ownership, not full conformance; see the open work below.
 
 ## Component implementation and qualification
 
 | Existing owner | Source state and current proof limit |
 | --- | --- |
-| [Gateway](COGNITIVE_GATEWAY.md) / Host admission | Deterministic protective controls and immutable admitted turn exist. Attention model repair conflicts with single semantic authority. Physical audio admission needs source-bound proof. |
-| [Turn lifecycle](COGNITIVE_TURN_LOOP.md) / Cognitive Runtime | Concurrent SC and GA/Work, exact identity, cancellation, prerequisite joins and Evidence re-entry exist. Text admission chronology repaired and mechanically proved; water Work activation and native coverage/latency remain open. |
-| [Semantic authorities](SEMANTIC_AUTHORITY.md) / UMI, GA, Planner, SC | Source ownership migration is implemented; preserved original wording is authoritative. Current workflow corpus compatibility is repaired; other authority conflicts and native coverage remain unresolved. |
-| [Agent Skills](AGENT_SKILLS_ARCHITECTURE.md) / planner and registry | Semantic methods and Capability contracts exist. Frozen references are not independent/native-model qualification. |
+| [Gateway](COGNITIVE_GATEWAY.md) / Host admission | Deterministic protective controls and immutable admitted turn exist. The Attention same-authority finding is unreviewed. Physical audio admission needs source-bound proof. |
+| [Turn lifecycle](COGNITIVE_TURN_LOOP.md) / Cognitive Runtime | Concurrent SC and GA/Work, exact identity, cancellation, prerequisite joins and Evidence re-entry exist. Text admission chronology is repaired and mechanically proved; native coverage and latency remain open. |
+| [Semantic authorities](SEMANTIC_AUTHORITY.md) / UMI, GA, Planner, Value Judgment, SC | Source ownership migration is implemented; preserved original wording is authoritative. Native coverage remains unqualified. |
+| [Agent Skills](AGENT_SKILLS_ARCHITECTURE.md) / Planner and registry | Semantic methods, Capability contracts and need-first library search exist. Frozen references are not independent native-model qualification. |
 | [Execution lanes](EXECUTION_LANES_AND_COORDINATION.md) / Trusted Runtime | Confirmation, cancellation, coordination, provider truth and safe-idle contracts remain blocking. No permission comes from premature speech. |
-| [Resource acquisition](RESOURCE_ACQUISITION_AND_DELIVERY.md) / providers | Provider-owned source resolution is implemented; observed milk object/pose and mixed-place qualification remain gaps. Simulator handover does not prove real acquisition. |
-| [Cognitive architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) / retained state | Goal continuity, scoped re-entry, Memory and mechanical time wake exist. Old duplicated prose is not current qualification evidence. |
-| [Agent mind and Memory](../agent/README.md) / stable and relational Memory | Stable identity and privacy/provenance mechanisms exist. Trusted real-world identity/audience sources and broader live social behavior remain unqualified. |
+| [Resource acquisition](RESOURCE_ACQUISITION_AND_DELIVERY.md) / providers | Provider-owned source resolution is implemented; observed object/pose and mixed-place qualification remain gaps. Simulator handover does not prove real acquisition. |
+| [Cognitive architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md) / retained state | Goal continuity, scoped re-entry, Memory and mechanical time wake exist. |
+| [Agent mind and Memory](../agent/README.md) / stable and relational Memory | Stable identity, Stable Mind values and privacy/provenance mechanisms exist. Trusted real-world identity/audience sources and broader live social behavior remain unqualified. |
 | [Capability providers](../capabilities/README.md) / Soridormi | Embodied feasibility and safety stay with Soridormi. Simulation perception exists; real camera/person/hardware ingress is incomplete. |
-| [Runtime rollout](COGNITIVE_RUNTIME_ROLLOUT.md) / operators | Existing evidence/fallback machinery remains. Retired PresentationCommit promotion text must not substitute for current SC + Work qualification. |
+| [Runtime rollout](COGNITIVE_RUNTIME_ROLLOUT.md) / operators | Evidence and fallback machinery remain. |
 | [Acceptance](ACCEPTANCE.md) / qualification operators | Frozen cohorts, ability classes and strict failure accounting remain required; local failures cannot be averaged into a release pass. |
 
 ## Current open work
 
 Follow the [Roadmap migration order](../ROADMAP.md#social-cognition-migration)
-and [checkpoint](../DEVELOPMENT_CHECKPOINT.md); the audit does not create a new
-feature line or revive historical iteration authorizations.
+and the [checkpoint](../DEVELOPMENT_CHECKPOINT.md).
 
-1. Retain completed bounded Planner compound/count/source proofs; qualify remaining
-   primary HOW choices and current stop coverage without changing SC expression authority.
-   Attention authority and SC silence findings remain open; UMI cannot author bindings.
-2. Retain repaired user-before-assistant admission; qualify accepted-offer Work
-   activation against complete actual context before interpreting model-comparison scores.
-3. Preserve the passing canonical local gate and current reviewed workflow freeze;
-   historical-restatement input types are repaired at their fixture owner. Keep
-   reference validity distinct from native-model semantic qualification.
-4. Qualify exact Schema/DTO/native grammar, SC context budget/latency, provider
-   scene and geographic Evidence, Goal/action/provenance coverage.
-5. Retain narrow current-revision voice and the default
+1. Deploy the latest Agent image and complete the everyday cohort: smoke, then
+   `core` and `challenge`.
+2. Known live defects: the homework decline offers reminders Chromie cannot set;
+   "去那边等我" is acknowledged with "好的。" although no go-to-a-place ability exists;
+   Value Judgment asks consent or meaning questions that belong elsewhere (hug);
+   SC echoes the user's words (celebrate). The corpus has no SC step or
+   perceived-answer turn; replays and unit tests cover them.
+3. Constrained Planner decoding runs about 12-15 tokens/s in grammar-heavy regions,
+   so a second Planner pass can miss the turn deadline.
+4. Review the Attention same-authority and SC fresh-turn silence findings; qualify
+   Schema/DTO/native grammar, SC context budget and latency, provider scene and
+   geographic Evidence, and Goal/action/provenance coverage.
+5. Narrow current-revision voice proof and the default
    [target-evidence profile](TARGET_EVIDENCE_CLOSURE.md). Physical evidence stays supervised.
 
 ## Evidence interpretation
 
-Detailed historical narrative belongs in Git history. Historical source tests,
-automatic passes or owner-reported audio remain bound to their original revisions;
-none establish this audit's target validation. Exact current resume commands,
-private artifact paths and matrix identities are in [Handoff](../HANDOFF.md).
+Historical source tests, automatic passes or owner-reported audio remain bound to
+their original revisions; none establish current target validation. A planned
+observation, acknowledgement or safe idle alone is never task completion.

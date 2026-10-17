@@ -2,30 +2,17 @@ from __future__ import annotations
 
 from typing import Any
 
-try:
-    from chromie_contracts.interaction import (
-        MEDIA_CAPABILITY_IDS,
-        MEDIA_OPERATIONS,
-        MediaProviderDeclaration,
-        VOCAL_PERFORMANCE_CAPABILITY_ID,
-        VocalProviderDeclaration,
-        media_capability_input_schema,
-        media_capability_output_schema,
-        vocal_performance_input_schema,
-        vocal_performance_output_schema,
-    )
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.interaction import (
-        MEDIA_CAPABILITY_IDS,
-        MEDIA_OPERATIONS,
-        MediaProviderDeclaration,
-        VOCAL_PERFORMANCE_CAPABILITY_ID,
-        VocalProviderDeclaration,
-        media_capability_input_schema,
-        media_capability_output_schema,
-        vocal_performance_input_schema,
-        vocal_performance_output_schema,
-    )
+from shared.chromie_contracts.interaction import (
+    MEDIA_CAPABILITY_IDS,
+    MEDIA_OPERATIONS,
+    MediaProviderDeclaration,
+    VOCAL_PERFORMANCE_CAPABILITY_ID,
+    VocalProviderDeclaration,
+    media_capability_input_schema,
+    media_capability_output_schema,
+    vocal_performance_input_schema,
+    vocal_performance_output_schema,
+)
 
 from ..settings import agent_service_settings
 

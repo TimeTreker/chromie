@@ -3,7 +3,7 @@
 ## Status
 
 The [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
-owns communication and optional social expression; Work Planner owns requested
+owns communication and optional social expression; Planner owns requested
 work. The owner authorized scheduler alignment on 2026-09-14. The existing
 Trusted Capability Runtime now keeps separate Vocal and Activity waiting queues
 under one resource/safety arbiter. With total capacity greater than one, one slot
@@ -15,7 +15,7 @@ The [Project Charter](PROJECT_CHARTER.md) remains the authoritative main workflo
 These are execution mechanisms below semantic Activities, not separate minds:
 
 ```text
-SC / Work Planner author exact acts and temporal relationships
+SC / Planner author exact acts and temporal relationships
   -> Trusted Capability Runtime
        -> Vocal queue: ordered personal voice
        -> Activity queue: compatible non-Vocal providers
@@ -56,7 +56,7 @@ overlap in time.
 
 | Layer | Owns | Must not own |
 |---|---|---|
-| Work Planner | requested work, exact Capability selection, temporal intent and Goal coverage | SC wording, motor control or provider internals |
+| Planner | requested work, exact Capability selection, temporal intent and Goal coverage | SC wording, motor control or provider internals |
 | Social Cognition | communication, silence and optional social expression in its primary result; exact observable act anchors | rewriting Work or claiming unobserved completion |
 | Vocal lane / Host | personal voice preparation, ordered playback, interruption and delivery evidence | conversational meaning |
 | Activity lane / Runtime | provider lifecycle, resource admission, coordinated release and correlated outcomes | Goals or raw motor control |

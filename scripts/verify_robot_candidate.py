@@ -4,12 +4,16 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Sequence
+
+try:
+    from evidence_io import sha256_file as _sha256
+except ImportError:  # imported as scripts.verify_robot_candidate
+    from scripts.evidence_io import sha256_file as _sha256
 
 STATES = {"draft", "ready_for_no_motion_review", "selected"}
 PLACEHOLDERS = {"replace-me", "todo", "tbd", "unknown", "not-configured"}
@@ -121,14 +125,6 @@ def _check_file_reference(
         blockers.append(f"{label} file does not exist: {path}")
         return None
     return path
-
-
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _check_provider_manifest(

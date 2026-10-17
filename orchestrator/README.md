@@ -144,7 +144,7 @@ confirmation regardless of the provider declaration.
 ### Maintained authority path
 
 ```text
-ASR -> Gateway -> UMI -> independent SC / GA / Work Planner
+ASR -> Gateway -> UMI -> independent SC / GA / Planner
     -> validated communication / Goal commit / Work -> Runtime -> Evidence
     -> scoped Planner Work and independent SC interaction
 ```
@@ -291,7 +291,7 @@ long-term projections without creating another semantic owner. When
 as recoverable after restart; GA may compare their abstract durable summaries with current
 working Goals, while physical work still requires fresh validation/confirmation and never
 resumes blindly. Consent-bound personal long-term Memory remains owned by the protected durable
-Memory store. See [`../docs/conversation_state.md`](../docs/conversation_state.md) and
+Memory store. See [`../docs/CONVERSATION_STATE.md`](../docs/CONVERSATION_STATE.md) and
 [`../docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md`](../docs/DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md).
 
 ## Scheduling, interruption, and cancellation

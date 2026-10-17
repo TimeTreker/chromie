@@ -2,785 +2,90 @@
 
 Chromie is in active development. This roadmap owns delivery order and exit
 criteria; current implementation and evidence state live in
-[docs/STATUS.md](docs/STATUS.md).
+[docs/STATUS.md](docs/STATUS.md), and completed history lives in Git and the
+[CHANGELOG](CHANGELOG.md).
 
 The current focus is a **Goal-driven single semantic authority**. The Cognitive
 Gateway owns ingress, protective reflexes, and attention admission. The
 Goal-driven Cognitive Core owns ordinary semantic interpretation, goal
-association, Planner-authored Work, Social Cognition communication, and outcome reconciliation.
-Provider and Host boundaries remain the only authorities for effects.
-The core embodied target is a qualified simulator provider. Chromie's cognition
-must remain backend-neutral; physical-robot commissioning is optional
-Soridormi/provider work and is not a Chromie milestone or release prerequisite.
+association, Planner-authored Work, Value Judgment, Social Cognition
+communication, and outcome reconciliation. Provider and Host boundaries remain
+the only authorities for effects. The core embodied target is a qualified
+simulator provider. Chromie's cognition must remain backend-neutral;
+physical-robot commissioning is optional Soridormi/provider work and is not a
+Chromie milestone or release prerequisite.
 
 Sequential milestone codes are not part of the current project model. Work is
 organized by capability, risk, and retained evidence.
 
-The 2026-09-11 owner-authorized local amendment implements independent UMI-/GA-triggered
-Planner tasks, scoped Runtime Work changes, explicit safe-read admission before GA,
-and role Memory projections. This is the agreed authority correction within Issue #35;
-it does not reopen other audit findings or replace the remaining model/voice/target
-qualification order. See [Status](docs/STATUS.md) and the current
-[checkpoint](DEVELOPMENT_CHECKPOINT.md) for evidence and resume scope.
-
-The accepted September authority amendments and implementation sequences below
-remain design context; they do not carry forward old iteration budgets, commit/push
-authorization or claims that a previous gate is still green. The
-[current audit](ARCHITECTURE_AUDIT.md) was refreshed on 2026-10-05. Canonical
-local validation passes; current-revision voice and default target evidence remain
-open. The exact results and remaining evidence gaps
-belong to [Status](docs/STATUS.md), the [checkpoint](DEVELOPMENT_CHECKPOINT.md)
-and [Handoff](HANDOFF.md).
-
-The accepted intent-only boundary gives UMI complete natural-language meaning and
-provider-neutral result type; GA owns retained Goal association and Host inherits
-new Goal meaning; Planner owns parameter extraction, realization and readiness;
-SC owns ordinary communication. Current `bindings` and Attention semantic-repair
-conflicts are recorded in the audit, not authorized by old implementation prose.
-No model, profile or release is promoted. Historical Issue closure statements
-below are bound to their original delivery records and were not rechecked remotely.
-
-## Owner-approved semantic transaction simplification and generalization line — 2026-09-16
-
-The owner approved a new implementation order from the provided 2026-09-16 archive
-baseline: reduce avoidable model protocol burden, raise provider-shaped Capability inputs
-to stable semantic contracts, and then qualify generalization/continuous episodes **before**
-returning to model replacement, SGLang scheduling, or latency optimization. This is an
-authority-preserving architecture amendment, not a new semantic owner, service, runtime
-switch or compatibility mode. Existing safety, authorization, Evidence, Goal, SC and
-Planner ownership remain binding.
-
-Work proceeds in this order:
-
-1. **Land the design before source changes — this slice.** Record the semantic model
-   boundary, Capability semantic facade, SC context-projection rule, generalization
-   evidence contract and this delivery order in existing authority documents. No runtime
-   behavior is claimed by the design patch.
-2. **Audit Planner and SC model-facing burden.** Inventory every material model-visible
-   input and model-writable output field in the actual native transactions. Classify each
-   as semantic decision, deterministic projection, provider realization, or
-   duplicate/compatibility representation. **First source slice implemented:** the original
-   user source is now explicitly anchored to the same typed `UserTurnEnvelope` across UMI and
-   the GA/Planner work transaction, with fail-closed text/session/language correlation and no
-   new frozen Work-request field. The generic semantic-artifact envelope substrate is also
-   implemented as the next anti-loss foundation. **Phase 1C is now implemented:** live
-   UserTurn/UMI/Responsibility refs travel to GA/Fast, GA/new-Goal refs are appended after
-   continuity, Plan refs reach SC/Capability Runtime, and accepted SC/talk refs continue into
-   delivery/evidence without entering model prompts. **Phase 1D is now implemented:** Fast
-   argument provenance uses closed `UserTurnEnvelope` token spans and Host quote materialization,
-   so the model no longer retypes exact source strings. Next finish the SC relevance/context
-   burden inventory. Do not change models during this audit. The
-   deliverable remains the smallest justified deletion/projection set plus red tests.
-3. **Establish immutable semantic-artifact lineage before deleting provenance copies.**
-   **First substrate slice implemented:** a generic trusted-code `SemanticArtifactEnvelope` /
-   packet protects accepted UserTurn, UMI, Responsibility, GA/new-Goal, Planner, SC/talk and
-   execution-outcome payloads with canonical SHA-256 plus parent refs. Existing Cognitive
-   Evidence JSONL always archives their immutable envelopes and retains exact packets when the
-   configured text-retention policy permits; active state remains in existing owners and later
-   completion/delivery appends lifecycle facts rather than rewriting history. This does not
-   yet change model-facing semantic authority. **Live-ref transport is now implemented in
-   Phase 1C** through the existing context/Runtime metadata: refs are content-bound and checked
-   at downstream boundaries while prompts omit the bookkeeping. Phase 1D now uses that
-   established UserTurn coordinate system for Fast argument source spans.
-4. **Simplify the Planner/SC transactions without moving semantic authority.** Start with
-   facts already known to be burdensome: model-retyped exact source text/strategy
-   decoration, generated/correlation bookkeeping, decoder-shape-only fields, and SC
-   exposure to irrelevant task plumbing. Planner still chooses Capability, semantic
-   argument values, source refs/spans, timing/dependencies and planning disposition; SC
-   still chooses communication. Trusted code only materializes exact projections. Retain
-   fail-closed provenance, scope, confirmation, safety and Evidence checks.
-5. **Raise provider-shaped Capability arguments to a semantic facade.** Audit the active
-   catalog for coordinate signs/axes, provider frames, actuator/joint identifiers,
-   calibration, transport encodings and other backend-shaped inputs. Migrate one coherent
-   path at a time, beginning with the retained left/right turn failure: Core planning uses
-   semantic direction (and human-meaningful magnitude where needed); Soridormi/provider
-   adaptation owns yaw sign/frame realization. Preserve provider schemas/evidence below
-   the semantic boundary and prove backend changes do not change Goal/Plan meaning.
-6. **Add generalization and continuous-episode qualification.** Extend existing scenario
-   and general-ability infrastructure rather than adding a second benchmark framework.
-   Add declared metamorphic families for paraphrase, bilingual equivalence, irrelevant
-   context, catalog permutation, controlled semantic deltas, provider-realization
-   invariance and compositional recombination. Add bounded stateful episodes that retain
-   Mind/Goal/Interaction state across conversation, Work, waiting, Evidence, interruption,
-   correction, re-entry and silence. Keep references target-blind and hard invariants
-   non-averageable.
-7. **Requalify the existing model/profile on the reduced architecture.** Only after the
-   above source and qualification gates pass should prompt/model selection be revisited.
-   Compare models on the reduced semantic transactions, then qualify SGLang priority/
-   contention and finally optimize first-meaningful-response/task-completion latency. A
-   faster provider does not compensate for an unnecessarily difficult semantic wire.
-
-Each implementation phase must have one reproduced red boundary, the smallest general
-repair, focused proof, applicable metamorphic/episode non-regression, canonical gates and
-an updated checkpoint/handoff. Do not combine all phases into one rewrite. If a field that
-looks mechanical actually requires semantic choice, keep it model-owned and document the
-reason rather than forcing the simplification.
-
-### Phase 1E — communication model-view diet
-
-Implemented after source-span provenance: the trusted SC request retains complete Plan and
-lineage truth, while the SC model projection omits provider/capability realization plumbing.
-SC receives the high-level facts needed to decide interaction but cannot infer a task
-capability limitation from raw motor-control restrictions intended only for its optional
-social expression. This completes the first SC contract-diet slice before the semantic
-Capability-facade line.
-
-Phase 2A now implements the provider-declared semantic Capability facade substrate: semantic input schemas can replace provider-local model-facing encodings, and the Soridormi adapter materializes declared signed-magnitude arguments only after Runtime validates the semantic request. This is source support, not evidence that the current live Soridormi catalog publishes a facade or that native direction qualification is closed.
+UMI owns complete natural-language meaning and provider-neutral result type; GA
+owns retained Goal association and Host inherits new Goal meaning; the one
+Planner owns parameter extraction, realization and readiness
+(PLANNER-AUTHORITY-001); Value Judgment reviews value-relevant effects
+(VALUE-JUDGMENT-001); SC owns ordinary communication. No model, profile or
+release is promoted.
 
 ## Social Cognition migration
 
 The owner approved the [Social Cognition target](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
-on 2026-09-14 and subsequently authorized implementation, multimodal interaction,
-environment-driven initiative and high-priority foreground scheduling. The communication responsibility
-has moved from Planner to this distinct Core owner; UMI/GA, Work planning,
-Memory, Host and Soridormi retain their own truth and permissions. This is the
-explicit migration exception to the architecture/terminology freeze, not a
-new release line. No new document, runtime switch or
-service is needed. The one new role replaces Planner's communication ownership;
-the retired response/critic/Social Attention model paths must not return.
+on 2026-09-14 and authorized implementation, multimodal interaction,
+environment-driven initiative and high-priority foreground scheduling. The
+communication responsibility has moved from Planner to this distinct Core owner;
+UMI/GA, Work planning, Memory, Host and Soridormi retain their own truth and
+permissions. The retired response/critic/Social Attention model paths and
+Planner-authored speech must not return.
 
-Contract/implementation work below is source-complete, with controlled and
-bounded native evidence in Status. Current deployed end-to-end and performance
-qualification remain open. Existing #24/#32 evidence and failures remain retained; their
-historical single-stream topology does not constrain the accepted destination.
-Do not silently close or redefine a remote Issue from this local documentation.
+The transaction contracts and the coherent migration of the maintained path are
+source-complete. Remaining order:
 
-1. **Fix the transaction contracts before source work.** Use the
-   [source inventory](docs/COGNITIVE_TURN_LOOP.md#source-migration-inventory)
-   to specify Social Cognition input/output, scoped coverage, identity, depth,
-   silence and failure; remove Planner's writable speech/confirmation wording
-   together with the corresponding validators and clients. Settle the exact
-   speech/auxiliary anchor migration, API shape and required-communication
-   completion handoff. Keep one writer per semantic fact.
-2. **Migrate one coherent maintained path.** Reuse shared state, model transport,
-   privacy, correlation, delivery and Runtime infrastructure. Transfer initial,
-   Goal-bound result/control and Goal-free communication together; do not add
-   a permanent two-writer compatibility mode or a separate microservice. Preserve
-   all action/confirmation/cancellation and safe-read prerequisites.
-3. **Prove authority and behavior.** Freeze bilingual contrasting episodes,
+1. **Prove authority and behavior.** Freeze bilingual contrasting episodes,
    including substantive dialogue without Work, pending/delivered speech,
    results overtaking progress, multi-Goal scope, failures and interruption.
    Apply the [acceptance contract](docs/ACCEPTANCE.md#social-cognition-acceptance)
    and semantic qualification method to both owners and the combined workflow.
-4. **Measure the scheduling tradeoff.** SGLang is the intended candidate for
-   independently prioritized requests. Verify actual scheduler support/config,
-   measure idle and contended first meaningful response plus task completion
-   and TTS, and rule out Planner starvation. No provider or model is promoted
-   by this design decision.
-5. **Retain the evidence closure sequence.** Canonical local gates, narrow
+2. **Measure the scheduling tradeoff.** Verify SGLang scheduler support and
+   configuration for independently prioritized requests; measure idle and
+   contended first meaningful response, task completion and TTS, and rule out
+   Planner starvation.
+3. **Retain the evidence closure sequence.** Canonical local gates, narrow
    current-revision supervised voice and the default target-evidence profile
    remain required. Source implementation, automated verification, target
    validation and release readiness are recorded separately in Status.
 
-## Current execution order — existing implementation and evidence
-
-The owner's September 13 scope completed #59/#61's offline prototype and 1,500-case
-audit, then expanded to 6,000 cases under #65. #60 connects complete temporal intent
-to Planner-authored waiting/re-entry without a pre-seeded Goal; UMI does not extract time fields. #66
-rejects empty, absent and foreign single-Goal outcome maps before canonical execution.
-The final replay requires all 6,000 declared outcomes, including genuine resource
-conflicts and expected nonexecution; exact counts and gates belong to Status/handoffs.
-These are architecture/workflow/contract tests, not native model qualification. LoRA
-training is not started: references, faults, hidden semantic holdouts and actual
-candidate outputs need separate review. #24/#32 retain their native/target requirements.
-
-Historical ordered offline Fast/Deep qualification and supported-version CI
-results belong to their original revision. The current local gate fails; current
-#24/#32 work must use the Status/checkpoint evidence rather than inherit those passes.
-Exact current results belong in [Status](docs/STATUS.md) and the
-[checkpoint](DEVELOPMENT_CHECKPOINT.md). Retain all original failures and separately
-frozen staged/readiness oracle amendments. The coverage-designed 204 Fast/40 Deep
-corpora plus boundary contrasts replace #35's earlier numeric-size proposal; a
-surrogate pass is not a native provider or target claim.
-
-Continue #24/#32 native/model work only after the semantic simplification and
-generalization line above reaches its requalification phase. UMI still has failures in its
-wider contrast cohort; in the latest original compound UMI/GA are correct, while Fast
-provenance/direction and SC communication fail. Those retained failures are the first
-contract-diet probes, not permission to bypass UMI, hardcode direction, or force SC wording.
-The latest aggregate live cohort is incomplete; historical Qwen9b output-budget contrasts
-also retain semantic/binding/truncation failures. Keep canonical source gate → narrow
-current-revision live voice → default target-evidence closure as the release evidence line,
-but do not select a new model/backend to compensate for avoidable model-contract burden.
-Numeric class/document sizes remain review measurements, and #57's reasoned no-extraction
-result does not authorize unrelated refactoring.
-
-The current-revision implementation/qualification axes remain separate. The 2026-09-06 archive audit found a bounded GA/Fast/Runtime transaction-fidelity slice without reopening the authority architecture; A01–A06 are now source-closed in the current worktree. The implementation/evidence boundary is recorded in [Current Status](docs/STATUS.md#current-verification-and-deployment-state--2026-10-04). Continue in this order:
-
-1. **Preserve revision-bound full source qualification.** The latest observed source gate is recorded in Status/checkpoint; avoid duplicating revision-specific counts here. After a source change, rerun the documented policy, static, ownership, configuration, documentation and complete main-tree gates and retain their exact revision. A source pass does not supersede the failing qualification cohorts.
-2. **Freeze and qualify the complete model transaction on that exact source.** Re-run target-blind UMI/GA/Fast/Deep cohorts with the production prompt projections, schemas/decoder transport, one-call topology, early commit guard, and failure-state reconciliation. A model or serving backend may be promoted only from revision-bound evidence.
-3. **Run current-revision qualification and retain target evidence.** Re-run canonical gates
-   and retain bilingual/provider/simulator/live evidence for SC-owned communication,
-   Evidence-bound result claims, WorkDAG revision/continuation, retry/alternative/silence
-   behavior, duplicate-effect prevention, SC-owned auxiliary social expression, and
-   latency.
-4. **Qualify current SC communication and Work-Planner transaction boundaries before final
-   Prompt/model promotion.** Issue [#32](https://github.com/TimeTreker/chromie/issues/32)
-   retains historical evidence for the retired Planner-presentation topology; it must not
-   restore Planner wording authority. Run source gates and measure the current separate
-   semantic owners' provider/model integrity, latency and resource behavior only after the
-   model-contract simplification/generalization phases above.
-5. **Keep implementation, automated verification, target validation, and release readiness
-   separate.** A source-closed architecture slice does not qualify microphone, provider,
-   simulator, model quality, or latency behavior.
-6. **Reopen structural work only for a concrete ownership seam or defect.** File or method
-   count remains evidence of reconstructability cost, not permission to create another
-   semantic manager or perform decomposition for its own sake.
-
-## Existing architecture line — migration baseline and retained evidence
-
-The broad architecture-discovery phase is closed. New work starts from the canonical
-event/readiness authority seam: User Meaning Interpretation establishes Responsibility / WHAT;
-the one Planner owns HOW (PLANNER-AUTHORITY-001; the Deep Planner was retired 2026-10-11); Goal Association independently owns canonical Goal
-continuity; Trusted Capability Runtime and Providers realize Work; asynchronous Runtime
-events report what happened; Host-bound Evidence records what is true; and a meaningful
-state transition may create a bounded `CognitiveOpportunity` that re-enters the same
-Planner with Responsibility + Goal + Situation + actual Work + Evidence. Planner may
-produce zero, one, or many Activity changes. Existing-Work comparison is a Planner
-operation, not a mandatory reconciliation stage. This baseline must pass the Charter's
-architecture-irreducibility review before adding a new principle, owner, persistent state
-concept, manager, workflow, contract field, or mechanism.
-
-Reviewed architecture status (each item states its implementation state explicitly):
-
-1. **UMI/Planner input boundary — contract retained, conformance open.** UMI owns
-   complete contextual WHAT, provider-neutral requested result type, source evidence
-   and genuine unresolved meaning. GA owns retained Goal association; Planner owns
-   parameter extraction, Capability selection and execution-input completeness.
-   The current UMI binding conflict is recorded in the audit, not an extension of
-   this boundary. Source-based Deep UMI resolves genuine consequential ambiguity,
-   not missing Capability arguments.
-2. **Independent interaction and Work advancement — migration implemented.** Runtime
-   starts the standing SC interaction while requested GA/Planner may advance from the
-   same accepted UMI. SC authors exact words, timing and truth provenance; Planner
-   produces complete Work. Early safe reads require exact declared contracts;
-   effectful Work still needs canonical Goal binding and trusted prerequisites.
-3. **Evidence re-entry — distinct SC and Planner owners.** Runtime binds terminal
-   Evidence to immutable request/Goal provenance. Planner reasons about remaining
-   Work, reuse, revision, readiness or gaps; SC reasons about grounded answer,
-   follow-up, repair or silence. Eligible optional expression belongs to SC and
-   cannot complete a Goal. Retain separate SC commit, TTS-first-PCM, playback,
-   Work re-entry and expression validation/suppression evidence.
-4. **Epistemic Qualification contract detail — first source slice implemented.** Do not add an `EpistemicManager`.
-   Extend existing capability/evidence contracts to represent claim-specific required
-   observations, provenance/trust-domain independence, alternatives/corroboration,
-   validity/freshness, closed-world coverage, and qualification state
-   (`established|insufficient|stale|contradicted|unknown`). Keep ASR/input fidelity in
-   Gateway and semantic meaning in UMI/GA. Principal recognition/authentication uses
-   the ordinary Capability/Provider/Evidence path; authorization/consent remains Host
-   policy.
-5. **Forward Adaptation contract detail — first source slice implemented.** Separate open-Responsibility actions from
-   terminal-history learning proposals. Online Reflection may create only bounded
-   advisory experience/calibration; trusted policy caps scope and lifetime and Memory
-   materializes it with explicit expiry. It may not modify Stable Mind/shared prompts/models/global
-   Fast/Deep policy, authorization/safety, Capability semantics, or cache semantic
-   decisions. Shared/systemic changes remain offline and owner-governed.
-6. **Retention/negative-evidence consistency.** Make `immutable while retained !=
-   permanent` explicit across Evidence/Memory/Data Loop. No universal tombstone is
-   required; absence supports a negative claim only under complete collection and
-   retention coverage, otherwise Response must preserve `unknown`.
-7. **Machine guards and scenarios.** Only after contract text is stable, add the
-   smallest schema/runtime/audit changes needed to protect these boundaries. Tests
-   should guard authority and observable semantics, not one incidental call sequence.
-8. **Qualification after implementation.** Source/test success, target qualification,
-   and release readiness stay separate; relevant revision/model/provider/config changes
-   invalidate the corresponding qualification claim before age-based review does.
-
-Exit criteria for this line:
-
-- no reviewed case requires a new top-level semantic authority;
-- UMI emits no planning InformationGap or resolution strategy, while Planner resolves
-  execution inputs without changing Responsibility meaning;
-- Planner-selected Communicative Acts retain their exact model-authored wording,
-  while Host delivery remains a mechanically validating non-authoring boundary;
-- evidence integrity and evidence sufficiency are explicitly distinct;
-- terminal history can teach bounded future cognition without reopening history;
-- local adaptation has separately bounded scope and lifetime and cannot self-promote to
-  shared policy; and
-- Status records design/source/test/target evidence separately.
-
-## Immediate architecture line — Continuous Mind implementation from the compressed baseline
-
-The General Progress substrate remains the first implemented slice of
-readiness-driven cognition. The complete problem-space discussion has now been
-compressed into the architecture baseline in
-[Goal-Driven Cognitive Architecture](docs/GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md#414-continuous-mind-synthesis--compressed-architecture-baseline).
-The project should not reopen the ontology by creating one class/manager per
-human cognitive term.
-
-The settled target is intentionally small:
-
-- durable Mind state: Stable Mind, Goal as unfinished Responsibility, and Memory;
-- live Mind state: bounded, revisable, mostly reconstructable Situation; and
-- existing grounding/action substrate: Evidence/Interaction Ledger,
-  Progress/CanonicalPlan/request/execution/outcome artifacts, and
-  Capability/provider truth.
-
-`Work`, Intention, Commitment, Attention, Readiness, Salience, Concern,
-Reflection, Learning, Recovery, Common Ground, Affordance, and similar terms are
-currently explanatory/process/derived/policy concepts unless a concrete future
-case proves an independent lifecycle or authority that existing owners cannot
-represent.
-
-The next work is **bounded architecture closure followed by detail validation against this
-baseline**, not another broad concept-expansion phase. The owner-approved order from the
-2026-08-25 full audit is binding until new source evidence disproves it:
-
-1. **Close Continuous Mind wake/re-entry mechanics first.** A meaningful non-turn state
-   transition must be able to wake the same Planner without fabricating a UserTurn,
-   Responsibility, Evidence, or response. **Implemented:** the structured due-time
-   consumer is production-wired and non-Evidence readiness is admitted explicitly.
-2. **Make Situation a bounded current interpretation, then connect trusted sources.** Keep
-   immutable Evidence/provider truth outside Situation; represent only current relevant
-   interpretations, uncertainty/contradiction, and provenance needed by cognition. Do not
-   create a world-model database or `SituationManager`. **Implemented for the first live
-   source:** Situation v3 carries bounded source-grounded interpretations and meaningful
-   provider Runtime-state transitions enter as `SituationRevisionObservation` without
-   being mislabeled Evidence. Broader scene/body/environment ingress remains future work.
-3. **Close Planner-authored structured time-condition creation.** **Implemented:** the
-   same Planner can author bounded `time_conditions` for executable Goals; Host materializes
-   stable condition identity and ConversationState binds current Plan plus original
-   Responsibility provenance. Host never parses deadline prose into timers.
-4. **Make readiness genuinely selective without semantic Host routing.** **Implemented for bounded Situation re-entry:**
-   unchanged state produces no opportunity and source-specific mechanical churn filtering remains
-   below cognition. Any admitted meaningful Situation revision begins with one bounded Fast semantic
-   pass; Host does not map waiting/blocked/degraded/unsafe or other domain values directly to
-   local/Fast/Deep cognition. The owning model may remain silent/no-change or escalate within its
-   existing authority when deeper reasoning is actually warranted. No numeric priority engine or
-   competing semantic planner is introduced.
-5. **Activate Memory by current context rather than recency alone.** **Implemented:** the
-   existing Memory owner deterministically projects bounded cues from the current user turn,
-   open task/Goal context, and discourse focus. Older relevant entries outrank unrelated recent
-   entries; recency remains the fallback/fill policy. No vector database, retrieval LLM, or new
-   Memory authority is introduced.
-6. **Add bounded semantic expectation mismatch and active perception through existing
-   owners.** **Implemented at the Planner/Work boundary:** an ordinary step may declare
-   `step_purpose=acquire_information` plus a non-empty prospective `expected_outcome`. Runtime
-   preserves normal Capability safety/provider authority; trusted result re-entry exposes the
-   original expectation beside actual Evidence so the same Planner can revise on mismatch. The
-   expectation is never Evidence or Goal-completion truth, and no prediction/perception agent is
-   introduced.
-7. **Mechanically simplify the coordinators and stale surfaces.** **Implemented for the
-   audited closure slice:** the Fast-advance subphase is a typed helper on the existing
-   `CognitiveRuntime` owner, reducing the monolithic `_resolve()` transaction without a new
-   service or semantic state owner. The docs then named Fast/Deep Planner and the native
-   Memory owner instead of retired deepthinking/memory-agent routes; current composition-root
-   metrics are factual; the docs gate rejects those stale positive claims; and the proven-dead
-   top-level `memory_updates` compatibility input is removed in favor of native
-   `InteractionResponse.metadata.memory_updates`. Further decomposition requires another
-   concrete reconstructability/ownership defect, not file size alone.
-8. **Re-run current-revision qualification on the resulting exact tree.** Target evidence
-   remains separate from source/test closure and must not be inferred from these patches.
-9. **Progressive Cognition & Conversational Repair — architecture approved, source open.**
-   Extend the existing one-authority Continuous Mind rather than adding a Belief/Reconcile
-   manager. The target Fast presentation contract distinguishes an ordinary
-   `complete_response` from a substantive `provisional_response`; provisional delivery keeps
-   the Responsibility open and may schedule exactly one bounded communication-only
-   deliberative continuation. Deliberative cognition has no persistent truth, Goal/Work
-   mutation, or second wording authority and is not a Planner pass. The same
-   Core/Planner communication authority then reconciles current meaning against actually
-   delivered Interaction-Ledger speech and chooses silence, still-needed delta, `repair`, or
-   retract+repair. `repair` is a Communicative Activity role/function, not `PlanDisposition`.
-   Pending Work whose unreturned result materially determines a factual answer forbids
-   provisional result speech. Consequence/claim-qualification requirements cannot be
-   weakened by a tentative stance. Implementation should share existing model transaction,
-   grounding, validation, and re-entry infrastructure; Host prevents repeat delivery only
-   by exact Activity/submission identity. No source-complete or target-qualified claim is made by this
-   documentation patch.
-
-The already-settled implementation facts below remain constraints during that closure:
-
-1. **Goal/Work truth separation is implemented.** `SemanticGoal` now owns the
-   small Responsibility lifecycle while `ActiveGoalSnapshot.work_status` exposes
-   the independently owned Work/runtime projection. `ExecutionOutcomeBundle` is
-   recorded as historical execution truth before a separate Responsibility
-   reconciliation step; non-completed Work leaves the Goal open, and later
-   correction may reopen a satisfied Goal without rewriting history. Preserve
-   this separation and delete any remaining duplicate commitment/work truth when
-   encountered.
-2. **The minimal live Situation projection is implemented.** A frozen bounded
-   projection now carries only current relevance/interpretation references: the
-   current turn ID, focused Goal IDs, discourse focus, unresolved condition refs,
-   and evidence refs. It is rebuilt in-process, revisioned
-   between Goal Association and planning, prompt-validated, and never owns or
-   copies the referenced Goal/Evidence/provider truth.
-3. **Goal materialization, refinement, and replacement are implemented.** A fully
-   discharged provider-free interaction still receives canonical conversational Goal
-   continuity for the admitted turn, but a closed Goal need not be durably retained merely
-   because the response was immediate. Same-Responsibility refinement changes Canonical
-   Goal meaning only. Planner may compare that meaning with retained/provisional Work and
-   explicitly select reuse, correction, replacement, or no change; this is a Planner
-   operation rather than a Work-Reconciliation stage. GA and Host never decide
-   compatibility. Genuine
-   replacement creates new Goal lineage, stops Planner-rejected old Work through
-   trusted receipts, and supersedes the old Responsibility without rewriting history.
-4. **Evidence-driven reactivation and selective Reflection are implemented.**
-   Trusted non-completed execution evidence derives an ephemeral fast/slow opportunity.
-   Only slow opportunities invoke typed Reflection; its Goal/evidence references are
-   runtime-bound, and repeated evidence may promote ephemeral task/session memory only.
-5. **Preserve truth semantics and repair forward.** Historical Evidence/outcomes/
-   delivered speech are append-only facts; current Goal/Plan/Memory meaning may be
-   provenance-preserving revised; Situation remains soft; Stable Mind and
-   provider/authorization/safety authority cannot be rewritten by ordinary
-   cognition.
-6. **Restart/revalidation is implemented for durable Goal continuity.** Only open
-   Responsibility is restored; current Work becomes recoverable/revalidation-required,
-   stale confirmation/runtime bindings lose current authority, volatile Situation/provider/
-   body projections are excluded from durable Goal state, and stale bindings cannot be
-   cancelled or superseded before fresh runtime/provider revalidation.
-7. **Widen only after the core invariants hold.** Durable scoped consent/privacy,
-   multi-user identity, broader autonomy, competence calibration, and richer
-   resumable cognition remain later detail work unless a current implementation
-   slice requires them.
-
-### Incremental implementation rhythm for human-like behavior
-
-This sequence is subordinate to the owner-approved Continuous Mind closure order above.
-The previous scheduling assumption that target qualification must precede any further semantic
-implementation is superseded by the 2026-08-25 audit: verified production wiring gaps must be
-closed before those behaviors can honestly be qualified. `Rhythm` still means delivery cadence
-only; it is not architecture vocabulary, a runtime mode, a persistent state, or another manager.
-Each item should remain one focused patch with an originating episode, the earliest wrong
-boundary, a General Ability regression, canonical gates, and the highest safe evidence profile
-available.
-
-1. **Make simple interaction promptly useful.** Meet the approved Fast-Planner and
-   audible-start budgets by removing avoidable model reloads, duplicate generations,
-   and serial waits inside existing owners. A provider-free answer may close its canonical
-   conversational Goal immediately when it is complete; a useful low-consequence answer may
-   instead be explicitly provisional, remain open, and continue one bounded deliberative
-   cognition pass. A pending-work acknowledgement must add truthful common ground and must
-   not preview an unreturned result. Preserve claim-specific evidence qualification,
-   primary-result truth contracts, and every deterministic truth/safety validator.
-2. **Keep conversation available while Work continues.** Exercise a follow-up or
-   correction while safe read-only or embodied Work is queued/running. Gateway keeps
-   accepting input, UMI/GA preserve responsibility continuity, Planner revises only
-   affected Work, and independent Work survives. Barge-in stops stale output without
-   silently cancelling unrelated Goals.
-3. **Speak from state changes, not pipeline milestones.** On progress, terminal
-   Evidence, timeout, refusal, cancellation, or an explicitly authorized provisional
-   continuation, reactivate the same Core/Planner communication authority with the bounded
-   current snapshot. Reconcile against actually delivered speech and emit only silence,
-   the still-needed delta, intentional repetition, or a forward repair. Host enforces exact
-   Activity/submission identity and delivery facts; Planner owns semantic reconciliation. Safety/control
-   obligations retain deterministic pre-emption.
-4. **Make correction and waiting feel continuous.** Retain open Responsibility while
-   waiting for user input, time, provider readiness, or trustworthy Evidence. A later
-   event should resume from current Goal/Work/Evidence state rather than restart the
-   whole request. Corrections revise current meaning, reuse compatible Work, and repair
-   incompatible speech or effects forward without rewriting history.
-5. **Add restrained embodied expression.** Qualify SC-owned auxiliary social
-   Activities only around an explicit primary Activity with current target/scene evidence. Optional gaze, posture,
-   or expression remains resource-aware and fail-soft, never delays the primary outcome,
-   and never becomes Goal-completion Evidence. Missing expression is preferable to a
-   mismatched or unsafe gesture.
-6. **Learn selectively after the interaction.** Use existing Reflection and Memory
-   boundaries to retain only supported, reusable, scope- and lifetime-bounded meaning.
-   Prove in a later episode that the retained lesson improves context without replacing
-   fresh grounding, mutating Stable Mind/shared policy, or reopening completed history.
-
-Do not bundle affect simulation, ambient autonomy, multi-user identity, or new durable
-Mind objects into these slices. Those require their separately governed evidence,
-privacy, consent, and authority decisions. The target is coherent behavior over time,
-not a claim that Chromie is a human being.
-
-Architecture review may remove or replace pre-release compatibility/workflow
-structures when they obstruct this model. `Use less to solve more` means ending
-with fewer truth owners and processes, not preserving an obsolete pipeline or
-adding a manager because a useful explanatory term exists.
-## Approved architecture line — Persistent Social Mind and relational life
-
-The person-first social target is approved as an extension of the compressed Continuous
-Mind baseline. Chromie is one persistent twelve-year-old-girl social identity whose
-ordinary life happens primarily with her family; family is not a service role, Persona, or
-runtime mode. Social cognition generalizes the same Mind to family, friends, acquaintances,
-guests, strangers, and changing relationships without adding a `FamilyManager`,
-`SocialGraphManager`, `ConcernManager`, `InitiativeManager`, or second response owner.
-
-This line keeps the existing truth owners:
-
-- Stable Mind owns persistent Self/identity/personality/value boundaries;
-- Memory owns selectively retained person/relationship/shared-experience meaning;
-- Situation owns bounded current social/world interpretation;
-- Goal owns only unfinished Responsibility that genuinely needs continuity;
-- the same Core owns ordinary semantic/social communication decisions;
-- Planner owns HOW/Work when actual means selection is required;
-- Interaction/Evidence/Runtime retain delivered speech and real-world truth; and
-- Host/provider policy remains authoritative for privacy, authentication, consent,
-  authorization, safety, and effects.
-
-Implementation order:
-
-1. **Rebase the factory identity — source implemented by this slice.** Change the maintained
-   identity from six-year-old family secretary to a person-first twelve-year-old girl who
-   lives primarily with her family, has her own interests, and may form relationships
-   through real experience. Preserve truthful robotic embodiment. Update identity prompts,
-   startup wording, tests, and identity benchmarks together so old service-role behavior
-   cannot silently return.
-2. **Generalize Situation/CognitiveOpportunity beyond Goal-only readiness — first source slice implemented.**
-   `SituationRevisionObservation.goal_ids` and `CognitiveOpportunity.goal_ids` may now be
-   empty for an exact trusted Situation-only transition. Goal-free opportunities require
-   a Situation digest plus trusted source provenance, retain bounded subject/source refs,
-   and fail validation when neither Goal/Evidence nor Situation provenance exists. The
-   maintained Goal-bound provider/time/Evidence paths are unchanged. No UserTurn, UMI result,
-   Responsibility, or Goal is fabricated to wake cognition.
-3. **Add source-specific social/perception Situation ingress — PSM-5 trusted person/presence/audience contract implemented.**
-   `build_trusted_goal_free_situation_observation(...)` binds one already-trusted source,
-   its typed current interpretations, and optional exact `audience_refs` into the existing
-   Goal-free Situation surface; `apply_goal_free_situation_opportunity(...)` invokes the same
-   Cognitive Core without synthetic UserTurn/Goal provenance. The generic ingress performs no
-   person recognition, relationship inference, audience guessing, or scene/social semantic
-   classification. The source-neutral `TrustedSocialPerceptionObservation` now carries source-owned person/presence, identity-resolution status/confidence, and exact audience; Runtime projects those facts into Situation without recommending behavior. Concrete camera/person/scene providers remain source-specific and must establish sensing/trust/privacy before constructing this contract. Replaying the same Situation digest
-   remains a mechanical no-op; no ambient polling loop or world-model database is introduced.
-4. **Extend relational Memory and privacy provenance — first source slice implemented.**
-   `MemoryEntry` now retains bounded relation/subject/source-person/audience/disclosure
-   provenance, exact Situation subject refs participate in deterministic activation, and
-   privacy-aware entries are filtered mechanically before model projection. Ordinary
-   model/interaction Memory cannot self-promote permissive disclosure; only the dedicated
-   already-trusted relational ingress may retain `public|shared_with_audience`. `public` may
-   project; `shared_with_audience` requires an explicitly resolved current audience;
-   `private`/`unknown` stay hidden. Goal-free Situation cognition deliberately infers no
-   audience, so gated Memory fails closed. Raw retained Memory is no longer copied into the
-   top-level model context. Structured relational entries are also blocked from the existing
-   durable owner-profile channel until principal/privacy/deletion policy is separately
-   qualified. No SocialGraph/relationship-memory owner is introduced.
-5. **Derive relational/situational salience — semantic owner corrected and source-implemented.** Goal-free
-   Situation cognition no longer uses a deterministic Host decision table over event words,
-   relationship labels, routine/busy/private categories, or consequence terms. Every changed
-   trusted Goal-free Situation enters one bounded Fast Planner Situation judgment after
-   disclosure-safe relational Memory and delivery-qualified Interaction projection; the same
-   Planner inside the Cognitive Core decides relevance, non-interruption, silence, and low-commitment speech. A
-   semantic Situation signature remains only transport-independent correlation/common-ground
-   context and now includes exact trusted audience; Host keeps no persistent salience state or
-   priority manager. Relationship Memory can inform semantic relevance but never privacy,
-   trust, Goal, Work, or effect authority.
-6. **Close the social feedback loop — PSM-6 source contract implemented.** Trusted social feedback may reference the exact delivered Communicative Activity IDs it reacts to and enter the same Goal-free Situation/Core path. Source adapters report observable signals only; they do not label anger/approval/rejection or prescribe behavior. Planner's Situation invocation may remain silent, follow up, or author a `repair` act that must reference an actually delivered Activity. Runtime validates that reference mechanically and never decides whether repair is socially warranted.
-7. **Form relationship experience without relationship rules — PSM-7 first source slice implemented.** Goal-free cognition may propose a bounded session-scoped `shared_experience` Memory candidate tied to exact current Situation subjects/source refs. Runtime rejects widened provenance and stores the candidate as private ephemeral Memory only. No interaction-count→friendship rule, relationship score, or model-granted public disclosure is created; future cognition interprets relationships from retained experiences.
-8. **Bound Goal-free Planner depth — PSM-8 source implemented; #42 authority corrected; Deep pass retired 2026-10-11.** A Goal-free Situation decision is one restricted Planner invocation: silence, one low-commitment Communicative Activity, and private bounded experience proposals only. It cannot create Goal/Capability Work, reinterpret a user Responsibility, or recurse into another deliberative pass. Slow readiness is context, not a second planner pass; complete decisions receive no second review and an unavailable Planner remains quiet.
-9. **Retain short-lived self-directed concerns/interests — PSM-9 first source slice implemented.** The same Goal-free Core may propose bounded `self_concern|interest` session Memory with exact Situation source provenance and TTL. Runtime stores it as Chromie-owned `self_context`; it can re-enter later cognition but creates no Goal, timer, Work, Capability, authorization, or autonomous polling loop. Long-lived self-created intentions remain a separate future irreducibility question.
-10. **Qualify low-commitment self-initiative — bounded source contract implemented, target qualification open.**
-   Goal-free Situation planning is a stateless Planner invocation with no Goal/Work
-   fields. It may return `silence` or author exactly one context-grounded communicative act
-   (`greeting|acknowledge|inquire|inform|respond`); Runtime binds Situation/opportunity
-   provenance and the resulting `InteractionResponse` structurally contains no Capability
-   Work or Goal-completion authority. Semantic relevance is decided in that same invocation,
-   not by a Host salience gate. `slow` Goal-free readiness uses the same restricted Deep
-   Planner contract; shared identity/repair validation preserves delivery truth. Concrete
-   social adapters and model/target qualification are still open. Capability availability
-   must not manufacture demand, and effectful autonomy remains separately governed.
-11. **Qualify the implemented social feedback and bounded depth contracts.** PSM-6
-   feedback/repair and PSM-8 zero/one/two-call depth are implemented in the existing
-   Situation/Planner path and guarded by `test_social_feedback_loop.py` and
-   `test_situational_cognition.py`. The earlier source-open description is superseded.
-   Concrete perception/identity adapters, real-model social judgment and live
-   multi-person interaction remain unqualified; generic ingress is not recognition.
-12. **Extend General Ability evidence before wider autonomy.** Cover ordinary family life,
-   meeting a new person, gradual familiarity, friend interaction, awkward/negative feedback,
-   privacy boundaries, person-to-person versus Chromie-to-person relationships, doing
-   nothing, continuing her own activity, and Capability temptation without need. Qualify
-   semantics and user experience before adding long-lived self-created intentions.
-
-Exit criteria:
-
-- one Self behaves coherently across family/friend/stranger situations without Persona
-  routing;
-- a trusted meaningful Situation can wake cognition without manufacturing a Goal;
-- goal-free wake frequently and correctly results in silence/observation;
-- relational Memory improves later interaction without becoming authorization or a privacy
-  leak;
-- Social Attention remains auxiliary body expression rather than social cognition owner;
-- no Capability is selected merely because it exists; and
-- source, automated verification, target-model quality, and live/social evidence remain
-  separately reported.
-
-## Approved architecture line — asynchronous transport-independent Capability Runtime
-
-The Trusted Capability Runtime now has an approved target architecture. Current source
-has request identity, validation, resource arbitration, cancellation, provider execution,
-bounded internal concurrency, a non-blocking `CapabilityRuntime.submit(...)` dispatch
-boundary, and a correlated in-process `CapabilityRuntimeEvent` lifecycle surface. `submit()`
-returns a `CapabilityDispatchReceipt` after Host validation, Runtime ownership registration,
-and submission-task creation; provider terminal completion is an explicit
-`wait_terminal(receipt)` join rather than the dispatch API. No
-`CapabilityRuntime.execute(...)` aggregate compatibility API remains. Accepted, running,
-progress, and terminal events are published per exact Runtime-owned request without waiting
-for sibling completion. Incremental terminal Evidence reconciliation and detached cognitive
-re-entry are now maintained without creating a second Work/Result/Event manager or semantic
-agent. Provider transport remains below the Capability contract.
-
-Implement this line as separate focused Issues and separate patches:
-
-- **Issue — Canonicalize Capability Runtime vocabulary — source implementation complete.**
-  Canonical executable source now uses `CapabilityRuntime`, `CapabilityDefinition`,
-  `CapabilityRegistry`, `CapabilityProvider`, `CapabilityRequest`, `CapabilityResult`,
-  `capability_id`, and `capability_version`. The old executable `Skill*` aliases/files and
-  live `skill_id` compatibility are removed; Agent Skills retain `agent_skill_id`, while
-  Soridormi wire `skill_id` is translated only at its adapter boundary. This naming/authority
-  cleanup does **not** claim the asynchronous dispatch behavior of the later Issues.
-- **Issue — Split capability dispatch from terminal completion — source implementation complete.**
-  `CapabilityRuntime.submit(...)` now returns a `CapabilityDispatchReceipt` after validation,
-  canonical request registration, and Runtime-owned task creation while provider execution
-  continues independently. Terminal joining is explicit through `wait_terminal(receipt)`;
-  the old `CapabilityRuntime.execute(...)` API was deleted rather than retained as a
-  compatibility wrapper. Existing sequential dependencies, provider grouping, cancellation,
-  and resource barriers remain Runtime-owned.
-- **Issue — Publish correlated capability lifecycle events — source implementation complete.**
-  `CapabilityRuntime` now retains one bounded, cursor-addressable mechanical
-  `CapabilityRuntimeEvent` history for accepted/running/progress/terminal state using
-  Host-owned request correlation. Consumers keep independent cursors rather than destructively
-  competing for one queue. Provider-returned IDs are checked against Runtime ownership and
-  identity mismatches fail closed; provider `execute()` cannot close a request with a
-  non-terminal `accepted`/`running` result. Each request publishes its terminal event as soon
-  as it becomes terminal, even while a parallel sibling is still running. Runtime events are
-  lifecycle observations, not terminal Evidence.
-- **Issue — Reconcile terminal Evidence incrementally — source implementation complete.**
-  `ExecutionOutcomeReconciler.reconcile_terminal_result(...)` validates the full committed
-  request set against the immutable Plan but emits canonical `ExecutionEvidence` only for the
-  exact terminal request. `CognitiveTurnClosure.build_terminal_evidence(...)` applies the same
-  committed output-schema and completion-evidence gates used by final closure. A sibling with
-  no terminal result is absent from incremental Evidence rather than fabricated as
-  `not_run`/`missing_result`; the terminal request receives the same stable `evidence_id` used
-  by final aggregate reconciliation. `ExecutionOutcomeBundle` remains final terminal truth,
-  not a live scheduler snapshot, and no duplicate completion store is introduced.
-- **Issue — Decouple interaction lifetime from capability lifetime — source implementation complete.**
-  All maintained interaction responses now submit through `submit_response(...)`; the foreground
-  interaction task ends after Runtime acceptance while a Runtime-correlated result consumer owns
-  lifecycle observation until terminal closure. Each terminal Capability result may become exact incremental `ExecutionEvidence`, then an
-  internal `CognitiveOpportunity`, then Planner re-entry when the affected Responsibility remains
-  relevant. Result arrival is never fabricated as a user turn and the callback never chooses speech.
-  Planner receives the current Goal/Responsibility/Situation/Work/Evidence view and may answer,
-  author genuinely new follow-up Work, wait, or emit no Activity; newly planned Work returns through
-  the same detached Runtime boundary. Planner-authored `after_capabilities` terminal wording is
-  excluded from detached execution because completion language belongs to terminal Evidence. Final
-  aggregate closure remains available for whole-scope truth and filters Evidence already consumed
-  incrementally so the same transition is not planned or spoken twice. Runtime open-interaction ownership
-  also remains visible to scoped cancellation after the foreground Python task has exited.
-- **Issue — Harden cancellation, supersession, and late-result semantics — source implementation complete.**
-  Late terminal Evidence remains valid execution history, but cognitive re-entry now fails closed
-  unless every source Goal still has open Responsibility and the Host-owned current binding matches
-  the exact canonical Plan ID/fingerprint and request ID that originally dispatched the work. Goal
-  cancellation, Goal supersession, replanning, or request rebinding therefore suppress obsolete
-  result speech/action without discarding the terminal Evidence. Existing exact cancellation receipts
-  continue to own provider stop truth; a late provider completion cannot reopen terminal Goal state.
-- **Issue — Migrate long-running Soridormi work to asynchronous provider lifecycle — source implementation complete for provider activities.**
-  Soridormi body-activity execution may now acknowledge `running`/non-terminal state; the adapter
-  retains the provider-owned `compiled_activity_id`, polls `soridormi.activity.status`, and projects
-  each non-terminal snapshot through `CapabilityExecutionContext.publish_progress(...)` into generic
-  `CapabilityRuntimeEvent(progress)` observations. Terminal member evidence is produced only after
-  Soridormi reports terminal activity state. Runtime timeout/cancellation still invokes the existing
-  provider-local `soridormi.activity.cancel` path. Chromie never interprets provider status as a new
-  cognitive plan and never exposes Soridormi activity identity as canonical Capability identity.
-  Single named-skill calls keep their existing wire execution path because the checked-in provider
-  contract exposes no named-skill status/event endpoint; no fake polling API is invented.
-- **Issue — Delete remaining foreground aggregate-wait behavior — source implementation complete.**
-  The old `CapabilityRuntime.execute(...)`, `InteractionRuntimeCoordinator.execute(...)`, and
-  `VoiceAssistant.execute_interaction_response(...)` aggregate APIs are deleted. Every maintained
-  foreground interaction now dispatches through `submit_response(...)` and returns after Runtime
-  acceptance; terminal joining is explicit only in result consumers or bounded internal call sites
-  that genuinely require terminal truth. Planner-authored `after_capabilities` completion wording
-  is never executed before terminal Evidence, and the coordinator no longer invents semantic failure
-  speech. Repository policy forbids reintroducing the removed aggregate APIs or bypassing detached
-  result consumers.
-
-Each Issue must preserve the central authority invariant: Runtime owns execution lifecycle;
-LLM/Core owns meaning. Framework choice must not turn transport, queues, workflows, or
-callbacks into a second planner.
-
 ## Current priorities
 
-### 2026-08-22 audit-remediation line
+1. **Everyday live-cohort root-cause repairs (active Issue).** Run the
+   `scenarios/everyday/` cohort against Soridormi MuJoCo, judge every case and
+   repair each failure at its earliest responsible owner. Scope and next steps:
+   [checkpoint](DEVELOPMENT_CHECKPOINT.md).
+2. **Semantic transaction simplification and generalization.** Source-span
+   provenance, semantic-artifact lineage, the SC model-view diet and the
+   provider-declared semantic Capability facade substrate are implemented.
+   Remaining, in order:
+   - publish the semantic facade on the live Soridormi catalog, beginning with
+     semantic turn direction, and prove backend changes do not change Goal/Plan
+     meaning;
+   - add declared metamorphic families (paraphrase, bilingual equivalence,
+     irrelevant context, catalog permutation, controlled semantic deltas,
+     provider-realization invariance, compositional recombination) and bounded
+     stateful episodes to the existing scenario and general-ability
+     infrastructure;
+   - only then requalify the model/profile on the reduced transactions, then
+     SGLang priority/contention, then latency.
+3. **Persistent Social Mind qualification.** The person-first identity,
+   Goal-free Situation wake, trusted social-perception ingress, relational
+   Memory with privacy provenance, social feedback and bounded self-initiative
+   contracts are source-implemented. Concrete perception and identity
+   adapters, real-model social judgment and live multi-person interaction
+   remain unqualified. Extend General Ability evidence (family life, meeting a
+   new person, familiarity, negative feedback, privacy boundaries, doing
+   nothing, Capability temptation without need) before wider autonomy.
+4. **Evidence closure.** Preserve the canonical local gate, then narrow
+   current-revision voice proof, then default target-evidence closure.
 
-The audit-remediation line is deliberately subtractive. Phase 1 has closed the verified
-live Host semantic-authority leaks in source. Current work therefore removes stale or
-overlapping surfaces without reopening the cognitive backbone or relocating deleted
-authority behind a new manager.
-
-1. **Phase 1 — close live semantic-authority violations.**
-   - **1A Confirmation authority:** authorization state owns only exact request identity,
-     TTL/fingerprint, and typed decision. It must reuse Planner-authored confirmation
-     wording exactly and has no fallback phrase or resolution message. Missing Planner
-     wording fails closed. **Implemented in Phase 1A.**
-   - **1B Cancellation and technical failure truth:** preserve deterministic stop/cancel
-     safety, but return receipts/state facts to cognition rather than replacing the
-     Planner response with Host self-narration. Named-Goal cancellation now materializes
-     bounded `GoalCancellationEvidence` and re-enters the existing Planner state path; an
-     affected pending confirmation is revoked as a whole rather than narrowed by Host
-     child-plan/prompt synthesis. Failed or uncertain cancellation may use only a tiny
-     operational safety utterance if Planner re-entry is unavailable, and that utterance
-     must not claim success. Processing/commit failures must never be rounded into
-     capability inability or pipeline jargon. **Implemented in Phase 1B.**
-   - **1C Result meaning:** remove `status -> sentence` outcome composition and other
-     post-execution Host result interpretation. Trusted Evidence updates Goal/Work/Situation
-     and reactivates Planner; unavailable Planner cognition records failure and remains
-     conservative rather than manufacturing semantic completion/refusal text. Aggregate
-     re-entry now exposes terminal status plus mechanical completion qualification to the
-     same Planner; the deterministic `outcome_response.py` owner is removed. **Implemented.**
-   - **1D Body recovery:** recoverable body failure remains trusted Evidence; bounded
-     provider-declared retryability facts are exposed without interpretation and the same
-     Planner may choose retry/alternative/clarification/wait/no new Work. Host no longer
-     builds retry Plans, retry request identities, or recovery prompts; Soridormi and
-     Runtime retain confirmation enforcement, safety, preflight, and execution authority.
-     **Implemented in Phase 1D.**
-
-   **Phase 1 exit:** a source/AST policy and behavior regressions demonstrate that normal
-   confirmation, cancellation, execution failure, partial/refused/result, and recoverable
-   body paths contain no Host-authored semantic response owner; fixed protective reflexes
-   and the documented cognition-unavailable emergency utterance are the only explicit
-   exceptions.
-
-2. **Phase 2 — documentation convergence.** Current documentation now describes the same
-   Goal-driven authority implemented by source: `chromie_mind.md` is rewritten around
-   MindProfile-as-context rather than deleted agents/routes; duplicated configuration tails
-   are removed; current architecture docs no longer describe Host result fallbacks or
-   route/intent UMI branches; ROADMAP/STATUS/checkpoint separate source closure from target
-   qualification; and the docs gate rejects duplicate Configuration H2 sections plus the
-   reviewed stale semantic phrases. **Implemented in Phase 2.**
-
-3. **Phase 3 — WorkDAG / DAGEngine authority convergence.** WorkDAG is the revisioned,
-   Planner-authored topology of coherent planned Work; DAGEngine is the deterministic DAG
-   runtime. Planner is the only ordinary semantic mutation entry. GA changes Goal continuity
-   only, then Planner may retain the current DAG (`reuse_activity_id` / NO_CHANGE), extend or
-   replace it with the exact next revision, or create/merge another coherent DAG. Normal node
-   completion advances in DAGEngine without another model call. Completed/skipped nodes are
-   immutable Evidence-bound history and are inherited without redispatch. Engine-authored
-   `residual_replan`, recovery recommendations, and outcome narration are removed; material
-   failure returns facts to Planner. Provider-local DAGs remain valid behind provider
-   Capability boundaries. **Implemented in Phase 3.**
-
-4. **Phase 4 — repository hygiene.** Verified orphan multi-agent prompt assets and the
-   dead `ToolClient` are removed; `pytest-asyncio` is pinned; repeated string-field whitespace
-   normalization and the three bounded JSON-Schema/type implementations converge on two
-   small shared mechanical helpers; stale mock-hardware naming and the unused
-   `CHROMIE_EVENT_ROOT` compatibility alias are removed. Repository policy rejects the
-   verified obsolete artifacts and direct re-copying of these shared mechanisms.
-   **Implemented in Phase 4.**
-
-5. **Phase 5 — structural simplification.** GA model DTOs, decoder schemas, and deterministic
-   normalization/coverage mechanics are separated into representation/schema/validation
-   modules while the Resolver remains the sole continuity transaction. Planner shared
-   validation remains common, while Fast-specific qualification/fail-safe mechanics and
-   Deep-specific repair/safety/diagnostic mechanics move to pass-specific mechanical modules.
-   No compatibility re-export facade, second Planner/GA authority, or Host semantic manager is
-   added. Remaining Host/runtime large methods are retained where the reviewed code owns a
-   real lifecycle/state/runtime transaction rather than a safely extractable mechanical seam.
-   **Implemented in Phase 5.**
-
-6. **Phase 6 — qualification and release evidence.** The source-side qualification
-   harness is now implemented: canonical source qualification explicitly includes semantic
-   authority, focused audit-remediation regressions, retained Level-A general ability, and
-   the deterministic provider fault matrix; target-evidence closure adds a
-   `current_revision_qualification` profile requiring the same clean revision across source,
-   Gateway/Core, Agent Skill/weather, directory-discovered live interaction behavior, live provider
-   faults, SC-owned auxiliary social behavior, and LAN tracks. The interaction track now requires explicit
-   passing coverage for human-like continuity, Planner/Goal semantic quality, WorkDAG
-   multi-Goal revision/cardinality, and continuous-cognition recovery in addition to the
-   retained baseline probes and warm Fast-Planner/playback budgets. Source qualification pins
-   the corresponding semantic/WorkDAG/turn-loop/continuous-cognition regressions. **Target
-   evidence remains open until an actual current-revision bundle finalizes eligible.** Physical
-   voice/robot remain separate optional evidence.
-
-Across all phases: `use less to solve more`; fix the earliest wrong boundary; do not add a
-`SpeechManager`, Response Composer, recovery brain, compatibility semantic path, or a second WorkDAG semantic owner.
+Across all lines: `use less to solve more`; fix the earliest wrong boundary; do
+not add a `SpeechManager`, Response Composer, recovery brain, compatibility
+semantic path, or a second WorkDAG semantic owner.
 
 ## Completed foundations
 
@@ -790,70 +95,33 @@ sequential milestone numbers. Earlier incremental work is represented by two com
 - **Local interaction foundation:** Compose-based services, ASR/TTS contracts,
   bounded session state, playback ordering, reversible speech-start barge-in,
   order-aware echo resume, deterministic stop and cancellation, and simulator
-  integration. Clean generated-speech evidence for `94718ab` retains acoustic
-  and later semantic cancellation as distinct receipts; physical audio remains
-  an open evidence track.
+  integration. Physical audio remains an open evidence track.
 - **Goal-driven control-plane foundation:** Cognitive Gateway admission,
   immutable turn envelopes, Core-owned User Meaning Interpretation, Goal Association,
   the Planner contract, SC-owned Communicative Activities, Trusted Capability
   Runtime validation, outcome evidence, and fail-closed execution.
+
+Source lines completed on top of them (details in Git history and the CHANGELOG):
+asynchronous transport-independent Capability Runtime (dispatch receipts,
+lifecycle events, incremental terminal Evidence, detached re-entry, late-result
+suppression); removal of Host-authored semantic responses for confirmation,
+cancellation, result meaning and body recovery; Planner-owned WorkDAG with a
+mechanical DAGEngine; Continuous Mind wake/re-entry, bounded Situation,
+structured time conditions and context-activated Memory; layered prompt prefixes;
+semantic authority closure (`apply` is the only authoritative semantic path);
+the need-first one-Planner contract with the Deep Planner retired; and Value
+Judgment.
 
 These foundations are maintained only while their automated contracts remain
 passing.
 
 ## Active source work
 
-### Layered prompt prefix integration — source complete
-
-Issue [#17](https://github.com/TimeTreker/chromie/issues/17) owns the design and
-Issue [#18](https://github.com/TimeTreker/chromie/issues/18) owns the completed
-source integration and its explicit target-evidence boundary. The architecture defines six ordered layers: a
-constitutional foundation; exact identity/world projection; exact Agent role;
-exact capability/Skill/schema projection; session context; and current turn.
-Only identical rendered layers 0 through 3 form a stable-prefix candidate.
-Preserve the current model-facing contracts and deterministic validation; do
-not add a Host semantic cache, a runtime flag, or a compatibility path.
-
-Exit criteria:
-
-- each layer has one owner, allowed content, mutability rule, and invalidation
-  condition;
-- current time, session state, Goals, memory, observations, evidence, validator
-  feedback, and current user input remain volatile;
-- owner identity/world and capability projections are stable only while their
-  exact rendered content is unchanged;
-- hashes are defined as non-sensitive invalidation/observability evidence, not
-  a provider cache-key API or cache-hit claim; and
-- `OllamaClient` owns exact assembly, context accounting, non-sensitive layer
-  digests, request-contract identity, and provider timing correlation; and
-- focused non-live regressions pass; the same-model RTX 4090 Laptop measurement
-  remains part of the next model-profile qualification and must distinguish
-  source completion from target evidence.
-
-### Semantic authority closure — source complete
-
-- `apply` is the only maintained authoritative semantic path.
-- `report_only` is observer-only and `off` is diagnostic fail-closed disablement.
-- UMI owns WHAT; Goal Association owns canonical Goal continuity; the Planner owns HOW;
-  Social Cognition owns exact Communicative Activities.
-- Runtime derives the execution lane mechanically from the terminal Plan and fails
-  closed when that lane is unsupported or disabled.
-- Retired Agent `/run`, `/interaction`, `/agents`, CapabilityAgent, direct-LLM,
-  route/intent, and emergency semantic fallback surfaces are not rollback options.
-
-Exit criteria:
-
-- the semantic-authority matrix has exactly one owner per maintained entrypoint;
-- unsupported/disallowed terminal Plan lanes produce typed no-action outcomes;
-- no authoritative failure enters another semantic planner;
-- current docs, profiles, and source describe the same authority and lane policy.
-
 ### Social Cognition interaction and independent Work — source implemented, qualification open
 
-The owner-approved SC migration supersedes the earlier #32 presentation-frame
-implementation. `/fast-advance` emits one complete Work decision; `/social-cognition`
-authors interaction from the shared UMI result, canonical needs, Work/Evidence state
-or trusted Situation. GA/Work and SC proceed independently until a required
+`/fast-advance` emits one complete Work decision; `/social-cognition` authors
+interaction from the shared UMI result, canonical needs, Work/Evidence state or
+trusted Situation. GA/Work and SC proceed independently until a required
 confirmation or explicit ordering dependency must join.
 
 Maintained exit criteria:
@@ -867,193 +135,106 @@ Maintained exit criteria:
 - freeze and adjudicate SC and Work transactions, run full local gates, and retain
   current-target latency/contention and physical-evidence gaps separately.
 
-Native role cases and controlled runtime tests do not by themselves close #24/#32
-or qualify the deployed end-to-end interaction path. Current evidence is owned by
-[STATUS.md](docs/STATUS.md#social-cognition-migration).
+Current evidence is owned by [STATUS.md](docs/STATUS.md#social-cognition-migration).
 
 ### Goal-scoped Interaction Ledger and current-turn continuity
 
-Issue [#22](https://github.com/TimeTreker/chromie/issues/22) owns the append-only
-Interaction Ledger and bounded Goal-scoped Interaction Context supplied to Goal
-Association and the Planner. The Ledger
-transports facts from existing owners; it does not replace or rewrite playback,
-auxiliary-Activity results, the canonical Plan, Goal state, static preflight
-diagnostics, or `ExecutionOutcomeBundle` evidence.
+The append-only Interaction Ledger and bounded Goal-scoped Interaction Context
+are supplied to Goal Association and the Planner. The Ledger transports facts
+from existing owners; it does not replace or rewrite playback, auxiliary-Activity
+results, the canonical Plan, Goal state, static preflight diagnostics, or
+`ExecutionOutcomeBundle` evidence.
 
 Exit criteria:
 
-- delivered response-stage speech retains exact turn, Goal, Plan, claim, and
+- delivered speech retains exact turn, Goal, Plan, claim, and
   completion-restriction provenance;
 - Cognitive Runtime, playback, Trusted Capability Runtime, and execution
   closure append only typed facts they authoritatively observe;
 - replay cannot change an immutable event, and terminal Activity entries require
   trusted execution evidence references;
-- Goal Association receives bounded recent Interaction Context and later
-  Planners receive the Goal-scoped projection so they can produce
-  only the still-needed delta;
-- An SC Communicative Activity scheduled before GA finishes retains UMI Responsibility refs and is
-  later bound only through GA-owned canonical Goal identity;
+- an SC Communicative Activity scheduled before GA finishes retains UMI
+  Responsibility refs and is later bound only through GA-owned canonical Goal identity;
 - Goal-bound speech cannot be reused for unrelated Goals or a different Plan;
 - scheduled and delivered speech remain distinct, and neither proves Activity
-  execution or completion; and
-- focused lane/runtime/model-prompt regressions plus the canonical source gate
-  pass without a new runtime switch, compatibility path, standalone document,
-  or competing semantic/effect authority.
+  execution or completion.
 
 ### Interpretation and capability grounding
 
-- Preserve the implemented ownership boundary: UMI emits no planning InformationGap or
-  strategy fields; Fast Planner owns execution-input completeness, source/default choice,
-  blocking, gap provenance, and clarification selection. Keep UMI bounded unresolved
-  meaning for genuine semantic ambiguity, GA-only canonical Goal commit, and exact
-  pending-clarification continuity. Keep clear weather, missing lookup input, ambiguous
-  referent, and movement regressions in the relevant general-ability classes.
-- Preserve one Fast User Meaning Interpretation transaction: one primary interpretation,
-  then accept, delegate genuine consequential unresolved WHAT once to source-based
-  Deep UMI, or fail closed. Invalid primary or Deep DTOs receive no same-authority
-  repair. Schema-valid benign chat remains on the fast conversational path.
+- UMI emits no planning InformationGap or strategy fields and never authors
+  bindings; the Planner owns execution-input completeness, source/default choice,
+  blocking, gap provenance, and clarification selection. UMI keeps bounded
+  unresolved meaning for genuine semantic ambiguity.
+- One User Meaning Interpretation transaction: one primary interpretation, then
+  accept, delegate genuine consequential unresolved WHAT once to source-based
+  Deep UMI, or fail closed. Invalid DTOs receive no same-authority semantic repair.
 - Treat non-empty interpretation failure as `interpretation_unavailable`; never
   rewrite it into plausible chat, tool, memory, or motion intent.
-- Keep semantic reconsideration source-based. Do not restore intent reviewers,
-  generic-chat critics, capability-grounding reviewers, contract-loss recovery,
-  or repair-of-repair around previous model output.
-- Preserve the implemented Goal Association primary-only transaction: one normal
-  primary call, at most one semantics-preserving repair for a Pydantic-invalid DTO,
-  then trusted closed-reference, provenance, cardinality, binding-conservation, and
-  continuity validation. Candidate-aware output writes associations and independent
-  new Goals as non-exclusive collections and conserves every UMI Responsibility exactly
-  once across their union, without a second branch-decision fact. Do not restore the
-  removed coverage/resegmentation calls or allow semantic rejection to enter repair.
-- Revalidate capability IDs, argument schemas, confidence, confirmation policy,
-  resources, and effect envelopes at trusted boundaries. There is one Planner pass;
-  regeneration is reserved for one mechanically malformed DTO only; semantic
+- Goal Association is primary-only: one call, at most one semantics-preserving
+  repair for a Pydantic-invalid DTO, then trusted closed-reference, provenance,
+  cardinality and continuity validation; every UMI Responsibility is conserved
+  exactly once across associations and new Goals.
+- There is one Planner pass plus at most one need-first library search and
+  re-plan; regeneration is reserved for one mechanically malformed DTO; semantic
   rejection and trusted Host rejection are terminal.
 - Expand general-ability scenarios rather than phrase-specific routing rules.
 
 Exit criteria:
 
 - no fallback invents an ordinary semantic lane;
-- a second malformed Fast DTO or semantic contradiction fails closed;
-- low-confidence Fast meaning that could change responsibility, external work,
-  memory, or effects reaches Deep Thinking without an intermediate semantic
-  repair model; low-confidence benign chat remains fast;
 - an effectful Goal has an owned executable step, delivered evidence for the
   same Goal, or an explicit clarify/unavailable/refused outcome;
 - compound body requests retain ordered exact capabilities;
 - missing abilities remain honest terminal outcomes;
-- semantic outcome tests enforce the logical model-call budgets instead of an
-  exact historical prompt sequence.
+- semantic outcome tests enforce logical model-call budgets instead of an exact
+  historical prompt sequence.
 
 ### Vocal semantics and provider qualification
 
-The retained compound walk/sing/blink defect has met its source and Level C
-simulator exit criteria; [Current Status](docs/STATUS.md) owns the evidence.
-Issue #6 has an exact source-qualified `chromie.vocal.perform` provider contract
-while keeping the maintained ownership boundary. Fake-provider tests, an exact
-recitation scenario, the relevant general-ability class, ordinary TTS
-regressions, and the canonical gate meet the source criteria. Clean Chromie
-`e558ff4` and Soridormi `1c15371` then passed the default-provider
-walk/sing/blink replay retained at
-`.chromie/acceptance/vocal-issue-6/issue-6-e558ff4-clean`: body work completed,
-singing remained unavailable with zero steps, all ordinary-TTS chunks played,
-and safe idle held before and after. Real vocal modes remain target evidence.
+`chromie.vocal.perform` and `chromie.media.play|pause|resume|seek|stop|volume|status`
+have source-qualified provider contracts; real vocal modes and real media remain
+target evidence. Vocal, TTS synthesis, playback transport, echo handling,
+audible-delivery ordering, and user-level barge-in remain Chromie-owned;
+Soridormi is a peer embodied Capability Provider beneath Activity.
 
-Issue #7 now has the exact provider-prefixed
-`chromie.media.play|pause|resume|seek|stop|volume|status` source contract with a
-bounded persistent lifecycle beneath Activity. Qualified fake-provider tests
-cover supported-kind negotiation, state/progress, exact operation evidence,
-cancellation, mixer policy, and private backend identity. Focused scenarios
-retain a mixed Soridormi walk plus exact media step and deterministic
-`media_output` cancellation. The default-provider live profile keeps playback
-unavailable with no media execution, keeps singing in Vocal, completes an
-independent Soridormi/MuJoCo walk, retains a cognition-bypassing stop-media
-receipt, and returns safe-idle. Existing audio playback therefore does not
-become authored vocal performance; real media and acoustic behavior remain
-target evidence.
-Vocal, TTS synthesis, playback transport, echo handling, audible-delivery
-ordering, and user-level barge-in remain Chromie-owned. Soridormi remains a peer
-embodied Capability Provider beneath Activity.
-
-- Typed Goal and Planner projections now separate completion modality,
-  execution lane, output mode, and exact-provider need; preserve this contract
-  through canonical and live evidence closure.
 - Keep `singing`, `humming`, `recitation`, and other authored vocal performance
-  in Vocal even when coordinated with body work.
-- Keep playback of existing music, recordings, streams, and sound effects in
-  Activity with an exact media-provider capability identity.
-- Use an exact provider-prefixed vocal capability such as
-  `chromie.vocal.perform`; provider implementation may change behind the stable
-  identity, but the Planner-to-evidence identity must not.
-- Carry a typed mode for speech, expressive speech, recitation, singing,
-  humming, or nonverbal vocalization. Provider declarations own supported modes,
-  streaming, timing marks, sample formats, concurrency, cancellation, and model
-  provenance.
-- Do not let ordinary expressive TTS advertise or close a singing outcome.
+  in Vocal even when coordinated with body work; keep playback of existing
+  audio in Activity with an exact media-provider capability identity.
 - Return exact unavailable outcomes for unsupported modes; never silently
-  downgrade one vocal mode to another.
-- Do not attach resource-acquisition responsibility to ordinary vocal output.
-- Keep one authoritative Planner step-ownership representation and derive or
-  strictly validate redundant references.
+  downgrade one vocal mode to another, and do not let ordinary expressive TTS
+  close a singing outcome.
 
-Exit criteria:
-
-- exact capability identity survives proposal, validation, authorization,
-  execution, cancellation, and evidence;
-- a fake provider proves supported-mode negotiation, exact unsupported outcomes,
-  cancellation, and provenance in source tests;
-- ordinary TTS remains equivalent for ordering, interruption, echo handling,
-  and audible-delivery evidence without becoming singing evidence;
-- the retained Chinese walk/sing/blink and generalized vocal/media distinctions
-  remain passing; and
-- real singing and physical audio are claimed only from retained mode-specific
-  target evidence.
+Exit criteria: exact capability identity survives proposal, validation,
+authorization, execution, cancellation, and evidence; real singing and physical
+audio are claimed only from retained mode-specific target evidence.
 
 ### Conditional vocal-hosting review
 
 Do not move TTS, playback, microphone, speaker, or media execution into
-Soridormi as part of the vocal architecture work. Reopen the hosting decision only
-when retained evidence demonstrates at least one concrete blocker that the
-current peer-provider boundary cannot meet, such as:
-
-- frame-accurate viseme/body/audio synchronization required by a physical robot;
-- measured cross-boundary start skew outside a named acceptance budget;
-- measured cancel-to-silence latency outside a named barge-in budget;
-- unavoidable platform audio adaptation leaking into cognitive or semantic
-  code; or
-- shared accelerator or mixer contention that cannot be solved behind the
-  existing provider contract.
-
-Any such review is a separate architecture decision. It must update the Project
-Charter, `AGENTS.md`, capability contracts, Status, Roadmap, tests, and evidence
-plan in one coherent change. Co-location or a cockpit/ADAS analogy is not by
- itself sufficient evidence.
+Soridormi. Reopen the hosting decision only when retained evidence demonstrates
+a concrete blocker the current peer-provider boundary cannot meet: frame-accurate
+viseme/body/audio synchronization on a physical robot, measured start skew or
+cancel-to-silence latency outside a named budget, platform audio adaptation
+leaking into cognitive code, or accelerator/mixer contention that cannot be
+solved behind the provider contract. Any such review is a separate architecture
+decision that updates the Charter, `AGENTS.md`, capability contracts, Status,
+Roadmap, tests, and evidence plan together.
 
 ### Structural simplification
 
 The maintained component and failure contracts are
 [VoiceAssistant Composition Root](docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md) and
-[Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md).
-
-**First source slice implemented.** Planner re-entry from terminal Evidence now uses a
-pure Host policy module for current Goal/Plan/request validation, exact originating
-Responsibility selection, completed-Activity idempotence, and already-delivered speech
-delta suppression. Missing Responsibility provenance fails closed instead of fabricating
-a callback Responsibility. This extraction removes nine private methods from
-`VoiceAssistant`, lowering its method count from 159 to 150. A second mechanical slice
-moves TTS text segmentation and Goal-list console projection behind existing Host/runtime
-module boundaries, lowering the composition root from 150 to 142 methods. Stateless observability-recording containment then lowers it to 139 methods. Fixed-reflex confirmation-token revocation, widening evidence, and state bookkeeping now live with the existing ConfirmationDialogue owner, lowering it to 136 methods while confirmation meaning remains GA-owned and confirmation speech remains SC-owned. OS-default audio-device detection, pending-switch queueing, cross-device input reset, and output rollover then move to stateless `audio_device_lifecycle.py`, lowering the root to 129 methods while device discovery remains `AudioDeviceManager`-owned and output I/O remains `PlaybackTransport`-owned. Top-level process teardown then moves to stateless `shutdown_lifecycle.py`: it reuses the existing InputTurn task owner, Playback wait/duck/transport owners, Session trace finalizer, and concrete ASR/HTTP/audio resource closers. Removing the old `VoiceAssistant.cleanup()` method and cleanup-only output-close compatibility wrapper lowers the root to 127 methods. Accelerator telemetry schedule/sample/task-tracking then moves into the existing stateless observability policy, lowering the root to 124 methods while Session remains the trace owner and telemetry remains non-semantic. The next mechanical slice removes the seven remaining PlaybackTransport/TTS compatibility delegates from `VoiceAssistant`: the transport now calls its own provider/output methods, Host call sites access the cached transport directly, and the existing TTS/playback trace spans move to that real owner. This lowers the root to 117 methods without moving SC-authored speech semantics, playback-generation authority, or barge-in/reflex interruption policy. The next slice removes twelve `VoiceAssistant` input/session compatibility delegates: `InputSessionRuntime` calls its own microphone callback, VAD/ASR queue, routed-turn lifecycle, injected/device audio streams, and session-idle sweep directly, while Host integration obtains that existing runtime explicitly and `InputTurnLifecycle` remains the task-state owner. This lowers the root to 105 methods without moving Gateway, turn, reflex, or conversation semantics. None of these
-slices adds a semantic owner, manager, state store, service, environment key, or public
-runtime path.
-
-**Goal Association internal decomposition implemented further.** GA model DTO/typed representation lives in `agent/app/goal_association_contract.py`; constrained-decoder schema construction lives in `agent/app/goal_association_schema.py`; deterministic normalization, grounding/conflict, and Responsibility-conservation mechanics live in `agent/app/goal_association_validation.py`; bounded prompt projection/system-prompt construction lives in `agent/app/goal_association_prompt.py`. Candidate-aware GA directly owns both existing-Goal associations and independent new Goals in one primary result; the decoder and Host conserve every accepted UMI Responsibility exactly once across their union, and no exclusive model-authored branch discriminant may erase a mixed turn. `GoalAssociationResolver` remains the only GA model-invocation/continuity transaction and canonical Goal-continuity writer. None of these mechanical layers may own Ollama invocation, runtime state, Goal commit, tracing, or a second semantic lifecycle.
-
-**Planner prompt/projection decomposition implemented.** Planner prompt construction, streaming presentation/truth prompt text, system prompts, model-facing capability compaction, and layered-prompt assembly live in `agent/app/planner_prompt.py`; raw read-only catalog payload projection lives in `planner_context.py`. The prompt module has no model client, runtime trace, Plan validation/materialization, Goal mutation, execution authorization, or second semantic lifecycle. `FastPlannerResolver` retains the primary model invocation, bounded mechanical repair decisions, Plan return, and the single Planner HOW authority (`DeepPlannerResolver` was removed on 2026-10-11). Each primary result owns its complete Goal coverage, evidence scope, truth strength, communicative wording, and satisfaction decision. Trusted validation cannot trigger a second same-owner model call.
-
-**Planner Resolver convergence implemented.** The former 6K-line `agent/app/planner_contract.py` catch-all is removed rather than preserved as a re-export facade. The same Planner owner is internally separated into `planner_model_contract.py` (model DTOs/errors, stable Plan IDs, canonical materialization), `planner_context.py` (read-only Goal/Evidence/Situation/Gateway and catalog-payload projection), `planner_grounding.py` (canonical material/binding comparison), `planner_schema.py` (constrained-decoder schemas), `planner_validation.py` (shared deterministic provenance/integrity checks), `planner_fast_validation.py` (primary-result/reuse/commitment/fail-safe validation mechanics), and `planner_fallback.py` (mechanical materialization of an already-decided unavailable limitation or fail-closed failure only; `planner_deep_validation.py` was removed with the Deep Planner). The former model-assisted coverage/communication audit module and its dedicated truth-model configuration are removed under Charter principles 30–31. Resolver methods no longer re-own deterministic schema, validation, normalization, fallback-construction, stable-ID, or projection mechanics. Every executable model step must explicitly author `timing`; the Host no longer preserves a singleton omission path that silently supplies `sequential`. These modules are implementation layers of one Planner authority; they do not create a Planner reviewer, reconciliation stage, response composer, Goal writer, Capability executor, or Runtime state store.
+[Runtime Failure Paths](docs/RUNTIME_FAILURE_PATHS.md). Planner prompt
+construction lives in `agent/app/planner_prompt.py` and produces one complete
+Work DTO with no presentation wording; the Planner owner is split into
+model-contract, context, grounding, schema, validation and fallback modules
+without a re-export facade. Goal Association is split into contract, schema,
+validation and prompt modules while `GoalAssociationResolver` remains the only
+GA transaction.
 
 - Decompose the Orchestrator composition root when ownership or independently
-  testable boundaries improve. Review method/property/initializer size deltas;
-  preserve blocking ownership, exception-boundary and direct-model-call checks.
+  testable boundaries improve; preserve blocking ownership, exception-boundary
+  and direct-model-call checks.
 - Remove import-time global logging configuration from library modules.
 - Keep configuration parsing inside typed settings owners.
 - Delete transient implementation plans once their durable contracts have moved
@@ -1070,7 +251,7 @@ Exit criteria:
 
 - Run repository policy, test ownership, static analysis, configuration,
   runtime structure, documentation, benchmark, unit, and legacy compatibility
-  checks from one canonical entry point.
+  checks from one canonical entry point (`./scripts/run_tests.sh`).
 - Pin third-party GitHub Actions by immutable commit SHA.
 - Record source identity from Git when available and from a deterministic source
   tree digest for archives.

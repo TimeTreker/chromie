@@ -4,12 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-try:
-    from chromie_contracts.core_interpretation import CognitiveActivationRequest, CognitiveResponsibilityProposal, UserMeaningUncertainty
-    from chromie_contracts.user_turn import UserTurnEnvelope
-except ImportError:  # pragma: no cover - repository development path
-    from shared.chromie_contracts.core_interpretation import CognitiveActivationRequest, CognitiveResponsibilityProposal, UserMeaningUncertainty
-    from shared.chromie_contracts.user_turn import UserTurnEnvelope
+from shared.chromie_contracts.core_interpretation import CognitiveActivationRequest, CognitiveResponsibilityProposal, UserMeaningUncertainty
+from shared.chromie_contracts.user_turn import UserTurnEnvelope
 
 
 class UserMeaningInterpretationRequest(BaseModel):

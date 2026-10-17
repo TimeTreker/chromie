@@ -21,7 +21,6 @@ from agent.app.goal_association_contract import (
     GoalAssociationModelBinding,
     GoalAssociationModelGoal,
     GoalAssociationModelInformationResourceResponsibility,
-    GoalAssociationModelInformationSource,
     GoalAssociationModelOutput,
     GoalAssociationModelPhysicalResourceResponsibility,
     GoalSegmentationModelOutput,
@@ -35,18 +34,11 @@ from shared.chromie_contracts.resource import (
     ResourceSource,
     resource_semantic_bindings,
 )
-
-
-class FakeOllama:
-    def __init__(self, payload):
-        self.payload = payload
-        self.prompts = []
-
-    async def generate(self, prompt, **kwargs):
-        self.prompts.append((prompt, kwargs))
-        if isinstance(self.payload, Exception):
-            raise self.payload
-        return self.payload
+from tests.goal_association_test_support import (
+    FakeOllama,
+    create_goals,
+    intent_goal,
+)
 
 
 class ScriptedOllama:
@@ -145,27 +137,6 @@ def goal(
         **extra,
     }
     return payload
-
-
-def intent_goal(description: str, output_mode: str, **extra) -> dict:
-    """GA fixture selects intent identities; descriptions/types come from UMI."""
-    return {"source_responsibility_refs": ["r1"], "related_goal_ids": [],
-            "supersedes_goal_ids": [], **extra}
-
-
-def create_goals(*goals: dict) -> dict:
-    return {
-        "new_goals": [
-            {"source_responsibility_refs": [ref],
-             "related_goal_ids": item.get("related_goal_ids", []),
-             "supersedes_goal_ids": item.get("supersedes_goal_ids", [])}
-            for item in goals for ref in item.get("source_responsibility_refs", [])
-        ],
-        "cognitive_requests": [],
-        "confidence": 1.0,
-        "reason_summary": "No retained Goal matches the current Responsibility.",
-    }
-
 
 
 def typed_responsibilities(*items: dict) -> list[CognitiveResponsibilityProposal]:
@@ -474,11 +445,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
 
-
-
-
-
-
     def test_decoder_nested_association_preserves_types_and_conditional_contract(self):
         schema = ga_schema.goal_association_response_schema(
             GoalAssociationModelOutput, [{"goal_id": "goal-a"}], [],
@@ -506,9 +472,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertFalse(Draft202012Validator({"$defs": schema["$defs"], **association}).is_valid(modify))
         modify["requirement_changes"] = [{"target_goal_id": "goal-a", "replace_requirement_indices": [0], "source_responsibility_refs": ["r1"]}]
         self.assertTrue(Draft202012Validator({"$defs": schema["$defs"], **association}).is_valid(modify))
-
-
-
 
 
     def test_unscoped_optional_referent_correction_is_rejected(self):
@@ -544,18 +507,6 @@ class GoalExecutionContractTests(unittest.TestCase):
             canonical.resource.attributes["location"]["value"],
             "重庆",
         )
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     def test_physical_resource_entity_binding_is_conserved_by_description(self):
@@ -738,8 +689,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
 
-
-
     def test_verbatim_relative_location_is_valid_location_provenance(self):
         output = GoalSegmentationModelOutput.model_validate(
             create_goals(
@@ -792,17 +741,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
 
-
-
-
-
-
-
-
-
-
-
-
     def test_primary_result_preserves_two_responsibilities_without_a_reviewer(self):
         candidates = create_goals(
             intent_goal("Look at me", "body_action", source_responsibility_refs=["r1"]),
@@ -846,7 +784,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         )
 
 
-
     def test_goal_association_projection_omits_fast_planner_response_wording(self):
         req = request("今天晚上有大雨吗？")
         req = req.model_copy(
@@ -884,14 +821,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertNotIn("Planner HOW, not Goal meaning.", prompt)
         self.assertNotIn('"activity_id":"vocal_1"', prompt)
         self.assertNotIn('"role":"progress"', prompt)
-
-
-
-
-
-
-
-
 
 
     def test_goal_segmentation_prompt_preserves_all_authoritative_responsibilities(self):
@@ -944,9 +873,6 @@ class GoalExecutionContractTests(unittest.TestCase):
         self.assertIn("never silent semantic repair", prompt)
 
 
-
-
-
     def test_temporal_binding_preserves_human_semantic_surface(self):
         value = GoalAssociationModelBinding(
             name="temporal_scope",
@@ -955,7 +881,6 @@ class GoalExecutionContractTests(unittest.TestCase):
             confidence=1.0,
         )
         self.assertEqual(value.value, "今晚")
-
 
 
 class GoalAssociationTransactionTests(unittest.TestCase):
@@ -980,24 +905,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             [kwargs["prompt_family"] for _, kwargs in ollama.prompts],
             families,
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
     def test_ungrounded_reference_commits_provisional_goal_for_planner(self):
@@ -1026,10 +933,6 @@ class GoalAssociationTransactionTests(unittest.TestCase):
             terminal="resolved",
             families=["goal_association.primary"],
         )
-
-
-
-
 
 
     def test_model_transport_failure_is_formal_fail_closed(self):
@@ -1078,12 +981,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         )
 
 
-
-
-
-
-
-
     def test_terminal_goal_cannot_absorb_fresh_responsibility(self):
         terminal = active_goal("goal-weather", "Check Chongqing weather.")
         terminal["responsibility_status"] = "satisfied"
@@ -1117,10 +1014,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         )
 
 
-
-
-
-
     def test_existing_goal_continuity_commits_without_creation_or_audit(self):
         ollama = ScriptedOllama(
             [
@@ -1149,7 +1042,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 1)
 
 
-
     def test_duplicate_new_goal_responsibility_fails_closed_without_repair(self):
         ollama = ScriptedOllama([
             create_goals(
@@ -1172,7 +1064,6 @@ class GoalAssociationOutcomeRegressionTests(unittest.TestCase):
         self.assertFalse(
             result.metadata["goal_semantic_transaction"]["contract_repair_attempted"]
         )
-
 
 
 class GoalAssociationResolutionContractTests(unittest.TestCase):
@@ -1208,8 +1099,6 @@ class GoalAssociationResolutionContractTests(unittest.TestCase):
                 turn_id="turn-1",
                 clarification="Which one?",
             )
-
-
 
 
 if __name__ == "__main__":
@@ -1264,7 +1153,6 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
         self.assertEqual(inherited["confidence"], 0.97)
 
 
-
     def test_source_bound_changes_reject_missing_requirement_binding_or_snapshot(self):
         from shared.chromie_contracts.semantic_task import SemanticGoal, apply_goal_meaning_update, semantic_goal_fingerprint
         original = SemanticGoal(goal_id="g", source_text="original", description="A; B", success_criteria=["A", "B"])
@@ -1304,7 +1192,6 @@ class GoalMeaningInheritanceTests(unittest.TestCase):
                        {**base, "relationship": "continue"}):
             with self.assertRaises(ValidationError):
                 GoalAssociationModelAssociation.model_validate(change)
-
 
 
 class GoalAssociationRepairPreservationTests(unittest.TestCase):
@@ -1429,14 +1316,6 @@ class GoalAssociationRepairPreservationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "required prompt projection budget"):
             ga_prompt.build_repair_prompt(request=req, candidate_goals=[], turn_id="turn",
                 output_type=GoalAssociationModelOutput, raw=malformed, validation_error="[]")
-
-
-
-
-
-
-
-
 
 
 class GoalAssociationOnlyContractTests(unittest.TestCase):

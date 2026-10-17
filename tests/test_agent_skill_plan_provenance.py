@@ -10,22 +10,13 @@ from agent.app.agent_skills import (
 )
 from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
 
-try:
-    from chromie_contracts import (
-        AgentSkillDisclosureResolution,
-        CanonicalPlan,
-        DisclosedAgentSkillProjection,
-        PlanAgentSkillProvenance,
-        canonical_plan_fingerprint,
-    )
-except ImportError:  # pragma: no cover - repository test path
-    from shared.chromie_contracts import (
-        AgentSkillDisclosureResolution,
-        CanonicalPlan,
-        DisclosedAgentSkillProjection,
-        PlanAgentSkillProvenance,
-        canonical_plan_fingerprint,
-    )
+from shared.chromie_contracts import (
+    AgentSkillDisclosureResolution,
+    CanonicalPlan,
+    DisclosedAgentSkillProjection,
+    PlanAgentSkillProvenance,
+    canonical_plan_fingerprint,
+)
 
 
 class AgentSkillPlanProvenanceTests(unittest.TestCase):

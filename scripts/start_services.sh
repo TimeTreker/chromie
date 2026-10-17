@@ -59,7 +59,7 @@ echo "[start] GPU: ${CHROMIE_NVIDIA_GPU_NAME:-unknown} compute=${CHROMIE_NVIDIA_
 echo "[start] CPU: ${CHROMIE_CPU_MODEL:-unknown} cores=${CHROMIE_CPU_CORES:-unknown} mem=${CHROMIE_MEM_TOTAL_MIB:-unknown}MiB"
 echo "[start] User Meaning Interpreter model: ${AGENT_USER_MEANING_INTERPRETER_MODEL:-unset}"
 echo "[start] Agent model: ${AGENT_MODEL:-unset}"
-echo "[start] Cognitive models: association=${AGENT_GOAL_ASSOCIATION_MODEL:-unset} fast=${AGENT_FAST_PLANNER_MODEL:-unset} deep=${AGENT_DEEP_PLANNER_MODEL:-unset}"
+echo "[start] Cognitive models: association=${AGENT_GOAL_ASSOCIATION_MODEL:-unset} fast=${AGENT_FAST_PLANNER_MODEL:-unset} deep=${AGENT_DELIBERATIVE_MODEL:-unset}"
 echo "[start] Ollama: max_loaded=${OLLAMA_MAX_LOADED_MODELS:-unset} num_parallel=${OLLAMA_NUM_PARALLEL:-unset}"
 echo "[start] ASR: backend=sherpa_onnx mode=${ASR_MODE:-unset} model=${ASR_MODEL:-unset}"
 echo "[start] TTS backend: ${CHROMIE_TTS_BACKEND:-cosyvoice3}"
@@ -129,19 +129,46 @@ if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}
   export AGENT_MODEL="$COSYVOICE_BRAIN_MODEL"
   export AGENT_GOAL_ASSOCIATION_MODEL="$COSYVOICE_BRAIN_MODEL"
   export AGENT_FAST_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_DEEP_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
+  export AGENT_DELIBERATIVE_MODEL="$COSYVOICE_BRAIN_MODEL"
   COSYVOICE_BRAIN_NUM_CTX="${TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192}"
   export AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX="${AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
   export AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX="${AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
   export AGENT_GOAL_ASSOCIATION_NUM_CTX="${AGENT_GOAL_ASSOCIATION_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
   export AGENT_FAST_PLANNER_NUM_CTX="${AGENT_FAST_PLANNER_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
-  export AGENT_DEEP_PLANNER_NUM_CTX="${AGENT_DEEP_PLANNER_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
+  export AGENT_DELIBERATIVE_NUM_CTX="${AGENT_DELIBERATIVE_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
   export OLLAMA_MAX_LOADED_MODELS=1
   echo "[start] CosyVoice shared-GPU cognition: $COSYVOICE_BRAIN_MODEL context_fallback=$COSYVOICE_BRAIN_NUM_CTX (generated role contexts preserved; one resident Ollama model/runner)."
+  # verify_runtime_profile.sh re-sources .env.runtime. Record the effective
+  # compact-cognition values as a service override so the verifier compares the
+  # containers against what this launcher actually started.
+  COMPACT_OVERRIDE="$ROOT_DIR/.chromie/services.compact-cognition.env"
+  mkdir -p "$ROOT_DIR/.chromie"
+  {
+    if [ -n "${CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE:-}" ]; then
+      cat "$CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE"
+    fi
+    for key in \
+      AGENT_USER_MEANING_INTERPRETER_MODEL \
+      AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL \
+      AGENT_MODEL \
+      AGENT_GOAL_ASSOCIATION_MODEL \
+      AGENT_FAST_PLANNER_MODEL \
+      AGENT_DELIBERATIVE_MODEL \
+      AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX \
+      AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX \
+      AGENT_GOAL_ASSOCIATION_NUM_CTX \
+      AGENT_FAST_PLANNER_NUM_CTX \
+      AGENT_DELIBERATIVE_NUM_CTX \
+      OLLAMA_MAX_LOADED_MODELS; do
+      printf '%s=%q\n' "$key" "${!key}"
+    done
+  } > "$COMPACT_OVERRIDE.tmp"
+  mv "$COMPACT_OVERRIDE.tmp" "$COMPACT_OVERRIDE"
+  export CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE="$COMPACT_OVERRIDE"
 fi
 
-# Optional comma-separated override list, for example:
-# CHROMIE_COMPOSE_OVERRIDE_FILES=docker-compose.jetson.yml,docker-compose.local.yml
+# Optional comma-separated compose override list, for example:
+# CHROMIE_COMPOSE_OVERRIDE_FILES=docker-compose.sglang.yml
 if [ -n "${CHROMIE_COMPOSE_OVERRIDE_FILES:-}" ]; then
   IFS=',' read -ra override_files <<< "${CHROMIE_COMPOSE_OVERRIDE_FILES}"
   for file in "${override_files[@]}"; do

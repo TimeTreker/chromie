@@ -5,6 +5,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from shared.chromie_runtime.env_values import parse_bool
+
 class Settings(BaseModel):
     cognitive_budget_profile: str = Field(
         default_factory=lambda: os.getenv(
@@ -22,7 +24,7 @@ class Settings(BaseModel):
     )
     sglang_url: str = Field(
         default_factory=lambda: os.getenv(
-            "AGENT_SGLANG_URL", "http://chromie-llm-sglang-qualification:30000/v1"
+            "AGENT_SGLANG_URL", "http://chromie-llm:30000/v1"
         ).rstrip("/")
     )
     sglang_priority_step: int = Field(
@@ -31,23 +33,24 @@ class Settings(BaseModel):
         le=100000,
     )
     use_llm: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_USE_LLM", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_USE_LLM"), name="AGENT_USE_LLM", default=True
+        )
     )
     enable_read_only_dag_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_READ_ONLY_DAG_EXECUTION", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_ENABLE_READ_ONLY_DAG_EXECUTION"), name="AGENT_ENABLE_READ_ONLY_DAG_EXECUTION", default=False
+        )
     )
     enable_planning_dag_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_PLANNING_DAG_EXECUTION", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_ENABLE_PLANNING_DAG_EXECUTION"), name="AGENT_ENABLE_PLANNING_DAG_EXECUTION", default=False
+        )
     )
     enable_parallel_dag_execution: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_ENABLE_PARALLEL_DAG_EXECUTION",
-            "0",
-        ).strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_ENABLE_PARALLEL_DAG_EXECUTION"), name="AGENT_ENABLE_PARALLEL_DAG_EXECUTION", default=False
+        )
     )
     dag_engine_max_concurrency: int = Field(
         default_factory=lambda: int(
@@ -57,12 +60,14 @@ class Settings(BaseModel):
         le=64,
     )
     enable_guarded_dag_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_GUARDED_DAG_EXECUTION", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_ENABLE_GUARDED_DAG_EXECUTION"), name="AGENT_ENABLE_GUARDED_DAG_EXECUTION", default=False
+        )
     )
     enable_physical_dag_execution: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_ENABLE_PHYSICAL_DAG_EXECUTION", "0").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_ENABLE_PHYSICAL_DAG_EXECUTION"), name="AGENT_ENABLE_PHYSICAL_DAG_EXECUTION", default=False
+        )
     )
     dag_engine_execution_token: str = Field(
         default_factory=lambda: os.getenv("AGENT_DAG_ENGINE_EXECUTION_TOKEN", "")
@@ -99,10 +104,9 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("AGENT_SKILL_ROOTS", "agent-skills")
     )
     agent_skill_selection_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_SKILL_SELECTION_ENABLED",
-            "1",
-        ).strip().lower() not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_SKILL_SELECTION_ENABLED"), name="AGENT_SKILL_SELECTION_ENABLED", default=True
+        )
     )
     agent_skill_selection_model: str = Field(
         default_factory=lambda: os.getenv(
@@ -152,10 +156,9 @@ class Settings(BaseModel):
         le=4096,
     )
     agent_skill_progressive_disclosure_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED",
-            "1",
-        ).strip().lower() not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED"), name="AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED", default=True
+        )
     )
     agent_skill_projection_max_chars: int = Field(
         default_factory=lambda: int(
@@ -189,13 +192,14 @@ class Settings(BaseModel):
         le=32,
     )
     weather_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_WEATHER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_WEATHER_ENABLED"), name="AGENT_WEATHER_ENABLED", default=True
+        )
     )
     external_information_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_EXTERNAL_INFORMATION_ENABLED", "0"
-        ).strip().lower() not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_EXTERNAL_INFORMATION_ENABLED"), name="AGENT_EXTERNAL_INFORMATION_ENABLED", default=False
+        )
     )
     external_information_url: str = Field(
         default_factory=lambda: os.getenv("AGENT_EXTERNAL_INFORMATION_URL", "").strip()
@@ -217,10 +221,9 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES", "")
     )
     cognitive_gateway_attention_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED",
-            "1",
-        ).strip().lower() not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED"), name="AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED", default=True
+        )
     )
     cognitive_gateway_attention_model: str = Field(
         default_factory=lambda: os.getenv(
@@ -260,9 +263,9 @@ class Settings(BaseModel):
         le=1024,
     )
     cognitive_activation_enabled: bool = Field(
-        default_factory=lambda: os.getenv(
-            "AGENT_COGNITIVE_ACTIVATION_ENABLED", "1"
-        ).strip().lower() not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_COGNITIVE_ACTIVATION_ENABLED"), name="AGENT_COGNITIVE_ACTIVATION_ENABLED", default=True
+        )
     )
     cognitive_activation_model: str = Field(
         default_factory=lambda: os.getenv(
@@ -295,8 +298,9 @@ class Settings(BaseModel):
         le=4096,
     )
     goal_association_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_GOAL_ASSOCIATION_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_GOAL_ASSOCIATION_ENABLED"), name="AGENT_GOAL_ASSOCIATION_ENABLED", default=True
+        )
     )
     goal_association_model: str = Field(
         default_factory=lambda: os.getenv("AGENT_GOAL_ASSOCIATION_MODEL", "qwen3:4b")
@@ -317,8 +321,9 @@ class Settings(BaseModel):
         default_factory=lambda: int(os.getenv("AGENT_GOAL_ASSOCIATION_NUM_PREDICT", "512")), ge=128, le=4096
     )
     fast_planner_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_FAST_PLANNER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_FAST_PLANNER_ENABLED"), name="AGENT_FAST_PLANNER_ENABLED", default=True
+        )
     )
     fast_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_FAST_PLANNER_MODEL", "qwen3:4b"))
     fast_planner_timeout_ms: int = Field(
@@ -334,20 +339,20 @@ class Settings(BaseModel):
         default_factory=lambda: int(os.getenv("AGENT_FAST_PLANNER_MAX_CAPABILITIES", "24")), ge=1, le=64
     )
     # The deliberative model service shared by Social Cognition's deep path and Reflection.
-    # Its names predate the retired Deep Planner (2026-10-11); renaming them is a follow-up.
-    deep_planner_enabled: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_DEEP_PLANNER_ENABLED", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
+    deliberative_enabled: bool = Field(
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_DELIBERATIVE_ENABLED"), name="AGENT_DELIBERATIVE_ENABLED", default=True
+        )
     )
-    deep_planner_model: str = Field(default_factory=lambda: os.getenv("AGENT_DEEP_PLANNER_MODEL", "gemma4:e2b"))
-    deep_planner_timeout_ms: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_TIMEOUT_MS", "120000")), ge=100, le=120000
+    deliberative_model: str = Field(default_factory=lambda: os.getenv("AGENT_DELIBERATIVE_MODEL", "gemma4:e2b"))
+    deliberative_timeout_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_DELIBERATIVE_TIMEOUT_MS", "120000")), ge=100, le=120000
     )
-    deep_planner_num_ctx: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_NUM_CTX", "8192")), ge=4096, le=131072
+    deliberative_num_ctx: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_DELIBERATIVE_NUM_CTX", "8192")), ge=4096, le=131072
     )
-    deep_planner_num_predict: int = Field(
-        default_factory=lambda: int(os.getenv("AGENT_DEEP_PLANNER_NUM_PREDICT", "1024")), ge=256, le=8192
+    deliberative_num_predict: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_DELIBERATIVE_NUM_PREDICT", "1024")), ge=256, le=8192
     )
     log_level: str = Field(default_factory=lambda: os.getenv("AGENT_LOG_LEVEL", os.getenv("LOG_LEVEL", "INFO")))
     ollama_fallback_url: str = Field(default_factory=lambda: os.getenv("OLLAMA_URL", "http://chromie-llm:11434"))
@@ -357,8 +362,26 @@ class Settings(BaseModel):
     ollama_num_predict: int = Field(default_factory=lambda: int(float(os.getenv("OLLAMA_NUM_PREDICT", "0") or "0")), ge=0)
     llm_prompt_chars_per_token_estimate: float = Field(default_factory=lambda: float(os.getenv("AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE", "2.0")), gt=0.0)
     llm_context_safety_margin_tokens: int = Field(default_factory=lambda: int(os.getenv("AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS", "0")), ge=0)
-    user_meaning_interpreter_debug_raw: bool = Field(default_factory=lambda: os.getenv("CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW", os.getenv("AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW", "0")).strip().lower() not in {"", "0", "false", "no", "off"})
-    user_meaning_interpreter_debug_prompt: bool = Field(default_factory=lambda: os.getenv("CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT", os.getenv("AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT", "0")).strip().lower() not in {"", "0", "false", "no", "off"})
+    user_meaning_interpreter_debug_raw: bool = Field(
+        default_factory=lambda: parse_bool(
+            os.getenv(
+                "CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW",
+                os.getenv("AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW"),
+            ),
+            name="CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_RAW",
+            default=False,
+        )
+    )
+    user_meaning_interpreter_debug_prompt: bool = Field(
+        default_factory=lambda: parse_bool(
+            os.getenv(
+                "CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT",
+                os.getenv("AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT"),
+            ),
+            name="CHROMIE_AGENT_USER_MEANING_INTERPRETER_DEBUG_PROMPT",
+            default=False,
+        )
+    )
     weather_geocoding_url: str = Field(default_factory=lambda: os.getenv("AGENT_WEATHER_GEOCODING_URL", "https://geocoding-api.open-meteo.com/v1/search"))
     weather_forecast_url: str = Field(default_factory=lambda: os.getenv("AGENT_WEATHER_FORECAST_URL", "https://api.open-meteo.com/v1/forecast"))
     weather_timeout_s: float = Field(default_factory=lambda: float(os.getenv("AGENT_WEATHER_TIMEOUT_S", "7")), gt=0.0)
@@ -372,7 +395,7 @@ class UserMeaningInterpreterSettings(BaseModel):
     )
     sglang_url: str = Field(
         default_factory=lambda: os.getenv(
-            "AGENT_SGLANG_URL", "http://chromie-llm-sglang-qualification:30000/v1"
+            "AGENT_SGLANG_URL", "http://chromie-llm:30000/v1"
         ).rstrip("/")
     )
     sglang_priority_step: int = Field(
@@ -383,7 +406,7 @@ class UserMeaningInterpreterSettings(BaseModel):
     model: str = Field(default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_MODEL", "qwen3.5:4b"))
     deep_model: str = Field(
         # Deep User Meaning Interpretation retains the same WHAT-only model authority.
-        # Reusing the Deep Planner model here couples semantic interpretation to
+        # Reusing the deliberative model here couples semantic interpretation to
         # a separately tuned HOW owner and has produced responsibility collapse.
         default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_MODEL", "qwen3.5:4b")
     )
@@ -401,8 +424,9 @@ class UserMeaningInterpreterSettings(BaseModel):
         )
     )
     warm_llm_on_startup: bool = Field(
-        default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP", "1").strip().lower()
-        not in {"0", "false", "no", "off"}
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP"), name="AGENT_USER_MEANING_INTERPRETER_WARM_LLM_ON_STARTUP", default=True
+        )
     )
     warm_llm_timeout_ms: int = Field(
         default_factory=lambda: int(os.getenv("AGENT_USER_MEANING_INTERPRETER_WARM_LLM_TIMEOUT_MS", "60000"))

@@ -25,7 +25,7 @@ from shared.chromie_contracts.semantic_artifact import (
 )
 from shared.chromie_contracts.semantic_task import SemanticGoal
 from shared.chromie_contracts.social_cognition import SocialCognitionResolution
-from tests.test_cognitive_runtime_pr7 import admitted_core, respond_plan
+from tests.cognitive_runtime_test_support import admitted_core, respond_plan
 from tests.test_execution_outcome_truth import _bundle as execution_bundle
 from tests.test_execution_outcome_truth import _plan as execution_plan
 
@@ -437,7 +437,7 @@ def test_plan_lineage_reaches_interaction_and_capability_runtime() -> None:
         SemanticArtifactLineage,
         semantic_artifact_ref,
     )
-    from tests.test_cognitive_runtime_pr7 import FakeRuntime, blink_definition, execute_plan
+    from tests.cognitive_runtime_test_support import FakeRuntime, blink_definition, execute_plan
 
     plan = execute_plan()
     response = asyncio.run(
@@ -471,7 +471,7 @@ def test_live_turn_lineage_reaches_final_interaction_without_model_bookkeeping()
         GoalDrivenRuntimeCoordinator,
     )
     from shared.chromie_contracts.semantic_artifact import SemanticArtifactLineage
-    from tests.test_cognitive_runtime_pr7 import (
+    from tests.cognitive_runtime_test_support import (
         FakeRuntime,
         ScriptedClient,
         admitted_core,

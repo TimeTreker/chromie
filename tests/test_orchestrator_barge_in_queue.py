@@ -26,14 +26,14 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         blocker = asyncio.Event()
         active = asyncio.create_task(blocker.wait())
-        assistant.active_asr_task = active
-        assistant._pending_vad_audio = None
+        assistant.input_turn_lifecycle.active_asr_task = active
+        assistant.input_turn_lifecycle.pending_vad_audio = None
 
         input_session_runtime_for(assistant)._queue_vad_utterance(b"first")
         input_session_runtime_for(assistant)._queue_vad_utterance(b"latest")
 
-        self.assertEqual(assistant._pending_vad_audio, b"latest")
-        self.assertIs(assistant.active_asr_task, active)
+        self.assertEqual(assistant.input_turn_lifecycle.pending_vad_audio, b"latest")
+        self.assertIs(assistant.input_turn_lifecycle.active_asr_task, active)
 
         active.cancel()
         with self.assertRaises(asyncio.CancelledError):
@@ -41,7 +41,7 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_completed_asr_immediately_starts_queued_latest_utterance(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant._pending_vad_audio = b"queued"
+        assistant.input_turn_lifecycle.pending_vad_audio = b"queued"
         seen: list[bytes] = []
 
         def queue(self: VoiceAssistant, audio: bytes) -> None:
@@ -56,22 +56,22 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
 
         task = asyncio.create_task(done())
         await task
-        assistant.active_asr_task = task
+        assistant.input_turn_lifecycle.active_asr_task = task
 
         input_session_runtime_for(assistant)._on_asr_task_done(task)
 
-        self.assertIsNone(assistant.active_asr_task)
-        self.assertIsNone(assistant._pending_vad_audio)
+        self.assertIsNone(assistant.input_turn_lifecycle.active_asr_task)
+        self.assertIsNone(assistant.input_turn_lifecycle.pending_vad_audio)
         self.assertEqual(seen, [b"queued"])
 
     async def test_new_routed_turn_preserves_prior_turn_and_runs_both_texts(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         release_first = asyncio.Event()
         first_started = asyncio.Event()
-        assistant.active_turn_task = None
-        assistant.active_turn_tasks = {}
-        assistant.active_reflex_task = None
-        assistant.concurrent_protective_reflex_tasks = set()
+        assistant.input_turn_lifecycle.active_turn_task = None
+        assistant.input_turn_lifecycle.active_turn_tasks = {}
+        assistant.input_turn_lifecycle.active_reflex_task = None
+        assistant.input_turn_lifecycle.concurrent_protective_reflex_tasks = set()
         seen: list[tuple[str, str]] = []
 
         async def handle(
@@ -98,11 +98,11 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         assistant.handle_routed_text = MethodType(handle, assistant)
 
         input_session_runtime_for(assistant)._launch_routed_turn("first request", "sid-first")
-        first = assistant.active_turn_task
+        first = assistant.input_turn_lifecycle.active_turn_task
         assert first is not None
         await first_started.wait()
         input_session_runtime_for(assistant)._launch_routed_turn("latest request", "sid-latest")
-        latest = assistant.active_turn_task
+        latest = assistant.input_turn_lifecycle.active_turn_task
         assert latest is not None
         await latest
         await asyncio.sleep(0)
@@ -118,20 +118,20 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         release_first.set()
         await first
         await asyncio.sleep(0)
-        self.assertEqual(assistant.active_turn_tasks, {})
-        self.assertIsNone(assistant.active_turn_task)
+        self.assertEqual(assistant.input_turn_lifecycle.active_turn_tasks, {})
+        self.assertIsNone(assistant.input_turn_lifecycle.active_turn_task)
 
     async def test_scoped_control_cancels_only_foreground_routed_turn(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         first = asyncio.create_task(asyncio.Event().wait())
         foreground = asyncio.create_task(asyncio.Event().wait())
-        assistant.active_turn_task = foreground
-        assistant.active_turn_tasks = {
+        assistant.input_turn_lifecycle.active_turn_task = foreground
+        assistant.input_turn_lifecycle.active_turn_tasks = {
             first: "sid-first",
             foreground: "sid-foreground",
         }
-        assistant.active_reflex_task = None
-        assistant.concurrent_protective_reflex_tasks = set()
+        assistant.input_turn_lifecycle.active_reflex_task = None
+        assistant.input_turn_lifecycle.concurrent_protective_reflex_tasks = set()
         assistant.session_log = MethodType(
             lambda self, *args, **kwargs: None,
             assistant,
@@ -172,7 +172,7 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
         assistant.active_interaction_task = asyncio.create_task(
             asyncio.Event().wait()
         )
-        assistant.playback_generation = 0
+        assistant.playback_delivery.playback_generation = 0
         assistant.session_log = MethodType(
             lambda self, *args, **kwargs: None,
             assistant,
@@ -192,13 +192,13 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_cleanup_cancels_asr_and_turn_tasks_and_clears_pending_audio(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.playback_start_waiters = {}
+        assistant.playback_delivery.playback_start_waiters = {}
         assistant.active_llm_task = None
-        assistant.active_synthesis_tasks = set()
-        assistant.active_asr_task = asyncio.create_task(asyncio.Event().wait())
-        assistant.active_turn_task = asyncio.create_task(asyncio.Event().wait())
-        assistant._pending_vad_audio = b"queued"
-        assistant.playback_task = None
+        assistant.playback_delivery.active_synthesis_tasks = set()
+        assistant.input_turn_lifecycle.active_asr_task = asyncio.create_task(asyncio.Event().wait())
+        assistant.input_turn_lifecycle.active_turn_task = asyncio.create_task(asyncio.Event().wait())
+        assistant.input_turn_lifecycle.pending_vad_audio = b"queued"
+        assistant.playback_delivery.playback_task = None
         assistant.asr_ws = None
         assistant.http_session = None
 
@@ -207,8 +207,8 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
 
         assistant.audio_mgr = types.SimpleNamespace(close=lambda: None)
 
-        asr_task = assistant.active_asr_task
-        turn_task = assistant.active_turn_task
+        asr_task = assistant.input_turn_lifecycle.active_asr_task
+        turn_task = assistant.input_turn_lifecycle.active_turn_task
         await shutdown_voice_assistant(
             assistant,
             close_output_stream=close_output_stream,
@@ -217,7 +217,7 @@ class OrchestratorBargeInQueueTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertTrue(asr_task.cancelled())
         self.assertTrue(turn_task.cancelled())
-        self.assertIsNone(assistant._pending_vad_audio)
+        self.assertIsNone(assistant.input_turn_lifecycle.pending_vad_audio)
 
 
 if __name__ == "__main__":

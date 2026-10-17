@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import shutil
@@ -23,6 +22,11 @@ except ImportError:  # imported as scripts.prepare_release in tests/tools
     from scripts.cognitive_runtime_acceptance import build_bundle as build_cognitive_bundle
     from scripts.release_provenance import collect_provenance
     from scripts.verify_voice_evidence import verify_bundle
+
+try:
+    from evidence_io import sha256_file as sha256
+except ImportError:  # imported as scripts.prepare_release
+    from scripts.evidence_io import sha256_file as sha256
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = ROOT / ".chromie" / "artifacts"
@@ -57,14 +61,6 @@ def soridormi_manifest_revision(root: Path = ROOT) -> str:
             "capabilities/soridormi.json does not declare metadata.upstream_commit"
         )
     return str(revision)
-
-
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def run_logged(command: Sequence[str], log_path: Path) -> None:
