@@ -294,7 +294,6 @@ def record_confirmation_scope(
             request = {
                 "request_id": getattr(raw_request, "request_id", None),
                 "capability_id": getattr(raw_request, "capability_id", None),
-                "capability_id": getattr(raw_request, "capability_id", None),
                 "metadata": getattr(raw_request, "metadata", None),
             }
         request_id = str(request.get("request_id") or "").strip()

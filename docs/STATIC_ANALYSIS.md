@@ -26,7 +26,8 @@ scope to pass before it is committed. Removing a checked path requires a separat
 reviewed architecture decision.
 
 The same runner also checks the whole Python tree for undefined names (`F821`),
-undefined `__all__` exports (`F822`) and redefined unused names (`F811`). These
+undefined `__all__` exports (`F822`), redefined unused names (`F811`) and
+repeated dictionary key literals (`F601`). These
 rules are listed in `TREE_WIDE_RULES` in `scripts/run_ruff.py` and have no
 scope list, so a new file is checked as soon as it exists.
 

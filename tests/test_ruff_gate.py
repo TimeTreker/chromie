@@ -88,8 +88,8 @@ class RuffGateTests(unittest.TestCase):
             calls = log.read_text(encoding="utf-8").splitlines()
         self.assertEqual(result, 1)
         self.assertEqual(len(calls), 2)
-        self.assertTrue(calls[1].endswith("--select F811,F821,F822 ."))
-        self.assertTrue({"F821", "F822"} <= set(run_ruff.TREE_WIDE_RULES))
+        self.assertTrue(calls[1].endswith("--select F601,F811,F821,F822 ."))
+        self.assertTrue({"F601", "F821", "F822"} <= set(run_ruff.TREE_WIDE_RULES))
 
     def test_test_dependencies_pin_ruff(self) -> None:
         requirements = (ROOT / "requirements-test.txt").read_text(encoding="utf-8")

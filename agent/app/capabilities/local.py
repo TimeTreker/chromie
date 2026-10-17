@@ -770,9 +770,8 @@ def chromie_manifests(
                     "tool_name": "weather",
                     "semantic_type": "weather_lookup",
                     "pre_execution_speech_guidance": (
-                        "If a progress Communicative Activity is useful, keep it short and "
-                        "say only that Chromie is checking the requested weather scope. "
-                        "Do not state weather results before trusted Evidence exists."
+                        "Generate natural model-owned wording for the specific lookup. "
+                        "The Host validates truth and timing but does not provide a fixed sentence."
                     ),
                     "semantic_scope": {
                         "responsibility_type": "acquire_and_deliver_resource",
@@ -837,10 +836,6 @@ def chromie_manifests(
                         "completion_evidence": "trusted_tool_result",
                         "final_delivery_owner": "planner_communicative_activity",
                     },
-                    "pre_execution_speech_guidance": (
-                        "Generate natural model-owned wording for the specific lookup. "
-                        "The Host validates truth and timing but does not provide a fixed sentence."
-                    ),
                 },
             )
         ],
