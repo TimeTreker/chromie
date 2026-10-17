@@ -1,6 +1,6 @@
 """Terminal Evidence reaches Social Cognition directly (owner decision 3).
 
-SC is Chromie's communication interface. A result the person asked for must not
+SC is the interface between the user and Chromie. A result the person asked for must not
 be dropped because Activation or the Planner chose no next Work, and the Planner
 path must not cause a second SC communication for the same Evidence.
 """

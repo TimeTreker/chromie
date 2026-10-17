@@ -6126,7 +6126,7 @@ class VoiceAssistant:
     ) -> InteractionResponse | None:
         """Give SC terminal Evidence for a result the person asked to be told.
 
-        Social Cognition is Chromie's communication interface. When Activation or
+        Every communication with the user goes through Social Cognition. When Activation or
         the Planner chose no next Work for terminal Evidence whose Goal carries an
         ``information`` Responsibility, SC still receives that Evidence directly
         with one Runtime result Need and decides how to communicate it (speech,

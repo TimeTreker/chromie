@@ -331,8 +331,9 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   policy. Social Cognition may complete conversational Responsibilities immediately and remains
   the sole wording owner. `continuity_scope` never wakes or suppresses Planner by itself. The
   distinction comes from bounded meaning and context, never phrase tables or hardware profiles.
-- **SPEECH-OWNER-001** — Social Cognition is Chromie's communication interface: speech and
-  every other social expression (gesture, gaze, facial or body expression). It is the sole
+- **SPEECH-OWNER-001** — Social Cognition is the interface between the user and Chromie.
+  Chromie uses SC to express herself (speech, gestures, gaze and other social expression),
+  and every communication with the user goes through it. It is the sole
   ordinary semantic owner of whether, when and how to
   communicate, the Communicative Activity, its exact wording, truth stage, and source
   provenance. UMI, committed GA/Planner state, Runtime/Evidence or trusted Situation

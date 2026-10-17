@@ -5,9 +5,10 @@
 The [Charter's Social Cognition amendment](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
 splits ordinary communication from Work planning inside the same Cognitive Core.
 Single semantic authority means one writer per semantic decision, not one model
-invocation for every responsibility in a turn. Social Cognition is Chromie's
-communication interface (speech, gesture, gaze and other social expression) and owns exact
-Communicative Activities; Planner owns Capability/Work decisions. UMI and GA keep
+invocation for every responsibility in a turn. Social Cognition is the interface
+between the user and Chromie: Chromie uses it to express herself (speech, gestures, gaze
+and other social expression), every communication with the user goes through it, and it
+owns exact Communicative Activities; Planner owns Capability/Work decisions. UMI and GA keep
 WHAT and canonical continuity respectively. Neither downstream role reinterprets
 UMI or reviews/repairs the other's output.
 

@@ -1164,7 +1164,7 @@ whole. It must not synthesize a narrowed child Plan, replacement confirmation wo
 "continue the rest" sentence. Deterministic cancellation instead records exact bounded
 control Evidence and reactivates Planner; Planner decides what still-open sibling Work
 should happen next. Whether and how the person hears about it belongs to Social Cognition,
-Chromie's communication interface, which answers the cancel turn itself and receives any
+the interface through which every communication with the user goes, which answers the cancel turn itself and receives any
 Planner communication Need for that Evidence (Charter SPEECH-OWNER-001). If that Planner re-entry is
 unavailable after a failed or uncertain stop attempt, a bounded operational safety warning
 may say only that the stop was not verified and must never imply it succeeded.
