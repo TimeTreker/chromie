@@ -1,6 +1,6 @@
 # Stress and Behavior-Distribution Evaluation
 
-Status: implemented Benchmark Phase 6 foundation
+Status: implemented stress and behavior-distribution benchmark foundation
 
 ## Purpose
 

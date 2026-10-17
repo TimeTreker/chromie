@@ -113,15 +113,17 @@
       }
     ]
   },
-  "size_baseline_revision": "bd9557407504f4ce28e955df726f1a3dc6b04af7",
+  "size_baseline_revision": "014cbc2d3ef2c58f4c2c82a8fc5366bd54361ee8",
   "line_baselines": {
-    "CHANGELOG.md": 220,
-    "DEVELOPMENT_CHECKPOINT.md": 142,
-    "docs/STATUS.md": 260
+    "CHANGELOG.md": 278,
+    "DEVELOPMENT_CHECKPOINT.md": 86,
+    "HANDOFF.md": 55,
+    "ROADMAP.md": 320,
+    "docs/STATUS.md": 79
   },
   "surface_baselines": {
     "core_reading_path": 15,
-    "docs_root_markdown_files": 58,
-    "markdown_files": 102
+    "docs_root_markdown_files": 57,
+    "markdown_files": 99
   }
 }

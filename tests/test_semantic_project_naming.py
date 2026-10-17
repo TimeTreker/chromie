@@ -10,6 +10,7 @@ from scripts.check_docs import (
     ABANDONED_RELEASE_VERSION_RE,
     MILESTONE_TOKEN_RE,
     NUMBERED_PHASE_PATH_RE,
+    NUMBERED_PROSE_TOKEN_RES,
     NUMBERED_STEP_TOKEN_RE,
 )
 
@@ -70,6 +71,32 @@ class SemanticProjectNamingTests(unittest.TestCase):
         self.assertIsNone(
             ABANDONED_RELEASE_VERSION_RE.search("http://127.0.0.1:8091")
         )
+
+    def test_numbered_pull_request_and_phase_prose_is_rejected(self) -> None:
+        for text in ("### " + "PR" + " 3 - Runner", "see " + "PR" + "7 scope", "For " + "Phase" + " 6, run", "phase" + " 1.5 audit"):
+            with self.subTest(text=text):
+                self.assertTrue(
+                    any(pattern.search(text) for pattern, _ in NUMBERED_PROSE_TOKEN_RES)
+                )
+
+    def test_real_pull_request_references_and_words_are_allowed_in_prose(self) -> None:
+        for text in ("merged in PR #70", "After PRs #12 and #13 merged", "a multiphase 2-step plan", "protocol-5 round-trip"):
+            with self.subTest(text=text):
+                self.assertFalse(
+                    any(pattern.search(text) for pattern, _ in NUMBERED_PROSE_TOKEN_RES)
+                )
+
+    def test_numbered_prose_is_checked_in_markdown_only(self) -> None:
+        token = "Phase" + " 6"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "GUIDE.md").write_text(f"For {token}, initialize.\n", encoding="utf-8")
+            (root / "run.sh").write_text(f"# {token}: optional adjudication\n", encoding="utf-8")
+            errors: list[str] = []
+            with mock.patch.object(check_docs, "ROOT", root):
+                check_docs.check_semantic_project_naming(errors)
+        self.assertEqual(len(errors), 1, errors)
+        self.assertIn("GUIDE.md:1: numbered phase", errors[0])
 
     def test_semantic_paths_are_allowed(self) -> None:
         self.assertIsNone(
