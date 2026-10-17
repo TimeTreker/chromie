@@ -804,23 +804,6 @@ WorkDAG `$ref` arguments may read `<node>.output[.<field>]`, `<node>.error`, or
 topology; semantic replanning after changed reality belongs to Planner and normally
 produces a revised/new WorkDAG. Goal Association never edits the DAG directly; a Goal change is input to Planner. Retaining the current WorkDAG is a valid NO_CHANGE decision.
 
-## Hardware compatibility HTTP API — port 8095
-
-This is the legacy mock-action daemon, not the Soridormi robot boundary.
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/health` | Return mock driver and robot state. |
-| `GET` | `/state` | Return current mock robot state. |
-| `POST` | `/actions` | Execute a namespaced compatibility action. |
-| `GET` | `/actions/{action_id}` | Return an in-memory action result. |
-| `POST` | `/emergency_stop` | Set mock emergency-stop state. |
-| `POST` | `/reset_emergency_stop` | Clear mock emergency-stop state. |
-
-The daemon rejects `unsafe.*` actions and actions that still require
-confirmation. In this revision it always constructs `MockRobotDriver`; serial
-configuration variables do not select a production backend.
-
 ## ASR WebSocket protocol — port 9001
 
 The ASR service accepts WebSocket connections and two message forms:

@@ -255,10 +255,8 @@ class CognitionSettings:
     llm_url: str
     ollama_model: str
     agent_url: str
-    action_executor_url: str
     agent_timeout_ms: int
     user_meaning_interpreter_timeout_ms: int
-    action_timeout_ms: int
     action_dry_run: bool
     enable_agent: bool
     enable_interaction_response: bool
@@ -550,9 +548,6 @@ class HostSettingsSnapshot:
                 ),
                 ollama_model=ollama_model,
                 agent_url=_text(values, "AGENT_URL", "http://127.0.0.1:8092"),
-                action_executor_url=_text(
-                    values, "ACTION_EXECUTOR_URL", "http://127.0.0.1:8095"
-                ),
                 agent_timeout_ms=_int(
                     values, "ORCH_AGENT_TIMEOUT_MS", 9000, minimum=100
                 ),
@@ -561,9 +556,6 @@ class HostSettingsSnapshot:
                     "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
                     9000,
                     minimum=100,
-                ),
-                action_timeout_ms=_int(
-                    values, "ORCH_ACTION_TIMEOUT_MS", 5000, minimum=100
                 ),
                 action_dry_run=_bool(values, "ORCH_ACTION_DRY_RUN", True),
                 enable_agent=_bool(values, "ORCH_ENABLE_AGENT", False),

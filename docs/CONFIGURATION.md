@@ -130,7 +130,7 @@ twice.
 | `AGENT_ENABLE_PARALLEL_DAG_EXECUTION` | `0` | Enable bounded parallel read/planning and guarded non-physical work. |
 | `AGENT_ENABLE_GUARDED_DAG_EXECUTION` | `0` | Enable bearer-authorized side-effect execution. |
 | `AGENT_ENABLE_PHYSICAL_DAG_EXECUTION` | `0` | Permit guarded physical nodes after all other proofs. |
-| `ORCH_ACTION_DRY_RUN` | `true` | Log compatibility actions instead of calling the hardware daemon. |
+| `ORCH_ACTION_DRY_RUN` | `true` | Preview-only execution mode; Text-MuJoCo execution requires `false`. |
 | `ORCH_CLI_COLOR` | `auto` | Force Orchestrator session log color with `1`, disable with `0`; warnings are yellow and errors are red. |
 
 `AGENT_ENABLE_PHYSICAL_DAG_EXECUTION=1` requires guarded execution.
@@ -244,7 +244,6 @@ generated prompts must use a specific speaker.
 | `TTS_URL` | `ws://127.0.0.1:5000` (CosyVoice); the launchers select `5001` for `oute` and `5002` for `qwen3`. |
 | `LLM_URL` | `http://127.0.0.1:11434/api/generate`. Ollama-native endpoint used only to generate ready-greeting speech when `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and no `ORCH_RUNTIME_READY_GREETING_TEXT` is configured. SGLang profiles publish no Ollama port, so set a greeting text there. |
 | `AGENT_URL` | `http://127.0.0.1:8092` |
-| `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
 | `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
 | `SORIDORMI_REPO` | Optional paired Soridormi Git checkout used by acceptance tools to record diagnostic source provenance. It does not identify or bind the source executing behind `SORIDORMI_MCP_URL`. |
 
@@ -492,7 +491,6 @@ Do not commit a real execution token. Manifest strings may use required
 |---|---|
 | `ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` | Common fallback `9000`; interactive `services`/`speech`/`voice_mujoco` modes use `65000`, while explicit qualification mode uses `150000`. It must exceed `AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` so the service can return a WHAT-only result or typed unavailability before the Host timeout. |
 | `ORCH_ASR_TIMEOUT_MS` | Host wait for one final ASR response; common default `30000`. |
-| `ORCH_ACTION_TIMEOUT_MS` | Host timeout for one legacy hardware-daemon action; common default `5000`. |
 | `ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S` | Seconds to keep the Orchestrator-side Soridormi named-skill catalog before reloading; code default `30`. Unknown requested `soridormi.*` skills force an immediate refresh even before this TTL expires. Set `0` to reload before every body-skill execution. |
 
 Deep-thinking delegation (Deep User Meaning Interpretation, Social Cognition's deep
@@ -835,11 +833,6 @@ retained only as bounded observability metadata and never spoken.
 Prompts ask the model to speak as the configured Mind-profile identity (factory: Chromie, a twelve-year-old girl),
 rather than as a backend model. There is no phrase-triggered disclaimer check or
 retry: each wording call is one model call with no semantic repair.
-
-## Legacy hardware daemon
-
-`HARDWARE_HOST` and `HARDWARE_PORT` are read by the daemon. It always
-constructs `MockRobotDriver`; there is no driver selection.
 
 ## Acceptance-script controls
 

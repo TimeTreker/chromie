@@ -63,7 +63,6 @@ HARDCODED_GATE_COUNT_RE = re.compile(
 
 ROUTE_SOURCES = [
     ROOT / "agent" / "app" / "main.py",
-    ROOT / "hardware" / "daemon.py",
 ]
 
 RUNTIME_CONFIG_SOURCES = [

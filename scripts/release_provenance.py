@@ -23,7 +23,6 @@ except ImportError:  # imported as scripts.release_provenance
 REQUIREMENT_FILES = (
     "agent/requirements.txt",
     "asr/requirements.txt",
-    "hardware/requirements.txt",
     "orchestrator/requirements.txt",
     "requirements-test.txt",
     "tts/requirements.txt",

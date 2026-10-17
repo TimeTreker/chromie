@@ -21,7 +21,6 @@ SHELL_READ_RE = re.compile(r"\$\{?([A-Z][A-Z0-9_]*)")
 SOURCE_ROOTS = (
     "agent",
     "asr",
-    "hardware",
     "orchestrator",
     "scripts",
     "shared",
@@ -30,7 +29,7 @@ SOURCE_ROOTS = (
     "tts_candidates",
 )
 IGNORED_PARTS = {"__pycache__", ".git", ".venv", "venv"}
-SERVICE_ROOTS = {"agent", "asr", "hardware", "tts"}
+SERVICE_ROOTS = {"agent", "asr", "tts"}
 BOOL_TRUE = {"1", "true", "yes", "on"}
 BOOL_FALSE = {"0", "false", "no", "off"}
 

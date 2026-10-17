@@ -34,15 +34,6 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
-      "key": "ACTION_EXECUTOR_URL",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "service_internal",
       "key": "AGENT_CAPABILITY_CATALOG_REFRESH_SEC",
       "owners": [
@@ -1639,22 +1630,6 @@
       ]
     },
     {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "HARDWARE_HOST",
-      "owners": [
-        "hardware/daemon.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "HARDWARE_PORT",
-      "owners": [
-        "hardware/daemon.py"
-      ]
-    },
-    {
       "boolean": true,
       "category": "profile_constant",
       "key": "HF_HUB_OFFLINE",
@@ -2010,15 +1985,6 @@
         "env/modes/services.env",
         "env/modes/speech.env",
         "env/modes/voice_mujoco.env",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_ACTION_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -4065,12 +4031,12 @@
     "category_counts": {
       "acceptance_override": 30,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 110,
+      "profile_constant": 108,
       "public_choice": 9,
-      "service_internal": 240
+      "service_internal": 238
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 389
+    "total_keys": 385
   }
 }

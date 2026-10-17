@@ -52,7 +52,6 @@ POSITIVE_INT_VARS = (
     "ORCH_CAPABILITY_MAX_CONCURRENCY",
     "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
     "ORCH_ASR_TIMEOUT_MS",
-    "ORCH_ACTION_TIMEOUT_MS",
     "TTS_FLUSH_CHARS",
     "ORCH_TTS_CHUNK_CHARS",
     "ORCH_TTS_MIN_CHUNK_CHARS",
@@ -65,7 +64,6 @@ POSITIVE_INT_VARS = (
 
 URL_VARS = (
     "AGENT_URL",
-    "ACTION_EXECUTOR_URL",
     "ASR_URL",
     "TTS_URL",
     "LLM_URL",
@@ -352,7 +350,7 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
             Diagnostic(
                 "warning",
                 "legacy_action_dry_run_disabled",
-                "ORCH_ACTION_DRY_RUN=false can call the legacy mock hardware daemon",
+                "ORCH_ACTION_DRY_RUN=false permits live simulator or robot execution",
             )
         )
     return diagnostics

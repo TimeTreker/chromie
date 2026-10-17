@@ -6,7 +6,6 @@ import asyncio
 import time
 import unittest
 
-from shared.chromie_contracts.action import ActionCommand
 from shared.chromie_contracts.interaction import CapabilityResult, InteractionResponse
 from shared.chromie_contracts.reflex import CancellationDirective, CancellationDispatchReceipt
 

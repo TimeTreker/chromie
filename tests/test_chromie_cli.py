@@ -568,7 +568,6 @@ class ChromieCliTests(unittest.TestCase):
                 AGENT_ENABLE_PHYSICAL_DAG_EXECUTION=0
                 AGENT_ENABLE_GUARDED_DAG_EXECUTION=0
                 AGENT_URL=
-                ACTION_EXECUTOR_URL=
                 ASR_URL=
                 TTS_URL=
                 LLM_URL=

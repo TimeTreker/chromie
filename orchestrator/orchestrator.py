@@ -43,7 +43,6 @@ from scipy import signal
 from orchestrator.audio_device_manager import AudioDeviceManager
 from orchestrator.readiness import ServiceReadinessGate
 from orchestrator.vad import VAD
-from orchestrator.clients.action_client import ActionClient
 from orchestrator.runtime.audio_device_lifecycle import (
     audio_device_monitor,
     set_input_device_params,
@@ -271,13 +270,8 @@ class VoiceAssistant:
         )
 
         self.agent_url = cognition_settings.agent_url
-        self.action_executor_url = cognition_settings.action_executor_url
         self.action_dry_run = cognition_settings.action_dry_run
         self.agent_client = build_agent_client(self.host_settings)
-        self.action_client = ActionClient(
-            self.action_executor_url,
-            cognition_settings.action_timeout_ms,
-        )
         self.asr_timeout_s = max(0.001, audio_settings.asr_timeout_ms / 1000.0)
 
         self.min_rms = audio_settings.min_rms
@@ -443,10 +437,9 @@ class VoiceAssistant:
             self.discard_playback_realtime,
         )
         logger.info(
-            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s action_url=%s dry_run=%s cognitive_runtime_mode=%s",
+            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s dry_run=%s cognitive_runtime_mode=%s",
             self.agent_url,
             self.enable_agent,
-            self.action_executor_url,
             self.action_dry_run,
             self.cognitive_runtime_mode,
         )

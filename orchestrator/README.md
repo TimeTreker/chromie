@@ -36,8 +36,6 @@ Runtime retains validated pre-GA preparation, admits only contract-declared safe
   stream is still arriving.
 - The Trusted Capability Runtime resolves and schedules trusted named capabilities.
 - Soridormi plans and executes embodied skills and owns physical safety.
-- `hardware/daemon.py` is a legacy mock compatibility boundary, not the alpha
-  embodiment path.
 
 The Agent does not call TTS or low-level hardware. Separately gated WorkDAG
 read/planning/guarded endpoints may use MCP, but normal embodied apply is

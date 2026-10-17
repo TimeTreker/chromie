@@ -147,7 +147,7 @@ implemented. The five Gateway responsibilities are explicit logical modules in t
 There is no independent Router service or `/route` compatibility API.
 
 Chromie never gives raw motor, joint, actuator, or torque controls to the
-language model. The legacy `hardware/` daemon is mock compatibility only.
+language model.
 
 ## Implemented core path and retained evidence
 
@@ -360,7 +360,6 @@ documented in
 | `shared/` | Shared contracts and scheduling primitives |
 | `capabilities/` | Pinned external capability manifests and prompt-tier presets |
 | `agent-skills/` | Repository-owned passive Agent Skill packages; mounted read-only and never execution-authoritative |
-| `hardware/` | Legacy mock compatibility daemon |
 | `scripts/` | Startup, validation, evidence, and release tooling |
 | `docs/` | Project authority, interfaces, configuration, and decisions |
 | `release/` | Candidate compatibility and release assets |
