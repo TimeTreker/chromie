@@ -617,6 +617,7 @@
             "required": true,
             "reason": "This tool can move the robot.",
             "required_in_modes": [
+              "hardware_shadow",
               "hardware_dry_run",
               "hardware"
             ],
@@ -1131,7 +1132,7 @@
               },
               "target_resolution": {
                 "type": "object",
-                "description": "How Soridormi resolved the physical target the caller described. role is gaze_target, resource, recipient, or source; status is resolved, not_observed, ambiguous, outside_head_range, perception_unavailable, or not_resolved (a cited place). Any status other than resolved comes with completed=false and a summary naming what was not found; Soridormi never substitutes a default direction or the nearest keyword match.",
+                "description": "How Soridormi resolved the physical target the caller described. role is gaze_target, resource, recipient, or source; status is resolved, not_observed, ambiguous, outside_head_range, perception_unavailable, or not_resolved (a cited place). Any status other than resolved comes with completed=false and a summary naming what was not found; Soridormi never substitutes a default direction or the nearest keyword match. source, when present, names a non-perceived origin of the resolved target: mocked_requester_position is a configured simulation stand-in, not an observation of the person.",
                 "properties": {
                   "role": {
                     "type": "string"
@@ -1162,6 +1163,9 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "source": {
+                    "type": "string"
                   }
                 },
                 "required": [
@@ -4539,6 +4543,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "cd6c37ba17fcf8c7bd238b54ae597e58a31233d7"
+    "upstream_commit": "a5df83303e92ba00e7d7acbc8a62cc032b4b8df7"
   }
 }
