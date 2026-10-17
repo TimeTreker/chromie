@@ -832,7 +832,6 @@ Supported default-provider JSON messages:
 | Request type | Result |
 |---|---|
 | `health` or `ping` | `pong` with provider contract/declaration, immutable model identity, sample rate, worker readiness, cancellation counters, and `speakers` (`default` plus every catalog profile, currently `["default", "chromie_en", "chromie_mixed", "chromie_zh"]`). |
-| `list_speakers` | The same `speakers` list: `default` (a language-routed logical ID) plus the committed catalog profiles. |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
 A synthesis request includes `text`, optional `speaker_id`, optional

@@ -138,13 +138,9 @@ Response:
 identity, declared capabilities, worker readiness, cancellation counters, and
 backend-specific metadata.
 
-### List speakers
+### Speakers
 
-```json
-{"type": "list_speakers"}
-```
-
-CosyVoice exposes the three built-in profiles plus `default`. `default` is a
+The health `pong` lists the speakers. CosyVoice exposes the three built-in profiles plus `default`. `default` is a
 language-routed logical ID; Qwen uses the committed `chromie_mixed` profile.
 The network endpoint does not mutate the source-controlled catalog.
 

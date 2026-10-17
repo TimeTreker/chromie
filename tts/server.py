@@ -1353,13 +1353,6 @@ async def ws_handler(ws):
                 )
                 continue
 
-            if msg_type == "list_speakers":
-                await send_json(
-                    ws,
-                    {"type": "speakers", "speakers": await tts_provider.list_speakers()},
-                )
-                continue
-
             if msg_type == "create_speaker":
                 task = asyncio.create_task(handle_create_speaker(data, ws))
                 active_tasks.add(task)
