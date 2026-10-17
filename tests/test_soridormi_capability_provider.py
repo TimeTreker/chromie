@@ -1111,6 +1111,40 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(invoker.calls, [])
 
+    async def test_look_at_me_targets_the_requester(self) -> None:
+        """"Look at me" names the current speaker; Soridormi resolves where they are."""
+
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [self._look_at_person_skill()])
+        definition = registry.get("soridormi.look_at_person")
+        assert definition is not None
+        for target_ref, expected in (
+            ("me", "requester"), ("current_speaker", "requester"),
+            ("requester", "requester"), ("Alice", "Alice"),
+        ):
+            with self.subTest(target_ref=target_ref):
+                invoker = _RecordingInvoker()
+                await SoridormiCapabilityProvider(invoker).execute(
+                    CapabilityRequest(
+                        request_id="look-me",
+                        capability_id="soridormi.look_at_person",
+                        args={"target_ref": target_ref},
+                    ),
+                    definition,
+                    CapabilityExecutionContext(
+                        interaction_id="look", trace=CapabilityTrace(
+                            interaction_id="look", request_id="look-me",
+                            capability_id="soridormi.look_at_person",
+                            provider_id="soridormi.mcp",
+                        ),
+                    ),
+                )
+                planned = next(
+                    args for tool, args, _ in invoker.calls
+                    if tool == "soridormi.skill.create_plan"
+                )
+                self.assertEqual(planned["parameters"]["target_ref"], expected)
+
     async def test_current_speaker_recipient_is_sent_as_requester(self) -> None:
         registry = CapabilityRegistry()
         import_soridormi_capability_catalog(registry, [{

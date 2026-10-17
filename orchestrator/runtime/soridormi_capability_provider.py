@@ -31,7 +31,7 @@ from shared.chromie_contracts.interaction import (
     CapabilityRequest, CapabilityResult, CapabilityTraceEvent,
 )
 from shared.chromie_contracts.perception import live_perception_dependency_from_metadata
-from shared.chromie_contracts.resource import requester_recipient
+from shared.chromie_contracts.resource import REQUESTER_REFERENT_ID, requester_recipient
 from shared.chromie_contracts.semantic_capability import (
     normalize_semantic_capability_facade,
     realize_semantic_capability_args,
@@ -62,13 +62,27 @@ _NON_EXPRESSIVE_EFFECTS = frozenset(
 )
 
 
-def _described_target_args(args: dict[str, Any]) -> dict[str, Any]:
+# Gaze skills whose person target Soridormi resolves from ``target_ref``.
+REQUESTER_GAZE_CAPABILITY_IDS = frozenset({"soridormi.look_at_person"})
+# Ways a plan may name the current speaker as a gaze target.
+_SPEAKER_TARGET_REFS = frozenset(
+    {"", REQUESTER_REFERENT_ID, "me", "user", "speaker", "current_speaker", "the requester"}
+)
+
+
+def _described_target_args(args: dict[str, Any], *, capability_id: str = "") -> dict[str, Any]:
     """Return provider args with the agreed target description format applied.
 
-    The current speaker is the reserved ``referent_id="requester"``. Other
-    descriptions and explicit referents are passed exactly as authored.
+    The current speaker is the reserved ``referent_id="requester"``; a gaze at
+    the person without another named target ("look at me") is
+    ``target_ref="requester"``. Other descriptions and explicit referents are
+    passed exactly as authored.
     """
 
+    if capability_id in REQUESTER_GAZE_CAPABILITY_IDS:
+        target_ref = str(args.get("target_ref") or "").strip()
+        if target_ref.casefold() in _SPEAKER_TARGET_REFS and target_ref != REQUESTER_REFERENT_ID:
+            args = {**args, "target_ref": REQUESTER_REFERENT_ID}
     recipient = args.get("recipient")
     if not isinstance(recipient, dict):
         return args
@@ -358,7 +372,7 @@ class SoridormiCapabilityProvider:
                 provider_input_schema=definition.metadata.get("provider_input_schema")
                 or definition.input_schema,
                 capability_id=request.capability_id,
-            ))
+            ), capability_id=request.capability_id)
         except ValueError as exc:
             return CapabilityResult(
                 request_id=request.request_id,
@@ -574,7 +588,7 @@ class SoridormiCapabilityProvider:
                     provider_input_schema=definition.metadata.get("provider_input_schema")
                     or definition.input_schema,
                     capability_id=request.capability_id,
-                ))
+                ), capability_id=request.capability_id)
             except ValueError as exc:
                 return self._group_terminal_results(
                     items,

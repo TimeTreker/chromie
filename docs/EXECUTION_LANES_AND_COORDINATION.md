@@ -169,6 +169,12 @@ never as completion. Explicit numeric values the person states are passed
 unchanged; Soridormi may refuse a value outside its limits and report that
 limitation, but it never silently runs a different value.
 
+A gaze at the speaker without another named person ("look at me") is sent as
+`target_ref="requester"`. Until Soridormi can perceive people, its simulator
+resolves that to a declared mocked requester position and says so in
+`target_resolution.source` (`mocked_requester_position`); see Soridormi's
+`docs/SORIDORMI_LOOK_TARGET_PROVIDER.md`.
+
 ## Lane-coordination contract
 
 `LaneCoordinationGroup` records model-authored execution overlap after the
