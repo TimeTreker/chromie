@@ -1648,9 +1648,11 @@ class VoiceAssistant:
         playback_task = self.playback_delivery.playback_task
         if playback_task is None or playback_task.done():
             self.playback_delivery.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
-        self.session_idle_sweeper_task = asyncio.create_task(
-            input_session_runtime_for(self)._session_idle_sweeper()
-        )
+        sweeper_task = getattr(self, "session_idle_sweeper_task", None)
+        if sweeper_task is None or sweeper_task.done():
+            self.session_idle_sweeper_task = asyncio.create_task(
+                input_session_runtime_for(self)._session_idle_sweeper()
+            )
 
     async def reset_playback_ordering(self):
         async with self.playback_delivery.order_lock:
