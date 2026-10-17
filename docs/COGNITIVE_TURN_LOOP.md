@@ -1529,7 +1529,10 @@ commit cannot be verified, the user-facing result is explicitly uncertain; the
 host must not claim the action never started or the Goal was cancelled. Current
 Soridormi motion cancellation is global-domain, so a specific physical target
 may widen to `embodied_motion`; every coaffected request and Goal is retained in
-the receipt and reconciled rather than reported as exact isolation.
+the receipt and reconciled rather than reported as exact isolation. A coaffected
+sibling whose responsibility stays open becomes `recoverable`, and the same
+cancellation Evidence re-enters the Planner for it from its retained Goal
+provenance, so the Planner decides whether to resume, re-plan, or report it.
 
 Goal-owned cognitive speech now carries source Goal IDs and exact plan identity
 into its runtime request. Unfinished speech can therefore participate in named

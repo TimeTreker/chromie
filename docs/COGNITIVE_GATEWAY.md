@@ -364,7 +364,8 @@ Exact isolation also depends on provider granularity. Current Soridormi motion
 cancellation is global-domain, so a specific physical target widens to
 `embodied_motion`; the receipt explicitly records `widened`, the reason, and
 every coaffected request and goal. It must never be presented as exact
-goal-only cancellation. A deterministic hold for ambiguous safety-relevant
+goal-only cancellation. A coaffected Goal that stays open is re-entered into
+the Planner with the same cancellation Evidence. A deterministic hold for ambiguous safety-relevant
 language is a future policy, not current implementation.
 
 `embodied_motion` is ledger-bound: it selects motion registered in the host

@@ -6102,6 +6102,44 @@ class ConversationStateManager:
             )
         return candidates
 
+    def goal_reentry_provenance(
+        self,
+        goal_ids: list[str] | tuple[str, ...] | set[str],
+    ) -> list[dict[str, Any]]:
+        """Return retained Planner re-entry provenance for still-open Goals.
+
+        Used when a trusted state transition (such as a shared stop that halted a
+        sibling's Work) must re-enter the Planner for a Goal whose originating
+        turn response is no longer at hand. Terminal or unknown Goals are omitted.
+        """
+
+        provenance: list[dict[str, Any]] = []
+        wanted = {str(item).strip() for item in goal_ids if str(item).strip()}
+        for context in self._active_task_contexts():
+            semantic_goal = context.get("semantic_goal")
+            if not isinstance(semantic_goal, dict):
+                continue
+            goal_id = str(semantic_goal.get("goal_id") or context.get("task_id") or "").strip()
+            if goal_id not in wanted:
+                continue
+            metadata = context.get("metadata")
+            if not isinstance(metadata, dict):
+                metadata = {}
+            responsibilities = metadata.get("planner_reentry_responsibilities")
+            provenance.append(
+                {
+                    "goal_id": goal_id,
+                    "source_text": str(semantic_goal.get("source_text") or context.get("last_meaningful_user_turn") or "").strip(),
+                    "language": str(metadata.get("planner_reentry_language") or "auto").strip() or "auto",
+                    "responsibilities": [
+                        self._json_safe(item)
+                        for item in (responsibilities if isinstance(responsibilities, list) else [])
+                        if isinstance(item, dict)
+                    ],
+                }
+            )
+        return provenance
+
     def complete_runtime_revalidation(
         self,
         goal_ids: list[str],

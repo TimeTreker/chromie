@@ -393,6 +393,14 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         self.assertTrue(
             coaffected["metadata"]["cancellation_scope_widened"]
         )
+        # The halted sibling stays open, so its provenance can re-enter Planner.
+        self.assertEqual(
+            [
+                item["goal_id"]
+                for item in manager.goal_reentry_provenance(["goal-a", "goal-b"])
+            ],
+            ["goal-b"],
+        )
 
     def test_persistence_failure_rolls_back_atomic_goal_state(self) -> None:
         manager = ConversationStateManager(base_conversation_id="cancel-test")

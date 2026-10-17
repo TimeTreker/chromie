@@ -759,6 +759,33 @@ def goal_cancellation_evidence_reentry_goal_ids(
     return requested_goal_ids or evidence_goal_ids
 
 
+def goal_cancellation_evidence_sibling_goal_ids(
+    context: dict[str, Any] | None,
+) -> set[str]:
+    """Return still-open sibling Goals named by admitted cancellation Evidence.
+
+    A shared stop can halt a coaffected sibling's Work, and a revoked multi-Goal
+    confirmation releases its preserved Goals. Both stay open, so the same
+    cancellation Evidence may re-enter the Planner for them as ordinary Goals,
+    not as cancellation targets.
+    """
+
+    if not isinstance(context, dict) or not goal_cancellation_evidence_reentry_goal_ids(
+        context
+    ):
+        return set()
+    evidence = [
+        GoalCancellationEvidence.model_validate(item)
+        for item in context.get("trusted_goal_cancellation_evidence") or []
+    ]
+    target_goal_ids = {goal_id for item in evidence for goal_id in item.target_goal_ids}
+    return {
+        goal_id
+        for item in evidence
+        for goal_id in (*item.coaffected_goal_ids, *item.released_confirmation_goal_ids)
+    } - target_goal_ids
+
+
 @dataclass(frozen=True)
 class PlannerGoalContext:
     """One immutable Goal/evidence projection shared by every Planner pass.
@@ -884,9 +911,14 @@ def planner_goal_context(
             result_goal_ids = scope_ids
             cancellation_goal_ids = frozenset()
         elif reentry_scope.trigger == "goal_cancellation_reentry":
-            if cancellation_goal_ids != scope_ids:
+            # Targets are reported as cancelled; coaffected or released siblings
+            # named by the same Evidence stay ordinary open Goals in scope.
+            sibling_goal_ids = goal_cancellation_evidence_sibling_goal_ids(current)
+            if not cancellation_goal_ids or not scope_ids <= (
+                cancellation_goal_ids | sibling_goal_ids
+            ):
                 raise ValueError("Planner cancellation re-entry context does not match typed scope")
-            cancellation_goal_ids = scope_ids
+            cancellation_goal_ids = cancellation_goal_ids & scope_ids
             result_goal_ids = frozenset()
         else:
             cancellation_goal_ids = frozenset()
