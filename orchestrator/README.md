@@ -30,9 +30,10 @@ Runtime retains validated pre-GA preparation, admits only contract-declared safe
   Social Cognition. SC owns exact Communicative Activity wording and optional
   social expression. Terminal Evidence currently re-enters Planner before SC
   expresses established Needs; independent Goal-bound SC reactivation remains open.
-- TTS delivers PCM synthesis chunks; the current Orchestrator buffers one
-  complete request through the provider `end` event before ordered playback and
-  interruption handling.
+- TTS delivers PCM synthesis chunks; on the first PCM chunk the Orchestrator
+  queues the request for ordered playback and plays chunks as they arrive, before
+  the provider `end` event. Barge-in and stale-playback checks apply while the
+  stream is still arriving.
 - The Trusted Capability Runtime resolves and schedules trusted named capabilities.
 - Soridormi plans and executes embodied skills and owns physical safety.
 - `hardware/daemon.py` is a legacy mock compatibility boundary, not the alpha
@@ -153,7 +154,9 @@ If the Goal-driven Runtime is disabled or fails after admission, ordinary cognit
 fails closed and retains typed operational failure evidence. Host does not manufacture an
 ordinary semantic explanation; only the separately documented tiny protective/operational
 fail-safe exceptions may speak. The Host never switches to a direct-LLM or retired Agent
-semantic path.
+semantic path for a user turn. The only Host-side model call is the opt-in generated
+startup greeting (off by default; see
+[composition root](../docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md)).
 
 `orchestrator/runtime/observability_recording.py` owns fail-soft recording containment for Experience/Episode and Cognitive Evidence writes plus optional accelerator sample scheduling/task tracking/trace attachment; it is not a semantic owner and observability failure cannot alter Goal, Planner, speech, or execution truth.
 `orchestrator/runtime/shutdown_lifecycle.py` owns only final process teardown sequencing. It reuses the existing InputTurn/Playback/Session owners, closes concrete transports/resources, and may abandon unfinished session traces during process exit; it cannot interpret user intent, cancel Goals semantically, author speech, or fabricate completion Evidence.

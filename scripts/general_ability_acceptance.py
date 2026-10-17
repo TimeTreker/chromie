@@ -345,7 +345,7 @@ def _is_expressive_cue_capability(item: dict[str, Any]) -> bool:
         and (
             metadata.get("source") in {
                 "expressive_body_cue",
-                "canonical_plan_auxiliary_activity",
+                "social_cognition_auxiliary_activity",
             }
             or metadata.get("auxiliary_plan_activity") is True
         )
