@@ -2086,8 +2086,7 @@
       "key": "ORCH_CAPABILITY_MAX_CONCURRENCY",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/interaction_coordinator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
