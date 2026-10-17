@@ -32,10 +32,10 @@ from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
 from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle

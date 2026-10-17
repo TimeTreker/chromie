@@ -92,7 +92,15 @@ def audit() -> dict[str, Any]:
         if forbidden in orchestrator:
             errors.append(f"Orchestrator still contains removed semantic rollback surface: {forbidden}")
 
-    cognitive_runtime = _read("orchestrator/runtime/cognitive_runtime.py")
+    cognitive_runtime = "".join(
+        _read(relative)
+        for relative in (
+            "orchestrator/runtime/cognitive_runtime.py",
+            "orchestrator/runtime/canonical_plan_adapter.py",
+            "orchestrator/runtime/cognitive_evidence.py",
+            "orchestrator/runtime/planner_advance_projection.py",
+        )
+    )
     if '"legacy_fallback"' in cognitive_runtime:
         errors.append("Goal-driven runtime still declares a legacy_fallback status")
 

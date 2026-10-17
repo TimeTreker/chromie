@@ -18,6 +18,7 @@ from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_contracts.plan import FastPlannerStreamFailure, FastPlannerStreamTerminal
 from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_activity_count, declared_ability_needs_text
+from orchestrator.runtime import planner_advance_projection
 
 
 EPISODES = [
@@ -275,7 +276,7 @@ async def test_compound_intent_becomes_three_grounded_activities_and_one_goal():
     assert len(association.new_goals) == 1
     assert association.new_goals[0].description == EPISODES[0]
     assert association.new_goals[0].metadata["output_mode"] == "body_action"
-    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+    plan = planner_advance_projection.canonical_plan_from_fast_advance(
         advance=frames[0].advance, association=association, user_text=request.text,
     )
     assert [step.capability_id for step in plan.steps] == ["test.walk", "test.nod", "test.turn"]
@@ -583,7 +584,7 @@ async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path)
         from orchestrator.runtime.capability_runtime import (
             CapabilityDefinition, MockCapabilityProvider, LocalSpeechCapabilityProvider, local_speech_definition,
         )
-        from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+        from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
         from orchestrator.runtime.conversation_state import ConversationStateManager
         from tests.cognitive_runtime_test_support import FakeRuntime
         from tests.capability_runtime_test_support import submit_and_wait_terminal
@@ -707,9 +708,9 @@ def test_fast_quote_binding_includes_exact_retained_goal_owner(foreign):
             "goal_id":"other" if foreign else "retained","description":"Nod twice"}}])
     if foreign:
         with pytest.raises(ValueError,match="no exact canonical Goal owner"):
-            GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(**kwargs)
+            planner_advance_projection.canonical_plan_from_fast_advance(**kwargs)
     else:
-        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(**kwargs)
+        plan = planner_advance_projection.canonical_plan_from_fast_advance(**kwargs)
         assert plan.parameter_resolutions[0].source_goal_ids == ["retained"]
 
 
@@ -1044,7 +1045,7 @@ async def test_planner_cites_contextual_source_without_umi_bindings(text, outcom
                 "confidence": 1.0, "reason_summary": "New complete request."}])
     association = await GoalAssociationResolver(ga).resolve(request)
     assert association.new_goals[0].description == outcome
-    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+    plan = planner_advance_projection.canonical_plan_from_fast_advance(
         advance=frames[0].advance, association=association, user_text=text,
         responsibilities=request.responsibilities,
     )
@@ -1076,7 +1077,7 @@ def test_canonical_binding_rejects_context_citation_from_sibling_requirement():
         SemanticGoal(goal_id="g2", source_responsibility_refs=["r2"], description=sibling.outcome, source_text="Do it."),
     ])
     with pytest.raises(ValueError, match="exact accepted Responsibility owner"):
-        GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        planner_advance_projection.canonical_plan_from_fast_advance(
             advance=advance, association=association, user_text="Do it.", responsibilities=[first, sibling],
         )
 
@@ -1185,7 +1186,7 @@ def test_situation_cited_source_is_recorded_as_observed_context():
     association = GoalAssociationResolution(turn_id="t", resolution_status="resolved", confidence=1., new_goals=[
         SemanticGoal(goal_id="g1", source_responsibility_refs=["r1"], description=owner.outcome, source_text="sure"),
     ])
-    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+    plan = planner_advance_projection.canonical_plan_from_fast_advance(
         advance=advance, association=association, user_text="sure", responsibilities=[owner],
     )
     # Never presented as words the person said.
@@ -1420,7 +1421,7 @@ def test_canonical_steps_keep_adjacent_execution_groups_apart():
     association = GoalAssociationResolution(turn_id="t", resolution_status="resolved", confidence=1., new_goals=[
         SemanticGoal(goal_id="g1", source_responsibility_refs=["r1"], description=owner.outcome, source_text="x"),
     ])
-    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+    plan = planner_advance_projection.canonical_plan_from_fast_advance(
         advance=advance, association=association, user_text="x", responsibilities=[owner],
     )
     assert [(step.step_id, step.timing, step.metadata["execution_group"]) for step in plan.steps] == [
@@ -1541,7 +1542,7 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
                 "cognitive_requests": [], "referent_updates": [], "resolved_references": [], "confidence": 1.0,
                 "reason_summary": "New intent."}
     association = await GoalAssociationResolver(Model([ga_reply])).resolve(request)
-    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+    plan = planner_advance_projection.canonical_plan_from_fast_advance(
         advance=frames[0].advance, association=association, user_text=request.text,
     )
     assert [step.capability_id for step in plan.steps] == ["chromie.weather.lookup"]

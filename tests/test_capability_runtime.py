@@ -3914,7 +3914,11 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(called, [])
 
     async def test_partial_reuse_cancel_and_add_preserves_original_execution(self) -> None:
-        from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, GoalDrivenRuntimeCoordinator, CognitiveRuntimePolicy
+        from orchestrator.runtime.cognitive_runtime import (
+            GoalDrivenRuntimeCoordinator,
+            CognitiveRuntimePolicy,
+        )
+        from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
         from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
         from shared.chromie_contracts.plan import CanonicalPlan
 

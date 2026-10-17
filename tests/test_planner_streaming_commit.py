@@ -9,7 +9,12 @@ from agent.app.planner_model_contract import PlannerDTOContractError
 from agent.app.planner_fast_validation import AuthoritativeGroundingValidationError, validate_fast_advance_output
 from agent.app.planner_prompt import fast_advance_capability_prompt_projection, fast_advance_layered_prompt, fast_advance_semantic_capability_projection, fast_advance_streaming_capability_prompt_projection, fast_responsibility_decision_projection, fast_streaming_advance_system_prompt, planner_interaction_context_projection
 from agent.app.planner_schema import fast_streaming_advance_response_schema
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveStageFailure, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
+from orchestrator.runtime.cognitive_runtime import (
+    CognitiveStageFailure,
+    CognitiveRuntimePolicy,
+    GoalDrivenRuntimeCoordinator,
+)
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.plan import FastPlannerAdvanceModelOutput, FastPlannerStreamFailure, FastPlannerStreamTerminal
 from tests.cognitive_runtime_test_support import admitted_core, new_goal_association, respond_plan

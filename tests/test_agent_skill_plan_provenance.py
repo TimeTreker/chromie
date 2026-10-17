@@ -8,7 +8,7 @@ from agent.app.agent_skills import (
     attach_disclosure_metadata,
     attach_planner_disclosure_metadata_fail_closed,
 )
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 
 from shared.chromie_contracts import (
     AgentSkillDisclosureResolution,

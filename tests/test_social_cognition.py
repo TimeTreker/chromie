@@ -13,6 +13,7 @@ from agent.app.capabilities.validator import validate_args_for_schema
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCommunicativeAct
 from tests.test_situational_cognition import goal_free_observation
 from tests.voice_assistant_test_support import bare_voice_assistant
+from orchestrator.runtime import planner_advance_projection
 
 
 class Model:
@@ -1202,7 +1203,7 @@ async def test_situation_speech_retains_correlation_through_actual_delivery_ledg
 @pytest.mark.asyncio
 async def test_social_expression_uses_existing_trusted_runtime_without_goal_work():
     from tests.auxiliary_activity_test_support import RecordingCapabilityRuntime as _Runtime, social_capability_definition as _definition
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
 
@@ -1239,7 +1240,7 @@ async def test_social_expression_uses_existing_trusted_runtime_without_goal_work
 @pytest.mark.parametrize("covered", [True, False])
 async def test_sc_words_bind_to_work_without_changing_its_identity_or_completing_progress(covered):
     from tests.cognitive_runtime_test_support import FakeRuntime
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import CanonicalPlan, canonical_plan_fingerprint
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
 
@@ -1272,7 +1273,7 @@ async def test_sc_words_bind_to_work_without_changing_its_identity_or_completing
 @pytest.mark.asyncio
 async def test_optional_sc_progress_does_not_create_a_physical_work_playback_barrier():
     from tests.cognitive_runtime_test_support import FakeRuntime, walk_definition
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
 
@@ -1317,7 +1318,7 @@ def test_delivery_receipt_preserves_communication_need_and_responsibility_bindin
 @pytest.mark.asyncio
 @pytest.mark.parametrize("mutation", ["completion", "need", "commitment", "question", "ordering"])
 async def test_sc_projection_rejects_relabeling_exact_speech_as_other_authority(mutation):
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.planner_response import PlannerResponseProjection
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1359,7 +1360,11 @@ async def test_sc_projection_rejects_relabeling_exact_speech_as_other_authority(
 @pytest.mark.asyncio
 async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
     from tests.cognitive_runtime_test_support import FakeRuntime, blink_definition, body_goal_association, admitted_core
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
+    from orchestrator.runtime.cognitive_runtime import (
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerStreamTerminal
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
     from orchestrator.runtime.session import SessionTracker
@@ -1413,7 +1418,11 @@ async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
 @pytest.mark.asyncio
 async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
     from tests.cognitive_runtime_test_support import FakeRuntime, new_goal_association, admitted_core
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
+    from orchestrator.runtime.cognitive_runtime import (
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import FastPlannerAdvance, FastPlannerStreamTerminal
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
     requests = []
@@ -1470,7 +1479,7 @@ async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
 @pytest.mark.asyncio
 async def test_ordered_sc_answer_stays_between_work_steps_and_waits_for_delivery():
     from tests.cognitive_runtime_test_support import FakeRuntime, blink_definition
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
     plan = CanonicalPlan(plan_id="ordered-work", planner_tier="fast", disposition="mixed", coverage="complete",
@@ -1652,7 +1661,7 @@ def test_terminal_fast_limitation_establishes_exact_result_need(disposition):
         unresolved=["The required provider is unavailable."],
         reason_summary="The supplied provider contract cannot support the request.",
     )
-    plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+    plan = planner_advance_projection.canonical_plan_from_fast_advance(
         advance=advance, association=new_goal_association(), user_text="Check it.",
     )
     assert plan.steps == []
@@ -1754,8 +1763,10 @@ async def test_social_route_preserves_typed_budget_failure_without_unhandled_ser
 async def test_independent_sc_result_reaches_runtime_expression_queue(spoken, primary):
     from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator,
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
     )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
     from shared.chromie_contracts.plan import CanonicalPlan
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
@@ -1904,8 +1915,10 @@ async def test_session_joins_social_delivery_and_retains_failed_completion(failu
 @pytest.mark.parametrize("failure", ["planner_contract", "planner_exception", "social", "playback", "interrupt"])
 async def test_planner_failure_joins_independent_social_delivery_without_hiding_failure(failure):
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator,
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
     )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.plan import FastPlannerStreamFailure
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution
     from tests.cognitive_runtime_test_support import FakeRuntime, admitted_core, body_goal_association
@@ -2072,8 +2085,10 @@ async def test_sc_delivery_remains_visible_after_canonical_goal_binding():
 async def test_sc_expression_uses_real_runtime_queue_and_completion_ledger(fresh, terminal_status):
     from orchestrator.runtime.capability_runtime import MockCapabilityProvider
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator,
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
     )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.social_cognition import SocialCognitionResolution

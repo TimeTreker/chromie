@@ -791,7 +791,7 @@ async def test_newer_situation_supersedes_inflight_speech_and_memory():
 
 @pytest.mark.asyncio
 async def test_environment_nonverbal_sc_uses_existing_soridormi_expression_runtime():
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.auxiliary_activity_test_support import RecordingCapabilityRuntime as _Runtime, social_capability_definition as _definition
 
     provider = _Runtime([_definition()])

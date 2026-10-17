@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 
 from benchmarks.datasets.fast_planner_daily_life.qualification import load_cases, materialize_catalog
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts import CognitiveWorkRequest
 from tests.capability_runtime_test_support import submit_and_wait_terminal

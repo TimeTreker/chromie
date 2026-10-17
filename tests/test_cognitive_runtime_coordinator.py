@@ -14,11 +14,11 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
-    CognitiveEvidenceRecorder,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
 from orchestrator.runtime.interaction_ledger import InteractionLedger
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.capability_runtime import (
@@ -61,6 +61,7 @@ from tests.cognitive_runtime_test_support import (
     walk_definition,
     work_fixture,
 )
+from orchestrator.runtime import planner_advance_projection
 
 
 class FailingPlannerAdapter(CanonicalPlanRuntimeAdapter):
@@ -208,7 +209,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             confidence=0.95,
         )
 
-        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        plan = planner_advance_projection.canonical_plan_from_fast_advance(
             advance=advance,
             association=association,
             user_text="Is anyone outside?",
@@ -4557,7 +4558,7 @@ class FastInformationAcquisitionLifecycleTests(unittest.TestCase):
             reason_summary="Acquire the requested information first.",
         )
 
-        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        plan = planner_advance_projection.canonical_plan_from_fast_advance(
             advance=advance,
             association=association,
             user_text="Please help me check the weather in Chongqing today.",

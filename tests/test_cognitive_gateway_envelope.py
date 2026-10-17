@@ -17,11 +17,11 @@ from orchestrator.runtime.cognitive_gateway import (
     USER_TURN_ENVELOPE_CONTEXT_KEY,
 )
 from orchestrator.runtime.cognitive_runtime import (
-    CognitiveEvidenceRecorder,
     CognitiveRuntimePolicy,
     CognitiveRuntimeResolution,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CognitiveWorkRequest,

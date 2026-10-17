@@ -19,10 +19,8 @@ from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import canonical_plan_response_schema
 from agent.app.planner_validation import validate_goal_responsibility_outcomes
 from tests.cognitive_work_test_support import cognitive_work_request
-from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
-    GoalDrivenRuntimeCoordinator,
-)
+from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.capability_runtime import (

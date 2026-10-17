@@ -920,7 +920,7 @@
       "contract": "Contain the single Activation call or its typed scope validation failure, log the cause and return no decision so no downstream cognition is authorized."
     },
     {
-      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "path": "orchestrator/runtime/canonical_plan_adapter.py",
       "symbol": "CanonicalPlanRuntimeAdapter._validation_errors",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
@@ -933,7 +933,7 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/cognitive_runtime.py",
+      "path": "orchestrator/runtime/canonical_plan_adapter.py",
       "symbol": "CanonicalPlanRuntimeAdapter._validation_errors",
       "ordinal": 2,
       "classification": "fail_closed_boundary",

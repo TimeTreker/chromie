@@ -14,7 +14,7 @@ from orchestrator.runtime.capability_runtime import (
     schema_valid_completion_evidence_policy,
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.session import SessionTracker
 from shared.chromie_contracts.execution_outcome import claim_qualification_policy_sha256
 from shared.chromie_contracts.interaction import (

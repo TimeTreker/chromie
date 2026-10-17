@@ -10,9 +10,7 @@ from orchestrator.runtime.capability_runtime import (
     CapabilityRuntime,
 )
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
-from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
-)
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from shared.chromie_contracts.core_interpretation import (
     CoreInterpretationResult,
 )

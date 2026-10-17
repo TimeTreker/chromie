@@ -9,10 +9,10 @@ from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from agent.app.goal_association_schema import goal_association_response_schema
 from agent.app.social_cognition import social_cognition_response_schema
 from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.goal import GoalAssociation, GoalAssociationResolution
 from shared.chromie_contracts.plan import (

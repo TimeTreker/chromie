@@ -3312,7 +3312,7 @@ Prospective planning output cannot contain a final completion claim.
 A clear request whose required Capability is absent takes no shortcut around Goal
 Association or the Planner: UMI stays WHAT-only, GA associates the Responsibility as usual,
 and the Planner reports the uncovered Responsibility as an `unavailable` outcome or
-Activity with no provider request (`orchestrator/runtime/cognitive_runtime.py`). SC then
+Activity with no provider request (`orchestrator/runtime/planner_advance_projection.py`). SC then
 expresses that limitation. An unavailable outcome is categorically different from an
 executed query whose trusted result is empty. Speech delivery can express the distinction but cannot
 change it, and `chromie.speak` cannot stand in for the missing substantive Capability.

@@ -31,7 +31,11 @@ from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition, LocalSpeechCapabilityProvider, MockCapabilityProvider,
     local_speech_definition, RuntimeAuthorization,
 )
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
+from orchestrator.runtime.cognitive_runtime import (
+    CognitiveRuntimePolicy,
+    GoalDrivenRuntimeCoordinator,
+)
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler

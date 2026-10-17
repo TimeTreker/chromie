@@ -12,7 +12,7 @@ from agent.app.planner_context import (
 from agent.app.planner_schema import (
     canonical_plan_response_schema,
 )
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from shared.chromie_contracts.interaction import InteractionResponse, InteractionSpeech
 from shared.chromie_contracts.plan import (
     AuxiliaryPlanActivity,

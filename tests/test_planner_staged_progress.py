@@ -34,10 +34,10 @@ from orchestrator.runtime.capability_runtime import (
     local_speech_definition,
 )
 from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest

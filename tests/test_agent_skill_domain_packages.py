@@ -12,7 +12,7 @@ from agent.app.agent_skills import (
     load_agent_skill_registry,
 )
 from agent.app.capabilities.local import build_chromie_registry
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 
 from shared.chromie_contracts import (
     AgentSkillDisclosureRequest,

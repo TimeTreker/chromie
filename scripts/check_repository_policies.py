@@ -41,6 +41,13 @@ VOICE_ASSISTANT_HOST_MODULES = (
     "orchestrator/runtime/reflex_cancellation_host.py",
     "orchestrator/runtime/routed_turn_host.py",
 )
+# Goal-driven runtime classes split out of cognitive_runtime.py, held to the
+# same source guards as that module.
+COGNITIVE_RUNTIME_MODULES = (
+    "orchestrator/runtime/canonical_plan_adapter.py",
+    "orchestrator/runtime/cognitive_evidence.py",
+    "orchestrator/runtime/planner_advance_projection.py",
+)
 
 RULE_PRODUCTION_ASSERT = "python.production_assert"
 RULE_SILENT_BROAD_EXCEPTION = "python.silent_broad_exception"
@@ -1037,6 +1044,8 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
     }
     for relative in VOICE_ASSISTANT_HOST_MODULES:
         source_checks[relative] = source_checks["orchestrator/orchestrator.py"]
+    for relative in COGNITIVE_RUNTIME_MODULES:
+        source_checks[relative] = source_checks["orchestrator/runtime/cognitive_runtime.py"]
     for relative, (rule_id, tokens, message) in source_checks.items():
         path = root / relative
         if not path.is_file():
@@ -1625,6 +1634,10 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             "social_attention_opportunity",
         ),
     }
+    for relative in COGNITIVE_RUNTIME_MODULES:
+        retired_social_planner_tokens[relative] = retired_social_planner_tokens[
+            "orchestrator/runtime/cognitive_runtime.py"
+        ]
     for relative, tokens in retired_social_planner_tokens.items():
         path = root / relative
         if not path.is_file():
@@ -1750,6 +1763,10 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             '"skill_id": "chromie.speak"',
         ),
     }
+    for relative in COGNITIVE_RUNTIME_MODULES:
+        canonical_source_checks[relative] = canonical_source_checks[
+            "orchestrator/runtime/cognitive_runtime.py"
+        ]
     for relative, tokens in canonical_source_checks.items():
         path = root / relative
         if not path.is_file():

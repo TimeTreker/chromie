@@ -143,7 +143,10 @@ def test_withheld_effect_is_refused_before_any_provider_starts():
 def walk_turn(verdict, reviewed=frozenset({"soridormi.walk_forward"})):
     """One full apply-mode turn whose Plan walks; the scripted Agent returns the given verdict."""
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.cognitive_runtime_test_support import (
         FakeRuntime, ScriptedClient, admitted_core, body_goal_association, walk_definition)
 
@@ -206,7 +209,7 @@ def test_full_turn_value_verdict_gates_only_the_reviewed_effect(verdict, confirm
         assert declined[0].facts["withheld_capability_ids"] == ["soridormi.walk_forward"]
         assert declined[0].facts["value_declined"]["decision"] == "decline"
     # Live 2026-10-11 (h_ask_phone_zh): the annotated Plan must archive as the Planner's artifact.
-    from orchestrator.runtime.cognitive_runtime import CognitiveEvidenceRecorder
+    from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
     packets = CognitiveEvidenceRecorder.semantic_artifact_packets(result, sid="sid-vj")
     (plan_packet,) = [packet for packet in packets if packet.ref.artifact_kind == "planner_plan"]
     assert "value_judgment" not in plan_packet.payload["metadata"]
@@ -253,7 +256,10 @@ def test_withheld_effect_never_joins_a_provider_local_body_group():
 def speech_turn(verdict, *, value_review=True):
     """Turn-local speech UMI marked value_review (owner choice B, 2026-10-12)."""
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.cognitive_runtime_test_support import FakeRuntime, ScriptedClient, admitted_core, body_goal_association
 
     class Client(ScriptedClient):
@@ -333,7 +339,7 @@ def test_value_review_speech_is_judged_before_social_cognition_says_it(verdict, 
         assert facts["withheld_answer_need_ids"] == [answer.need_id]
         assert ("value_question" if extra_kind == "input" else "value_declined") in facts
         assert plan.metadata["value_judgment"]["withheld_answer_goal_ids"] == ["goal-1"]
-    from orchestrator.runtime.cognitive_runtime import CognitiveEvidenceRecorder
+    from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
     packets = CognitiveEvidenceRecorder.semantic_artifact_packets(result, sid="sid-say")
     (plan_packet,) = [packet for packet in packets if packet.ref.artifact_kind == "planner_plan"]
     assert all("value_withheld" not in need["facts"] and "value_judgment" not in need["facts"]
@@ -376,7 +382,10 @@ def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=f
 
     from orchestrator.orchestrator import VoiceAssistant
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.cognitive_runtime_test_support import FakeRuntime, walk_definition
     from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_resolution
 
@@ -483,7 +492,10 @@ def test_planner_authored_verdict_on_a_reentry_plan_is_not_a_verdict():
 
 def test_turn_record_reuses_a_verdict_and_judges_only_new_reviewed_capabilities():
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.cognitive_runtime_test_support import FakeRuntime
 
     verdicts = [judged("proceed"), judged("decline", "consent", "another_adult")]

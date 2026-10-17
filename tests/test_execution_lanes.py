@@ -6,7 +6,7 @@ import asyncio
 import time
 import unittest
 
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.capability_runtime import (
     MockCapabilityProvider,
     RuntimeAuthorization,
