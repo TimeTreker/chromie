@@ -812,9 +812,11 @@ The ASR service accepts WebSocket connections and two message forms:
   `{"type":"pong","service":"asr",...}` with backend, mode, model revision,
   and bounded-concurrency metadata.
 - Binary PCM16 mono audio at `ASR_SAMPLE_RATE` -> one JSON final result:
-  `{"type":"final","text":"...","duration":<seconds>}`.
+  `{"type":"final","sequence":<n>,"text":"...","duration":<seconds>}`.
 
-Failures return `{"type":"error","message":"..."}`. The host Orchestrator
+Failures return `{"type":"error","sequence":<n>,"message":"..."}`. `sequence`
+numbers the utterances sent on one connection from 1; clients reject a reply
+whose sequence is not the utterance they are waiting for and reconnect. The host Orchestrator
 performs VAD and sends complete utterance audio; this service does not stream
 partial transcripts. Blocking final-backend inference runs in a bounded
 executor, so health/ping handling remains responsive while a transcription is

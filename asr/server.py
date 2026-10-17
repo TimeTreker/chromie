@@ -76,6 +76,10 @@ def pcm16_to_float32(audio_bytes: bytes) -> np.ndarray:
 
 
 async def handle_client(ws):
+    # Each binary utterance on this connection gets the next sequence number,
+    # and its final or error reply echoes it, so a client can tell a late reply
+    # to an earlier utterance from the reply it is waiting for.
+    sequence = 0
     async for message in ws:
         if isinstance(message, str):
             try:
@@ -101,6 +105,7 @@ async def handle_client(ws):
                 )
             continue
 
+        sequence += 1
         audio = pcm16_to_float32(message)
         duration = len(audio) / settings.sample_rate
         rms = float(np.sqrt(np.mean((audio * 32768.0) ** 2))) if len(audio) else 0.0
@@ -115,10 +120,21 @@ async def handle_client(ws):
             )
             elapsed = time.time() - start
             logger.info("ASR done in %.2fs text=%s", elapsed, text)
-            await ws.send(json.dumps({"type": "final", "text": text, "duration": duration}))
+            await ws.send(
+                json.dumps(
+                    {
+                        "type": "final",
+                        "sequence": sequence,
+                        "text": text,
+                        "duration": duration,
+                    }
+                )
+            )
         except Exception as exc:
             logger.error("ASR failed: %s", exc, exc_info=True)
-            await ws.send(json.dumps({"type": "error", "message": str(exc)}))
+            await ws.send(
+                json.dumps({"type": "error", "sequence": sequence, "message": str(exc)})
+            )
 
 
 async def main():

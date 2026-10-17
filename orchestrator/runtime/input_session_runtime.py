@@ -51,6 +51,11 @@ class InputSessionRuntime:
 
     def __init__(self, host: Any) -> None:
         self.host = host
+        # ASR replies echo the per-connection utterance sequence; a reply for
+        # any other sequence (for example a late reply after a timeout) is
+        # rejected and the connection is reset.
+        self._asr_socket: Any = None
+        self._asr_sequence = 0
 
     async def _revoke_presentation_compute_lease(self, *, reason: str) -> None:
         lease = getattr(self.host, "presentation_compute_lease", None)
@@ -284,6 +289,11 @@ class InputSessionRuntime:
 
                     asr_start_ms = now_ms()
                     host.session_log(session_id, "asr_send_start: audio_ms=%.1f bytes=%s", duration_ms, len(audio))
+                    if host.asr_ws is not self._asr_socket:
+                        self._asr_socket = host.asr_ws
+                        self._asr_sequence = 0
+                    self._asr_sequence += 1
+                    expected_sequence = self._asr_sequence
                     await host.asr_ws.send(audio)
                     send_ms = now_ms() - asr_start_ms
                     asr_span.set_attribute("send_ms", round(send_ms, 3))
@@ -291,6 +301,11 @@ class InputSessionRuntime:
                     resp = await asyncio.wait_for(host.asr_ws.recv(), timeout=host.asr_timeout_s)
                     asr_done_ms = now_ms()
                     result = json.loads(resp)
+                    if result.get("sequence") != expected_sequence:
+                        raise RuntimeError(
+                            "ASR reply sequence "
+                            f"{result.get('sequence')!r} does not match utterance {expected_sequence}"
+                        )
                     asr_span.set_attribute("result_type", str(result.get("type") or "unknown"))
                     if result.get("type") == "error":
                         asr_span.set_status("error")

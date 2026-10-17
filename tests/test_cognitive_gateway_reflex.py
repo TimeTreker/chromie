@@ -1357,14 +1357,17 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
 
         class _Asr:
             close_code = None
+            sent = 0
 
             async def send(self, audio: bytes) -> None:
+                self.sent += 1
                 events.append(f"asr_send:{len(audio)}")
 
             async def recv(self) -> str:
                 return json.dumps(
                     {
                         "type": "final",
+                        "sequence": self.sent,
                         "text": "Emergency stop!",
                     }
                 )

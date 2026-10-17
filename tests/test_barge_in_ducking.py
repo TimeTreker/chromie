@@ -26,7 +26,7 @@ class _Asr:
         self.sent.append(audio)
 
     async def recv(self) -> str:
-        return json.dumps({"type": "final", "text": self.text})
+        return json.dumps({"type": "final", "sequence": len(self.sent), "text": self.text})
 
     async def close(self) -> None:
         return None
