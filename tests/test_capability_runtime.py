@@ -10,12 +10,14 @@ from shared.chromie_contracts.interaction import CapabilityResult, InteractionRe
 from shared.chromie_contracts.reflex import CancellationDirective, CancellationDispatchReceipt
 
 from orchestrator.runtime.capability_runtime import (
-    LocalSpeechCapabilityProvider,
-    MockCapabilityProvider,
     RuntimeAuthorization,
     CapabilityDefinition,
     CapabilityDefinitionRegistry,
     CapabilityRuntime,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
+    MockCapabilityProvider,
     local_speech_definition,
 )
 from orchestrator.runtime.soridormi_capability_provider import (

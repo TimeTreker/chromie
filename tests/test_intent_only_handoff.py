@@ -581,8 +581,11 @@ async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path)
         assert [step.source_goal_ids for step in plan.steps] == [[ready]]
         assert [condition.goal_id for condition in plan.time_conditions] == [future]
         assert plan.goal_outcomes[0].satisfaction.unmet_goal_ids == [future]
-        from orchestrator.runtime.capability_runtime import (
-            CapabilityDefinition, MockCapabilityProvider, LocalSpeechCapabilityProvider, local_speech_definition,
+        from orchestrator.runtime.capability_runtime import CapabilityDefinition
+        from orchestrator.runtime.builtin_capability_providers import (
+            MockCapabilityProvider,
+            LocalSpeechCapabilityProvider,
+            local_speech_definition,
         )
         from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
         from orchestrator.runtime.conversation_state import ConversationStateManager

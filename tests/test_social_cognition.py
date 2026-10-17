@@ -1034,7 +1034,11 @@ async def test_state_social_refreshes_continuity_after_previous_speech(state, pa
 @pytest.mark.asyncio
 @pytest.mark.parametrize("change", ["same_work", "cancelled_work", "other_work", "interpretation"])
 async def test_pending_state_social_result_rechecks_actual_work(change):
-    from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime, MockCapabilityProvider
+    from orchestrator.runtime.capability_runtime import (
+        CapabilityDefinitionRegistry,
+        CapabilityRuntime,
+    )
+    from orchestrator.runtime.builtin_capability_providers import MockCapabilityProvider
     from orchestrator.runtime.cognitive_runtime import CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
     from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
     from shared.chromie_contracts.interaction import InteractionResponse
@@ -2083,7 +2087,7 @@ async def test_sc_delivery_remains_visible_after_canonical_goal_binding():
 @pytest.mark.parametrize("fresh", [False, True])
 @pytest.mark.parametrize("terminal_status", ["completed", "failed", "cancelled"])
 async def test_sc_expression_uses_real_runtime_queue_and_completion_ledger(fresh, terminal_status):
-    from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+    from orchestrator.runtime.builtin_capability_providers import MockCapabilityProvider
     from orchestrator.runtime.cognitive_runtime import (
         CognitiveRuntimePolicy,
         GoalDrivenRuntimeCoordinator,
@@ -2151,7 +2155,7 @@ async def test_sc_expression_uses_real_runtime_queue_and_completion_ledger(fresh
 @pytest.mark.asyncio
 async def test_social_terminal_ledger_has_one_writer_through_cognitive_closure():
     from orchestrator.orchestrator import VoiceAssistant
-    from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+    from orchestrator.runtime.builtin_capability_providers import MockCapabilityProvider
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.interaction import CapabilityRequest, InteractionResponse

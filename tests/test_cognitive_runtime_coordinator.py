@@ -22,10 +22,12 @@ from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
 from orchestrator.runtime.interaction_ledger import InteractionLedger
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.capability_runtime import (
-    LocalSpeechCapabilityProvider,
     CapabilityDefinition,
     CapabilityDefinitionRegistry,
     CapabilityRuntime,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
     local_speech_definition,
 )
 from shared.chromie_contracts.execution_outcome import (
@@ -4697,7 +4699,7 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(item["stage"] == "fast_planner_stream" for item in result.metadata["stage_diagnostics"]))
 
     async def test_safe_read_executes_before_ga_and_is_not_dispatched_again(self):
-        from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+        from orchestrator.runtime.builtin_capability_providers import MockCapabilityProvider
         from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 
         started = asyncio.Event()

@@ -24,9 +24,11 @@ from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdap
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.capability_runtime import (
-    LocalSpeechCapabilityProvider,
     CapabilityDefinitionRegistry as RuntimeCapabilityRegistry,
     CapabilityRuntime,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
     VocalPerformanceCapabilityProvider,
     local_speech_definition,
     vocal_performance_definition,

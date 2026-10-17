@@ -1192,6 +1192,7 @@ def audit_repository_hygiene(root: Path) -> list[PolicyFinding]:
         "agent/app/capabilities/validator.py",
         "agent/app/local_tool_execution.py",
         "orchestrator/runtime/capability_runtime.py",
+        "orchestrator/runtime/builtin_capability_providers.py",
     )
     for relative in duplicated_schema_targets:
         path = root / relative
@@ -1580,6 +1581,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
 
     for relative in (
         "orchestrator/runtime/capability_runtime.py",
+        "orchestrator/runtime/builtin_capability_providers.py",
         "orchestrator/runtime/interaction_coordinator.py",
     ):
         path = root / relative
@@ -1711,6 +1713,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         "shared/chromie_contracts/interaction.py",
         "shared/chromie_contracts/__init__.py",
         "orchestrator/runtime/capability_runtime.py",
+        "orchestrator/runtime/builtin_capability_providers.py",
         "orchestrator/runtime/capability_adapters.py",
         "orchestrator/runtime/interaction_coordinator.py",
         "orchestrator/runtime/outcome_reconciliation.py",

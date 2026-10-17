@@ -308,7 +308,7 @@ def test_preview_checks_optional_defaults_from_retained_contract(
 async def test_live_check_consumes_social_delivery_without_replaying_it(
     tmp_path, already_delivered,
 ):
-    from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+    from orchestrator.runtime.builtin_capability_providers import MockCapabilityProvider
     from orchestrator.runtime.cognitive_gateway import CognitiveGateway
     from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator

@@ -28,8 +28,13 @@ from benchmarks.datasets.fast_planner_daily_life.qualification import StaticCata
 from benchmarks.integration.model_replay import ModelReplay, ReplayServer
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.capability_runtime import (
-    CapabilityDefinition, LocalSpeechCapabilityProvider, MockCapabilityProvider,
-    local_speech_definition, RuntimeAuthorization,
+    CapabilityDefinition,
+    RuntimeAuthorization,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
+    MockCapabilityProvider,
+    local_speech_definition,
 )
 from orchestrator.runtime.cognitive_runtime import (
     CognitiveRuntimePolicy,

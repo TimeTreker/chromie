@@ -468,7 +468,8 @@ if __name__ == "__main__":
 
 class RetainedGoalWorkCancellationTests(unittest.IsolatedAsyncioTestCase):
     async def test_goal_stop_cancels_current_and_preserved_prior_plan_work(self):
-        from orchestrator.runtime.capability_runtime import CapabilityDefinition, MockCapabilityProvider
+        from orchestrator.runtime.capability_runtime import CapabilityDefinition
+        from orchestrator.runtime.builtin_capability_providers import MockCapabilityProvider
         from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 
         state = ConversationStateManager(base_conversation_id="multi-plan-stop")

@@ -8,12 +8,14 @@ import unittest
 
 from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.capability_runtime import (
-    MockCapabilityProvider,
     RuntimeAuthorization,
     CapabilityDefinition,
     CapabilityDefinitionRegistry,
     CapabilityResult,
     CapabilityRuntime,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    MockCapabilityProvider,
     local_speech_definition,
     vocal_performance_definition,
 )

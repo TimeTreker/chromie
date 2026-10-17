@@ -36,13 +36,15 @@ from shared.chromie_contracts.reflex import (
 
 from .capability_runtime import (
     CapabilityDispatchReceipt,
-    LocalSpeechCapabilityProvider,
-    MediaPlaybackCapabilityProvider,
     RuntimeAuthorization,
-    SessionControlCapabilityProvider,
     CapabilityDefinitionRegistry,
     CapabilityRuntime,
     CapabilityRuntimeResult,
+)
+from .builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
+    MediaPlaybackCapabilityProvider,
+    SessionControlCapabilityProvider,
     VocalPerformanceCapabilityProvider,
     local_speech_definition,
     media_playback_definitions,

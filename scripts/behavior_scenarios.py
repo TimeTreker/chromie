@@ -40,12 +40,14 @@ from orchestrator.runtime.session import SessionTracker
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.capability_runtime import (
-    LocalSpeechCapabilityProvider,
     CapabilityDefinition,
     CapabilityDefinitionRegistry,
     CapabilityRuntime,
     CapabilityRuntimeResult,
     RuntimeAuthorization,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
     local_speech_definition,
 )
 from orchestrator.runtime.soridormi_capability_provider import (

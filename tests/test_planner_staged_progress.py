@@ -28,9 +28,11 @@ from benchmarks.datasets.fast_planner_daily_life.qualification import (
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition,
+    RuntimeAuthorization,
+)
+from orchestrator.runtime.builtin_capability_providers import (
     LocalSpeechCapabilityProvider,
     MockCapabilityProvider,
-    RuntimeAuthorization,
     local_speech_definition,
 )
 from orchestrator.runtime.cognitive_runtime import (
