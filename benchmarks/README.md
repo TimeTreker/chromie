@@ -193,7 +193,8 @@ python scripts/run_workflow_replay.py \
 python -m pytest -q tests/test_workflow_replay.py
 ```
 
-The source gate and replay runner restore missing expanded inputs from the
+The source gate, the replay runner and `tests/conftest.py` (whenever pytest
+collects `tests/test_workflow_replay.py`) restore missing expanded inputs from the
 manifest's checksum-pinned `frozen.tar.xz`, retained in the checkout. A shallow
 checkout needs no historical fetch for this freeze. Historical manifests that pin
 a Git revision still require explicit `restore-fixtures --fetch` when that revision
