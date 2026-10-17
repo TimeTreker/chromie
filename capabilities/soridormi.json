@@ -4536,6 +4536,6 @@
     },
     "upstream_repository": "https://github.com/TimeTreker/soridormi.git",
     "transport_overlay": "mcp_streamable_http",
-    "upstream_commit": "c3e5b0be207418eed150af2efc489cfb25cfddfd"
+    "upstream_commit": "7d7d23d320325fb0460a581f6902d8a69e5c8333"
   }
 }
