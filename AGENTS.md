@@ -12,17 +12,12 @@ never force-push to overwrite others' work.
 
 ## Read first
 
-1. `docs/PROJECT_CHARTER.md` — stable goal, boundaries, and non-goals
-2. `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` — root-cause rules for natural, grounded robot behavior
-3. `docs/STATUS.md` — current implementation and evidence authority
-4. `ROADMAP.md` — milestone intent and exit criteria
-5. `DEVELOPMENT_CHECKPOINT.md` — exact resume point
-6. `HANDOFF.md` — volatile cross-machine commands, identities, and evidence paths
-7. `README.md` and the relevant component README
-8. `docs/ACCEPTANCE.md` — required validation level
-9. `docs/README.md` — documentation ownership and update rules
-10. `CONTRIBUTING.md` — required defect-analysis, implementation, and delivery process
-11. `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` — required frozen-cohort method before optimizing a model-role prompt
+Read the [core reading path](docs/README.md#core-reading-path) in order; the
+Documentation Index owns that one list. Coding agents additionally read:
+
+- the relevant component README;
+- `CONTRIBUTING.md` — required defect-analysis, implementation, and delivery process;
+- `docs/LLM_PROMPT_QUALIFICATION_METHOD.md` — required frozen-cohort method before optimizing a model-role prompt.
 
 Treat current source and tests as truth. Historical patches, tags, exported
 archives, and old milestone prose are context only.
@@ -59,13 +54,10 @@ authority, or failure semantics become clearer. See the size-review policy in
 - For every patch handoff, follow the
   [patch Git commands skill](.agents/skills/chromie-patch-git-commands/SKILL.md)
   and include the complete, copy-ready Git sequence, including add, commit and push.
-- Follow the active Issue in `DEVELOPMENT_CHECKPOINT.md`. Until the canonical
-  local gate is reproducible and the current-revision live voice proof is
-  retained and the default target-evidence profile closes, do not add product
-  features, new architecture, new runtime switches, or new terminology unless
-  the change directly closes those prerequisites or a demonstrated
-  safety/provenance blocker. Root-cause repairs for the active Issue inside the
-  existing architecture are not growth and remain allowed.
+- Follow the active Issue in `DEVELOPMENT_CHECKPOINT.md` under the
+  [delivery constraint](#current-delivery-constraint) above. Root-cause repairs
+  for the active Issue inside the existing architecture are not growth and
+  remain allowed.
 - When a delivery commit changes behavior, evidence, blockers or resume state,
   update `docs/STATUS.md`, `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in that
   same commit by replacing their current sections: implemented scope, evidence

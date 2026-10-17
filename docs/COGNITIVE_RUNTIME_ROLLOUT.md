@@ -2,18 +2,12 @@
 
 ## Status
 
-**Implementation:** ownership migration exists; known contract conflicts remain in the audit.
-
-**Automatic verification:** the canonical local gate currently fails; existing source
-tests and retained scenarios cover diagnostic operation, validated apply, honest
-Planner limitation, trusted terminal host validation, atomic Goal-state application,
-SC communication projection, fail-closed disablement, and evidence classification.
-
-**Target validation:** open. This documentation reconciliation adds no live model-stack,
-MuJoCo or physical evidence; retained revision-bound proof belongs in Status/Handoff.
-
-**Deployment state:** not established. This rollout does not widen
-simulator, microphone, speaker, or physical-robot support claims.
+Current implementation, automatic verification, target validation and deployment
+state are owned by [Current Status](STATUS.md). Source tests and retained scenarios
+cover diagnostic operation, validated apply, honest Planner limitation, trusted
+terminal host validation, atomic Goal-state application, SC communication
+projection, fail-closed disablement, and evidence classification. This rollout does
+not widen simulator, microphone, speaker, or physical-robot support claims.
 
 This document is the operational companion to
 [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md).

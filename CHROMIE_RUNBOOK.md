@@ -488,16 +488,16 @@ python scripts/run_target_evidence_closure.py --help
 
 The complete ordered procedure, review files, second-machine LAN probe, and
 physical profile are owned by
-[Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md). For Phase 6, initialize
-`--profile current_revision_qualification`; that profile additionally requires the canonical
-source report, the directory-discovered executed/full-assertion interaction set, and the live
+[Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md). For current-revision
+qualification, initialize `--profile current_revision_qualification`; that profile additionally
+requires the canonical source report, the manifest-pinned executed/full-assertion interaction set, and the live
 provider fault matrix on the same clean revision. Do not combine unrelated smoke logs into a
 stronger target claim.
 
-## 13. Alpha voice acceptance
+## 13. Provider fault matrix and voice acceptance
 
 Use the functional voice acceptance commands for new evidence. Historical
-Historical text-to-MuJoCo evidence remains documented separately.
+text-to-MuJoCo evidence remains documented separately.
 
 Before live simulator work, run the dependency-free provider fault matrix:
 
@@ -599,7 +599,7 @@ run was killed before cleanup, unload the stale module with
 `pactl list short modules` followed by `pactl unload-module <id>`.
 
 For a later claim that includes human microphone/speaker operation, commit the
-committed revision and run the real reference-host matrix:
+working tree and run the real reference-host matrix:
 
 ```bash
 python scripts/voice_acceptance.py \

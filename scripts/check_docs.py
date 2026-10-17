@@ -78,6 +78,7 @@ RUNTIME_CONFIG_SOURCES = [
 # documentation. Keep this list explicit so repository-owned hidden directories
 # such as .github can still contain indexed Markdown files.
 IGNORED_MARKDOWN_DIRS = {
+    ".claude",
     ".git",
     ".chromie",
     ".mypy_cache",
@@ -115,18 +116,18 @@ STALE_PHRASES = {
     "robotidentity": "the current identity contract is ChromieIdentity",
     "retained capabilityagent planner": "CapabilityAgent is retired from the maintained semantic architecture",
     "emergency compatibility planner is retained": "there is no maintained emergency semantic planner",
-    "capability planner, conversation agent, or deepthinking agent": "Mind context must use the current UMI/GA/Planner/Social Attention owners",
+    "capability planner, conversation agent, or deepthinking agent": "Mind context must use the current UMI/GA/Planner/Social Cognition owners",
     "selected route/capability hints": "current cognition has no route/intent handoff",
     "may propose routes, speech, task metadata, or skill plans": "current model owners have separate typed authority boundaries",
-    "direct no-planner `spoken_response` branch": "ordinary response meaning is Planner-owned",
+    "direct no-planner `spoken_response` branch": "Social Cognition authors every user-facing Communicative Activity; the Planner is word-free",
     "contract-defined conservative fallback": "Host may fail closed but may not author an ordinary semantic fallback",
     "schema-valid benign `chat`": "User Meaning Interpretation no longer has chat/tool/memory/robot route branches",
-    "goal interpretation can hand complex requests to `deepthinking_agent`": "Fast/Deep are Planner cognition depths, not a downstream deepthinking agent",
+    "goal interpretation can hand complex requests to `deepthinking_agent`": "there is one Planner and no downstream deepthinking agent; the Deep Planner is retired",
     "`memory_agent` only validates and applies": "Memory has no maintained semantic agent or route",
     "explicit `memory` routes now carry": "Memory is not a User Meaning Interpretation route",
-    "deepthinking may use the full catalog": "Deep Planner owns full-catalog HOW reasoning",
+    "deepthinking may use the full catalog": "the one Planner reaches library Capability contracts through need-first search; the Deep Planner is retired",
     "deepthinking can replace an exact catalog-backed action proposal": "current downstream cognition must preserve Planner authority",
-    "deterministic post-execution composer produces": "terminal Evidence must re-enter Planner rather than a status-to-sentence composer",
+    "deterministic post-execution composer produces": "terminal Evidence re-enters the Planner for next Work and reaches Social Cognition for wording, never a status-to-sentence composer",
     "post /run` |": "the retired Agent /run endpoint must not appear in current API tables",
     "post /interaction` |": "the retired Agent /interaction endpoint must not appear in current API tables",
 }
@@ -145,6 +146,13 @@ NUMBERED_STEP_TOKEN_RE = re.compile(
 NUMBERED_PHASE_PATH_RE = re.compile(
     r"(?:^|[._/-])(?:m|step|pr|stage|r|phase|psm)[_-]?(?:0|[1-9][0-9]*)(?=$|[._/-])",
     re.IGNORECASE,
+)
+# Development-order tokens in Markdown prose: numbered pull-request plans
+# ("PR 3", "PR3") and numbered phases ("Phase 6"). A reference to a real GitHub
+# pull request ("PR #70") is not matched.
+NUMBERED_PROSE_TOKEN_RES = (
+    (re.compile(r"(?<![A-Za-z0-9])PR ?(?:0|[1-9][0-9]*)(?![A-Za-z0-9])"), "numbered pull-request plan"),
+    (re.compile(r"(?<![A-Za-z0-9])[Pp]hase ?(?:0|[1-9][0-9]*)(?![A-Za-z0-9])"), "numbered phase"),
 )
 ABANDONED_RELEASE_VERSION_RE = re.compile(
     r"(?<![0-9.])0\.0\.1(?![0-9.])"
@@ -237,10 +245,12 @@ def check_semantic_project_naming(errors: list[str]) -> None:
                 f"{relative}:{line}: abandoned fixed release version is forbidden; "
                 "use the development identity until a future version is explicitly planned"
             )
-        forbidden_tokens = (
+        forbidden_tokens: tuple[tuple[re.Pattern[str], str], ...] = (
             (MILESTONE_TOKEN_RE, "numbered milestone"),
             (NUMBERED_STEP_TOKEN_RE, "numbered implementation-stage"),
         )
+        if path.suffix.lower() == ".md":
+            forbidden_tokens += NUMBERED_PROSE_TOKEN_RES
         for pattern, token_kind in forbidden_tokens:
             for match in pattern.finditer(text):
                 line = text.count("\n", 0, match.start()) + 1

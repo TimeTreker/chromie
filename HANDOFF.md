@@ -2,31 +2,36 @@
 
 Volatile operational snapshot: checkout, runtime identities, evidence paths and
 exact commands. Replace it on each delivery; do not append history. The resume
-boundary and next work are in the [checkpoint](DEVELOPMENT_CHECKPOINT.md); current
-status is in [STATUS](docs/STATUS.md).
+boundary is in the [checkpoint](DEVELOPMENT_CHECKPOINT.md); current status and the
+ordered open work are in [STATUS](docs/STATUS.md).
 
-## Current snapshot — 2026-10-16
+## Current snapshot — 2026-10-17
 
 - Checkout `/home/chromie/github/chromie`, branch `main`; the expected resume revision
   is the latest `origin/main` commit containing this file.
-- Soridormi `/home/chromie/github/soridormi` at `origin/main` `33b8a13`, water scene
-  running.
-- Live Agent: `chromie-agent:latest` = `rootcause18-20261016`. Built, not deployed:
-  `chromie-agent:rootcause19-20261016` (`sha256:2d3e917e…`, 125 source files identical
-  to the gate worktree, digest `7c33fc6132d09d56`).
+- Soridormi `/home/chromie/github/soridormi`: check out `origin/main` `cd6c37b`, the
+  revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`,
+  and restart the water scene from it (the last recorded running checkout was
+  `33b8a13`).
+- Last recorded live Agent: `chromie-agent:latest` = `rootcause18-20261016` (rollback
+  image). No built image matches `main`: `rootcause19-20261016` predates the 2026-10-17
+  source changes. Rebuild the Agent image from `main` before deploying.
 - Workflow corpus: freeze 41 (`a36b1ebf…`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
 - Evidence: `.chromie/acceptance/everyday-20261016/` (README; `run6/`, `run7/`).
+- Last gate and strict replay: TODO-COUNTS.
 - `.env.runtime` may be in `mode:speech`; give the harness process
   `ORCH_ACTION_DRY_RUN=false CHROMIE_OPERATOR_MODE=voice_mujoco` instead of editing it.
 
 ## Deploy and run
 
 ```bash
-# owner: deploy (rollback: chromie-agent:rootcause18-20261016)
-docker tag chromie-agent:rootcause19-20261016 chromie-agent:latest
+# owner: rebuild the Agent from a clean main checkout and deploy it
+# (rollback: docker tag chromie-agent:rootcause18-20261016 chromie-agent:latest)
+env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh build chromie-agent
 env -u HTTP_PROXY -u HTTPS_PROXY -u http_proxy -u https_proxy ./scripts/compose.sh up -d --no-build --force-recreate --no-deps chromie-agent
+python scripts/capture_runtime_identity.py --verify-agent-source chromie-agent
 # Soridormi water scene (replaces the simulator only when the runtime is idle)
 (cd ../soridormi && ./scripts/run_scenario.sh --scenario configs/simulation_scenarios/thirst_water_delivery.json --profile open_duck_forward --viewer)
 # capture identity, then smoke; then core + challenge with --stage core --stage challenge

@@ -45,9 +45,9 @@ runtime environment is always loaded:
 ./scripts/compose.sh ps
 ```
 
-Plain `docker compose ...` also works after `scripts/build_runtime_env.sh` has
-generated the root `.env`, but the wrapper is still preferred because it always
-uses the intended Compose file and runtime env explicitly.
+Use the wrapper instead of plain `docker compose`: it refreshes the runtime env and
+adds the hardware profile's Compose override files (`CHROMIE_COMPOSE_OVERRIDE_FILES`,
+for example the SGLang overlay), which plain Compose omits.
 
 ## Maintained operator modes
 
@@ -177,7 +177,7 @@ lifetime, not foreground service delay. Development use does not qualify promoti
 | `ORCH_LOCK_FILE` | Host lock preventing duplicate Orchestrator processes. `start_chromie.sh` checks the same lock before generating runtime files or mutating containers, so a stale host process cannot remain attached across a rebuild. |
 | `ORCH_RUNTIME_OVERRIDE_FILE` | Optional shell env file sourced after `.env.runtime`; intended for supervised acceptance, not normal persistent configuration. |
 | `TTS_COSYVOICE_OLLAMA_MODEL` | Compact Ollama model used for fast and lightweight Agent lanes while the default CosyVoice service shares the GPU; default `qwen3:4b`. |
-| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy; `.env.common` default `1`. With the default CosyVoice backend, `1` makes `start_services.sh`, `start_orchestrator.sh` and `start_chromie.sh` replace every role model with `TTS_COSYVOICE_OLLAMA_MODEL` and keep one resident Ollama model; `start_services.sh` records the effective values in `.chromie/services.compact-cognition.env` so `verify_runtime_profile.sh` checks the containers it started. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared `qwen3.5:4b` SGLang engine; RTX 5090 similarly assigns all reasoning roles to one shared `chromie-gemma4-12b` SGLang FP8 engine. ASR and TTS retain their specialized models. Each hardware profile owns its own model artifact and memory/context budget; source selection does not by itself qualify live contention or speech headroom. |
+| `TTS_COSYVOICE_COMPACT_COGNITION` | Shared-GPU cognition policy; `.env.common` default `1`. With the default CosyVoice backend, `1` makes `start_services.sh`, `start_orchestrator.sh` and `start_chromie.sh` replace every role model with `TTS_COSYVOICE_OLLAMA_MODEL` and keep one resident Ollama model; `start_services.sh` records the effective values in `.chromie/services.compact-cognition.env` so `verify_runtime_profile.sh` checks the containers it started. The maintained RTX 4090 Laptop profile sets `0` and assigns every LLM role to one shared SGLang engine served as `chromie-qwen35-4b` (Qwen3.5-4B AWQ; `qwen3.5:4b` remains only its Ollama fallback tag); RTX 5090 similarly assigns all reasoning roles to one shared `chromie-gemma4-12b` SGLang FP8 engine. ASR and TTS retain their specialized models. Each hardware profile owns its own model artifact and memory/context budget; source selection does not by itself qualify live contention or speech headroom. |
 
 The default launcher selects `chromie-tts` on port 5000 and validates the
 source-controlled `assets/tts/voices` catalog before service creation.
@@ -285,7 +285,7 @@ Capabilities, or delegate HOW.
 
 | Variable | Default or profile behavior |
 |---|---|
-| `AGENT_USER_MEANING_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `qwen3.5:4b`, while RTX 5090 retains the already-resident `chromie-gemma4-12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
+| `AGENT_USER_MEANING_INTERPRETER_MODEL` | `qwen3.5:4b` in common configuration; the hardware profile owns the deployed identity. RTX 4090 Laptop uses `chromie-qwen35-4b`, while RTX 5090 retains the already-resident `chromie-gemma4-12b` for the one-call primary source-evidence contract. Qualification mode preserves the selected hardware-profile model. |
 | `AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL` | Goal-Interpreter-to-Ollama base URL inside the Agent deployment. |
 | `AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS` | Common fallback `5400`; interactive `services`/`speech`/`voice_mujoco` modes use `60000`, while explicit qualification mode uses `120000`. This is the per-invocation watchdog for one complete WHAT-only Fast interpretation or one allowed source-based Deep UMI interpretation; human-facing latency remains separately measured and is not used as a cognition kill switch. An invalid primary or Deep DTO fails closed without a same-authority repair call. |
 | `AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX` | `16384`; conservative prompt/schema budget for user meaning plus semantic continuity. The maintained UMI request still excludes Capability catalog entries and canonical lifecycle IDs. |
@@ -805,8 +805,8 @@ Important variables include `OLLAMA_MODEL`, `OLLAMA_KEEP_ALIVE`,
 Common configuration keeps `OLLAMA_MAX_LOADED_MODELS=2` and
 `OLLAMA_NUM_PARALLEL=1`, which lets distinct role models stay resident when memory
 allows without increasing per-model parallel KV-cache pressure. The RTX 4090 Laptop
-profile instead assigns every LLM role to `qwen3.5:4b` and sets the resident-runner
-limit to `1`. Ollama 0.32.14 reports that the `qwen35` architecture does not support
+profile instead serves every LLM role through SGLang as `chromie-qwen35-4b`; for its
+explicit Ollama fallback it uses `qwen3.5:4b` and sets the resident-runner limit to `1`. Ollama 0.32.14 reports that the `qwen35` architecture does not support
 parallel requests and creates `n_seq_max=1`, so this profile retains one honest
 provider slot. The laptop-specific topology remains subject to retained GPU and
 latency qualification while CosyVoice shares the 16 GB GPU.
@@ -889,7 +889,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_GOAL_ASSOCIATION_ENABLED` | `1`; exposes the advisory Goal Association endpoint when Agent LLM use is enabled. It never mutates goal/task state. |
-| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `qwen3.5:4b` model and RTX 5090 uses `chromie-gemma4-12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
+| `AGENT_GOAL_ASSOCIATION_MODEL` | `qwen3:4b` in the common base; RTX 4090 Laptop uses its shared `chromie-qwen35-4b` model and RTX 5090 uses `chromie-gemma4-12b`. The RTX 5090 model-facing Goal DTO exposes an explicit `resource_kind` discriminator because retained cross-model evidence showed that inferring this semantic choice from a nullable object biased both models in opposite directions; the deliberate model remains assigned because its primary result preserved the correct independent responsibility/constraint structure under the retained Chinese locomotion request. |
 | `AGENT_COGNITIVE_ACTIVATION_ENABLED` | `1` by default. Enables the narrow internal state-transition Activation model used before Goal-bound Planner or Goal-free SC re-entry. Disabling/unavailability fails closed; Runtime does not restore deterministic semantic wake routing. |
 | `AGENT_COGNITIVE_ACTIVATION_MODEL` | Defaults to `AGENT_FAST_PLANNER_MODEL`. It selects only among Host-supplied existing authorities; it owns no Goal, Work, wording, Capability, execution, or completion semantics. |
 | `AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS` / `AGENT_COGNITIVE_ACTIVATION_NUM_CTX` / `AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT` | Timeout defaults to the active `AGENT_FAST_PLANNER_TIMEOUT_MS` budget (`60000` ms if unset); context/output defaults: `8192` / `384`; the SGLang profiles set the context to their shared-engine size (`65536` on RTX 5090, `49152` on RTX 4090 Laptop). An explicit activation timeout overrides inheritance. Bounded one-call activation transaction; no repair or Deep pass. Compose forwards all five `AGENT_COGNITIVE_ACTIVATION_*` keys to `chromie-agent`. |
@@ -923,7 +923,7 @@ or certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; retained standalone diagnostic observer only. Goal Association is an integrated stage in the maintained Goal-driven Runtime and is never a fallback semantic authority. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around the 60-second Agent Goal Association watchdog. |
 | `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
-| `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. |
+| `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses its shared `chromie-qwen35-4b` model. |
 | `AGENT_FAST_PLANNER_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the one structured streaming Fast Planner invocation. The stream carries only a `terminal` or a typed `failure` frame, so timeout ownership is the complete terminal result. |
 There is one Planner (PLANNER-AUTHORITY-001): its depth comes from need-first library search, Evidence re-entry or clarification, never from a second planner pass. Model self-reported confidence is telemetry, never a standalone threshold. The Planner's own commitment bar is 0.75 prospective satisfaction (code constant `MINIMUM_PLAN_SATISFACTION`); a Plan below it becomes an honest limitation.
 | `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |
@@ -939,7 +939,7 @@ use it: both Fast and Deep UMI use `AGENT_USER_MEANING_INTERPRETER_MODEL`.
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_DELIBERATIVE_ENABLED` | `1`; enables the deliberative clients (Social Cognition deep client, Reflection). |
-| `AGENT_DELIBERATIVE_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. The deliberative model identity. It is not used for Deep User Meaning Interpretation, which deliberately keeps the UMI model (`AGENT_USER_MEANING_INTERPRETER_MODEL`) so semantic interpretation is not coupled to a separately tuned HOW owner. |
+| `AGENT_DELIBERATIVE_MODEL` | `gemma4:e2b` in common configuration; RTX 4090 Laptop uses its shared `chromie-qwen35-4b` model. The deliberative model identity. It is not used for Deep User Meaning Interpretation, which deliberately keeps the UMI model (`AGENT_USER_MEANING_INTERPRETER_MODEL`) so semantic interpretation is not coupled to a separately tuned HOW owner. |
 | `AGENT_DELIBERATIVE_TIMEOUT_MS` | `120000` in maintained development modes; workflow-completion watchdog for one deliberative model call. |
 | `AGENT_DELIBERATIVE_NUM_CTX` | `8192`; deliberative context (Social Cognition uses the larger of this and the Planner context). Qualification mode and the architecture-validation overlay use `40960`. |
 | `AGENT_DELIBERATIVE_NUM_PREDICT` | `1024`; deliberative output budget. |

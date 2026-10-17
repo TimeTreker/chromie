@@ -28,15 +28,17 @@ Runtime retains validated pre-GA preparation, admits only contract-declared safe
 - User Meaning Interpretation produces typed WHAT-only goal interpretation decisions and Responsibility candidates.
 - Agent exposes schema-constrained Goal Association, Work Planning, Value Judgment and
   Social Cognition. SC owns exact Communicative Activity wording and optional
-  social expression. Terminal Evidence currently re-enters Planner before SC
-  expresses established Needs; independent Goal-bound SC reactivation remains open.
+  social expression. Terminal Evidence re-enters the Planner for next Work, and
+  when the Planner adds no communication for Evidence a Responsibility asked for
+  (an `information` request), SC receives that Evidence directly with a Runtime
+  result Need ([SPEECH-OWNER-001](../docs/PROJECT_CHARTER.md)).
 - TTS delivers PCM synthesis chunks; on the first PCM chunk the Orchestrator
   queues the request for ordered playback and plays chunks as they arrive, before
   the provider `end` event. Barge-in and stale-playback checks apply while the
   stream is still arriving.
 - The Trusted Capability Runtime resolves and schedules trusted named capabilities.
 - Soridormi plans and executes embodied skills and owns physical safety.
-- `hardware/daemon.py` is a legacy mock compatibility boundary, not the alpha
+- `hardware/daemon.py` is a legacy mock compatibility boundary, not the current
   embodiment path.
 
 The Agent does not call TTS or low-level hardware. Separately gated WorkDAG
@@ -187,15 +189,8 @@ retain precedence. `scripts/start_orchestrator.sh` can additionally source an
 `ORCH_RUNTIME_OVERRIDE_FILE` after `.env.runtime`; this is intended for
 acceptance runs that must not rewrite local configuration.
 
-Prepare the host environment:
-
-```bash
-conda create -n Chromie python=3.11 -y
-conda activate Chromie
-./scripts/install_orchestrator_deps.sh
-cp orchestrator/.env.local.example orchestrator/.env.local
-python orchestrator/list_devices.py
-```
+Prepare the host environment with the
+[Runbook host-audio steps](../CHROMIE_RUNBOOK.md#4-configure-and-start-host-audio).
 
 Python 3.11 is the minimum supported host runtime. Both supervised voice
 preflight and `scripts/start_orchestrator.sh` validate the selected Conda
@@ -233,7 +228,7 @@ only recorded assistant dialogue crosses back to the client. This transport skip
 microphone/VAD/ASR and preserves `handle_routed_text(..., channel="text")` admission.
 See the [local text transport contract](../docs/API_REFERENCE.md#local-text-console).
 
-The alpha automatic runner can instead set:
+The automatic voice acceptance runner can instead set:
 
 ```text
 ORCH_AUDIO_INPUT_MODE=stdin
@@ -368,7 +363,7 @@ action-specific prompt, bounded reply matching, request binding, expiry,
 single-use approval, deterministic denial, and operational-interrupt
 passthrough. Confirmation is derived from the provider contract plus backend-neutral
 Host safety rules. Retained
-automatic and supervised approval/denial evidence is still an alpha gate.
+automatic and supervised approval/denial evidence is still an open evidence gate.
 One pending token may cover multiple requests. A motion stop revokes that whole
 token if any confirmed request is motion-bound or cannot be safely classified;
 this conservative widening can also revoke unrelated unused approvals and is

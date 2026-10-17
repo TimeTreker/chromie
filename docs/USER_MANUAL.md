@@ -138,10 +138,9 @@ cd ../chromie
 ./scripts/start_chromie.sh --mcp-url http://127.0.0.1:8000/mcp --keep-services --no-orchestrator
 ```
 
-Use Chromie's Compose wrapper for service inspection. Startup generates a root
-`.env` so plain `docker compose` can interpolate required variables, but the
-wrapper is preferred because it always passes the intended runtime env and
-Compose file explicitly.
+Use Chromie's Compose wrapper (`./scripts/compose.sh`) for service inspection, not
+plain `docker compose`: only the wrapper passes the generated runtime env together
+with the hardware profile's Compose override files.
 
 ```bash
 ./scripts/compose.sh logs -f chromie-llm

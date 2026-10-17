@@ -193,7 +193,7 @@ review explicitly changes their provenance.
 
 ## 5. The qualification and optimization loop
 
-### Phase 0 — establish authority and permission
+### Establish authority and permission
 
 Before creating scenarios or changing text:
 
@@ -208,9 +208,9 @@ Before creating scenarios or changing text:
    authorization before violating or amending it.
 5. Define the evidence claim and the maximum evidence level this run can support.
 
-The output of Phase 0 is an authority map, not a proposed prompt rewrite.
+The output of this step is an authority map, not a proposed prompt rewrite.
 
-### Phase 1 — reconstruct the real transaction
+### Reconstruct the real transaction
 
 Trace one representative case from admitted input through the first state mutation.
 For each boundary, record:
@@ -229,7 +229,7 @@ Do not infer the prompt from a template alone. Runtime projections, dynamic cons
 catalog compaction, previous-turn state, and response Schema are part of the request.
 Do not infer model failure from the final spoken response alone.
 
-### Phase 1.5 — audit model-contract burden before changing the prompt
+### Audit model-contract burden before changing the prompt
 
 Inventory every model-visible input and every model-writable output field in the failing
 transaction. Classify it using the canonical semantic-boundary categories:
@@ -265,7 +265,7 @@ mechanism, not an inference oracle: corpus construction and native model calls r
 separate, targets stay outside inference, and the checker may not encode phrase-to-answer
 rules.
 
-### Phase 2 — design a frozen contrast corpus
+### Design a frozen contrast corpus
 
 Build the corpus from the role's real input surface, not generic chatbot questions.
 Use contrast sets so one semantic seed changes one important condition at a time.
@@ -323,7 +323,7 @@ For every scenario:
 Reference outputs are candidate oracles, not automatic truth. Reviewers must be
 allowed to find that a reference, rubric, or grader is wrong.
 
-### Phase 3 — run one immutable baseline batch
+### Run one immutable baseline batch
 
 Freeze the corpus and source before inference:
 
@@ -353,7 +353,7 @@ When Codex performs both inference and later review, keep those as separate phas
 and exclude targets from inference, but label the result same-model and
 non-independent. It is strong diagnostic evidence, not independent release closure.
 
-### Phase 4 — adjudicate after the complete batch
+### Adjudicate after the complete batch
 
 Apply evidence in this order:
 
@@ -372,7 +372,7 @@ A deterministic hard failure cannot be averaged into a pass. A semantic reviewer
 explain a hard failure but cannot override it. Preserve per-case adjudication, not only
 an aggregate percentage.
 
-### Phase 5 — classify the earliest divergence
+### Classify the earliest divergence
 
 Use exactly one primary class unless independent evidence requires `mixed`:
 
@@ -399,7 +399,7 @@ Also distinguish:
 
 The last visible failure is often not the root cause.
 
-### Phase 6 — select one minimal general fix at the correct owner
+### Select one minimal general fix at the correct owner
 
 Cluster failures by their earliest shared boundary. Select one cluster and one
 testable hypothesis. Implement the repair only when the task authorizes changes to
@@ -432,7 +432,7 @@ Do not change the prompt merely because a case failed. Do not change multiple pr
 layers, the model, the Schema, and the oracle in one iteration unless evidence proves
 they are one inseparable root cause.
 
-### Phase 7 — focused proof, then full qualification
+### Focused proof, then full qualification
 
 After the minimal change:
 
@@ -472,7 +472,7 @@ outside a scoped delivery claim; attributing unsafe or untruthful behavior to th
 does not waive the affected deployment gate. Owner acceptance of uncertainty must be
 recorded as uncertainty, not evidence of a model-only root cause.
 
-### Phase 8 — stop deliberately
+### Stop deliberately
 
 Stop prompt iteration when all of these are true for the declared scope:
 

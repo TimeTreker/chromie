@@ -375,7 +375,7 @@ class AttentionReviewer:
             "as requiring a wake name, explicit address, or another stated condition "
             "remains in force until the user revokes or replaces it. Under such a "
             "rule, ambient speech that does not satisfy the stated condition is "
-            "unaddressed even when it follows a recent exchange. Conversely, an ordinary reply in "
+            "unaddressed. Conversely, an ordinary reply in "
             "an ongoing direct exchange is addressed when no restrictive rule is "
             "active. Assistant wording never creates or relaxes the user's addressedness "
             "rule. If the linguistic function, policy applicability, or addressee is "

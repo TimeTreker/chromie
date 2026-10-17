@@ -255,109 +255,31 @@ The runner records `root_cause_report_required=true` when an ability-class run
 fails. That flag is a process gate: someone must inspect the earliest wrong
 boundary before claiming the failure is fixed.
 
-## Reconstruction Plan
+## Reconstruction directions
 
-### PR 0 - Scenario Library And Runner
+The scenario library, directory discovery, Level A ability-class execution, live
+text preview/execution, stage gating and semantic-review packaging are
+implemented; the runner and its tests own those contracts. Further directions,
+each closed by its own evidence (current open work is listed in
+[Current Status](STATUS.md#current-open-work)):
 
-State: implemented in this patch.
-
-Scope:
-
-- create the self-describing one-file live scenario library;
-- add directory discovery and per-file metadata validation;
-- add Level A ability-class execution;
-- add live text preview/execution support using the existing text-to-MuJoCo
-  boundary;
-- stop at the case boundary on integrity failure; otherwise finish the stage
-  before applying its gate and block later stages after a must-pass hard failure;
-- package natural-language outcomes for the existing hybrid semantic-review
-  workflow instead of using exact response-string truth;
-- add focused tests and test-matrix wiring;
-- document claim rules.
-
-Exit criteria:
-
-- `python scripts/general_ability_acceptance.py --mode check --no-write` passes;
-- `python scripts/general_ability_acceptance.py --mode level-a --ability-class deterministic_safety_controls --no-write` passes;
-- focused unit tests for the runner pass;
-- docs checker passes.
-
-### PR 1 - Better Live Runner Diagnostics
-
-Scope:
-
-- make broad live sweeps print per-case progress before and after each run;
-- enforce per-case wall-clock timeouts;
-- write partial summaries when a case hangs or a service fails;
-- expand exception reporting for grouped async failures;
-- surface User Meaning Interpreter, Agent, review-model, and provider timeout causes separately.
-
-Exit criteria:
-
-- live text failures produce a retained summary without hanging the suite;
-- failure summaries identify the likely first boundary instead of only showing
-  `ExceptionGroup` or generic connection errors.
-
-### PR 2 - Root-Cause Classifier
-
-Scope:
-
-- attach a first-pass failure classification to retained summaries:
-  ASR/audio, User Meaning Interpretation/Responsibility, Goal Association, Planner contract,
-  Prompt wording, Orchestrator policy, Trusted Capability Runtime/provider, or Test evidence;
-- include Goal, Plan, response, speech, capability/skill, provider, and Evidence facts
-  needed to inspect the classification;
-- keep the classifier advisory and auditable.
-
-Exit criteria:
-
-- a failed live text case points to an inspectable earliest boundary;
-- coding-agent final reports can cite the retained summary instead of guessing.
-
-### PR 3 - Broader Live Ability Sampling
-
-Scope:
-
-- add more live text probes for each ability class;
-- add bilingual, typo/noisy-ASR, follow-up, tool, unsupported body, compound
-  body, stop/cancel, and truthful speech samples;
-- keep live samples representative rather than overfitting one reported phrase.
-
-Exit criteria:
-
-- every class has at least one live text preview probe when live services are
-  available;
-- simulator execution samples exist for the body-action classes only.
-
-### PR 4 - Voice Evidence Integration
-
-Scope:
-
-- connect synthetic, virtual-microphone, acoustic, and supervised voice evidence
-  to the same ability-class vocabulary;
-- make preflight fail clearly when an existing Orchestrator lock would block a
-  full run;
-- keep supervised physical microphone/speaker evidence separate from automated
-  regression evidence.
-
-Exit criteria:
-
-- voice acceptance reports ability-class coverage and evidence level;
-- no voice runner claims readiness when only preflight or synthetic evidence
-  exists.
-
-### PR 5 - Release Gate Alignment
-
-Scope:
-
-- require release notes and status updates to cite exact evidence levels;
-- remove hardcoded test counts from claim documents or validate them
-  automatically;
-- keep implemented, automatically verified, target validated, and release ready
-  separate.
-
-Exit criteria:
-
-- release candidates cannot cite Level A or preview evidence as target
-  validation;
-- status and acceptance docs match the current runner outputs.
+- **Live runner diagnostics.** Per-case progress, per-case wall-clock timeouts,
+  partial summaries when a case hangs or a service fails, and separate User
+  Meaning Interpretation, Agent, review-model and provider timeout causes, so a
+  failure names its likely first boundary instead of a generic `ExceptionGroup`.
+- **Root-cause classification.** An advisory, auditable first-pass classification
+  in retained summaries (ASR/audio, User Meaning Interpretation/Responsibility, Goal
+  Association, Planner contract, prompt wording, Orchestrator policy, Trusted
+  Capability Runtime/provider, test evidence) with the Goal, Plan, response,
+  speech, Capability, provider and Evidence facts needed to inspect it.
+- **Broader live ability sampling.** Representative bilingual, noisy-ASR,
+  follow-up, tool, unsupported-body, compound-body, stop/cancel and truthful-speech
+  probes for every ability class; simulator execution samples only for body-action
+  classes.
+- **Voice evidence integration.** Synthetic, virtual-microphone, acoustic and
+  supervised voice evidence reported in the same ability-class vocabulary with its
+  evidence level; preflight fails clearly on an existing Orchestrator lock;
+  supervised physical evidence stays separate from automated regression evidence.
+- **Release gate alignment.** Release notes and status cite exact evidence levels;
+  claim documents carry no hardcoded test counts unless validated; Level A or
+  preview evidence never counts as target validation.

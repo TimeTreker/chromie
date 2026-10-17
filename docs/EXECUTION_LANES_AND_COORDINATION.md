@@ -65,9 +65,8 @@ overlap in time.
 ## Social Attention
 
 SC may author `auxiliary_activities[]` attached to its exact observable
-Communicative Act. Gestures are social expression: a nod, a look or a bow is an
-eligible motion when Soridormi declares it a low-risk expressive skill; walking,
-whole-body control, manipulation and delivery never are. Empty output is normal; a nonverbal act may have no speech.
+Communicative Act. Which gestures are eligible is owned by the
+[Social Attention behavior domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md). Empty output is normal; a nonverbal act may have no speech.
 The Host materializes that result in the same InteractionResponse as its anchored
 speech, without a decoration-only model call. It validates catalog grounding,
 arguments, target evidence, freshness, resource compatibility and safety; it may

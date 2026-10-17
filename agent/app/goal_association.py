@@ -604,10 +604,11 @@ class GoalAssociationResolver:
                 "surface into resolved_references.surface_form: "
                 + ", ".join(location_bindings)
             )
-        # GA now owns only canonical Goal identity/continuity.  UMI already owns
-        # the accepted semantic bindings, and the constrained GA new-goal DTO
-        # intentionally does not expose a second writable binding surface.  The
-        # Host therefore inherits those bindings while materializing the canonical
+        # GA now owns only canonical Goal identity/continuity.  Live UMI authors
+        # no bindings (CoreInterpretationResult rejects them), and the constrained
+        # GA new-goal DTO intentionally exposes no writable binding surface.  The
+        # Host therefore copies whatever retained bindings the Responsibility
+        # carries (none on a fresh live turn) while materializing the canonical
         # Goal below instead of requiring the model to restate them.  Requiring
         # both was contradictory: the decoder forbade GA-authored bindings while
         # this boundary rejected their absence.
