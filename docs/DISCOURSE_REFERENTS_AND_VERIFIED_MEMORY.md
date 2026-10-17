@@ -20,18 +20,21 @@ Chromie's cognitive stages have distinct responsibilities:
    reference means.
 2. **User Meaning Interpretation (UMI)** resolves what an indirect expression
    means at human level from recent accepted dialogue, salient discourse
-   entities, active Goal meaning and Memory, and carries the resolved value into
-   WHAT (for example `location=内乡`). It sees no canonical Goal or referent IDs.
+   entities, active Goal meaning and Memory, and states the resolved value in the
+   Responsibility's complete WHAT outcome (for example a weather question about
+   内乡). UMI never authors `bindings`: `CoreInterpretationResult` rejects a
+   Responsibility that carries them. It sees no canonical Goal or referent IDs.
 3. **Goal Association** links that resolution to canonical identity: for an
    indirect expression it copies the supplied `referent_id` into
    `resolved_references`, whose value must equal that referent's canonical value
    (a mismatch rejects), and it associates the Responsibility with open Goals.
-   GA does not author or change the bound value; new Goal bindings are inherited
-   from UMI.
+   GA does not author or change the resolved value and authors no Goal bindings;
+   trusted code materializes a new Goal's WHAT from the UMI Responsibility.
 4. **Host conversation state** validates and stores the LLM-authored typed
    referent/focus mutations, IDs, provenance, and bounded persistence. It does
    not contain phrase rules or choose a semantic referent.
-5. **Planner** receives resolved Goal bindings and decides whether to
+5. **Planner** receives the Goal WHAT and GA's resolved references, extracts the
+   Capability parameters (for example `location=内乡`), and decides whether to
    retrieve one exact verified prior result or execute a fresh read.
 6. **Social Cognition** authors the exact natural pre-result Communicative
    Activity from the Planner's communication Need. It may say that Chromie is checking a source or retrieving a
@@ -43,11 +46,11 @@ Chromie's cognitive stages have distinct responsibilities:
 Tool-result memory is never reference-resolution authority.
 
 An ordinary explicit entity mention is not a resolved reference. For example,
-`今天晚上重庆热不热？` places `重庆` directly in the Goal binding and may introduce
+`今天晚上重庆热不热？` keeps `重庆` directly in the Responsibility's WHAT and may introduce
 a salient scoped referent for later dialogue. `resolved_references` is reserved for
 indirect expressions such as `那边`, pronouns, ellipsis, aliases, corrections, or
-task mentions that the LLM binds to an already supplied discourse referent or active
-Goal binding. Every such indirect resolution carries the copied referent ID and an
+task mentions that the LLM links to an already supplied discourse referent or active
+Goal meaning. Every such indirect resolution carries the copied referent ID and an
 explicit confidence; omitted confidence is a contract error rather than an implicit
 low- or high-confidence decision.
 
@@ -110,8 +113,8 @@ For:
 
 > 不是重庆，是一个地名叫内乡。
 
-UMI carries the corrected meaning in its Responsibility `r1` (WHAT with
-`location=内乡`). Because the Chongqing Goal is terminal, Goal Association reports
+UMI carries the corrected meaning in its Responsibility `r1` (a WHAT outcome about
+内乡, with no bindings). Because the Chongqing Goal is terminal, Goal Association reports
 `r1` as a new Goal related to it and emits a model-authored referent correction:
 
 ```json
@@ -137,7 +140,8 @@ UMI carries the corrected meaning in its Responsibility `r1` (WHAT with
 ```
 
 New Goal rows carry only source refs and Goal relationships; trusted code copies
-the Goal's description and bindings from the UMI Responsibility.
+the Goal's description from the UMI Responsibility. Live UMI authors no bindings,
+so the new Goal inherits none.
 
 The Host generates the new referent ID, stores Neixiang as foreground, and
 moves only the explicitly superseded Chongqing discourse referent to
@@ -151,7 +155,7 @@ For:
 > 今天那边下雨了没有？
 
 UMI resolves `那边` from the foreground Neixiang context and emits Responsibility
-`r1` with WHAT bindings `location=内乡` and `date=today`. Goal Association receives
+`r1` whose WHAT outcome asks whether it rained in 内乡 today (no bindings). Goal Association receives
 the foreground Neixiang referent and links the indirect expression to it:
 
 ```json
@@ -182,7 +186,8 @@ If UMI's value and the referent's canonical value disagree, GA cannot link them:
 a `resolved_references` value that does not match the supplied referent rejects
 the GA result rather than choosing between the two.
 
-Downstream planners receive `location=内乡`; they do not reinterpret `那边`.
+The Planner receives that WHAT and the resolved reference and extracts
+`location=内乡`; it does not reinterpret `那边`.
 A deterministic provenance validator rejects any executable step that claims
 this Goal while sending `location=重庆`.
 
@@ -308,8 +313,9 @@ facts, and only from trusted Evidence.
 
 ## Provider location recognition does not change discourse authority
 
-Once a weather location is bound on the canonical Goal (resolved by UMI, linked to
-its referent by Goal Association), the binding is immutable. For example, `河南省内乡县` stays the tool argument even when a provider
+Once a weather location is grounded for the canonical Goal (resolved by UMI, linked to
+its referent by Goal Association, extracted as the Capability argument by the Planner),
+it is immutable. For example, `河南省内乡县` stays the tool argument even when a provider
 geocoder cannot match that full administrative string. The weather adapter may
 query bounded equivalent forms such as the locality name and may use supplied
 province/country fields to qualify candidates. These are retrieval mechanics for
