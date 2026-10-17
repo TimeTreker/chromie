@@ -656,7 +656,7 @@ class PlannerResolverTests(unittest.TestCase):
         self.assertTrue(plan.metadata["resource_contract_unavailable"])
         self.assertNotIn("failure_class", plan.metadata)
 
-    def test_deep_planner_composes_advertised_granular_resource_capabilities(self):
+    def test_planner_composes_advertised_granular_resource_capabilities(self):
         goal_id = "goal-resource"
         reason = "Fetch and hand over the red mug."
         satisfaction = {

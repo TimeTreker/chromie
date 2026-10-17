@@ -628,7 +628,7 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("hardware detection reported 120", result.stderr)
 
-    def test_compose_passes_fast_and_deep_planner_profile_values(self) -> None:
+    def test_compose_passes_planner_and_deliberative_profile_values(self) -> None:
         compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
         agent = compose.split("  chromie-agent:", 1)[1].split("\nnetworks:", 1)[0]
         for fragment in (

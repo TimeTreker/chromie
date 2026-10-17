@@ -343,7 +343,7 @@ social_cognition_resolver = (
     if social_cognition_client is not None
     else None
 )
-# Value Judgment shares the Fast Planner's model service and deadline: one short call that
+# Value Judgment shares the Planner's model service and deadline: one short call that
 # gates value-reviewed effects (owner amendment 2026-10-10).
 value_judgment_client = (
     build_model_client(
@@ -560,10 +560,10 @@ async def resolve_cognitive_activation(
 @app.post("/plan-advance")
 async def resolve_plan_advance(request: CognitiveWorkRequest):
     if planner_resolver is None:
-        raise HTTPException(status_code=503, detail="Fast planner is disabled")
-    # Fast Planner authors the first Activity Plan over UMI Responsibility refs.
+        raise HTTPException(status_code=503, detail="Planner is disabled")
+    # The Planner authors the first Activity Plan over UMI Responsibility refs.
     # Agent Skill disclosure remains deferred; the endpoint may select only the
-    # bounded common Capability catalog supplied by the Fast Planner resolver.
+    # bounded common Capability catalog supplied by the Planner resolver.
     async def frames():
         async for frame in planner_resolver.stream_advance(request):
             yield frame.model_dump_json(exclude_none=True) + "\n"
@@ -574,7 +574,7 @@ async def resolve_plan_advance(request: CognitiveWorkRequest):
 @app.post("/plan")
 async def resolve_plan(request: CognitiveWorkRequest):
     if planner_resolver is None:
-        raise HTTPException(status_code=503, detail="Fast planner is disabled")
+        raise HTTPException(status_code=503, detail="Planner is disabled")
     prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
         request,
         "fast_planner",
