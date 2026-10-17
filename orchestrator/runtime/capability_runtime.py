@@ -20,7 +20,7 @@ from shared.chromie_runtime import ResourceArbiter
 from orchestrator.runtime.scheduler import CoordinatedStart, CoordinatedStartError, ExecutionStart, current_execution_start
 from contextlib import nullcontext
 from shared.chromie_contracts.execution_outcome import ClaimQualificationPolicy
-from shared.chromie_contracts.json_schema import json_schema_validation_errors
+from shared.chromie_contracts.json_schema import require_json_schema as _validate_json_schema
 from shared.chromie_contracts.interaction import (
     CapabilityIdentityModel,
     CapabilityRequest,
@@ -3964,9 +3964,3 @@ def session_interrupt_definition() -> CapabilityDefinition:
         idempotent=True,
         metadata={"control": "session_interrupt"},
     )
-
-
-def _validate_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> None:
-    errors = json_schema_validation_errors(value, schema, path=path)
-    if errors:
-        raise ValueError(errors[0])

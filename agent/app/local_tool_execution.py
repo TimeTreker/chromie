@@ -24,7 +24,7 @@ from .clients.weather_client import (
 )
 
 from shared.chromie_runtime.env_values import parse_bool
-from shared.chromie_contracts.json_schema import json_schema_validation_errors
+from shared.chromie_contracts.json_schema import require_json_schema as _validate_json_schema
 from shared.chromie_contracts.tool_result import ToolExecutionRequest, ToolExecutionResponse
 
 logger = logging.getLogger("chromie.agent.local_tool_execution")
@@ -333,15 +333,6 @@ def _weather_output(
     }
 
 
-def _validate_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> None:
-    errors = json_schema_validation_errors(
-        value,
-        schema,
-        path=path,
-        validate_array_bounds=False,
-    )
-    if errors:
-        raise ValueError(errors[0])
 
 
 __all__ = ["LocalToolExecutor"]

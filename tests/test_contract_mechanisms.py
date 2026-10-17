@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from shared.chromie_contracts.json_schema import json_schema_validation_errors
+import pytest
+
+from shared.chromie_contracts.json_schema import json_schema_validation_errors, require_json_schema
 from shared.chromie_contracts.text import normalize_whitespace
 
 
@@ -40,8 +42,8 @@ def test_json_schema_validation_checks_nested_contracts() -> None:
     ]
 
 
-def test_json_schema_validation_can_preserve_local_tool_array_policy() -> None:
+def test_require_json_schema_raises_the_first_violation() -> None:
     schema = {"type": "array", "minItems": 2, "items": {"type": "integer"}}
-    assert json_schema_validation_errors(
-        [1], schema, path="args", validate_array_bounds=False
-    ) == []
+    with pytest.raises(ValueError, match="args has fewer than 2 items"):
+        require_json_schema([1], schema, path="args")
+    require_json_schema([1, 2], schema, path="args")
