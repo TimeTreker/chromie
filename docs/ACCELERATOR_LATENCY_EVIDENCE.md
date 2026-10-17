@@ -176,17 +176,22 @@ same request class and declared environment. Goal omission, unsafe execution,
 ungrounded speech, critical LLM/schema integrity failure, service failure, or
 unsafe idle is a hard failure; it cannot be averaged into a latency pass.
 
-Concurrency qualification compares the maintained single-request setting with
-at most one bounded two-request candidate per hardware profile under shared
-LLM/TTS load. It must show that user-observable response and TTS work are not
+Concurrency qualification compares the maintained running-request setting with
+at most one bounded candidate per hardware profile under shared LLM/TTS load. The
+maintained SGLang overlays now run three bounded running requests so SC, GA and the
+Fast Planner can be admitted together ([Configuration](CONFIGURATION.md)); the
+two-request (`max_running_requests=2`) settings in the dated records below are retained
+evidence for that earlier candidate and do not qualify the three-request topology. It must show that user-observable response and TTS work are not
 starved by deliberative or optional background work, and must retain the current
 setting when p95 latency, hard-failure rate, or recovery worsens. These are
 measured scheduling requirements, not fixed realtime/deliberative/background
 model slots.
 
-Thresholds must come from a retained representative baseline and an explicitly
-reviewed policy. This document does not invent a universal first-response
-budget, and automated or simulator traces cannot support a target-audio claim.
+Regression-gate thresholds must come from a retained representative baseline and
+an explicitly reviewed policy. A baseline-relative pass does not waive the absolute
+first-response targets in Charter INTERACTION-LATENCY-001, and meeting those targets
+does not waive a reviewed regression gate. Automated or simulator traces cannot
+support a target-audio claim.
 
 ## Foreground-priority inference runtime candidate qualification
 
@@ -210,6 +215,10 @@ one resident Gemma 12B SGLang instance shared by all cognition roles. SC, UMI, G
 and Planner retain independent semantic authority and request context. The order
 is SC > UMI > GA > Fast Planner > deliberative Work > background, mapped by the
 default step to 500/400/300/200/100/0. Depth does not lower SC/UMI urgency.
+Here "deliberative Work" means the `DELIBERATIVE` compute class only. The configuration
+names `AGENT_DELIBERATIVE_MODEL` and `ORCH_DELIBERATIVE_TIMEOUT_MS` select a model and a
+Host deadline, not a compute class: Deep SC stays `REALTIME` and Deep UMI stays
+`INTERPRETATION` (`agent/app/inference_compute.py`).
 SGLang must actually preempt and resume lower-priority requests; a priority field
 alone is not sufficient evidence. The two-instance Qwen/Gemma experiments are
 retained as failed/unqualified candidates, not the maintained topology.

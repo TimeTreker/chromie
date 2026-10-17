@@ -521,11 +521,21 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   effectively, but it does not create independent compute capacity or another cognitive
   authority.
 - **INTERACTION-LATENCY-001** — For qualified warm interactive behavior, the target is at
-  most 2.0 seconds from validated UMI handoff to the first valid Social Cognition Communicative
-  Activity commitment and at most 3.0 seconds from that commitment to playback start.
+  most 2.0 seconds from validated UMI handoff to the first valid Social Cognition decision
+  (a Communicative Activity commitment, or a validated choice of silence or progress-only
+  where silence is the legal output) and at most 3.0 seconds from a committed
+  Communicative Activity to playback start. The 3.0-second target applies only when that
+  decision commits speech; a valid silence decision is not a latency failure. These
+  absolute targets apply alongside any baseline-relative regression gate; passing one
+  does not waive the other.
   Until a development model/profile has first completed semantic workflow qualification,
   its watchdogs must contain one legal end-to-end transaction rather than cancel valid
-  cognition at the target latency. A latency miss remains a retained qualification
+  cognition at the target latency. The playback-start delivery barrier
+  (`ORCH_TTS_PLAYBACK_START_TIMEOUT_MS`) is not a cognition watchdog: it starts after
+  speech is already authored and scheduled, cancels only that unplayed speech, and fails
+  closed by blocking the body effects that depend on it. Maintained interactive modes keep
+  its short value so a person is not left waiting for a dependent action; a barrier
+  failure is retained as a delivery failure. A latency miss remains a retained qualification
   failure and must not be hidden by that containment budget. Only current-revision live
   evidence can qualify these targets or justify tightening production watchdogs.
 
@@ -1238,8 +1248,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    without action planning. Silence never drops an unanswered Responsibility.
    Meaningful trusted progress can justify another communication task; every
    internal stage boundary does not. Qualified warm rapid-response targets remain
-   at most 2.0 seconds from validated UMI handoff to a valid communication commitment
-   and 3.0 seconds from commitment to playback start. Preserve UMI, queue, inference,
+   at most 2.0 seconds from validated UMI handoff to the first valid Social Cognition
+   decision and 3.0 seconds from a speech commitment to playback start
+   (see the interaction-latency requirement). Preserve UMI, queue, inference,
    TTS and delivery anchors separately. These are qualification targets, not established performance
    of the source-implemented Social Cognition path. Qualify semantic correctness, first
    meaningful response and Work completion under contention together. Watchdog

@@ -110,9 +110,9 @@ Capability, change a target, rewrite arguments, generate gesture sequences, infe
 social purpose, or attach Goal ownership. If Alice leaves, Runtime drops “nod to
 Alice”; it does not retarget the nod to Bob.
 
-Accepted requests use `source=canonical_plan_auxiliary_activity`,
-`auxiliary_plan_activity=true`, `execution_role=social_decoration`, and an empty
-`source_goal_ids`. They execute through the existing trusted Activity runtime. The
+Accepted requests use `source=social_cognition_auxiliary_activity`,
+`semantic_owner=social_cognition`, `auxiliary_plan_activity=true`,
+`execution_role=social_decoration`, and an empty `source_goal_ids`. They execute through the existing trusted Activity runtime. The
 result is retained as auxiliary-behavior evidence, not Goal-completion evidence.
 
 ## Failure, freshness, and re-entry

@@ -33,7 +33,7 @@ Admitted immutable UserTurn
        SC -> exact grounded communication or silence -> qualified delivery
        GA -> retained Goal association / unassociated Responsibility refs
        Host -> canonical new Goals preserving exact accepted WHAT
-       Planner -> complete Work / required communication needs / genuine Deep-HOW
+       Planner -> complete Work / required communication needs
   -> trusted source/version/confirmation/resource/safety validation
   -> Trusted Capability Runtime
   -> provider lifecycle and exact terminal Evidence
@@ -288,7 +288,6 @@ To summarize retained live events:
 python scripts/cognitive_runtime_acceptance.py \
   --mode evidence \
   --events .chromie/evidence/cognitive-runtime/events.jsonl \
-  --require-applied-lane chat \
   --output .chromie/evidence/cognitive-runtime/live-text-summary.json
 ```
 
@@ -312,9 +311,9 @@ Target validation therefore requires the endpoint to report its own revision
 and for that revision to match the clean paired checkout and manifest. It also
 requires explicit goal-driven `apply` selection, an `applied` cognitive
 resolution, completed Soridormi `sim` execution, and explicit safe idle before
-and after execution. The current runner records `declared_paired_checkout` with
-no endpoint-reported revision, so its new bundles remain diagnostic until that
-endpoint binding exists. Bundle-generator identity is kept separate from
+and after execution. The runner records `endpoint_reported_revision` when the
+Soridormi endpoint reports its revision and `declared_paired_checkout` otherwise;
+only the endpoint-reported binding can be target-validated. Bundle-generator identity is kept separate from
 retained-run provenance.
 
 ## 13. Level A rollout scenarios
@@ -419,12 +418,11 @@ hardware qualification; retain exact Chromie/Soridormi revisions and provider co
 
 ## 15. Cognitive text-to-MuJoCo procedure
 
-The text-to-MuJoCo checker uses the unified authority path by default:
+The text-to-MuJoCo checker always uses the unified authority path; it has no option to select another path:
 
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "Walk forward for five seconds, then nod." \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --no-speaker \

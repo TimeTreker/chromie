@@ -15,8 +15,9 @@ move behind narrow collaborators with explicit contracts and focused tests.
 
 There is one maintained Host-to-Agent service boundary. `chromie-agent` is one
 FastAPI service containing separately testable UMI, GA, Planner, Value Judgment, Social Cognition
-and Reflection modules/endpoints. Optional Social Attention is part of Planner output,
-not another module or endpoint; these cognitive roles are not
+and Reflection modules/endpoints. Optional Social Attention is part of Social Cognition
+output (`auxiliary_activities` on its Communicative Act), not Planner output or another
+module or endpoint; these cognitive roles are not
 independent deployment services. `VoiceAssistant` coordinates their lifecycle and
 dataflow but cannot reinterpret one module's semantics or become a response author.
 
@@ -69,7 +70,14 @@ the config; each run reports current values and signed deltas:
 These size values are informational in every delivery phase under approved #45;
 they do not prove that structural simplification is complete. Missing collaborators,
 returned lifecycle state, forbidden compatibility methods and any direct legacy
-Host model call remain blocking. The composition root has already moved transport, input/session,
+Host model call remain blocking. One Host model call still exists outside Social
+Cognition: when an owner explicitly sets `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1`
+and leaves `ORCH_RUNTIME_READY_GREETING_TEXT` empty,
+`VoiceAssistant._generate_runtime_ready_greeting` asks the Ollama `LLM_URL` for the
+startup line (one corrective retry). Maintained profiles disable startup speech, and
+`scripts/check_runtime_structure.py` counts only `process_llm_tts` calls, so its
+`direct_llm_calls=0` does not cover this path; it is the direct-LLM seam in the table
+below. The composition root has already moved transport, input/session,
 shutdown, observability, confirmation bookkeeping, and other mechanical lifecycle concerns to
 their existing owners. Historical transitions belong in Git history/CHANGELOG.
 Review size deltas alongside ownership and readability; do not move code merely to
@@ -87,7 +95,7 @@ Further work is ordered by
 | playback delivery | keep synthesis, transport, playback barriers, echo handling, cancellation, and delivery evidence behind one collaborator |
 | audio-device lifecycle | keep OS-default detection, validated pending-device queueing, cross-device input reset, and output rollover as Host mechanics; device discovery stays in `AudioDeviceManager` and output I/O stays in `PlaybackTransport` |
 | input session lifecycle | keep microphone/VAD/ASR transport, injected audio, routed turns, idle sweeping, and deterministic task shutdown behind the session/lifecycle owners |
-| direct-LLM compatibility | prove maintained-profile unreachability, then remove it or retain only a separately tested emergency contract |
+| direct-LLM compatibility | the opt-in generated startup greeting is the remaining Host model call; move its wording to Social Cognition or keep only configured text, then remove it |
 | Cognitive Gateway/Core dispatch | one Host turn-execution owner that delegates semantic work without gaining semantic authority |
 | observability recording | storage and lifecycle sampling remain delegated with exact turn/session correlation |
 | stop, interruption, approval revocation, and active-Goal cancellation | fixed-reflex token revocation/audit bookkeeping stays with the existing confirmation token owner; interruption dispatch and Goal cancellation remain atomic Host/runtime responsibilities |

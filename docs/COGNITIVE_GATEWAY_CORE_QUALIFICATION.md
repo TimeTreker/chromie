@@ -64,9 +64,19 @@ The retained set covers:
 - inactive ambient speech suppressed before Core entry;
 - deterministic `Stop.` reflex dispatch without ordinary Core interpretation;
 - a direct question admitted to the Core;
+- a natural self-identity answer (`你好，你是谁呀？`);
+- a four-turn basic social sequence (greeting, check-in, negative reaction, and
+  "what did you just say?") whose turns each stay atomic;
 - Beijing weather lookup through the tool lane;
 - an elliptical follow-up that reuses recent trusted tool evidence, targets the
   prior semantic Goal, and does not repeat the lookup.
+
+The manifest's `human_review_expectations.required_checks` lists 13 required
+qualitative checks, including persona and voice checks
+(`person_identity_consistency`, `age_appropriate_natural_voice`,
+`greeting_naturalness_and_context_fit`) beside attention, answer, tool
+continuity, and cancellation-feedback quality. The manifest is the authoritative
+list.
 
 Every manifest-declared user-facing speech turn must retain correlated delivery:
 at least one scheduled TTS item, zero failed or skipped items, every scheduled
@@ -147,7 +157,8 @@ enters maintained qualification evidence.
 The maintained compound request runs through the same Goal-Driven Runtime and
 Trusted Capability Runtime to Soridormi. Qualification requires:
 
-- cognitive runtime mode `apply` on the `robot_action` lane;
+- cognitive runtime mode `apply` (the verifier checks the mode only; it checks
+  no lane);
 - the exact evaluated Chromie revision;
 - a clean declared paired Soridormi checkout;
 - an endpoint-reported Soridormi revision matching that checkout;

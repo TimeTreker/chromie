@@ -345,7 +345,7 @@ def _is_expressive_cue_capability(item: dict[str, Any]) -> bool:
         and (
             metadata.get("source") in {
                 "expressive_body_cue",
-                "canonical_plan_auxiliary_activity",
+                "social_cognition_auxiliary_activity",
             }
             or metadata.get("auxiliary_plan_activity") is True
         )
@@ -881,18 +881,18 @@ def validate_live_text_result(
     summary["social_response_timing_evidence"] = timing_evidence
     timing_derived = timing_evidence["derived"]
     if case.max_warm_sc_decision_ms > 0:
-        planner_commit_ms = timing_derived["sc_decision_ms"]
+        sc_decision_ms = timing_derived["sc_decision_ms"]
         if (
             timing_evidence["social_cognition_status"] not in {"accepted", "resolved"}
-            or planner_commit_ms is None
+            or sc_decision_ms is None
         ):
             errors.append(
                 "Social Cognition decision timing is missing"
             )
-        elif planner_commit_ms > case.max_warm_sc_decision_ms:
+        elif sc_decision_ms > case.max_warm_sc_decision_ms:
             errors.append(
                 "Social Cognition decision exceeded target: "
-                f"{planner_commit_ms:.1f}ms > "
+                f"{sc_decision_ms:.1f}ms > "
                 f"{case.max_warm_sc_decision_ms:.1f}ms"
             )
     if (

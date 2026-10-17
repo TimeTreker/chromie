@@ -100,12 +100,13 @@ The acceptance summary stores:
 
 ## Qualification budgets
 
-The architecture-validation profile deliberately uses long budgets so the first
-question is whether the model and architecture can complete correctly:
+The explicit `qualification` operator mode (`env/modes/qualification.env`)
+deliberately uses long budgets so the first question is whether the model and
+architecture can complete correctly:
 
 - 120 seconds for critical Agent model stages;
 - 150 seconds for corresponding host waits;
-- 600 seconds for the cognitive pipeline;
+- 900 seconds for the cognitive pipeline;
 - 1200 seconds for the outer live case;
 - 120 seconds for supervised skill execution.
 
