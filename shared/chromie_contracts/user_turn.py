@@ -42,6 +42,10 @@ def normalize_turn_text(value: str) -> str:
 
 
 
+def _normalize_identifiers(value: str) -> str:
+    return normalize_turn_text(str(value or ""))
+
+
 class UserTurnSourceSpan(BaseModel):
     """Closed token span into one immutable normalized UserTurnEnvelope source.
 
@@ -54,10 +58,7 @@ class UserTurnSourceSpan(BaseModel):
     source_start_token_ref: str = Field(min_length=1, max_length=24)
     source_end_token_ref: str = Field(min_length=1, max_length=24)
 
-    @field_validator("source_start_token_ref", "source_end_token_ref", mode="before")
-    @classmethod
-    def normalize_source_token_ref(cls, value: Any) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_source_token_ref = field_validator("source_start_token_ref", "source_end_token_ref", mode="before")(_normalize_identifiers)
 
 
 def user_turn_source_span_schema(
@@ -143,10 +144,7 @@ class InputQualityEvidence(BaseModel):
     asr_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     reason: str = Field(default="", max_length=500)
 
-    @field_validator("reason", mode="before")
-    @classmethod
-    def normalize_reason(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_reason = field_validator("reason", mode="before")(_normalize_identifiers)
 
 
 class AttentionFinding(BaseModel):
@@ -165,10 +163,14 @@ class AttentionFinding(BaseModel):
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
     reason: str = Field(default="", max_length=500)
 
-    @field_validator("source", "reason", mode="before")
-    @classmethod
-    def normalize_text_fields(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_text_fields = field_validator("source", "reason", mode="before")(_normalize_identifiers)
+
+
+def _validate_context_digest(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if len(normalized) != 64 or any(ch not in "0123456789abcdef" for ch in normalized):
+        raise ValueError("context_digest must be a lowercase SHA-256 hex digest")
+    return normalized
 
 
 class AttentionReviewRequest(BaseModel):
@@ -189,23 +191,11 @@ class AttentionReviewRequest(BaseModel):
     engagement: dict[str, Any] = Field(default_factory=dict)
     recent_dialogue: list[dict[str, Any]] = Field(default_factory=list, max_length=8)
 
-    @field_validator("turn_id", "session_id", "language", mode="before")
-    @classmethod
-    def normalize_identifiers(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_identifiers = field_validator("turn_id", "session_id", "language", mode="before")(_normalize_identifiers)
 
-    @field_validator("context_digest")
-    @classmethod
-    def validate_context_digest(cls, value: str) -> str:
-        normalized = str(value or "").strip().lower()
-        if len(normalized) != 64 or any(ch not in "0123456789abcdef" for ch in normalized):
-            raise ValueError("context_digest must be a lowercase SHA-256 hex digest")
-        return normalized
+    validate_context_digest = field_validator("context_digest")(_validate_context_digest)
 
-    @field_validator("text", mode="before")
-    @classmethod
-    def normalize_text(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_text = field_validator("text", mode="before")(_normalize_identifiers)
 
 
 class AttentionReviewResult(BaseModel):
@@ -223,18 +213,9 @@ class AttentionReviewResult(BaseModel):
     source: str = Field(min_length=1, max_length=120)
     reason: str = Field(default="", max_length=500)
 
-    @field_validator("turn_id", "session_id", "source", "reason", mode="before")
-    @classmethod
-    def normalize_text_fields(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_text_fields = field_validator("turn_id", "session_id", "source", "reason", mode="before")(_normalize_identifiers)
 
-    @field_validator("context_digest")
-    @classmethod
-    def validate_context_digest(cls, value: str) -> str:
-        normalized = str(value or "").strip().lower()
-        if len(normalized) != 64 or any(ch not in "0123456789abcdef" for ch in normalized):
-            raise ValueError("context_digest must be a lowercase SHA-256 hex digest")
-        return normalized
+    validate_context_digest = field_validator("context_digest")(_validate_context_digest)
 
     def as_finding(self) -> AttentionFinding:
         return AttentionFinding(
@@ -244,6 +225,12 @@ class AttentionReviewResult(BaseModel):
             confidence=self.confidence,
             reason=self.reason,
         )
+
+
+def _require_timezone(value: datetime) -> datetime:
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError("captured_at must include a timezone")
+    return value
 
 
 class ContextReference(BaseModel):
@@ -258,17 +245,9 @@ class ContextReference(BaseModel):
     freshness: ContextFreshness = "unknown"
     age_ms: int | None = Field(default=None, ge=0)
 
-    @field_validator("context_type", "reference_id", "source", mode="before")
-    @classmethod
-    def normalize_identifiers(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_identifiers = field_validator("context_type", "reference_id", "source", mode="before")(_normalize_identifiers)
 
-    @field_validator("captured_at")
-    @classmethod
-    def require_timezone(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("captured_at must include a timezone")
-        return value
+    require_timezone = field_validator("captured_at")(_require_timezone)
 
     @model_validator(mode="after")
     def validate_freshness(self) -> "ContextReference":
@@ -291,17 +270,9 @@ class GatewayContextSnapshot(BaseModel):
     references: tuple[ContextReference, ...] = Field(default_factory=tuple, max_length=32)
     digest: str = Field(min_length=64, max_length=64)
 
-    @field_validator("turn_id", "session_id", "conversation_id", mode="before")
-    @classmethod
-    def normalize_identifiers(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_identifiers = field_validator("turn_id", "session_id", "conversation_id", mode="before")(_normalize_identifiers)
 
-    @field_validator("captured_at")
-    @classmethod
-    def require_timezone(cls, value: datetime) -> datetime:
-        if value.tzinfo is None or value.utcoffset() is None:
-            raise ValueError("captured_at must include a timezone")
-        return value
+    require_timezone = field_validator("captured_at")(_require_timezone)
 
     @model_validator(mode="after")
     def validate_snapshot(self) -> "GatewayContextSnapshot":
@@ -350,10 +321,7 @@ class UserTurnEnvelope(BaseModel):
     )
     admission: TurnAdmissionDisposition
 
-    @field_validator("turn_id", "session_id", "conversation_id", mode="before")
-    @classmethod
-    def normalize_identifiers(cls, value: str) -> str:
-        return normalize_turn_text(str(value or ""))
+    normalize_identifiers = field_validator("turn_id", "session_id", "conversation_id", mode="before")(_normalize_identifiers)
 
     @field_validator("received_at")
     @classmethod
