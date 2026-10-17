@@ -317,7 +317,7 @@ materialization, failure handling, and evidence-driven Planner re-entry.
 Suppressed speech is not delivered evidence; a plan containing a forbidden
 vocal Capability fails closed rather than executing a partial coordinated plan.
 Confirmation requirements still hold. Pure stop/emergency commands bypass
-cognition, and subsequent ordinary turns and independent earlier Goals retain
+cognition and are not acknowledged in speech (see the turn loop's stop section), and subsequent ordinary turns and independent earlier Goals retain
 their own output constraints. The live text harness retains the actual compound
 continuation and execution instead of reporting a reflex-only projection.
 

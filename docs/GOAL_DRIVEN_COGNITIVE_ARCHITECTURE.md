@@ -714,8 +714,9 @@ interaction act must acquire before useful progress can begin.
 
 Fast User Meaning Interpretation may establish a fully understood, low-risk Responsibility
 quickly and, in the same primary result, request which existing cognitive authorities are
-useful next. Initial Social Cognition and Fast Planner activation follows those explicit
-`cognitive_requests[]`. Runtime may close a hard architectural prerequisite of an explicitly
+useful next. Initial Goal Association and Fast Planner activation follows those explicit
+`cognitive_requests[]`; initial Social Cognition starts mechanically for every fresh admitted
+addressed turn and is not a UMI request. Runtime may close a hard architectural prerequisite of an explicitly
 requested authority: an initial Planner request mechanically schedules turn-wide Goal
 Association so eventual Work can obtain canonical Goal binding. This dependency closure is
 not a second semantic activation decision and does not infer Planner readiness from

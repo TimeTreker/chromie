@@ -429,9 +429,11 @@ not require the supervised real-microphone run.
 - `turn your head left/right` and `look left/right` mean the head-only
   `soridormi.look_direction` skill.
 - `nod` and `shake head` are head gestures.
-- `walk ... with nodding/shaking your head` is accepted by the text route, but
-  the physical skills are serialized for now: body movement first, then the head
-  gesture. This preserves the current physical-work safety boundary.
+- `walk ... with nodding/shaking your head`: Soridormi does not yet declare the nod
+  or head shake safe to run during walking, so Chromie never silently runs them one
+  after the other. She either proposes doing them in sequence as a safe adjustment
+  that waits for your confirmation, or tells you she cannot do both at once. This
+  preserves the current physical-work safety boundary.
 - `sing a song` is speech-only chat unless the request also asks for body
   motion. Phrases such as `go ahead and sing` are treated as permission to
   speak, not as a walking command.

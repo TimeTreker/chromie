@@ -138,9 +138,9 @@ reason about HOW/`respond`, while Social Cognition remains the sole exact wordin
 Responsibility is expected to complete within the current interaction and any mechanically
 materialized Goal has interaction lifetime; it does not mean "no Goal" or "no Planner". `goal`
 means the Responsibility must remain open beyond the immediate interaction or explicitly changes
-retained Goal meaning. GA itself only associates the current Responsibility with retained Goal
-history. When GA reports no association, trusted lifecycle code may mechanically materialize a
-new canonical Goal from UMI-owned WHAT without another semantic interpretation. Optional
+retained Goal meaning. GA associates the current Responsibility with retained Goal history or
+decides that it starts a new Goal; trusted lifecycle code then records that new canonical Goal,
+materializing its fields from UMI-owned WHAT without another semantic interpretation. Optional
 communication does not gate already-requested planning or safe dispatch, and Work completion does
 not gate an already-grounded conversational answer.
 Not every turn requires GA and Planner in addition to the standing initial SC call. Missing canonical Goal identity alone does not
@@ -328,7 +328,8 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   the current interaction may still have a short-lived interaction Goal and may still receive
   Planner HOW cognition when UMI requests it. GA performs bounded historical association only:
   it may associate the current Responsibility with a retained open Goal when accepted meaning
-  supports continuity, or decide that it starts a new Goal. GA does **not** model-author a new
+  supports continuity, or decide that it starts a new Goal (exactly one Responsibility per new
+  Goal, so GA never regroups UMI's segmentation). GA does **not** model-author a new
   Goal WHAT. Trusted lifecycle code only records the new Goal GA decided exists, mechanically
   materializing its identity and semantic fields from the accepted UMI Responsibility and marking turn-scoped Goals as
   interaction lifetime and longer obligations as working/persistent according to lifecycle
@@ -354,7 +355,9 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
 - **PLANNER-AUTHORITY-001** — There is one Planner authority and one Planner contract.
   Planning depth comes from acquiring what is missing: library Capability contracts
   (need-first search), Evidence (act, then re-enter), or the person's input (clarification).
-  It is never a second planner pass. A stronger model or a larger budget is a configuration
+  It is never a second planner pass over the same inputs; the need-first contract load is
+  not one, because its first call stops at `ability_needs` and no Plan from it is used.
+  A stronger model or a larger budget is a configuration
   of the same Planner role, not another semantic owner (owner amendment 2026-10-10).
   The Deep Planner is retired (2026-10-11). A Responsibility the Planner cannot fulfil now
   is an honest `unavailable` outcome naming what is missing, beside its siblings' Work; a
@@ -389,7 +392,12 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   Capability it uses). UMI currently marks only deception requests on speech; widening the
   mark to other harmful requests is pending a UMI corpus re-freeze. UMI's mark is a fact
   about WHAT is asked, not a verdict; such a Responsibility requests the Planner, and
-  Social Cognition may only acknowledge it neutrally until the verdict. Its output states who is affected and the concern before the
+  Social Cognition may only acknowledge it neutrally until the verdict. While such a marked
+  Responsibility waits, its whole turn receives only that acknowledgement at ingress and
+  sibling speech is answered after the verdict through its Planner need, because a
+  sibling reply can promise the reviewed content (live 2026-10-16); this is the one
+  exception to Responsibility-local progress. A value-reviewed Capability alone does
+  not hold back sibling speech. Its output states who is affected and the concern before the
   decision. Effects of reviewed Capabilities wait for its verdict. On ask they need the
   person's confirmation, and Social Cognition asks the one question that settles the
   concern. On decline, or when the judgment fails or is unavailable, they never start on any
@@ -619,7 +627,8 @@ flowchart TD
 ```
 
 A complete validated UMI-triggered Planner result may enter Runtime preparation under
-immutable Responsibility provenance before Goal Association finishes. Only an available,
+immutable Responsibility provenance before Goal Association finishes; it carries no Planner
+Agent Skill, which needs canonical Goal identity ([Agent Skills](AGENT_SKILLS_ARCHITECTURE.md)). Only an available,
 explicitly side-effect-free `safe_read` Capability whose current contract requires no
 confirmation may dispatch at that point; all other Work remains prepared until canonical
 Goal binding and its ordinary execution prerequisites hold. No partial model result
@@ -782,8 +791,8 @@ Read the diagram with these boundaries:
   an event-type routing rule. Planner and SC own their own Fast→Deep depth decisions.
 - **Progressive cognitive commitment:** cognition that is already sufficiently grounded for
   its own next step should not wait for unrelated cognition merely because another branch is
-  still running. UMI may therefore request GA, SC, and Planner concurrently when the model
-  judges their inputs sufficiently established. A genuine dependency waits only the affected
+  still running. UMI may therefore request GA and Planner, concurrently with the standing
+  initial SC, when the model judges their inputs sufficiently established. A genuine dependency waits only the affected
   cognition or Activity, not the whole turn. Optional interaction does not gate independent
   planning; unresolved long-horizon motive does not gate a well-grounded weather lookup; and
   GA continuity reasoning does not retroactively erase a valid Planner result.
@@ -1300,7 +1309,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    actively reason over every part of them on every turn. Current dialogue,
    Goals, Tasks, scene state, capability state, evidence, and relevant memory are
    dynamic projections layered after that stable Mind and supplied only to roles
-   that need them.
+   that need them. The shared prefix carries no robot/human label; the fact that her
+   body is a robot body is added only in Social Cognition's own instructions
+   (see the identity-truth rule), so the Planner and Value Judgment never hold it.
 27. **Dynamic world knowledge is acquired, not baked into the Mind.** Weather,
    news, prices, schedules, current policies, specific laws and regulations,
    jurisdictional requirements, and similar facts can change independently of
@@ -1371,7 +1382,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    normalization, defaults, Activity decomposition, dependencies and planning gaps.
    Missing execution inputs are not UMI uncertainty.
 
-   The same accepted intent fans out concurrently to SC, GA and Fast Planner. SC
+   The same accepted intent fans out concurrently to the standing SC and to the GA and
+   Fast Planner that UMI requests. SC
    has the highest communication compute priority and reports actual module state;
    understood, checking, planned, running and completed are distinct facts. UMI, GA,
    Planner and Runtime may request communication. SC owns exact speech and eligible
@@ -1470,7 +1482,9 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    The same fact also must not be authored again in a second model invocation at
    the same authority boundary. A new model call is justified only by a distinct
    owner and decision contract or by the one explicit deeper-cognition delegation
-   for genuinely unresolved meaning; latency, low confidence in a prior model,
+   for genuinely unresolved meaning. The Planner's need-first contract load
+   (principle 30 amendment) is the one listed exception: its first call stops at
+   `ability_needs` when a contract is missing, so the Plan is still authored once; latency, low confidence in a prior model,
    validation convenience, or the label “audit” does not create new authority.
    Development must improve the primary prompt, schema, model choice, or
    deterministic mechanics when that primary result is unreliable instead of
@@ -1611,7 +1625,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    that Fast path; it is not semantic evidence that Deep should repair the same Plan.
 
    **Cognitive depth is Responsibility-local.** Independent Responsibilities in one turn
-   need not share a single depth or wall-clock barrier. Once a Responsibility has canonical
+   need not share a single depth or wall-clock barrier (the one exception is speech UMI
+   marked `value_review`; see VALUE-JUDGMENT-001). Once a Responsibility has canonical
    Goal grounding, a terminal valid Plan may execute while a genuinely uncertain
    remaining Responsibility waits for clarification or Evidence re-entry. Before
    GA finishes, only validated side-effect-free safe reads and realized
@@ -1738,10 +1753,11 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    result from either authority must itself preserve exact Goal/Evidence scope,
    epistemic strength, execution status, perspective, and sibling-Goal boundaries.
    Trusted code validates closed schema/provenance mechanics and must not invoke a
-   second same-owner model to qualify, review, or repair the response. A mechanical DTO regeneration
-   may occur once without reconsidering meaning; it preserves the initial semantic
-   disposition and may make schema defaults explicit so Runtime never guesses omitted
-   scope. Consequential evidence/provenance failure remains fail-closed.
+   second same-owner model to qualify, review, or repair the response. The Planner never
+   regenerates its DTO: a malformed or rejected Planner result fails closed. Only a role
+   whose own contract allows one bounded structural regeneration (GA's container repair)
+   may use it, without reconsidering meaning and preserving the initial semantic
+   disposition. Consequential evidence/provenance failure remains fail-closed.
 
    Cancellation reporting permission is distinct from both original Goal meaning
    and current provider availability. A trusted control re-entry may report the

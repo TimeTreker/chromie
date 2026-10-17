@@ -268,7 +268,7 @@ more coordinated Activities:
 - ask clarification;
 - acknowledge and run a tool;
 - propose a physical action and ask for confirmation when required;
-- refuse or explain a missing capability;
+- communicate a Value Judgment decline or explain a missing capability;
 - continue, cancel, or stop an existing task.
 
 The chosen Activities must be grounded in actual runtime state. Speaking is an
@@ -294,8 +294,10 @@ clarifications, and relevant Evidence. It emits contextual Responsibility eviden
 with complete intent, requested result type, source provenance and bounded unresolved meaning. It may understand an answer
 against a pending clarification, but it does not decide that a Capability parameter is
 missing, create a planning `InformationGap`, classify one as blocking, or choose how it
-should be resolved. The same immutable UMI result starts Social Cognition, Fast Planner and Goal
-Association independently. SC owns a complete interaction decision; Planner owns
+should be resolved. Every fresh admitted addressed turn mechanically starts Social
+Cognition; the same immutable UMI result starts Fast Planner and Goal Association
+independently only when its `cognitive_requests[]` asks for them (a Planner request also
+schedules turn-wide GA). SC owns a complete interaction decision; Planner owns
 one complete Work result and emits no presentation prefix. Deep User Meaning Interpretation is reserved for genuine consequential ambiguity
 in the person's intended outcome, scope, or referent; it is not an external-evidence
 lookup or parameter-completion strategy. GA alone decides the Goal creation or update; the
@@ -805,7 +807,8 @@ completed, and a committed request is never terminal evidence.
 - an immediate acknowledgement may claim only hearing or evaluation;
 - a proposal or confirmation requires a validated plan and the applicable
   confirmation state;
-- speech such as "I'm starting" requires committed execution;
+- speech such as "I'm starting" requires committed execution (a validated, admitted Plan
+  that Runtime releases once that speech begins playback);
 - a progress update requires correlated runtime evidence;
 - a final result or completion claim requires reconciled terminal evidence.
 
@@ -1133,15 +1136,17 @@ Better:
 
 ## Physical action behavior
 
-Chromie proposes physical actions. Soridormi owns execution, realtime safety,
-perception, and final modification authority. When the body cannot do something
-safely, Soridormi reports a limitation, not a refusal. Whether Chromie should act at
+Chromie proposes physical actions. Soridormi owns execution, realtime safety, and
+perception, and may reject a request it cannot run safely. It does not silently
+modify Planner-owned semantic values (target, distance, duration, speed, count): a value
+outside its limits is rejected and reported, never run as a different value. When the
+body cannot do something safely, Soridormi reports a limitation, not a refusal. Whether Chromie should act at
 all is Value Judgment's alone; the Planner never refuses (it reports `unavailable`),
 and Social Cognition communicates a decline.
 
 For physical commands, Chromie should preserve the semantic intent, produce a
 proposal when the capability exists, and let CapabilityRuntime and Soridormi validate,
-bound, confirm, or reject it as a limitation. LLM confidence is not execution authorization.
+confirm, or reject it as a limitation. LLM confidence is not execution authorization.
 
 Chromie must not say it has executed, will execute, or is sending a physical
 command unless the corresponding proposal and runtime state support that speech.
@@ -1392,7 +1397,7 @@ capability recovery:
 | `往前走个15秒。` | Catalog-backed physical proposal path for the exact walk skill when available; no direct hardware command; no internal fallback sentence. |
 | `walk forward for 15 seconds quickly` | Preserve duration and speed semantics; Planner, trusted Runtime, and Soridormi may bound or request confirmation according to their owned contracts. |
 | `B.` | Clarify; do not blink or execute a weakly related skill. |
-| unsupported physical request | Short localized refusal or clarification; no fake execution claim. |
+| unsupported physical request | Short localized limitation report or clarification; no fake execution claim. |
 
 If any of these are intentionally out of scope for a patch, say so in the final
 answer or PR notes.

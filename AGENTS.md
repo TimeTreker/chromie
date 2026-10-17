@@ -136,6 +136,9 @@ authority, or failure semantics become clearer. See the size-review policy in
   it is unreliable. A later model call is allowed only for a genuinely distinct
   downstream authority or the one designated deeper-cognition delegation for
   unresolved meaning, and it must not reinterpret or repair upstream semantics.
+  The Planner's need-first contract load (Charter principle 30 amendment) is the
+  one listed exception: its first call stops at `ability_needs`, so the Plan is
+  still authored once.
   If current code or a lower-authority document conflicts with Project Charter
   principles 30–31, treat that conflict as a blocker to remove, not precedent to
   extend. Report the conflict before implementation and update the canonical

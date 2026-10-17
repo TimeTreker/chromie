@@ -466,7 +466,7 @@ Before widening the enabled provider/capability surface, review:
 1. Does Goal Association preserve existing Goals instead of creating duplicates?
 2. Do Fast plans apply only with complete high-confidence coverage?
 3. Do compound Goals that cannot be fully planned end honestly without leaking partial skills?
-4. Does the Planner avoid semantic replanning and permit at most one mechanical DTO regeneration before terminal Host validation?
+4. Does the Planner avoid semantic replanning and DTO regeneration, failing closed before terminal Host validation?
 5. Are material alternatives held for request-bound approval?
 6. Does speech match the current plan and execution state?
 7. Are all applied events recorded only after host preparation and Goal commit?
@@ -481,7 +481,7 @@ The runtime implementation is automatically verified when:
 - the unified pipeline supports `off`, `report_only`, and `apply`;
 - apply is lane-gated and rollback-safe;
 - one Planner pass decides; a limitation is honest and never delegated;
-- the Planner performs no semantic replan; at most one mechanical DTO regeneration is allowed, and trusted runtime rejection fails closed;
+- the Planner performs no semantic replan and no DTO regeneration, and trusted runtime rejection fails closed;
 - invalid or partial plans commit no effectful skill;
 - Goal-state application is atomic;
 - the SC communication projection is fingerprint-bound to the terminal Plan;
