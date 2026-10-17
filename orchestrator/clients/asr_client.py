@@ -43,6 +43,7 @@ class ASRClient:
         ws = await self.ensure_connected()
         self._sequence += 1
         expected = self._sequence
+        completed = False
         try:
             await ws.send(audio)
             raw = await asyncio.wait_for(
@@ -55,14 +56,12 @@ class ASRClient:
                     f"ASR reply sequence {result.get('sequence')!r} "
                     f"does not match utterance {expected}"
                 )
-        except BaseException:
-            # A timed-out or mismatched reply may still arrive later; never
-            # read it as the answer to the next utterance.
-            try:
+            completed = True
+        finally:
+            if not completed:
+                # A timed-out or mismatched reply may still arrive later; never
+                # read it as the answer to the next utterance.
                 await self.close()
-            except Exception as close_exc:
-                logger.debug("Best-effort ASR websocket close failed: %s", close_exc)
-            raise
         return result
 
     async def close(self):
