@@ -859,10 +859,11 @@ contract repair. Technical Planner failures must remain visible and fail closed.
 Target qualification retains at least three consecutive warm simulator runs
 and compares cognitive-runtime latency with the July 17 diagnostic baseline.
 The target is at least a 35 percent median reduction without weakening any
-execution or evidence boundary.
+execution or evidence boundary. This relative target is a regression goal; it does
+not replace the absolute warm targets in Charter INTERACTION-LATENCY-001.
 
-The RTX 5090 and RTX 4090 Laptop hardware profiles currently use qualification
-time budgets: 120 seconds per Agent cognitive stage, 150 seconds per host stage,
+The explicit `qualification` operator mode (`env/modes/qualification.env`), not a
+hardware profile, owns the qualification time budgets: 120 seconds per Agent cognitive stage, 150 seconds per host stage,
 and 900 seconds for the complete cognitive pipeline. The live runner therefore
 defaults to a 1200-second outer case timeout. Do not reduce these values while
 validating LLM capability and end-to-end architecture; optimize latency only
@@ -1413,7 +1414,7 @@ invokes General Ability with `--execute`, `--assertion-scope full`, Goal-driven 
 `apply`, and the retained runtime identity. The track requires Chinese and English
 effectful cases, cancellation, provider-backed weather/Evidence re-entry, multi-goal mixed
 body/conversation behavior, follow-up continuity, duplicate-effect cardinality checks, and
-the declared warm 2s Planner-commit / 3s playback-start budgets where a retained case owns
+the declared warm 2s SC-decision / 3s SC-commitment-to-playback-start budgets where a retained case owns
 those thresholds. The track is injected-text/simulator evidence; it does not claim a
 physical microphone or audible speaker.
 
@@ -1977,4 +1978,4 @@ release authority. See
 
 ### Audit topics 6–10 qualification
 
-Current-revision closure also retains explicit evidence for the second audit group. Trusted `situation_revision` observations must be delta-driven, preserve exact admitted source provenance, and keep live Runtime state distinct from Evidence. Source regressions must prove that meaningful provider blocked/waiting/degraded/paused/recovering or material phase/member-state transitions enter bounded Situation, that heartbeat/percentage churn does not, that the opportunity digest is bound to the exact validated Situation/Goal set, and that non-Evidence Situation re-entry cannot mark speech `post_evidence`. Generic camera/scene/body/environment Situation ingress remains unclaimable until source-specific trusted adapters exist. Durable `time_condition` records must be exact Goal/current-Plan/Responsibility bindings and one-shot when due; due-clock regressions must prove re-entry without fabricating a UserTurn or Evidence. Planner-authored time-condition creation remains unclaimable until its production output/registration path exists. Gateway regressions must prove broad emergency receipts reconcile all selected Goal requests. Social Attention human review must confirm subordinate/nonblocking/no-duplication/fail-soft behavior. Bilingual identity live-text cases carry the same warm Planner-commit and playback-start budgets as other interactive responses; they do not by themselves prove microphone or audible-speaker latency.
+Current-revision closure also retains explicit evidence for the second audit group. Trusted `situation_revision` observations must be delta-driven, preserve exact admitted source provenance, and keep live Runtime state distinct from Evidence. Source regressions must prove that meaningful provider blocked/waiting/degraded/paused/recovering or material phase/member-state transitions enter bounded Situation, that heartbeat/percentage churn does not, that the opportunity digest is bound to the exact validated Situation/Goal set, and that non-Evidence Situation re-entry cannot mark speech `post_evidence`. Generic camera/scene/body/environment Situation ingress remains unclaimable until source-specific trusted adapters exist. Durable `time_condition` records must be exact Goal/current-Plan/Responsibility bindings and one-shot when due; due-clock regressions must prove re-entry without fabricating a UserTurn or Evidence. Planner-authored time-condition creation remains unclaimable until its production output/registration path exists. Gateway regressions must prove broad emergency receipts reconcile all selected Goal requests. Social Attention human review must confirm subordinate/nonblocking/no-duplication/fail-soft behavior. Bilingual identity live-text cases carry the same warm SC-decision and playback-start budgets as other interactive responses; they do not by themselves prove microphone or audible-speaker latency.

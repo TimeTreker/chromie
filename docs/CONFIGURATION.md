@@ -944,7 +944,7 @@ Cognition's deep client, Deep User Meaning Interpretation and Reflection.
 | `AGENT_DELIBERATIVE_TIMEOUT_MS` | `120000` in maintained development modes; workflow-completion watchdog for one deliberative model call. |
 | `AGENT_DELIBERATIVE_NUM_CTX` | `8192`; deliberative context (Social Cognition uses the larger of this and the Planner context). Qualification mode and the architecture-validation overlay use `40960`. |
 | `AGENT_DELIBERATIVE_NUM_PREDICT` | `1024`; deliberative output budget. |
-| `ORCH_DELIBERATIVE_TIMEOUT_MS` | `125000` in maintained development modes; Host deadline for Social Cognition, Reflection and Goal-free Situation cognition calls (the larger of this and the Planner deadline). |
+| `ORCH_DELIBERATIVE_TIMEOUT_MS` | `125000` in maintained development modes; Host deadline for Social Cognition, Reflection and Goal-free Situation cognition calls (the larger of this and the Planner deadline). It is a deadline only: Social Cognition keeps its `REALTIME` compute class. |
 
 There is no independent response-composition or tool-result-interpretation
 model, endpoint, timeout, or profile role. Social Cognition owns Communicative Activity
@@ -975,7 +975,7 @@ the authoritative Goal/Evidence snapshots remain Host-owned.
 | Variable | Default or profile behavior |
 |---|---|
 | `ORCH_COGNITIVE_RUNTIME_MODE` | `apply` in `.env.common` and the maintained launcher. `off` disables the Goal-driven Runtime and therefore fails closed for admitted ordinary cognition; `report_only` is diagnostic evidence-only execution when invoked explicitly; `apply` is the maintained authoritative mode. No mode falls back to a retired semantic pipeline. |
-| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | Foreground Host deadline for one admitted cognitive interaction. Maintained development modes and the code/common fallback use `300000` so an unqualified model/profile can complete one legal GA/Planner/Social Cognition workflow; explicit qualification mode uses `900000` as an evidence-collection watchdog. Neither value is a latency pass: the 2-second Planner-commit and 3-second playback targets are measured and failed independently. When the foreground deadline cancels the pipeline, Runtime cleans up unbound provisional Fast work before propagating cancellation. Trusted Host rejection is terminal and does not reopen semantic planning. |
+| `ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS` | Foreground Host deadline for one admitted cognitive interaction. Maintained development modes and the code/common fallback use `300000` so an unqualified model/profile can complete one legal GA/Planner/Social Cognition workflow; explicit qualification mode uses `900000` as an evidence-collection watchdog. Neither value is a latency pass: the 2-second SC-decision and 3-second playback targets are measured and failed independently. When the foreground deadline cancels the pipeline, Runtime cleans up unbound provisional Fast work before propagating cancellation. Trusted Host rejection is terminal and does not reopen semantic planning. |
 | `ORCH_COGNITIVE_EVIDENCE_ENABLED` | `1`; writes append-only operational resolution evidence. It does not by itself prove simulator or physical execution. |
 | `ORCH_COGNITIVE_EVIDENCE_INCLUDE_TEXT` | `0`; stores only text length and a short SHA-256 digest by default, including in completed/abandoned Session workflow reports. Structural SC ownership, function, delivery phase and truth-stage fields remain visible so asynchronous communication can be verified without exposing its words. Enable raw text only under an explicit privacy decision. |
 | `ORCH_COGNITIVE_EVIDENCE_PATH` | `.chromie/evidence/cognitive-runtime/events.jsonl`; append-only Gateway admission, Goal Association, terminal Plan, Planner response projection, latency, failure, and execution-outcome summaries. Its parent directory also owns `session-workflows/`, containing per-SID JSON/Markdown flows and a rolling conversation-correlated view; this does not add another runtime setting. |
@@ -1058,8 +1058,9 @@ catalog/schema projections for semantic Capability grounding. No maintained `rul
 The SGLang qualification cache cap is owned by `docker-compose.sglang-qualification.yml`.
 It addresses reproduced shared-GPU TTS allocation failures; startup health alone is not
 sufficient. The 32K default is the measured AWQ laptop budget, not a guarantee for every
-model/GPU. Keep the two-request priority/preemption contract and qualify the exact model,
-context, cache cap and resident speech service together. An explicit higher cap is supported
+model/GPU. The qualification compose defaults to `SGLANG_MAX_RUNNING_REQUESTS=2`; set it to
+the maintained overlay's `3` when qualifying the promoted topology, and qualify the exact
+model, context, cache cap, running-request count and resident speech service together. An explicit higher cap is supported
 only with retained headroom/contention evidence. This numeric setting adds no compatibility
 alias or boolean mode; it remains with the existing qualification service until that service
 is promoted or removed. The RTX 5090 runtime configuration below supersedes the former Qwen candidate overlay.

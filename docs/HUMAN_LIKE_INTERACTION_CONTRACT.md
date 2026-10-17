@@ -700,14 +700,18 @@ or decide truth. Fast and Deep remain cognition depths of their existing semanti
 Goal Association remains canonical Goal continuity; Planner remains Work HOW authority; SC owns interaction planning and wording.
 
 Latency qualification must include contention, not only an idle-server TTFT. A target run
-must keep deliberative cognition active, inject a real foreground interaction, carry it
+must keep `DELIBERATIVE`/`BACKGROUND` compute-class work (for example Reflection or
+Goal-free deliberative Situation cognition) active, inject a real foreground interaction, carry it
 through validated UMI and independent SC, and include TTS on the shared
 GPU. Retain P50/P95/P99 first meaningful reaction, foreground queue/TTFT/completion, TTS
 first PCM/playback, deep interruption/resume behavior, GPU/VRAM, cache/preemption, provider
 errors, structured-output validity, and semantic correctness. A longer watchdog or higher
 average tokens/sec cannot convert foreground tail-latency failure into a pass. The
-provider-level procedure is maintained in
+provider-level scheduling canary is maintained in
 [Accelerator Telemetry and Latency Evidence Gates](ACCELERATOR_LATENCY_EVIDENCE.md#foreground-priority-inference-runtime-candidate-qualification).
+That canary runs UMI and Planner requests at one `INTERACTIVE` class and has no SC
+transaction, so it qualifies only provider preemption; it does not satisfy this target
+run, which must use the production compute-class mapping and include SC.
 
 ## Responsive speech and planning depth
 
@@ -986,10 +990,12 @@ preserves valid independent Work and Evidence. Planning failure cannot manufactu
 execution progress; factual failures remain available to SC and observability.
 
 Foreground workflow watchdogs and user-facing latency targets are separate.
-Configured role/provider budgets are owned by runtime profiles and Configuration;
-raising them cannot qualify interaction latency. Qualified warm targets remain at
-most 2.0 seconds from validated UMI handoff to a complete valid SC commitment and
-3.0 seconds from commitment to playback start. Retain UMI, queue, inference, TTS,
+Configured role/provider deadlines are owned by the operator modes in `env/modes/*.env`
+(see [Configuration](CONFIGURATION.md)), not by hardware profiles; raising them cannot
+qualify interaction latency. Qualified warm targets remain at most 2.0 seconds from
+validated UMI handoff to the first valid SC decision (a complete Communicative Activity
+commitment, or a valid silence/progress-only decision) and 3.0 seconds from a speech
+commitment to playback start (Charter INTERACTION-LATENCY-001). Retain UMI, queue, inference, TTS,
 PCM and delivery anchors separately. Headless/discard playback proves transport
 scheduling only, never audible speaker behavior. The current native profile has
 not met these targets.
