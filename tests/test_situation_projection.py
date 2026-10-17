@@ -7,6 +7,7 @@ from shared.chromie_contracts.situation import (
     SituationProjection,
     SituationSourceRef,
 )
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def test_situation_projection_is_bounded_current_interpretation_and_reconstructable() -> None:
@@ -263,7 +264,7 @@ def test_situation_digest_opportunity_cannot_reenter_with_different_projection()
         recommended_cognition="fast",
         situation_digest="b" * 64,
     )
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.session_log = lambda *_args, **_kwargs: None
 
     response = asyncio.run(

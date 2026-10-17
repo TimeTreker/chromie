@@ -12,6 +12,7 @@ from agent.app.social_cognition import SocialCognitionResolver, social_cognition
 from agent.app.capabilities.validator import validate_args_for_schema
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCommunicativeAct
 from tests.test_situational_cognition import goal_free_observation
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class Model:
@@ -2180,7 +2181,7 @@ async def test_social_terminal_ledger_has_one_writer_through_cognitive_closure()
     execution = await runtime.wait_dispatch(dispatch)
     assert ledger.social_result_calls == 1
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.interaction_runtime = runtime
     assistant.session_log = lambda *args, **kwargs: None
     status = await assistant._close_cognitive_execution(

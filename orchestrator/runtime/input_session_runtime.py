@@ -67,7 +67,7 @@ class InputSessionRuntime:
         session_id: str | None,
     ) -> None:
         host = self.host
-        state = host._playback_state()
+        state = host.playback_delivery
         started_ms = now_ms()
         if not state.begin_output_duck(
             generation=generation,
@@ -107,9 +107,6 @@ class InputSessionRuntime:
     ) -> None:
         if generation is None:
             return
-        playback_state = getattr(self.host, "_playback_state", None)
-        if not callable(playback_state):
-            return
         await playback_transport_for(self.host).resume_output_after_duck(
             generation=generation,
             session_id=session_id,
@@ -145,7 +142,7 @@ class InputSessionRuntime:
         playback_generation_at_start: int | None = None,
     ):
         host = self.host
-        playback_state = host._playback_state()
+        playback_state = host.playback_delivery
         current_session_id = getattr(host, "session_id", None)
         duck_session_id = (
             playback_state.output_duck_session_id
@@ -528,7 +525,7 @@ class InputSessionRuntime:
         excluding: asyncio.Task | None = None,
     ) -> bool:
         host = self.host
-        return host._input_turn_state().has_active_protective_reflex(
+        return host.input_turn_lifecycle.has_active_protective_reflex(
             excluding=excluding
         )
 
@@ -542,7 +539,7 @@ class InputSessionRuntime:
         host = self.host
         """Cancel routed work only after an explicit scoped decision."""
 
-        cancelled_session_ids = host._input_turn_state().request_turn_cancellation(
+        cancelled_session_ids = host.input_turn_lifecycle.request_turn_cancellation(
             excluding=excluding,
             cancel_all=cancel_all,
             reason=reason,
@@ -573,7 +570,7 @@ class InputSessionRuntime:
                 # cleanup or provider I/O, and an ordinary queued turn must
                 # never be able to replace it.
                 task = asyncio.create_task(route())
-                lifecycle = host._input_turn_state()
+                lifecycle = host.input_turn_lifecycle
                 lifecycle.register_turn(
                     task,
                     session_id,
@@ -595,7 +592,7 @@ class InputSessionRuntime:
                     reflex_candidate.cancellation_scope,
                 )
                 return task
-            queue_depth = host._input_turn_state().queue_turn_after_reflex(
+            queue_depth = host.input_turn_lifecycle.queue_turn_after_reflex(
                 user_text,
                 session_id,
                 channel=channel,
@@ -609,7 +606,7 @@ class InputSessionRuntime:
 
         task = asyncio.create_task(route())
         is_reflex = reflex_candidate.action == "interrupt"
-        host._input_turn_state().register_turn(
+        host.input_turn_lifecycle.register_turn(
             task,
             session_id,
             protective_reflex=is_reflex,
@@ -634,7 +631,7 @@ class InputSessionRuntime:
         concurrent_reflex: bool = False,
     ) -> None:
         host = self.host
-        lifecycle = host._input_turn_state()
+        lifecycle = host.input_turn_lifecycle
         was_concurrent_hint = concurrent_reflex or task in (
             lifecycle.concurrent_protective_reflex_tasks
         )
@@ -674,7 +671,7 @@ class InputSessionRuntime:
             host._protective_reflex_failure = True
         if self._has_active_protective_reflex():
             return
-        pending = host._input_turn_state().drain_turns_after_reflex()
+        pending = host.input_turn_lifecycle.drain_turns_after_reflex()
         protective_failed = bool(
             getattr(host, "_protective_reflex_failure", False)
         )
@@ -718,7 +715,7 @@ class InputSessionRuntime:
             )
         else:
             queued = audio
-        lifecycle = host._input_turn_state()
+        lifecycle = host.input_turn_lifecycle
         active = lifecycle.active_asr_task
         if active is not None and not active.done():
             replaced = lifecycle.queue_pending_vad_audio(queued)
@@ -739,7 +736,7 @@ class InputSessionRuntime:
 
     def _on_asr_task_done(self, task: asyncio.Task) -> None:
         host = self.host
-        lifecycle = host._input_turn_state()
+        lifecycle = host.input_turn_lifecycle
         lifecycle.complete_asr_task(task)
         if not task.cancelled():
             try:
@@ -813,7 +810,7 @@ class InputSessionRuntime:
                     await self._release_playback_duck(
                         generation=playback_generation_at_start,
                         session_id=(
-                            host._playback_state().output_duck_session_id
+                            host.playback_delivery.output_duck_session_id
                         ),
                         reason="hard_maximum",
                     )
@@ -828,7 +825,7 @@ class InputSessionRuntime:
             elif ended:
                 await self._release_playback_duck(
                     generation=host.input_turn_lifecycle.vad_segment_playback_generation,
-                    session_id=host._playback_state().output_duck_session_id,
+                    session_id=host.playback_delivery.output_duck_session_id,
                     reason="empty_vad_end",
                 )
                 host.input_turn_lifecycle.vad_segment_started_during_playback = False
@@ -975,7 +972,7 @@ class InputSessionRuntime:
 
 
 def input_session_runtime_for(host: Any) -> InputSessionRuntime:
-    lifecycle = host._input_turn_state()
+    lifecycle = host.input_turn_lifecycle
     runtime = lifecycle.runtime
     if not isinstance(runtime, InputSessionRuntime):
         runtime = InputSessionRuntime(host)

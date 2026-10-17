@@ -22,6 +22,7 @@ from shared.chromie_contracts.value_judgment import (
 )
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_capability_runtime import MockCapabilityProvider, _body_definition
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -411,7 +412,7 @@ def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=f
         async def build_social_cognition_response(self, **_kwargs):
             return InteractionResponse(interaction_id="reentry-walk", status="ok")
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Client()
     assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000, deliberative_timeout_ms=6000)
     assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(

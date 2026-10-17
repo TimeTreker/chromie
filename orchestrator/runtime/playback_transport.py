@@ -145,7 +145,7 @@ class PlaybackTransport:
         session_id: str | None,
     ) -> float | None:
         host = self.host
-        state = host._playback_state()
+        state = host.playback_delivery
         if not state.output_duck_matches(generation, session_id):
             return None
         pause_error = ""
@@ -191,7 +191,7 @@ class PlaybackTransport:
         reason: str,
     ) -> bool:
         host = self.host
-        state = host._playback_state()
+        state = host.playback_delivery
         if not state.output_duck_matches(generation, session_id):
             return False
         resume_error = ""
@@ -235,7 +235,7 @@ class PlaybackTransport:
         session_id: str | None,
     ) -> None:
         host = self.host
-        state = host._playback_state()
+        state = host.playback_delivery
         while state.output_duck_matches(generation, session_id):
             await state.output_duck_released.wait()
         if host.is_stale_playback(generation, session_id):
@@ -383,7 +383,7 @@ class PlaybackTransport:
                     started=False,
                     reason="stale_before_order",
                 )
-                host._playback_state().resolve_playback_release_waiter(
+                host.playback_delivery.resolve_playback_release_waiter(
                     generation=generation,
                     order=order,
                     session_id=session_id,
@@ -399,7 +399,7 @@ class PlaybackTransport:
                     generation, order, audio, source_rate, session_id, skip_reason
                 )
             finally:
-                host._playback_state().resolve_playback_release_waiter(
+                host.playback_delivery.resolve_playback_release_waiter(
                     generation=generation,
                     order=order,
                     session_id=session_id,
@@ -418,7 +418,7 @@ class PlaybackTransport:
                         started=False,
                         reason="stale_pending_order",
                     )
-                    host._playback_state().resolve_playback_release_waiter(
+                    host.playback_delivery.resolve_playback_release_waiter(
                         generation=ng,
                         order=pending_order,
                         session_id=nsid,
@@ -432,7 +432,7 @@ class PlaybackTransport:
                         ng, pending_order, na, nsr, nsid, nreason
                     )
                 finally:
-                    host._playback_state().resolve_playback_release_waiter(
+                    host.playback_delivery.resolve_playback_release_waiter(
                         generation=ng,
                         order=pending_order,
                         session_id=nsid,
@@ -534,7 +534,7 @@ class PlaybackTransport:
                 )
                 host.maybe_session_done(session_id)
                 return True
-            execution_start = host._playback_state().execution_starts.pop(key, None)
+            execution_start = host.playback_delivery.execution_starts.pop(key, None)
             if execution_start is not None:
                 try:
                     await self.wait_for_output_duck_release(generation=generation, session_id=session_id)
@@ -621,7 +621,7 @@ class PlaybackTransport:
             if state is not None:
                 state["played_tts"] = int(state.get("played_tts", 0)) + 1
             playback_end_ms = now_ms()
-            playback_state = host._playback_state()
+            playback_state = host.playback_delivery
             playback_state.last_completed_playback_generation = int(generation)
             playback_state.last_playback_end_monotonic_ms = playback_end_ms
             host.session_log(session_id, "playback_end: order=%s playback_ms=%.1f played_tts=%s", order, playback_ms, state.get("played_tts", 0) if state else "unknown")
@@ -630,8 +630,8 @@ class PlaybackTransport:
             host.maybe_session_done(session_id)
             return True
         finally:
-            host._playback_state().execution_starts.pop(host.playback_start_key(generation, order, session_id), None)
-            host._playback_state().complete_turn_speech_order(
+            host.playback_delivery.execution_starts.pop(host.playback_start_key(generation, order, session_id), None)
+            host.playback_delivery.complete_turn_speech_order(
                 generation=generation, order=order, session_id=session_id,
                 completed=bool(completed),
                 reason="playback_completed" if completed else (skip_reason or "playback_incomplete"),
@@ -810,7 +810,7 @@ class PlaybackTransport:
 
 
 def transport_for(host: Any) -> PlaybackTransport:
-    state = host._playback_state()
+    state = host.playback_delivery
     transport = state.transport
     if not isinstance(transport, PlaybackTransport):
         transport = PlaybackTransport(host)

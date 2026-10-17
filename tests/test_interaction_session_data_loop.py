@@ -12,6 +12,7 @@ from orchestrator.runtime.interaction_session_evidence import (
     LocalInteractionSessionCapturePolicyProvider,
 )
 from orchestrator.runtime.session import SessionTracker
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class InteractionSessionDataLoopTests(unittest.TestCase):
@@ -275,7 +276,7 @@ class InteractionSessionDataLoopTests(unittest.TestCase):
                     root, policy_path=policy_path
                 ),
             )
-            assistant = VoiceAssistant.__new__(VoiceAssistant)
+            assistant = bare_voice_assistant()
             assistant.sessions = tracker
             assistant.save_audio_enabled = False
             assistant.recordings_dir = str(root / "debug-recordings")
@@ -303,7 +304,7 @@ class InteractionSessionDataLoopTests(unittest.TestCase):
                 enabled=False,
                 interaction_session_capture=self._collector(root, policy_path=None),
             )
-            assistant = VoiceAssistant.__new__(VoiceAssistant)
+            assistant = bare_voice_assistant()
             assistant.sessions = tracker
             assistant.save_audio_enabled = True
             assistant.recordings_dir = str(root / "debug-recordings")

@@ -4,11 +4,12 @@ import inspect
 import unittest
 
 from orchestrator.orchestrator import VoiceAssistant
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class RuntimeBoundaryRegressionTests(unittest.TestCase):
     def test_agent_tool_handler_is_a_bound_instance_method(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         handler = assistant._execute_agent_tool
         signature = inspect.signature(handler)
         self.assertEqual(list(signature.parameters), ["request", "timeout_ms"])

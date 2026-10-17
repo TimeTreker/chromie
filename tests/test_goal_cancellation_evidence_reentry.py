@@ -10,6 +10,7 @@ from orchestrator.runtime.named_goal_cancellation import _build_confirmation_rem
 from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.plan import CanonicalPlan
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class GoalCancellationEvidenceReentryTests(unittest.TestCase):
@@ -94,7 +95,7 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
             "approved")
 
     def test_cancellation_reentry_delegates_to_existing_planner_state_entry(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         captured = {}
 
         async def state_reentry(**kwargs):
@@ -181,7 +182,7 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
 
 
     def test_shared_stop_reenters_planner_for_coaffected_open_sibling(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         calls: list[dict] = []
         applied: list[InteractionResponse] = []
         provenance_requests: list[list[str]] = []

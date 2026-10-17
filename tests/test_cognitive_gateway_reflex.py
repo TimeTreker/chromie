@@ -27,6 +27,7 @@ from shared.chromie_contracts.reflex import (
     CancellationDispatchReceipt,
     ReflexFilter,
 )
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class ReflexFilterTests(unittest.TestCase):
@@ -174,7 +175,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             for prior_state in ("fresh", "expired", "active")
         ):
             with self.subTest(text=text, prior_state=prior_state):
-                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                assistant = bare_voice_assistant()
                 events = []
                 admitted = []
                 state = ConversationStateManager(enabled=True)
@@ -271,7 +272,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
                     )
 
     async def test_silent_turn_failure_and_host_dispatch_do_not_emit_speech(self):
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         envelope = {
             "admission": "reflex_and_admit",
             "reflex": {"action": "interrupt", "should_speak": False},
@@ -303,7 +304,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     def _blocked_reflex_assistant(
         self,
     ) -> tuple[VoiceAssistant, dict[str, asyncio.Event], list[str]]:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         controls = {
             "release_abort": asyncio.Event(),
             "abort_started": asyncio.Event(),
@@ -446,7 +447,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         *,
         with_pending_confirmation: bool = False,
     ) -> tuple[list[str], dict[str, Any]]:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         events: list[str] = []
         network_calls = {"confirmation": 0, "session": 0, "user_meaning_interpretation": 0, "model": 0}
         recorded_turn: dict[str, Any] = {}
@@ -726,7 +727,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
             ("Stop moving.", "embodied_motion", []),
         ):
             with self.subTest(text=text):
-                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                assistant = bare_voice_assistant()
                 output_invalidations: list[bool] = []
                 output_aborts: list[str | None] = []
                 directives: list[Any] = []
@@ -816,7 +817,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     async def test_emergency_reflex_dispatches_dedicated_estop_without_active_work(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         emergency_reasons: list[str] = []
 
         class _Runtime:
@@ -877,7 +878,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     async def test_blocked_audio_abort_does_not_delay_runtime_or_estop(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         output_started = asyncio.Event()
         release_output = asyncio.Event()
         runtime_cancelled = asyncio.Event()
@@ -970,7 +971,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     async def test_global_emergency_cancels_all_host_interactions_when_runtime_fails(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         started = {
             "older": asyncio.Event(),
             "newer": asyncio.Event(),
@@ -1049,7 +1050,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     async def test_foreground_interaction_restores_older_unfinished_work(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.active_interaction_task = None
         assistant.active_interaction_id = None
         assistant.active_interaction_tasks = {}
@@ -1111,7 +1112,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     async def test_output_only_does_not_revoke_unrelated_confirmation(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.confirmation_dialogue = ConfirmationDialogue(
             clock=lambda: 100.0
         )
@@ -1147,7 +1148,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     async def test_motion_stop_revokes_unknown_confirmed_request(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.confirmation_dialogue = ConfirmationDialogue(
             clock=lambda: 100.0
         )
@@ -1197,7 +1198,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     async def test_motion_stop_revokes_shared_confirmation_scope(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.confirmation_dialogue = ConfirmationDialogue(
             clock=lambda: 100.0
         )
@@ -1453,7 +1454,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
     async def test_foreground_dispatch_cancellation_blocks_provider_before_submit(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         reset_started = asyncio.Event()
         release_reset = asyncio.Event()
         provider_calls: list[str] = []
@@ -1547,7 +1548,7 @@ class CognitiveGatewayReflexTests(unittest.IsolatedAsyncioTestCase):
         release_reset.set()
 
     async def test_following_turn_waits_for_reflex_instead_of_cancelling_it(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         events: list[str] = []
         reflex_started = asyncio.Event()
         release_reflex = asyncio.Event()

@@ -42,6 +42,7 @@ from shared.chromie_contracts.interaction import CapabilityResult
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.cognitive_runtime_test_support import FakeRuntime
 from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_response, social_fixture_resolution
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class UnexpectedAdmission(AssertionError):
@@ -146,7 +147,7 @@ class Episode(PlannerActivationFixture):
         return result
 
     def host(self, request):
-        host = VoiceAssistant.__new__(VoiceAssistant)
+        host = bare_voice_assistant()
         host.agent_client = self
         host.conversation_state = self.manager
         host.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=self.model_timeout_ms)

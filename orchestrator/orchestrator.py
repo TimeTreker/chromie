@@ -537,43 +537,13 @@ class VoiceAssistant:
     def maybe_session_done(self, sid: Optional[str]) -> None:
         self.sessions.maybe_done(sid)
 
-    def _playback_state(self) -> PlaybackDeliveryLifecycle:
-        state = self.__dict__.get("playback_delivery")
-        if not isinstance(state, PlaybackDeliveryLifecycle):
-            state = PlaybackDeliveryLifecycle()
-            self.__dict__["playback_delivery"] = state
-        return state
-
-    def _input_turn_state(self) -> InputTurnLifecycle:
-        state = self.__dict__.get("input_turn_lifecycle")
-        if not isinstance(state, InputTurnLifecycle):
-            state = InputTurnLifecycle()
-            self.__dict__["input_turn_lifecycle"] = state
-        return state
-
-    @property
-    def playback_delivery(self) -> PlaybackDeliveryLifecycle:
-        return self._playback_state()
-
-    @playback_delivery.setter
-    def playback_delivery(self, value: PlaybackDeliveryLifecycle) -> None:
-        self.__dict__["playback_delivery"] = value
-
-    @property
-    def input_turn_lifecycle(self) -> InputTurnLifecycle:
-        return self._input_turn_state()
-
-    @input_turn_lifecycle.setter
-    def input_turn_lifecycle(self, value: InputTurnLifecycle) -> None:
-        self.__dict__["input_turn_lifecycle"] = value
-
     def playback_start_key(
         self,
         generation: int,
         order: int,
         session_id: Optional[str],
     ) -> tuple[int, int, str | None]:
-        return self._playback_state().key(generation, order, session_id)
+        return self.playback_delivery.key(generation, order, session_id)
 
     def _register_turn_speech_event(
         self,
@@ -603,7 +573,7 @@ class VoiceAssistant:
         subject_refs: list[str] | None = None,
         origin_session_id: str | None = None,
     ) -> dict[str, Any] | None:
-        return self._playback_state().register_turn_speech_event(
+        return self.playback_delivery.register_turn_speech_event(
             session_id=session_id,
             origin_session_id=origin_session_id,
             generation=generation,
@@ -635,7 +605,7 @@ class VoiceAssistant:
         self,
         session_id: str,
     ) -> list[dict[str, Any]]:
-        return self._playback_state().delivered_turn_speech_events(session_id)
+        return self.playback_delivery.delivered_turn_speech_events(session_id)
 
     def resolve_playback_start_waiter(
         self,
@@ -646,7 +616,7 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        resolved = self._playback_state().resolve_playback_start_waiter(
+        resolved = self.playback_delivery.resolve_playback_start_waiter(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -668,7 +638,7 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        for _, order, session_id in self._playback_state().resolve_all_playback_start_waiters(
+        for _, order, session_id in self.playback_delivery.resolve_all_playback_start_waiters(
             started=started,
             reason=reason,
         ):
@@ -679,7 +649,7 @@ class VoiceAssistant:
                 started,
                 reason,
             )
-        self._playback_state().resolve_all_playback_release_waiters(reason=reason)
+        self.playback_delivery.resolve_all_playback_release_waiters(reason=reason)
 
 
     async def wait_for_playback_start(
@@ -690,7 +660,7 @@ class VoiceAssistant:
         session_id: Optional[str],
         timeout_s: float,
     ) -> bool:
-        started = await self._playback_state().wait_for_playback_start(
+        started = await self.playback_delivery.wait_for_playback_start(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -713,7 +683,7 @@ class VoiceAssistant:
         session_id: str | None,
         reason: str,
     ) -> bool:
-        cancelled = self._playback_state().cancel_order_before_start(
+        cancelled = self.playback_delivery.cancel_order_before_start(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -976,7 +946,7 @@ class VoiceAssistant:
         if playback_generation_at_start is None:
             return False, 0.0, 0.0
         if not started_during_playback:
-            playback_state = self._playback_state()
+            playback_state = self.playback_delivery
             last_generation = playback_state.last_completed_playback_generation
             playback_end_ms = playback_state.last_playback_end_monotonic_ms
             if (
@@ -1083,9 +1053,9 @@ class VoiceAssistant:
         from orchestrator.runtime.scheduler import current_execution_start
         execution_start = current_execution_start.get()
         if execution_start is not None:
-            self._playback_state().execution_starts[key] = execution_start
+            self.playback_delivery.execution_starts[key] = execution_start
         self.playback_delivery.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
-        self._playback_state().create_playback_release_waiter(
+        self.playback_delivery.create_playback_release_waiter(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -1230,7 +1200,7 @@ class VoiceAssistant:
                 timeout_ms = max(1000, int(raw_timeout_ms))
             except (TypeError, ValueError):
                 timeout_ms = 30000
-            return await self._playback_state().wait_for_playback_release(
+            return await self.playback_delivery.wait_for_playback_release(
                 generation=generation,
                 order=orders[-1],
                 session_id=session_id,
@@ -1265,7 +1235,7 @@ class VoiceAssistant:
                 }
 
             def current_status() -> str:
-                events = self._playback_state().turn_speech_events.get(
+                events = self.playback_delivery.turn_speech_events.get(
                     str(origin_session_id or session_id or ""),
                     [],
                 )
@@ -1302,13 +1272,13 @@ class VoiceAssistant:
                         orders[0],
                         session_id,
                     )
-                    self._playback_state().execution_starts[key] = execution_start
+                    self.playback_delivery.execution_starts[key] = execution_start
                     status_after_binding = current_status()
                     if status_after_binding in {
                         "playback_started",
                         "playback_completed",
                     }:
-                        self._playback_state().execution_starts.pop(key, None)
+                        self.playback_delivery.execution_starts.pop(key, None)
                         await execution_start.group.ready_after_observed_start(
                             execution_start.member
                         )
@@ -1428,9 +1398,9 @@ class VoiceAssistant:
             if fast_activity_id and fast_activity_id not in semantic_activity_ids:
                 semantic_activity_ids.append(fast_activity_id)
         reuse_args = None
-        async with self._playback_state().speech_submission_lock:
+        async with self.playback_delivery.speech_submission_lock:
             if semantic_activity_ids:
-                existing_event = self._playback_state().find_turn_speech_event_for_activities(
+                existing_event = self.playback_delivery.find_turn_speech_event_for_activities(
                     session_id=origin_session_id or session_id,
                     turn_id=(
                         str(metadata.get("turn_id") or session_id or "")
@@ -2573,7 +2543,7 @@ class VoiceAssistant:
             )
         planner_speech_events = [
             event
-            for event in self._playback_state().turn_speech_events.get(
+            for event in self.playback_delivery.turn_speech_events.get(
                 str(session_id or ""), []
             )
             if isinstance(event, dict)
@@ -4350,7 +4320,7 @@ class VoiceAssistant:
                 continue
             if not isinstance(result.output, dict):
                 continue
-            if await self._playback_state().wait_for_speech_completion(session_id, result.output):
+            if await self.playback_delivery.wait_for_speech_completion(session_id, result.output):
                 delivered_speech.append(speech)
         if not delivered_speech:
             self.session_log(
@@ -7129,7 +7099,7 @@ class VoiceAssistant:
         cancel_cognitive_work: bool = True,
     ) -> None:
         self.playback_delivery.playback_generation += 1
-        self._playback_state().cancel_output_duck()
+        self.playback_delivery.cancel_output_duck()
         self.resolve_all_playback_start_waiters(
             started=False,
             reason="interrupt",

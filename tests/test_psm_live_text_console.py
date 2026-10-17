@@ -87,7 +87,9 @@ def test_text_turn_queued_behind_stop_keeps_text_channel() -> None:
                 self.input_turn = InputTurnLifecycle()
                 self.sessions = SimpleNamespace(state={"stop": {}, "next": {}})
 
-            def _input_turn_state(self) -> InputTurnLifecycle:
+            @property
+
+            def input_turn_lifecycle(self) -> InputTurnLifecycle:
                 return self.input_turn
 
             def session_log(self, *_args: object) -> None:
@@ -166,7 +168,9 @@ def test_client_contains_only_dialogue_and_reuses_one_host(
             self.sessions = SimpleNamespace(state=sessions)
             self.input_turn = InputTurnLifecycle()
 
-        def _input_turn_state(self) -> InputTurnLifecycle:
+        @property
+
+        def input_turn_lifecycle(self) -> InputTurnLifecycle:
             return self.input_turn
 
         def create_session(self) -> str:
@@ -302,7 +306,9 @@ def test_console_admits_new_text_while_previous_turn_is_running(
             self.sessions = SimpleNamespace(state={})
             self.input_turn = InputTurnLifecycle()
 
-        def _input_turn_state(self) -> InputTurnLifecycle:
+        @property
+
+        def input_turn_lifecycle(self) -> InputTurnLifecycle:
             return self.input_turn
 
         def create_session(self) -> str:

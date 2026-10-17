@@ -5,6 +5,7 @@ from orchestrator.runtime.planner_reentry import (
     provider_state_relevance,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def _response() -> InteractionResponse:
@@ -161,7 +162,7 @@ def test_restart_revalidation_uses_one_fresh_catalog_before_planner_reentry():
 
     from orchestrator.orchestrator import VoiceAssistant
 
-    host = VoiceAssistant.__new__(VoiceAssistant)
+    host = bare_voice_assistant()
     host.conversation_state = _RestoredState()
     host.interaction_runtime = _FreshRuntime()
     host.session_log = lambda *_args, **_kwargs: None
@@ -209,7 +210,7 @@ def test_planner_reentry_stages_fresh_confirmation_instead_of_auto_dispatch():
         def record_interaction_response(self, *_args, **_kwargs):
             raise AssertionError("confirmation-gated Work must not be recorded as dispatched")
 
-    host = VoiceAssistant.__new__(VoiceAssistant)
+    host = bare_voice_assistant()
     host.interaction_runtime = _ConfirmationRuntime()
     host.conversation_state = _NoRecordState()
     host.session_log = lambda *_args, **_kwargs: None

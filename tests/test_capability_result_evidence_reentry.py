@@ -37,6 +37,7 @@ from shared.chromie_contracts.tool_result import (
     ToolResultEvidence,
     canonical_value_sha256,
 )
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def _work_result(plan):
@@ -118,7 +119,7 @@ def test_reentry_retains_failure_without_delegation_or_commit(failure_kind):
             return await resolver.resolve(request)
 
         selected.side_effect = resolve_invalid
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = client
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(mode="apply")
     adapter = CanonicalPlanRuntimeAdapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True}))
@@ -332,7 +333,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     speech=[InteractionSpeech(text="上午不会下雨。")],
                 )
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = Client()
         assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000)
         assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
@@ -565,7 +566,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     speech=[InteractionSpeech(text="It is time.")],
                 )
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = Client()
         assistant.cognitive_runtime_policy = SimpleNamespace(
             fast_planner_timeout_ms=3000,
@@ -680,7 +681,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     speech=[InteractionSpeech(text="I need to revise the approach.")],
                 )
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = Client()
         assistant.cognitive_runtime_policy = SimpleNamespace(
             fast_planner_timeout_ms=3000,
@@ -806,7 +807,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
         captured: dict[str, object] = {}
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.session_log = lambda *_args, **_kwargs: None
 
         async def capture(**kwargs):
@@ -861,7 +862,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             "language": "zh-CN",
             "user_turn_envelope": {"normalized_input": {"text": "往前走一下", "language": "zh-CN"}},
         })
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.session_log = lambda *_args, **_kwargs: None
 
         def respond_with(error):
@@ -993,7 +994,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             },
         )
         captured: dict[str, object] = {}
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.session_log = lambda *_args, **_kwargs: None
 
         async def capture(**kwargs):
@@ -1057,7 +1058,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 self.called = True
                 raise AssertionError("Planner must not run without Responsibility provenance")
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = Client()
         assistant.session_log = lambda *_args, **_kwargs: None
 
@@ -1137,7 +1138,7 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                     async def build_social_cognition_response(self, **kwargs):
                         return InteractionResponse(interaction_id="body-result", speech=[InteractionSpeech(text=wording,
                             metadata={"communicative_activity_ids": ["activity-new"], "turn_id": "turn"})])
-                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                assistant = bare_voice_assistant()
                 assistant.agent_client = Client()
                 assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000)
                 ledger = InteractionLedger()
@@ -1151,7 +1152,7 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                 assistant.get_http_session = session
                 delivered = dict(event_id="speech-sibling", session_id="sid", turn_id="turn", source_goal_ids=["goal-chat"],
                     text="A joke.", status="playback_completed", communicative_activity_ids=["activity-old"])
-                assistant._playback_state().turn_speech_events["sid"] = [delivered]
+                assistant.playback_delivery.turn_speech_events["sid"] = [delivered]
                 ledger.record_playback_event(delivered)
                 source = InteractionResponse(interaction_id="mixed", metadata={"turn_id": "turn",
                     "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r1", "outcome": "Blink twice.",
@@ -1179,7 +1180,7 @@ async def test_agent_session_releases_idle_connections_before_the_agent_closes_t
     harmless request was declined as unjudgeable."""
     from uvicorn.config import Config
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.http_session = None
     session = await assistant.get_http_session()
     try:

@@ -11,6 +11,7 @@ from shared.chromie_contracts.user_turn import (
     AttentionReviewRequest,
     AttentionReviewResult,
 )
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class _Sessions:
@@ -79,7 +80,7 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
         for core_mode in ("unavailable", "raises"):
             with self.subTest(core_mode=core_mode):
                 session_id = f"turn-ignore-{core_mode}"
-                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                assistant = bare_voice_assistant()
                 assistant.cognitive_runtime_mode = "apply"
                 assistant.conversation_state = _ConversationState(
                     "conversation-ignore"
@@ -188,7 +189,7 @@ class CognitiveGatewayRegressionTests(unittest.IsolatedAsyncioTestCase):
         channel: str = "voice",
     ) -> dict[str, Any]:
         session_id = f"turn-confirm-{disposition}-{channel}"
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.cognitive_runtime_mode = "apply"
         assistant.conversation_state = _ConversationState("conversation-confirm")
         assistant.sessions = _Sessions(session_id)

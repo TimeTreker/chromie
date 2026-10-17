@@ -29,6 +29,7 @@ from shared.chromie_contracts.situation import (
     SituationRevisionObservation,
     SituationSourceRef,
 )
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 
@@ -309,7 +310,7 @@ def test_voice_assistant_uses_social_cognition_without_goal_work_api() -> None:
             self.planner_calls += 1
             raise AssertionError("Goal-bound Deep API requires Goal provenance")
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
         mode="apply", fast_planner_timeout_ms=3000
@@ -418,7 +419,7 @@ def test_routine_presence_still_uses_core_semantic_judgment_not_host_rules() -> 
                 reason_summary="No useful outward social delta now.",
             )
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
         mode="apply", fast_planner_timeout_ms=3000
@@ -475,7 +476,7 @@ def test_trusted_audience_is_used_by_memory_privacy_gate() -> None:
                 reason_summary="No speech needed.",
             )
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
         mode="apply", fast_planner_timeout_ms=3000

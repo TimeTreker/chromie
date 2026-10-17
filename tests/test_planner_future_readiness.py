@@ -15,6 +15,7 @@ from shared.chromie_contracts import CognitiveWorkRequest
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_response, word_free_model_fixture, social_fixture_resolution
 from tests.test_planner_staged_progress import episode_runtime, read_reply, resolve, status
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def future_case(language='en'):
@@ -277,7 +278,7 @@ def test_future_intention_survives_restart_and_due_host_reentry_dispatches_once(
                 return await resolve(request,catalog,raw,'fast')
 
         client=Client()
-        host=VoiceAssistant.__new__(VoiceAssistant)
+        host=bare_voice_assistant()
         host.agent_client=client
         host.conversation_state=restored
         host.cognitive_runtime_policy=SimpleNamespace(fast_planner_timeout_ms=3000,deliberative_timeout_ms=6000)

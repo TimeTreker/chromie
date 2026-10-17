@@ -23,6 +23,7 @@ from shared.chromie_contracts.interaction import (
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.reflex import CancellationDispatchReceipt
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def _plan() -> CanonicalPlan:
@@ -293,7 +294,7 @@ class NamedGoalCancellationClosureTests(unittest.TestCase):
         self.assertEqual(unchanged["status"], "running")
 
     def test_speech_cancel_without_scheduling_receipt_aborts_shared_output(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         invalidations: list[bool] = []
         aborts: list[bool] = []
         assistant._cancel_scheduled_playback_before_start = (

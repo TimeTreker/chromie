@@ -20,6 +20,7 @@ if "scipy" not in sys.modules:
     sys.modules["scipy.signal"] = scipy.signal  # type: ignore[attr-defined]
 
 from orchestrator.orchestrator import VoiceAssistant
+from tests.voice_assistant_test_support import bare_voice_assistant
 import orchestrator.orchestrator as orchestrator_module
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import CapabilityInteractionDispatch
@@ -43,7 +44,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_fast_first_speech_enters_current_turn_context_only_after_playback(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -70,7 +71,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             reason="playback_start",
         )
         self.assertEqual(assistant._delivered_turn_speech_events("sid-fast"), [])
-        assistant._playback_state().complete_turn_speech_order(generation=3, order=7, session_id="sid-fast", completed=True, reason="completed")
+        assistant.playback_delivery.complete_turn_speech_order(generation=3, order=7, session_id="sid-fast", completed=True, reason="completed")
         delivered = assistant._delivered_turn_speech_events("sid-fast")
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["status"], "playback_completed")
@@ -78,7 +79,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(delivered[0]["fast_activity_id"], "progress_weather")
 
     async def test_failure_experience_recovers_user_text_from_accepted_dialogue(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.conversation_state = ConversationStateManager(enabled=True)
         assistant.conversation_state.record_accepted_user_turn(
             "sid-failure",
@@ -132,7 +133,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
 
     def test_runtime_ready_greeting_prompt_is_a_human_like_wake_up(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.runtime_ready_greeting_language = "zh-CN"
         assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
@@ -174,7 +175,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Do not explain the task", prompt)
 
     def test_runtime_ready_greeting_prompt_changes_with_grounded_local_period(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.runtime_ready_greeting_language = "zh-CN"
         assistant._owner_identity_json = MethodType(
             lambda self: '{"name":"Chromie"}',
@@ -198,7 +199,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(morning, evening)
 
     async def test_runtime_ready_greeting_uses_llm_text_before_live_microphone_turns(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.runtime_ready_greeting_enabled = True
         assistant.runtime_ready_greeting_speech_enabled = True
         assistant.runtime_ready_greeting_text = ""
@@ -263,7 +264,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.playback_delivery.next_playback_order, 1)
 
     async def test_runtime_ready_greeting_generation_uses_python_310_compatible_timeout(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
@@ -338,7 +339,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_runtime_ready_greeting_rejects_reasoning_prose_and_falls_back(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
@@ -394,7 +395,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(source, "fallback")
 
     async def test_runtime_ready_greeting_rejects_separate_thinking_field(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
@@ -452,7 +453,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_runtime_ready_greeting_generation_timeout_falls_back(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
@@ -509,7 +510,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(source, "fallback")
 
     async def test_runtime_ready_greeting_falls_back_when_generation_fails(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         self._configure_model_generation(assistant)
         assistant.runtime_ready_greeting_text = ""
         assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
@@ -548,7 +549,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(source, "fallback")
 
     async def test_runtime_ready_greeting_is_skipped_for_injected_audio(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.runtime_ready_greeting_enabled = True
         assistant.runtime_ready_greeting_speech_enabled = True
         assistant.runtime_ready_greeting_text = ""
@@ -588,7 +589,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(scheduled)
 
     async def test_multi_goal_confirmation_denial_closes_all_scoped_goals(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(
             ttl_s=20.0
         )
@@ -709,7 +710,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(launched), 1)
 
     async def test_multi_goal_confirmation_approval_schedules_all_scoped_goals(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(
             ttl_s=20.0
         )
@@ -809,7 +810,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_stale_session_cannot_reserve_a_playback_order(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         stale_session_id = assistant.sessions.create()
         current_session_id = assistant.sessions.create()
@@ -887,7 +888,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_interaction_speech_reuses_existing_turn_audio_without_resynthesis(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -937,7 +938,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             current_execution_start,
         )
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -987,7 +988,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             await body_wait
 
     async def test_same_communicative_activity_auto_reuses_audio_without_transport_identity(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -1036,7 +1037,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["orders"], [8])
 
     async def test_undelivered_fast_communicative_act_is_fulfilled_once_by_reused_stage(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -1093,7 +1094,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_cognitive_core_exception_does_not_semantically_classify_embodied_text(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
 
         response = assistant._cognitive_core_exception_safe_response(
             "Please walk ahead quickly for 10 minutes.",
@@ -1112,7 +1113,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_cognitive_core_exception_on_plain_text_does_not_create_second_semantic_authority(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
 
         response = assistant._cognitive_core_exception_safe_response(
             "Tell me a quick joke.",
@@ -1129,7 +1130,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     def test_cognitive_core_exception_diagnostic_mode_speaks_recorded_failure(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.failure_speech_mode = "diagnostic"
 
         response = assistant._cognitive_core_exception_safe_response(
@@ -1170,7 +1171,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(response.metadata["semantic_fallback"])
 
     def test_cognitive_failure_metadata_is_recorded_as_experience_error(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         response = assistant._cognitive_core_exception_safe_response(
             "你好。",
             failure_stage="user_meaning_interpretation",
@@ -1215,7 +1216,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_cognitive_core_exception_chinese_fallback_is_natural_and_fail_closed(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
 
         response = assistant._cognitive_core_exception_safe_response(
             "前面有一瓶水，你帮我拿过来好吗？",
@@ -1233,7 +1234,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_input_barge_in_does_not_cancel_body_before_routing(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_generation = 0
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.active_synthesis_tasks = set()
@@ -1296,7 +1297,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_final_deep_thought_response_can_keep_ack_playback_queue(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         reset_calls = 0
@@ -1376,7 +1377,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(done_calls, 2)
 
     async def test_session_completion_waits_for_detached_speech_delivery(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         release_delivery = asyncio.Event()
@@ -1443,7 +1444,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(assistant.sessions.state[session_id]["llm_done"])
 
     async def test_nonterminal_interaction_does_not_mark_session_done(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         done_calls = 0
@@ -1511,7 +1512,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     async def test_scheduled_confirmation_without_playback_is_not_history(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         recorded: list[InteractionResponse] = []
 
         class _ConversationState:
@@ -1555,7 +1556,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(recorded, [])
 
     async def test_interaction_speech_can_wait_until_playback_starts(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.order_lock = asyncio.Lock()
@@ -1610,7 +1611,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.playback_delivery.playback_start_waiters, {})
 
     async def test_playback_barrier_timeout_cancels_all_late_audio_chunks(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.order_lock = asyncio.Lock()
@@ -1689,7 +1690,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.playback_delivery.cancelled_playback_orders, set())
 
     async def test_interaction_speech_splits_long_text_into_ordered_chunks(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.order_lock = asyncio.Lock()
@@ -1757,7 +1758,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_interaction_speech_registers_delivered_turn_evidence(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -1816,7 +1817,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             reason="playback_start",
         )
         self.assertEqual(assistant._delivered_turn_speech_events("sid-final"), [])
-        assistant._playback_state().complete_turn_speech_order(generation=4, order=9, session_id="sid-final", completed=True, reason="completed")
+        assistant.playback_delivery.complete_turn_speech_order(generation=4, order=9, session_id="sid-final", completed=True, reason="completed")
         delivered = assistant._delivered_turn_speech_events("sid-final")
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["text"], "The Moon reflects sunlight.")
@@ -1834,7 +1835,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(delivered[0]["must_not_claim_completion"])
 
     async def test_single_tts_worker_pipelines_next_chunk_during_playback(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.order_lock = asyncio.Lock()
@@ -1977,7 +1978,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_provider_pcm_starts_playback_before_stream_end(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.playback_generation = 0
@@ -2106,7 +2107,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_provider_error_before_pcm_uses_bounded_websocket_retry(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.playback_generation = 0
@@ -2184,7 +2185,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.playback_delivery.playback_queue.qsize(), 1)
 
     async def test_tts_splitter_groups_tiny_fragments_without_swallowing_long_chunk(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_chunk_chars = 80
         assistant.tts_min_chunk_chars = 40
@@ -2204,7 +2205,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_preserves_fast_first_section(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 40
         assistant.tts_chunk_chars = 80
@@ -2224,7 +2225,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_allows_tiny_complete_first_sentence(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 8
         assistant.tts_chunk_chars = 40
@@ -2244,7 +2245,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_keeps_sentences_intact_below_service_limit(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 40
@@ -2265,7 +2266,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_does_not_split_ready_sentence_by_length(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 40
@@ -2287,7 +2288,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_keeps_substantial_followup_sentences_separate(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 120
@@ -2309,7 +2310,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_uses_clause_boundaries_for_long_sentence(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 120
@@ -2331,7 +2332,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_splits_chinese_sentences_without_spaces(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 40
@@ -2343,7 +2344,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(chunks, ["你好。", "我可以帮你。"])
 
     def test_tts_splitter_chunks_long_chinese_weather_reply_for_earlier_audio(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 120
@@ -2364,7 +2365,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual("".join(chunks), text)
 
     def test_tts_splitter_keeps_compact_chinese_weather_answer_in_one_request(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 120
@@ -2379,7 +2380,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.split_tts_text(text), [text])
 
     def test_failure_speech_contract_rejects_incomplete_sentence(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.normalize_tts_candidate = MethodType(
             lambda self, text: " ".join(str(text).strip().split()),
             assistant,
@@ -2400,7 +2401,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
 
     def test_tts_splitter_does_not_make_tiny_fragment_without_sentence_boundary(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 8
         assistant.tts_chunk_chars = 40
@@ -2414,7 +2415,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(chunks, ["I am doing well and ready to help."])
 
     def test_tts_splitter_does_not_split_one_medium_sentence_for_first_chunk(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 40
         assistant.tts_chunk_chars = 80
@@ -2437,7 +2438,7 @@ if __name__ == "__main__":
 
 class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
     def make_assistant(self):
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.session_log = lambda *args, **kwargs: None
         assistant.normalize_tts_candidate = lambda text: " ".join(text.split())
         calls = []
@@ -2478,7 +2479,7 @@ class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_activity_wording_cannot_change_before_retry(self):
         assistant, calls = self.make_assistant()
         await assistant._schedule_interaction_speech(self.args())
-        assistant._playback_state().complete_turn_speech_order(generation=1, order=0,
+        assistant.playback_delivery.complete_turn_speech_order(generation=1, order=0,
             session_id="sid", completed=False, reason="failed")
         with self.assertRaisesRegex(ValueError, "wording"):
             await assistant._schedule_interaction_speech(self.args(text="Cancel that."))
@@ -2489,7 +2490,7 @@ class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
     async def test_interrupted_activity_is_not_automatically_replayed(self):
         assistant, calls = self.make_assistant()
         await assistant._schedule_interaction_speech(self.args())
-        lifecycle = assistant._playback_state()
+        lifecycle = assistant.playback_delivery
         lifecycle.update_turn_speech_event_for_playback(generation=1, order=0,
             session_id="sid", started=True, reason="started")
         lifecycle.complete_turn_speech_order(generation=1, order=0,
@@ -2504,10 +2505,10 @@ class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
         args = self.args()
         args["metadata"].update(session_id=None, origin_session_id="sid")
         result = await assistant._schedule_interaction_speech(args)
-        waiter = asyncio.create_task(assistant._playback_state().wait_for_speech_completion("sid", result))
+        waiter = asyncio.create_task(assistant.playback_delivery.wait_for_speech_completion("sid", result))
         await asyncio.sleep(0)
         self.assertFalse(waiter.done())
-        assistant._playback_state().complete_turn_speech_order(generation=1, order=0,
+        assistant.playback_delivery.complete_turn_speech_order(generation=1, order=0,
             session_id=None, completed=True, reason="completed")
         self.assertTrue(await waiter)
         repeated = await assistant._schedule_interaction_speech(args)

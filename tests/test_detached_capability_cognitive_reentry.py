@@ -25,6 +25,7 @@ from shared.chromie_contracts.interaction import (
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 _SCHEMA = {
@@ -301,7 +302,7 @@ def _response() -> InteractionResponse:
 
 
 def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.interaction_runtime = coordinator
     assistant.playback_delivery.playback_generation = 0
     assistant.sessions = _Sessions()
