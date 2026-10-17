@@ -33,7 +33,9 @@ fi
 
 tts_backend="${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 tts_service=chromie-tts
-tts_provider=fun-cosyvoice3-0.5b
+# The default service's provider identity is overridable (docker-compose.yml
+# forwards TTS_PROVIDER); compare against the value the containers were given.
+tts_provider="${TTS_PROVIDER:-fun-cosyvoice3-0.5b}"
 compose_args=(--env-file .env.runtime -f docker-compose.yml)
 case "${tts_backend,,}" in
   cosyvoice|cosyvoice3)

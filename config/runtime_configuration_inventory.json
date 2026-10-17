@@ -3094,15 +3094,6 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
-      "key": "PYTORCH_CUDA_ALLOC_CONF",
-      "owners": [
-        ".env.common",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "service_internal",
       "key": "PYTORCH_INDEX_URL",
       "owners": [
@@ -3460,9 +3451,10 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_CANDIDATE_CUDA_IMAGE",
       "owners": [
+        ".env.common",
         "docker-compose.yml"
       ]
     },
@@ -3484,14 +3476,6 @@
         ".env.common",
         "docker-compose.yml",
         "tts/settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "TTS_CANDIDATE_STARTUP_TIMEOUT_SEC",
-      "owners": [
-        "docker-compose.yml"
       ]
     },
     {
@@ -4067,10 +4051,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 110,
       "public_choice": 9,
-      "service_internal": 240
+      "service_internal": 238
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 389
+    "total_keys": 387
   }
 }

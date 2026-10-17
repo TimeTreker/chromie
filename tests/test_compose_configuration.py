@@ -3,6 +3,8 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -152,6 +154,59 @@ class ComposeConfigurationTests(unittest.TestCase):
             agent_block,
         )
 
+
+    def test_tts_services_share_one_runtime_contract(self) -> None:
+        services = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))[
+            "services"
+        ]
+        providers = {
+            "chromie-tts": "${TTS_PROVIDER:-fun-cosyvoice3-0.5b}",
+            "chromie-tts-oute": "oute",
+            "chromie-tts-qwen3": "qwen3-tts-0.6b-base",
+        }
+        for name, provider in providers.items():
+            with self.subTest(service=name):
+                service = services[name]
+                environment = service["environment"]
+                build_args = service["build"]["args"]
+                self.assertEqual(environment["TTS_PROVIDER"], provider)
+                # One startup budget and one allocator key for every TTS service.
+                self.assertEqual(
+                    environment["TTS_WORKER_STARTUP_TIMEOUT_SEC"],
+                    "${TTS_WORKER_STARTUP_TIMEOUT_SEC:-1200}",
+                )
+                self.assertEqual(
+                    environment["PYTORCH_ALLOC_CONF"],
+                    "${TTS_PYTORCH_ALLOC_CONF:-expandable_segments:True}",
+                )
+                self.assertNotIn("PYTORCH_CUDA_ALLOC_CONF", environment)
+                for key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy", "NO_PROXY", "no_proxy"):
+                    self.assertIn(key, build_args)
+                    self.assertIn(key, environment)
+                self.assertEqual(
+                    service["deploy"]["resources"]["reservations"]["devices"][0]["capabilities"],
+                    ["gpu"],
+                )
+                self.assertEqual(service["extra_hosts"], ["host.docker.internal:host-gateway"])
+                # The health probe compares against the configured identity, not a literal.
+                probe = service["healthcheck"]["test"][1]
+                self.assertIn('os.environ["TTS_PROVIDER"]', probe)
+                self.assertNotIn("fun-cosyvoice3-0.5b", probe)
+        for name in ("chromie-tts", "chromie-tts-qwen3"):
+            self.assertEqual(
+                services[name]["build"]["args"]["CUDA_IMAGE"],
+                "${TTS_CANDIDATE_CUDA_IMAGE:?TTS_CANDIDATE_CUDA_IMAGE is set in .env.common}",
+            )
+
+    def test_agent_container_paths_are_not_overridden_by_host_relative_values(self) -> None:
+        values = {}
+        for line in (ROOT / ".env.common").read_text(encoding="utf-8").splitlines():
+            if line and not line.startswith("#") and "=" in line:
+                key, value = line.split("=", 1)
+                values[key] = value
+        # Empty values select the Compose container defaults (${KEY:-/app/...}).
+        self.assertEqual(values["AGENT_SKILL_ROOTS"], "")
+        self.assertEqual(values["AGENT_CAPABILITY_PROMPT_TIER_PRESET"], "")
 
 
 if __name__ == "__main__":

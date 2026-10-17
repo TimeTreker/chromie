@@ -8,6 +8,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from shared.chromie_runtime.llm_diagnostics import ollama_prompt_preflight_diagnostics
 
 
@@ -638,9 +640,11 @@ class AutomaticProfileEnvironmentTests(unittest.TestCase):
             "AGENT_DELIBERATIVE_NUM_CTX: ${AGENT_DELIBERATIVE_NUM_CTX:-8192}",
         ):
             self.assertIn(fragment, agent)
-        tts = compose.split("  chromie-tts:", 1)[1].split("  chromie-llm:", 1)[0]
-        self.assertIn("CHROMIE_BUILD_PROFILE: ${CHROMIE_ACTIVE_PROFILE:?", tts)
-        self.assertIn("TTS_CUDA_ARCH: ${TTS_CUDA_ARCH:?", tts)
+        tts = yaml.safe_load(compose)["services"]["chromie-tts"]
+        self.assertTrue(
+            tts["build"]["args"]["CHROMIE_BUILD_PROFILE"].startswith("${CHROMIE_ACTIVE_PROFILE:?")
+        )
+        self.assertTrue(tts["environment"]["TTS_CUDA_ARCH"].startswith("${TTS_CUDA_ARCH:?"))
         dockerfile = (ROOT / "tts" / "Dockerfile").read_text(encoding="utf-8")
         self.assertIn('org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"', dockerfile)
         self.assertIn('org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}"', dockerfile)

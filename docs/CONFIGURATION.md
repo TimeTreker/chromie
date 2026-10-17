@@ -84,10 +84,10 @@ environment in `build-provenance.json`, so a mutable local alias such as
 
 | Variable | Purpose |
 |---|---|
-| `CHROMIE_IMAGE_TAG` | Single tag value applied by Compose to the four repository-built service images. |
+| `CHROMIE_IMAGE_TAG` | Single tag value applied by Compose to the six repository-built service images: `chromie-asr`, `chromie-tts`, `chromie-tts-oute`, `chromie-tts-qwen3`, `chromie-agent` and, on SGLang profiles, `chromie-sglang`. |
 | `PYTHON_IMAGE` | Versioned Python base image for the Agent build. |
 | `OLLAMA_IMAGE` | Complete Ollama runtime image reference consumed directly by Compose. |
-| `ASR_CUDA_IMAGE`, `TTS_CUDA_IMAGE` | Versioned CUDA base images selected by the active profile/common configuration. |
+| `ASR_CUDA_IMAGE`, `TTS_CANDIDATE_CUDA_IMAGE`, `TTS_CUDA_IMAGE` | Versioned CUDA base images from the common configuration: ASR, the default CosyVoice3 and the Qwen3-TTS candidate images, and the OuteTTS evaluation image. |
 
 Model repository revisions are tracked in
 [`release/model-lock.json`](../release/model-lock.json). Profile-specific ASR
@@ -443,7 +443,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_NUM_CTX` | Ollama context window for the bounded selection prompt; default `8192`. No repair prompt is sent. |
 | `AGENT_SKILL_SELECTION_NUM_PREDICT` | Structured output budget for the single selection call; default `512`. |
 | `AGENT_CAPABILITY_CATALOG_REFRESH_SEC` | TTL for refreshing live Provider named capabilities through the trusted manifest transport; default `30`. |
-| `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. Common host env uses `capabilities/prompt_tiers.json`; Docker Compose defaults to `/app/capabilities/prompt_tiers.json`. |
+| `AGENT_CAPABILITY_PROMPT_TIER_PRESET` | Owner-editable initial common/rare prompt-tier preset. `.env.common` leaves it empty so Docker Compose supplies the mounted container path `/app/capabilities/prompt_tiers.json`; set it only to another path inside the Agent container. |
 | `capabilities/value_review.json` (file, not an env variable) | Owner-editable list of Capability IDs whose effects need a Value Judgment `proceed` verdict before dispatch (VALUE-JUDGMENT-001). The Orchestrator loads it at startup from the repository root; an invalid file fails startup. It keys on the Capability the Planner chose, never on the person's words. Current list: object fetch/move, walking, and `hug_gesture`; gaze such as `look_at_person` is an expressive gesture and is not reviewed. An empty policy list (test harnesses, replay corpora) means no value gate for Capabilities; speech UMI marks `value_review` is reviewed independently of this list. |
 | `AGENT_CAPABILITY_PROMPT_TIER_OVERRIDES` | Optional JSON overlay path for auditable experience-derived `prompt_tier` changes. The overlay can move unlocked skills between `common` and `rare`; safety-locked entries remain excluded from the fast common prompt. |
 | `AGENT_CAPABILITY_MATCH_LIMIT` | Maximum model-neutral catalog preview attached at the native interaction boundary; default `8`. It does not rank user language. |
@@ -679,7 +679,8 @@ can recognize English, Chinese, Japanese, Korean, and Cantonese utterances.
 | `COSYVOICE3_SOURCE_REVISION`, `COSYVOICE3_MODEL_ID`, `COSYVOICE3_MODEL_REVISION` | Immutable default runtime and model locks. |
 | `COSYVOICE3_FP16` | Load the default model in half precision; default `1`. |
 | `COSYVOICE3_PROMPT_PREFIX` | Trusted prompt prefix prepended before the exact reference transcript. |
-| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget; default `1200` for the large offline model load. A CosyVoice worker warms every committed voice inside this budget before it reports ready, so TTS health `provider_health.ready` means warm; the launcher and the Host wait for it and do not warm TTS themselves. |
+| `TTS_WORKER_STARTUP_TIMEOUT_SEC` | Initial or post-restart worker readiness budget for every TTS service (CosyVoice3, Oute and Qwen3-TTS); default `1200` for the large offline model load. A CosyVoice worker warms every committed voice inside this budget before it reports ready, so TTS health `provider_health.ready` means warm; the launcher and the Host wait for it and do not warm TTS themselves. |
+| `TTS_PYTORCH_ALLOC_CONF` | PyTorch allocator setting forwarded as `PYTORCH_ALLOC_CONF` to every TTS service; default `expandable_segments:True`. |
 | `TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC` | Bounded drain before fail-closed worker restart after cancellation; default `3` seconds. |
 | `TTS_SPEAKER_ID` | `default` for CosyVoice/Qwen reference cloning. Oute may use installation-local profile IDs. |
 
