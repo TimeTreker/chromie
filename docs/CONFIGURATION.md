@@ -242,7 +242,7 @@ generated prompts must use a specific speaker.
 |---|---|
 | `ASR_URL` | `ws://127.0.0.1:9001` |
 | `TTS_URL` | `ws://127.0.0.1:5000` (CosyVoice); the launchers select `5001` for `oute` and `5002` for `qwen3`. |
-| `LLM_URL` | `http://127.0.0.1:11434/api/generate`. Ollama-native endpoint used only to generate ready-greeting speech when `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and no `ORCH_RUNTIME_READY_GREETING_TEXT` is configured. SGLang profiles publish no Ollama port, so set a greeting text there. |
+| `LLM_URL` | `http://127.0.0.1:11434/api/generate`. Ollama-native endpoint that `chromie doctor` probes. The Host never generates speech from it; the startup greeting comes from Social Cognition. |
 | `AGENT_URL` | `http://127.0.0.1:8092` |
 | `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
 | `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
@@ -508,12 +508,10 @@ and there are no `ORCH_CONDITIONAL_DEEPTHINK_*` runtime controls.
 | `ORCH_TTS_PLAYBACK_START_TIMEOUT_MS` | Hard Host wait for response speech that carries a playback-start delivery/effect barrier. Maintained interactive modes and the code/common fallback use `3500`; explicit qualification mode uses `120000`. The Capability Runtime speech envelope is derived to outlive this wait by a bounded cleanup margin. Failure prevents dependent body effects, marks the speech request failed, terminalizes every accepted dependent request as blocked-before-start, and invalidates every queued chunk of that utterance so late synthesis cannot speak after the failed barrier. |
 | `ORCH_RUNTIME_READY_GREETING_ENABLED` | `1`; runtime-ready lifecycle switch. In a live device session, Chromie may attempt one quiet, untargeted, provider-declared startup-orientation Activity before opening the microphone. This is baseline liveliness, not Social Attention because there is no interaction anchor yet. Missing, unavailable, confirmation-bound, or invalid orientation fails open and never produces failure speech. Stdin/discard acceptance modes skip the orientation. |
 | `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED` | `0`; startup speech is disabled by default. Set to `1` only when the owner deliberately wants a spoken startup line. The non-verbal orientation remains independent. |
-| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence is preferred. Leaving it empty allows the existing bounded generation path, but maintained profiles do not require or schedule that speech. |
-| `ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT` | Empty by default. A generation failure therefore remains silent rather than replacing it with a generic character slogan. |
+| `ORCH_RUNTIME_READY_GREETING_TEXT` | Empty by default. When startup speech is explicitly enabled, a valid configured sentence (the owner's own wording) is played as given. Left empty, Social Cognition decides whether to greet and authors the line from the owner-approved Mind through `POST /social-cognition/startup-greeting`; maintained profiles do not require or schedule that speech. |
+| `ORCH_RUNTIME_READY_GREETING_FALLBACK_TEXT` | Empty by default. A Social Cognition failure therefore remains silent rather than replacing it with a generic character slogan. |
 | `ORCH_RUNTIME_READY_GREETING_LANGUAGE` | `zh-CN`; authoritative language only when startup speech is explicitly enabled. |
-| `ORCH_RUNTIME_READY_GREETING_MODEL` | Empty by default; compatibility model selection used only by explicitly enabled generated startup speech. |
-| `ORCH_RUNTIME_READY_GREETING_NUM_PREDICT` | `32`; compatibility output budget for explicitly enabled generated startup speech. |
-| `ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS` | `15000`; compatibility generation timeout for explicitly enabled startup speech. |
+| `ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS` | `15000`; Host deadline for the Social Cognition startup-greeting request when startup speech is explicitly enabled. |
 | `ORCH_RUNTIME_READY_GREETING_TIMEOUT_MS` | `45000`; maximum startup speech playback wait. Non-verbal orientation uses a five-second bounded subset and always fails open. |
 | `ORCH_VOICE_SYSTEM_PROMPT` | Optional replacement for the direct-LLM voice brevity/style instruction. |
 
@@ -826,11 +824,11 @@ the same endpoint so a reachable health surface cannot hide an unusable
 production generation transport.
 
 Spoken generation paths set `think: false` and separate model reasoning from the
-user-visible speech contract. Normal cognition already uses typed response plans.
-The runtime wake-up greeting and rare Host direct-LLM fallback additionally require
-a structured `{"text": ...}` envelope. Only that validated field can reach TTS;
-raw prose, malformed JSON, truncated output, and any separate `thinking` field are
-retained only as bounded observability metadata and never spoken.
+user-visible speech contract. Every spoken word comes from a typed Social Cognition
+result, including the optional wake-up greeting (`SocialStartupGreetingOutput`). Only
+its validated text can reach TTS; raw prose, malformed JSON, truncated output, and any
+separate `thinking` field are retained only as bounded observability metadata and
+never spoken.
 
 Prompts ask the model to speak as the configured Mind-profile identity (factory: Chromie, a twelve-year-old girl),
 rather than as a backend model. There is no phrase-triggered disclaimer check or

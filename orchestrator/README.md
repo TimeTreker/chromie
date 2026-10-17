@@ -154,8 +154,8 @@ If the Goal-driven Runtime is disabled or fails after admission, ordinary cognit
 fails closed and retains typed operational failure evidence. Host does not manufacture an
 ordinary semantic explanation; only the separately documented tiny protective/operational
 fail-safe exceptions may speak. The Host never switches to a direct-LLM or retired Agent
-semantic path for a user turn. The only Host-side model call is the opt-in generated
-startup greeting (off by default; see
+semantic path for a user turn, and makes no model call of its own: the opt-in startup
+greeting (off by default) is authored by Social Cognition (see
 [composition root](../docs/VOICE_ASSISTANT_COMPOSITION_ROOT.md)).
 
 `orchestrator/runtime/observability_recording.py` owns fail-soft recording containment for Experience/Episode and Cognitive Evidence writes plus optional accelerator sample scheduling/task tracking/trace attachment; it is not a semantic owner and observability failure cannot alter Goal, Planner, speech, or execution truth.

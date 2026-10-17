@@ -182,6 +182,7 @@ Important endpoints include:
 - `POST /fast-plan`
 - `POST /value-judgment`
 - `POST /social-cognition` (shared interaction planning, including Goal-free Situation)
+- `POST /social-cognition/startup-greeting` (optional SC wake-up line)
 - Agent Skill selection/disclosure endpoints
 - WorkDAG validate/dry-run/guarded execution/trace diagnostics
 

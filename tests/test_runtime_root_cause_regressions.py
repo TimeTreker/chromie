@@ -896,17 +896,28 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_wake_up_prompt_uses_grounded_time_without_unverified_state(self) -> None:
-        assistant = object.__new__(VoiceAssistant)
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._owner_identity_json = lambda: "{}"  # type: ignore[method-assign]
-        assistant._owner_mind_summary = lambda: "{}"  # type: ignore[method-assign]
-        prompt = assistant._runtime_ready_greeting_prompt()
+        from agent.app.social_cognition import (
+            SOCIAL_COGNITION_STARTUP_GREETING_PROMPT,
+            social_startup_greeting_prompt,
+        )
+        from shared.chromie_contracts.mind import default_mind_profile
+        from shared.chromie_contracts.social_cognition import SocialStartupGreetingRequest
 
-        self.assertIn("Grounded local temporal context JSON", prompt)
+        request = SocialStartupGreetingRequest(
+            request_id="startup-greeting:regression",
+            language="zh-CN",
+            local_time=VoiceAssistant._runtime_ready_greeting_time_context(),
+            context={"mind": default_mind_profile().prompt_context(max_chars=5000)},
+        )
+        prompt = social_startup_greeting_prompt(request)
+
+        self.assertIn("Trusted startup context JSON", prompt)
         self.assertIn("local_period", prompt)
-        self.assertIn("Do not quote the exact clock time", prompt)
-        self.assertIn("Do not invent meals, hunger, sleepiness, weather", prompt)
-        self.assertIn("Do not ask a question or end mid-clause", prompt)
+        system = SOCIAL_COGNITION_STARTUP_GREETING_PROMPT
+        self.assertIn("quote the clock time", system)
+        self.assertIn("Do not invent meals, hunger, sleepiness, weather", system)
+        self.assertIn("or ask any question", system)
+        self.assertIn("End the line with sentence punctuation", system)
 
     async def test_vad_segment_started_during_playback_keeps_barge_in_threshold(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)

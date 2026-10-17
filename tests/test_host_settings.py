@@ -63,8 +63,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         self.assertEqual(model.keep_alive, "8h")
         self.assertEqual(model.prompt_chars_per_token_estimate, 2.5)
         self.assertEqual(model.context_safety_margin_tokens, 1024)
-        self.assertEqual(model.ready_greeting_fallback_model, "fast-model")
-        self.assertEqual(model.ready_greeting_num_ctx, 12288)
+        self.assertFalse(hasattr(model, "ready_greeting_fallback_model"))
 
 
     def test_extended_host_collaborator_settings_are_typed_once(self) -> None:

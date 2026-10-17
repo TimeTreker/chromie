@@ -2946,3 +2946,65 @@ def test_no_act_can_bind_an_answer_value_judgment_withheld():
             offered |= set(shape["properties"]["addressed_need_ids"].get("items", {}).get("enum", []))
     assert "need:answer" not in offered
     assert "need:decline" in offered
+
+
+def _startup_request(**overrides):
+    from shared.chromie_contracts.mind import default_mind_profile
+    from shared.chromie_contracts.social_cognition import SocialStartupGreetingRequest
+
+    values = {
+        "request_id": "startup-greeting:1",
+        "language": "zh-CN",
+        "max_chars": 24,
+        "local_time": {"local_period": "morning", "weekday": "Saturday"},
+        "context": {"mind": default_mind_profile().prompt_context(max_chars=5000)},
+    }
+    values.update(overrides)
+    return SocialStartupGreetingRequest(**values)
+
+
+@pytest.mark.asyncio
+async def test_social_cognition_authors_the_startup_greeting_from_the_mind():
+    model = Model({"disposition": "communicate", "text": "我醒啦，好开心！", "reason_summary": "wake-up line"})
+    result = await SocialCognitionResolver(model, Catalog()).resolve_startup_greeting(_startup_request())
+
+    assert result.disposition == "communicate"
+    assert result.text == "我醒啦，好开心！"
+    assert result.semantic_owner == "social_cognition"
+    assert result.model_call_count == 1
+    prompt, kwargs = model.calls[0]
+    assert kwargs["prompt_family"] == "social_cognition.startup_greeting"
+    assert kwargs["response_format"]["properties"]["text"]["maxLength"] == 24
+    assert "only owner of what Chromie says" in kwargs["system"]
+    assert "Never call yourself a robot" in kwargs["system"]
+    packet = json.loads(prompt.split("Trusted startup context JSON:\n", 1)[1])
+    assert packet["mind"]["identity"]["name"] == "Chromie"
+    assert packet["local_time"]["local_period"] == "morning"
+    assert "Speak only in zh-CN" in prompt
+
+
+@pytest.mark.asyncio
+async def test_social_cognition_may_choose_startup_silence():
+    model = Model({"disposition": "silence", "text": "", "reason_summary": "nothing to add"})
+    result = await SocialCognitionResolver(model, Catalog()).resolve_startup_greeting(_startup_request())
+
+    assert result.disposition == "silence"
+    assert result.text == ""
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("raw", [
+    {"disposition": "communicate", "text": "", "reason_summary": ""},
+    {"disposition": "silence", "text": "我醒啦！", "reason_summary": ""},
+    {"disposition": "communicate", "text": "我" * 30, "reason_summary": ""},
+])
+async def test_startup_greeting_rejects_words_outside_its_contract(raw):
+    with pytest.raises(ValueError):
+        await SocialCognitionResolver(Model(raw), Catalog()).resolve_startup_greeting(_startup_request())
+
+
+def test_startup_greeting_requires_the_owner_approved_mind():
+    with pytest.raises(ValueError, match="owner-approved Mind"):
+        _startup_request(context={})
+    with pytest.raises(ValueError, match="owner-approved Mind"):
+        _startup_request(context={"mind": {"owner_approved": False}})

@@ -943,8 +943,9 @@ arguments supplied by the Host startup policy. It does not target a person,
 claim to inspect the room, or infer nearby people, weather, meals, feelings, or
 other environmental facts.
 
-Startup speech is an explicit operator opt-in. When enabled, it still uses one
-validated short sentence and the existing playback barrier, but silence is a
+Startup speech is an explicit operator opt-in. When enabled, Social Cognition decides
+whether to greet and authors the line from the owner-approved Mind; it uses one
+validated short sentence and the existing playback barrier, and silence is a
 complete and preferred startup result. A missing orientation capability or
 provider failure remains silent and fail-open; it must never trigger a body
 failure apology or a synthetic character slogan.

@@ -369,3 +369,59 @@ class SocialCognitionResolution(SocialCognitionOutput):
                     raise ValueError("an input or confirmation need requires a question")
                 if need.delivery_phase is not None and act.delivery_phase != need.delivery_phase:
                     raise ValueError("communication changed an upstream delivery-order requirement")
+
+
+class SocialStartupGreetingRequest(BaseModel):
+    """Startup context for Social Cognition's optional wake-up line.
+
+    Startup has no user turn, Goal, Work or Evidence. The Host supplies only the
+    owner-approved Mind (``context.mind``), trusted local clock facts and the
+    delivery bounds; Social Cognition alone decides whether to speak and what.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    request_id: str = Field(min_length=1, max_length=160)
+    language: str = Field(min_length=1, max_length=32)
+    max_chars: int = Field(default=24, ge=4, le=80)
+    local_time: dict[str, str] = Field(default_factory=dict)
+    context: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_scope(self) -> "SocialStartupGreetingRequest":
+        reject_forbidden_low_level_fields(self.context)
+        mind = self.context.get("mind")
+        if not isinstance(mind, dict) or mind.get("owner_approved") is not True:
+            raise ValueError("the startup greeting requires the owner-approved Mind")
+        return self
+
+
+class SocialStartupGreetingOutput(BaseModel):
+    """Social Cognition's model-authored startup decision."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    disposition: Literal["communicate", "silence"]
+    text: str = Field(default="", max_length=80)
+    reason_summary: str = Field(default="", max_length=240)
+
+    @model_validator(mode="after")
+    def validate_text(self) -> "SocialStartupGreetingOutput":
+        self.text = normalize_whitespace(self.text)
+        if self.disposition == "communicate" and not self.text:
+            raise ValueError("a startup greeting must carry its exact words")
+        if self.disposition == "silence" and self.text:
+            raise ValueError("startup silence carries no words")
+        return self
+
+
+class SocialStartupGreetingResolution(SocialStartupGreetingOutput):
+    request_id: str = Field(min_length=1, max_length=160)
+    semantic_owner: Literal["social_cognition"] = "social_cognition"
+    model_call_count: int = Field(ge=1, le=1)
+
+    def validate_request(self, request: SocialStartupGreetingRequest) -> None:
+        if self.request_id != request.request_id:
+            raise ValueError("Social Cognition changed the startup request identity")
+        if len(self.text) > request.max_chars:
+            raise ValueError("Social Cognition exceeded the startup greeting length bound")

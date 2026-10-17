@@ -463,38 +463,9 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "d460378e1f5ffbce9dda8442afd7f0f23f9decee9555252eace3427214ffb320",
+      "body_sha256": "d02ccd3ed2eed7eb2577d77fe9d42ea9e54c0387fd5f2d915506a028066d516b",
       "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._owner_identity_json",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "765ca9a1d2c8357b44c78e316e7e4a1d6e5069f637171aa1f2f07de5493addc0",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._owner_mind_summary",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "24dbceb84c6feee4a6f168098250b2f38dd4f34a86f907e90f26bf1a9729a9bf",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
+        "diagnostic"
       ]
     },
     {

@@ -61,7 +61,7 @@ from .reflection import ReflectionResolver
 from .value_judgment import ValueJudgmentResolver
 from shared.chromie_contracts.reflection import ReflectionRequest
 from shared.chromie_contracts.value_judgment import ValueJudgmentResult
-from shared.chromie_contracts.social_cognition import SocialCognitionRequest
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialStartupGreetingRequest
 from .schema import HealthResponse
 from .cognitive_core.user_meaning_interpreter import (
     UserMeaningInterpretationRequest,
@@ -613,6 +613,18 @@ async def resolve_social_cognition(request: SocialCognitionRequest):
         raise HTTPException(status_code=503, detail="Social Cognition is unavailable")
     try:
         return await social_cognition_resolver.resolve(request)
+    except OllamaGenerationError as exc:
+        raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/social-cognition/startup-greeting")
+async def resolve_social_startup_greeting(request: SocialStartupGreetingRequest):
+    if social_cognition_resolver is None:
+        raise HTTPException(status_code=503, detail="Social Cognition is unavailable")
+    try:
+        return await social_cognition_resolver.resolve_startup_greeting(request)
     except OllamaGenerationError as exc:
         raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
     except ValueError as exc:

@@ -24,7 +24,10 @@ from shared.chromie_contracts.plan import (
     FastPlannerStreamTerminal,
 )
 from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
-from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
+from shared.chromie_contracts.social_cognition import (
+    SocialCognitionRequest, SocialCognitionResolution,
+    SocialStartupGreetingRequest, SocialStartupGreetingResolution,
+)
 from shared.chromie_contracts.value_judgment import ValueJudgmentResult
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
@@ -310,6 +313,32 @@ class AgentClient:
                 if response.status != 200:
                     raise RuntimeError(f"Agent Social Cognition HTTP {response.status}: {body[:500]}")
                 result = SocialCognitionResolution.model_validate_json(body)
+            result.validate_request(request)
+            span.set_attribute("disposition", result.disposition)
+            return result
+
+    async def resolve_startup_greeting(
+        self, session: aiohttp.ClientSession, *, request: SocialStartupGreetingRequest,
+        timeout_ms: int | None = None,
+    ) -> SocialStartupGreetingResolution:
+        """Ask Social Cognition whether and what to say on waking; it owns the words."""
+        timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE, operation="resolve_startup_greeting", kind="tool_call",
+            attributes={"endpoint": "/social-cognition/startup-greeting", "timeout_ms": timeout_ms},
+        ) as span:
+            async with session.post(
+                f"{self.base_url}/social-cognition/startup-greeting",
+                json=request.model_dump(mode="json"),
+                timeout=aiohttp.ClientTimeout(total=timeout_ms / 1000.0),
+            ) as response:
+                body = await response.text()
+                span.set_attribute("http_status", response.status)
+                if response.status != 200:
+                    raise RuntimeError(
+                        f"Agent Social Cognition startup greeting HTTP {response.status}: {body[:500]}"
+                    )
+                result = SocialStartupGreetingResolution.model_validate_json(body)
             result.validate_request(request)
             span.set_attribute("disposition", result.disposition)
             return result

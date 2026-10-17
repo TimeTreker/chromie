@@ -190,8 +190,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "",
         )
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_LANGUAGE"], "zh-CN")
-        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_MODEL"], "")
-        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_NUM_PREDICT"], "32")
+        # Social Cognition authors any generated greeting; the Host has no model knobs.
+        self.assertNotIn("ORCH_RUNTIME_READY_GREETING_MODEL", values)
+        self.assertNotIn("ORCH_RUNTIME_READY_GREETING_NUM_PREDICT", values)
         self.assertEqual(
             values["ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS"],
             "15000",
