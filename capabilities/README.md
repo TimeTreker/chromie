@@ -44,6 +44,17 @@ reports a typed non-completion when it cannot find it. The import hides body-fra
 look offsets (`target_yaw_rad`, `target_pitch_rad`) from Chromie's catalog, and the
 adapter refuses a request that carries them.
 
+Confirmation is mode-dependent, and Chromie enforces it from Soridormi's live
+per-skill and per-plan flags, not from the static `required_in_modes` and
+`skippable_in_modes` lists. In `sim`, Soridormi's live catalog and freshly
+created plans report `requires_confirmation=false` for supported skills; in
+every other mode they report `true` (the simulation-only resource skills are not
+offered outside `sim`). Chromie waives the transport-level execute-tool gate
+(`trusted_preflight_authorized`) only when the live definition, the committed
+request and the fresh plan all say `false`; otherwise execution needs a
+confirmed `chromie.ask_confirmation`. Stop, cancel and emergency stop never need
+confirmation.
+
 The Soridormi task surface includes retry and monitoring contracts used by Chromie's
 WorkDAG/DAGEngine execution boundary:
 

@@ -665,12 +665,11 @@ class SoridormiCapabilityProvider:
         for _, _, context in items[1:]:
             context.provider_state = shared_state
 
+        # monitor_motion declares only ``during_node_id`` and reports Soridormi's
+        # global body safety state; it is not scoped to this activity.
         monitored = await self.invoker.invoke(
             "soridormi.safety.monitor_motion",
-            {
-                "coordination_id": coordination_id,
-                "compiled_activity_id": activity_id,
-            },
+            {"during_node_id": activity_id},
             context=ToolInvocationContext(allow_safety_controls=True),
         )
         monitor_failure = self._group_failure_results(

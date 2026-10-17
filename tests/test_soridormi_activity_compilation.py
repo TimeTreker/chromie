@@ -342,6 +342,8 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertFalse(compile_args["members"][0]["optional"])
         self.assertTrue(compile_args["members"][1]["optional"])
+        # Only the declared monitor input is sent.
+        self.assertEqual(invoker.calls[1][1], {"during_node_id": "activity-1"})
         self.assertEqual(
             result.results[0].metadata["provider_activity_id"],
             "activity-1",
