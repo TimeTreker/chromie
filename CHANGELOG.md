@@ -5,6 +5,15 @@ remains available in Git history.
 
 ## Unreleased
 
+### Body target descriptions (owner decision, 2026-10-17)
+
+- Soridormi calls describe targets in one format: person by referent (the current
+  speaker is the reserved `"requester"`), object by description, place by cited
+  name. Soridormi resolves the physical target; Chromie never sends look yaw/pitch,
+  and a typed not-found is a reported limitation, never completion.
+- Social Cognition decoration may use expressive gestures (nod, look, bow) that
+  Soridormi declares low-risk; locomotion stays excluded.
+
 ### Everyday live cohort and root-cause repairs (2026-10-13 to 2026-10-16)
 
 - Added the everyday live-text cohort `scenarios/everyday/` (70 cases: a 15-case

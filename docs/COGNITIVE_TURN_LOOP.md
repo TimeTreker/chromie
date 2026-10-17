@@ -60,9 +60,11 @@ or re-entering Planner. Speech still requires confirmed playback before it enter
 heard dialogue. The admitted user-turn ID remains the delivery correlation when
 available; the distinct SC request ID remains the inference/snapshot identity.
 For Soridormi expression, the provider recognizes the Runtime-validated SC source
-and semantic owner. Its existing transport preflight still requires a low-risk,
-non-motion Capability, no confirmation requirement from request/definition/fresh
-body plan, and successful safety monitoring; this never fabricates user consent.
+and semantic owner. Its existing transport preflight still requires a skill
+Soridormi declares a low-risk expressive gesture (a nod, look or bow may move the
+body; locomotion, manipulation and delivery never qualify), no confirmation
+requirement from request/definition/fresh body plan, and successful safety
+monitoring; this never fabricates user consent.
 Grouped SC decorations retain optional-member status. Goal-free Situation ingress
 retains its own observation identity. Later Goal
 binding therefore cannot hide early speech or expression from the same turn.

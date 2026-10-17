@@ -21,10 +21,12 @@ from agent.app.planner_schema import (
 from agent.app.planner_validation import validate_resource_responsibility_capability_grounding
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
 from shared.chromie_contracts.resource import (
+    REQUESTER_REFERENT_ID,
     AcquireAndDeliverResource,
     ResourceDescriptor,
     ResourceRecipient,
     ResourceSource,
+    requester_recipient,
 )
 from shared.chromie_contracts.semantic_task import SemanticGoal
 
@@ -138,6 +140,30 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                 "delivery_mode": "physical_handover",
             },
         }
+
+    def test_current_speaker_recipient_is_the_reserved_requester_referent(self) -> None:
+        """Soridormi resolves the person; Chromie names the speaker as "requester"."""
+
+        bind = requester_recipient
+        self.assertEqual(
+            bind({"description": "requester"}),
+            {"description": "requester", "referent_id": REQUESTER_REFERENT_ID},
+        )
+        self.assertEqual(
+            bind(ResourceRecipient().model_dump()),
+            {"description": "requester", "referent_id": REQUESTER_REFERENT_ID},
+        )
+        # Another person is never silently redirected to the speaker, and an
+        # explicit referent is kept exactly.
+        alice = {"description": "Alice", "referent_id": None}
+        self.assertIs(bind(alice), alice)
+        explicit = {"description": "requester", "referent_id": "ref_x"}
+        self.assertIs(bind(explicit), explicit)
+        # The canonical Goal DTO keeps its retained shape; binding is at the provider.
+        self.assertEqual(
+            ResourceRecipient(referent_id=REQUESTER_REFERENT_ID).referent_id,
+            REQUESTER_REFERENT_ID,
+        )
 
     def test_contract_is_provider_neutral_and_rejects_backend_fields(self) -> None:
         responsibility = AcquireAndDeliverResource(

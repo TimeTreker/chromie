@@ -13,6 +13,7 @@ from ..prompt_projection import bounded_json
 
 from shared.chromie_contracts.soridormi_body_contract import (
     normalize_soridormi_body_contract,
+    without_body_frame_look_target,
 )
 from shared.chromie_contracts.semantic_capability import normalize_semantic_capability_facade
 
@@ -463,7 +464,9 @@ class CapabilityCatalog:
                         capability_id=capability_id,
                         provider_input_schema=provider_input_schema,
                     )
-                    input_schema = (
+                    # Chromie describes look targets; Soridormi resolves their
+                    # body-frame offsets, which the Planner never sees or authors.
+                    input_schema = without_body_frame_look_target(
                         dict(semantic_facade["input_schema"])
                         if semantic_facade
                         else dict(provider_input_schema)

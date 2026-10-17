@@ -663,21 +663,31 @@ domain. They cannot author or adapt response text independently. Applied decorat
 proposals and Goal completion. Runtime validation checks exact catalog
 membership, schemas, target evidence, resource conflicts, confirmation policy,
 and a bounded latency budget. Target evidence is semantic only; installation calibration and body-specific
-coordinates are never part of the Chromie planning contract. Concrete user-requested actions remain primary
+coordinates are never part of the Chromie planning contract. Soridormi calls describe
+targets in the [body target format](EXECUTION_LANES_AND_COORDINATION.md#body-target-descriptions):
+the current speaker is `referent_id`/`target_ref` `"requester"`, objects by description
+and places by cited name. A look target is still copied only from trusted target
+evidence; the Host does not yet produce evidence for the current speaker on its own. The Soridormi adapter hides `target_yaw_rad`/`target_pitch_rad`
+from the catalog and refuses requests carrying them (`body_frame_target_not_semantic`).
+Soridormi resolves the target from perception; a target it cannot find returns
+`completed: false`, surfaced as a failed result with Soridormi's typed reason (or
+`execution_incomplete`), never as completion. SC decoration gestures such as a nod,
+look or bow are eligible when Soridormi declares them low-risk expressive skills;
+locomotion is not. Concrete user-requested actions remain primary
 CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and tool requests flow through model-assisted User Meaning Interpretation, the live
 capability catalog, the single Planner authority, schemas, and Trusted Capability
 Runtime validation rather than hidden phrase parsers or a retired routing layer. Plain walking requests
-use a normal safe forward speed of `0.18 m/s`;
-requested forward speeds above Soridormi's current runtime limit of `0.20 m/s`
-are normalized back to the normal speed and surfaced through `speak_first`.
+use a normal safe forward speed of `0.18 m/s`. An explicit speed or other numeric value
+the person states is sent unchanged; Soridormi may refuse a value outside its limits,
+which Chromie reports as a limitation, but neither side silently runs a different value.
 Requests to joke, recite, or otherwise author speech while walking use a
 `vocal_output` Goal coordinated with the walking step; `chromie.speak` is a
 Host speech transport and is never a planner step. A request to sing still
 belongs to the Vocal lane, but it may be claimed as singing only when a
 registered vocal-performance capability can provide that evidence. The planner
 must otherwise report the limitation or propose an explicit alternative rather
-than substituting a body action or ordinary TTS. The same motion safety
-normalization still applies to the walking step. When
+than substituting a body action or ordinary TTS. The same motion limits still
+apply to the walking step. When
 native speech metadata includes `wait_for_playback_start=true`, the host speech
 provider completes that speech request only after playback has started or the
 configured wait times out; this lets the following sequential body skill begin

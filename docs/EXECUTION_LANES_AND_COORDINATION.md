@@ -65,7 +65,9 @@ overlap in time.
 ## Social Attention
 
 SC may author `auxiliary_activities[]` attached to its exact observable
-Communicative Act. Empty output is normal; a nonverbal act may have no speech.
+Communicative Act. Gestures are social expression: a nod, a look or a bow is an
+eligible motion when Soridormi declares it a low-risk expressive skill; walking,
+whole-body control, manipulation and delivery never are. Empty output is normal; a nonverbal act may have no speech.
 The Host materializes that result in the same InteractionResponse as its anchored
 speech, without a decoration-only model call. It validates catalog grounding,
 arguments, target evidence, freshness, resource compatibility and safety; it may
@@ -144,6 +146,28 @@ blink, look, speak, or sing.
 Speech remains a peer Chromie Vocal-lane execution linked through the same
 `coordination_id`. Soridormi never owns speech meaning, TTS playback, or peer
 media execution.
+
+### Body target descriptions
+
+Chromie says **what** it means; Soridormi resolves **which** physical person,
+object or place that is from its own perception and body state. Every Soridormi
+call uses one description format:
+
+| Target | Chromie sends | Soridormi does |
+|---|---|---|
+| Person | its referent (`recipient.referent_id`, a look skill's `target_ref`); the current speaker is the reserved literal `"requester"`, never a Host discourse ID or `null` | finds that person |
+| Object | the person's description of it (`resource.description`) | finds an observed object matching it |
+| Place | the name the person cited (`source` quote or cited observation) | resolves the place |
+
+Chromie never sends body-frame coordinates for a look target: the adapter hides
+`target_yaw_rad`/`target_pitch_rad` from the Planner and refuses a request that
+carries them. When Soridormi cannot find the target, or cannot tell it apart from
+another, it reports a typed not-found or ambiguous non-completion (`completed:
+false` with its reason) instead of looking straight ahead or picking a near
+keyword match. Chromie treats that as a limitation it tells the person about,
+never as completion. Explicit numeric values the person states are passed
+unchanged; Soridormi may refuse a value outside its limits and report that
+limitation, but it never silently runs a different value.
 
 ## Lane-coordination contract
 

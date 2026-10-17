@@ -1332,7 +1332,7 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         )
         self.assertEqual(
             namespace.trusted_target_context["target_ref"],
-            "current_speaker",
+            "requester",
         )
         self.assertEqual(
             namespace.trusted_target_context["source"],

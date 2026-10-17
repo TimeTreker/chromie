@@ -10,6 +10,11 @@ CONTROL_COUPLING_OVERLAY = "body_command_overlay"
 CONTROL_COUPLING_INDEPENDENT = "independent_output"
 CONTROL_COUPLING_STANDALONE = "standalone_body_motion"
 
+# Body-frame offsets toward a look target. Chromie describes whom or what to look
+# at (``target_ref``); Soridormi resolves where that target is from its own
+# perception and body state, so these never cross the Chromie contract.
+BODY_FRAME_LOOK_TARGET_FIELDS = frozenset({"target_yaw_rad", "target_pitch_rad"})
+
 _ALLOWED_ABILITY_CLASSES = {
     ABILITY_CLASS_LOCOMOTION,
     ABILITY_CLASS_SUBTLE_EXPRESSION,
@@ -26,6 +31,28 @@ _ALLOWED_BODY_LANES = {
     "whole_body",
     "safety",
 }
+
+
+def without_body_frame_look_target(schema: dict[str, Any]) -> dict[str, Any]:
+    """Drop provider body-frame look offsets from a Core-facing input schema."""
+
+    properties = schema.get("properties")
+    if not isinstance(properties, Mapping) or not (
+        BODY_FRAME_LOOK_TARGET_FIELDS & set(properties)
+    ):
+        return schema
+    projected = dict(schema)
+    projected["properties"] = {
+        name: value
+        for name, value in properties.items()
+        if name not in BODY_FRAME_LOOK_TARGET_FIELDS
+    }
+    required = schema.get("required")
+    if isinstance(required, list):
+        projected["required"] = [
+            name for name in required if name not in BODY_FRAME_LOOK_TARGET_FIELDS
+        ]
+    return projected
 
 
 def _object(value: Any) -> dict[str, Any]:

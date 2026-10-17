@@ -394,6 +394,45 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertNotIn("provider_id", capability.hints["semantic_scope"])
 
+    async def test_planner_never_sees_body_frame_look_target_coordinates(self) -> None:
+        invoker = _SequenceInvoker(
+            [
+                {
+                    "mode": "sim",
+                    "skills": [
+                        {
+                            "skill_id": "look_at_person",
+                            "description": "Look at a described person.",
+                            "parameters_schema": {
+                                "type": "object",
+                                "properties": {
+                                    "target_ref": {"type": "string"},
+                                    "target_yaw_rad": {"type": "number"},
+                                    "target_pitch_rad": {"type": "number"},
+                                    "duration_s": {"type": "number"},
+                                },
+                                "required": ["target_ref", "target_pitch_rad"],
+                            },
+                            "available": True,
+                            "requires_confirmation": False,
+                        }
+                    ],
+                }
+            ]
+        )
+        catalog = CapabilityCatalog(_registry(), live_invoker=invoker)
+
+        capability = await catalog.get_capability(
+            "soridormi.look_at_person",
+            refresh=True,
+        )
+
+        assert capability is not None
+        self.assertEqual(
+            set(capability.input_schema["properties"]), {"target_ref", "duration_s"}
+        )
+        self.assertEqual(capability.input_schema["required"], ["target_ref"])
+
     async def test_live_named_skill_rejects_argument_realization_for_unknown_argument(self) -> None:
         invoker = _SequenceInvoker(
             [

@@ -36,6 +36,14 @@ actually advertises it; Chromie must not hand-add it to the checked-in snapshot
 or infer it from walking or grasping primitives. See
 [`Resource Acquisition and Delivery`](../docs/RESOURCE_ACQUISITION_AND_DELIVERY.md).
 
+Live named-skill arguments describe targets in the agreed
+[body target format](../docs/EXECUTION_LANES_AND_COORDINATION.md#body-target-descriptions):
+person by referent (`"requester"` for the current speaker), object by description,
+place by cited name. Soridormi resolves the physical target from its perception and
+reports a typed non-completion when it cannot find it. The import hides body-frame
+look offsets (`target_yaw_rad`, `target_pitch_rad`) from Chromie's catalog, and the
+adapter refuses a request that carries them.
+
 The Soridormi task surface includes retry and monitoring contracts used by Chromie's
 WorkDAG/DAGEngine execution boundary:
 
