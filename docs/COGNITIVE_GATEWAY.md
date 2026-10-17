@@ -131,7 +131,13 @@ recognition of the input; recognition alone proves neither dispatch nor a safe
 state. The host then dispatches both global runtime cancellation and the
 dedicated Soridormi E-stop path, and the cancellation receipt records E-stop
 success, failure, or unavailability. Reaching safe idle still requires an
-explicit correlated Soridormi postcondition.
+explicit correlated Soridormi postcondition. After an emergency stop that
+postcondition is the latched stop, not `safe_idle=true`: Soridormi keeps
+emergency stop active until its MCP process is restarted and reports
+`safe_idle=true` only when emergency stop is clear, so the E-stop evidence is
+`robot.get_status` with `emergency_stop=true` and, once running work has
+ended, no active body lane (`activity_idle=true`). A later run needs a restarted Soridormi and passes the
+ordinary `safe_idle=true` preflight.
 
 ### 4.3 Attention Review / 注意审查
 
@@ -465,7 +471,7 @@ evidence status is reported separately in [STATUS.md](STATUS.md).
 | Mixed-language compound request | Preserve the complete utterance without narrowing it | Core segments independent goals and plans complete coverage |
 | Independent request while another turn is in flight | Admit and preserve both turn identities; do not synthesize a cancellation reflex | Both turns remain eligible for closure unless explicit control or the Core authorizes scoped interruption |
 | `Stop now.` / `停止` during speech | Record input and trigger deterministic cancellation before model work | No stale audio resumes; affected speech goal receives cancellation evidence |
-| Emergency stop during simulated motion | Trigger trusted stop and retain `ReflexOutcome` | Provider evidence closes affected goals and proves safe idle |
+| Emergency stop during simulated motion | Trigger trusted stop and retain `ReflexOutcome` | Provider evidence closes affected goals and proves the latched stop (`emergency_stop=true`, no active body lane) |
 | `Explain what “stop” means` | Do not trigger reflex; admit the contextual question | Core answers without treating it as an operational stop |
 | Inactive ambient narration | Suppress only with policy-qualified evidence | No tool, memory, or physical effect is authorized |
 | Direct weather question mislabelled ambient | Fail open because question form contradicts suppression | Core may use weather evidence and reconcile its result |

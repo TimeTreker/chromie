@@ -109,7 +109,12 @@ python scripts/provider_conformance.py --compare \
 - [ ] Both modes pass catalog, planning, monitor, cancellation, status,
   abstraction, and safe-idle checks.
 - [ ] Their high-level call sequence, arguments, authorization context, and
-  terminal statuses match the simulator trace.
+  terminal statuses match the simulator trace. The conformance probe executes
+  with the same operator-confirmed context (`confirmed=true`) in every mode, so
+  this comparison is well defined even though confirmation is mode-dependent:
+  Soridormi reports `requires_confirmation=false` in `sim` and `true` in the
+  other modes, and an interactive Chromie turn outside `sim` therefore adds a
+  confirmed `chromie.ask_confirmation` that the simulator turn does not need.
 - [ ] No model-facing output contains motor, joint, torque, actuator,
   controller-array, or bus-level fields.
 

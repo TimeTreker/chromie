@@ -71,7 +71,9 @@ One robot can simultaneously hold locations for independent scopes:
 
 These values must coexist. A discourse referent therefore carries:
 
-- a stable Host-generated `referent_id`;
+- a stable Host-generated `referent_id` (distinct from the reserved literal
+  `"requester"` that a physical body target uses for the current speaker; see
+  [body target descriptions](EXECUTION_LANES_AND_COORDINATION.md#body-target-descriptions));
 - `entity_type` and canonical value;
 - `conversation`, `task`, or `goal` scope;
 - scoped IDs and source Goal IDs;

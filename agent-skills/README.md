@@ -34,7 +34,8 @@ Only declared projections that actually exist are required. Projection paths
 must be normalized package-relative Markdown paths. Unknown fields, duplicate
 YAML keys, executable/provider declarations, unapproved packages, unsafe paths,
 symlinks, duplicate IDs, unknown parents, inheritance cycles, digest mismatch,
-and oversized content fail closed.
+and oversized content fail closed: the loader raises on the first such
+package and `chromie-agent` refuses to start, rather than skipping that package.
 
 Generate the digest after all content except `skill.yaml` is final:
 
