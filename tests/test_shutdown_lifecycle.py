@@ -136,7 +136,7 @@ class ShutdownLifecycleTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_playback_worker_starts_one_session_idle_sweeper_that_shutdown_cancels(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         sweeper_starts: list[asyncio.Event] = []
 
         class _InputSessionRuntime:

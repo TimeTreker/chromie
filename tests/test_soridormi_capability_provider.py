@@ -1186,7 +1186,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                 self.assertEqual(planned["parameters"]["target_ref"], expected)
 
     async def test_a_missing_gaze_target_is_never_defaulted_to_the_speaker(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [self._look_at_person_skill()])
         definition = registry.get("soridormi.look_at_person")
         assert definition is not None
