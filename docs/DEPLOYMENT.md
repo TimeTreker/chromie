@@ -36,8 +36,11 @@ The Chromie deploy script:
 - creates `.env.local` and `orchestrator/.env.local` from templates when they
   are missing;
 - generates `.env.runtime`;
-- pulls the external Ollama image;
-- builds Chromie-owned ASR, TTS, and Agent images; the User Meaning Interpreter is embedded in Agent;
+- pulls the external Ollama image on Ollama profiles; on the SGLang profiles
+  (`AGENT_LLM_PROVIDER=sglang`) `chromie-llm` is buildable, so the pull step
+  pulls nothing;
+- builds Chromie-owned ASR, TTS, and Agent images, plus `chromie-llm` on the
+  SGLang profiles; the User Meaning Interpreter is embedded in Agent;
 - runs `INSTALL_TEST_DEPS=1 ./scripts/run_tests.sh`.
 
 ## Start Separately

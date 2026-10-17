@@ -16,6 +16,7 @@ from typing import Any
 
 from candidate_provider import WorkerBackedCandidateProvider
 from provider import TTSModelArtifact, TTSProviderCapabilities
+from settings import TTSCandidateSettings, required_boolean, required_text
 from streaming_worker import StreamingProcessWorker
 from voice_catalog import VoiceCatalog, VoiceProfile, resolve_voice_profile, validate_voice_catalog
 
@@ -27,20 +28,12 @@ DEFAULT_MODEL_ID = "FunAudioLLM/Fun-CosyVoice3-0.5B-2512"
 DEFAULT_MODEL_REVISION = "29e01c4e8d000f4bcd70751be16fa94bf3d85a18"
 
 
-def required_env(name: str, default: str | None = None) -> str:
-    value = str(os.getenv(name, default or "")).strip()
-    if not value:
-        raise RuntimeError(f"{name} is required")
-    return value
-
-
 def reference_metadata() -> tuple[Path, str, str, str]:
     """Load the legacy single-reference contract used by isolated A/B runs."""
 
-    wav_path = Path(required_env("TTS_REFERENCE_WAV", "/evaluation/reference.wav"))
-    metadata_path = Path(
-        required_env("TTS_REFERENCE_METADATA", "/evaluation/reference.json")
-    )
+    settings = TTSCandidateSettings.from_env()
+    wav_path = settings.reference_wav
+    metadata_path = settings.reference_metadata
     if not wav_path.is_file() or not metadata_path.is_file():
         raise RuntimeError(
             "TTS reference is missing; install it with scripts/tts_reference.py"
@@ -84,15 +77,13 @@ class _RuntimeVoices:
 
 
 def runtime_voices() -> _RuntimeVoices:
-    voice_root = str(os.getenv("TTS_VOICE_ROOT") or "").strip()
-    if voice_root:
+    settings = TTSCandidateSettings.from_env()
+    if settings.voice_root is not None:
         try:
-            catalog = validate_voice_catalog(Path(voice_root))
+            catalog = validate_voice_catalog(settings.voice_root)
         except ValueError as exc:
             raise RuntimeError(f"invalid TTS voice catalog: {exc}") from exc
-        configured_default = str(
-            os.getenv("TTS_DEFAULT_SPEAKER") or catalog.default_speaker_id
-        ).strip()
+        configured_default = settings.default_speaker or catalog.default_speaker_id
         if configured_default not in catalog.profiles:
             raise RuntimeError(
                 f"TTS_DEFAULT_SPEAKER is not in the voice catalog: {configured_default}"
@@ -116,7 +107,7 @@ def runtime_voices() -> _RuntimeVoices:
     profile = VoiceProfile(
         speaker_id="default",
         wav_path=wav_path,
-        metadata_path=Path(required_env("TTS_REFERENCE_METADATA", "/evaluation/reference.json")),
+        metadata_path=settings.reference_metadata,
         text=text,
         audio_sha256=audio_sha,
         license_id=license_id,
@@ -203,15 +194,15 @@ def worker_target(connection: Connection, *, cancellation_event: Any = None) -> 
 
         threading.excepthook = fail_worker_on_cuda_oom
 
-        model_id = required_env("COSYVOICE3_MODEL_ID", DEFAULT_MODEL_ID)
-        model_revision = required_env(
+        model_id = required_text("COSYVOICE3_MODEL_ID", DEFAULT_MODEL_ID)
+        model_revision = required_text(
             "COSYVOICE3_MODEL_REVISION", DEFAULT_MODEL_REVISION
         )
         voices = runtime_voices()
         model_path = snapshot_download(repo_id=model_id, revision=model_revision)
         model = AutoModel(
             model_dir=model_path,
-            fp16=required_env("COSYVOICE3_FP16", "1") == "1",
+            fp16=required_boolean("COSYVOICE3_FP16", True),
         )
         initial_token_hop_len = model.model.token_hop_len
         if type(initial_token_hop_len) is not int or initial_token_hop_len <= 0:
@@ -219,7 +210,7 @@ def worker_target(connection: Connection, *, cancellation_event: Any = None) -> 
         if cancellation_event is not None:
             _enable_native_cancellation(model.model, cancellation_event, torch)
         sample_rate = int(model.sample_rate)
-        prompt_prefix = required_env(
+        prompt_prefix = required_text(
             "COSYVOICE3_PROMPT_PREFIX", "You are a helpful assistant."
         )
         # Reference conditioning also initializes shape-specific native paths.
@@ -344,11 +335,11 @@ def worker_target(connection: Connection, *, cancellation_event: Any = None) -> 
 
 def create_provider() -> WorkerBackedCandidateProvider:
     voices = runtime_voices()
-    software_revision = required_env(
+    software_revision = required_text(
         "COSYVOICE3_SOURCE_REVISION", DEFAULT_SOFTWARE_REVISION
     )
-    model_id = required_env("COSYVOICE3_MODEL_ID", DEFAULT_MODEL_ID)
-    model_revision = required_env(
+    model_id = required_text("COSYVOICE3_MODEL_ID", DEFAULT_MODEL_ID)
+    model_revision = required_text(
         "COSYVOICE3_MODEL_REVISION", DEFAULT_MODEL_REVISION
     )
     voice_artifacts = tuple(
@@ -385,27 +376,18 @@ def create_provider() -> WorkerBackedCandidateProvider:
         speaker_profiles=True,
         voice_cloning=True,
     )
+    settings = TTSCandidateSettings.from_env()
     cancellation_event = multiprocessing.get_context("spawn").Event()
     worker = StreamingProcessWorker(
         partial(worker_target, cancellation_event=cancellation_event),
         cancellation_event=cancellation_event,
         name="cosyvoice3-worker",
-        startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "1200")),
-        cancel_drain_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC", "3")
-        ),
-        first_audio_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_FIRST_AUDIO_TIMEOUT_SEC", "20")
-        ),
-        request_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_REQUEST_TIMEOUT_SEC", "60")
-        ),
-        cold_first_audio_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_COLD_FIRST_AUDIO_TIMEOUT_SEC", "180")
-        ),
-        cold_request_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_COLD_REQUEST_TIMEOUT_SEC", "240")
-        ),
+        startup_timeout_s=settings.worker_startup_timeout_s,
+        cancel_drain_timeout_s=settings.cancel_drain_timeout_s,
+        first_audio_timeout_s=settings.first_audio_timeout_s,
+        request_timeout_s=settings.request_timeout_s,
+        cold_first_audio_timeout_s=settings.cold_first_audio_timeout_s,
+        cold_request_timeout_s=settings.cold_request_timeout_s,
     )
     speakers = ["default", *sorted(voices.profiles)]
     return WorkerBackedCandidateProvider(

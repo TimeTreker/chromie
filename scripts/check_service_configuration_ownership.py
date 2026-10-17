@@ -11,6 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 OWNERS = {
     "asr": ("asr", "asr/settings.py"),
     "tts": ("tts", "tts/settings.py"),
+    "tts-candidates": ("tts_candidates", "tts/settings.py"),
     "agent": ("agent/app", "agent/app/settings.py"),
     "shared-runtime": ("shared/chromie_runtime", "shared/chromie_runtime/settings.py"),
 }
@@ -50,6 +51,8 @@ def check(root: Path = ROOT) -> list[Finding]:
         if not owner_path.is_file():
             findings.append(Finding(owner, 0, "typed settings owner is missing"))
             continue
+        if not service_root.is_dir():
+            continue
         for path in sorted(service_root.rglob("*.py")):
             if path == owner_path or "__pycache__" in path.parts:
                 continue
@@ -72,7 +75,7 @@ def main() -> int:
         for finding in findings:
             print(f"[service-config][error] {finding.path}:{finding.line}: {finding.message}")
         return 1
-    print("Service configuration ownership passed: Agent, ASR, TTS, and shared runtime own environment parsing")
+    print("Service configuration ownership passed: Agent, ASR, TTS (including provider candidates), and shared runtime own environment parsing")
     return 0
 
 

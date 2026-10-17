@@ -43,6 +43,21 @@ class ServiceConfigurationOwnershipTests(unittest.TestCase):
         self.assertEqual(len(findings), 1)
         self.assertEqual(findings[0].path, "tts/worker.py")
 
+    def test_tts_candidate_environment_read_is_owned_by_tts_settings(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            (root / "tts").mkdir()
+            (root / "tts" / "settings.py").write_text("VALUE = 1\n", encoding="utf-8")
+            (root / "tts_candidates" / "example").mkdir(parents=True)
+            (root / "tts_candidates" / "example" / "provider_impl.py").write_text(
+                "import os\nVALUE = os.getenv('TTS_VOICE_ROOT')\n", encoding="utf-8"
+            )
+            findings = [
+                finding for finding in check(root) if finding.path.startswith("tts_candidates/")
+            ]
+        self.assertEqual(len(findings), 1)
+        self.assertIn("tts/settings.py", findings[0].message)
+
 
 if __name__ == "__main__":
     unittest.main()

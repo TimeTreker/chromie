@@ -197,9 +197,8 @@ Then the compact no-microphone wrapper is:
 The first command also checks speaker playback; the second is better for
 headless automation. The runner owns a complete in-process Host and therefore
 refuses to start while another Chromie Host holds the Orchestrator lock; sharing
-services is supported, sharing the microphone/text Host is not. The wrapper uses
-goal-driven apply by default; pass
-`--legacy-agent-runtime` only for an explicitly labelled compatibility check.
+services is supported, sharing the microphone/text Host is not. The wrapper always
+uses the goal-driven cognitive runtime; there is no legacy-runtime option.
 
 The text request is the only input Chromie uses for routing and skill planning.
 `--expect-*` flags are optional post-run assertions for regression tests; they
@@ -209,7 +208,6 @@ operator rehearsal.
 ```bash
 conda run -n Chromie python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --expect-capability soridormi.walk_velocity \
@@ -432,13 +430,18 @@ not require the supervised real-microphone run.
 - `walk ... with nodding/shaking your head` is accepted by the text route, but
   the physical skills are serialized for now: body movement first, then the head
   gesture. This preserves the current physical-work safety boundary.
-- `sing a song` is speech-only chat unless the request also asks for body
-  motion. Phrases such as `go ahead and sing` are treated as permission to
-  speak, not as a walking command.
-- `sing a song while walking` is handled as speech plus the walking skill. The
-  speech uses a short original line and still applies the same walking safety
-  normalization. Chromie waits until that speech is actually audible before
-  starting the body walk, so the song and walk overlap.
+- `sing a song` is a singing request, not ordinary chat. Chromie claims singing
+  only when a qualified vocal-performance provider (`chromie.vocal.perform`) is
+  registered; otherwise it tells you singing is unavailable or offers an
+  explicit alternative instead of reading lyrics through ordinary TTS. The same
+  rule applies to reciting, humming, and speaking in a requested style.
+  Phrases such as `go ahead and sing` are treated as permission to speak, not
+  as a walking command.
+- `sing a song while walking` combines that singing request with the walking
+  skill. Without a qualified vocal-performance provider, only the walk can run
+  and Chromie reports the singing limitation. When native speech metadata asks
+  for it, Chromie waits until speech is actually audible before starting the
+  body walk.
 - A Social Cognition act may include optional Social Attention in
   `auxiliary_activities[]`. There is no independent Social Attention mode or model;
   Runtime validates or suppresses the exact proposal. These semantics do not select a

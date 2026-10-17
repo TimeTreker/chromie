@@ -113,10 +113,12 @@ a 32K cache topology only, so current-revision 49K GPU coexistence and latency r
 fresh qualification requirement rather than an inherited release claim.
 
 Foreground latency is owned by `env/modes/*.env`. The maintained `speech`,
-`services`, and `voice_mujoco` modes use interactive stage budgets, a 15-second
-foreground Cognitive Runtime deadline, and a 3.5-second playback-start hard
-barrier. The explicit `qualification` mode owns the long 120/150/900-second
-watchdogs used when collecting complete source-bound evidence. This separation
+`services`, and `voice_mujoco` modes use interactive stage budgets, a 300-second
+foreground Cognitive Runtime deadline (`ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS=300000`,
+a completion watchdog, not a latency target), and a 3.5-second playback-start hard
+barrier. The explicit `qualification` mode owns the longer watchdogs (for example a
+900-second Cognitive Runtime deadline and a 120-second playback-start barrier) used
+when collecting complete source-bound evidence. This separation
 prevents a powerful GPU profile from making an ordinary person wait through a
 qualification watchdog merely because that profile was auto-detected.
 
@@ -135,8 +137,8 @@ qualification watchdog merely because that profile was auto-detected.
 | `jetson_thor` | AGX Thor placeholder profile | `gemma4:12b` | `qwen3:4b` | 4096 |
 
 On the Ollama profiles the quality model is `AGENT_MODEL` and the deliberative
-roles (`AGENT_DELIBERATIVE_MODEL`: Social Cognition's deep client, Deep UMI,
-Reflection). The fast model is used by User Meaning Interpretation, Cognitive
+roles (`AGENT_DELIBERATIVE_MODEL`: Social Cognition's deep client and
+Reflection). The fast model is used by User Meaning Interpretation (Fast and Deep), Cognitive
 Gateway attention, Goal Association and the Planner (including terminal Evidence
 re-entry). RTX 5090 and RTX 4090 Laptop assign every role to one SGLang engine.
 

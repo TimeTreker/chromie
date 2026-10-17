@@ -1115,7 +1115,6 @@ manifest loaded and run:
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --no-speaker
@@ -1128,7 +1127,6 @@ speech, and skills from the text exactly as it would after ASR. Add
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "walk ahead at 0.2 speed for 10 seconds and then nod your head twice, then turn left" \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --expect-capability soridormi.walk_velocity \
@@ -1146,8 +1144,8 @@ left/right directly instead of expecting the provider's internal `yaw_radps` or
 fixing a speed the person did not request. Provider realization traces remain
 separate evidence; normalized observations do not invent measured heading changes.
 
-This runner defaults to the maintained goal-driven path; use
-`--no-cognitive-runtime` only for an explicitly labelled diagnostic fail-closed run. It
+This runner always uses the maintained goal-driven path; it has no option to
+disable the cognitive runtime. It
 writes `cognitive_runtime_resolution.json`, `interaction_response.json`,
 `execution.json`, status snapshots, session events, recordings when enabled,
 and `summary.json` under `.chromie/acceptance/text-mujoco/<id>/`. The summary
@@ -1290,7 +1288,6 @@ known ASR-style walk typo regression, run:
 ```bash
 python scripts/interaction_text_mujoco_check.py \
   "Wal forward for 15 seconds, quickly." \
-  --cognitive-runtime \
   --soridormi-mcp-url http://127.0.0.1:8000/mcp \
   --soridormi-repo ../soridormi \
   --preview-only \
