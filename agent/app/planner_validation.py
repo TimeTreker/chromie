@@ -3048,7 +3048,7 @@ def planner_contract_diagnostics(
     Pydantic intentionally validates nested values before parent model validators.
     That means one invalid nested satisfaction object can hide a missing
     ``step_ids`` or ``response_text`` defect in the same goal outcome.  The
-    planners allow only one mechanical DTO regeneration, so validation feedback must
+    Planner never regenerates a rejected result, so validation diagnostics must
     expose all independently observable structural defects from the original
     model output rather than only the first validation layer that failed.
 

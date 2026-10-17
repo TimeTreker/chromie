@@ -119,7 +119,7 @@ The ordinary turn and Goal-free Situation paths share the SC transaction.
 
 | Boundary / owner | Implemented contract | Evidence boundary |
 |---|---|---|
-| Host fan-out | One UMI result starts SC, GA and Fast Work independently. | SC output cannot predict an unfinished Plan. |
+| Host fan-out | Every admitted addressed turn starts SC; one UMI result starts the GA and Fast Work it requests, independently. | SC output cannot predict an unfinished Plan. |
 | Fast Planner | One complete validated Work result, no early presentation. | No partial Work or raw token dispatch. |
 | Canonical Planner | Word-free Work and exact communication Needs. | SC joins against the immutable Plan and input snapshot. |
 | Goal-free Situation | Trusted revisions/opportunities enter the same SC authority. | Stale revisions fail before delivery or Memory application. |
@@ -271,9 +271,9 @@ composer or execution specialist.
 | Cognitive Gateway | captured turn, bounded Host context, deterministic protective controls | admitted immutable `UserTurnEnvelope` or protective outcome | user Goal, Capability, Plan, or social expression |
 | User Meaning Interpretation | admitted turn plus bounded Situation/continuity context | complete provider-neutral intentions, result types, source evidence and unresolved meaning | Capability input gaps, clarification policy, Goal continuity, or Work |
 | Planner (one pass; PLANNER-AUTHORITY-001) | UMI Responsibilities plus applicable Goal, Situation, Work, Evidence, schemas/catalog, and trusted context | complete desired `CanonicalPlan`, word-free communication Needs, Capability Work and honest limitations | canonical Goal identity, execution truth, or Host/runtime mutation |
-| Goal Association | unchanged UMI result plus bounded retained Goals | Existing-Goal association/unassociated result, plus source-preserving updates only when an existing Goal is selected | New Goal WHAT, `requires_replan`, Work compatibility, Capability, or next action |
+| Goal Association | unchanged UMI result plus bounded retained Goals | Existing-Goal association or a decision that a Responsibility starts a new Goal, plus source-preserving updates only when an existing Goal is selected | New Goal WHAT, `requires_replan`, Work compatibility, Capability, or next action |
 | Planner current-state re-entry | Canonical Goals, open Responsibilities, Situation, Evidence, and bounded queued/running/completed Work after a meaningful state transition | 0..N desired Activity changes, including explicit reuse/cancel/replace/follow-up/response decisions | execution truth or mutation without Runtime validation |
-| Host Orchestrator and Trusted Capability Runtime | accepted UMI/GA semantics, validated Plan, and exact live request/version/state/resource/safety bindings | mechanical Goal materialization for GA-unassociated Responsibilities; accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | reinterpreting WHAT, deciding Goal association, semantic compatibility, or rewritten SC wording |
+| Host Orchestrator and Trusted Capability Runtime | accepted UMI/GA semantics, validated Plan, and exact live request/version/state/resource/safety bindings | mechanical materialization of the new Goals GA decided exist; accepted/rejected dispatch, reuse/cancellation receipts, traces, and typed Evidence | reinterpreting WHAT, deciding Goal association, semantic compatibility, or rewritten SC wording |
 | Runtime event/state transition → Evidence or bounded Situation observation → `CognitiveOpportunity` | exact authority-owned source provenance plus affected Goal IDs when continuing an existing Responsibility; target situation-only social/world readiness may instead be Goal-free | ephemeral readiness signal for the same Core; no fabricated user turn/Responsibility/Goal and no response decision. Terminal qualified observations enter through Evidence. Meaningful live/provider/perception/interaction state enters Situation with exact provenance and does **not** become Evidence merely to wake cognition. Provider-state/restart Work paths remain Goal-bound; the implemented trusted Goal-free Situation path invokes SC without task Work authority. | Goal ownership, Evidence truth, relationship/authorization truth, or any Activity by itself |
 
 Progressive conversational deliberation intentionally does **not** add another row or
@@ -1285,7 +1285,9 @@ state that a validated action is about to begin, provide a state-validated
 progress update, or explain refusal/unavailability. It must not claim that a
 tool found a result, an action completed, the robot is safe, or a user goal was
 satisfied. Speech such as "I'm starting" requires committed execution state;
-planning output alone is insufficient.
+planning output alone is insufficient. Committed here means a validated, admitted Plan
+that Runtime has released to start once this barrier speech begins playback; the
+speech says the action is about to begin, never that it has started.
 
 Pre-execution speech is never execution evidence and never closes an effectful
 goal. A Plan carries no `response_text` or Communicative Acts (the Host rejects a
@@ -1374,7 +1376,8 @@ scheduled/completed delivery and rejects changed wording under that identity. A 
 may carry the same words. Started speech remains pending; interrupted or partially played
 speech is retained as such and cannot certify the whole utterance or close its speech Goal.
 All chunks must complete, including playback that finishes before Activity registration.
-Playback start remains a separate action-start barrier; voice-resource release alone is
+Playback start remains a separate action-start barrier for a Planner-required
+pre-action need or a confirmation prompt (never for optional speech); voice-resource release alone is
 not complete-delivery evidence. Deferred delivery preserves the original speech owner
 separately from the physical playback session; both remain bound to the same exact attempt.
 An interrupted Activity is retained without automatic whole-utterance replay; Planner
@@ -1442,17 +1445,26 @@ A stop command is both input and control:
 ```text
 receive stop input
   -> create stable turn identity
-  -> revoke stale approvals synchronously
+  -> revoke stale approvals synchronously (scope-dependent; see below)
   -> begin deterministic cancellation before model work
   -> for embodied emergency, dispatch the dedicated Soridormi E-stop contract
   -> retain ReflexOutcome and provider cancellation evidence
   -> reconcile affected goals as cancelled, recoverable, or uncertain
-  -> optionally speak one concise evidence-grounded acknowledgement
+  -> only when the turn also carries residual meaning admitted to the Core,
+     optionally speak one concise evidence-grounded acknowledgement
 ```
+
+A pure stop or emergency command bypasses cognition entirely, so nothing speaks:
+the stop itself is the response. Its receipt and any failed or unavailable E-stop
+evidence are retained in the conversation record; there is currently no fixed
+spoken warning for an unverified pure E-stop.
 
 The Gateway and host implement this recognition and control path
 deterministically; no LLM decides whether to send, delay, override, or resume
-it. Pending approval is revoked before the first await, and a following turn
+it. When the stop's scope revokes a pending approval, it is revoked before the first
+await: an `embodied_motion` stop revokes the whole token when any confirmed request is
+motion-bound or cannot be classified, broader scopes always revoke it, and
+`output_only` or `media_output` (for example "stop talking") preserve it. A following turn
 cannot cancel an active protective-reflex lifecycle. Recording and final
 response never delay stopping. A later semantic stage may clarify what was
 affected, but it cannot undo the stop or silently resume work.
@@ -1537,7 +1549,10 @@ commit cannot be verified, the user-facing result is explicitly uncertain; the
 host must not claim the action never started or the Goal was cancelled. Current
 Soridormi motion cancellation is global-domain, so a specific physical target
 may widen to `embodied_motion`; every coaffected request and Goal is retained in
-the receipt and reconciled rather than reported as exact isolation.
+the receipt and reconciled rather than reported as exact isolation. A coaffected
+sibling whose responsibility stays open becomes `recoverable`, and the same
+cancellation Evidence re-enters the Planner for it from its retained Goal
+provenance, so the Planner decides whether to resume, re-plan, or report it.
 
 Goal-owned cognitive speech now carries source Goal IDs and exact plan identity
 into its runtime request. Unfinished speech can therefore participate in named
@@ -1566,7 +1581,8 @@ evidence.
 
 The loop is bounded:
 
-- at most one mechanical DTO regeneration at a model stage that owns a structured-output contract;
+- at most one mechanical DTO regeneration, and only at a stage whose own contract allows it
+  (GA's container repair); the Planner never regenerates and fails closed;
 - no same-tier semantic replan budget;
 - explicit tool and provider timeouts;
 - cancellation propagated through the host and provider;

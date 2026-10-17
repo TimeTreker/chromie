@@ -1911,6 +1911,13 @@ and only `supervised` adds human speech and operator observations.
 | Stop/emergency | Explicit stop during active work | Deterministic operational route linked to the active prior session, with no later old-session output or completed work. |
 | Follow-up | “Remember … blue,” then ask for the color | Same conversation ID, both intended ASR utterances, and completed second-response output containing `blue`. |
 
+The confirmation rows (body skill, refusal, body cancellation) need a body request that
+actually requires confirmation under the per-request rule in
+[Execution Lanes](EXECUTION_LANES_AND_COORDINATION.md#playback-and-confirmation-rules).
+The maintained simulator skill catalog declares no named skill that requires it, so a
+plain nod now runs without asking; those rows must be re-qualified against a request
+that requires confirmation before they count as evidence.
+
 For every case retain:
 
 - repository and Soridormi revisions;

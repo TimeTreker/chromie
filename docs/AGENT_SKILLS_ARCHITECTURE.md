@@ -305,12 +305,15 @@ representation rules such as typed location/time/resource bindings belong to the
 shared Goal/Resource contracts so canonical meaning does not depend on whether a
 domain Skill happened to load. Planner Skills begin at HOW, after canonical Goal
 identity exists. The Host loads a requested Planner projection only after that
-Planner has selected the Skill for one or more current canonical Goals.
+Planner has selected the Skill for one or more current canonical Goals. A
+UMI-triggered Fast Planner that runs before Goal Association has no canonical Goal
 identity yet, so its pre-association Agent-Skill path receives no historical
 active/recent Goal IDs and deterministically returns `no_skill` without a model call.
 This prevents an unrelated unfinished Goal from injecting a stale domain method into
 new user meaning. Domain-method selection begins only after Goal Association has
-established the relevant canonical Goal identity. The Host never infers the domain
+established the relevant canonical Goal identity. The early Planner therefore plans
+from the common Capability contracts and need-first search alone and is not delayed
+to wait for a Skill. The Host never infers the domain
 from phrases.
 
 ### Progressive disclosure

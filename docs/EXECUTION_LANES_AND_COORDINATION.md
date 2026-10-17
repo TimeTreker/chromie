@@ -229,13 +229,18 @@ dependency.
 
 ## Playback and confirmation rules
 
-Ordinary pre-action acknowledgement remains playback-barriered:
+Only a pre-action communication the Planner requires (a `pre_action` need or one
+naming `before_step_ids`) or a confirmation prompt is playback-barriered:
 
 ```text
-say “我准备开始了”
+Planner-required pre-action need, e.g. say “我准备开始了”
 → playback starts
-→ effectful activity may begin
+→ the Work it precedes may begin
 ```
+
+Optional SC acknowledgement or courtesy speech is never a Work-start barrier: the
+Work starts as soon as its own prerequisites hold, and a slow or failed TTS for that
+optional speech does not delay or block it.
 
 Speech participates in Activity overlap only when the Planner explicitly marks
 it with a coordination group and
@@ -253,6 +258,16 @@ ask for confirmation
 A provider confirmation requirement remains authoritative. Lane coordination
 cannot weaken confirmation, capability availability, argument validation,
 resource conflict checks, or provider safety.
+
+Whether a body request needs the person's confirmation is decided per request, the
+same way in every backend mode (Charter principle 10): it does when the live named
+Soridormi skill or Soridormi's freshly created plan sets `requires_confirmation`, or
+when Value Judgment asks. The `required_in_modes`/`skippable_in_modes` lists on the
+execute tools in `capabilities/soridormi.json` describe Soridormi's transport gate;
+Chromie does not branch on them. When neither the skill nor the plan requires
+confirmation, the trusted preflight (body-declared no confirmation, goal-grounded or
+reviewed SC request, accepted safety monitoring) satisfies that gate without a
+fabricated approval, so a simulator nod or walk runs without asking.
 
 Response presentation and optional Social Attention are not execution authority.
 Invalid optional decoration is suppressed with a retained reason; it cannot alter

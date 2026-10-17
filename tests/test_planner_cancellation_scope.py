@@ -155,3 +155,25 @@ def test_delivering_control_report_does_not_fulfill_original_goal(control):
             manager.update_pending_task_status_for_request_id(request_id=speech.id, status='completed')
         assert manager._goal_responsibility_status(goal) == ('cancelled' if control == 'cancelled' else 'open')
     asyncio.run(run())
+
+
+@pytest.mark.parametrize('listed', [True, False])
+def test_cancellation_scope_admits_only_evidence_named_open_siblings(listed):
+    """A shared stop's coaffected sibling re-enters as an open Goal, not a target."""
+    request, _ = case_request('en', 'cancelled')
+    context = copy.deepcopy(request.context)
+    sibling = copy.deepcopy(context['goal_association_resolution']['new_goals'][0])
+    sibling.update(goal_id='sibling', metadata={'output_mode': 'stateful_effect'})
+    context['goal_association_resolution']['new_goals'].append(sibling)
+    if listed:
+        context['trusted_goal_cancellation_evidence'][0]['coaffected_goal_ids'] = ['sibling']
+    gid = request.planner_reentry_scope.goal_ids[0]
+    scope = request.planner_reentry_scope.model_copy(update={'goal_ids': [gid, 'sibling']})
+    if not listed:
+        with pytest.raises(ValueError, match='does not match typed scope'):
+            planner_goal_context(context, reentry_scope=scope)
+        return
+    projected = planner_goal_context(context, reentry_scope=scope)
+    assert projected.cancellation_reentry_goal_ids == {gid}
+    assert projected.requires_execution
+    assert 'sibling' not in projected.response_goal_ids
