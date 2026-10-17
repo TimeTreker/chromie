@@ -242,7 +242,7 @@ generated prompts must use a specific speaker.
 |---|---|
 | `ASR_URL` | `ws://127.0.0.1:9001` |
 | `TTS_URL` | `ws://127.0.0.1:5000` (CosyVoice); the launchers select `5001` for `oute` and `5002` for `qwen3`. |
-| `LLM_URL` | `http://127.0.0.1:11434/api/generate`. Ollama-native endpoint used only to generate ready-greeting speech when `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and no `ORCH_RUNTIME_READY_GREETING_TEXT` is configured. SGLang profiles publish no Ollama port, so set a greeting text there. |
+| `LLM_URL` | `http://127.0.0.1:11434/api/generate`. Ollama-native endpoint used only to generate ready-greeting speech when `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and no `ORCH_RUNTIME_READY_GREETING_TEXT` is configured. SGLang profiles publish no Ollama port, so the Host refuses to start with generated greeting speech when `AGENT_LLM_PROVIDER` is not `ollama`; set a greeting text there. |
 | `AGENT_URL` | `http://127.0.0.1:8092` |
 | `ACTION_EXECUTOR_URL` | `http://127.0.0.1:8095` |
 | `SORIDORMI_MCP_URL` | Deployment-specific MCP Streamable HTTP URL; typical host value `http://127.0.0.1:8000/mcp`; the Agent container defaults to `http://host.docker.internal:8000/mcp`. |
@@ -262,7 +262,7 @@ written to the Agent and Orchestrator runtime overrides.
 | Variable | Default or profile behavior |
 |---|---|
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_ENABLED` | `1`; enables the focused pre-Core addressedness classifier. Disabled or unavailable review admits the turn and cannot block direct/unclear speech. |
-| `AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL` | Set explicitly by `.env.common` and every hardware profile (`qwen3:4b` on the Ollama profiles, which differs from the UMI model `qwen3.5:4b`); the code falls back to `AGENT_USER_MEANING_INTERPRETER_MODEL` only when the key is unset; the launcher-effective model identity must be retained with cognitive evidence. |
+| `AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL` | Set explicitly by `.env.common` and every hardware profile (`qwen3:4b` on the Ollama profiles; only `.env.common` and the default profile give UMI a different model, `qwen3.5:4b`); the code falls back to `AGENT_USER_MEANING_INTERPRETER_MODEL` only when the key is unset; the launcher-effective model identity must be retained with cognitive evidence. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_TIMEOUT_MS` | `2500`; bounded model-call deadline. Timeout and transport failure fail open to Core admission. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_MIN_SUPPRESSION_CONFIDENCE` | `0.72`; applies only to inactive ambient speech acts. It is not a normal-intent or capability threshold. |
 | `AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX` | `2048`; bounded engagement and latest-transcript context. |
@@ -1078,7 +1078,9 @@ same `llm/sglang/Dockerfile` into one `chromie-sglang:${CHROMIE_IMAGE_TAG}` imag
 The provider-qualification overlays `docker-compose.sglang-qualification.yml`
 (`SGLANG_*`, `HF_TOKEN`; host port 30000) and `docker-compose.vllm-qualification.yml`
 (`VLLM_*`, `HF_TOKEN`; host port 8001, because 8000 is the paired Soridormi MCP
-default) are standalone and never selected by a hardware profile.
+default) are standalone and never selected by a hardware profile. The SGLang
+qualification overlay shares host port 30000 with the maintained SGLang `chromie-llm`, so
+run it on an Ollama profile or with that service stopped.
 
 The Compose owner pins Google Gemma4-12B-IT revision
 `707f0a3b8a3c7ad586ed01e27eafbad8a27dd0f7`, served as `chromie-gemma4-12b`, with online FP8

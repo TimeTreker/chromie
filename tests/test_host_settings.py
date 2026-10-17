@@ -44,6 +44,21 @@ class HostSettingsSnapshotTests(unittest.TestCase):
             settings.playback.concurrency = 3  # type: ignore[misc]
 
 
+    def test_generated_ready_greeting_speech_requires_the_ollama_endpoint(self) -> None:
+        speech = {"ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED": "1"}
+        with self.assertRaisesRegex(HostConfigurationError, "LLM_URL"):
+            HostSettingsSnapshot.from_env(
+                project_root=Path("/tmp"),
+                environ={**speech, "AGENT_LLM_PROVIDER": "sglang"},
+            )
+        for environ in (
+            {**speech, "AGENT_LLM_PROVIDER": "ollama"},
+            {**speech, "AGENT_LLM_PROVIDER": "sglang", "ORCH_RUNTIME_READY_GREETING_TEXT": "你好"},
+            {"AGENT_LLM_PROVIDER": "sglang"},
+        ):
+            with self.subTest(environ=environ):
+                HostSettingsSnapshot.from_env(project_root=Path("/tmp"), environ=environ)
+
     def test_model_generation_settings_are_typed_once(self) -> None:
         settings = HostSettingsSnapshot.from_env(
             project_root=Path("/tmp"),

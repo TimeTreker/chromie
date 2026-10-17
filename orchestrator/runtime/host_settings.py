@@ -493,6 +493,18 @@ class HostSettingsSnapshot:
                 minimum=1000,
             ),
         )
+        if (
+            playback.ready_greeting_speech_enabled
+            and not playback.ready_greeting_text
+            and (_text(values, "AGENT_LLM_PROVIDER", "ollama") or "ollama").casefold()
+            != "ollama"
+        ):
+            raise HostConfigurationError(
+                "generated ready-greeting speech posts to the Ollama-native LLM_URL, "
+                "which non-Ollama inference profiles do not serve; set "
+                "ORCH_RUNTIME_READY_GREETING_TEXT or keep "
+                "ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=0"
+            )
         return cls(
             audio_input=AudioInputSettings(
                 asr_url=_text(values, "ASR_URL", "ws://localhost:9001"),

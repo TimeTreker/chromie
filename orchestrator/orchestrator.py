@@ -7998,8 +7998,6 @@ class VoiceAssistant:
         gate = ServiceReadinessGate(
             asr_url=self.asr_url,
             tts_url=self.tts_url,
-            llm_url=self.llm_url,
-            ollama_model=self.ollama_model,
             speaker_id=self.speaker_id,
             get_http_session=self.get_http_session,
             agent_url=self.agent_url,

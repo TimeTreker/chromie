@@ -57,7 +57,12 @@ jobs:
             runtime="$work/$name/.env.runtime"
             args=(--env-file "$runtime" -f docker-compose.yml)
             overrides="$(grep '^CHROMIE_COMPOSE_OVERRIDE_FILES=' "$runtime" | cut -d= -f2- || true)"
-            [ -n "$overrides" ] && args+=(-f "$overrides")
+            # Comma-separated, split exactly as start_services.sh and deploy_chromie.sh do.
+            IFS=',' read -ra override_files <<< "$overrides"
+            for file in "${override_files[@]}"; do
+              file="$(echo "$file" | xargs)"
+              if [ -n "$file" ]; then args+=(-f "$file"); fi
+            done
             docker compose "${args[@]}" --profile tts-evaluation config --quiet
             echo "compose config ok: $name ${overrides:-}"
           done
