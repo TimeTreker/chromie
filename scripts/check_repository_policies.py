@@ -48,6 +48,14 @@ COGNITIVE_RUNTIME_MODULES = (
     "orchestrator/runtime/cognitive_evidence.py",
     "orchestrator/runtime/planner_advance_projection.py",
 )
+# ConversationStateManager behavior split out of conversation_state.py, held to
+# the same source guards as that module.
+CONVERSATION_STATE_MODULES = (
+    "orchestrator/runtime/goal_association_state.py",
+    "orchestrator/runtime/goal_cancellation_state.py",
+    "orchestrator/runtime/goal_outcome_state.py",
+    "orchestrator/runtime/goal_planning_state.py",
+)
 
 RULE_PRODUCTION_ASSERT = "python.production_assert"
 RULE_SILENT_BROAD_EXCEPTION = "python.silent_broad_exception"
@@ -1046,6 +1054,8 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         source_checks[relative] = source_checks["orchestrator/orchestrator.py"]
     for relative in COGNITIVE_RUNTIME_MODULES:
         source_checks[relative] = source_checks["orchestrator/runtime/cognitive_runtime.py"]
+    for relative in CONVERSATION_STATE_MODULES:
+        source_checks[relative] = source_checks["orchestrator/runtime/conversation_state.py"]
     for relative, (rule_id, tokens, message) in source_checks.items():
         path = root / relative
         if not path.is_file():
@@ -1074,6 +1084,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         *VOICE_ASSISTANT_HOST_MODULES,
         "orchestrator/runtime/confirmation.py",
         "orchestrator/runtime/conversation_state.py",
+        *CONVERSATION_STATE_MODULES,
         "orchestrator/runtime/session.py",
         "shared/chromie_contracts/semantic_task.py",
         "shared/chromie_contracts/perception.py",
@@ -1083,6 +1094,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/capabilities/validator.py",
         "orchestrator/runtime/confirmation.py",
         "orchestrator/runtime/conversation_state.py",
+        *CONVERSATION_STATE_MODULES,
         "shared/chromie_contracts/semantic_task.py",
     }
     forbidden_name_fragments = (
@@ -1771,6 +1783,10 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
     for relative in COGNITIVE_RUNTIME_MODULES:
         canonical_source_checks[relative] = canonical_source_checks[
             "orchestrator/runtime/cognitive_runtime.py"
+        ]
+    for relative in CONVERSATION_STATE_MODULES:
+        canonical_source_checks[relative] = canonical_source_checks[
+            "orchestrator/runtime/conversation_state.py"
         ]
     for relative, tokens in canonical_source_checks.items():
         path = root / relative

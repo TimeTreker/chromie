@@ -14,6 +14,7 @@ from orchestrator.runtime.named_goal_cancellation import (
 )
 from orchestrator.runtime.situation import build_situation_projection
 from shared.chromie_contracts.goal import GoalAssociationResolution
+from orchestrator.runtime import goal_planning_state
 
 
 class _NoDispatchRuntime:
@@ -165,7 +166,8 @@ class RestartRevalidationTests(unittest.TestCase):
                 "output_mode": "body_action",
                 "confidence": 1.0,
             }
-            retained = manager._planner_reentry_responsibilities(
+            retained = goal_planning_state.planner_reentry_responsibilities(
+                manager,
                 result_metadata={
                     "user_meaning_interpretation": {"responsibilities": [responsibility]}
                 },

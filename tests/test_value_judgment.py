@@ -23,6 +23,7 @@ from shared.chromie_contracts.value_judgment import (
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_capability_runtime import MockCapabilityProvider, _body_definition
 from tests.voice_assistant_test_support import bare_voice_assistant
+from orchestrator.runtime import goal_outcome_state
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -357,7 +358,7 @@ def test_withheld_answer_sets_its_goal_outcome(decision, expected):
 
     plan = {"goal_outcomes": [{"goal_id": "goal-1", "disposition": "respond"}, {"goal_id": "goal-2", "disposition": "respond"}],
             "metadata": {"value_judgment": {"decision": decision, "withheld_answer_goal_ids": ["goal-1"]}}}
-    outcomes = ConversationStateManager._canonical_goal_outcomes({"canonical_plan": plan})
+    outcomes = goal_outcome_state.canonical_goal_outcomes({"canonical_plan": plan})
     assert outcomes["goal-1"]["disposition"] == expected
     assert outcomes["goal-2"]["disposition"] == "respond"
 
@@ -370,7 +371,7 @@ def test_value_declined_goal_ends_like_a_limitation_without_a_semantic_version_b
     manager = ConversationStateManager(base_conversation_id="vj-goal")
     manager._task_contexts.append({"task_id": "goal-1", "status": "planning", "goal_version": 1})
     before = manager._semantic_goal_from_context(manager._task_contexts[-1]).model_dump(mode="json")
-    manager._record_nonexecuting_goal_outcomes({"goal-1": {"goal_id": "goal-1", "disposition": "value_declined"}})
+    goal_outcome_state.record_nonexecuting_goal_outcomes(manager, {"goal-1": {"goal_id": "goal-1", "disposition": "value_declined"}})
     context = manager._task_contexts[-1]
     assert (context["status"], context["commitment_state"], context["plan_status"]) == ("refused", "failed", "value_declined")
     assert manager._semantic_goal_from_context(context).model_dump(mode="json") == before

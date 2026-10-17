@@ -48,6 +48,16 @@ The host store can retain bounded representations of:
 - follow-up context;
 - the current conversation identifier and timestamps.
 
+`ConversationStateManager` (`orchestrator/runtime/conversation_state.py`) owns
+the store, its lock and its public methods. Goal state transitions run in
+function modules that take the manager as `state`: `goal_association_state`
+(Goal Association, Planner information gaps and semantic Task operations),
+`goal_cancellation_state` (named-Goal cancellation, Goal replacement and reflex
+cancellation receipts), `goal_outcome_state` (confirmation scope, pending
+execution, execution outcomes, Reflection and cognitive opportunities) and
+`goal_planning_state` (planning metadata, time conditions, restart revalidation
+and interaction responses).
+
 Limits are enforced for turn count, text length, context size, pending tasks,
 and idle age. Older content is trimmed rather than allowed to grow without
 bound.

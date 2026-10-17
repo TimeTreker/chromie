@@ -12,6 +12,7 @@ from shared.chromie_contracts.plan import (
     PlannedGoalTimeCondition,
 )
 from shared.chromie_contracts.semantic_task import SemanticGoal
+from orchestrator.runtime import goal_planning_state
 
 
 def _satisfaction(goal_id: str) -> GoalSatisfactionAssessment:
@@ -136,7 +137,7 @@ def test_conversation_state_binds_planner_time_condition_to_original_responsibil
         },
     }
 
-    assert manager._record_planner_time_conditions(metadata) == 1
+    assert goal_planning_state.record_planner_time_conditions(manager, metadata) == 1
     due = manager.due_time_condition_opportunities(now_ms=2_000)
     assert len(due) == 1
     assert due[0]["condition"]["source_plan_id"] == "plan-1"

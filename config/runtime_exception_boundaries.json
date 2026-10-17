@@ -1067,8 +1067,8 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/conversation_state.py",
-      "symbol": "ConversationStateManager._commit_semantic_state_transaction",
+      "path": "orchestrator/runtime/goal_association_state.py",
+      "symbol": "commit_semantic_state_transaction",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "orchestrator",
@@ -1080,8 +1080,8 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/conversation_state.py",
-      "symbol": "ConversationStateManager.apply_semantic_task_operations_atomically",
+      "path": "orchestrator/runtime/goal_association_state.py",
+      "symbol": "apply_semantic_task_operations_atomically",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
@@ -1093,14 +1093,14 @@
       ]
     },
     {
-      "path": "orchestrator/runtime/conversation_state.py",
-      "symbol": "ConversationStateManager.record_execution_outcome_bundle",
+      "path": "orchestrator/runtime/goal_outcome_state.py",
+      "symbol": "record_execution_outcome_bundle",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator",
       "contract": "Preserve the primary operation; retain bounded diagnostics and do not invent user-visible success.",
       "review_status": "reviewed",
-      "body_sha256": "a1e3ed07354f4fda848aa202b2776122d170b25558e47b6904e16f207b62fb09",
+      "body_sha256": "eceb76100617291f3a498cee29ad9196623aa20c8a6d4933ac4154bc78e2e851",
       "failure_signals": [
         "bare_reraise",
         "state_update"

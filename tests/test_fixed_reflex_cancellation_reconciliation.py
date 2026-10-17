@@ -5,6 +5,7 @@ import unittest
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 from shared.chromie_contracts.reflex import CancellationDispatchReceipt
+from orchestrator.runtime import goal_outcome_state
 
 
 def _create_goal(manager: ConversationStateManager, goal_id: str, text: str) -> None:
@@ -35,7 +36,8 @@ def _bind_execution(
     status: str = "running",
 ) -> None:
     capabilities = capability_ids or ["soridormi.walk_forward"] * len(request_ids)
-    manager._record_goal_pending_execution(
+    goal_outcome_state.record_goal_pending_execution(
+        manager,
         sid="sid-run",
         goal_id=goal_id,
         status=status,
