@@ -684,7 +684,7 @@ class _CognitiveScenarioClient:
             },
         )
 
-    async def stream_fast_advance(self, *args: Any, **kwargs: Any):
+    async def stream_plan_advance(self, *args: Any, **kwargs: Any):
         self.calls.append("fast_stream")
         request = kwargs["request"]
         yield FastPlannerStreamTerminal(turn_id=str(request.sid), advance=self._streamed_fast_fixture(request))
@@ -711,7 +711,7 @@ class _CognitiveScenarioClient:
             need_outcomes={need.need_id: "covered" if need.need_id in covered else "pending" for need in request.communication_needs},
             reason_summary=fixture["reason_summary"], model_call_count=1)
 
-    async def resolve_fast_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
+    async def resolve_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
         del args, kwargs
         self.calls.append("fast_plan")
         return CanonicalPlan.model_validate(self.stub["fast_plan"])

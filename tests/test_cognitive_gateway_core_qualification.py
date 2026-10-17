@@ -40,7 +40,7 @@ def write_identity(path: Path) -> dict:
                 "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "qwen3:4b",
                 "AGENT_USER_MEANING_INTERPRETER_MODEL": "qwen3:4b",
                 "AGENT_GOAL_ASSOCIATION_MODEL": "qwen3:4b",
-                "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
+                "AGENT_PLANNER_MODEL": "qwen3:4b",
                 "AGENT_DELIBERATIVE_MODEL": "qwen3:4b",
             }
         },
@@ -63,7 +63,7 @@ def write_identity(path: Path) -> dict:
                         "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "qwen3:4b",
                         "AGENT_USER_MEANING_INTERPRETER_MODEL": "qwen3:4b",
                         "AGENT_GOAL_ASSOCIATION_MODEL": "qwen3:4b",
-                        "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
+                        "AGENT_PLANNER_MODEL": "qwen3:4b",
                         "AGENT_DELIBERATIVE_MODEL": "qwen3:4b",
                     },
                 },

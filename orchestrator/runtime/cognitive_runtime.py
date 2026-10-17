@@ -150,7 +150,7 @@ class CognitiveRuntimeResolution(BaseModel):
 class CognitiveRuntimePolicy:
     mode: CognitiveRuntimeMode = "off"
     goal_association_timeout_ms: int = 3500
-    fast_planner_timeout_ms: int = 3000
+    planner_timeout_ms: int = 3000
     # Deliberative deadline for Social Cognition and Reflection.
     deliberative_timeout_ms: int = 10000
     # Capabilities whose effects need a Value Judgment proceed verdict before dispatch
@@ -357,11 +357,11 @@ class CognitiveAgentClient(Protocol):
         self, session: Any, **kwargs: Any
     ) -> GoalAssociationResolution: ...
 
-    def stream_fast_advance(
+    def stream_plan_advance(
         self, session: Any, **kwargs: Any
     ) -> AsyncIterator[FastPlannerStreamFrame]: ...
 
-    async def resolve_fast_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
+    async def resolve_plan(self, session: Any, **kwargs: Any) -> CanonicalPlan: ...
 
     async def resolve_value_judgment(self, session: Any, **kwargs: Any) -> ValueJudgmentResult: ...
 
@@ -2855,7 +2855,7 @@ class GoalDrivenRuntimeCoordinator:
                 sid=session_id, stage="social_cognition", input_payload=request,
                 operation=self.agent_client.resolve_social_cognition(
                     session, request=request,
-                    timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deliberative_timeout_ms),
+                    timeout_ms=max(self.policy.planner_timeout_ms, self.policy.deliberative_timeout_ms),
                 ),
             )
             result.validate_request(request)
@@ -2905,7 +2905,7 @@ class GoalDrivenRuntimeCoordinator:
         async def resolve() -> SocialCognitionResolution:
             result = await self.agent_client.resolve_social_cognition(
                 session, request=request,
-                timeout_ms=max(self.policy.fast_planner_timeout_ms, self.policy.deliberative_timeout_ms),
+                timeout_ms=max(self.policy.planner_timeout_ms, self.policy.deliberative_timeout_ms),
             )
             result.validate_request(request)
             metadata["model_call_count"] = result.model_call_count
@@ -3330,7 +3330,7 @@ class GoalDrivenRuntimeCoordinator:
     ) -> ValueJudgmentResult:
         try:
             return await self.agent_client.resolve_value_judgment(
-                session, request=request, timeout_ms=self.policy.fast_planner_timeout_ms,
+                session, request=request, timeout_ms=self.policy.planner_timeout_ms,
             )
         except Exception as exc:  # noqa: BLE001 - a failed judgment withholds reviewed effects
             logger.warning("value_judgment_unavailable sid=%s error_type=%s error=%s",
@@ -4773,14 +4773,14 @@ class GoalDrivenRuntimeCoordinator:
                 sid=sid,
                 stage="fast_planner",
                 input_payload={"goal_association": association, "trigger": "goal_association", "existing_work_activities": planning_context["existing_work_activities"]},
-                operation=self.agent_client.resolve_fast_plan(
+                operation=self.agent_client.resolve_plan(
                     session,
                     request=planning_work_request.model_copy(deep=True, update={
                         "planning_task_id": "ga:" + goal_association_fingerprint(association),
                         "context": planning_context,
                         "history": history,
                     }),
-                    timeout_ms=self.policy.fast_planner_timeout_ms,
+                    timeout_ms=self.policy.planner_timeout_ms,
                 ),
             ), name="goal-planning:" + turn_id)
 
@@ -5333,8 +5333,8 @@ class GoalDrivenRuntimeCoordinator:
                     }
                 )
                 terminal_frame: FastPlannerStreamTerminal | None = None
-                async for frame in self.agent_client.stream_fast_advance(
-                    session, request=stream_request, timeout_ms=self.policy.fast_planner_timeout_ms,
+                async for frame in self.agent_client.stream_plan_advance(
+                    session, request=stream_request, timeout_ms=self.policy.planner_timeout_ms,
                 ):
                     if isinstance(frame, FastPlannerStreamFailure):
                         raise CognitiveStageFailure("fast_planner_stream", frame.model_dump(mode="json"))
@@ -5954,7 +5954,7 @@ class GoalDrivenRuntimeCoordinator:
                                 "interaction_context", {}
                             ),
                         },
-                        operation=self.agent_client.resolve_fast_plan(
+                        operation=self.agent_client.resolve_plan(
                             session,
                             request=work_request.model_copy(
                                 update={
@@ -5962,7 +5962,7 @@ class GoalDrivenRuntimeCoordinator:
                                     "history": history,
                                 }
                             ),
-                            timeout_ms=self.policy.fast_planner_timeout_ms,
+                            timeout_ms=self.policy.planner_timeout_ms,
                         ),
                     )
                 timings["fast_planner"] = (

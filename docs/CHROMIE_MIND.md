@@ -131,8 +131,12 @@ identity is configured: she speaks only as herself, never as a robot, AI, model,
 assistant, or service, and never asserts a falsehood about her nature.
 
 A deployment owner (the operator; distinct from the project owner who approves the
-Charter) may change the configured name, age, pronouns, self-description,
-identity-answer guidance, or personality expression without changing Python source.
+Charter) may also change the age description, self-description, identity-answer
+guidance, and personality expression without changing Python source. No other
+identity field is deployment-configurable. `IDENTITY-TRUTH-001` lives in Social
+Cognition's fixed instructions, not in profile text, so identity-answer guidance may
+shape how she answers but cannot remove or override it. Social Cognition uses these
+identity settings, with all other context, when it decides how to interact.
 Increment the profile version and review the complete profile before retaining
 `owner_approved=true`.
 

@@ -175,6 +175,16 @@ def test_social_authority_does_not_confuse_high_level_work_with_raw_motor_contro
     assert "must never be declared unavailable or unsafe" in prompt
 
 
+def test_social_authority_keeps_probabilistic_evidence_uncertain():
+    """SC authors the words, so the evidence-certainty rule lives in SC, not the Planner."""
+    from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
+
+    prompt = SOCIAL_COGNITION_AUTHORITY_PROMPT.lower()
+    assert "keep the certainty the evidence has" in prompt
+    assert "never as certainty" in prompt
+    assert "keep cited numbers exactly as supplied" in prompt
+
+
 def test_fresh_turn_prompt_frontloads_social_opportunity_without_duplicate_source_or_empty_needs():
     from agent.app.social_cognition import social_cognition_prompt
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
@@ -1365,7 +1375,7 @@ async def test_slow_sc_does_not_hold_validated_body_work_after_gi():
                 disposition="silence", activities=[], reason_summary="No useful acknowledgement now.", model_call_count=1)
         async def resolve_goal_association(self, session, **kwargs):
             return body_goal_association()
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             await sc_started.wait()
             advance = FastPlannerAdvance(turn_id=request.sid, disposition="execute", coverage="complete",
                 covered_responsibility_refs=["r1"], confidence=1, activities=[{
@@ -1431,7 +1441,7 @@ async def test_normal_greeting_work_establishes_need_and_sc_authors_the_reply():
                 }])
         async def resolve_goal_association(self, session, **kwargs):
             return new_goal_association()
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             advance = FastPlannerAdvance(turn_id=request.sid, disposition="respond", coverage="complete",
                 covered_responsibility_refs=["r1"], confidence=1, activities=[{
                     "role": "complete_response", "activity_id": "greeting", "rationale": "Ordinary greeting is supported by current context.",
@@ -1947,7 +1957,7 @@ async def test_planner_failure_joins_independent_social_delivery_without_hiding_
                 update={"non_goal_responsibility_refs": ["hello"]},
             )
 
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             await social_started.wait()
             planner_failed.set()
             if failure == "planner_exception":
@@ -2936,3 +2946,65 @@ def test_no_act_can_bind_an_answer_value_judgment_withheld():
             offered |= set(shape["properties"]["addressed_need_ids"].get("items", {}).get("enum", []))
     assert "need:answer" not in offered
     assert "need:decline" in offered
+
+
+def _startup_request(**overrides):
+    from shared.chromie_contracts.mind import default_mind_profile
+    from shared.chromie_contracts.social_cognition import SocialStartupGreetingRequest
+
+    values = {
+        "request_id": "startup-greeting:1",
+        "language": "zh-CN",
+        "max_chars": 24,
+        "local_time": {"local_period": "morning", "weekday": "Saturday"},
+        "context": {"mind": default_mind_profile().prompt_context(max_chars=5000)},
+    }
+    values.update(overrides)
+    return SocialStartupGreetingRequest(**values)
+
+
+@pytest.mark.asyncio
+async def test_social_cognition_authors_the_startup_greeting_from_the_mind():
+    model = Model({"disposition": "communicate", "text": "我醒啦，好开心！", "reason_summary": "wake-up line"})
+    result = await SocialCognitionResolver(model, Catalog()).resolve_startup_greeting(_startup_request())
+
+    assert result.disposition == "communicate"
+    assert result.text == "我醒啦，好开心！"
+    assert result.semantic_owner == "social_cognition"
+    assert result.model_call_count == 1
+    prompt, kwargs = model.calls[0]
+    assert kwargs["prompt_family"] == "social_cognition.startup_greeting"
+    assert kwargs["response_format"]["properties"]["text"]["maxLength"] == 24
+    assert "only owner of what Chromie says" in kwargs["system"]
+    assert "Never call yourself a robot" in kwargs["system"]
+    packet = json.loads(prompt.split("Trusted startup context JSON:\n", 1)[1])
+    assert packet["mind"]["identity"]["name"] == "Chromie"
+    assert packet["local_time"]["local_period"] == "morning"
+    assert "Speak only in zh-CN" in prompt
+
+
+@pytest.mark.asyncio
+async def test_social_cognition_may_choose_startup_silence():
+    model = Model({"disposition": "silence", "text": "", "reason_summary": "nothing to add"})
+    result = await SocialCognitionResolver(model, Catalog()).resolve_startup_greeting(_startup_request())
+
+    assert result.disposition == "silence"
+    assert result.text == ""
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("raw", [
+    {"disposition": "communicate", "text": "", "reason_summary": ""},
+    {"disposition": "silence", "text": "我醒啦！", "reason_summary": ""},
+    {"disposition": "communicate", "text": "我" * 30, "reason_summary": ""},
+])
+async def test_startup_greeting_rejects_words_outside_its_contract(raw):
+    with pytest.raises(ValueError):
+        await SocialCognitionResolver(Model(raw), Catalog()).resolve_startup_greeting(_startup_request())
+
+
+def test_startup_greeting_requires_the_owner_approved_mind():
+    with pytest.raises(ValueError, match="owner-approved Mind"):
+        _startup_request(context={})
+    with pytest.raises(ValueError, match="owner-approved Mind"):
+        _startup_request(context={"mind": {"owner_approved": False}})

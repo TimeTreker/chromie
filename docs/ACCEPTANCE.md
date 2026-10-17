@@ -854,7 +854,7 @@ not a substitute for ignored `.chromie/` live evidence. Sanitization removes kno
 credentials and local identity but may retain private conversation content, so the
 report and archive still require human review before sharing.
 
-### Fast Planner multi-goal qualification
+### Planner multi-goal qualification
 
 The repository implements the accepted
 [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md).

@@ -13,7 +13,7 @@ import json
 import pytest
 from jsonschema import Draft202012Validator
 
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_context import planner_goal_context
 from benchmarks.datasets.fast_planner_daily_life.qualification import (
     load_request_fixture_cases as load_cases, CaptureModel, ReplayModel, StaticCatalog, materialize_catalog,
@@ -41,7 +41,7 @@ def case_request(language, control, available=True):
 
 def for_resolver(resolver, raw):
     """A control report uses no Capability, so the need-first prefix is empty for Fast."""
-    return {'ability_needs': [], **raw} if resolver is FastPlannerResolver else raw
+    return {'ability_needs': [], **raw} if resolver is PlannerResolver else raw
 
 
 def report(request):
@@ -65,7 +65,7 @@ def report(request):
                     rationale='Report the exact trusted control facts.')}))
 
 
-@pytest.mark.parametrize('resolver', [FastPlannerResolver])
+@pytest.mark.parametrize('resolver', [PlannerResolver])
 @pytest.mark.parametrize('language', ['en', 'zh'])
 @pytest.mark.parametrize('control', ['cancelled', 'released', 'not_cancelled', 'uncertain'])
 @pytest.mark.parametrize('available', [True, False])
@@ -93,7 +93,7 @@ def test_control_report_preserves_catalog_truth_and_unmet_effect(resolver, langu
     asyncio.run(run())
 
 
-@pytest.mark.parametrize('resolver', [FastPlannerResolver])
+@pytest.mark.parametrize('resolver', [PlannerResolver])
 @pytest.mark.parametrize('mutation', ['fake_fulfillment', 'confirmation', 'reschedule', 'extra_work'])
 def test_control_scope_rejects_false_completion_and_execution(resolver, mutation):
     async def run():
@@ -139,7 +139,7 @@ def test_cancellation_scope_preserves_independent_effect_goal_execution():
 def test_delivering_control_report_does_not_fulfill_original_goal(control):
     async def run():
         request, entries = case_request('en', control)
-        plan = await FastPlannerResolver(ReplayModel(json.dumps(report(request))), StaticCatalog(entries)).resolve(request)
+        plan = await PlannerResolver(ReplayModel(json.dumps(report(request))), StaticCatalog(entries)).resolve(request)
         adapter = CanonicalPlanRuntimeAdapter(FakeRuntime())
         response = await social_fixture_response(adapter,plan=plan, session_id=request.sid, language='en-US')
         manager = ConversationStateManager(base_conversation_id='control-delivery')

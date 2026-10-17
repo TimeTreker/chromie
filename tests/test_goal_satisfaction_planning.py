@@ -6,7 +6,7 @@ import unittest
 from pydantic import ValidationError
 
 from agent.app.capabilities.catalog import CatalogCapability
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_fast_validation import qualify_fast_canonical_plan
 from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -193,7 +193,7 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
             },
         }
         plan = asyncio.run(
-            FastPlannerResolver(FakeOllama([raw]), Catalog()).resolve(
+            PlannerResolver(FakeOllama([raw]), Catalog()).resolve(
                 request("眨眨眼睛。", goal_ids=["goal-blink"])
             )
         )
@@ -246,7 +246,7 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
             },
         }
         plan = asyncio.run(
-            FastPlannerResolver(FakeOllama([raw]), Catalog()).resolve(
+            PlannerResolver(FakeOllama([raw]), Catalog()).resolve(
                 request("往前走。", goal_ids=["goal-walk"])
             )
         )
@@ -323,7 +323,7 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
         }
         ollama = FakeOllama([low, exact])
         plan = asyncio.run(
-            FastPlannerResolver(
+            PlannerResolver(
                 ollama,
                 Catalog(),
             ).resolve(request("多眨几下眼睛。", goal_ids=["goal-blink"]))
@@ -427,7 +427,7 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
         }
         ollama = FakeOllama([raw])
         asyncio.run(
-            FastPlannerResolver(ollama, Catalog()).resolve(
+            PlannerResolver(ollama, Catalog()).resolve(
                 request("往前走。", goal_ids=["goal-walk"])
             )
         )

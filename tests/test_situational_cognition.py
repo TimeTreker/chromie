@@ -301,7 +301,7 @@ def test_voice_assistant_uses_social_cognition_without_goal_work_api() -> None:
                 reason_summary="Small family greeting.",
             )
 
-        async def resolve_fast_plan(self, *_args, **_kwargs):
+        async def resolve_plan(self, *_args, **_kwargs):
             self.planner_calls += 1
             raise AssertionError("Goal-bound Planner API requires Goal provenance")
 
@@ -312,7 +312,7 @@ def test_voice_assistant_uses_social_cognition_without_goal_work_api() -> None:
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
-        mode="apply", fast_planner_timeout_ms=3000
+        mode="apply", planner_timeout_ms=3000
     )
     assistant.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
     assistant.sessions = SimpleNamespace(current_sid=None)
@@ -421,7 +421,7 @@ def test_routine_presence_still_uses_core_semantic_judgment_not_host_rules() -> 
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
-        mode="apply", fast_planner_timeout_ms=3000
+        mode="apply", planner_timeout_ms=3000
     )
     assistant.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
     assistant.sessions = SimpleNamespace(current_sid=None)
@@ -478,7 +478,7 @@ def test_trusted_audience_is_used_by_memory_privacy_gate() -> None:
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
-        mode="apply", fast_planner_timeout_ms=3000
+        mode="apply", planner_timeout_ms=3000
     )
     assistant.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
     assistant.sessions = SimpleNamespace(current_sid=None)
@@ -561,7 +561,7 @@ def test_goal_free_apply_path_treats_silence_and_no_change_as_success() -> None:
             self.delivered = 0
             self.agent_client = Agent()
             self.cognitive_runtime_policy = CognitiveRuntimePolicy(
-                mode="apply", fast_planner_timeout_ms=3000
+                mode="apply", planner_timeout_ms=3000
             )
             self.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
             self.sessions = SimpleNamespace(current_sid=None)
@@ -742,7 +742,7 @@ async def test_host_validates_complete_social_cognition_result_before_any_memory
         cognitive_runtime=SimpleNamespace(interaction_ledger=None), session_log=lambda *args: None,
         sessions=SimpleNamespace(current_sid=None), get_http_session=session,
         agent_client=SimpleNamespace(resolve_cognitive_activation=allow_activation, resolve_social_cognition=resolve),
-        cognitive_runtime_policy=CognitiveRuntimePolicy(mode="apply", fast_planner_timeout_ms=3000))
+        cognitive_runtime_policy=CognitiveRuntimePolicy(mode="apply", planner_timeout_ms=3000))
     with pytest.raises(ValueError):
         await resolve_goal_free_situation_response(host, observation=observation, opportunity=opportunity,
             session_id="sid", language="en-US")

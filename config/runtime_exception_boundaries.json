@@ -115,8 +115,8 @@
       ]
     },
     {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver._resolve",
+      "path": "agent/app/planner.py",
+      "symbol": "PlannerResolver._resolve",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
@@ -130,8 +130,8 @@
       ]
     },
     {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver.resolve",
+      "path": "agent/app/planner.py",
+      "symbol": "PlannerResolver.resolve",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "agent",
@@ -143,12 +143,12 @@
       ]
     },
     {
-      "path": "agent/app/fast_planner.py",
-      "symbol": "FastPlannerResolver.stream_advance",
+      "path": "agent/app/planner.py",
+      "symbol": "PlannerResolver.stream_advance",
       "ordinal": 1,
       "classification": "typed_failure_mapping",
       "owner": "agent.fast_planner",
-      "contract": "Map primary Work and bounded capability lookup failures into a typed failure before any Activity is released. No partial plan or semantic repair is admitted. Required-context overflow makes no model call. SC owns communication. Regression: tests/test_intent_only_handoff.py and tests/test_fast_planner_streaming_commit.py.",
+      "contract": "Map primary Work and bounded capability lookup failures into a typed failure before any Activity is released. No partial plan or semantic repair is admitted. Required-context overflow makes no model call. SC owns communication. Regression: tests/test_intent_only_handoff.py and tests/test_planner_streaming_commit.py.",
       "review_status": "reviewed",
       "body_sha256": "52ec999e9c161732b5c220ab033eff2503719e0ab46d00716898705b00906630",
       "failure_signals": [
@@ -463,38 +463,9 @@
       "owner": "orchestrator",
       "contract": "Contain the owned runtime boundary and return or raise an observable failed result without authorizing unvalidated work.",
       "review_status": "reviewed",
-      "body_sha256": "d460378e1f5ffbce9dda8442afd7f0f23f9decee9555252eace3427214ffb320",
+      "body_sha256": "d02ccd3ed2eed7eb2577d77fe9d42ea9e54c0387fd5f2d915506a028066d516b",
       "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._owner_identity_json",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "765ca9a1d2c8357b44c78e316e7e4a1d6e5069f637171aa1f2f07de5493addc0",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
-      ]
-    },
-    {
-      "path": "orchestrator/orchestrator.py",
-      "symbol": "VoiceAssistant._owner_mind_summary",
-      "ordinal": 1,
-      "classification": "typed_failure_mapping",
-      "owner": "orchestrator",
-      "contract": "Map the caught implementation failure into the owning typed state or diagnostic contract.",
-      "review_status": "reviewed",
-      "body_sha256": "24dbceb84c6feee4a6f168098250b2f38dd4f34a86f907e90f26bf1a9729a9bf",
-      "failure_signals": [
-        "diagnostic",
-        "state_update"
+        "diagnostic"
       ]
     },
     {

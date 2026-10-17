@@ -27,7 +27,7 @@ execution receipts, and final safety state.
   expectations.
 
 Use `user-outcome` while cognitive internals are evolving. Use `full` only for
-an explicit component claim, such as qualifying a Fast Planner optimization.
+an explicit component claim, such as qualifying a Planner optimization.
 The current-revision target-evidence interaction track is such a claim: it
 qualifies the implemented route, Planner path and contract boundaries of one
 committed revision, so it always runs `full`

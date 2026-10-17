@@ -511,8 +511,7 @@ The retained corpora are:
 
 ## 7. Applying the method to the Planner
 
-The Deep Planner was retired on 2026-10-11 (PLANNER-AUTHORITY-001); its corpus families
-now qualify the one Planner.
+There is one Planner (PLANNER-AUTHORITY-001).
 
 **Migration boundary:** the [Social Cognition target](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
 is implemented: Planner owns Work and SC owns ordinary communication. Retained
@@ -523,14 +522,13 @@ old speech/streaming results as proof of the new owner or insert an online
 reviewer between the two roles. No new-role prompt optimization is claimed by
 the documentation amendment.
 
-Fast and Deep are cognition-depth passes of one Planner HOW authority, not two
-independent planners and not mutual reviewers. Qualify them in order while preserving
-one shared Planner contract:
+The one Planner is word-free: it authors Work and typed communication Needs, never
+wording. Qualify it in order over one Planner contract:
 
 ```text
-Fast primary/common path
-  -> Fast streaming advance and bounded re-entry variants
-  -> Deep complex/blocked/revision path
+primary/common path
+  -> streaming advance and bounded re-entry variants
+  -> complex/blocked/revision path
   -> combined Planner regression
 ```
 
@@ -575,7 +573,7 @@ Use semantic review for:
 
 ### 7.3 Suggested frozen contrast families
 
-Fast Planner should cover at least:
+Planner should cover at least:
 
 - a direct-response obligation with no effect Work, expressed separately by SC;
 - one complete common Capability action;
@@ -585,12 +583,12 @@ Fast Planner should cover at least:
 - confirmation-held material alternatives;
 - unavailable or invalid Capability;
 - independent SC interaction and later GA binding without Work/wording transfer;
-- streaming advance and terminal Fast result;
+- streaming advance and terminal Planner result;
 - ordinary Evidence/Situation/time re-entry;
 - SC optional expression that cannot replace requested Planner Work;
 - cancellation/supersession containment.
 
-The Planner corpus should also cover (the former Deep families):
+The Planner corpus should also cover:
 
 - compound or constrained multi-Goal Work;
 - an honest per-Goal limitation beside sibling Work, with no leaked executable partial result;

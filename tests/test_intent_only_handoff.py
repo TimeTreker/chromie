@@ -11,7 +11,7 @@ from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import 
 )
 from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
 from agent.app.capabilities.catalog import CatalogCapability
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_context import fast_capability_context
 from agent.app.goal_association import GoalAssociationResolver
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
@@ -264,7 +264,7 @@ async def test_compound_intent_becomes_three_grounded_activities_and_one_goal():
         activity("nod", {"count": 2}, source_spans(EPISODES[0], {"count": "twice"})),
         activity("turn", {"direction": "left"}, source_spans(EPISODES[0], {"direction": "left"})),
     ]
-    frames = [frame async for frame in FastPlannerResolver(Model([work(activities)]), Catalog(entries)).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(Model([work(activities)]), Catalog(entries)).stream_advance(request)]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
     ga_reply = {"new_goals": [{"source_responsibility_refs": ["r1"], "related_goal_ids": [], "supersedes_goal_ids": []}], "cognitive_requests": [],
                 "referent_updates": [], "resolved_references": [], "confidence": 1.0,
@@ -342,7 +342,7 @@ async def test_provider_resource_contract_materializes_information_acquisition_p
         "reason_summary": "Acquire fresh weather Evidence before answering.",
     }])
     frames = [
-        frame async for frame in FastPlannerResolver(Model([raw]), Catalog([weather])).stream_advance(request)
+        frame async for frame in PlannerResolver(Model([raw]), Catalog([weather])).stream_advance(request)
     ]
     assert isinstance(frames[0], FastPlannerStreamTerminal), frames[0]
     activity = frames[0].advance.activities[0]
@@ -387,7 +387,7 @@ async def test_translated_required_location_must_cite_its_source_span(sources, a
                  "reason_summary": "Acquire fresh weather Evidence before answering."}])
     model = Model([raw])
     frames = [frame async for frame in
-              FastPlannerResolver(model, Catalog([weather])).stream_advance(request)]
+              PlannerResolver(model, Catalog([weather])).stream_advance(request)]
     assert isinstance(frames[0], FastPlannerStreamTerminal) is accepted, frames[0]
     # The constrained decoder itself must exclude the unspanned value, not only Host.
     decoder_schema = model.packets[0][1]["response_format"]
@@ -412,7 +412,7 @@ async def test_unmet_need_searches_library_then_plans_once(fault):
     elif fault == "invented_quote":
         final["activities"][0]["argument_sources"]["rotation_degrees"] = {"source_start_token_ref": "t999", "source_end_token_ref": "t999"}
     model = Model([first, final])
-    frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(model, Catalog([entry])).stream_advance(request)]
     first_schema = model.packets[0][1]["response_format"]
     for shape in need_first_shapes(first_schema):
         assert next(iter(shape["properties"])) == "ability_needs"
@@ -454,7 +454,7 @@ async def test_body_intent_cannot_be_completed_by_a_zero_work_response(text):
                    "rationale": "The response completes the task."}])
     reply["disposition"] = "respond"
     model = Model([reply])
-    frames = [frame async for frame in FastPlannerResolver(model, Catalog([])).stream_advance(request_for(text))]
+    frames = [frame async for frame in PlannerResolver(model, Catalog([])).stream_advance(request_for(text))]
     assert len(frames) == 1
     assert isinstance(frames[0], FastPlannerStreamFailure)
     assert len(model.packets) == 1
@@ -511,7 +511,7 @@ async def test_planner_owns_new_future_readiness_without_gi_time_fields(fault):
     elif fault == "missing_clock":
         condition["source_quote"] = "Nod twice"
     model = Model([raw])
-    plan = await FastPlannerResolver(model, Catalog([])).resolve(request)
+    plan = await PlannerResolver(model, Catalog([])).resolve(request)
     assert not plan.steps
     assert len(model.packets) == 1
     if fault:
@@ -569,7 +569,7 @@ async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path)
         raw["time_conditions"].append(copy.deepcopy(raw["time_conditions"][0]))
     raw = PlannerModelOutput.model_validate(raw).model_dump(mode="json")
     model = Model([raw])
-    plan = await FastPlannerResolver(model, Catalog([capability("blink", {"count": {"type": "integer", "minimum": 1}})])).resolve(request)
+    plan = await PlannerResolver(model, Catalog([capability("blink", {"count": {"type": "integer", "minimum": 1}})])).resolve(request)
     assert len(model.packets) == 1
     if fault:
         assert not plan.steps and plan.metadata.get("failure_class"), plan.model_dump()
@@ -632,7 +632,7 @@ async def test_index_visibility_does_not_authorize_unavailable_or_locked_work(av
     first = {"ability_needs": [need("turn the body in place by an angle")],
              **limitation_outcome("No loaded Capability turns the body.")}
     model = Model([first])
-    frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(
+    frames = [frame async for frame in PlannerResolver(model, Catalog([entry])).stream_advance(
         request_for("turn left by 45 degrees"))]
     assert len(model.packets) == 1
     assert isinstance(frames[0], FastPlannerStreamTerminal)
@@ -642,7 +642,7 @@ async def test_index_visibility_does_not_authorize_unavailable_or_locked_work(av
 
 @pytest.mark.asyncio
 async def test_canonical_fast_need_search_retains_original_intent_and_one_semantic_result():
-    from tests.fast_planner_test_support import execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
+    from tests.planner_test_support import execute_step, execute_outcome, exact_satisfaction, multi_goal_plan
     request = request_for("turn left by 45 degrees")
     request.context["goal_association_resolution"] = {"new_goals": [{
         "goal_id": "g", "description": request.text, "metadata": {"output_mode": "body_action"},
@@ -659,7 +659,7 @@ async def test_canonical_fast_need_search_retains_original_intent_and_one_semant
     raw.update(time_conditions=[], cancel_activity_ids=[])
     first = {"ability_needs": [need("turn the body in place by an angle")], **raw}
     model = Model([first, raw])
-    plan = await FastPlannerResolver(model,Catalog([entry])).resolve(request)
+    plan = await PlannerResolver(model,Catalog([entry])).resolve(request)
     assert plan.disposition == "execute", plan.metadata
     assert len(model.packets) == 2
     for packet in model.packets:
@@ -991,7 +991,7 @@ async def test_unfit_loaded_capability_leads_to_library_search_not_substitution(
     first = {"ability_needs": [need("wave one hand", "test.walk", False, "Walk forward.")],
              **work([activity("walk", {}, {})])}
     model = Model([first, work([activity("wave", {}, {})])])
-    frames = [frame async for frame in FastPlannerResolver(model, Catalog([walk, wave])).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(model, Catalog([walk, wave])).stream_advance(request)]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
     assert len(model.packets) == 2
     first_prompt = model.packets[0][0]
@@ -1032,7 +1032,7 @@ async def test_planner_cites_contextual_source_without_umi_bindings(text, outcom
     # The place is cited, never retyped: trusted code keeps the exact quote.
     raw = work([activity("deliver", {"source": {"status": "known"}}, sources)])
     model = Model([raw])
-    frames = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(model, Catalog([entry])).stream_advance(request)]
     assert len(model.packets) == 1
     if fault:
         assert isinstance(frames[0], FastPlannerStreamFailure)
@@ -1147,7 +1147,7 @@ async def test_decoder_offers_only_legal_provider_source_shapes(source, cite, de
     )
     raw = work([activity("deliver", {"source": source}, {"source": citation} if citation else {})])
     model = Model([raw])
-    frames = [frame async for frame in FastPlannerResolver(
+    frames = [frame async for frame in PlannerResolver(
         model, Catalog([provider_source_capability()])).stream_advance(request)]
     def native(schema):
         # What a native structured decoder enforces: conditionals are ignored.
@@ -1282,7 +1282,7 @@ async def test_information_already_perceived_is_answered_from_the_cited_observat
         request.context["situation"] = observed_scene()
     raw = perceived_answer(observed, decision, authored)
     model = Model([raw])
-    frames = [frame async for frame in FastPlannerResolver(
+    frames = [frame async for frame in PlannerResolver(
         model, Catalog([provider_source_capability()])).stream_advance(request)]
     from agent.app.clients.sglang_protocol import build_sglang_chat_payload
     from agent.app.inference_compute import CognitionComputeClass
@@ -1331,7 +1331,7 @@ async def test_unsettled_referent_is_clarified_with_a_gap_citing_umi_wording(cit
         local_ref="u1", kind="referent", description=UNSETTLED_THAT, responsibility_refs=["r1"])]
     raw = clarified(cited, count)
     model = Model([raw])
-    frames = [frame async for frame in FastPlannerResolver(
+    frames = [frame async for frame in PlannerResolver(
         model, Catalog([provider_source_capability()])).stream_advance(request)]
     from agent.app.clients.sglang_protocol import build_sglang_chat_payload
     from agent.app.inference_compute import CognitionComputeClass
@@ -1359,7 +1359,7 @@ async def test_situation_source_guidance_appears_only_where_it_can_apply(observe
         request.context["situation"] = observed_scene()
     entry = provider_source_capability() if provider_source else capability("walk", {"speed": {"type": "number"}})
     model = Model([work([])])
-    _ = [frame async for frame in FastPlannerResolver(model, Catalog([entry])).stream_advance(request)]
+    _ = [frame async for frame in PlannerResolver(model, Catalog([entry])).stream_advance(request)]
     prompt = model.packets[0][0]
     assert ("never retype a location" in prompt) is provider_source
     assert ("trust what you observe and cite the observation" in prompt) is expected
@@ -1455,7 +1455,7 @@ async def test_host_stops_reading_once_an_unmet_need_has_library_contracts():
                 yield json.dumps(declared_ability_needs(final, kwargs.get("response_format")))
 
     provider = Provider()
-    frames = [frame async for frame in FastPlannerResolver(provider, Catalog([entry])).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(provider, Catalog([entry])).stream_advance(request)]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
     assert len(provider.packets) == 2 and closed
     needs_end = first.index('"disposition"')
@@ -1475,7 +1475,7 @@ async def test_library_contracts_unusable_for_the_turn_trigger_no_second_call():
         "covered_responsibility_refs": ["r1"], "activities": [{"role": "complete_response", "activity_id": "joke",
         "source_responsibility_refs": ["r1"], "timing": "sequential", "rationale": "Tell the joke."}], "confidence": 1.0, "unresolved": [], "reason_summary": "Answer in speech."}
     model = Model([first])
-    frames = [frame async for frame in FastPlannerResolver(model, Catalog([wave])).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(model, Catalog([wave])).stream_advance(request)]
     assert len(model.packets) == 1
     assert isinstance(frames[0], FastPlannerStreamTerminal)
     assert frames[0].advance.metadata["capability_detail_lookups"] == 0
@@ -1527,7 +1527,7 @@ async def test_conditional_action_reads_first_and_names_its_deferred_decision():
     model = Model([first, {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
                                                   "Retrieve weather for a named place.")],
                            **work([decided, nod_after])}])
-    frames = [frame async for frame in FastPlannerResolver(model, Catalog([nod, weather])).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(model, Catalog([nod, weather])).stream_advance(request)]
     second = model.packets[1][1]["response_format"]
     loaded_needs = {"ability_needs": [need("read the forecast", "chromie.weather.lookup", True,
                                            "Retrieve weather for a named place.")]}

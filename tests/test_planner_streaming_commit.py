@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 from jsonschema import Draft202012Validator
 from agent.app.capabilities.catalog import CatalogCapability
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_model_contract import PlannerDTOContractError
 from agent.app.planner_fast_validation import AuthoritativeGroundingValidationError, validate_fast_advance_output
 from agent.app.planner_prompt import fast_advance_capability_prompt_projection, fast_advance_layered_prompt, fast_advance_semantic_capability_projection, fast_advance_streaming_capability_prompt_projection, fast_responsibility_decision_projection, fast_streaming_advance_system_prompt, planner_interaction_context_projection
@@ -186,7 +186,7 @@ async def test_terminal_cannot_drop_gi_meaning_gap(gap: str, preserve_gap: bool)
         output['activities'] = [{'activity_id': 'ask-meaning', 'role': 'clarification', 'source_responsibility_refs': ['r1'], 'information_gaps': [{'gap_id': 'missing-meaning', 'description': gap, 'required_for': [gap], 'preferred_resolution': 'ask_user', 'source_kind': 'unresolved_meaning', 'source_reference': gap, 'resolution_sources_considered': ['authoritative_context']}]}]
     model = _StreamingModel([_wire_output(output)])
     catalog = _Catalog([_nod_catalog_capability().model_copy(update={'capability_id': 'soridormi.shake_no', 'description': 'Shake head twice.'})])
-    frames = [frame async for frame in FastPlannerResolver(model, catalog).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(model, catalog).stream_advance(request)]
     assert model.calls == 1
     if preserve_gap:
         assert isinstance(frames[-1], FastPlannerStreamTerminal)
@@ -262,7 +262,7 @@ async def test_streamed_string_argument_mapping_preserves_source_ownership(varia
         "covered_responsibility_refs": ["turn"], "confidence": 1,
         "unresolved": [], "reason_summary": "Realize the requested turn."}
     model = _StreamingModel([json.dumps(raw)])
-    events = [event async for event in FastPlannerResolver(model, _Catalog([capability])).stream_advance(request)]
+    events = [event async for event in PlannerResolver(model, _Catalog([capability])).stream_advance(request)]
     assert model.calls == 1
     assert len(events) == 1
     schema = model.last_kwargs["response_format"]
@@ -323,7 +323,7 @@ async def test_nod_count_binding_evidence_wrapper_is_semantically_equal_to_scala
     model = _StreamingModel([_wire_output(raw)])
     frames = [
         frame
-        async for frame in FastPlannerResolver(
+        async for frame in PlannerResolver(
             model, _Catalog([_nod_catalog_capability()])
         ).stream_advance(request)
     ]
@@ -609,7 +609,7 @@ async def test_fast_stream_accepts_contextual_resource_bindings_without_fake_cur
     model = _StreamingModel([_wire_output(_contextual_structured_resource_output())])
     frames = [
         frame
-        async for frame in FastPlannerResolver(
+        async for frame in PlannerResolver(
             model, _Catalog([_structured_resource_catalog_capability()])
         ).stream_advance(request)
     ]
@@ -629,7 +629,7 @@ async def test_fast_stream_accepts_inherited_source_role_bindings_without_span()
     request = _contextual_resource_with_source_role_bindings()
     model = _StreamingModel([_wire_output(_contextual_structured_resource_output())])
     frames = [
-        frame async for frame in FastPlannerResolver(
+        frame async for frame in PlannerResolver(
             model, _Catalog([_structured_resource_catalog_capability()])
         ).stream_advance(request)
     ]
@@ -642,7 +642,7 @@ async def test_fast_stream_filters_incompatible_information_capability_before_ge
     model = _StreamingModel([_wire_output(_structured_resource_output())])
     frames = [
         frame
-        async for frame in FastPlannerResolver(
+        async for frame in PlannerResolver(
             model,
             _Catalog([
                 _structured_resource_catalog_capability(),
@@ -694,7 +694,7 @@ async def test_fast_stream_keeps_body_capabilities_across_social_domain_labels()
     model = _StreamingModel([_wire_output(raw)])
     frames = [
         frame
-        async for frame in FastPlannerResolver(
+        async for frame in PlannerResolver(
             model,
             _Catalog([
                 _blink_social_catalog_capability(),
@@ -709,13 +709,13 @@ async def test_fast_stream_keeps_body_capabilities_across_social_domain_labels()
 
 
 @pytest.mark.asyncio
-async def test_fast_planner_rejects_invalid_argument_source_in_compound_work() -> None:
+async def test_planner_rejects_invalid_argument_source_in_compound_work() -> None:
     request, capabilities, raw, _ = _compound_body_case("walk_nod_turn")
     raw["activities"][1]["argument_sources"]["count"]["source_end_token_ref"] = "t999"
     model = _StreamingModel([_wire_output(raw)])
     frames = [
         frame
-        async for frame in FastPlannerResolver(model, _Catalog(capabilities)).stream_advance(request)
+        async for frame in PlannerResolver(model, _Catalog(capabilities)).stream_advance(request)
     ]
     assert isinstance(frames[-1], FastPlannerStreamFailure)
     assert frames[-1].failure_class == "fast_stream_contract_invalid"
@@ -736,7 +736,7 @@ def test_fast_decision_projection_localizes_coverage_bindings_and_relations() ->
 @pytest.mark.asyncio
 async def test_declared_addressee_target_realization_accepts_exact_trusted_ref() -> None:
     model = _StreamingModel([_wire_output(_look_output(target_ref='current_speaker'))])
-    resolver = FastPlannerResolver(model, _Catalog([_look_at_person_catalog_capability()]))
+    resolver = PlannerResolver(model, _Catalog([_look_at_person_catalog_capability()]))
     frames = [frame async for frame in resolver.stream_advance(_look_request())]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
     assert frames[0].advance.activities[0].args == {'target_ref': 'current_speaker'}
@@ -747,7 +747,7 @@ async def test_declared_addressee_target_realization_accepts_exact_trusted_ref()
 async def test_required_target_ref_uses_trusted_evidence_without_binding_mapping() -> None:
     capability = _look_at_person_catalog_capability().model_copy(update={'hints': {}})
     model = _StreamingModel([_wire_output(_look_output(target_ref='current_speaker'))])
-    resolver = FastPlannerResolver(model, _Catalog([capability]))
+    resolver = PlannerResolver(model, _Catalog([capability]))
     frames = [frame async for frame in resolver.stream_advance(_look_request())]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
     assert frames[0].advance.activities[0].args['target_ref'] == 'current_speaker'
@@ -757,7 +757,7 @@ async def test_declared_target_realization_rejects_mismatched_trusted_ref() -> N
     """The decoder offers only the current trusted target, so a mismatch fails at the wire
     contract before any Host projection (and before commit)."""
     model = _StreamingModel([_wire_output(_look_output(target_ref='invented_person'))])
-    resolver = FastPlannerResolver(model, _Catalog([_look_at_person_catalog_capability()]))
+    resolver = PlannerResolver(model, _Catalog([_look_at_person_catalog_capability()]))
     frames = [frame async for frame in resolver.stream_advance(_look_request())]
     assert isinstance(frames[0], FastPlannerStreamFailure)
     assert frames[0].failure_stage == 'before_commit'
@@ -772,13 +772,13 @@ async def test_a_target_capability_is_not_offered_without_a_trusted_target() -> 
     request = _look_request()
     request = request.model_copy(update={'context': {}})
     model = _StreamingModel([_wire_output(_look_output(target_ref='current_speaker'))])
-    resolver = FastPlannerResolver(model, _Catalog([_look_at_person_catalog_capability()]))
+    resolver = PlannerResolver(model, _Catalog([_look_at_person_catalog_capability()]))
     [frame async for frame in resolver.stream_advance(request)]
     assert 'soridormi.look_at_person' not in json.dumps(model.last_kwargs['response_format'])
 
 @pytest.mark.asyncio
 async def test_declared_structured_resource_realization_accepts_exact_gi_values() -> None:
-    resolver = FastPlannerResolver(_StreamingModel([_wire_output(_structured_resource_output())]), _Catalog([_structured_resource_catalog_capability()]))
+    resolver = PlannerResolver(_StreamingModel([_wire_output(_structured_resource_output())]), _Catalog([_structured_resource_catalog_capability()]))
     frames = [frame async for frame in resolver.stream_advance(_structured_resource_request())]
     assert isinstance(frames[0], FastPlannerStreamTerminal)
     args = frames[0].advance.activities[0].args
@@ -788,7 +788,7 @@ async def test_declared_structured_resource_realization_accepts_exact_gi_values(
 
 @pytest.mark.asyncio
 async def test_declared_structured_resource_realization_rejects_lost_gi_value() -> None:
-    resolver = FastPlannerResolver(_StreamingModel([_wire_output(_structured_resource_output(recipient='requester'))]), _Catalog([_structured_resource_catalog_capability()]))
+    resolver = PlannerResolver(_StreamingModel([_wire_output(_structured_resource_output(recipient='requester'))]), _Catalog([_structured_resource_catalog_capability()]))
     frames = [frame async for frame in resolver.stream_advance(_structured_resource_request())]
     assert isinstance(frames[0], FastPlannerStreamFailure)
     assert 'structured resource realization omitted exact UMI bindings' in frames[0].reason
@@ -808,7 +808,7 @@ async def test_one_complete_work_decision_is_released_only_after_provider_closes
                     yield payload[offset:offset + chunks]
             finally:
                 closed = True
-    stream = FastPlannerResolver(Provider(), _Catalog()).stream_advance(_request())
+    stream = PlannerResolver(Provider(), _Catalog()).stream_advance(_request())
     result = await anext(stream)
     assert closed
     assert isinstance(result, FastPlannerStreamTerminal)
@@ -829,7 +829,7 @@ async def test_one_complete_work_decision_is_released_only_after_provider_closes
 ])
 async def test_ambiguous_incomplete_or_nonfinite_stream_releases_no_work(bad):
     model = _StreamingModel([bad])
-    frames = [frame async for frame in FastPlannerResolver(model, _Catalog()).stream_advance(_request())]
+    frames = [frame async for frame in PlannerResolver(model, _Catalog()).stream_advance(_request())]
     assert model.calls == 1
     assert len(frames) == 1
     assert isinstance(frames[0], FastPlannerStreamFailure)
@@ -843,7 +843,7 @@ async def test_ambiguous_incomplete_or_nonfinite_stream_releases_no_work(bad):
 async def test_work_model_cannot_author_sc_words_or_expression(field, value):
     output = _valid_output()
     output["activities"][0][field] = value
-    frames = [frame async for frame in FastPlannerResolver(_StreamingModel([_wire_output(output)]), _Catalog()).stream_advance(_request())]
+    frames = [frame async for frame in PlannerResolver(_StreamingModel([_wire_output(output)]), _Catalog()).stream_advance(_request())]
     assert len(frames) == 1
     assert isinstance(frames[0], FastPlannerStreamFailure)
 
@@ -854,7 +854,7 @@ async def test_provider_failure_after_valid_json_still_releases_no_work():
         async def generate_stream(self, *args, **kwargs):
             yield _wire_output(_valid_output())
             raise RuntimeError("provider stream integrity failed before termination")
-    frames = [frame async for frame in FastPlannerResolver(Provider(), _Catalog()).stream_advance(_request())]
+    frames = [frame async for frame in PlannerResolver(Provider(), _Catalog()).stream_advance(_request())]
     assert len(frames) == 1
     assert isinstance(frames[0], FastPlannerStreamFailure)
     assert "provider stream integrity" in frames[0].reason
@@ -1249,7 +1249,7 @@ def _compound_body_case(variant: str) -> tuple[CognitiveWorkRequest, list[Catalo
 async def test_compound_body_work_keeps_one_responsibility_and_mechanical_guards(variant):
     request, caps, raw, expected = _compound_body_case(variant)
     model = _StreamingModel([_wire_output(raw)])
-    frames = [f async for f in FastPlannerResolver(model, _Catalog(caps)).stream_advance(request)]
+    frames = [f async for f in PlannerResolver(model, _Catalog(caps)).stream_advance(request)]
     assert model.calls == 1
     assert len(frames) == 1
     assert isinstance(frames[0], FastPlannerStreamTerminal) is expected, frames[0]
@@ -1313,7 +1313,7 @@ def _compound_count_case(variant: str):
 async def test_compound_count_stays_in_declared_parameters(variant):
     request, caps, raw, expected = _compound_count_case(variant)
     model = _StreamingModel([_wire_output(raw)])
-    frames = [f async for f in FastPlannerResolver(model, _Catalog(caps)).stream_advance(request)]
+    frames = [f async for f in PlannerResolver(model, _Catalog(caps)).stream_advance(request)]
     assert model.calls == 1
     assert isinstance(frames[-1], FastPlannerStreamTerminal) == expected
     if expected:
@@ -1370,7 +1370,7 @@ async def test_required_enum_source_matches_selected_value_and_original_turn(var
         'source_responsibility_refs': ['r1'], 'depends_on': []}],
         'disposition': 'execute', 'coverage': 'complete', 'covered_responsibility_refs': ['r1'], 'confidence': 1, 'unresolved': [], 'reason_summary': 'Realize owned turn.'}
     model = _StreamingModel([_wire_output(raw)])
-    frames = [f async for f in FastPlannerResolver(model, _Catalog([capability])).stream_advance(request)]
+    frames = [f async for f in PlannerResolver(model, _Catalog([capability])).stream_advance(request)]
     assert model.calls == 1
     schema = model.last_kwargs['response_format']
     assert Draft202012Validator(schema).is_valid(declared_ability_needs(raw, schema)) == (
@@ -1403,7 +1403,7 @@ async def test_work_beside_an_impossible_sibling_is_one_mixed_decision() -> None
         "confidence": 1.0, "unresolved": [], "reason_summary": "Walk; coffee is not possible.",
     }
     model = _StreamingModel([_wire_output(decision)])
-    frames = [frame async for frame in FastPlannerResolver(model, _Catalog([_walk_catalog_capability()])).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(model, _Catalog([_walk_catalog_capability()])).stream_advance(request)]
     assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]
     advance = frames[-1].advance
     assert advance.disposition == "mixed"
@@ -1423,7 +1423,7 @@ async def test_ordinary_speech_is_answered_never_declared_unavailable() -> None:
     limited = {"responsibility_decisions": {"reply": {"decision": "unavailable", "missing": ["a joke capability"]}},
                "activities": [], "disposition": "unavailable", "coverage": "uncertain",
                "covered_responsibility_refs": ["reply"], "confidence": 1.0, "unresolved": [], "reason_summary": "No jokes."}
-    frames = [frame async for frame in FastPlannerResolver(_StreamingModel([_wire_output(limited)]), _Catalog()).stream_advance(request)]
+    frames = [frame async for frame in PlannerResolver(_StreamingModel([_wire_output(limited)]), _Catalog()).stream_advance(request)]
     assert isinstance(frames[-1], FastPlannerStreamFailure)
 
 
@@ -1439,7 +1439,7 @@ async def test_an_activity_listed_twice_is_one_activity(variant) -> None:
     decision = {"responsibility_decisions": {"walk": {"decision": "work", "missing": []}},
                 "activities": [walk, repeat], "disposition": "execute", "coverage": "complete",
                 "covered_responsibility_refs": ["walk"], "confidence": 1.0, "unresolved": [], "reason_summary": "Walk."}
-    frames = [frame async for frame in FastPlannerResolver(
+    frames = [frame async for frame in PlannerResolver(
         _StreamingModel([_wire_output(decision)]), _Catalog([_walk_catalog_capability()])).stream_advance(request)]
     if variant == "identical":
         assert isinstance(frames[-1], FastPlannerStreamTerminal), frames[-1]

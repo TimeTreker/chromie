@@ -263,8 +263,8 @@ class CognitionSettings:
     enable_agent: bool
     enable_interaction_response: bool
     enable_soridormi_capabilities: bool
-    fast_planner_mode: str
-    fast_planner_timeout_ms: int
+    planner_mode: str
+    planner_timeout_ms: int
     deliberative_timeout_ms: int
     goal_association_mode: str
     goal_association_timeout_ms: int
@@ -284,8 +284,6 @@ class ModelGenerationSettings:
     keep_alive: str
     prompt_chars_per_token_estimate: float
     context_safety_margin_tokens: int
-    ready_greeting_fallback_model: str
-    ready_greeting_num_ctx: int
 
 
 @dataclass(frozen=True)
@@ -316,8 +314,6 @@ class PlaybackSettings:
     ready_greeting_text: str
     ready_greeting_fallback_text: str
     ready_greeting_language: str
-    ready_greeting_model: str
-    ready_greeting_num_predict: int
     ready_greeting_generation_timeout_ms: int
     ready_greeting_timeout_ms: int
 
@@ -371,12 +367,6 @@ class HostSettingsSnapshot:
     ) -> "HostSettingsSnapshot":
         values = os.environ if environ is None else environ
         ollama_model = _text(values, "OLLAMA_MODEL", "gemma4:e2b") or "gemma4:e2b"
-        ollama_num_ctx = _int(values, "OLLAMA_NUM_CTX", 2048, minimum=512)
-        ready_greeting_fallback_model = (
-            _text(values, "AGENT_FAST_PLANNER_MODEL")
-            or _text(values, "AGENT_USER_MEANING_INTERPRETER_MODEL")
-            or ollama_model
-        )
         max_text_chars = _int(values, "TTS_MAX_TEXT_CHARS", 220, minimum=20)
         presentation_compute_lease_enabled = _bool(
             values, "ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED", False
@@ -471,15 +461,6 @@ class HostSettingsSnapshot:
                 _text(values, "ORCH_RUNTIME_READY_GREETING_LANGUAGE", "zh-CN")
                 or "zh-CN"
             ),
-            ready_greeting_model=_text(
-                values, "ORCH_RUNTIME_READY_GREETING_MODEL", ""
-            ),
-            ready_greeting_num_predict=_int(
-                values,
-                "ORCH_RUNTIME_READY_GREETING_NUM_PREDICT",
-                32,
-                minimum=8,
-            ),
             ready_greeting_generation_timeout_ms=_int(
                 values,
                 "ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS",
@@ -493,18 +474,6 @@ class HostSettingsSnapshot:
                 minimum=1000,
             ),
         )
-        if (
-            playback.ready_greeting_speech_enabled
-            and not playback.ready_greeting_text
-            and (_text(values, "AGENT_LLM_PROVIDER", "ollama") or "ollama").casefold()
-            != "ollama"
-        ):
-            raise HostConfigurationError(
-                "generated ready-greeting speech posts to the Ollama-native LLM_URL, "
-                "which non-Ollama inference profiles do not serve; set "
-                "ORCH_RUNTIME_READY_GREETING_TEXT or keep "
-                "ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=0"
-            )
         return cls(
             audio_input=AudioInputSettings(
                 asr_url=_text(values, "ASR_URL", "ws://localhost:9001"),
@@ -585,14 +554,14 @@ class HostSettingsSnapshot:
                 enable_soridormi_capabilities=_bool(
                     values, "ORCH_ENABLE_SORIDORMI_CAPABILITIES", False
                 ),
-                fast_planner_mode=_choice(
+                planner_mode=_choice(
                     values,
-                    "ORCH_FAST_PLANNER_MODE",
+                    "ORCH_PLANNER_MODE",
                     "off",
                     {"off", "report_only"},
                 ),
-                fast_planner_timeout_ms=_int(
-                    values, "ORCH_FAST_PLANNER_TIMEOUT_MS", 65000, minimum=100
+                planner_timeout_ms=_int(
+                    values, "ORCH_PLANNER_TIMEOUT_MS", 65000, minimum=100
                 ),
                 deliberative_timeout_ms=_int(
                     values, "ORCH_DELIBERATIVE_TIMEOUT_MS", 125000, minimum=100
@@ -811,13 +780,6 @@ class HostSettingsSnapshot:
                     "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
                     512,
                     minimum=0,
-                ),
-                ready_greeting_fallback_model=ready_greeting_fallback_model,
-                ready_greeting_num_ctx=_int(
-                    values,
-                    "AGENT_FAST_PLANNER_NUM_CTX",
-                    ollama_num_ctx,
-                    minimum=512,
                 ),
             ),
             playback=playback,

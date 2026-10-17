@@ -17,7 +17,7 @@ planning, capability execution, and evidence
   location/time/aspect scope, weather memory matching, lookup planning, and
   result interpretation. It declares the grounded method as its parent.
 
-Both packages expose one Planner projection (`fast_planner`; the Deep Planner projection was retired with the Deep Planner on 2026-10-11).
+Both packages expose one Planner projection (`fast_planner`).
 Parent metadata informs model-authored composition; the Host does not
 automatically select a parent or domain Skill. Neither package registers or
 executes a Capability. Goal Association does not load domain Agent Skills: its
@@ -29,7 +29,7 @@ intersects each package's declared `applicable_output_modes` and
 `applicable_information_domains` with the current canonical Goals. This is a
 typed disclosure boundary, not semantic classification: the Host does not infer
 a route or choose a Skill from user wording. When Goal Association broadens an
-external-information Goal after Fast Planner already authored exact provisional
+external-information Goal after Planner already authored exact provisional
 Work, the qualifier may retain only the exact capability IDs from that
 correlated Work; it does not expose other narrower-domain capabilities or make a
 new semantic choice. This preserves the Planner's existing HOW decision through
@@ -306,7 +306,7 @@ shared Goal/Resource contracts so canonical meaning does not depend on whether a
 domain Skill happened to load. Planner Skills begin at HOW, after canonical Goal
 identity exists. The Host loads a requested Planner projection only after that
 Planner has selected the Skill for one or more current canonical Goals. A
-UMI-triggered Fast Planner that runs before Goal Association has no canonical Goal
+UMI-triggered Planner that runs before Goal Association has no canonical Goal
 identity yet, so its pre-association Agent-Skill path receives no historical
 active/recent Goal IDs and deterministically returns `no_skill` without a model call.
 This prevents an unrelated unfinished Goal from injecting a stale domain method into
@@ -334,8 +334,8 @@ loads only metadata and the selected projection.
 This keeps prompts small, makes selection observable, and avoids turning the
 entire Skill library into permanent system-prompt text.
 
-The current implementation completes this flow for one Agent role, the Fast
-Planner (`fast_planner`, wired on `/fast-plan`). Social Cognition, UMI, Goal
+The current implementation completes this flow for one Agent role, the
+Planner (`fast_planner`, wired on `/plan`). Social Cognition, UMI, Goal
 Association and Value Judgment receive no Agent Skill projection; Social
 Cognition's plan projection drops `selected_agent_skills`. Skill guidance about
 answer wording therefore reaches only the word-free Planner, which can carry it

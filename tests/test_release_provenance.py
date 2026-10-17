@@ -32,7 +32,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
         def changed_profile(path):
             values = parse_env(path)
             if path.name == "rtx5090.env":
-                values["AGENT_FAST_PLANNER_MODEL"] = "unlocked-model"
+                values["AGENT_PLANNER_MODEL"] = "unlocked-model"
             return values
 
         with mock.patch("scripts.release_provenance.parse_env", side_effect=changed_profile):
@@ -46,7 +46,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
             "AGENT_USER_MEANING_INTERPRETER_MODEL": "chromie-qwen35-4b",
             "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL": "chromie-qwen35-4b",
             "AGENT_GOAL_ASSOCIATION_MODEL": "chromie-qwen35-4b",
-            "AGENT_FAST_PLANNER_MODEL": "chromie-qwen35-4b",
+            "AGENT_PLANNER_MODEL": "chromie-qwen35-4b",
             "AGENT_DELIBERATIVE_MODEL": "chromie-qwen35-4b",
             "AGENT_SKILL_SELECTION_MODEL": "chromie-qwen35-4b",
             **{
@@ -85,7 +85,7 @@ class ReleaseProvenanceTests(unittest.TestCase):
             "AGENT_MODEL": "gemma4:e2b",
             "OLLAMA_MODEL": "gemma4:e2b",
             "AGENT_USER_MEANING_INTERPRETER_MODEL": "qwen3.5:4b",
-            "AGENT_FAST_PLANNER_MODEL": "qwen3:4b",
+            "AGENT_PLANNER_MODEL": "qwen3:4b",
             "AGENT_SKILL_SELECTION_MODEL": "qwen3:4b",
             "TTS_COSYVOICE_OLLAMA_MODEL": "compact:model",
         }

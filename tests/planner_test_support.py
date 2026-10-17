@@ -6,7 +6,7 @@ import json
 
 from agent.app import planner_prompt as planner_prompt
 from agent.app.capabilities.catalog import CatalogCapability
-from agent.app.fast_planner import FastPlannerResolver as ProductionFastPlannerResolver
+from agent.app.planner import PlannerResolver as ProductionPlannerResolver
 from agent.app.planner_model_contract import (
     PlannerDTOContractError,
 )
@@ -49,7 +49,7 @@ class FakeOllama:
         return json.loads(text)
 
 
-class FastPlannerResolver(ProductionFastPlannerResolver):
+class PlannerResolver(ProductionPlannerResolver):
     """Test adapter retaining terminal-result assertions during wire migration."""
 
     async def resolve_advance(self, request):

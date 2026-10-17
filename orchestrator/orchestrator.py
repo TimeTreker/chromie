@@ -11,6 +11,7 @@ import re
 import threading
 import time
 import unicodedata
+import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
@@ -174,7 +175,10 @@ from shared.chromie_contracts.plan import (
     canonical_plan_fingerprint,
     communication_need_id,
 )
-from shared.chromie_contracts.social_cognition import SocialCognitionRequest
+from shared.chromie_contracts.social_cognition import (
+    SocialCognitionRequest,
+    SocialStartupGreetingRequest,
+)
 from shared.chromie_contracts.reflection import ReflectionRequest
 from shared.chromie_contracts.execution_outcome import (
     ExecutionEvidence,
@@ -201,9 +205,6 @@ from shared.chromie_contracts.user_turn import (
 from shared.chromie_contracts.semantic_authority import (
     SemanticAuthorityClaim,
     context_with_semantic_authority,
-)
-from shared.chromie_runtime.ollama_non_thinking import (
-    enforce_non_thinking_ollama_response,
 )
 from shared.chromie_runtime.llm_diagnostics import (
     log_llm_call_evidence,
@@ -251,8 +252,8 @@ class VoiceAssistant:
         self.addressedness_engagement_timeout_s = (
             session_settings.addressedness_engagement_timeout_s
         )
-        self.fast_planner_mode = cognition_settings.fast_planner_mode
-        self.fast_planner_timeout_ms = cognition_settings.fast_planner_timeout_ms
+        self.planner_mode = cognition_settings.planner_mode
+        self.planner_timeout_ms = cognition_settings.planner_timeout_ms
         self.deliberative_timeout_ms = cognition_settings.deliberative_timeout_ms
         self.goal_association_mode = cognition_settings.goal_association_mode
         self.goal_association_timeout_ms = (
@@ -361,10 +362,6 @@ class VoiceAssistant:
         )
         self.runtime_ready_greeting_language = (
             playback_settings.ready_greeting_language
-        )
-        self.runtime_ready_greeting_model = playback_settings.ready_greeting_model
-        self.runtime_ready_greeting_num_predict = (
-            playback_settings.ready_greeting_num_predict
         )
         self.runtime_ready_greeting_generation_timeout_ms = (
             playback_settings.ready_greeting_generation_timeout_ms
@@ -485,7 +482,7 @@ class VoiceAssistant:
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
-            fast_planner_timeout_ms=self.fast_planner_timeout_ms,
+            planner_timeout_ms=self.planner_timeout_ms,
             deliberative_timeout_ms=self.deliberative_timeout_ms,
             value_review_capability_ids=load_value_review_capability_ids(
                 PROJECT_ROOT / VALUE_REVIEW_RELATIVE_PATH
@@ -1670,37 +1667,6 @@ class VoiceAssistant:
                 except asyncio.QueueEmpty:
                     break
         self.ensure_playback_worker()
-
-
-
-
-
-    def _owner_identity_json(self) -> str:
-        try:
-            context = self.mind.context()
-            identity = context.get("identity", {}) if isinstance(context, dict) else {}
-        except Exception as exc:
-            logger.warning("direct_llm_identity_failed: %s", exc)
-            identity = {}
-        if not isinstance(identity, dict):
-            identity = {}
-        return json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-
-    def _owner_mind_summary(self) -> str:
-        try:
-            summary = self.mind.prompt_summary()
-        except Exception as exc:
-            logger.warning("direct_llm_mind_summary_failed: %s", exc)
-            summary = ""
-        summary = " ".join(str(summary or "").split())
-        if not summary:
-            return "Owner-approved mind summary unavailable; rely on the supplied Self model JSON."
-        if len(summary) > 1200:
-            return summary[:1200].rstrip() + "..."
-        return summary
-
 
     def _log_goal_list(
         self,
@@ -5967,9 +5933,9 @@ class VoiceAssistant:
         # nothing re-plans its decision. Runtime never selects reasoning depth from
         # event type or a Host-authored readiness mode.
         replanned: CanonicalPlan | None = await resolve_reentry_plan(
-            self.agent_client.resolve_fast_plan(
+            self.agent_client.resolve_plan(
                 session, request=request,
-                timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
+                timeout_ms=self.cognitive_runtime_policy.planner_timeout_ms,
             ), fast_workflow_stage, {"planner_pass": "fast"},
         )
 
@@ -7630,32 +7596,6 @@ class VoiceAssistant:
         if new_session_id:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_delivery.playback_generation)
 
-    @staticmethod
-    def _spoken_text_response_schema(
-        *,
-        max_chars: int,
-        semantic_state: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        properties: dict[str, Any] = {
-            "text": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": max_chars,
-            }
-        }
-        required = ["text"]
-        for key, value in (semantic_state or {}).items():
-            if key == "text":
-                raise ValueError("semantic_state must not redefine text")
-            properties[key] = {"type": "string", "const": value}
-            required.append(key)
-        return {
-            "type": "object",
-            "properties": properties,
-            "required": required,
-            "additionalProperties": False,
-        }
-
     def _validate_spoken_text_contract(
         self,
         text: str,
@@ -7691,68 +7631,6 @@ class VoiceAssistant:
             raise RuntimeError(f"{purpose} did not use the required Chinese language")
         return normalized
 
-    def _decode_spoken_text_envelope(
-        self,
-        data: dict[str, Any],
-        *,
-        purpose: str,
-        max_chars: int,
-        one_sentence: bool = False,
-        require_terminal_punctuation: bool = False,
-        language: str | None = None,
-        suppressed_thinking_chars: int = 0,
-        expected_semantic_state: dict[str, str] | None = None,
-    ) -> str:
-        thinking = data.get("thinking")
-        if isinstance(thinking, str):
-            suppressed_thinking_chars += len(thinking)
-        if suppressed_thinking_chars:
-            logger.warning(
-                "%s suppressed non-spoken model thinking: chars=%s",
-                purpose,
-                suppressed_thinking_chars,
-            )
-
-        done_reason = str(data.get("done_reason") or "").strip().lower()
-        if done_reason and done_reason != "stop":
-            raise RuntimeError(
-                f"{purpose} did not complete normally: done_reason={done_reason}"
-            )
-
-        raw_response = data.get("response")
-        if not isinstance(raw_response, str):
-            raise RuntimeError(f"{purpose} returned no response string")
-        try:
-            envelope = json.loads(raw_response)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"{purpose} returned non-JSON output; refusing to speak it"
-            ) from exc
-        expected_state = dict(expected_semantic_state or {})
-        expected_keys = {"text", *expected_state}
-        if not isinstance(envelope, dict) or set(envelope) != expected_keys:
-            raise RuntimeError(
-                f"{purpose} returned an invalid spoken-output envelope"
-            )
-        mismatched_state = {
-            key: {"expected": value, "actual": envelope.get(key)}
-            for key, value in expected_state.items()
-            if envelope.get(key) != value
-        }
-        if mismatched_state:
-            raise RuntimeError(
-                f"{purpose} changed authoritative semantic state: "
-                + json.dumps(mismatched_state, ensure_ascii=False, sort_keys=True)
-            )
-        return self._validate_spoken_text_contract(
-            envelope.get("text", ""),
-            purpose=purpose,
-            max_chars=max_chars,
-            one_sentence=one_sentence,
-            require_terminal_punctuation=require_terminal_punctuation,
-            language=language,
-        )
-
     @staticmethod
     def _runtime_ready_greeting_time_context(
         local_now: datetime | None = None,
@@ -7782,53 +7660,6 @@ class VoiceAssistant:
             "weekday": observed.strftime("%A"),
         }
 
-    def _runtime_ready_greeting_prompt(
-        self,
-        *,
-        local_now: datetime | None = None,
-    ) -> str:
-        language = self.runtime_ready_greeting_language
-        identity_json = self._owner_identity_json()
-        mind_summary = self._owner_mind_summary()
-        time_context = json.dumps(
-            self._runtime_ready_greeting_time_context(local_now),
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        return (
-            "The person described by the owner-approved identity JSON below has just woken up "
-            "and can now hear and talk with her family; she lives with her family and has her own interests. "
-            "Write exactly one complete, very short greeting she naturally says after waking up. "
-            "Sound like that configured identity (factory: a smart, warm twelve-year-old girl), "
-            "not a device, service agent, or adult professional. "
-            f"Speak only in {language}. "
-            "Do not explain the task, analyze the request, expose reasoning, or mention "
-            "the prompt. Do not mention readiness, startup, initialization, systems, "
-            "services, models, being an assistant, or operational status. Do not "
-            "introduce yourself, repeat your name or age, or ask what help is required. "
-            "Use the supplied local period only as quiet grounding, not as a command "
-            "to announce the time of day. Prefer the spontaneous first-person delight "
-            "of someone who has just opened her eyes at home, such as naturally showing that "
-            "she is awake and looking forward to being together. Do not default to a "
-            "formal morning, afternoon, or evening salutation. Do not quote the exact "
-            "clock time, calendar date, or weekday. "
-            "Do not invent meals, hunger, sleepiness, weather, or another personal "
-            "state. Do not ask a question or end mid-clause. "
-            "No individual family member has been identified at startup. Use no "
-            "vocative, addressee noun, personal name, kinship term, social category, "
-            "or relationship label at all. Speak naturally into the shared room without "
-            "naming an addressee; a cheerful first-person wake-up line is preferred over "
-            "a formal greeting. Return only a JSON "
-            "object with one field named text. The text value is the complete spoken "
-            "sentence, normally four to twelve Chinese characters and never more "
-            "than twenty-four characters. Prefer a complete greeting over filling "
-            "the available length.\n\n"
-            f"Grounded local temporal context JSON: {time_context}\n"
-            f"Owner-approved identity JSON: {identity_json}\n"
-            f"Owner-approved mind summary: {mind_summary}\n"
-        )
-
     @staticmethod
     def _validate_runtime_ready_greeting_completion(text: str) -> str:
         if not re.search(r"[。！？!?]$", str(text or "").strip()):
@@ -7838,97 +7669,66 @@ class VoiceAssistant:
         return text
 
     async def _generate_runtime_ready_greeting(self) -> tuple[str, str]:
+        """Return the startup line and its source; Social Cognition authors any words.
+
+        The Host is not a response author: it supplies trusted clock facts and the
+        owner-approved Mind, then only validates delivery bounds. An owner-configured
+        text is the owner's own wording and is played as given.
+        """
+        language = self.runtime_ready_greeting_language
         try:
             configured = self._validate_spoken_text_contract(
                 self.runtime_ready_greeting_text,
                 purpose="configured runtime ready greeting",
                 max_chars=24,
                 one_sentence=True,
-                language=self.runtime_ready_greeting_language,
+                language=language,
             )
         except RuntimeError:
             configured = ""
         if configured:
             return configured, "configured"
 
-        model = (
-            self.runtime_ready_greeting_model
-            or self.host_settings.model_generation.ready_greeting_fallback_model
-            or self.ollama_model
-        )
-        payload = {
-            "model": model,
-            "prompt": self._runtime_ready_greeting_prompt(),
-            "stream": False,
-            "think": False,
-            "format": self._spoken_text_response_schema(max_chars=24),
-            "keep_alive": self.host_settings.model_generation.keep_alive,
-            "options": {
-                "num_ctx": self.host_settings.model_generation.ready_greeting_num_ctx,
-                "num_predict": self.runtime_ready_greeting_num_predict,
-                "temperature": 0.55,
-                "top_p": 0.9,
-            },
-        }
-        timeout_s = self.runtime_ready_greeting_generation_timeout_ms / 1000.0
-
-        async def request_greeting(request_payload: dict[str, Any]) -> dict[str, Any]:
+        try:
+            if not self.enable_agent:
+                raise RuntimeError("Social Cognition is unavailable without the Agent")
+            request = SocialStartupGreetingRequest(
+                request_id=f"startup-greeting:{uuid.uuid4().hex}",
+                language=language,
+                max_chars=24,
+                local_time=self._runtime_ready_greeting_time_context(),
+                context={"mind": self.mind.context()},
+            )
             session = await self.get_http_session()
-            async with session.post(self.llm_url, json=request_payload) as response:
-                body = await response.text()
-                if response.status != 200:
-                    raise RuntimeError(
-                        f"runtime greeting model returned HTTP {response.status}: "
-                        f"{body[:300]}"
-                    )
-                provider_data = json.loads(body)
-                return enforce_non_thinking_ollama_response(
-                    provider_data, structured_output=True
-                ).response
-
-        generation_error: Exception | None = None
-        for attempt in range(2):
-            request_payload = dict(payload)
-            if attempt:
-                request_payload["prompt"] = (
-                    f"{payload['prompt']}\n"
-                    "The previous candidate violated the greeting contract. "
-                    "Choose a different short, time-grounded greeting without "
-                    "self-introduction, age, invented personal state, or any addressee "
-                    "noun, name, social category, or relationship label."
+            resolution = await self.agent_client.resolve_startup_greeting(
+                session,
+                request=request,
+                timeout_ms=self.runtime_ready_greeting_generation_timeout_ms,
+            )
+            if resolution.disposition == "silence":
+                logger.info(
+                    "Runtime ready greeting: Social Cognition chose silence: %s",
+                    resolution.reason_summary,
                 )
-            try:
-                data = await asyncio.wait_for(
-                    request_greeting(request_payload),
-                    timeout=timeout_s,
-                )
-                generated = self._decode_spoken_text_envelope(
-                    data,
-                    purpose="runtime ready greeting",
-                    max_chars=24,
-                    one_sentence=True,
-                    language=self.runtime_ready_greeting_language,
-                )
-                self._validate_runtime_ready_greeting_completion(generated)
-                return generated, f"llm:{model}"
-            except Exception as exc:
-                generation_error = exc
-                logger.warning(
-                    "Runtime ready greeting generation attempt %s failed: %s",
-                    attempt + 1,
-                    exc,
-                )
-        logger.warning(
-            "Runtime ready greeting generation failed after retries: %s",
-            generation_error,
-        )
+                return "", "social_cognition:silence"
+            generated = self._validate_spoken_text_contract(
+                resolution.text,
+                purpose="runtime ready greeting",
+                max_chars=24,
+                one_sentence=True,
+                language=language,
+            )
+            self._validate_runtime_ready_greeting_completion(generated)
+            return generated, "social_cognition"
+        except Exception as exc:
+            logger.warning("Runtime ready greeting from Social Cognition failed: %s", exc)
         try:
             fallback = self._validate_spoken_text_contract(
                 self.runtime_ready_greeting_fallback_text,
                 purpose="runtime ready greeting fallback",
                 max_chars=24,
                 one_sentence=True,
-                language=self.runtime_ready_greeting_language,
+                language=language,
             )
         except RuntimeError as fallback_exc:
             logger.warning("Runtime ready greeting fallback rejected: %s", fallback_exc)

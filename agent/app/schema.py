@@ -39,7 +39,7 @@ class HealthResponse(BaseModel):
     goal_association_model: str | None = None
     cognitive_activation_enabled: bool = False
     cognitive_activation_model: str | None = None
-    fast_planner_enabled: bool = False
-    fast_planner_model: str | None = None
+    planner_enabled: bool = False
+    planner_model: str | None = None
 
 

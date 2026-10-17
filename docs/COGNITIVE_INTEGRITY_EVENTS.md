@@ -9,7 +9,7 @@ same turn, or pass partial output to execution.
 The same event producer is used at all goal-driven cognitive boundaries:
 
 - Goal Association;
-- Planner (the Deep Planner was retired on 2026-10-11).
+- Planner.
 
 Every captured truncation declares that the result is untrusted, automatic retry
 and context reduction are forbidden, and new execution is prevented.

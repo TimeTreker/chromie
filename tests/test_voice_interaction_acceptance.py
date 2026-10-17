@@ -411,7 +411,7 @@ def write_live_voice_fixture(root: Path) -> None:
             "models": {"fast": "qwen3:4b"},
         },
         "orchestrator_runtime": {
-            "effective_models": {"AGENT_FAST_PLANNER_MODEL": "qwen3:4b"},
+            "effective_models": {"AGENT_PLANNER_MODEL": "qwen3:4b"},
         },
         "capability_manifests": [{"path": "fixture", "sha256": "b" * 64}],
         "deployment": {
@@ -425,7 +425,7 @@ def write_live_voice_fixture(root: Path) -> None:
                         else {}
                     ),
                     "effective_models": (
-                        {"AGENT_FAST_PLANNER_MODEL": "qwen3:4b"}
+                        {"AGENT_PLANNER_MODEL": "qwen3:4b"}
                         if service == "chromie-agent"
                         else {}
                     ),

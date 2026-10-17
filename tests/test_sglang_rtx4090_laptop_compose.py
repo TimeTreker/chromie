@@ -56,7 +56,7 @@ def test_laptop_sglang_profile_uses_colon_free_served_alias() -> None:
         "AGENT_USER_MEANING_INTERPRETER_MODEL",
         "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
         "AGENT_GOAL_ASSOCIATION_MODEL",
-        "AGENT_FAST_PLANNER_MODEL",
+        "AGENT_PLANNER_MODEL",
         "AGENT_DELIBERATIVE_MODEL",
         "AGENT_SKILL_SELECTION_MODEL",
     ):

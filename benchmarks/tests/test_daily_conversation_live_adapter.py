@@ -88,7 +88,7 @@ def _health_observation(tmp_path: Path, *, fast_model: str, expected_fast_model:
     evidence_dir.mkdir()
     (evidence_dir / "agent_health.json").write_text(
         '{"model": "chromie-gemma4-12b", "goal_association_model": "chromie-gemma4-12b", '
-        f'"fast_planner_model": "{fast_model}"}}',
+        f'"planner_model": "{fast_model}"}}',
         encoding="utf-8",
     )
     request = {
@@ -117,5 +117,5 @@ def test_daily_conversation_live_adapter_fails_a_fast_model_mismatch(tmp_path: P
 
 
 def test_daily_conversation_live_adapter_reads_the_profile_fast_model() -> None:
-    assert _configured_fast_model({"AGENT_FAST_PLANNER_MODEL": " chromie-qwen35-4b "}) == "chromie-qwen35-4b"
+    assert _configured_fast_model({"AGENT_PLANNER_MODEL": " chromie-qwen35-4b "}) == "chromie-qwen35-4b"
     assert _configured_fast_model({}) is None

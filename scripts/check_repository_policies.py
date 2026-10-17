@@ -819,7 +819,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "Goal Association trusted validation must conserve the primary result rather than trigger another semantic authority",
         ),
-        "agent/app/fast_planner.py": (
+        "agent/app/planner.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
                 "fast_planner.first_response.truth_check",
@@ -1634,7 +1634,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
 
     retired_split_fast_presentation_tokens = {
         "agent/app/main.py": ("/fast-first-response",),
-        "agent/app/fast_planner.py": ("resolve_first_response",),
+        "agent/app/planner.py": ("resolve_first_response",),
         "agent/app/settings.py": (
             "fast_first_response_model",
             "fast_first_response_timeout_ms",
@@ -1688,7 +1688,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         "orchestrator/runtime/interaction_preflight.py",
         "orchestrator/runtime/episode.py",
         "orchestrator/runtime/experience.py",
-        "agent/app/fast_planner.py",
+        "agent/app/planner.py",
     )
     for relative in canonical_runtime_files:
         path = root / relative
@@ -1711,7 +1711,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                 )
 
     canonical_source_checks = {
-        "agent/app/fast_planner.py": (
+        "agent/app/planner.py": (
             "FINAL ALLOWED EXECUTABLE SKILL IDS",
             "exact supplied skill IDs",
             "Skills are plan leaves",

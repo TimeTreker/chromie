@@ -44,21 +44,6 @@ class HostSettingsSnapshotTests(unittest.TestCase):
             settings.playback.concurrency = 3  # type: ignore[misc]
 
 
-    def test_generated_ready_greeting_speech_requires_the_ollama_endpoint(self) -> None:
-        speech = {"ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED": "1"}
-        with self.assertRaisesRegex(HostConfigurationError, "LLM_URL"):
-            HostSettingsSnapshot.from_env(
-                project_root=Path("/tmp"),
-                environ={**speech, "AGENT_LLM_PROVIDER": "sglang"},
-            )
-        for environ in (
-            {**speech, "AGENT_LLM_PROVIDER": "ollama"},
-            {**speech, "AGENT_LLM_PROVIDER": "sglang", "ORCH_RUNTIME_READY_GREETING_TEXT": "你好"},
-            {"AGENT_LLM_PROVIDER": "sglang"},
-        ):
-            with self.subTest(environ=environ):
-                HostSettingsSnapshot.from_env(project_root=Path("/tmp"), environ=environ)
-
     def test_model_generation_settings_are_typed_once(self) -> None:
         settings = HostSettingsSnapshot.from_env(
             project_root=Path("/tmp"),
@@ -67,10 +52,10 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                 "OLLAMA_NUM_CTX": "4096",
                 "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.5",
                 "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "1024",
-                "AGENT_FAST_PLANNER_MODEL": "fast-model",
-                "AGENT_FAST_PLANNER_NUM_CTX": "12288",
-                "AGENT_FAST_PLANNER_NUM_PREDICT": "512",
-                "AGENT_FAST_PLANNER_TIMEOUT_MS": "7000",
+                "AGENT_PLANNER_MODEL": "fast-model",
+                "AGENT_PLANNER_NUM_CTX": "12288",
+                "AGENT_PLANNER_NUM_PREDICT": "512",
+                "AGENT_PLANNER_TIMEOUT_MS": "7000",
             },
         )
 
@@ -78,8 +63,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         self.assertEqual(model.keep_alive, "8h")
         self.assertEqual(model.prompt_chars_per_token_estimate, 2.5)
         self.assertEqual(model.context_safety_margin_tokens, 1024)
-        self.assertEqual(model.ready_greeting_fallback_model, "fast-model")
-        self.assertEqual(model.ready_greeting_num_ctx, 12288)
+        self.assertFalse(hasattr(model, "ready_greeting_fallback_model"))
 
 
     def test_extended_host_collaborator_settings_are_typed_once(self) -> None:

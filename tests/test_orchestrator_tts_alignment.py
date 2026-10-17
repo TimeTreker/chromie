@@ -132,73 +132,161 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 assistant.conversation_state.conversation_id,
             )
 
-    def test_runtime_ready_greeting_prompt_is_a_human_like_wake_up(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+    @staticmethod
+    def _configure_startup_greeting(
+        assistant: VoiceAssistant,
+        resolve: Any,
+        *,
+        enable_agent: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Wire the Host greeting path to a fake Social Cognition client."""
+        assistant.runtime_ready_greeting_text = ""
+        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
         assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
+        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
+        assistant.enable_agent = enable_agent
+        assistant.mind = types.SimpleNamespace(
+            context=lambda: {"owner_approved": True, "identity": {"name": "Chromie"}}
+        )
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(),
             assistant,
         )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm, curious, and natural",
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()),
             assistant,
         )
+        calls: list[dict[str, Any]] = []
 
-        prompt = assistant._runtime_ready_greeting_prompt(
-            local_now=datetime(
-                2026,
-                8,
-                1,
-                7,
-                30,
-                tzinfo=timezone(timedelta(hours=8)),
-            )
+        class AgentClient:
+            async def resolve_startup_greeting(
+                self, session: Any, *, request: Any, timeout_ms: int,
+            ) -> Any:
+                calls.append({"session": session, "request": request, "timeout_ms": timeout_ms})
+                return await resolve(request)
+
+        assistant.agent_client = AgentClient()
+
+        async def get_http_session(self: VoiceAssistant) -> str:
+            del self
+            return "session"
+
+        assistant.get_http_session = MethodType(get_http_session, assistant)
+        return calls
+
+    @staticmethod
+    def _startup_resolution(request: Any, disposition: str, text: str = "") -> Any:
+        from shared.chromie_contracts.social_cognition import SocialStartupGreetingResolution
+
+        return SocialStartupGreetingResolution(
+            request_id=request.request_id,
+            disposition=disposition,
+            text=text,
+            reason_summary="test",
+            model_call_count=1,
         )
 
-        self.assertIn("has just woken up", prompt)
-        self.assertIn("naturally says after waking up", prompt)
-        self.assertIn('"local_period":"morning"', prompt)
-        self.assertIn('"utc_offset":"+08:00"', prompt)
-        self.assertIn("Do not quote the exact clock time", prompt)
-        self.assertIn("quiet grounding", prompt)
-        self.assertIn("Speak only in zh-CN", prompt)
-        self.assertIn("not a device, service agent, or adult professional", prompt)
-        self.assertIn("described by the owner-approved identity JSON", prompt)
-        self.assertIn("factory: a smart, warm twelve-year-old girl", prompt)
-        self.assertNotIn("Chromie has just woken up", prompt)
-        self.assertIn("Use no vocative, addressee noun", prompt)
-        self.assertIn("spontaneous first-person delight", prompt)
-        self.assertIn("Do not default to a formal morning, afternoon, or evening salutation", prompt)
-        self.assertIn("a cheerful first-person wake-up line is preferred", prompt)
-        self.assertNotIn("greet the room with only a general or time-of-day greeting", prompt)
-        self.assertIn("Return only a JSON object", prompt)
-        self.assertIn("Do not explain the task", prompt)
-
-    def test_runtime_ready_greeting_prompt_changes_with_grounded_local_period(self) -> None:
+    async def test_runtime_ready_greeting_is_authored_by_social_cognition(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
+
+        async def resolve(request: Any) -> Any:
+            return self._startup_resolution(request, "communicate", "早上好，我醒啦！")
+
+        calls = self._configure_startup_greeting(assistant, resolve)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("早上好，我醒啦！", "social_cognition"))
+        self.assertEqual(len(calls), 1)
+        request = calls[0]["request"]
+        self.assertEqual(calls[0]["timeout_ms"], 1000)
+        self.assertEqual(request.language, "zh-CN")
+        self.assertEqual(request.max_chars, 24)
+        self.assertEqual(request.context["mind"]["identity"]["name"], "Chromie")
+        self.assertIn(
+            request.local_time["local_period"],
+            {"morning", "midday", "afternoon", "evening", "late_night"},
         )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm, curious, and natural",
-            assistant,
-        )
+        self.assertFalse(hasattr(assistant, "_runtime_ready_greeting_prompt"))
+
+    def test_runtime_ready_greeting_clock_facts_follow_the_grounded_local_period(self) -> None:
         local_tz = timezone(timedelta(hours=8))
-
-        morning = assistant._runtime_ready_greeting_prompt(
-            local_now=datetime(2026, 8, 1, 8, 0, tzinfo=local_tz)
+        morning = VoiceAssistant._runtime_ready_greeting_time_context(
+            datetime(2026, 8, 1, 7, 30, tzinfo=local_tz)
         )
-        evening = assistant._runtime_ready_greeting_prompt(
-            local_now=datetime(2026, 8, 1, 19, 0, tzinfo=local_tz)
+        evening = VoiceAssistant._runtime_ready_greeting_time_context(
+            datetime(2026, 8, 1, 19, 0, tzinfo=local_tz)
         )
 
-        self.assertIn('"local_period":"morning"', morning)
-        self.assertIn('"local_period":"evening"', evening)
-        self.assertNotEqual(morning, evening)
+        self.assertEqual(morning["local_period"], "morning")
+        self.assertEqual(morning["utc_offset"], "+08:00")
+        self.assertEqual(evening["local_period"], "evening")
 
-    async def test_runtime_ready_greeting_uses_llm_text_before_live_microphone_turns(self) -> None:
+    async def test_runtime_ready_greeting_respects_social_cognition_silence(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+
+        async def resolve(request: Any) -> Any:
+            return self._startup_resolution(request, "silence")
+
+        self._configure_startup_greeting(assistant, resolve)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("", "social_cognition:silence"))
+
+    async def test_runtime_ready_greeting_plays_configured_owner_text_without_cognition(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+
+        async def resolve(request: Any) -> Any:
+            raise AssertionError("configured text needs no Social Cognition call")
+
+        calls = self._configure_startup_greeting(assistant, resolve)
+        assistant.runtime_ready_greeting_text = "嗨，我醒啦！"
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("嗨，我醒啦！", "configured"))
+        self.assertEqual(calls, [])
+
+    async def test_runtime_ready_greeting_rejects_incomplete_social_text_and_falls_back(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+
+        async def resolve(request: Any) -> Any:
+            return self._startup_resolution(request, "communicate", "六点半啦，我困了，你吃晚")
+
+        self._configure_startup_greeting(assistant, resolve)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("我醒啦，今天也一起开心吧！", "fallback"))
+
+    async def test_runtime_ready_greeting_falls_back_when_social_cognition_fails(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+
+        async def resolve(request: Any) -> Any:
+            raise RuntimeError("Agent Social Cognition startup greeting HTTP 503")
+
+        self._configure_startup_greeting(assistant, resolve)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("我醒啦，今天也一起开心吧！", "fallback"))
+
+    async def test_runtime_ready_greeting_without_agent_never_authors_words(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+
+        async def resolve(request: Any) -> Any:
+            raise AssertionError("no Agent means no Social Cognition call")
+
+        calls = self._configure_startup_greeting(assistant, resolve, enable_agent=False)
+        assistant.runtime_ready_greeting_fallback_text = ""
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("", "unavailable"))
+        self.assertEqual(calls, [])
+
+    async def test_runtime_ready_greeting_plays_before_live_microphone_turns(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_enabled = True
         assistant.runtime_ready_greeting_speech_enabled = True
@@ -223,7 +311,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             self: VoiceAssistant,
         ) -> tuple[str, str]:
             del self
-            return "嗨，我醒啦！", "llm:qwen3:4b"
+            return "嗨，我醒啦！", "social_cognition"
 
         assistant._generate_runtime_ready_greeting = MethodType(
             generate_runtime_ready_greeting,
@@ -263,291 +351,6 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(assistant.playback_delivery.next_playback_order, 1)
 
-    async def test_runtime_ready_greeting_generation_uses_python_310_compatible_timeout(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant.normalize_tts_candidate = MethodType(
-            lambda self, text: str(text).strip(),
-            assistant,
-        )
-        assistant.is_valid_tts_text = MethodType(
-            lambda self, text: bool(str(text).strip()),
-            assistant,
-        )
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        class FakeResponse:
-            status = 200
-
-            async def __aenter__(self) -> "FakeResponse":
-                return self
-
-            async def __aexit__(self, *args: Any) -> None:
-                del args
-
-            async def text(self) -> str:
-                return json.dumps({"response": json.dumps({"text": "早上好，我醒啦！"}), "done_reason": "stop"})
-
-        class FakeSession:
-            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
-                self.url = url
-                self.payload = json
-                return FakeResponse()
-
-        session = FakeSession()
-
-        async def get_http_session(self: VoiceAssistant) -> FakeSession:
-            del self
-            return session
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        original_timeout = getattr(asyncio, "timeout", None)
-        if hasattr(asyncio, "timeout"):
-            delattr(asyncio, "timeout")
-        try:
-            text, source = await assistant._generate_runtime_ready_greeting()
-        finally:
-            if original_timeout is not None:
-                asyncio.timeout = original_timeout
-
-        self.assertEqual(text, "早上好，我醒啦！")
-        self.assertEqual(source, "llm:qwen3:4b")
-        self.assertEqual(session.url, assistant.llm_url)
-        self.assertEqual(session.payload["model"], "qwen3:4b")
-        self.assertIs(session.payload["think"], False)
-        self.assertEqual(
-            session.payload["format"],
-            assistant._spoken_text_response_schema(max_chars=24),
-        )
-        self.assertEqual(session.payload["options"]["num_predict"], 32)
-
-
-    async def test_runtime_ready_greeting_rejects_reasoning_prose_and_falls_back(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        class FakeResponse:
-            status = 200
-
-            async def __aenter__(self) -> "FakeResponse":
-                return self
-
-            async def __aexit__(self, *args: Any) -> None:
-                del args
-
-            async def text(self) -> str:
-                return json.dumps(
-                    {
-                        "response": (
-                            "First, the user wants me to write a greeting. "
-                            "I need to make sure it sounds natural."
-                        ),
-                        "done_reason": "length",
-                    }
-                )
-
-        class FakeSession:
-            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
-                del url, json
-                return FakeResponse()
-
-        async def get_http_session(self: VoiceAssistant) -> FakeSession:
-            del self
-            return FakeSession()
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        text, source = await assistant._generate_runtime_ready_greeting()
-
-        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
-        self.assertEqual(source, "fallback")
-
-    async def test_runtime_ready_greeting_rejects_separate_thinking_field(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        class FakeResponse:
-            status = 200
-
-            async def __aenter__(self) -> "FakeResponse":
-                return self
-
-            async def __aexit__(self, *args: Any) -> None:
-                del args
-
-            async def text(self) -> str:
-                return json.dumps(
-                    {
-                        "thinking": "I should produce a short childlike greeting.",
-                        "response": json.dumps({"text": "早呀，我醒啦！"}),
-                        "done_reason": "stop",
-                    }
-                )
-
-        class FakeSession:
-            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
-                del url, json
-                return FakeResponse()
-
-        async def get_http_session(self: VoiceAssistant) -> FakeSession:
-            del self
-            return FakeSession()
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        with self.assertLogs(level="WARNING") as warning_logs:
-            text, source = await assistant._generate_runtime_ready_greeting()
-
-        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
-        self.assertEqual(source, "fallback")
-        self.assertTrue(
-            any("thinking/reasoning output although think=false" in line for line in warning_logs.output)
-        )
-
-    async def test_runtime_ready_greeting_generation_timeout_falls_back(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant.normalize_tts_candidate = MethodType(
-            lambda self, text: str(text).strip(),
-            assistant,
-        )
-        assistant.is_valid_tts_text = MethodType(
-            lambda self, text: bool(str(text).strip()),
-            assistant,
-        )
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        class SlowResponse:
-            status = 200
-
-            async def __aenter__(self) -> "SlowResponse":
-                return self
-
-            async def __aexit__(self, *args: Any) -> None:
-                del args
-
-            async def text(self) -> str:
-                await asyncio.sleep(1)
-                return json.dumps({"response": json.dumps({"text": "不应该返回"}), "done_reason": "stop"})
-
-        class SlowSession:
-            def post(self, url: str, json: dict[str, Any]) -> SlowResponse:
-                del url, json
-                return SlowResponse()
-
-        async def get_http_session(self: VoiceAssistant) -> SlowSession:
-            del self
-            return SlowSession()
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        text, source = await assistant._generate_runtime_ready_greeting()
-
-        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
-        self.assertEqual(source, "fallback")
-
-    async def test_runtime_ready_greeting_falls_back_when_generation_fails(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant.normalize_tts_candidate = MethodType(
-            lambda self, text: str(text).strip(),
-            assistant,
-        )
-        assistant.is_valid_tts_text = MethodType(
-            lambda self, text: bool(str(text).strip()),
-            assistant,
-        )
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        async def get_http_session(self: VoiceAssistant) -> Any:
-            del self
-            raise RuntimeError("Ollama unavailable")
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        text, source = await assistant._generate_runtime_ready_greeting()
-
-        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
-        self.assertEqual(source, "fallback")
-
     async def test_runtime_ready_greeting_is_skipped_for_injected_audio(self) -> None:
         assistant = VoiceAssistant.__new__(VoiceAssistant)
         assistant.runtime_ready_greeting_enabled = True
@@ -565,7 +368,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             del self
             nonlocal generated
             generated = True
-            return "嗨，我醒啦！", "llm:qwen3:4b"
+            return "嗨，我醒啦！", "social_cognition"
 
         async def schedule_tts_text(
             self: VoiceAssistant,

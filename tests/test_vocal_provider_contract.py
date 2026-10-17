@@ -13,7 +13,7 @@ import unittest
 from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
 from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_model_contract import ABILITY_NEED_NONE
 from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import canonical_plan_response_schema
@@ -280,7 +280,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             history=[],
         )
 
-        plan = asyncio.run(FastPlannerResolver(model, catalog).resolve(request))
+        plan = asyncio.run(PlannerResolver(model, catalog).resolve(request))
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(len(plan.steps), 1)

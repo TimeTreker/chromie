@@ -25,7 +25,7 @@ class ContainerImportPathTests(unittest.TestCase):
                 "agent",
                 ROOT / "agent" / "app",
                 "import app.clients.ollama_client; "
-                "import app.fast_planner; "
+                "import app.planner; "
                 "import app.cognitive_core.user_meaning_interpreter.engine; print('ok')",
             ),
         )

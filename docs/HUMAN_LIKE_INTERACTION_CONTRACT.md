@@ -295,7 +295,7 @@ with complete intent, requested result type, source provenance and bounded unres
 against a pending clarification, but it does not decide that a Capability parameter is
 missing, create a planning `InformationGap`, classify one as blocking, or choose how it
 should be resolved. Every fresh admitted addressed turn mechanically starts Social
-Cognition; the same immutable UMI result starts Fast Planner and Goal Association
+Cognition; the same immutable UMI result starts Planner and Goal Association
 independently only when its `cognitive_requests[]` asks for them (a Planner request also
 schedules turn-wide GA). SC owns a complete interaction decision; Planner owns
 one complete Work result and emits no presentation prefix. Deep User Meaning Interpretation is reserved for genuine consequential ambiguity
@@ -321,7 +321,7 @@ are Planner gaps, not UMI uncertainty.
 SC communicates the actual state reported by these owners through speech and eligible
 Social Attention. Runtime admission and execution safety remain independent.
 
-Fast Planner receives common Capability contracts and the available library index.
+Planner receives common Capability contracts and the available library index.
 It may read one bounded batch of indexed contracts before its complete planning
 result; lookup output has no executable work and cannot repair an existing Plan.
 Argument citations prove owned source presence, not semantic understanding. Complete
@@ -341,7 +341,7 @@ source evidence. UMI preserves the understood outcome; Planner realizes location
 and other Capability inputs. Host validates their declared provenance without
 resolving or rewriting a referent.
 
-Fast Planner is the first stage that compares understood Responsibility with concrete
+Planner is the first stage that compares understood Responsibility with concrete
 Plan, Agent-Skill, Capability, safety, and provider contracts. It therefore owns
 execution-input completeness and any planning `InformationGap`. It tries authoritative
 context, trusted observation or query, an owner/schema default, and a safe bounded
@@ -353,7 +353,7 @@ context; it does not inherit the Planner's source-policy authority.
 
 The distinction must remain visible in ordinary behavior. “今天上午重庆会不会下雨？”
 has a clear outcome, location, date, and day part, so UMI reports no unresolved meaning
-and Fast Planner schedules trusted weather Evidence. “今天会不会下雨？” can still be a
+and Planner schedules trusted weather Evidence. “今天会不会下雨？” can still be a
 clear weather question even though the selected lookup needs a location; Planner first
 uses trusted context or another permitted source and asks only if location remains a
 real blocker. “把它关掉” with several plausible referents is genuine unresolved meaning,
@@ -398,7 +398,7 @@ considers how the request fits ongoing concerns. If the user asks for weather, P
 obtain the weather while GA considers whether that request relates to an already-supported
 trip, lodging, activity, or other retained Goal. GA must not invent a hidden motive merely
 because one is plausible, and absence of that long-horizon answer does not block the
-current lookup. After Fast Planner verifies complete arguments, availability, schema
+current lookup. After Planner verifies complete arguments, availability, schema
 validity, no confirmation, `safe_read`, `side_effect_free=true`, and an explicit
 parallel-safety declaration, Trusted Runtime may start the lookup under Responsibility
 provenance while continuity cognition remains in flight.
@@ -417,7 +417,7 @@ unavailable.
 
 A changed Goal ID, association relationship, or exact argument equality cannot by itself
 decide Work compatibility. GA emits only Canonical Goal continuity. When that commit
-intersects retained or provisional Work, the existing Fast Planner compares the Goal,
+intersects retained or provisional Work, the existing Planner compares the Goal,
 Responsibility, Situation, Evidence, and queued/running/completed Activities and authors
 the complete desired Plan. To reuse provisional Work it explicitly sets
 `CanonicalPlanStep.reuse_activity_id` to the same stable Activity identity and
@@ -450,7 +450,7 @@ commit rules are owned by [Cognitive Turn Loop](COGNITIVE_TURN_LOOP.md).
 
 This is one iteration of the continuous Responsibility loop, not a turn-final repair.
 User corrections, provider Evidence, failure, timeout, dependency readiness, trusted
-Situation change, or another relevant event may reactivate the same Fast Planner while
+Situation change, or another relevant event may reactivate the same Planner while
 the Goal remains open. Routine runtime churn does not wake cognition, and passive waiting
 does not close the Responsibility. Continuous Mind means state-driven re-entry until all
 owned Responsibilities are satisfied, cancelled, refused, or superseded—not an unlimited
@@ -760,7 +760,7 @@ contract/provenance failure is never repaired by another planner. A
 confirmation-free read with canonical Goal grounding and a valid Plan need not wait for
 unrelated deeper thinking. Deep User Meaning Interpretation is exceptional and is
 justified by genuine consequential ambiguity in intended outcome, scope, or referent.
-The Planner has no deeper pass (the Deep Planner was retired on 2026-10-11): it acquires
+The Planner has no deeper pass: it acquires
 missing contracts, Evidence or input, or reports an honest limitation. Fast UMI may use
 its designated one-way Deep escalation only when broader reasoning inside that same
 authority is actually warranted. A purely mechanical schema/DTO failure may be
@@ -773,7 +773,7 @@ Streaming changes delivery timing, not semantic authority. Raw model-token
 deltas, partial JSON, private reasoning, and incomplete sentences are not speech
 contracts and must never reach TTS. User Meaning Interpretation never authors maintained
 speech. SC owns each complete interaction result, including function, timing,
-provenance and applicable Evidence. Fast Planner emits one complete Work result;
+provenance and applicable Evidence. Planner emits one complete Work result;
 partial Work output cannot release effects. A pre-evidence SC act cannot claim an
 unobserved result. The Host rejects invalid contracts without supplying replacement
 wording or treating conversational status as executed Work.
@@ -888,7 +888,7 @@ receives admitted evidence and emits provider-neutral Responsibility proposals,
 complete natural-language intentions, requested result types, source evidence and bounded unresolved meaning. It
 does not emit planning InformationGaps, input-source policy, conversational progress,
 route/intent labels, Activities, or Capabilities.
-The same UMI result starts SC, Fast Planner and GA independently. SC owns ordinary
+The same UMI result starts SC, Planner and GA independently. SC owns ordinary
 communication. Planner owns executable Activities, execution-input completeness,
 source/default policy and clarification requirements; SC expresses those requirements. Capability
 contracts constrain realization but cannot make Planner reinterpret Responsibility or
@@ -943,8 +943,9 @@ arguments supplied by the Host startup policy. It does not target a person,
 claim to inspect the room, or infer nearby people, weather, meals, feelings, or
 other environmental facts.
 
-Startup speech is an explicit operator opt-in. When enabled, it still uses one
-validated short sentence and the existing playback barrier, but silence is a
+Startup speech is an explicit operator opt-in. When enabled, Social Cognition decides
+whether to greet and authors the line from the owner-approved Mind; it uses one
+validated short sentence and the existing playback barrier, and silence is a
 complete and preferred startup result. A missing orientation capability or
 provider failure remains silent and fail-open; it must never trigger a body
 failure apology or a synthetic character slogan.
@@ -1101,7 +1102,7 @@ and optional decoration.
 A ready safe read need not wait for optional acknowledgement. After execution,
 Host binds immutable request, Goal and qualified Evidence. Planner may decide new
 Work or a result Need; SC authors the grounded result against the same evidence.
-Fast Evidence re-entry exposes a narrow next-state DTO rather than reusing either the
+Planner Evidence re-entry exposes a narrow next-state DTO rather than reusing either the
 ordinary Planner wire or the canonical Plan envelope. Host may mechanically lift that
 validated decision into canonical Planner state, but it may not reinterpret Evidence or
 repair model semantics. Historical Plan/Runtime shapes remain provenance only and must
@@ -1201,7 +1202,7 @@ rules. The planner chooses the capability and maps each number to an argument,
 then records the authoritative `source_goal_ids`. The Host may verify that the
 typed value matches the claimed argument and occurs in the claimed Goal; it
 must not infer or repair the mapping. Retained typed values can be checked directly;
-new intent-derived values carry an exact owned source quote. Fast uses
+new intent-derived values carry an exact owned source quote. The streaming Planner uses
 `argument_sources`; canonical Plans use `source_quote` in parameter resolutions.
 What perception saw, rather than what the person said, cites its current
 Situation interpretation (see Resource Acquisition and Delivery).

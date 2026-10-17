@@ -44,7 +44,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(settings.cognition.agent_timeout_ms, 9000)
         self.assertEqual(settings.cognition.user_meaning_interpreter_timeout_ms, 9000)
         self.assertEqual(settings.cognition.goal_association_timeout_ms, 65000)
-        self.assertEqual(settings.cognition.fast_planner_timeout_ms, 65000)
+        self.assertEqual(settings.cognition.planner_timeout_ms, 65000)
         self.assertEqual(settings.cognition.deliberative_timeout_ms, 125000)
         self.assertEqual(settings.cognition.runtime_timeout_ms, 300000)
         self.assertEqual(settings.model_generation.keep_alive, "24h")
@@ -163,7 +163,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["TTS_PYTORCH_ALLOC_CONF"], "expandable_segments:True")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
-        self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
+        self.assertEqual(values["ORCH_PLANNER_MODE"], "off")
         self.assertNotIn("ORCH_DEEP_PLANNER_MODE", values)  # one Planner (PLANNER-AUTHORITY-001)
         self.assertNotIn("ORCH_RESPONSE_COMPOSER_MODE", values)
 
@@ -190,8 +190,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "",
         )
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_LANGUAGE"], "zh-CN")
-        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_MODEL"], "")
-        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_NUM_PREDICT"], "32")
+        # Social Cognition authors any generated greeting; the Host has no model knobs.
+        self.assertNotIn("ORCH_RUNTIME_READY_GREETING_MODEL", values)
+        self.assertNotIn("ORCH_RUNTIME_READY_GREETING_NUM_PREDICT", values)
         self.assertEqual(
             values["ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS"],
             "15000",
@@ -226,7 +227,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             profile,
         )
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=chromie-qwen35-4b", profile)
-        self.assertIn("AGENT_FAST_PLANNER_MODEL=chromie-qwen35-4b", profile)
+        self.assertIn("AGENT_PLANNER_MODEL=chromie-qwen35-4b", profile)
         self.assertIn("AGENT_DELIBERATIVE_MODEL=chromie-qwen35-4b", profile)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", profile)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
@@ -250,7 +251,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_USER_MEANING_INTERPRETER_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_DELIBERATIVE_MODEL=chromie-gemma4-12b", rtx5090)
-        self.assertIn("AGENT_FAST_PLANNER_MODEL=chromie-gemma4-12b", rtx5090)
+        self.assertIn("AGENT_PLANNER_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_SKILL_SELECTION_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", rtx5090)
         self.assertIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT=1", rtx5090)
@@ -379,13 +380,13 @@ class RuntimeConfigurationTests(unittest.TestCase):
             'set -euo pipefail; source "$1"; '
             'if chromie_apply_compact_cognition "$2"; then echo applied; else echo skipped; fi; '
             'for key in "${CHROMIE_COMPACT_COGNITION_MODEL_KEYS[@]}" OLLAMA_MAX_LOADED_MODELS '
-            'AGENT_FAST_PLANNER_NUM_CTX; do printf "%s=%s\\n" "$key" "${!key-}"; done'
+            'AGENT_PLANNER_NUM_CTX; do printf "%s=%s\\n" "$key" "${!key-}"; done'
         )
         base_env = {
             "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
             "TTS_COSYVOICE_OLLAMA_MODEL": "compact:model",
             "AGENT_MODEL": "role:model",
-            "AGENT_FAST_PLANNER_NUM_CTX": "12345",
+            "AGENT_PLANNER_NUM_CTX": "12345",
             "OLLAMA_MAX_LOADED_MODELS": "2",
         }
 
@@ -410,14 +411,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "AGENT_MODEL",
             "AGENT_GOAL_ASSOCIATION_MODEL",
             "AGENT_COGNITIVE_ACTIVATION_MODEL",
-            "AGENT_FAST_PLANNER_MODEL",
+            "AGENT_PLANNER_MODEL",
             "AGENT_DELIBERATIVE_MODEL",
             "OLLAMA_MODEL",
         ):
             self.assertEqual(applied[key], "compact:model", key)
         self.assertEqual(applied["OLLAMA_MAX_LOADED_MODELS"], "1")
         # Generated role contexts are preserved.
-        self.assertEqual(applied["AGENT_FAST_PLANNER_NUM_CTX"], "12345")
+        self.assertEqual(applied["AGENT_PLANNER_NUM_CTX"], "12345")
 
         for backend, extra in (
             ("oute", {}),
@@ -535,7 +536,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             ),
             "User Meaning Interpretation": "EFFECTIVE_AGENT_USER_MEANING_INTERPRETER_MODEL",
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
-            "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
+            "Planner": "EFFECTIVE_PLANNER_MODEL",
             "Deliberative": "EFFECTIVE_DELIBERATIVE_MODEL",
         }
         for role, variable in expected_roles.items():

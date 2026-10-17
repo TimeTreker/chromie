@@ -32,10 +32,11 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
 ## Change rules
 
 - The [Social Cognition amendment](docs/PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
-  is the owner-approved communication target and source migration scope.
-  Treat existing Planner-owned wording as migration inventory and preserve the
-  documented evidence gates; do not add a competing speaker or infer deployment
-  readiness from the amended authority.
+  is the owner-approved communication target. Social Cognition alone decides how
+  and what Chromie says, using all context including the identity settings; the
+  Planner is word-free and authors no wording, Communicative Act, progress speech,
+  greeting or confirmation text. Do not add a competing speaker or infer
+  deployment readiness from the amended authority.
 - Follow the active Issue in `DEVELOPMENT_CHECKPOINT.md`. Until the canonical
   local gate is reproducible and the current-revision live voice loop is
   retained and the default target-evidence profile closes, feature,

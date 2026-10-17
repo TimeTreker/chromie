@@ -154,7 +154,7 @@ def run(base_url: str, *, timeout_s: float) -> dict[str, Any]:
         )
     planner_request = build_fast_plan_request(interpretation)
     status, plan_payload = _post_json(
-        f"{base_url.rstrip('/')}/fast-plan",
+        f"{base_url.rstrip('/')}/plan",
         planner_request.model_dump(mode="json", exclude_none=True),
         timeout_s=timeout_s,
     )

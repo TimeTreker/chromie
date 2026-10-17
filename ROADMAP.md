@@ -110,7 +110,7 @@ cancellation, result meaning and body recovery; Planner-owned WorkDAG with a
 mechanical DAGEngine; Continuous Mind wake/re-entry, bounded Situation,
 structured time conditions and context-activated Memory; layered prompt prefixes;
 semantic authority closure (`apply` is the only authoritative semantic path);
-the need-first one-Planner contract with the Deep Planner retired; and Value
+the need-first one-Planner contract; and Value
 Judgment.
 
 These foundations are maintained only while their automated contracts remain
@@ -120,7 +120,7 @@ passing.
 
 ### Social Cognition interaction and independent Work — source implemented, qualification open
 
-`/fast-advance` emits one complete Work decision; `/social-cognition` authors
+`/plan-advance` emits one complete Work decision; `/social-cognition` authors
 interaction from the shared UMI result, canonical needs, Work/Evidence state or
 trusted Situation. GA/Work and SC proceed independently until a required
 confirmation or explicit ordering dependency must join.

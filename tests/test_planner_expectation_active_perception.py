@@ -160,7 +160,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
         async def resolve_social_cognition(self, session, *, request, **kwargs):
             return social_fixture_resolution(request, "I can see it now.")
 
-        async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+        async def resolve_plan(self, _session, *, request, timeout_ms):
             self.request = request
             return work_fixture(followup)
 
@@ -171,7 +171,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = Client()
     assistant.cognitive_runtime_policy = SimpleNamespace(
-        fast_planner_timeout_ms=3000,
+        planner_timeout_ms=3000,
         deliberative_timeout_ms=6000,
     )
     assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(

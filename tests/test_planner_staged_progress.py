@@ -15,7 +15,7 @@ import pytest
 from jsonschema import Draft202012Validator
 from pydantic import ValidationError
 
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_context import completed_acquisition_goal_ids, completed_work_step_evidence
 from agent.app.planner_model_contract import PlannerModelOutput
 from benchmarks.datasets.fast_planner_daily_life.qualification import (
@@ -202,7 +202,7 @@ async def resolve(request, catalog, raw, tier="fast", *, compact=True):
             "user_confirmation_required": wire.get("user_confirmation_required", False),
         }
     model = CheckedReply(json.dumps(wire))
-    result = await FastPlannerResolver(model, StaticCatalog(loaded(catalog))).resolve(request)
+    result = await PlannerResolver(model, StaticCatalog(loaded(catalog))).resolve(request)
     assert model.calls == 1
     return result
 
@@ -324,7 +324,7 @@ async def reenter(request, catalog, plan, adapter, response, bundle, raw):
         async def resolve_social_cognition(self, session, *, request, **kwargs):
             return social_fixture_resolution(request, raw.get("response_text") or "Fixture response.")
 
-        async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+        async def resolve_plan(self, _session, *, request, timeout_ms):
             self.seen = request
             return await resolve(request, catalog, raw, "fast")
 
@@ -332,7 +332,7 @@ async def reenter(request, catalog, plan, adapter, response, bundle, raw):
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = client
     assistant.cognitive_runtime_policy = SimpleNamespace(
-        fast_planner_timeout_ms=3000, deliberative_timeout_ms=6000
+        planner_timeout_ms=3000, deliberative_timeout_ms=6000
     )
     assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
         agent_client=client, adapter=adapter, policy=CognitiveRuntimePolicy(mode="apply")
@@ -559,7 +559,7 @@ def test_acquisition_exception_cannot_admit_incomplete_or_effectful_work(mutatio
             raw["goal_satisfaction"] = assessment(gid)
         for tier in ["fast"]:
             model = ReplayModel(json.dumps(raw))
-            result = await FastPlannerResolver(model, StaticCatalog(loaded(catalog))).resolve(request.model_copy(deep=True))
+            result = await PlannerResolver(model, StaticCatalog(loaded(catalog))).resolve(request.model_copy(deep=True))
             assert result.disposition not in {"execute", "respond"}, (mutation, tier, result)
 
     asyncio.run(run())
@@ -605,7 +605,7 @@ def test_unqualified_acquisition_evidence_cannot_establish_either_branch(mutatio
             context["execution_outcome_bundle"]["goal_outcomes"][0]["acquisition_step_ids"] = []
         assert not completed_acquisition_goal_ids(context, reentry_scope=seen.planner_reentry_scope)
         for rain in [True, False]:
-            for tier, cls in [("fast", FastPlannerResolver)]:
+            for tier, cls in [("fast", PlannerResolver)]:
                 result = await cls(
                     ReplayModel(json.dumps(next_reply(request, rain))), StaticCatalog(loaded(catalog))
                 ).resolve(seen.model_copy(deep=True))

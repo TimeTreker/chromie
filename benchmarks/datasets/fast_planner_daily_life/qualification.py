@@ -34,8 +34,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from agent.app.capabilities.catalog import CatalogCapability  # noqa: E402
-from agent.app.fast_planner import (  # noqa: E402
-    FastPlannerResolver,
+from agent.app.planner import (  # noqa: E402
+    PlannerResolver,
     parse_fast_work_document,
 )
 from agent.app.planner_context import (  # noqa: E402
@@ -56,7 +56,7 @@ SCENARIO_ROOT = DATASET_ROOT / "scenarios"
 CATALOG_ROOT = DATASET_ROOT / "catalogs"
 MANIFEST_PATH = DATASET_ROOT / "dataset.json"
 PRODUCTION_TRANSACTION_FILES = (
-    ROOT / "agent" / "app" / "fast_planner.py",
+    ROOT / "agent" / "app" / "planner.py",
     ROOT / "agent" / "app" / "clients" / "ollama_client.py",
     ROOT / "agent" / "app" / "clients" / "sglang_protocol.py",
     ROOT / "agent" / "app" / "capabilities" / "catalog.py",
@@ -437,7 +437,7 @@ async def build_transaction(case: dict[str, Any]) -> dict[str, Any]:
     request = CognitiveWorkRequest.model_validate(case["input"]["request"])
     catalog = StaticCatalog(materialize_catalog(case["input"]))
     capture = CaptureModel()
-    resolver = FastPlannerResolver(
+    resolver = PlannerResolver(
         capture,
         catalog,
     )
@@ -1300,7 +1300,7 @@ async def _adjudicate_one(
     request = CognitiveWorkRequest.model_validate(case["input"]["request"])
     catalog = StaticCatalog(materialize_catalog(case["input"]))
     replay = ReplayModel(raw_text)
-    resolver = FastPlannerResolver(replay, catalog)
+    resolver = PlannerResolver(replay, catalog)
     schema_errors: list[str] = []
     host_accepted = False
     host_error = ""

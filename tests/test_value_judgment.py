@@ -395,7 +395,7 @@ def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=f
         def __init__(self):
             self.calls = []
 
-        async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+        async def resolve_plan(self, _session, *, request, timeout_ms):
             return walk
 
         async def resolve_value_judgment(self, session, *, request, **kwargs):
@@ -413,7 +413,7 @@ def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=f
 
     assistant = VoiceAssistant.__new__(VoiceAssistant)
     assistant.agent_client = Client()
-    assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000, deliberative_timeout_ms=6000)
+    assistant.cognitive_runtime_policy = SimpleNamespace(planner_timeout_ms=3000, deliberative_timeout_ms=6000)
     assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
         agent_client=assistant.agent_client, adapter=Adapter(FakeRuntime([walk_definition()])),
         policy=CognitiveRuntimePolicy(mode="apply", value_review_capability_ids=reviewed))

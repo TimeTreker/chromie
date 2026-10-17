@@ -16,7 +16,7 @@ class AgentSettingsTests(unittest.TestCase):
     def test_activation_inherits_active_model_budget_unless_explicitly_overridden(self) -> None:
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(Settings().cognitive_activation_timeout_ms, 60000)
-        with patch.dict(os.environ, {"AGENT_FAST_PLANNER_TIMEOUT_MS": "45000"}, clear=True):
+        with patch.dict(os.environ, {"AGENT_PLANNER_TIMEOUT_MS": "45000"}, clear=True):
             self.assertEqual(Settings().cognitive_activation_timeout_ms, 45000)
             os.environ["AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS"] = "18000"
             self.assertEqual(Settings().cognitive_activation_timeout_ms, 18000)
@@ -77,20 +77,20 @@ class AgentSettingsTests(unittest.TestCase):
         with self.assertRaisesRegex(InvalidBooleanSetting, "X must be a boolean"):
             parse_bool("disabled", name="X", default=False)
 
-    def test_fast_planner_stream_has_one_model_and_timeout_authority(self) -> None:
+    def test_planner_stream_has_one_model_and_timeout_authority(self) -> None:
         with patch.dict(
             os.environ,
             {
-                "AGENT_FAST_PLANNER_MODEL": "streaming-planner",
-                "AGENT_FAST_PLANNER_TIMEOUT_MS": "8000",
+                "AGENT_PLANNER_MODEL": "streaming-planner",
+                "AGENT_PLANNER_TIMEOUT_MS": "8000",
                 "AGENT_FAST_FIRST_RESPONSE_MODEL": "obsolete-model",
                 "AGENT_FAST_FIRST_RESPONSE_TIMEOUT_MS": "2500",
             },
             clear=False,
         ):
             settings = Settings()
-        self.assertEqual(settings.fast_planner_model, "streaming-planner")
-        self.assertEqual(settings.fast_planner_timeout_ms, 8000)
+        self.assertEqual(settings.planner_model, "streaming-planner")
+        self.assertEqual(settings.planner_timeout_ms, 8000)
         self.assertFalse(hasattr(settings, "fast_first_response_model"))
         self.assertFalse(hasattr(settings, "fast_first_response_timeout_ms"))
 
