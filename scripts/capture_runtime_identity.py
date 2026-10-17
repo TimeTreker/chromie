@@ -56,6 +56,14 @@ AGENT_SOURCE_TREES = (
     (ROOT / "shared" / "chromie_contracts", "chromie_contracts"),
     (ROOT / "shared" / "chromie_runtime", "chromie_runtime"),
 )
+# Where agent/Dockerfile copies each AGENT_SOURCE_TREES entry inside the image.
+# tests/test_runtime_identity_capture.py checks these against the Dockerfile.
+AGENT_CONTAINER_SOURCE_TREES = (
+    ("/app/app", "app"),
+    ("/app/agent-skills", "agent-skills"),
+    ("/app/shared/chromie_contracts", "chromie_contracts"),
+    ("/app/shared/chromie_runtime", "chromie_runtime"),
+)
 
 def _source_tree_digest(trees: Sequence[tuple[Path, str]]) -> str:
     digest = hashlib.sha256()
@@ -78,17 +86,16 @@ def _source_tree_digest(trees: Sequence[tuple[Path, str]]) -> str:
 
 def agent_runtime_source_identity(container: str = "chromie-agent") -> dict[str, Any]:
     host_digest = _source_tree_digest(AGENT_SOURCE_TREES)
+    container_trees = "".join(
+        f"    (Path({path!r}), {label!r}),\n" for path, label in AGENT_CONTAINER_SOURCE_TREES
+    )
     container_script = """
 from pathlib import Path
 import hashlib
 import json
 
 trees = (
-    (Path('/app/app'), 'app'),
-    (Path('/app/agent-skills'), 'agent-skills'),
-    (Path('/app/chromie_contracts'), 'chromie_contracts'),
-    (Path('/app/chromie_runtime'), 'chromie_runtime'),
-)
+""" + container_trees + """)
 digest = hashlib.sha256()
 for source_root, label in sorted(trees, key=lambda item: item[1]):
     if not source_root.is_dir():
