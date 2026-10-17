@@ -6,8 +6,8 @@
   "authority": "benchmark_suite",
   "source_strategy": "referenced_in_place",
   "runtime_policy_authority": false,
-  "expected_inventory_total": 349,
-  "expected_normalized_total": 348,
+  "expected_inventory_total": 347,
+  "expected_normalized_total": 346,
   "allowed_datasets": [
     "asr_noise",
     "bilingual",
@@ -93,21 +93,6 @@
       "target_reference": "integration/cognitive_core_dialogue",
       "migration_state": "referenced_in_place",
       "expected_inventory_count": 3
-    },
-    {
-      "name": "test_scenarios",
-      "path": "tests/scenarios",
-      "glob": "**/*.json",
-      "layer": "regression",
-      "datasets": [
-        "historical_regression"
-      ],
-      "evidence_levels": [
-        "static"
-      ],
-      "target_reference": "regression/historical",
-      "migration_state": "referenced_in_place",
-      "expected_inventory_count": 2
     },
     {
       "name": "social_attention_v1",
