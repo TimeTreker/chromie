@@ -7,7 +7,7 @@ from typing import Any, Literal, TypeAlias
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .text import normalize_whitespace
+from .text import normalize_unique_text_list as _normalize_ids, normalize_whitespace
 from .plan import GoalSatisfactionAssessment
 
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
@@ -229,23 +229,6 @@ class ClaimQualification(BaseModel):
 
 def _normalize_identifier(value: Any) -> Any:
     return normalize_whitespace(value)
-
-
-def _normalize_ids(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        value = [value]
-    if not isinstance(value, list):
-        raise ValueError("expected a list or string")
-    normalized: list[str] = []
-    seen: set[str] = set()
-    for item in value:
-        text = " ".join(str(item or "").strip().split())
-        if text and text not in seen:
-            seen.add(text)
-            normalized.append(text)
-    return normalized
 
 
 def aggregate_execution_status(

@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .text import normalize_whitespace
+from .text import normalize_unique_text_list as _normalize_unique_text_list, normalize_whitespace
 
 # Persisted identifiers. They match Soridormi's two DAG contract lanes,
 # ``vocal_execution`` and ``activity_execution``.
@@ -19,23 +19,6 @@ LaneCoordinationFailurePolicy = Literal["independent"]
 
 def _normalize_text(value: Any) -> Any:
     return normalize_whitespace(value)
-
-
-def _normalize_unique_text_list(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        value = [value]
-    if not isinstance(value, list):
-        raise ValueError("expected a list or string")
-    out: list[str] = []
-    seen: set[str] = set()
-    for item in value:
-        text = " ".join(str(item or "").strip().split())
-        if text and text not in seen:
-            seen.add(text)
-            out.append(text)
-    return out
 
 
 class LaneCoordinationGroup(BaseModel):
