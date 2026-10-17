@@ -186,7 +186,8 @@ async def reenter_cognition_for_terminal_capability(
         return
 
     try:
-        result_response = await plan_incremental_terminal_result_response(host,
+        result_response = await plan_incremental_terminal_result_response(
+            host,
             source_response=response,
             evidence=evidence,
             opportunity=opportunity,
@@ -1749,7 +1750,8 @@ async def plan_evidence_bound_capability_result_response(
             # resolve_plan_interaction already gave SC this exact Evidence
             # (trigger=evidence): one SC communication, never a second one.
             return planner_response
-        resource_response = await optional_completed_resource_social_response(host,
+        resource_response = await optional_completed_resource_social_response(
+            host,
             source_response=source_response,
             bundle=bundle,
             plan=plan,
@@ -1764,7 +1766,8 @@ async def plan_evidence_bound_capability_result_response(
             return resource_response
         # Activation/Planner chose no next Work. Terminal Evidence still reaches
         # SC directly, so a result the person asked for is never dropped.
-        return await requested_result_evidence_social_response(host,
+        return await requested_result_evidence_social_response(
+            host,
             source_response=source_response,
             plan=plan,
             session_id=session_id,

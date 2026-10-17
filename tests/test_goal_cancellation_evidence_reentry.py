@@ -227,7 +227,8 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
         )
 
         statuses = asyncio.run(
-            cognitive_pipeline_host.reenter_coaffected_goals_after_cancellation(assistant,
+            cognitive_pipeline_host.reenter_coaffected_goals_after_cancellation(
+                assistant,
                 evidence,
                 session_id="sid",
                 excluded_goal_ids={"goal-walk"},
@@ -253,7 +254,8 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
         # A sibling already in the target re-entry scope is not re-entered twice.
         calls.clear()
         statuses = asyncio.run(
-            cognitive_pipeline_host.reenter_coaffected_goals_after_cancellation(assistant,
+            cognitive_pipeline_host.reenter_coaffected_goals_after_cancellation(
+                assistant,
                 evidence,
                 session_id="sid",
                 excluded_goal_ids={"goal-walk", "goal-wave"},

@@ -2518,7 +2518,8 @@ class GoalDrivenRuntimeCoordinator:
 
         if run.speculative_work_request is not None:
             run.umi_planning_task = asyncio.create_task(
-                self._plan_current_responsibilities(run,
+                self._plan_current_responsibilities(
+                    run,
                     run.speculative_work_request, run.context, run.history
                 ),
                 name="umi-planning:" + run.turn_id,
@@ -2862,7 +2863,8 @@ class GoalDrivenRuntimeCoordinator:
             await self._cancel_early_safe_reads(run, "scope_extended_to_ga_goals")
             run.ready_fast_capability_execution = None
             run.fast_advance = None
-            await self._plan_current_responsibilities(run,
+            await self._plan_current_responsibilities(
+                run,
                 self._subset_work_request(run.post_ga_request, run.goal_responsibility_refs),
                 run.planning_context, run.history,
             )
@@ -2925,7 +2927,8 @@ class GoalDrivenRuntimeCoordinator:
         """Plan requested Responsibilities still without a decision and bind ready communicative Activities."""
 
         if run.fast_advance is None and run.association_stage.planning_task is None and run.planner_refs:
-            await self._plan_current_responsibilities(run,
+            await self._plan_current_responsibilities(
+                run,
                 self._subset_work_request(run.post_ga_request, set(run.planner_refs)),
                 run.planning_context, run.history
             )
@@ -3526,7 +3529,8 @@ class GoalDrivenRuntimeCoordinator:
                 },
             )
 
-        await self._communicate_terminal_work_failure(run,
+        await self._communicate_terminal_work_failure(
+            run,
             stage=exc.stage,
             failure_class=str(exc.failure_metadata.get("failure_class") or type(exc).__name__),
             failure_domain=str(exc.failure_metadata.get("failure_domain") or "cognitive_work"),
@@ -3562,7 +3566,8 @@ class GoalDrivenRuntimeCoordinator:
         """Report an unexpected runtime failure through Social Cognition and finish with an error."""
 
         await self._cancel_uncommitted_fast_work(run, type(exc).__name__)
-        await self._communicate_terminal_work_failure(run,
+        await self._communicate_terminal_work_failure(
+            run,
             stage="runtime", failure_class=type(exc).__name__,
             failure_domain="cognitive_runtime", failure_reason=str(exc),
         )

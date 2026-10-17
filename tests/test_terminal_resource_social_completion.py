@@ -34,7 +34,8 @@ def _host():
 
 
 def _handover_request(host):
-    return asyncio.run(planner_reentry_host.optional_completed_resource_social_response(host,
+    return asyncio.run(planner_reentry_host.optional_completed_resource_social_response(
+        host,
         source_response=SimpleNamespace(metadata={
             "user_turn_envelope": {
                 "turn_id": "turn-water",
@@ -81,7 +82,8 @@ def test_completed_resource_handover_becomes_optional_social_completion_need() -
 
 def test_non_resource_completion_does_not_create_handover_social_need() -> None:
     host, runtime = _host()
-    result = asyncio.run(planner_reentry_host.optional_completed_resource_social_response(host,
+    result = asyncio.run(planner_reentry_host.optional_completed_resource_social_response(
+        host,
         source_response=SimpleNamespace(metadata={}),
         bundle=SimpleNamespace(aggregate_status="completed"),
         plan=SimpleNamespace(plan_id="plan-other", steps=[]),

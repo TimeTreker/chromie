@@ -1353,7 +1353,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-        delivered = await cognitive_outcome_host.record_successfully_delivered_speech(assistant,
+        delivered = await cognitive_outcome_host.record_successfully_delivered_speech(
+            assistant,
             response,
             execution,
             session_id="sid-confirmation-failed",
@@ -1999,7 +2000,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Too fast. Walking normally. "
             "La la, tiny steps and circuits bright, I am walking through the light."
         )
@@ -2020,7 +2022,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Okay. I will check the route, then I will explain the next safe step."
         )
 
@@ -2040,7 +2043,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Hello. I am doing well and ready to help."
         )
 
@@ -2060,7 +2064,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             'I apologize, but your input "Yeah, so you guys" is incomplete. '
             "Could you please provide a full request or question so I can assist you?"
         )
@@ -2081,7 +2086,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Hello! I am functioning correctly and ready to assist you. "
             "How can I help you today?"
         )
@@ -2103,7 +2109,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Hello! I am doing well, thank you for asking. "
             "I am ready to help you with whatever you need."
         )
@@ -2125,7 +2132,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             "I can help you practice English, check simple ideas, plan small tasks, "
             "and keep you company while we work."
         )
@@ -2216,7 +2224,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             "I am doing well and ready to help."
         )
 
@@ -2230,7 +2239,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = tts_text.split_tts_text(assistant,
+        chunks = tts_text.split_tts_text(
+            assistant,
             "I will explain the route carefully without creating another section."
         )
 

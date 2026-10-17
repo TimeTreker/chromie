@@ -197,7 +197,8 @@ async def execute_cognitive_outcome_response(
         )
         return "speech_runtime_failed"
 
-    delivered_count = await record_successfully_delivered_speech(host,
+    delivered_count = await record_successfully_delivered_speech(
+        host,
         response,
         execution,
         session_id=session_id,
@@ -478,7 +479,8 @@ async def close_cognitive_execution(
         )
         # Evidence is retained, but Goal/Responsibility state did not commit.
         # Do not let Host turn that implementation failure into result meaning.
-        record_cognitive_outcome_evidence(host,
+        record_cognitive_outcome_evidence(
+            host,
             bundle,
             session_id=session_id,
             final_response=None,
@@ -553,7 +555,8 @@ async def close_cognitive_execution(
             session_id,
             "cognitive_outcome_response_suppressed: reason=stale_turn",
         )
-        record_cognitive_outcome_evidence(host,
+        record_cognitive_outcome_evidence(
+            host,
             bundle,
             session_id=session_id,
             final_response=None,
@@ -570,7 +573,8 @@ async def close_cognitive_execution(
             current_session_id,
         )
     if suppress_final_reason is not None:
-        record_cognitive_outcome_evidence(host,
+        record_cognitive_outcome_evidence(
+            host,
             bundle,
             session_id=session_id,
             final_response=None,
@@ -613,7 +617,8 @@ async def close_cognitive_execution(
             "reason=incremental_result_already_delivered evidence=%s",
             len(completed_evidence_ids),
         )
-        record_cognitive_outcome_evidence(host,
+        record_cognitive_outcome_evidence(
+            host,
             bundle,
             session_id=session_id,
             final_response=None,
@@ -635,7 +640,8 @@ async def close_cognitive_execution(
             "reason=incremental_planner_reentry_already_handled evidence=%s",
             len(terminal_evidence_ids),
         )
-        record_cognitive_outcome_evidence(host,
+        record_cognitive_outcome_evidence(
+            host,
             bundle,
             session_id=session_id,
             final_response=None,
@@ -654,7 +660,8 @@ async def close_cognitive_execution(
             plan=plan,
             session_id=session_id,
         )
-        schedule_outcome_reflection(host,
+        schedule_outcome_reflection(
+            host,
             response=response, plan=plan, bundle=bundle, opportunities=slow_opportunities,
             session_id=session_id, generation=generation,
         )
@@ -667,7 +674,8 @@ async def close_cognitive_execution(
                 bundle.aggregate_status,
                 len(bundle.evidence),
             )
-            record_cognitive_outcome_evidence(host,
+            record_cognitive_outcome_evidence(
+                host,
                 bundle,
                 session_id=session_id,
                 final_response=None,
@@ -737,7 +745,8 @@ async def close_cognitive_execution(
                 suppression_reason,
                 ",".join(window.waited_for_session_ids),
             )
-            record_cognitive_outcome_evidence(host,
+            record_cognitive_outcome_evidence(
+                host,
                 bundle,
                 session_id=session_id,
                 final_response=None,
@@ -766,7 +775,8 @@ async def close_cognitive_execution(
     response.metadata["post_execution_response"] = final_response.model_dump(
         mode="json"
     )
-    record_cognitive_outcome_evidence(host,
+    record_cognitive_outcome_evidence(
+        host,
         bundle,
         session_id=session_id,
         final_response=final_response,

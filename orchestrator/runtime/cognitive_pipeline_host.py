@@ -354,7 +354,8 @@ def launch_coaffected_goal_reentry(
     if not set(evidence.coaffected_goal_ids) - excluded_goal_ids:
         return
     task = asyncio.create_task(
-        reenter_coaffected_goals_after_cancellation(host,
+        reenter_coaffected_goals_after_cancellation(
+            host,
             evidence,
             session_id=session_id,
             excluded_goal_ids=excluded_goal_ids,
@@ -766,7 +767,8 @@ async def try_apply_cognitive_runtime(
             }
         elif cancellation_goal_ids:
             goal_state_results, cancellation_metadata = (
-                await dispatch_resolution_goal_cancellation(host,
+                await dispatch_resolution_goal_cancellation(
+                    host,
                     resolution,
                     session_id=session_id,
                     user_text=user_text,
@@ -878,7 +880,8 @@ async def try_apply_cognitive_runtime(
                 "named_goal_cancellation": cancellation_metadata,
                 "goal_cancellation_evidence_id": cancellation_evidence.evidence_id,
             }
-            launch_coaffected_goal_reentry(host,
+            launch_coaffected_goal_reentry(
+                host,
                 cancellation_evidence,
                 session_id=session_id,
                 excluded_goal_ids=set(reentry_goal_ids),
@@ -1001,7 +1004,8 @@ async def try_apply_cognitive_runtime(
                 )
             safe_response = (
                 planner_failure_response
-                or goal_cancellation_operational_fail_safe(host,
+                or goal_cancellation_operational_fail_safe(
+                    host,
                     user_text,
                     evidence=cancellation_failure_evidence,
                 )

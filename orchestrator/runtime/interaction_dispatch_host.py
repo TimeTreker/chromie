@@ -212,7 +212,8 @@ async def consume_detached_non_cognitive_dispatch(
             request_id=result.request_id, status=result.status
         )
     if response.metadata.get("history_after_successful_delivery") is True:
-        await cognitive_outcome_host.record_successfully_delivered_speech(host,
+        await cognitive_outcome_host.record_successfully_delivered_speech(
+            host,
             response, execution, session_id=session_id,
             log_event="interaction_history_after_delivery",
         )
@@ -293,7 +294,8 @@ async def consume_detached_cognitive_dispatch(
                     provider_state_signatures[event.request_id] = dict(
                         projected_state
                     )
-                    await planner_reentry_host.reenter_cognition_for_provider_state(host,
+                    await planner_reentry_host.reenter_cognition_for_provider_state(
+                        host,
                         response=response,
                         event=event,
                         provider_state=projected_state,

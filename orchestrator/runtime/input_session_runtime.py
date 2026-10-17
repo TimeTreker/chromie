@@ -344,7 +344,8 @@ class InputSessionRuntime:
                         )
                         if not playback_candidate:
                             host.session_log(session_id, "asr_final: asr_ms=%.1f text_chars=%s text=%r", asr_done_ms - asr_start_ms, len(user_text), user_text)
-                        likely_echo, echo_ratio, echo_coverage = tts_echo.likely_tts_echo(host,
+                        likely_echo, echo_ratio, echo_coverage = tts_echo.likely_tts_echo(
+                            host,
                             user_text,
                             playback_generation_at_start=playback_generation_at_start,
                             started_during_playback=started_during_playback,

@@ -1380,7 +1380,8 @@ class CapabilityRuntime:
         reason_code = str(result.reason_code or "")
         cancellation_scope = ""
         if reason_code == "cancelled_before_start":
-            rule = capability_cancellation.matching_cancellation_rule(self,
+            rule = capability_cancellation.matching_cancellation_rule(
+                self,
                 interaction_id,
                 request,
                 definition,
@@ -1919,7 +1920,8 @@ class CapabilityRuntime:
                 rule
                 for (request, definition) in items
                 if (
-                    rule := capability_cancellation.matching_cancellation_rule(self,
+                    rule := capability_cancellation.matching_cancellation_rule(
+                        self,
                         interaction_id,
                         request,
                         definition,
@@ -2371,7 +2373,8 @@ class CapabilityRuntime:
         active_key = (interaction_id, request.request_id)
         prestart_result: CapabilityResult | None = None
         async with self._active_lock:
-            cancellation_rule = capability_cancellation.matching_cancellation_rule(self,
+            cancellation_rule = capability_cancellation.matching_cancellation_rule(
+                self,
                 interaction_id,
                 request,
                 definition,

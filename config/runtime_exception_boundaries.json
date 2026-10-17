@@ -380,7 +380,7 @@
       "owner": "orchestrator",
       "contract": "Retain Evidence when Goal/Responsibility state commit fails; record goal_state_commit_failed and return without result speech or further Work.",
       "review_status": "reviewed",
-      "body_sha256": "f9bc0e2cdf123d9cc6160a5826d1898453da52033af4245c540c9f06b5af2670",
+      "body_sha256": "45d684874c41b710248a7a56325b32871a4f7e9604aceea43ef820cfffdac13d",
       "failure_signals": [
         "diagnostic",
         "return",
@@ -670,7 +670,7 @@
       "owner": "orchestrator",
       "contract": "Contain Host commit/cancellation failure, retain diagnostics and failure state, and authorize no unvalidated work. Preserve the admitted source envelope so operational fallback honors an existing protective silence constraint.",
       "review_status": "reviewed",
-      "body_sha256": "253ab8d2ed8b3ac3821084f52d02e35db196b759978fd751cdc34aced9bd7e15",
+      "body_sha256": "e310b92df891ef6af51e5b8b71091bee9ee10699038b6314a3626d92b6d58ccc",
       "failure_signals": [
         "diagnostic",
         "return",

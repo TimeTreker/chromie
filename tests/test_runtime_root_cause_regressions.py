@@ -957,7 +957,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ]
         }
 
-        likely, ratio, coverage = tts_echo.likely_tts_echo(assistant,
+        likely, ratio, coverage = tts_echo.likely_tts_echo(
+            assistant,
             "我会先眨两下眼睛，再往前走15秒，刚才没成功。",
             playback_generation_at_start=4,
         )
@@ -976,7 +977,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ]
         }
 
-        likely, ratio, _ = tts_echo.likely_tts_echo(assistant,
+        likely, ratio, _ = tts_echo.likely_tts_echo(
+            assistant,
             "Once upon a time along says why.",
             playback_generation_at_start=4,
         )
@@ -988,7 +990,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         assistant = bare_voice_assistant()
         assistant.playback_delivery.tts_text_by_generation = {5: ["我会先眨两下眼睛，再往前走15秒。"]}
 
-        likely, _, _ = tts_echo.likely_tts_echo(assistant,
+        likely, _, _ = tts_echo.likely_tts_echo(
+            assistant,
             "停一下，我不是让你先眨眼。",
             playback_generation_at_start=5,
         )
@@ -1002,7 +1005,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         playback.last_completed_playback_generation = 8
         playback.last_playback_end_monotonic_ms = 1000.0
 
-        likely, ratio, coverage = tts_echo.likely_tts_echo(assistant,
+        likely, ratio, coverage = tts_echo.likely_tts_echo(
+            assistant,
             "Okay, I'll do that for you.",
             playback_generation_at_start=8,
             started_during_playback=False,
@@ -1020,7 +1024,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         playback.last_completed_playback_generation = 8
         playback.last_playback_end_monotonic_ms = 1000.0
 
-        likely, _, _ = tts_echo.likely_tts_echo(assistant,
+        likely, _, _ = tts_echo.likely_tts_echo(
+            assistant,
             "Okay, I'll do that for you.",
             playback_generation_at_start=8,
             started_during_playback=False,
