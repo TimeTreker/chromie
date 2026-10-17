@@ -137,9 +137,6 @@ class CognitiveGateway:
         snapshot = self.assemble_context(capture, context) if context else None
         return self.turn_admission.for_reflex(capture, snapshot)
 
-    def for_confirmation(self, capture: GatewayTurnCapture) -> UserTurnEnvelope:
-        return self.turn_admission.for_confirmation(capture)
-
     def for_direct(
         self,
         capture: GatewayTurnCapture,

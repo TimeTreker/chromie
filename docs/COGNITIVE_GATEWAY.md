@@ -135,19 +135,25 @@ the Core. It is an interaction policy, not an intent classifier. It may suppress
 only bounded, high-confidence ambient speech when engagement is inactive and
 policy permits suppression.
 
-The primary Attention model owns addressedness and speech act using the admitted
-transcript and bounded engagement/context. Direct or unresolved usable input,
-malformed output, unavailability and failed review retain the fail-open admission
-contract. Suppression requires a qualified high-confidence inactive ambient result;
-Attention Review cannot authorize an effect.
+The Attention model owns addressedness and speech act using the admitted
+transcript and bounded engagement/context. Attention Review makes exactly one
+model call per turn. It discards a turn only when that call is schema-valid,
+at or above the suppression confidence threshold, classifies the input as
+unaddressed ambient speech (`ambient_report`, `dictation`, `narration`, or a
+contextless `reply`), and Host engagement is not active (no recent exchange,
+active work, or other in-flight turn). Every other outcome admits the turn:
+directed or unclear speech, low confidence, active engagement, malformed or
+self-contradictory output, unavailability, and failed review. There is no
+second, repair, or reconsideration call; wrongly ignoring a person is the worse
+mistake. Attention Review cannot authorize an effect.
 
-Current implementation uses greeting/question/wake-name surface cues to detect
-contradictions and calls the same model again to reclassify. That path violates
-Charter principles 30–31 and must not be treated as an allowed semantic repair.
-This is an open finding in [Status](STATUS.md#current-open-work);
-implementation qualification remains open. Ordinary phrase cues cannot become a
-second semantic authority. Gateway-suppressed room speech stays bounded input
-evidence and is excluded from accepted recent dialogue.
+Self-contradictory output includes an unaddressed directed speech act and output
+that contradicts bounded surface cues (a bare greeting, a trailing question mark,
+or the bare wake name). Those cues can only admit a turn; they never suppress one
+or become a second semantic authority. A pending confirmation is resolved only
+by a turn that the ignore reflex passed and Attention Review admitted.
+Gateway-suppressed room speech stays bounded input evidence and is excluded from
+accepted recent dialogue.
 
 ### 4.4 Context Assembly / 上下文组装
 

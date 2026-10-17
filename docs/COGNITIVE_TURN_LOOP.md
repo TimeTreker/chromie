@@ -150,11 +150,12 @@ evidence, and a bounded recent-dialogue projection. That projection contains adm
 user dialogue plus assistant dialogue; Gateway-suppressed room speech may remain bounded
 input evidence but is not fed back as if Chromie had accepted it into the conversation.
 Recent exchange is context, not an automatic addressedness grant: a temporary
-user-authored rule such as "wait until I say Chromie" can suppress ambient nearby speech
-while allowing a later explicitly addressed turn. The Attention model makes one primary
-judgment. An internally contradictory output receives at most one schema-constrained
-repair; malformed, unavailable, or still-contradictory review fails open to ordinary Core
-cognition. There is no open-ended Attention critic or suppression-review chain.
+user-authored rule such as "wait until I say Chromie" makes ambient nearby speech
+unaddressed while allowing a later explicitly addressed turn. Attention Review makes one
+model call and suppresses only confident unaddressed ambient speech while engagement is
+inactive; malformed, low-confidence, contradictory, or unavailable review fails open to
+ordinary Core cognition with no repair or second call
+([Gateway §4.3](COGNITIVE_GATEWAY.md#43-attention-review--注意审查)).
 
 The executable loop applies `TURN-GOAL-BOUNDARY-001`, `PLANNER-AUTHORITY-001`, and `ASYNC-COGNITION-001`; these names refer to Charter invariants, not additional stages.
 

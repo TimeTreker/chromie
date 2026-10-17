@@ -3195,15 +3195,6 @@ class VoiceAssistant:
                 self.maybe_session_done(session_id)
                 return
 
-        if not residual_semantic_input:
-            confirmation_envelope = gateway.for_confirmation(turn_capture)
-            if await self._handle_confirmation_reply(
-                user_text,
-                session_id,
-                turn_envelope=confirmation_envelope,
-            ):
-                return
-
         if reflex_outcome.action == "ignore":
             turn_envelope = gateway.for_suppression(turn_capture)
             record_cognitive_gateway_evidence(
@@ -3386,6 +3377,17 @@ class VoiceAssistant:
                 if state is not None:
                     state["llm_done"] = True
                 self.maybe_session_done(session_id)
+                return
+
+            # A pending confirmation is resolved only by input the Gateway has
+            # admitted. Noise/filler ignored by the reflex and room speech that
+            # Attention Review suppressed returned above, so neither can reach
+            # the model call that approves or denies a pending action.
+            if await self._handle_confirmation_reply(
+                user_text,
+                session_id,
+                turn_envelope=turn_envelope,
+            ):
                 return
 
         context["user_turn_envelope"] = turn_envelope.model_dump(mode="json")

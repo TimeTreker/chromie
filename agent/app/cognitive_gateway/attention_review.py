@@ -149,69 +149,32 @@ class AttentionReviewer:
                 reason=f"attention review failed open: {type(exc).__name__}",
             )
 
+        # Attention Review makes exactly one model call. Output that contradicts
+        # itself or the bounded surface cues is admitted, never re-asked: wrongly
+        # ignoring a person is the worse mistake.
         contradiction = self._contradiction_reason(
             result,
             active_engagement=active_engagement,
             surface_evidence=surface_evidence,
         )
-        result_source = "cognitive_gateway.attention_review_model"
         if contradiction:
-            try:
-                repaired_raw = await self.client.generate(
-                    self._repair_prompt(
-                        request,
-                        result=result,
-                        contradiction=contradiction,
-                        surface_evidence=surface_evidence,
-                    ),
-                    system=self._system_prompt(),
-                    options=options,
-                    response_format=self._response_schema(
-                        active_engagement=active_engagement
-                    ),
-                    prompt_family="cognitive_gateway_attention_review.repair",
-                    turn_id=request.turn_id,
-                    attempt=2,
-                )
-                repaired = self._parse_model_output(repaired_raw)
-                repaired_contradiction = self._contradiction_reason(
-                    repaired,
-                    active_engagement=active_engagement,
-                    surface_evidence=surface_evidence,
-                )
-                if repaired_contradiction:
-                    raise ValueError(
-                        "attention repair remained contradictory: "
-                        f"{repaired_contradiction}"
-                    )
-                result = repaired
-                result_source = "cognitive_gateway.attention_review_model_repair"
-            except Exception as exc:
-                logger.warning(
-                    "attention_review_repair_failed turn_id=%s contradiction=%s "
-                    "error_type=%s error=%s",
-                    request.turn_id,
-                    contradiction,
-                    type(exc).__name__,
-                    exc,
-                )
-                return self._admit(
-                    request=request,
-                    confidence=0.0,
-                    source="cognitive_gateway.attention_review_fail_open",
-                    reason=(
-                        "attention contradiction failed open after one repair: "
-                        f"{contradiction}"
-                    ),
-                    speech_act=(
-                        surface_evidence[0]
-                        if surface_evidence is not None
-                        and surface_evidence[0] is not None
-                        else "unclear"
-                    ),
-                )
+            return self._admit(
+                request=request,
+                confidence=0.0,
+                source="cognitive_gateway.attention_review_fail_open",
+                reason=f"attention contradiction failed open: {contradiction}",
+                speech_act=(
+                    surface_evidence[0]
+                    if surface_evidence is not None
+                    and surface_evidence[0] is not None
+                    else "unclear"
+                ),
+            )
 
-        fail_open_reason = self._admission_reason(result)
+        fail_open_reason = self._admission_reason(
+            result,
+            active_engagement=active_engagement,
+        )
         if fail_open_reason:
             return AttentionReviewResult(
                 turn_id=request.turn_id,
@@ -220,7 +183,7 @@ class AttentionReviewer:
                 disposition="admit",
                 speech_act=result.speech_act,
                 confidence=result.confidence,
-                source=result_source,
+                source="cognitive_gateway.attention_review_model",
                 reason=f"attention review admitted: {fail_open_reason}",
             )
 
@@ -231,19 +194,26 @@ class AttentionReviewer:
             disposition="suppress",
             speech_act=result.speech_act,
             confidence=result.confidence,
-            source=result_source,
-            reason="inactive/restricted turn classified as unaddressed ambient speech",
+            source="cognitive_gateway.attention_review_model",
+            reason="inactive turn classified as unaddressed ambient speech",
         )
 
-    def _admission_reason(self, result: _AttentionModelOutput) -> str:
+    def _admission_reason(
+        self,
+        result: _AttentionModelOutput,
+        *,
+        active_engagement: bool,
+    ) -> str:
         if result.addressed or result.confidence < self.min_suppression_confidence:
             return "addressed_or_low_confidence"
         if result.speech_act in DIRECTED_SPEECH_ACTS:
             return "direct_speech_act"
-        if result.speech_act == "unclear":
-            return ""
         if result.speech_act not in SUPPRESSIBLE_INACTIVE_SPEECH_ACTS:
             return "unsupported_speech_act"
+        if active_engagement:
+            # A live conversation or active work keeps every reviewed turn:
+            # suppression is reserved for inactive engagement.
+            return "engagement_active"
         return ""
 
     @staticmethod
@@ -300,23 +270,6 @@ class AttentionReviewer:
                     f"actual={result.speech_act}"
                 )
         return ""
-
-    @staticmethod
-    def _repair_prompt(
-        request: AttentionReviewRequest,
-        *,
-        result: _AttentionModelOutput,
-        contradiction: str,
-        surface_evidence: tuple[AttentionSpeechAct | None, str] | None,
-    ) -> str:
-        return (
-            f"Primary classification: {result.model_dump(mode='json')}\n"
-            f"Detected contradiction: {contradiction}\n"
-            f"Bounded direct-address surface evidence: {surface_evidence}\n"
-            "Reclassify the same latest transcript once. Do not invent intent, "
-            "route, goal, capability, action, plan, or response.\n"
-            f"{AttentionReviewer._prompt(request)}"
-        )
 
     @staticmethod
     def _admit(
@@ -421,8 +374,8 @@ class AttentionReviewer:
             "addressedness only. A prior user-authored temporary interaction rule such "
             "as requiring a wake name, explicit address, or another stated condition "
             "remains in force until the user revokes or replaces it. Under such a "
-            "rule, suppress ambient speech that does not satisfy the stated condition "
-            "even when it follows a recent exchange. Conversely, an ordinary reply in "
+            "rule, ambient speech that does not satisfy the stated condition is "
+            "unaddressed even when it follows a recent exchange. Conversely, an ordinary reply in "
             "an ongoing direct exchange is addressed when no restrictive rule is "
             "active. Assistant wording never creates or relaxes the user's addressedness "
             "rule. If the linguistic function, policy applicability, or addressee is "

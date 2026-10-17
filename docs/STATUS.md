@@ -37,7 +37,7 @@ This describes current intended ownership, not full conformance; see the open wo
 
 | Existing owner | Source state and current proof limit |
 | --- | --- |
-| [Gateway](COGNITIVE_GATEWAY.md) / Host admission | Deterministic protective controls and immutable admitted turn exist. The Attention same-authority finding is unreviewed. Physical audio admission needs source-bound proof. |
+| [Gateway](COGNITIVE_GATEWAY.md) / Host admission | Deterministic protective controls and immutable admitted turn exist. Attention Review makes one call and suppresses only confident inactive ambient speech. Physical audio admission needs source-bound proof. |
 | [Turn lifecycle](COGNITIVE_TURN_LOOP.md) / Cognitive Runtime | Concurrent SC and GA/Work, exact identity, cancellation, prerequisite joins and Evidence re-entry exist. Text admission chronology is repaired and mechanically proved; native coverage and latency remain open. |
 | [Semantic authorities](SEMANTIC_AUTHORITY.md) / UMI, GA, Planner, Value Judgment, SC | Source ownership migration is implemented; preserved original wording is authoritative. Native coverage remains unqualified. |
 | [Agent Skills](AGENT_SKILLS_ARCHITECTURE.md) / Planner and registry | Semantic methods, Capability contracts and need-first library search exist. Frozen references are not independent native-model qualification. |
@@ -63,7 +63,7 @@ and the [checkpoint](../DEVELOPMENT_CHECKPOINT.md).
    perceived-answer turn; replays and unit tests cover them.
 3. Constrained Planner decoding runs about 12-15 tokens/s in grammar-heavy regions,
    so a second Planner pass can miss the turn deadline.
-4. Review the Attention same-authority and SC fresh-turn silence findings; qualify
+4. Review the SC fresh-turn silence finding; qualify
    Schema/DTO/native grammar, SC context budget and latency, provider scene and
    geographic Evidence, and Goal/action/provenance coverage.
 5. Narrow current-revision voice proof and the default

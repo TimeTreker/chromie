@@ -103,12 +103,11 @@ inputs. Without a provider observation, the base context omits that state claim;
 execution authorization and provider safety checks remain independently enforced.
 
 `POST /cognitive-gateway/attention-review` accepts only normalized turn identity,
-text, language, and bounded host engagement evidence. Suppression is limited to high-confidence inactive ambient speech. Direct,
-unresolved unclear, malformed, unavailable or failed review admits the turn.
-Charter principles 30–31 prohibit a second same-authority semantic classification.
-Current implementation nevertheless uses surface cues and one model repair on
-some contradictions; this is an open conformance defect tracked in
-[Status](STATUS.md#current-open-work), not an allowed API repair contract.
+text, language, and bounded host engagement evidence. It makes one model call.
+Suppression is limited to high-confidence unaddressed ambient speech while engagement
+is inactive. Direct, unclear, low-confidence, contradictory, malformed, unavailable or
+failed review admits the turn without a second call
+([Gateway §4.3](COGNITIVE_GATEWAY.md#43-attention-review--注意审查)).
 
 `POST /cognitive-core/interpret` accepts only a schema-valid admitted
 `CoreTurnRequest`. Bare text, a suppressed envelope, mismatched context identity,
