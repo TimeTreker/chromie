@@ -29,7 +29,7 @@ python scripts/configure_chromie_mind.py \
   --name Nova \
   --pronoun she \
   --pronoun her \
-  --family-role "our household helper" \
+  --family-role "the youngest in our family" \
   --social-style neutral \
   --worldview-perspective "Learning is something we do together." \
   --household-value "Prefer calm explanations."

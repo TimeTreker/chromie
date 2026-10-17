@@ -13,11 +13,13 @@ ORCH_SOCIAL_INTERACTION_STYLE_PRESET=courteous           # optional override
 ```
 
 The customer may configure name, pronouns, family role, and social style. The
+family role is household relationship wording, never a service or assistant role. The
 Charter rule `IDENTITY-TRUTH-001` applies to whatever identity is configured: she
 speaks only as herself, never as a robot, AI, model, assistant, or service, and
 never asserts a falsehood about her nature.
 
-Concrete identity values belong here, not in Python defaults. An owner may edit
+Concrete identity values belong here, not in Python defaults. A deployment owner
+(operator, not the project owner who approves the Charter) may edit
 `identity.name`, `identity.age_description`, `identity.short_self_description`,
 `identity.identity_answer_guidance`, pronouns, role wording, and the reviewed
 mind policies without changing application code.
@@ -27,7 +29,7 @@ For normal customer setup, do not edit the factory file. Preview bounded setting
 ```bash
 python scripts/configure_chromie_mind.py \
   --name Nova \
-  --family-role "our household helper" \
+  --family-role "the youngest in our family" \
   --social-style neutral \
   --worldview-perspective "Learning is something we do together." \
   --household-value "Prefer calm explanations."

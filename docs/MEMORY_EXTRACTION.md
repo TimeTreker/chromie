@@ -59,7 +59,7 @@ Memory entries carry an explicit **scope**, but scope is not lifetime:
 | `session` | Current conversation cognition | Conversation boundary **and** a bounded maximum TTL | Current topic, recent correction, local calibration |
 | `task` | The bound unfinished task/Goal | Goal/task boundary or explicit expiry | Goal constraints, accepted/revised proposals |
 | `preference` | Owner-approved profile consumers | Durable only with policy/consent | Language preference, interaction style |
-| `experience` | Reviewed learning/evaluation paths | Policy-defined; never automatic global cognition | Mistakes, successful fixes, scenario mining |
+| `experience` | Reviewed learning/evaluation paths (not implemented as a Memory scope) | Policy-defined; never automatic global cognition | Mistakes, successful fixes, scenario mining |
 
 A local adaptation must have both an applicability scope and an independently bounded
 lifetime. A long-running Continuous Mind or active Goal must not make `session` or task
@@ -67,8 +67,12 @@ calibration de facto permanent merely because its natural boundary never arrives
 `expires_ms`/retention policy should be reused for this purpose before adding a new
 adaptation lifecycle manager.
 
-The first implementation focuses on `session` and `task` memory. Durable
-preference and experience-fed memory still need consent, deletion, retention,
+The first implementation focuses on `session` and `task` memory. The `experience`
+scope above is the offline reviewed corpus and is not stored as Memory. Online Reflection
+lessons are a different thing: `task`/`session`-scoped ephemeral entries of *kind*
+`experience` or `calibration`, applied without review and visible to later cognition until
+their TTL (see [Implementation Plan](#implementation-plan) item 8).
+Durable preference and experience-fed memory still need consent, deletion, retention,
 and review rules before broad use.
 
 ## Cognitive projections and storage lifetime
@@ -83,8 +87,9 @@ semantic responsibility to UMI, GA or Planner.
 | GA | How does that accepted meaning relate to existing Goals? | Accepted UMI Responsibilities and any explicit unresolved material; relevant canonical Goals, bounded Goal/progress history and unfulfilled commitments; disclosure-permitted activated Memory needed for association. |
 | Planner | Given the intent, Goals and actual state, what should happen now? | Relevant Responsibilities and available canonical Goals; prepared, queued, running and completed Work projections; trusted Evidence and delivered/pending communication records; the broader Planner-scoped Active Memory projection, including remembered world/task priors. |
 
-Historical world/task entries remain usable when their location is outside current
-perception. Both Memory's prompt entry and its cognitive projection preserve
+Historical world/task entries remain usable while retained when their location is outside
+current perception; they are Working Memory with a TTL, not durable storage, because no
+durable owner for world/object facts exists yet. Both Memory's prompt entry and its cognitive projection preserve
 `created_ms`, `updated_ms` and original source references. A previous delivery to the
 living room supplies a candidate search location, not proof the water is still there.
 Planner may use that prior to choose search Work; perception verifies current state.
@@ -256,7 +261,7 @@ retention policy, not a claim that public relationships can never be durable.
 
 ## Cognitive relationship experience
 
-Shared-experience Memory lets the same Goal-free Cognitive Core to propose a small `shared_experience` entry grounded in the current trusted Situation. Runtime binds subject/source provenance and stores it only as private, ephemeral session Memory. The proposal records an episode; it does not promote a person to friend/family/trusted, grant disclosure, or authorize effects. Repeated interactions therefore accumulate evidence for later cognition rather than crossing hard-coded relationship thresholds.
+Shared-experience Memory lets the same Goal-free Cognitive Core to propose a small `shared_experience` entry grounded in the current trusted Situation. Runtime binds subject/source provenance and stores it only as private, ephemeral session Memory. The proposal records an episode; it does not promote a person to friend/family/trusted, grant disclosure, or authorize effects. Because its disclosure scope is `private`, the prompt disclosure filter (`orchestrator/runtime/memory.py` `_memory_prompt_visible`) keeps it out of every UMI, GA, Planner and SC prompt: today it is retained, provenance-bound evidence only, and later cognition does not see it until a trusted disclosure owner permits a wider scope. Relationship status is never inferred from hard-coded thresholds.
 
 ## Short-lived self context
 

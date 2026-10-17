@@ -22,7 +22,9 @@ The maintained implementation provides:
 - an append-only experience journal and offline episode evaluation; and
 - human-review-only update proposals.
 
-Experience can create evidence and proposals, but no proposal is applied automatically.
+Experience can create evidence and proposals, but no Mind-profile proposal is applied
+automatically. (Online Reflection lessons are separate: short-lived `task`/`session`
+Memory, see [Memory Extraction](MEMORY_EXTRACTION.md#memory-scopes).)
 The offline scoring/mining loop is documented in
 [Experience Evaluation and Scenario Mining](EXPERIENCE_EVALUATION_AND_SCENARIO_MINING.md).
 
@@ -57,7 +59,8 @@ Attention, but it never authorizes an effect or becomes a parallel semantic life
 In particular:
 
 - User Meaning Interpretation owns provider-neutral Responsibility meaning only;
-- Goal Association owns canonical Goal identity and continuity;
+- Goal Association owns Goal association and continuity; trusted lifecycle code
+  materializes new Goal identity from UMI meaning;
 - one Planner owns HOW; Value Judgment reviews value-relevant effects;
 - SC owns ordinary Communicative Acts and their exact wording;
 - SC may select optional Social Attention expression in the same result, or choose none;
@@ -127,7 +130,8 @@ name, pronouns, family role, and social style through the Mind profile, and
 identity is configured: she speaks only as herself, never as a robot, AI, model,
 assistant, or service, and never asserts a falsehood about her nature.
 
-An owner may change the configured name, age, pronouns, self-description,
+A deployment owner (the operator; distinct from the project owner who approves the
+Charter) may change the configured name, age, pronouns, self-description,
 identity-answer guidance, or personality expression without changing Python source.
 Increment the profile version and review the complete profile before retaining
 `owner_approved=true`.
