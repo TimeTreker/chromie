@@ -6,7 +6,7 @@ from typing import Any
 from ..capabilities.models import CapabilityRegistry, FailurePolicy
 from ..tool_invocation import ToolCallOutcome, ToolInvoker
 
-from .models import ExecutionEvent, ExecutionTrace, NodeResult, WorkDAG, WorkNode
+from .models import ExecutionEvent, ExecutionTrace, NodeResult, WorkDAG, WorkNode, record_node_result
 from .refs import resolve_refs
 from .validator import WorkDAGValidator
 
@@ -290,12 +290,7 @@ class DAGDryRunEngine:
             return None
         return None
 
-    def _record_result(self, trace: ExecutionTrace, results: dict[str, NodeResult], result: NodeResult) -> None:
-        results[result.node_id] = result
-        trace.node_results.append(result)
-        trace.events.append(
-            ExecutionEvent(type="node_result", node_id=result.node_id, capability_id=result.capability_id, message=result.status, data={"error": result.error})
-        )
+    _record_result = staticmethod(record_node_result)
 
 
 class DAGToolEngine(DAGDryRunEngine):

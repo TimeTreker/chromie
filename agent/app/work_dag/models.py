@@ -217,3 +217,23 @@ class ExecutionTrace(BaseModel):
 
     def result_map(self) -> dict[str, NodeResult]:
         return {result.node_id: result for result in self.node_results}
+
+
+def record_node_result(
+    trace: ExecutionTrace,
+    results: dict[str, NodeResult],
+    result: NodeResult,
+) -> None:
+    """Store one node result and append its ``node_result`` trace event."""
+
+    results[result.node_id] = result
+    trace.node_results.append(result)
+    trace.events.append(
+        ExecutionEvent(
+            type="node_result",
+            node_id=result.node_id,
+            capability_id=result.capability_id,
+            message=result.status,
+            data={"error": result.error},
+        )
+    )
