@@ -348,14 +348,22 @@ a different Provider may expose navigation, perception, grasp, return, and
 handover separately. That changes Work composition, not Goal meaning. Provider
 internals remain private until explicitly advertised as capabilities.
 
-### Addressedness is bounded interaction policy, not recent-turn inertia
+### Addressedness is bounded interaction policy
 
 Cognitive Gateway Attention Review receives Host engagement evidence plus bounded
 recent accepted dialogue. A user-authored temporary interaction rule—such as requiring
 Chromie's wake name during a call—remains relevant addressedness context until the
-user revokes/replaces it or it falls outside the bounded conversation context. A recent
-exchange by itself does not make every nearby utterance addressed. Assistant wording
-never creates or relaxes the user's addressedness rule.
+user revokes/replaces it or it falls outside the bounded conversation context.
+Assistant wording never creates or relaxes the user's addressedness rule.
+
+The Gateway enforces such a rule only while Host engagement is inactive: Attention
+Review may then suppress confident ambient speech that does not satisfy it. While
+engagement is active (a recent exchange, active work or another in-flight turn),
+Attention Review admits every turn whatever its judgment
+([Cognitive Gateway](COGNITIVE_GATEWAY.md#43-attention-review--注意审查)), because wrongly
+ignoring a person is the worse mistake. The admitted turn carries the rule in its bounded
+conversation context, and Social Cognition, which owns whether to communicate, decides
+whether to respond.
 
 Attention suppression is a fail-open boundary and therefore has one model judgment.
 Malformed or unavailable Attention output admits the turn; it is not repaired, and a
