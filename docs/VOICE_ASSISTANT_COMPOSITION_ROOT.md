@@ -74,8 +74,10 @@ python scripts/check_runtime_structure.py
 ```
 
 The config holds the VoiceAssistant method, property, `__init__` line and
-initialized-attribute baselines, and line baselines for `orchestrator.py` and the
-other runtime files over 3,000 lines, measured at its `size_baseline_revision`.
+initialized-attribute baselines, and line baselines for `orchestrator.py`, the
+other runtime files over 3,000 lines and the split former god files
+`capability_runtime.py` and `conversation_state.py`, measured at its
+`size_baseline_revision`.
 Each run reports current values and signed deltas, and fails if a value grows
 above its baseline. Staying under the baselines does not prove that structural
 simplification is complete. Missing collaborators,
