@@ -2043,7 +2043,6 @@
       "key": "ORCH_ASR_TIMEOUT_MS",
       "owners": [
         ".env.common",
-        "orchestrator/clients/asr_client.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
