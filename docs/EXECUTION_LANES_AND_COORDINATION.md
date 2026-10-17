@@ -166,7 +166,7 @@ another, it reports a typed not-found or ambiguous non-completion (`completed:
 false` with its reason) instead of looking straight ahead or picking a near
 keyword match. Chromie treats that as a limitation it tells the person about,
 never as completion. Explicit numeric values the person states are passed
-unchanged; Soridormi may refuse a value outside its limits, or run an adjusted
+unchanged; Soridormi may reject a value outside its limits, or run an adjusted
 value inside them (for example a forward speed below its lowest walking speed
 runs at that lowest speed), but it never does so silently: it reports each
 adjustment in `value_adjustments` (parameter, requested, applied, reason). The
@@ -175,9 +175,13 @@ capability result output, so the evidence Chromie speaks from states the applied
 value, not the requested one.
 
 A gaze at the speaker without another named person ("look at me") is sent as
-`target_ref="requester"`. Until Soridormi can perceive people, its simulator
-resolves that to a declared mocked requester position and says so in
-`target_resolution.source` (`mocked_requester_position`); see Soridormi's
+`target_ref="requester"`; an empty or missing `target_ref` is never defaulted to
+the speaker and fails as `missing_target`. Until Soridormi can perceive people,
+its simulator resolves the requester only from a scene actor tagged `requester`
+or, when the operator configures one, a mocked requester bearing that it reports
+in `target_resolution.source` (`mocked_requester_position`); with neither, the
+requester is `not_observed`. That `source` marks a simulation stand-in, not
+perception; see Soridormi's
 `docs/SORIDORMI_LOOK_TARGET_PROVIDER.md`.
 
 ## Lane-coordination contract

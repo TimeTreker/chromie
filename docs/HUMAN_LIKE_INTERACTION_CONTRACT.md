@@ -1143,9 +1143,11 @@ Better:
 ## Physical action behavior
 
 Chromie proposes physical actions. Soridormi owns execution, realtime safety, and
-perception, and may reject a request it cannot run safely. It does not silently
-modify Planner-owned semantic values (target, distance, duration, speed, count): a value
-outside its limits is rejected and reported, never run as a different value. When the
+perception, and may reject a request it cannot run safely. It never silently
+modifies Planner-owned semantic values (target, distance, duration, speed, count): a
+value outside its limits is rejected, or run at the nearest supported value and reported
+in `value_adjustments` (parameter, requested, applied, reason), so Chromie speaks from
+the applied value, not the requested one. When the
 body cannot do something safely, Soridormi reports a limitation, not a refusal. Whether Chromie should act at
 all is Value Judgment's alone; the Planner never refuses (it reports `unavailable`),
 and Social Cognition communicates a decline.

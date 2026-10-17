@@ -157,10 +157,13 @@ Information example:
 ```
 
 The recipient's `referent_id` is the reserved `"requester"` for the person who made
-the request, a known discourse referent for someone else, or `null` when only the
-description names them. A recipient whose description is the reserved `requester`
-binds to that referent; Chromie never sends a Host discourse ID or `null` for the
-current speaker.
+the request and `null` for anyone else, who is named by the description. A Host
+discourse ID is Chromie's dialogue identity, not one Soridormi perceives: Soridormi's
+schema accepts only `"requester"` or `null`, and it reports a referent its perception
+does not carry as a typed recipient `not_observed` rather than matching the
+description's words. A recipient whose description is the reserved `requester` binds
+to that referent; Chromie never sends a Host discourse ID or `null` for the current
+speaker.
 
 `responsibility_type=acquire_and_deliver_resource` plus `resource.kind` is the
 canonical semantic discriminator. The removed `responsibility_variant` field is not
@@ -664,7 +667,8 @@ A typed not-found or ambiguous target is `completed: false` with a summary (and 
 reason code when Soridormi gives one). The adapter returns it as a failed result
 carrying that reason, never as completion; Chromie tells the person what was not
 found. Explicit numeric values the person states reach Soridormi unchanged; Soridormi
-may refuse one outside its limits as a limitation but never silently runs another.
+may reject one outside its limits as a limitation, or run the nearest supported value
+and report it in `value_adjustments`, but never silently runs another.
 
 Chromie's adapter validates only the `completion_requires` declared by the exact
 capability that produced a result. Goal completion is stricter: the complete Plan and

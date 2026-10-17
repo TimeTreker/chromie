@@ -271,9 +271,10 @@ def requester_recipient(value: Any) -> Any:
 class ResourceRecipient(BaseModel):
     """Who should receive the resource after acquisition.
 
-    ``referent_id`` is :data:`REQUESTER_REFERENT_ID` for the current speaker, a
-    known discourse referent for someone else, or ``null`` when only the
-    description identifies the recipient. The retained ``description="requester"``
+    ``referent_id`` is :data:`REQUESTER_REFERENT_ID` for the current speaker and
+    ``null`` for anyone else, whom the description identifies. A Host discourse
+    ID is not a body-perceived identity; Soridormi reports one it does not
+    perceive as a typed recipient ``not_observed``. The retained ``description="requester"``
     default is bound to that referent by :func:`requester_recipient` at the body
     provider boundary.
     """

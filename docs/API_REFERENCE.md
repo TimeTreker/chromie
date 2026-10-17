@@ -669,8 +669,12 @@ and a bounded latency budget. Target evidence is semantic only; installation cal
 coordinates are never part of the Chromie planning contract. Soridormi calls describe
 targets in the [body target format](EXECUTION_LANES_AND_COORDINATION.md#body-target-descriptions):
 the current speaker is `referent_id`/`target_ref` `"requester"`, objects by description
-and places by cited name. A look target is still copied only from trusted target
-evidence; the Host does not yet produce evidence for the current speaker on its own. The Soridormi adapter hides `target_yaw_rad`/`target_pitch_rad`
+and places by cited name. The reserved `"requester"` names the current speaker and
+needs no further target evidence: Soridormi resolves where that person is. The Soridormi
+adapter maps an explicit speaker reference in a gaze `target_ref` (`me`, `user`,
+`speaker`, `current_speaker`, `the requester`, case-insensitive) to `"requester"`; an
+empty or missing `target_ref` is never defaulted to the speaker and fails as
+`missing_target`. Any other look target is copied only from trusted target evidence. The Soridormi adapter hides `target_yaw_rad`/`target_pitch_rad`
 from the catalog and refuses requests carrying them (`body_frame_target_not_semantic`).
 Soridormi resolves the target from perception; a target it cannot find returns
 `completed: false`, surfaced as a failed result with Soridormi's typed reason (or
@@ -681,8 +685,9 @@ CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and too
 capability catalog, the single Planner authority, schemas, and Trusted Capability
 Runtime validation rather than hidden phrase parsers or a retired routing layer. Plain walking requests
 use the default forward speed Soridormi declares in its `walk_velocity` schema. An explicit speed or other numeric value
-the person states is sent unchanged; Soridormi may refuse a value outside its limits,
-which Chromie reports as a limitation, but neither side silently runs a different value.
+the person states is sent unchanged; Soridormi may reject a value outside its limits,
+which Chromie reports as a limitation, or run the nearest supported value and report it in
+`value_adjustments`, but neither side silently runs a different value.
 Requests to joke or otherwise talk while walking use a `speech` Goal
 coordinated with the walking step; `chromie.speak` is a Host speech transport
 and is never a planner step. Requests to recite, sing, hum, or speak in a
