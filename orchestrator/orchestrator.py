@@ -6112,6 +6112,153 @@ class VoiceAssistant:
         _resolution, response = resolved
         return response
 
+    async def _requested_result_evidence_social_response(
+        self,
+        *,
+        source_response: InteractionResponse,
+        plan: CanonicalPlan,
+        session_id: str | None,
+        language: str,
+        user_request: str,
+        evidence: list[ToolResultEvidence],
+        goal_ids: list[str],
+        extra_context: dict[str, Any],
+    ) -> InteractionResponse | None:
+        """Give SC terminal Evidence for a result the person asked to be told.
+
+        Social Cognition is Chromie's communication interface. When Activation or
+        the Planner chose no next Work for terminal Evidence whose Goal carries an
+        ``information`` Responsibility, SC still receives that Evidence directly
+        with one Runtime result Need and decides how to communicate it (speech,
+        gesture, gaze). The Planner path already invokes SC itself, so this runs
+        only when that path produced nothing.
+        """
+
+        if not evidence or not goal_ids:
+            return None
+        result_goal_ids: list[str] = []
+        responsibilities: dict[str, CognitiveResponsibilityProposal] = {}
+        for goal_id in goal_ids:
+            goal_responsibilities = [
+                item
+                for item in planner_reentry_responsibilities(
+                    source_response=source_response, goal_ids=[goal_id],
+                )
+                if item.output_mode == "information"
+            ]
+            if goal_responsibilities:
+                result_goal_ids.append(goal_id)
+                for item in goal_responsibilities:
+                    responsibilities.setdefault(item.local_ref, item)
+        if not result_goal_ids:
+            return None
+        evidence_refs = [item.evidence_id for item in evidence]
+        turn_envelope = (
+            source_response.metadata.get("user_turn_envelope")
+            if isinstance(source_response.metadata, dict)
+            else None
+        )
+        normalized_input = (
+            turn_envelope.get("normalized_input")
+            if isinstance(turn_envelope, dict)
+            else None
+        )
+        turn_id = str(
+            (turn_envelope or {}).get("turn_id")
+            or source_response.metadata.get("turn_id")
+            or session_id
+            or "terminal-requested-result"
+        )
+        source_turn = {
+            "turn_id": turn_id,
+            "original_text": (
+                str(normalized_input.get("text") or "").strip()
+                if isinstance(normalized_input, dict)
+                else user_request
+            ),
+        }
+        interaction_ledger = getattr(self.cognitive_runtime, "interaction_ledger", None)
+        interaction_context = (
+            interaction_ledger.context(
+                session_id, goal_ids=result_goal_ids, turn_id=turn_id
+            ).model_dump(mode="json")
+            if interaction_ledger is not None
+            else {
+                "events": [],
+                "already_spoken": [],
+                "pending_speech": [],
+                "prior_delivered_speech": [],
+            }
+        )
+        status = aggregate_execution_status([item.status for item in evidence])
+        need = SocialCommunicationNeed(
+            need_id=communication_need_id(plan.plan_id, "requested_result_evidence"),
+            owner="runtime",
+            kind="result",
+            source_goal_ids=result_goal_ids,
+            source_responsibility_refs=list(responsibilities),
+            reference_id=plan.plan_id,
+            facts={
+                "status": status,
+                "result_kind": "requested_information",
+                "required_result_update": True,
+            },
+            delivery_phase="immediate",
+            after_step_ids=[item.step_id for item in plan.steps],
+        )
+        request = SocialCognitionRequest(
+            request_id=(
+                "sc:terminal-result:"
+                + hashlib.sha256(
+                    f"{plan.plan_id}:{','.join(evidence_refs)}".encode("utf-8")
+                ).hexdigest()[:96]
+            ),
+            trigger="evidence",
+            source_refs=list(evidence_refs),
+            language=language,
+            responsibilities=list(responsibilities.values()),
+            source_turn=source_turn,
+            goal_ids=list(result_goal_ids),
+            evidence_refs=list(evidence_refs),
+            communication_needs=[need],
+            context={
+                "interaction_context": interaction_context,
+                "trusted_terminal_evidence": [
+                    item.model_dump(mode="json") for item in evidence
+                ],
+                **{
+                    key: extra_context[key]
+                    for key in ("trusted_execution_outcome", "goal_statuses")
+                    if key in extra_context
+                },
+                "work_result": {
+                    "status": status,
+                    "result_kind": "requested_information",
+                    "evidence_refs": list(evidence_refs),
+                },
+            },
+        )
+        self.session_log(
+            session_id,
+            "terminal_evidence_social_cognition: goals=%s evidence=%s reason=no_planner_communication",
+            ",".join(result_goal_ids),
+            len(evidence_refs),
+        )
+        generation = int(self.playback_delivery.playback_generation)
+        resolved = await self.cognitive_runtime.resolve_social_interaction(
+            await self.get_http_session(),
+            request=request,
+            session_id=str(session_id or "terminal-requested-result"),
+            snapshot_is_current=lambda: not self._outcome_response_is_stale(
+                generation=generation, session_id=session_id
+            ),
+            primary_plan=plan,
+        )
+        if resolved is None:
+            return None
+        _resolution, response = resolved
+        return response
+
     async def _plan_evidence_bound_capability_result_response(
         self,
         *,
@@ -6285,8 +6432,10 @@ class VoiceAssistant:
                 repeat_check_context=extra_context,
             )
             if planner_response is not None:
+                # resolve_plan_interaction already gave SC this exact Evidence
+                # (trigger=evidence): one SC communication, never a second one.
                 return planner_response
-            return await self._optional_completed_resource_social_response(
+            resource_response = await self._optional_completed_resource_social_response(
                 source_response=source_response,
                 bundle=bundle,
                 plan=plan,
@@ -6296,6 +6445,20 @@ class VoiceAssistant:
                 evidence_refs=evidence_refs,
                 goal_ids=goal_ids,
                 selected_execution_evidence=selected_execution_evidence,
+            )
+            if resource_response is not None:
+                return resource_response
+            # Activation/Planner chose no next Work. Terminal Evidence still reaches
+            # SC directly, so a result the person asked for is never dropped.
+            return await self._requested_result_evidence_social_response(
+                source_response=source_response,
+                plan=plan,
+                session_id=session_id,
+                language=language,
+                user_request=user_request,
+                evidence=evidence,
+                goal_ids=goal_ids,
+                extra_context=extra_context,
             )
         except Exception as exc:
             self.session_log(

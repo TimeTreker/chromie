@@ -139,8 +139,11 @@ turn-loop, delegation, observation, outcome-reconciliation, and final-response
 boundary between them. The host closes effectful cognitive turns through immutable plan/request/result
 correlation, per-Goal reconciliation, Goal-state updates, typed Evidence, and bounded
 Planner re-entry. Result meaning is not composed by Host: trusted terminal truth returns
-to Planner for Work revision and scoped communication needs, then to SC for
-interaction or silence. Automated contract evidence exists; retained provider-backed and live robot
+to Planner for Work revision and scoped communication needs, and reaches SC for
+interaction or silence. SC receives it through the Planner's Plan when the Planner revises
+Work, and directly, with a Runtime result Need, when Activation or the Planner chooses no
+further Work for a Goal whose Responsibility asked for a result; either way there is
+exactly one SC communication for that Evidence. Automated contract evidence exists; retained provider-backed and live robot
 evidence remains open and is owned by [STATUS.md](STATUS.md).
 
 ## Bounded addressedness before Core semantics
@@ -383,7 +386,9 @@ Evidence, provider state, due-time state, restored provider truth, cancellation,
 first form a bounded `CognitiveActivationContext` with exact provenance and the authorities
 structurally legal for that ingress. One narrow model decision may request an existing owner or
 no cognition. Runtime cannot replace that decision with `if event -> Planner/SC`. Goal-bound
-activation starts Fast Planner; only Fast may escalate to Deep. Goal-free Situation activation
+activation starts Fast Planner; only Fast may escalate to Deep. Activation gates Work
+reconsideration only: terminal Capability Evidence for a Goal whose Responsibility asked for
+a result reaches SC directly when no Planner communication of it follows. Goal-free Situation activation
 starts primary SC; only SC may request its deeper pass. Invalid or unavailable Activation fails
 closed and never fabricates progress.
 

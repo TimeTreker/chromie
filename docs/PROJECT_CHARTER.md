@@ -331,10 +331,18 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   policy. Social Cognition may complete conversational Responsibilities immediately and remains
   the sole wording owner. `continuity_scope` never wakes or suppresses Planner by itself. The
   distinction comes from bounded meaning and context, never phrase tables or hardware profiles.
-- **SPEECH-OWNER-001** — Social Cognition is the sole ordinary semantic owner of whether and when to
+- **SPEECH-OWNER-001** — Social Cognition is Chromie's communication interface: speech and
+  every other social expression (gesture, gaze, facial or body expression). It is the sole
+  ordinary semantic owner of whether, when and how to
   communicate, the Communicative Activity, its exact wording, truth stage, and source
   provenance. UMI, committed GA/Planner state, Runtime/Evidence or trusted Situation
-  may trigger independent communication tasks. A Goal-free Situation invocation fabricates
+  may trigger independent communication tasks; UMI, GA and Planner can each cause SC to be
+  invoked. Terminal Capability Evidence reaches SC directly as well as the Planner: when
+  Activation or the Planner chooses no further Work for Evidence whose Goal Responsibility
+  asked for a result (for example an `information` request), SC still receives that Evidence
+  with a Runtime result Need, so a requested answer is never silently dropped. When the
+  Planner path already gives SC that same Evidence, that is the one SC communication; SC is
+  not invoked twice for it. The Planner keeps next-Work ownership. A Goal-free Situation invocation fabricates
   no Responsibility/Goal and gains no Capability Work authority, including safe reads.
   Host, Runtime, TTS, and Provider may validate, schedule,
   realize, retry delivery, or reject it but never independently rewrite its meaning.
@@ -752,6 +760,8 @@ Read the diagram with these boundaries:
   may create an exact provenance-bound activation context. A bounded Activation model may
   request only the structurally legal existing authority (`planner` for Goal-bound Work
   reconsideration, `social_cognition` for Goal-free Situation interaction) or request none.
+  Activation gates Work reconsideration only, never communication of a requested result:
+  terminal Evidence for such a Goal reaches SC directly (see the speech-owner rule).
   It cannot reinterpret WHAT, create/change Goals, plan Work, choose Capabilities, author
   words, authorize effects, or claim completion. Runtime validates exact scope and schedules
   the selected authority; unavailable/invalid Activation fails closed rather than restoring
@@ -1701,7 +1711,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Evidence/cancellation binding, or source Plan fails closed.
    Planner decides follow-up Work, revision, input needs, waiting or no Work change;
    complex HOW acquires missing contracts, Evidence or input; there is no deeper planner pass. Social Cognition independently receives the
-   bounded trusted state and owns answer, clarification, result, repair or silence.
+   bounded trusted state, including terminal Evidence directly when the Planner adds no
+   communication of it (see the speech-owner rule), and owns answer, clarification, result, repair or silence.
    Neither result reviews or rewrites the other. Neither Host nor a separate Tool Result Interpreter may
    infer Goal ownership from result contents or author result meaning. A post-Evidence
    result from either authority must itself preserve exact Goal/Evidence scope,

@@ -5,7 +5,8 @@
 The [Charter's Social Cognition amendment](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14)
 splits ordinary communication from Work planning inside the same Cognitive Core.
 Single semantic authority means one writer per semantic decision, not one model
-invocation for every responsibility in a turn. Social Cognition owns exact
+invocation for every responsibility in a turn. Social Cognition is Chromie's
+communication interface (speech, gesture, gaze and other social expression) and owns exact
 Communicative Activities; Planner owns Capability/Work decisions. UMI and GA keep
 WHAT and canonical continuity respectively. Neither downstream role reinterprets
 UMI or reviews/repairs the other's output.
@@ -55,7 +56,10 @@ Communicative Activity's function, exact words, timing, truth stage, provenance,
 and constraints; User Meaning Interpretation owns none of those fields. Trusted Runtime
 and Host bind terminal results to exact request/Goal provenance as Evidence, then
 reactivate Planner for Work and SC for communication with bounded current-state
-views. Result contents cannot bypass those authorities or infer their own Goal. Confirmation/cancellation mechanisms likewise own
+views. UMI, GA and Planner can each cause SC to be invoked, and terminal Evidence reaches SC
+directly: if the Planner path already gives SC that Evidence, that is the one SC
+communication; if Activation or the Planner chooses no further Work, SC still receives the
+Evidence for a Goal whose Responsibility asked for a result (Charter SPEECH-OWNER-001). Result contents cannot bypass those authorities or infer their own Goal. Confirmation/cancellation mechanisms likewise own
 only authorization/control facts and may not turn those facts into ordinary dialogue.
 Named-Goal cancellation records bounded `GoalCancellationEvidence` after deterministic
 dispatch/reconciliation and re-enters the same Planner state path used for trusted runtime
@@ -121,7 +125,7 @@ SC does not infer missing identity or audience. Ordinary turns and trusted Situa
 
 | Entrypoint | Semantic owner | Role | Planner path | Failure behavior |
 |---|---|---|---|---|
-| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | User Meaning Interpretation → independent SC / Planner / Goal Association → Value Judgment for owner-listed reviewed effects → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
+| Orchestrator turn in `apply` | Goal-Driven Cognitive Core | authoritative | User Meaning Interpretation → independent SC / Planner / Goal Association → Value Judgment for owner-listed reviewed effects → asynchronous Trusted Capability Runtime → Runtime event / Evidence → CognitiveOpportunity → Planner re-entry when useful; requested-result Evidence also reaches SC directly | Once ownership is acquired, any semantic, validation, execution-preparation, or Goal-state error fails closed. |
 | Orchestrator turn in `report_only` | Goal-Driven Cognitive Core | observer | Same bounded cognitive stages, evidence only | No semantic state, user-visible speech, or execution authority is committed by the observer result. |
 | Trusted Goal-free Situation | Goal-Driven Cognitive Core; SC owns communication | authoritative, communication-only | Situation → bounded Social Cognition invocation → exact Activity → existing delivery runtime; no synthetic Goal or Capability Work | Invalid provenance/identity/repair fails before Memory or delivery; unavailable cognition remains quiet. |
 | Cognitive Gateway protective reflex | Host deterministic control | pre-semantic | Stop/cancel/emergency/silence policy only | Never enters ordinary Goal semantics merely to enact a reflex. |
