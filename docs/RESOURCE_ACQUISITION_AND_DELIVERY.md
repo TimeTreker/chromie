@@ -303,8 +303,8 @@ alignment or residual-repair workflow.
 The acquisition and its evidence-dependent explanation also stay one semantic responsibility.
 Goal Association must not duplicate one information request into one capability Goal that
 retrieves evidence and another capability Goal whose only purpose is to answer from that same
-evidence. Host-bound Evidence reactivates Fast Planner for natural delivery after
-acquisition. The GA primary result must represent that responsibility once. If it
+evidence. Host-bound Evidence re-enters the Fast Planner after acquisition, and
+Social Cognition authors the natural delivery. The GA primary result must represent that responsibility once. If it
 promotes an evidence-dependent answer into another provider-required Goal with no
 independent bindings/resource contract, trusted Responsibility-conservation and
 resource validation reject the transaction terminally. No coverage reviewer or fresh
@@ -702,8 +702,8 @@ The adapter rejects a nominally successful response with no source evidence or
 no retrieval timestamp. The provider result is evidence material only; it cannot
 supply final personality speech.
 
-The Host verifies exact Evidence provenance and reactivates Fast Planner to
-deliver it naturally. A more exact provider capability remains preferable when its scope
+The Host verifies exact Evidence provenance and re-enters the Fast Planner with
+it; Social Cognition authors the wording that delivers it. A more exact provider capability remains preferable when its scope
 matches, such as the structured weather contract.
 
 
