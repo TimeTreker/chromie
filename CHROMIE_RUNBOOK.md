@@ -409,17 +409,18 @@ The Agent service has `host.docker.internal:host-gateway` configured for Linux.
 Use a Docker service hostname instead when Soridormi is attached to the same
 network.
 
-List the active Agent registry:
+List the active Agent registry. The Soridormi manifest expands
+`SORIDORMI_MCP_URL`, so set it to the MCP endpoint you would probe:
 
 ```bash
-PYTHONPATH=agent python -m app.list_capabilities \
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp PYTHONPATH=agent python -m app.list_capabilities \
   --manifest capabilities/soridormi.json
 ```
 
 Generate LLM-visible context:
 
 ```bash
-PYTHONPATH=agent python -m app.list_capabilities \
+SORIDORMI_MCP_URL=http://127.0.0.1:8000/mcp PYTHONPATH=agent python -m app.list_capabilities \
   --manifest capabilities/soridormi.json \
   --llm-context --language en
 ```
