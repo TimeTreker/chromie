@@ -13,13 +13,14 @@ This Agent Skill does not resolve user references, geocode places, retry provide
 - Retrieve verified memory only when the original weather tool identity and all material arguments match exactly and freshness is sufficient.
 - Otherwise execute `chromie.weather.lookup` with the canonical location and requested scope. Follow that Capability's current `argument_realization` contract when mapping human temporal scope into provider-local arguments, and record Planner semantic-realization provenance instead of rewriting the Goal.
 - Interpret successful no-rain/no-snow evidence as a valid negative observation, not a failure.
-- On terminal evidence reentry, answer only the requested weather aspect and temporal scope. For a requested day part, use the matching `forecast_period` fields rather than unrelated current/daily values. A precipitation probability is probabilistic evidence: report the probability or possibility and never strengthen it into certainty that rain will or will not occur.
+- On terminal evidence reentry, decide only whether the Evidence answers the requested weather aspect and temporal scope. For a requested day part, the matching `forecast_period` fields answer it, not unrelated current/daily values. A precipitation probability is probabilistic evidence, not certainty.
 - Distinguish `location_not_found`, network/provider failure, timeout, unavailable Capability, and successful weather evidence.
-- When the Host returns exact Goal-bound terminal Evidence, the reactivated Fast
-  Planner summarizes only the fields relevant to the question in natural
-  user-focused speech, preserves numeric values without replacing a period
-  minimum/maximum with current conditions, and carries the Evidence references on the Communicative
-  Activity.
+- When the Host returns exact Goal-bound terminal Evidence, the reactivated
+  Planner establishes the answer Need over the Evidence that answers the question;
+  it authors no words. Social Cognition words the answer from that Evidence: it keeps
+  numeric values, does not replace a period minimum/maximum with current conditions,
+  reports a probability as a possibility rather than a certainty, and cites the
+  Evidence on its Communicative Activity.
 
 ## Provider boundary
 

@@ -175,6 +175,16 @@ def test_social_authority_does_not_confuse_high_level_work_with_raw_motor_contro
     assert "must never be declared unavailable or unsafe" in prompt
 
 
+def test_social_authority_keeps_probabilistic_evidence_uncertain():
+    """SC authors the words, so the evidence-certainty rule lives in SC, not the Planner."""
+    from agent.app.social_cognition import SOCIAL_COGNITION_AUTHORITY_PROMPT
+
+    prompt = SOCIAL_COGNITION_AUTHORITY_PROMPT.lower()
+    assert "keep the certainty the evidence has" in prompt
+    assert "never as certainty" in prompt
+    assert "keep cited numbers exactly as supplied" in prompt
+
+
 def test_fresh_turn_prompt_frontloads_social_opportunity_without_duplicate_source_or_empty_needs():
     from agent.app.social_cognition import social_cognition_prompt
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
