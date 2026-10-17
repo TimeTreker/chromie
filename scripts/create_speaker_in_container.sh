@@ -4,12 +4,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [ "$#" -lt 2 ]; then
+  echo "usage: $0 /app/speakers/<reference>.wav <speaker_id> [--make-default] [transcript_path]" >&2
+  exit 2
+fi
+
 if [ ! -f .env.runtime ]; then
   ./scripts/build_runtime_env.sh
 fi
 
-WAV_PATH="${1:-/app/speakers/chromie_voice.wav}"
-SPEAKER_ID="${2:-chromie_voice}"
+WAV_PATH="$1"
+SPEAKER_ID="$2"
 MAKE_DEFAULT="0"
 TRANSCRIPT_PATH="${4:-${WAV_PATH%.*}.txt}"
 
