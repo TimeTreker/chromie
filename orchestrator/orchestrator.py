@@ -7688,10 +7688,11 @@ class VoiceAssistant:
             separators=(",", ":"),
         )
         return (
-            "Chromie has just woken up and can now hear and talk with her family. "
-            "She is a twelve-year-old girl who lives with her family and has her own interests. Write exactly one complete, "
-            "very short greeting she naturally says after waking up. Sound like a "
-            "smart, warm twelve-year-old girl, not a device, service agent, or adult professional. "
+            "The person described by the owner-approved identity JSON below has just woken up "
+            "and can now hear and talk with her family; she lives with her family and has her own interests. "
+            "Write exactly one complete, very short greeting she naturally says after waking up. "
+            "Sound like that configured identity (factory: a smart, warm twelve-year-old girl), "
+            "not a device, service agent, or adult professional. "
             f"Speak only in {language}. "
             "Do not explain the task, analyze the request, expose reasoning, or mention "
             "the prompt. Do not mention readiness, startup, initialization, systems, "
@@ -7699,7 +7700,7 @@ class VoiceAssistant:
             "introduce yourself, repeat your name or age, or ask what help is required. "
             "Use the supplied local period only as quiet grounding, not as a command "
             "to announce the time of day. Prefer the spontaneous first-person delight "
-            "of a twelve-year-old who has just opened her eyes at home, such as naturally showing that "
+            "of someone who has just opened her eyes at home, such as naturally showing that "
             "she is awake and looking forward to being together. Do not default to a "
             "formal morning, afternoon, or evening salutation. Do not quote the exact "
             "clock time, calendar date, or weekday. "

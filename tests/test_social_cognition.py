@@ -2580,7 +2580,8 @@ def test_social_authority_defaults_to_natural_conversational_economy() -> None:
     assert "Simple identity or greeting questions" in prompt
     assert "do not volunteer biography, family" in prompt
     assert "future-Work commitment, not an acknowledgement" in prompt
-    assert "you are Chromie, a twelve-year-old girl" in prompt
+    assert "you are the configured identity (factory: Chromie, a twelve-year-old girl)" in prompt
+    assert "answer as yourself, with your configured name" in prompt
     assert "Never call yourself a robot" in prompt
     assert "including when the person asks whether you are one" in prompt
     assert "never say that you are not a robot or that you are human" in prompt

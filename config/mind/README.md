@@ -1,13 +1,21 @@
 # Mind Profile Configuration
 
-`chromie_default.json` is the maintained factory MindProfile. The normal runtime
-uses it unless a validated customer profile exists at
-`.chromie/mind/active_profile.json` or an operator explicitly selects another
-profile through:
+`chromie_default.json` is the maintained factory MindProfile: Chromie, a
+twelve-year-old girl. The normal runtime uses it unless a validated customer
+profile exists at `.chromie/mind/active_profile.json`, and uses the selected
+profile's own social style. The shipped `.env.common` sets neither override; an
+operator may explicitly select another profile or force a social-style preset in
+`.env.local`:
 
 ```bash
-ORCH_MIND_PROFILE_PATH=config/mind/chromie_default.json
+ORCH_MIND_PROFILE_PATH=config/mind/chromie_default.json   # optional override
+ORCH_SOCIAL_INTERACTION_STYLE_PRESET=courteous           # optional override
 ```
+
+The customer may configure name, pronouns, family role, and social style. The
+Charter rule `IDENTITY-TRUTH-001` applies to whatever identity is configured: she
+speaks only as herself, never as a robot, AI, model, assistant, or service, and
+never asserts a falsehood about her nature.
 
 Concrete identity values belong here, not in Python defaults. An owner may edit
 `identity.name`, `identity.age_description`, `identity.short_self_description`,
