@@ -48,17 +48,10 @@ if [ -n "${ORCH_RUNTIME_OVERRIDE_FILE:-}" ]; then
   set +a
 fi
 
-if [ "${CHROMIE_TTS_BACKEND:-cosyvoice3}" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}" = "1" ]; then
-  COSYVOICE_BRAIN_MODEL="${TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b}"
-  export AGENT_USER_MEANING_INTERPRETER_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_GOAL_ASSOCIATION_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_FAST_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_DELIBERATIVE_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export OLLAMA_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export OLLAMA_MAX_LOADED_MODELS=1
-  echo "[orchestrator] CosyVoice shared-GPU cognition: $COSYVOICE_BRAIN_MODEL"
+# shellcheck source=scripts/compact_cognition.sh
+source "$ROOT_DIR/scripts/compact_cognition.sh"
+if chromie_apply_compact_cognition "${CHROMIE_TTS_BACKEND:-cosyvoice3}"; then
+  echo "[orchestrator] CosyVoice shared-GPU cognition: $CHROMIE_COMPACT_COGNITION_MODEL"
 fi
 
 # Each TTS backend publishes its own host port (docker-compose.yml); mirror the

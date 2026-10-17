@@ -122,22 +122,10 @@ PY_TTS_CATALOG
     ;;
 esac
 
-if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}" = "1" ]; then
-  COSYVOICE_BRAIN_MODEL="${TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b}"
-  export AGENT_USER_MEANING_INTERPRETER_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_GOAL_ASSOCIATION_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_FAST_PLANNER_MODEL="$COSYVOICE_BRAIN_MODEL"
-  export AGENT_DELIBERATIVE_MODEL="$COSYVOICE_BRAIN_MODEL"
-  COSYVOICE_BRAIN_NUM_CTX="${TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192}"
-  export AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX="${AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
-  export AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX="${AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
-  export AGENT_GOAL_ASSOCIATION_NUM_CTX="${AGENT_GOAL_ASSOCIATION_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
-  export AGENT_FAST_PLANNER_NUM_CTX="${AGENT_FAST_PLANNER_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
-  export AGENT_DELIBERATIVE_NUM_CTX="${AGENT_DELIBERATIVE_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}"
-  export OLLAMA_MAX_LOADED_MODELS=1
-  echo "[start] CosyVoice shared-GPU cognition: $COSYVOICE_BRAIN_MODEL context_fallback=$COSYVOICE_BRAIN_NUM_CTX (generated role contexts preserved; one resident Ollama model/runner)."
+# shellcheck source=scripts/compact_cognition.sh
+source "$ROOT_DIR/scripts/compact_cognition.sh"
+if chromie_apply_compact_cognition "$TTS_BACKEND"; then
+  echo "[start] CosyVoice shared-GPU cognition: $CHROMIE_COMPACT_COGNITION_MODEL (generated role contexts preserved; one resident Ollama model/runner)."
   # verify_runtime_profile.sh re-sources .env.runtime. Record the effective
   # compact-cognition values as a service override so the verifier compares the
   # containers against what this launcher actually started.
@@ -147,19 +135,7 @@ if [ "$TTS_BACKEND" = "cosyvoice3" ] && [ "${TTS_COSYVOICE_COMPACT_COGNITION:-1}
     if [ -n "${CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE:-}" ]; then
       cat "$CHROMIE_SERVICE_RUNTIME_OVERRIDE_FILE"
     fi
-    for key in \
-      AGENT_USER_MEANING_INTERPRETER_MODEL \
-      AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL \
-      AGENT_MODEL \
-      AGENT_GOAL_ASSOCIATION_MODEL \
-      AGENT_FAST_PLANNER_MODEL \
-      AGENT_DELIBERATIVE_MODEL \
-      AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX \
-      AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX \
-      AGENT_GOAL_ASSOCIATION_NUM_CTX \
-      AGENT_FAST_PLANNER_NUM_CTX \
-      AGENT_DELIBERATIVE_NUM_CTX \
-      OLLAMA_MAX_LOADED_MODELS; do
+    for key in "${CHROMIE_COMPACT_COGNITION_MODEL_KEYS[@]}" OLLAMA_MAX_LOADED_MODELS; do
       printf '%s=%q\n' "$key" "${!key}"
     done
   } > "$COMPACT_OVERRIDE.tmp"
