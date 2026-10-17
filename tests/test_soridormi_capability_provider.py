@@ -1185,6 +1185,34 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual(planned["parameters"]["target_ref"], expected)
 
+    async def test_a_missing_gaze_target_is_never_defaulted_to_the_speaker(self) -> None:
+        registry = CapabilityRegistry()
+        import_soridormi_capability_catalog(registry, [self._look_at_person_skill()])
+        definition = registry.get("soridormi.look_at_person")
+        assert definition is not None
+        for args in ({"target_ref": ""}, {"target_ref": "  "}, {}):
+            with self.subTest(args=args):
+                invoker = _RecordingInvoker()
+                result = await SoridormiCapabilityProvider(invoker).execute(
+                    CapabilityRequest(
+                        request_id="look-none",
+                        capability_id="soridormi.look_at_person",
+                        args=args,
+                    ),
+                    definition,
+                    CapabilityExecutionContext(
+                        interaction_id="look", trace=CapabilityTrace(
+                            interaction_id="look", request_id="look-none",
+                            capability_id="soridormi.look_at_person",
+                            provider_id="soridormi.mcp",
+                        ),
+                    ),
+                )
+                self.assertEqual(
+                    (result.status, result.reason_code), ("failed", "missing_target")
+                )
+                self.assertEqual(invoker.calls, [])
+
     async def test_current_speaker_recipient_is_sent_as_requester(self) -> None:
         registry = CapabilityRegistry()
         import_soridormi_capability_catalog(registry, [{

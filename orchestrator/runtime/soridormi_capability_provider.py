@@ -10,7 +10,7 @@ The adapter accepts a trusted ``CapabilityRequest`` that has already passed Chro
 preflight/confirmation gates, translates ``soridormi.<skill_id>`` into the
 upstream Soridormi named-skill ID, and invokes the Soridormi MCP planning,
 monitoring, execution, and cancellation tools. Soridormi still owns physical
-planning, realtime safety, motion execution, refusal, and recovery.
+planning, realtime safety, motion execution, body limitations, and recovery.
 
 Do not add one method per Soridormi skill here. New body skills should be
 published by Soridormi through ``soridormi.skill.list`` and then imported into
@@ -64,23 +64,37 @@ _NON_EXPRESSIVE_EFFECTS = frozenset(
 
 # Gaze skills whose person target Soridormi resolves from ``target_ref``.
 REQUESTER_GAZE_CAPABILITY_IDS = frozenset({"soridormi.look_at_person"})
-# Ways a plan may name the current speaker as a gaze target.
+# Explicit references to the current speaker that map to the reserved
+# ``"requester"`` referent. An empty or missing target is not among them.
 _SPEAKER_TARGET_REFS = frozenset(
-    {"", REQUESTER_REFERENT_ID, "me", "user", "speaker", "current_speaker", "the requester"}
+    {REQUESTER_REFERENT_ID, "me", "user", "speaker", "current_speaker", "the requester"}
 )
+
+
+class MissingTargetError(ValueError):
+    """A gaze request names no target; Chromie never defaults one."""
 
 
 def _described_target_args(args: dict[str, Any], *, capability_id: str = "") -> dict[str, Any]:
     """Return provider args with the agreed target description format applied.
 
-    The current speaker is the reserved ``referent_id="requester"``; a gaze at
-    the person without another named target ("look at me") is
-    ``target_ref="requester"``. Other descriptions and explicit referents are
-    passed exactly as authored.
+    The current speaker is the reserved ``referent_id="requester"``. A gaze
+    ``target_ref`` that explicitly names the current speaker (``me``, ``user``,
+    ``speaker``, ``current_speaker``, ``the requester``, case-insensitive) is sent
+    as ``target_ref="requester"``. An empty or missing ``target_ref`` raises
+    :class:`MissingTargetError`: it is never defaulted to the speaker, so the
+    plan fails as a typed missing target instead of looking at a guessed person.
+    Other descriptions and explicit referents are passed exactly as authored, and
+    Soridormi reports a typed not-found when it cannot resolve them.
     """
 
     if capability_id in REQUESTER_GAZE_CAPABILITY_IDS:
         target_ref = str(args.get("target_ref") or "").strip()
+        if not target_ref:
+            raise MissingTargetError(
+                f"{capability_id} requires target_ref naming whom to look at; "
+                "a missing target is never defaulted to the current speaker"
+            )
         if target_ref.casefold() in _SPEAKER_TARGET_REFS and target_ref != REQUESTER_REFERENT_ID:
             args = {**args, "target_ref": REQUESTER_REFERENT_ID}
     recipient = args.get("recipient")
@@ -458,7 +472,10 @@ class SoridormiCapabilityProvider:
                 capability_version=definition.version,
                 status="failed",
                 provider_id=self.provider_id,
-                reason_code="semantic_realization_failed",
+                reason_code=(
+                    "missing_target" if isinstance(exc, MissingTargetError)
+                    else "semantic_realization_failed"
+                ),
                 message=str(exc),
             )
         if semantic_facade:
@@ -671,7 +688,10 @@ class SoridormiCapabilityProvider:
                 return self._group_terminal_results(
                     items,
                     status="failed",
-                    reason_code="semantic_realization_failed",
+                    reason_code=(
+                        "missing_target" if isinstance(exc, MissingTargetError)
+                        else "semantic_realization_failed"
+                    ),
                     message=f"{request.capability_id}: {exc}",
                 )
             if semantic_facade:
