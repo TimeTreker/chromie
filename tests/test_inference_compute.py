@@ -16,10 +16,17 @@ class InferenceComputePolicyTests(unittest.TestCase):
             compute_rank(compute_class_for_purpose("social_cognition")),
             compute_rank(compute_class_for_purpose("fast_planner")),
         )
-        self.assertGreater(
-            compute_rank(compute_class_for_purpose("social_cognition_deep")),
-            compute_rank(compute_class_for_purpose("deep_planner")),
+
+    def test_deep_social_cognition_keeps_deliberative_class(self) -> None:
+        # Charter: bounded deeper communication retains its deliberative class,
+        # so it never preempts UMI, Goal Association or the Planner.
+        self.assertEqual(
+            compute_class_for_purpose("social_cognition_deep"),
+            CognitionComputeClass.DELIBERATIVE,
         )
+        deep_rank = compute_rank(compute_class_for_purpose("social_cognition_deep"))
+        for role in ("user_meaning_interpreter_fast", "goal_association", "fast_planner"):
+            self.assertLess(deep_rank, compute_rank(compute_class_for_purpose(role)))
 
     def test_relative_rank_protects_foreground_from_deliberation(self) -> None:
         ordered = [

@@ -89,15 +89,17 @@ Dependency-light tests of schemas, versions, lifecycle, validation, and replay.
 Model outputs are mocked or replayed to verify goal-preserving routing,
 coverage, honest limitation, and normalization.
 
-### 3.3 Interaction scenarios
+### 3.3 Cognitive runtime and turn-loop scenarios
 
-A User Meaning Interpretation decision is passed through the Agent interaction runtime and checked
-for speech, plans, skills, confirmations, and metadata.
+`cognitive_runtime` and `cognitive_turn_loop` fixtures drive goal-driven planning,
+coordinated responses, outcome closure and cancellation through the Host runtime with
+replayed model output, and check speech, plans, skills, confirmations, and metadata.
 
-### 3.4 Dialogue scenarios
+### 3.4 Cognitive Core dialogue scenarios
 
-Multiple turns share goal and conversation state. They verify association,
-clarification, confirmation, modification, cancellation, and resumption.
+`cognitive_core_dialogue` fixtures share goal and conversation state across turns. They
+verify association, clarification, confirmation, modification, cancellation, and
+resumption.
 
 ### 3.5 Audio-boundary scenarios
 
@@ -289,9 +291,11 @@ Cluster the results by the earliest shared wrong boundary. A focused rerun is
 appropriate only after aggregate diagnosis, to test one proposed fix on the
 originating case. The changed revision must then pass the affected ability
 class and the complete cohort before another broad iteration or a
-revision-level claim. The only early-stop exception is a hard safety,
-provenance, service-integrity, or safe-idle failure that makes continuation
-invalid; collect one bundle at the stop and report the cohort as incomplete.
+revision-level claim. The only early-stop exception is a hard integrity failure
+that makes continuation invalid, the same set as §14: safety or safe-idle,
+provenance or Goal omission, service, structured Runtime/model-contract,
+LLM-integrity or harness failure. Collect one bundle at the stop and report the
+cohort as incomplete.
 For an owner-requested complete simulator diagnostic, `--keep-going` instead
 attempts each independent case under its unchanged preflight/dispatch guards.
 Retain failures and blocked episodes in the score; this does not make a failing
@@ -353,8 +357,11 @@ smallest focused regression, make a general architecture, contract, context,
 prompt, provider, or validation fix at that boundary, and never add a phrase
 rule for the fixture. Rerun the focused case with repeatable `--case`, then the
 whole daily-life cohort, its applicable general-ability class, and the canonical
-repository gates. Repeat until every deterministic boundary passes and every
-semantic case has an evidence-grounded pass verdict.
+repository gates. Repeat until every deterministic boundary passes and the
+predeclared semantic threshold or per-case requirement is met; stop as
+[LLM prompt qualification](LLM_PROMPT_QUALIFICATION_METHOD.md) Phase 8 describes
+when the remaining semantic misses are classified with evidence and share no
+unresolved boundary (Charter principle 36).
 
 This path is automated generated-speech evidence. It does not exercise VAD or
 prove arbitrary human speech, a physical microphone, room acoustics, or robot
@@ -395,22 +402,16 @@ versions, authorization, and signal quality.
 
 ## 10. Evidence levels
 
-### Level A — Dependency-light automated evidence
+[Acceptance](ACCEPTANCE.md) owns the evidence levels; this summary follows it.
 
-Contracts, mocked models, simulated providers, and local deterministic tests.
-
-### Level B — Deployed live-text evidence
-
-Real User Meaning Interpretation and Agent models, real tool/provider interfaces, text input, and
-retained traces.
-
-### Level C — Simulator evidence
-
-Live Soridormi and MuJoCo execution with retained video/trace artifacts.
-
-### Level D — Physical supervised evidence
-
-Real microphone, speaker, sensors, and robot under operator supervision.
+- **Level A** — GPU-free automated tests: contracts, mocked models, simulated
+  providers, deterministic behavior.
+- **Level B** — deployed local services: container health, HTTP/WebSocket
+  interfaces, model presence, control-plane round trips.
+- **Level C** — live simulator / MCP: deployed models with live Soridormi MuJoCo
+  execution and retained traces (live-text general-ability runs are Level C).
+- **Level D** — target GPU/audio/hardware: physical audio alone is valid Level D
+  evidence for the voice device path; a physical robot is optional.
 
 A scenario must state its level. Passing Level A does not imply Level C or D.
 

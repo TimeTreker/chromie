@@ -57,9 +57,11 @@ Planner owns:
 - deciding what the new trusted state means for the still-open Responsibility;
 - selecting relevant facts while preserving Evidence scope and uncertainty;
 - deciding response, follow-up Work, reuse/cancellation/replacement, clarification,
-  waiting, or no new Activity;
-- exact natural wording of any Communicative Activity;
+  waiting, or no new Activity, and any communication Need for Social Cognition;
 - carrying exact Goal and Evidence provenance into the next Plan.
+
+Social Cognition, not Planner, owns the exact natural wording of any Communicative
+Activity; the Planner model contract has no utterance field.
 
 There is one Planner pass (the Deep Planner was retired on 2026-10-11); terminal
 Evidence does not create a second semantic owner or an automatic deep-thinking stage.
@@ -92,8 +94,10 @@ The mechanical policy for this boundary lives in
 `orchestrator/runtime/planner_reentry.py`. It validates current Goal/Plan/request
 correlation, selects only supplied Responsibility provenance, rejects exact repetition
 of the terminal Activity, projects the current per-Goal execution status (including
-unresolved sibling steps) from exact Plan/Evidence bindings, and suppresses
-already-delivered exact speech deltas. These are pure Host checks over supplied truth;
+unresolved sibling steps) from exact Plan/Evidence bindings. Already-delivered speech
+is not handled there: `cognitive_runtime.py` projects deduplicated
+`prior_delivered_speech` into Social Cognition's interaction context, and SC uses it to
+avoid repeating delivered speech. These are pure Host checks over supplied truth;
 the module does not interpret Goal meaning, author speech, invoke Planner, or mutate
 Runtime. Both incremental and aggregate result re-entry supply this bounded
 `trusted_execution_outcome`; the historical source Plan proves requested semantics and

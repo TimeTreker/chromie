@@ -105,10 +105,10 @@ def semantic_authority_route_matrix() -> list[dict[str, Any]]:
             "role": "authoritative",
             "communication_owner": "social_cognition",
             "planner_path": (
-                "User Meaning Interpretation owns WHAT; Goal Association owns persistent Goal "
-                "identity and continuity; Fast/Deep Planner own task HOW; Social Cognition "
-                "owns interaction selection and wording; the Host validates immutable "
-                "realization; CapabilityRuntime "
+                "User Meaning Interpretation owns WHAT; Goal Association owns Goal "
+                "association and continuity; the one Planner owns task HOW; Value Judgment "
+                "reviews owner-listed effects; Social Cognition owns interaction selection "
+                "and wording; the Host validates immutable realization; CapabilityRuntime "
                 "owns trusted execution lifecycle; Evidence owns reality"
             ),
             "fallback": "fail_closed_without_legacy_reentry",

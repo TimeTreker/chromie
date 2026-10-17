@@ -46,9 +46,10 @@ passed + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership).
   or trusted target evidence singles it out. Known cost: a "那个" named by the previous
   turn is also flagged; Goal Association may resolve it from history
   (`multi_that_water_zh` measures that live).
-- While any Responsibility of a turn waits for Value Judgment, SC ingress offers and
-  Host admits only an acknowledgement; sibling speech is answered after Value Judgment
-  through its Planner need.
+- While a speech Responsibility UMI marked `value_review` waits for Value Judgment, SC
+  ingress offers and Host admits only an acknowledgement for the whole turn; sibling speech
+  is answered after Value Judgment through its Planner need. A value-reviewed Capability
+  alone does not hold back sibling speech.
 - An information Responsibility with citable current perception states `observed_refs`
   before its decision; only a non-empty list opens `answer_from_perception`, which Host
   binds as a cited response need.
@@ -63,7 +64,8 @@ passed + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership).
   nothing false about her nature (Charter and interaction contract).
 - An unsettled referent is resolved from the conversation when possible, otherwise
   Chromie asks the person.
-- Value Judgment does not review speech-only deception; `protect_children` is not in
+- Value Judgment reviews speech that UMI marks `value_review` (deception requests;
+  owner choice B, 2026-10-12, Charter VALUE-JUDGMENT-001); `protect_children` is not in
   the Stable Mind (owner undecided).
 - UMI never authors `bindings`; Planner alone extracts Capability parameters.
 

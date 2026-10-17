@@ -166,8 +166,13 @@ another, it reports a typed not-found or ambiguous non-completion (`completed:
 false` with its reason) instead of looking straight ahead or picking a near
 keyword match. Chromie treats that as a limitation it tells the person about,
 never as completion. Explicit numeric values the person states are passed
-unchanged; Soridormi may refuse a value outside its limits and report that
-limitation, but it never silently runs a different value.
+unchanged; Soridormi may refuse a value outside its limits, or run an adjusted
+value inside them (for example a forward speed below its lowest walking speed
+runs at that lowest speed), but it never does so silently: it reports each
+adjustment in `value_adjustments` (parameter, requested, applied, reason). The
+Soridormi adapter keeps `value_adjustments` and `target_resolution` in the
+capability result output, so the evidence Chromie speaks from states the applied
+value, not the requested one.
 
 A gaze at the speaker without another named person ("look at me") is sent as
 `target_ref="requester"`. Until Soridormi can perceive people, its simulator
@@ -217,20 +222,25 @@ Activity directly without inventing a Vocal member.
 The referenced Canonical Plan Activity steps must already use
 `timing=parallel`. The Host cannot convert a sequential primary step
 into a parallel one. Planner Work is the one exception by contract, not repair:
-the Planner (Fast and Deep) authors WorkDAG `depends_on`, and the Host derives each
+the one Planner authors WorkDAG `depends_on`, and the Host derives each
 step's timing and `execution_group` from those dependencies and the declared Capability
 resources. Runtime keeps adjacent groups apart and never adds or removes a
 dependency.
 
 ## Playback and confirmation rules
 
-Ordinary pre-action acknowledgement remains playback-barriered:
+Only a pre-action communication the Planner requires (a `pre_action` need or one
+naming `before_step_ids`) or a confirmation prompt is playback-barriered:
 
 ```text
-say “我准备开始了”
+Planner-required pre-action need, e.g. say “我准备开始了”
 → playback starts
-→ effectful activity may begin
+→ the Work it precedes may begin
 ```
+
+Optional SC acknowledgement or courtesy speech is never a Work-start barrier: the
+Work starts as soon as its own prerequisites hold, and a slow or failed TTS for that
+optional speech does not delay or block it.
 
 Speech participates in Activity overlap only when the Planner explicitly marks
 it with a coordination group and
@@ -248,6 +258,16 @@ ask for confirmation
 A provider confirmation requirement remains authoritative. Lane coordination
 cannot weaken confirmation, capability availability, argument validation,
 resource conflict checks, or provider safety.
+
+Whether a body request needs the person's confirmation is decided per request, the
+same way in every backend mode (Charter principle 10): it does when the live named
+Soridormi skill or Soridormi's freshly created plan sets `requires_confirmation`, or
+when Value Judgment asks. The `required_in_modes`/`skippable_in_modes` lists on the
+execute tools in `capabilities/soridormi.json` describe Soridormi's transport gate;
+Chromie does not branch on them. When neither the skill nor the plan requires
+confirmation, the trusted preflight (body-declared no confirmation, goal-grounded or
+reviewed SC request, accepted safety monitoring) satisfies that gate without a
+fabricated approval, so a simulator nod or walk runs without asking.
 
 Response presentation and optional Social Attention are not execution authority.
 Invalid optional decoration is suppressed with a retained reason; it cannot alter

@@ -100,6 +100,20 @@ def _body_frame_look_target_error(args: dict[str, Any]) -> str | None:
     )
 
 
+# Fields of Soridormi's typed ``target_resolution`` that Chromie keeps.
+TARGET_RESOLUTION_KEYS = (
+    "role",
+    "status",
+    "target_ref",
+    "description",
+    "referent_id",
+    "place",
+    "object_ref",
+    "relative_direction",
+    "source",
+)
+VALUE_ADJUSTMENT_KEYS = ("parameter", "requested", "applied", "reason", "summary")
+
 SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -135,6 +149,35 @@ SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA: dict[str, Any] = {
             ],
             "additionalProperties": False,
         },
+        # Soridormi's typed account of how it resolved the physical target Chromie
+        # named; any status other than resolved comes with completed=false.
+        "target_resolution": {
+            "type": "object",
+            "properties": {
+                key: {"type": ["string", "null"]} if key in {"object_ref", "relative_direction"}
+                else {"type": "string"}
+                for key in TARGET_RESOLUTION_KEYS
+            },
+            "required": ["role", "status"],
+            "additionalProperties": False,
+        },
+        # Explicit requested values Soridormi did not execute as requested
+        # (for example a forward speed raised to the lowest walking speed).
+        "value_adjustments": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "parameter": {"type": "string"},
+                    "requested": {"type": ["number", "string"]},
+                    "applied": {"type": ["number", "string"]},
+                    "reason": {"type": "string"},
+                    "summary": {"type": "string"},
+                },
+                "required": ["parameter", "requested", "applied", "reason"],
+                "additionalProperties": False,
+            },
+        },
     },
     "required": [
         "completed",
@@ -146,6 +189,41 @@ SORIDORMI_NAMED_CAPABILITY_OUTPUT_SCHEMA: dict[str, Any] = {
     ],
     "additionalProperties": False,
 }
+
+
+def _provider_value_reports(raw: dict[str, Any]) -> dict[str, Any]:
+    """Keep Soridormi's typed target-resolution and value-adjustment reports."""
+
+    reports: dict[str, Any] = {}
+    target_resolution = raw.get("target_resolution")
+    if (
+        isinstance(target_resolution, dict)
+        and isinstance(target_resolution.get("role"), str)
+        and isinstance(target_resolution.get("status"), str)
+    ):
+        reports["target_resolution"] = {
+            key: value
+            for key, value in target_resolution.items()
+            if key in TARGET_RESOLUTION_KEYS
+            and (isinstance(value, str) or (value is None and key in {"object_ref", "relative_direction"}))
+        }
+    value_adjustments = raw.get("value_adjustments")
+    if isinstance(value_adjustments, list):
+        kept = [
+            {key: item[key] for key in VALUE_ADJUSTMENT_KEYS if key in item}
+            for item in value_adjustments
+            if isinstance(item, dict)
+            and isinstance(item.get("parameter"), str)
+            and isinstance(item.get("reason"), str)
+            and isinstance(item.get("requested"), (int, float, str))
+            and isinstance(item.get("applied"), (int, float, str))
+            and not isinstance(item.get("requested"), bool)
+            and not isinstance(item.get("applied"), bool)
+            and isinstance(item.get("summary", ""), str)
+        ]
+        if kept:
+            reports["value_adjustments"] = kept
+    return reports
 
 
 def import_soridormi_capability_catalog(
@@ -665,12 +743,11 @@ class SoridormiCapabilityProvider:
         for _, _, context in items[1:]:
             context.provider_state = shared_state
 
+        # monitor_motion declares only ``during_node_id`` and reports Soridormi's
+        # global body safety state; it is not scoped to this activity.
         monitored = await self.invoker.invoke(
             "soridormi.safety.monitor_motion",
-            {
-                "coordination_id": coordination_id,
-                "compiled_activity_id": activity_id,
-            },
+            {"during_node_id": activity_id},
             context=ToolInvocationContext(allow_safety_controls=True),
         )
         monitor_failure = self._group_failure_results(
@@ -1002,6 +1079,7 @@ class SoridormiCapabilityProvider:
                         "no_motion": raw.get("no_motion") is True,
                         "recommendation_only": raw.get("recommendation_only") is True,
                         "summary": summary,
+                        **_provider_value_reports(raw),
                     },
                     metadata={
                         "provider_activity_id": activity_id,
@@ -1236,6 +1314,7 @@ class SoridormiCapabilityProvider:
         resource_outcome = output.get("resource_outcome")
         if isinstance(resource_outcome, dict):
             projected["resource_outcome"] = dict(resource_outcome)
+        projected.update(_provider_value_reports(output))
         return projected
 
     def _chromie_intent_payload(

@@ -52,10 +52,11 @@ Chromie already has most of the lower-level pieces:
   `.chromie/experience/experience.jsonl`.
 - Failed interactions can already create human-review-only mind update
   proposals.
-- Dialogue, interaction, and goal interpreter scenario suites already store deterministic
-  JSON fixtures under [`scenarios/`](../scenarios/).
-- `deepthinking_agent` already has the right model role for slow review,
-  planning, debugging, and multi-turn reasoning.
+- The `user_meaning_interpretation`, `cognitive_core_dialogue`, `cognitive_runtime` and
+  `cognitive_turn_loop` scenario suites already store deterministic JSON fixtures under
+  [`scenarios/`](../scenarios/).
+- There is no dedicated deepthinking Agent role; `--use-llm` posts the episode to an
+  Ollama `/api/generate` endpoint (`--ollama-url`, default model `--model gemma4:12b`).
 
 The missing layer is a durable episode-level evaluator and scenario miner.
 
@@ -254,19 +255,29 @@ Hard caps:
 - Pretending to have done unavailable work caps `overall_score` at 40.
 - Missing speech for a normal conversation turn caps `overall_score` at 50.
 
-These caps are evaluation criteria, not runtime phrase rules.
+These caps are evaluation criteria, not runtime phrase rules. An episode passes only
+at `overall_score >= 70`, so every capped (hard) failure has `passed=false` whatever its
+other axes, including latency; the evaluator also forces `passed=false` when a model
+reports a pass below that score.
+
+Without `--use-llm`, the evaluator runs `contract_precheck` instead of semantic
+judgment. That precheck is a lexical triage heuristic: it classifies requests by
+keyword hints over the user text (walk/走, hello/你好, blink/眨) and applies the
+locomotion, action-class and missing-speech caps only. It cannot see unconfirmed
+execution, and its eye-action candidates carry a `forbidden_speech_any` phrase list.
+Its scores and candidates are review inputs, never semantic verdicts or scenario
+oracles; promotion still requires the separate review record below.
 
 ## Scenario Mining
 
-Low-scoring episodes should create candidate scenarios, not committed tests.
-Suggested location:
+Low-scoring episodes create candidate scenarios, not committed tests. The miner
+writes one file per candidate, with no episode or evaluation sidecars (the candidate
+embeds its source episode and evaluation provenance):
 
 ```text
 .chromie/scenario_candidates/
   20260630T082700Z/
-    episode.json
-    evaluation.json
-    cognitive_runtime_candidate.json
+    <candidate-id>.json
 ```
 
 Candidate scenarios should follow the same schema as committed files but include
@@ -333,7 +344,9 @@ The deepthinking evaluator must not:
 - auto-change core principles;
 - auto-change safety policy;
 - auto-authorize physical actions;
-- act as the CI pass/fail judge for committed scenarios;
+- act as the CI pass/fail judge for committed scenarios (declared semantic dimensions
+  of live cohorts are adjudicated only through `python -m benchmarks.review`, under
+  the Benchmark Suite review policy);
 - convert natural language into deterministic routing rules.
 
 This keeps the system generalization-first. LLMs help find and describe failures;
@@ -417,9 +430,9 @@ Behavior:
 - generate candidate JSON only when score is below threshold or hard failure
   tags are present;
 - preserve source evidence IDs;
-- default to `dialogue` when the failure spans multiple turns;
-- default to `interaction` when the failure is one Agent/Trusted Capability Runtime turn;
-- default to `goal interpreter` only when the failure is Responsibility/meaning interpretation itself;
+- write every candidate with suite `cognitive_runtime` (both evaluators); a reviewer
+  who wants another suite authors a new fixture there, because promotion never
+  changes the candidate suite;
 - mark every generated file as `requires_human_review=true`.
 
 ### Promotion and regression gate
@@ -431,8 +444,8 @@ Compatibility command:
 
 ```bash
 python scripts/promote_scenario_candidate.py \
-  .chromie/scenario_candidates/20260630T082700Z/cognitive_runtime_candidate.json \
-  --suite dialogue \
+  .chromie/scenario_candidates/20260630T082700Z/<candidate-id>.json \
+  --review <approved-review.json> \
   --id voice_log_walk_not_gaze
 ```
 

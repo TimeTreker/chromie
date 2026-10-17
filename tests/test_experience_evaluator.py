@@ -5,8 +5,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from orchestrator.runtime.episode import EpisodeRecord, EpisodeTurnRecord
+from orchestrator.runtime.episode import EpisodeEvaluation, EpisodeRecord, EpisodeTurnRecord
 from scripts.evaluate_experience_episodes import (
+    PASS_SCORE,
+    _evaluation_prompt,
+    _with_score_bound_verdict,
     evaluate_episode_contract_precheck,
     mind_update_proposal_from_review,
     offline_review_from_episode,
@@ -254,3 +257,19 @@ class ExperienceEpisodeEvaluatorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_llm_prompt_lists_every_documented_hard_cap() -> None:
+    prompt = _evaluation_prompt(EpisodeRecord(episode_id="e", conversation_id="c", turns=[]))
+    for cap in ("<=35", "<=40", "<=30", "unavailable work <=40", "missing speech", "<=50"):
+        assert cap in prompt
+
+
+def test_capped_llm_score_cannot_report_a_pass() -> None:
+    capped = EpisodeEvaluation(
+        episode_id="e", conversation_id="c", overall_score=30, passed=True,
+        severity="critical", summary="unconfirmed physical execution",
+    )
+    assert _with_score_bound_verdict(capped).passed is False
+    passing = capped.model_copy(update={"overall_score": PASS_SCORE})
+    assert _with_score_bound_verdict(passing).passed is True

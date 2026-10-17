@@ -15,6 +15,7 @@ sys.modules[spec.name] = module
 spec.loader.exec_module(module)
 TTSConfigurationError = module.TTSConfigurationError
 TTSServiceSettings = module.TTSServiceSettings
+TTSCandidateSettings = module.TTSCandidateSettings
 
 
 class TTSServiceSettingsTests(unittest.TestCase):
@@ -56,8 +57,31 @@ class TTSServiceSettingsTests(unittest.TestCase):
             ("example/tokenizer", "abc", "example/gguf", "def"),
         )
 
+    def test_candidate_settings_are_typed_and_name_the_key(self) -> None:
+        settings = TTSCandidateSettings.from_env({})
+        self.assertIsNone(settings.voice_root)
+        self.assertEqual(settings.worker_startup_timeout_s, 1200.0)
+        self.assertEqual(settings.transport_chunk_ms, 120)
+        self.assertEqual(settings.request_timeout_s, 60.0)
+        configured = TTSCandidateSettings.from_env(
+            {"TTS_VOICE_ROOT": "/voices", "TTS_DEFAULT_SPEAKER": "chromie_en"}
+        )
+        self.assertEqual(configured.voice_root, Path("/voices"))
+        self.assertEqual(configured.default_speaker, "chromie_en")
+        for key, value in (
+            ("TTS_WORKER_STARTUP_TIMEOUT_SEC", "soon"),
+            ("TTS_CANDIDATE_REQUEST_TIMEOUT_SEC", "-1"),
+            ("TTS_TRANSPORT_CHUNK_MS", "1.5"),
+        ):
+            with self.subTest(key=key), self.assertRaisesRegex(TTSConfigurationError, key):
+                TTSCandidateSettings.from_env({key: value})
+        with self.assertRaisesRegex(TTSConfigurationError, "COSYVOICE3_FP16"):
+            module.required_boolean("COSYVOICE3_FP16", True, {"COSYVOICE3_FP16": "2"})
+        with self.assertRaisesRegex(TTSConfigurationError, "QWEN3_TTS_DTYPE is required"):
+            module.required_text("QWEN3_TTS_DTYPE", "bfloat16", {"QWEN3_TTS_DTYPE": " "})
+
     def test_tts_runtime_has_no_direct_environment_reads(self) -> None:
-        for path in (ROOT / "tts").glob("*.py"):
+        for path in [*(ROOT / "tts").glob("*.py"), *(ROOT / "tts_candidates").rglob("*.py")]:
             if path.name == "settings.py":
                 continue
             with self.subTest(path=path.name):

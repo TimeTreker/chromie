@@ -151,7 +151,7 @@ running.
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named capabilities and refresh status. |
 | `POST` | `/capabilities/search` | Return a bounded model-neutral catalog view for inspection; it never scores language, suggests an ordinary route, or selects agents. |
-| `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise full-catalog LLM context; `text` is accepted at the interface but does not filter capabilities. |
+| `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise LLM context for at most `limit` catalog entries (default `20`, capped at `64`); `text` is accepted at the interface but does not filter capabilities. |
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
 | `POST` | `/cognitive-activation` | Decide whether a trusted internal state transition should wake one of the exact existing authorities allowed by the Host scope. It cannot author Goal meaning, Work, wording, Capability selection, execution, or completion truth. |
 | `POST` | `/fast-plan` | Produce the one Planner's complete `CanonicalPlan` (need-first: an unmet ability loads library contracts and the Planner plans once with them); a limitation is an honest `unavailable` outcome whose every Goal carries a Planner `result` communication need, so Social Cognition says it in the same turn. `/deep-plan` was removed with the Deep Planner (2026-10-11). |
@@ -184,7 +184,8 @@ packages. Startup validates safe YAML, explicit
 approval, semantic version, deterministic package digest, projection paths,
 duplicate IDs, parent references, inheritance cycles, and normalized
 package applicability metadata. The endpoint exposes only immutable bounded summaries. The
-two packages expose projections for all three maintained Agent roles; the
+two packages expose only the `fast_planner` projection, the single Agent role the
+contract accepts (`AgentSkillProjectionName`); the
 weather package declares the grounded method as its parent and remains passive
 despite referencing required/optional Capabilities.
 
@@ -237,9 +238,10 @@ inspection endpoints, not User Meaning Interpretation execution authorization.
 `POST /agent-skills/disclose` accepts a previously validated selection and loads
 only its exact matching role projections. The Loader rechecks package content,
 applies per-projection/aggregate/count budgets, omits rather than truncates
-oversized content, and returns typed failures plus a disclosure digest. The three
-maintained semantic model endpoints perform this selection/disclosure automatically;
-caller-supplied disclosure context is removed before trusted injection.
+oversized content, and returns typed failures plus a disclosure digest. Only the
+Fast Planner endpoint (`/fast-plan`) performs this selection/disclosure automatically;
+Goal Association, Fast-advance and Value Judgment receive no Agent Skill methods.
+Caller-supplied disclosure context is removed before trusted injection.
 
 ### Cognitive planning and interaction support
 
@@ -451,8 +453,9 @@ The retired `escalation_reason` field is rejected by Schema and Host. The Planne
 receives exact bounded UMI unresolved evidence and the requested response language.
 It receives first-class `CognitiveWorkRequest.history` through
 at most six retained user/assistant records with exact text and delivery-source
-metadata. Oversize history projection fails before inference at 6,000 characters;
-it is never silently shortened. Historical dialogue does not establish current
+metadata. The history records are not truncated and have no separate character
+budget; the transport admits the complete prompt against the configured model
+context budget (token preflight). Historical dialogue does not establish current
 world truth, and authored assistant text is not automatically audible-delivery
 Evidence. Native canonical speech schemas expose complete aggregate branches,
 while full Schema/DTO/Host validation remains required.
@@ -677,14 +680,15 @@ locomotion is not. Concrete user-requested actions remain primary
 CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and tool requests flow through model-assisted User Meaning Interpretation, the live
 capability catalog, the single Planner authority, schemas, and Trusted Capability
 Runtime validation rather than hidden phrase parsers or a retired routing layer. Plain walking requests
-use a normal safe forward speed of `0.18 m/s`. An explicit speed or other numeric value
+use the default forward speed Soridormi declares in its `walk_velocity` schema. An explicit speed or other numeric value
 the person states is sent unchanged; Soridormi may refuse a value outside its limits,
 which Chromie reports as a limitation, but neither side silently runs a different value.
-Requests to joke, recite, or otherwise author speech while walking use a
-`vocal_output` Goal coordinated with the walking step; `chromie.speak` is a
-Host speech transport and is never a planner step. A request to sing still
-belongs to the Vocal lane, but it may be claimed as singing only when a
-registered vocal-performance capability can provide that evidence. The planner
+Requests to joke or otherwise talk while walking use a `speech` Goal
+coordinated with the walking step; `chromie.speak` is a Host speech transport
+and is never a planner step. Requests to recite, sing, hum, or speak in a
+requested style use the `recitation`, `singing`, `humming`, or `styled_speech`
+output modes. They still belong to the Vocal lane, but they may be claimed only
+when a registered vocal-performance capability can provide that evidence. The planner
 must otherwise report the limitation or propose an explicit alternative rather
 than substituting a body action or ordinary TTS. The same motion limits still
 apply to the walking step. When
@@ -856,8 +860,8 @@ Supported default-provider JSON messages:
 
 | Request type | Result |
 |---|---|
-| `health` or `ping` | `pong` with provider contract/declaration, immutable model identity, sample rate, worker readiness, cancellation counters, and `speakers=["default"]`. |
-| `list_speakers` | `speakers` with the installed cloned-reference identity. |
+| `health` or `ping` | `pong` with provider contract/declaration, immutable model identity, sample rate, worker readiness, cancellation counters, and `speakers` (`default` plus every catalog profile, currently `["default", "chromie_en", "chromie_mixed", "chromie_zh"]`). |
+| `list_speakers` | The same `speakers` list: `default` (a language-routed logical ID) plus the committed catalog profiles. |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
 A synthesis request includes `text`, optional `speaker_id`, optional
@@ -871,14 +875,12 @@ software/model provenance and declared licenses, languages, rates, maximum
 concurrency, native streaming, cancellation, speaker-profile, and voice-cloning
 capabilities. These are capability declarations, not quality or legal approval.
 
-The default CosyVoice provider consumes a host-installed authorized reference:
-
-```bash
-python scripts/tts_reference.py install \
-  --source-wav /path/to/reference.wav \
-  --transcript '录音中的逐字文本' \
-  --license-id 'user-owned-recording'
-```
+The default CosyVoice provider reads the source-controlled voice catalog from
+`TTS_VOICE_ROOT`; Docker Compose mounts `${TTS_VOICE_ROOT:-./assets/tts/voices}`
+at `/voices`. `TTS_DEFAULT_SPEAKER` may select another catalog profile as the
+default. See [tts/README.md](../tts/README.md) for the catalog format. A private
+reference installed with `scripts/tts_reference.py` is not read by the
+maintained runtime.
 
 It does not expose network `create_speaker`. The optional Oute fallback retains
 that legacy operation on port `5001` for Oute v3 profiles; its success response
@@ -898,10 +900,11 @@ before playback.
 
 ## Soridormi contract snapshot
 
-`capabilities/soridormi.json` contains 27 tools grouped under seven external
+`capabilities/soridormi.json` contains 28 tools grouped under seven external
 agents:
 
-- robot status, mode, and battery reads;
+- robot status, scene observation (`soridormi.robot.observe_scene`), mode, and
+  battery reads;
 - motion plan creation, execution, stop, and cancellation;
 - named-skill catalog, plan creation, and execution;
 - resource-aware body-activity capability discovery, compilation, execution,
@@ -912,7 +915,9 @@ agents:
   reporting, skill-dry-run metadata, `skill_sequence` dry-run step metadata,
   embodied `plan_steps`/`blocked_subsystems`, and
   `recommended_next_actions`;
-- motion monitoring and emergency stop.
+- motion monitoring and emergency stop;
+- simulator fault injection for tests (`soridormi.testing.configure_fault` and
+  `clear_faults`).
 
 The live endpoint URL is supplied by `${SORIDORMI_MCP_URL}`. Probe the endpoint
 against the manifest before enabling execution; the checked-in JSON is not proof

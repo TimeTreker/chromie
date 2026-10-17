@@ -714,8 +714,9 @@ interaction act must acquire before useful progress can begin.
 
 Fast User Meaning Interpretation may establish a fully understood, low-risk Responsibility
 quickly and, in the same primary result, request which existing cognitive authorities are
-useful next. Initial Social Cognition and Fast Planner activation follows those explicit
-`cognitive_requests[]`. Runtime may close a hard architectural prerequisite of an explicitly
+useful next. Initial Goal Association and Fast Planner activation follows those explicit
+`cognitive_requests[]`; initial Social Cognition starts mechanically for every fresh admitted
+addressed turn and is not a UMI request. Runtime may close a hard architectural prerequisite of an explicitly
 requested authority: an initial Planner request mechanically schedules turn-wide Goal
 Association so eventual Work can obtain canonical Goal binding. This dependency closure is
 not a second semantic activation decision and does not infer Planner readiness from
@@ -970,26 +971,19 @@ existing goal does not automatically create a new goal.
 
 The semantic relationship between the current turn and existing goals.
 
-Supported relationships should include:
-
-- `continue`
-- `modify`
-- `clarification_answer`
-- `confirm`
-- `reject`
-- `cancel`
-- `pause`
-- `resume`
-- `query_status`
-- `correct`
-- `replace`
-- `merge`
-- `split`
-- `reference`
-- `new`
+The Goal Association model relationships to an open retained Goal are
+`continue`, `modify`, `clarify`, `confirm`, `reject`, `cancel`, `pause`, `resume`
+and `reference` (`agent/app/goal_association_contract.py`). `merge` and `split`
+are in the enum but their state transactions are unimplemented and reject. A
+Responsibility with no retained association is a `new_goals` row, recorded as
+relationship `new`; correction or replacement of an entity is a new Goal that
+names the old one in `supersedes_goal_ids` (open Goals) or `related_goal_ids`
+(terminal history). There is no separate `clarification_answer`, `query_status`,
+`correct` or `replace` relationship in the model contract; the Host maps
+`clarify` to its internal `clarification_answer` task operation.
 
 These relationships are model-proposed and deterministically validated against
-known goal IDs and lifecycle state.
+known goal IDs and lifecycle state. Only open Goals are association targets.
 
 ### 4.5 Planner information gap
 
@@ -1489,10 +1483,14 @@ superseded as appropriate. Current Goal meaning may therefore be canonical and
 revisable at the same time: `canonical` means one current semantic owner, not
 `immutable forever`.
 
-Goal completion is also a reconciliation judgment, not an immutable historical
-event. Later evidence may show that a previously closed Goal was never actually
-satisfied and justify reopening/revising it. The underlying execution outcome or
-past completion claim remains historical evidence and is never rewritten.
+Goal completion is also a reconciliation judgment over trusted execution evidence.
+A terminal Goal (`satisfied`, `cancelled`, `refused`, `superseded`) is not reopened by
+later conversation or observation: Goal Association cannot target it, and a later
+finding that it was never actually satisfied ("that's not my cup") becomes a new Goal
+that names the old one in `related_goal_ids`. The underlying execution outcome or
+past completion claim remains historical evidence and is never rewritten. The only
+state move out of `satisfied` is the trusted reconciler recomputing the same Goal
+from a later exact `ExecutionOutcomeBundle` bound to it.
 
 The canonical Goal lifecycle must therefore stay responsibility-level and small.
 `planning`, `needs_context`, `waiting_for_user`, `awaiting_confirmation`,
@@ -1598,7 +1596,9 @@ invalidation graph.
 
 Execution success and Goal satisfaction remain distinct. A provider may
 successfully perform the wrong action; the execution record remains successful
-while reconciliation leaves/reopens the responsibility as unfinished. Likewise,
+while reconciliation leaves the responsibility unfinished when the evidence does not
+establish completion, and a later discovered mistake on a closed Goal becomes a new
+related Goal. Likewise,
 a presentation/interpreter failure cannot rewrite trusted execution truth.
 
 #### 4.14.7 Grounding must not be polluted by intention
@@ -1781,7 +1781,10 @@ owner they may establish or revise:
 
 - qualified cognition may revise soft/reconstructable Situation interpretation but does
   not rewrite trusted Evidence;
-- Goal Association owns canonical Goal identity, association, versioning, and continuity;
+- Goal Association owns association and continuity: which open Goal a Responsibility
+  continues, and that an unassociated one becomes a new Goal related to or superseding
+  named Goals; trusted lifecycle code materializes the new Goal's identity and WHAT from
+  UMI, and the Host commits the Goal write;
 - Planner owns chosen Work/Plan semantics, communication Needs, and current-state Work changes
   without rewriting user Responsibility meaning or execution history;
 - trusted validation/runtime owns authorization, request correlation, execution,
@@ -2118,14 +2121,14 @@ may create a bounded readiness opportunity without fabricating a turn or Goal.
 Admitted User Turn + bounded Session Context
   -> User Meaning Interpretation (UMI)
        Responsibility + Goal relation + bounded unresolved meaning
-  -> Fast Planner -> author first Communicative Activity
+  -> Social Cognition -> author first Communicative Activity (Planner authors no words)
        -> one primary truth/provenance result -> validated Activity or silence
   -> concurrent continuation from the same UMI result
-       |-> same Fast Planner -> remaining Activity Plan + input resolution
-       |     |-> ready Capability and still-needed speaking Activities
+       |-> Fast Planner -> Activity Plan + communication Needs + input resolution
+       |     |-> ready Capability Activities and still-needed communication Needs for SC
        |     |-> user-resolvable clarification only when needed
        |     `-> honest unavailable outcome for what it cannot do now
-       `-> Goal Association -> sole canonical Goal commit/version authority
+       `-> Goal Association -> Goal continuity; trusted code commits Goal identity/version
   -> bind each Activity to the applicable per-Goal Runtime task-list views
   -> deterministic validation/authorization/resource scheduling
   -> trusted execution -> observation/Evidence
@@ -2160,16 +2163,24 @@ necessary.
 
 ### 5.1 Model-facing Goal Association boundary
 
-The source implementation may separate representation and prompt mechanics without creating another authority. `agent/app/goal_association_contract.py` contains Pydantic model-facing DTO/typed representation; `agent/app/goal_association_schema.py` contains constrained-decoder schema construction; `agent/app/goal_association_validation.py` contains deterministic normalization, grounding/conflict, and Responsibility-conservation checks; `agent/app/goal_association_prompt.py` contains bounded prompt projections and system-prompt text. `GoalAssociationResolver` remains the single model-invocation/continuity transaction and canonical Goal writer. None of these extracted mechanical modules may acquire a model client, runtime state, Goal commit, tracing, or an independent repair/decision lifecycle.
+The source implementation may separate representation and prompt mechanics without creating another authority. `agent/app/goal_association_contract.py` contains Pydantic model-facing DTO/typed representation; `agent/app/goal_association_schema.py` contains constrained-decoder schema construction; `agent/app/goal_association_validation.py` contains deterministic normalization, grounding/conflict, and Responsibility-conservation checks; `agent/app/goal_association_prompt.py` contains bounded prompt projections and system-prompt text. `GoalAssociationResolver` remains the single model-invocation/continuity transaction; it materializes the canonical `GoalAssociationResolution` (new Goal identity and WHAT copied mechanically from UMI), and the Host's conversation state commits it. None of these extracted mechanical modules may acquire a model client, runtime state, Goal commit, tracing, or an independent repair/decision lifecycle.
 
 Goal Association must not expose Chromie's persistence and lifecycle objects
 directly to the language model. Its model-facing output is intentionally small
 and explicitly discriminated:
 
-- `associate` for relationships to exact active goal IDs;
-- `create_goals` for source refs and Goal relationship IDs, with meaning inherited
-  from UMI;
-- `clarify` for unresolved continuity facts, expressed to the user by SC.
+- `associations[]` for relationships to exact open retained Goal IDs;
+- `new_goals[]` for current UMI source refs that no retained Goal owns, each with
+  exactly `source_responsibility_refs`, `related_goal_ids` and
+  `supersedes_goal_ids`; trusted code inherits the Goal's meaning from UMI;
+- `referent_updates[]` and `resolved_references[]` for scoped discourse referents;
+- at most one `cognitive_requests[]` entry each for Planner and SC.
+
+There is no `decision` discriminator and no `clarify`/`clarification` output
+branch (`GoalAssociationModelOutput`). The no-candidate segmentation output
+carries a representational `decision` of `create_goals` or `no_goal` only.
+Continuity facts GA cannot resolve remain UMI meaning uncertainties for the
+Planner, and any question to the user is expressed by SC.
 
 Goal Association has one bounded semantic transaction. Its primary model result
 conserves the accepted UMI Responsibilities while deciding only canonical Goal
@@ -2193,10 +2204,9 @@ does not become capability-unavailable, execution-failed, empty-result, or
 user-ambiguity truth. Clarification is valid only when the user can actually
 resolve ambiguous or missing semantic information.
 
-The declared decision selects the active branch. Harmless content emitted in an
-inactive branch is ignored structurally; it does not trigger semantic repair.
-`clarification` never carries reasoning, translations, route labels, model
-failures, or validator diagnostics. Goal Association also does not receive prior
+GA output never carries reasoning beyond the bounded non-authoritative
+`reason_summary`, translations, route labels, model failures, or validator
+diagnostics. Goal Association also does not receive prior
 routing or validation failures as semantic evidence; the admitted user turn,
 bounded Goal/dialogue state, and trusted evidence remain authoritative.
 
@@ -2369,8 +2379,10 @@ The second turn creates a new weather goal while leaving the coffee goal
 active.
 
 When a user materially corrects an entity on an external-read Goal, Goal
-Association creates a fully bound replacement Goal while retaining the old Goal
-as history. If the corrected answer still depends on external facts, planning
+Association reports the correcting Responsibility as a new Goal that supersedes the
+old Goal if it is still open (or names it in `related_goal_ids` if it is terminal);
+trusted code materializes the replacement Goal with UMI's corrected bindings, and
+the old Goal is retained as history. If the corrected answer still depends on external facts, planning
 must perform a new exact read. It may not relabel evidence produced for the old
 entity as evidence for the replacement Goal. A direct response without a new
 Capability is valid only when delivered evidence-bound dialogue names the same
@@ -2474,23 +2486,32 @@ The link is explicit and scoped. A model-facing semantic `goal_id` is not the
 same identifier as the host `task_id`; the host resolves the semantic goal to
 its owning task context and binds each canonical speech or skill request by
 `source_goal_ids`. Provider completion, refusal, failure, timeout, or
-cancellation updates every bound goal independently. A conversational
-`respond` goal likewise remains active until its scoped speech request has
-runtime delivery evidence; producing Planner text is not completion.
+cancellation updates every bound goal independently, but completed
+information-acquisition Work does not by itself close a Goal. An `information`
+Goal closes only when Social Cognition's evidence-bound answer is delivered and
+cites committed completed execution Evidence
+([Discourse Referents](DISCOURSE_REFERENTS_AND_VERIFIED_MEMORY.md#completed-goal-conversational-continuity));
+until then it stays open, so a follow-up may still `continue` it. A failed or empty
+lookup leaves it open as well; it ends through a later successful read,
+cancellation or supersession. A conversational `speech` goal likewise remains
+active until its scoped speech request has runtime delivery evidence.
 This prevents a completed compound action from remaining in the active-goal
 projection and being accidentally associated with a later turn.
 
 Goal Association also receives a separate bounded projection of recently
-terminal Goals. A semantic `continue` or `reference` relationship may point to
-one of them, but the Host records only a continuity marker and preserves the
-terminal state. This permits questions about a just-completed result without
-reopening work or treating recency as semantic authority.
+terminal Goals. They are never association targets: a follow-up about a
+just-completed result is a new Goal that names the terminal Goal in
+`related_goal_ids`, and the terminal Goal keeps its state. This permits questions
+about a just-completed result without reopening work or treating recency as
+semantic authority.
 
 ### 6.6 Active goals protect conversational continuity
 
-A goal remains conversationally active while it is planning, waiting for user
-input, awaiting confirmation, executing, paused, or recoverably blocked. It does
-not become disposable merely because no provider request is currently running.
+A goal remains conversationally active while its Responsibility is open, whatever
+its Work condition: planning, waiting for user input, awaiting confirmation,
+executing, paused, or `recoverable` after restart (a Work condition, not a Goal
+state). It does not become disposable merely because no provider request is
+currently running.
 
 Soft-topic and idle-boundary heuristics must not clear active goals. A short
 answer after a long pause may still resolve an existing information gap.
@@ -3063,15 +3084,15 @@ tagged `social_attention`, but the owning structural role—not the actuator—d
 whether work is primary or decorative. Provider/backend/calibration identity and
 low-level motor fields are absent from model-facing candidates.
 
-Valid anchors are semantic human-observable Planner Activities: a Communicative
-Act, canonical Plan response, or Plan step. Internal milestones such as
+The only valid anchor is the containing SC Communicative Act (`anchor_kind=communicative_act`,
+`shared/chromie_contracts/social_cognition.py`). Internal milestones such as
 understanding ready, Goal Association, planning, waiting, Work start, Evidence
 arrival, or lane transitions are never anchors. Target priority is fresh perceived
 interaction target, structured conversational target, then no target. Runtime drops
 a stale target rather than choosing another person.
 
 Accepted decoration executes through Activity with
-`source=canonical_plan_auxiliary_activity`, `auxiliary_plan_activity=true`,
+`source=social_cognition_auxiliary_activity`, `auxiliary_plan_activity=true`,
 `execution_role=social_decoration`, and empty `source_goal_ids`. It is recorded as
 auxiliary evidence but never completion Evidence. Failure never delays or changes
 Vocal output, emergency handling, or primary Work.
@@ -3166,7 +3187,7 @@ CapabilityRequest
         ↓
 CapabilityRuntime.submit(...)
         ↓
-CapabilityDispatchReceipt   # accepted/rejected/scheduled, never completion
+CapabilityDispatchReceipt   # status=accepted only, never completion; rejection raises or is recorded elsewhere
         ↓
 originating interaction may continue or finish
 
@@ -3273,13 +3294,12 @@ Before effectful execution, a response plan may contain:
 
 Prospective planning output cannot contain a final completion claim.
 
-A clear request whose required Capability is absent has an earlier terminal path. Goal
-Interpretation may acknowledge the understood outcome and return
-`missing_or_unsupported_ability`; Cognitive Runtime then emits one capability-limitation
-interaction with no Goal Association, Plan, or provider request. The interaction records
-`capability_state=unavailable`, `execution_state=not_attempted`, and
-`result_state=not_observed`. This state is categorically different from an executed query
-whose trusted result is empty. Speech delivery can express the distinction but cannot
+A clear request whose required Capability is absent takes no shortcut around Goal
+Association or the Planner: UMI stays WHAT-only, GA associates the Responsibility as usual,
+and the Planner reports the uncovered Responsibility as an `unavailable` outcome or
+Activity with no provider request (`orchestrator/runtime/cognitive_runtime.py`). SC then
+expresses that limitation. An unavailable outcome is categorically different from an
+executed query whose trusted result is empty. Speech delivery can express the distinction but cannot
 change it, and `chromie.speak` cannot stand in for the missing substantive Capability.
 
 The Host schedules only complete, schema-valid SC decisions after exact source,
@@ -3456,7 +3476,8 @@ authority scope unless genuine HOW separately invokes Planner planning.
 After execution, deterministic closure correlates every executable canonical Goal with
 the `ExecutionOutcomeBundle`, updates trusted Goal/Work state, and reactivates the same
 Planner with immutable Goal/Evidence/Situation/current-Work context. Planner owns the new
-human-relevant answer/follow-up/silence decision and exact wording and may author genuinely
+Work decision and any communication Need; Social Cognition owns the answer/follow-up/silence
+wording (see below). Planner may author genuinely
 new follow-up, retry, alternative, cancellation, replacement, or clarification Work when
 the still-open Responsibility and trusted Evidence justify it. Any new effect still crosses
 ordinary Runtime validation, confirmation, authorization, and provider-safety boundaries.

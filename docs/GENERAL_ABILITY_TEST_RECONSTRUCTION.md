@@ -35,7 +35,8 @@ This is implemented and automatically verifiable at Level A. It is not target
 validation and it does not prove microphone, speaker, simulator execution, or
 physical hardware behavior.
 
-The current live library contains 79 cases: 55 `must_pass`, 16 `core`, and 8
+The general-ability live library (the source of the current-revision closure track; the
+owner's everyday target cohort lives in `scenarios/everyday`) contains 79 cases: 55 `must_pass`, 16 `core`, and 8
 `challenge`. The spelling-error probe `tianxin_ambiguous_tool` was removed at
 the owner's request; historical 80-case reports are not rewritten. The first
 stage includes retained regression and owner-reported cases plus 25
@@ -225,6 +226,14 @@ The discovered scenario metadata tracks these classes:
 | `tool_and_conversation_lane_discipline` | Keep conversation, memory, tools, and body actions in their proper lanes. |
 | `deterministic_safety_controls` | Keep stop, cancel, emergency, silence, and unusable-audio paths deterministic. |
 | `evidence_coverage_and_claim_discipline` | Prevent weak tests from being reported as stronger evidence than they are. |
+| `continuous_cognition_recovery` | Return external results and completions through evidence-bound Planner re-entry, never Host-authored completion speech. |
+| `human_like_cognitive_continuity` | Respond to feelings, pressure and confidences like a caring peer without validating harmful claims, diagnosing, or inventing circumstances. |
+| `planner_goal_semantic_quality` | Plan a scoped Goal as the work it needs (for example evidence-backed information work) instead of downgrading it to immediate speech. |
+| `speech_identity_latency` | Keep the maintained identity and the warm response path within the declared latency budgets, without implementation narration. |
+| `workdag_multi_goal_revision_integrity` | Execute each independent Goal's Work exactly once across WorkDAG revision, with no duplicate dispatch. |
+
+`scenarios/everyday/` uses its own `everyday_*` and `greeting_and_chat` ability classes
+for the everyday live cohort; each of its files carries its declared review rubric.
 
 New user-reported failures should either map to one of these classes or justify
 adding a new class in the scenario metadata and governing interaction contract.

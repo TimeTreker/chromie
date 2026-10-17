@@ -60,8 +60,8 @@ voice / text / trusted interaction event
   -> Cognitive Gateway
        Input Normalization
        Protective Reflex
-       Attention Review
        Context Assembly
+       Attention Review
        Turn Admission -> UserTurnEnvelope
   -> Goal-Driven Cognitive Core
        Goal Association and segmentation
@@ -88,23 +88,28 @@ execution evidence, and response behavior.
 
 The Cognitive Gateway contains exactly these five logical modules. They may be
 deployed together or separated physically, but their contracts and ownership
-remain distinct.
+remain distinct. They run in the order listed below: Context Assembly runs
+before Attention Review because review is bound to the digest of the assembled
+`GatewayContextSnapshot`.
 
 | Module | Chinese name | Owns | Produces |
 |---|---|---|---|
-| Input Normalization | 输入规范化 | Transport-independent shaping, original-input preservation, language/timing hints, input-quality attachment, bounded decoding and size checks | Normalized input evidence without semantic reinterpretation |
+| Input Normalization | 输入规范化 | Transport-independent shaping, original-input preservation, language/timing hints, input-quality attachment | Normalized input evidence without semantic reinterpretation |
 | Protective Reflex | 保护性反射 | Deterministic stop, cancel, emergency, silence, and unusable-input controls that must not wait for model judgment | Immediate `ReflexOutcome` plus evidence attached to the turn |
-| Attention Review | 注意审查 | Bounded addressedness and ambient-input review that can suppress only policy-permitted non-effectful input | Attention finding with admit/suppress recommendation and reason |
 | Context Assembly | 上下文组装 | Bounded, source-attributed snapshots of conversation, active goals, engagement, environment, capability availability, and input quality | Immutable context references with freshness/provenance metadata |
-| Turn Admission | 话轮准入 | Final deterministic validation of the ingress envelope and one admission disposition | A `UserTurnEnvelope`, or an explicit suppressed/unusable/reflex-only record |
+| Attention Review | 注意审查 | Bounded addressedness and ambient-input review that can suppress only policy-permitted non-effectful input | Attention finding with admit/suppress recommendation and reason |
+| Turn Admission | 话轮准入 | Final deterministic validation of the ingress envelope and one admission disposition | A `UserTurnEnvelope` with `admit`, `suppress`, or `reflex_and_admit` |
 
 ### 4.1 Input Normalization / 输入规范化
 
 Input Normalization preserves what arrived. It may normalize encoding,
 whitespace, language tags, timestamps, channel identity, and bounded quality
-signals. It may reject malformed transport data or mark an ASR hypothesis as
-uncertain. It must not silently rewrite an utterance to match a likely tool,
+signals. It must not silently rewrite an utterance to match a likely tool,
 skill, intent, or prior goal. Original input remains immutable evidence.
+The current implementation records every transcript that reaches the Gateway
+with `quality.usable=true`; audio decoding and ASR quality are handled at the
+transport/ASR boundary before the Gateway, and an empty, punctuation-only, or
+filler transcript is suppressed by the Protective Reflex ignore rule.
 
 ### 4.2 Protective Reflex / 保护性反射
 
@@ -126,7 +131,13 @@ recognition of the input; recognition alone proves neither dispatch nor a safe
 state. The host then dispatches both global runtime cancellation and the
 dedicated Soridormi E-stop path, and the cancellation receipt records E-stop
 success, failure, or unavailability. Reaching safe idle still requires an
-explicit correlated Soridormi postcondition.
+explicit correlated Soridormi postcondition. After an emergency stop that
+postcondition is the latched stop, not `safe_idle=true`: Soridormi keeps
+emergency stop active until its MCP process is restarted and reports
+`safe_idle=true` only when emergency stop is clear, so the E-stop evidence is
+`robot.get_status` with `emergency_stop=true` and, once running work has
+ended, no active body lane (`activity_idle=true`). A later run needs a restarted Soridormi and passes the
+ordinary `safe_idle=true` preflight.
 
 ### 4.3 Attention Review / 注意审查
 
@@ -158,7 +169,12 @@ accepted recent dialogue.
 ### 4.4 Context Assembly / 上下文组装
 
 Context Assembly gathers only bounded evidence the Core needs to reason. Every
-item identifies its source, freshness, and confidence when applicable. Missing
+item identifies its source and capture time. The current implementation reads
+each item from in-process Host state at capture and records `freshness="current"`
+and `age_ms=0` for every reference; it does not measure the age of the underlying
+source (for example, when robot state was last observed) and records no
+confidence. The `stale` and `unknown` freshness values are reserved. Consumers
+that need a source's age must use timestamps carried inside that item. Missing
 context remains unknown; it is never filled with invented facts. The production
 projection does not copy aggregate Conversation State beside the same state's
 leaf projections: top-level canonical leaves win, aggregate-only compatibility
@@ -219,6 +235,16 @@ following abbreviated example:
   "admission": "reflex_and_admit"
 }
 ```
+
+Turn Admission currently emits three dispositions: `admit` (Attention Review
+admitted the turn), `suppress` (ignore reflex or Attention Review suppression),
+and `reflex_and_admit` (any interrupt reflex). A pure stop such as `Stop.` is
+also recorded as `reflex_and_admit`, but it carries no residual semantic input
+and returns after cancellation without entering the Core; the qualification
+manifest expects `core_entered=false` and its verifier checks that no Core
+runtime event was recorded for that turn. The contract values `unusable`
+(for `quality.usable=false`) and `reflex_only` are reserved and are not emitted
+by the current Host.
 
 The shared model is frozen and rejects unknown fields. Normalized text may
 change whitespace only; context references are bounded, unique, and
@@ -297,6 +323,7 @@ It first assigns one closed cancellation scope:
 | Input class | Cancellation scope | Deterministic target |
 |---|---|---|
 | `Stop talking`, `别说了` | `output_only` | The host's shared audible-output resource plus interruptible speech requests in the bound interaction |
+| `Stop the music`, `停止音乐` | `media_output` | Media requests declaring the `media_output` cancellation domain across open runtime interactions; Vocal output is unchanged |
 | `Stop moving`, `停止移动` | `embodied_motion` | Current and queued requests explicitly declared to have a physical-motion effect |
 | Bare `Stop`, `Cancel`, `停止` | `current_interaction` | Every unfinished request in the foreground interaction; completed goals and unrelated remembered goals are unchanged |
 | Exact structured target identified by Goal Association | `specific_goal` | Structured skill/effect requests whose committed `source_goal_ids` are wholly contained in the exact target set and whose plan identity matches |
@@ -317,7 +344,7 @@ materialization, failure handling, and evidence-driven Planner re-entry.
 Suppressed speech is not delivered evidence; a plan containing a forbidden
 vocal Capability fails closed rather than executing a partial coordinated plan.
 Confirmation requirements still hold. Pure stop/emergency commands bypass
-cognition, and subsequent ordinary turns and independent earlier Goals retain
+cognition and are not acknowledged in speech (see the turn loop's stop section), and subsequent ordinary turns and independent earlier Goals retain
 their own output constraints. The live text harness retains the actual compound
 continuation and execution instead of reporting a reflex-only projection.
 
@@ -364,7 +391,8 @@ Exact isolation also depends on provider granularity. Current Soridormi motion
 cancellation is global-domain, so a specific physical target widens to
 `embodied_motion`; the receipt explicitly records `widened`, the reason, and
 every coaffected request and goal. It must never be presented as exact
-goal-only cancellation. A deterministic hold for ambiguous safety-relevant
+goal-only cancellation. A coaffected Goal that stays open is re-entered into
+the Planner with the same cancellation Evidence. A deterministic hold for ambiguous safety-relevant
 language is a future policy, not current implementation.
 
 `embodied_motion` is ledger-bound: it selects motion registered in the host
@@ -409,7 +437,7 @@ out of Soridormi.
 
 ## 9. Invariants
 
-1. Every received input has a stable turn identity, including reflex-only and
+1. Every received input has a stable turn identity, including pure-stop and
    suppressed input.
 2. Original input is immutable evidence; normalization never substitutes a
    nearby capability or meaning.
@@ -419,7 +447,7 @@ out of Soridormi.
    returned to cognitive and goal state.
 5. Attention suppression is non-effectful, bounded, evidence-based, and fails
    open on direct or unclear speech.
-6. Context is bounded, source-attributed, freshness-aware, and never invented.
+6. Context is bounded, source-attributed, capture-timestamped, and never invented.
 7. The Gateway emits no normal intent, goal, capability choice, plan,
    authorization, execution claim, or final response.
 8. One admitted turn has one downstream semantic authority.
@@ -444,11 +472,11 @@ evidence status is reported separately in [STATUS.md](STATUS.md).
 | Mixed-language compound request | Preserve the complete utterance without narrowing it | Core segments independent goals and plans complete coverage |
 | Independent request while another turn is in flight | Admit and preserve both turn identities; do not synthesize a cancellation reflex | Both turns remain eligible for closure unless explicit control or the Core authorizes scoped interruption |
 | `Stop now.` / `停止` during speech | Record input and trigger deterministic cancellation before model work | No stale audio resumes; affected speech goal receives cancellation evidence |
-| Emergency stop during simulated motion | Trigger trusted stop and retain `ReflexOutcome` | Provider evidence closes affected goals and proves safe idle |
+| Emergency stop during simulated motion | Trigger trusted stop and retain `ReflexOutcome` | Provider evidence closes affected goals and proves the latched stop (`emergency_stop=true`, no active body lane) |
 | `Explain what “stop” means` | Do not trigger reflex; admit the contextual question | Core answers without treating it as an operational stop |
 | Inactive ambient narration | Suppress only with policy-qualified evidence | No tool, memory, or physical effect is authorized |
 | Direct weather question mislabelled ambient | Fail open because question form contradicts suppression | Core may use weather evidence and reconcile its result |
-| Unusable or empty audio | Produce a deterministic unusable/suppressed record | No model, tool, action, or TTS work starts |
+| Unusable or empty audio | Produce a deterministic suppressed record (empty or filler transcripts match the ignore reflex) | No model, tool, action, or TTS work starts |
 | Completed weather goal followed by unrelated action | Assemble only genuinely active goals | Core does not inherit stale weather meaning or authority |
 | Tool success, partial failure, or timeout | Preserve turn and correlations | Goal-scoped outcomes return to Core for closure, replan, clarification, or truthful report |
 

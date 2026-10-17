@@ -10,7 +10,6 @@
     "soridormi.walk_velocity",
     "soridormi.curve_walk",
     "soridormi.sidestep",
-    "soridormi.look_at_person",
     "soridormi.hug_gesture"
   ]
 }

@@ -74,6 +74,34 @@ def _boolean(values: Mapping[str, str], name: str, default: bool) -> bool:
     )
 
 
+def _worker_startup_timeout(values: Mapping[str, str], default: float) -> float:
+    return _floating(values, "TTS_WORKER_STARTUP_TIMEOUT_SEC", default, minimum=1.0)
+
+
+def required_text(
+    name: str,
+    default: str,
+    environ: Mapping[str, str] | None = None,
+) -> str:
+    """Return a non-empty provider source/model value, failing with its key."""
+
+    values = os.environ if environ is None else environ
+    value = str(values.get(name, default)).strip()
+    if not value:
+        raise TTSConfigurationError(f"{name} is required")
+    return value
+
+
+def required_boolean(
+    name: str,
+    default: bool,
+    environ: Mapping[str, str] | None = None,
+) -> bool:
+    """Return a strict boolean provider value, failing with its key."""
+
+    return _boolean(os.environ if environ is None else environ, name, default)
+
+
 @dataclass(frozen=True)
 class TTSServiceSettings:
     log_level: str
@@ -186,12 +214,7 @@ class TTSServiceSettings:
                 minimum=0.0,
                 maximum=1.0,
             ),
-            worker_startup_timeout_s=_floating(
-                values,
-                "TTS_WORKER_STARTUP_TIMEOUT_SEC",
-                600.0,
-                minimum=1.0,
-            ),
+            worker_startup_timeout_s=_worker_startup_timeout(values, 600.0),
             tokenizer_repo=_text(values, "TTS_TOKENIZER_REPO"),
             tokenizer_revision=_text(values, "TTS_TOKENIZER_REVISION"),
             gguf_repo=_text(values, "TTS_GGUF_REPO"),
@@ -216,4 +239,67 @@ class TTSServiceSettings:
             self.tokenizer_revision,
             self.gguf_repo,
             self.gguf_revision,
+        )
+
+
+@dataclass(frozen=True)
+class TTSCandidateSettings:
+    """Typed snapshot for the worker-backed provider images (CosyVoice, Qwen3).
+
+    Provider model-source keys (``COSYVOICE3_*``, ``QWEN3_TTS_*``) are read
+    through :func:`required_text` and :func:`required_boolean`.
+    """
+
+    voice_root: Path | None
+    default_speaker: str
+    reference_wav: Path
+    reference_metadata: Path
+    transport_chunk_ms: int
+    worker_startup_timeout_s: float
+    cancel_drain_timeout_s: float
+    first_audio_timeout_s: float
+    request_timeout_s: float
+    cold_first_audio_timeout_s: float
+    cold_request_timeout_s: float
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> "TTSCandidateSettings":
+        values = dict(os.environ if environ is None else environ)
+        voice_root = _text(values, "TTS_VOICE_ROOT")
+        return cls(
+            voice_root=Path(voice_root) if voice_root else None,
+            default_speaker=_text(values, "TTS_DEFAULT_SPEAKER"),
+            reference_wav=Path(
+                required_text("TTS_REFERENCE_WAV", "/evaluation/reference.wav", values)
+            ),
+            reference_metadata=Path(
+                required_text(
+                    "TTS_REFERENCE_METADATA", "/evaluation/reference.json", values
+                )
+            ),
+            transport_chunk_ms=_integer(
+                values, "TTS_TRANSPORT_CHUNK_MS", 120, minimum=1
+            ),
+            worker_startup_timeout_s=_worker_startup_timeout(values, 1200.0),
+            cancel_drain_timeout_s=_floating(
+                values, "TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC", 3.0, minimum=0.0
+            ),
+            first_audio_timeout_s=_floating(
+                values, "TTS_CANDIDATE_FIRST_AUDIO_TIMEOUT_SEC", 20.0, minimum=0.0
+            ),
+            request_timeout_s=_floating(
+                values, "TTS_CANDIDATE_REQUEST_TIMEOUT_SEC", 60.0, minimum=0.0
+            ),
+            cold_first_audio_timeout_s=_floating(
+                values,
+                "TTS_CANDIDATE_COLD_FIRST_AUDIO_TIMEOUT_SEC",
+                180.0,
+                minimum=0.0,
+            ),
+            cold_request_timeout_s=_floating(
+                values, "TTS_CANDIDATE_COLD_REQUEST_TIMEOUT_SEC", 240.0, minimum=0.0
+            ),
         )

@@ -101,10 +101,11 @@ bindings nor Goal relationships. It does not author Work, Primary
 Activities, Plan structure, execution lanes, realization, Capability IDs, executable
 arguments, provider requests, planning InformationGaps, input-source/default policy,
 clarification selection, or `actions[]`; Goal Association owns association with retained canonical
-Goal history, while trusted lifecycle code materializes new Goal identity/fields mechanically from
-accepted UMI WHAT when no retained Goal matches. Planner owns the first Work/Activity contract,
+Goal history and decides when a Responsibility starts a new Goal, while trusted lifecycle code
+records that Goal and materializes its identity/fields mechanically from accepted UMI WHAT. Planner owns the first Work/Activity contract,
 execution-input completeness, and
-source strategy, in one Planner pass (PLANNER-AUTHORITY-001). That ownership cannot be used to reinterpret,
+source strategy, in one Planner decision (PLANNER-AUTHORITY-001; at most one need-first
+contract-loading call precedes it). That ownership cannot be used to reinterpret,
 widen, narrow, or invent Responsibility meaning. No maintained `RouteDecision` or
 legacy Agent semantic compatibility surface remains on the Core path.
 
@@ -190,7 +191,10 @@ evaluation evidence: they cannot replace candidate results, mutate Runtime state
 or feed a repair back into the current online decision.
 
 `GET /semantic-authority` exposes the maintained machine-readable authority
-matrix from the Agent service.
+matrix from the Agent service (`semantic_authority_route_matrix()`). It covers the
+three cognitive Runtime routes in the table above (`apply`, `report_only` and
+Goal-free Situation); the Gateway reflex and Agent-endpoint rows are pre-semantic or
+module-local and are documented here only.
 
 ## Retired semantic fallbacks
 

@@ -180,5 +180,86 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
         )
 
 
+    def test_shared_stop_reenters_planner_for_coaffected_open_sibling(self) -> None:
+        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        calls: list[dict] = []
+        applied: list[InteractionResponse] = []
+        provenance_requests: list[list[str]] = []
+
+        class State:
+            def goal_reentry_provenance(self, goal_ids):
+                provenance_requests.append(sorted(goal_ids))
+                return [
+                    {
+                        "goal_id": "goal-wave",
+                        "source_text": "Walk forward and wave.",
+                        "language": "en-US",
+                        "responsibilities": [
+                            {
+                                "local_ref": "r2",
+                                "outcome": "Chromie waves.",
+                            }
+                        ],
+                    }
+                ]
+
+        async def state_reentry(**kwargs):
+            calls.append(kwargs)
+            return InteractionResponse(metadata={"source": "planner"})
+
+        async def apply(response, *, session_id):
+            applied.append(response)
+            return "planner_reentry_dispatched"
+
+        assistant.conversation_state = State()
+        assistant._planner_state_reentry_response = state_reentry
+        assistant._apply_planner_reentry_response = apply
+        evidence = GoalCancellationEvidence.create(
+            source_turn_id="turn-cancel",
+            target_goal_ids=["goal-walk"],
+            coaffected_goal_ids=["goal-wave"],
+            status="cancelled",
+            goal_state_reconciled=True,
+            confirmation_state_reconciled=True,
+            reason_code="wider_scope_cancelled",
+        )
+
+        statuses = asyncio.run(
+            assistant._reenter_coaffected_goals_after_cancellation(
+                evidence,
+                session_id="sid",
+                excluded_goal_ids={"goal-walk"},
+            )
+        )
+
+        self.assertEqual(statuses, {"goal-wave": "planner_reentry_dispatched"})
+        self.assertEqual(provenance_requests, [["goal-wave"]])
+        self.assertEqual(len(calls), 1)
+        call = calls[0]
+        self.assertEqual(call["goal_ids"], ["goal-wave"])
+        self.assertEqual(call["evidence_refs"], [evidence.evidence_id])
+        self.assertEqual(call["phase"], "goal_cancellation_reentry")
+        self.assertIsNone(call["source_response"])
+        self.assertEqual(call["responsibilities_override"][0].local_ref, "r2")
+        context = call["context_updates"]
+        self.assertEqual(
+            context["goal_cancellation_reentry"]["source_goal_ids"], ["goal-walk"]
+        )
+        self.assertEqual(context["cognitive_opportunity"]["goal_ids"], ["goal-wave"])
+        self.assertEqual(len(applied), 1)
+
+        # A sibling already in the target re-entry scope is not re-entered twice.
+        calls.clear()
+        statuses = asyncio.run(
+            assistant._reenter_coaffected_goals_after_cancellation(
+                evidence,
+                session_id="sid",
+                excluded_goal_ids={"goal-walk", "goal-wave"},
+            )
+        )
+        self.assertEqual(statuses, {})
+        self.assertEqual(calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()

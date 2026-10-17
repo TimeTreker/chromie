@@ -45,6 +45,8 @@ Container Toolkit, Conda or an equivalent host environment, and audio devices.
   retained and the default target-evidence profile closes, feature,
   architecture, flag, and terminology growth is frozen except for work that
   closes those prerequisites or a demonstrated safety/provenance blocker.
+  Root-cause repairs for the active Issue inside the existing architecture are
+  not growth and remain allowed.
 - Keep microphone, playback, VAD, interruption, and Trusted Capability Runtime
   coordination in the host Orchestrator.
 - Keep robot-body execution and physical safety in Soridormi.
@@ -290,8 +292,10 @@ status, or support scope changes. Run:
 python scripts/check_docs.py
 ```
 
-Use the four-axis vocabulary from `docs/STATUS.md`: implemented, automatically
-verified, target validated, and release ready.
+Use the four-axis vocabulary from `docs/STATUS.md`
+([Documentation authority](docs/DOCUMENTATION_AUTHORITY.md#four-axis-status-vocabulary)):
+implementation, automatic verification, target validation, and deployment state.
+Release readiness is a separate verdict outside those four axes.
 
 ## Pull requests
 

@@ -2269,6 +2269,108 @@ class VoiceAssistant:
             language=language,
         )
 
+    async def _reenter_coaffected_goals_after_cancellation(
+        self,
+        evidence: GoalCancellationEvidence,
+        *,
+        session_id: str | None,
+        excluded_goal_ids: set[str],
+    ) -> dict[str, str]:
+        """Re-enter the Planner for still-open siblings a shared stop halted.
+
+        Provider-widened cancellation can stop a sibling Goal's Work while its
+        responsibility stays open. The same trusted cancellation Evidence wakes
+        the Planner for each such Goal from its retained provenance, so the
+        Planner (never the Host) decides whether to resume, re-plan, or report.
+        """
+
+        sibling_goal_ids = [
+            goal_id
+            for goal_id in evidence.coaffected_goal_ids
+            if goal_id not in excluded_goal_ids
+        ]
+        provenance_fn = getattr(self.conversation_state, "goal_reentry_provenance", None)
+        if not sibling_goal_ids or not callable(provenance_fn):
+            return {}
+        statuses: dict[str, str] = {}
+        for item in provenance_fn(sibling_goal_ids):
+            goal_id = str(item.get("goal_id") or "")
+            source_text = str(item.get("source_text") or "").strip()
+            try:
+                responsibilities = [
+                    CognitiveResponsibilityProposal.model_validate(raw)
+                    for raw in item.get("responsibilities") or []
+                ]
+            except (TypeError, ValueError):
+                responsibilities = []
+            if not responsibilities or not source_text:
+                statuses[goal_id] = "missing_responsibility_provenance"
+                continue
+            opportunity = CognitiveOpportunity.create(
+                trigger="execution_outcome",
+                goal_ids=[goal_id],
+                evidence_refs=[evidence.evidence_id],
+                reason_codes=[evidence.reason_code],
+                recommended_cognition="fast",
+            )
+            planner_response = await self._planner_state_reentry_response(
+                source_response=None,
+                canonical_plan=None,
+                user_request=source_text,
+                language=str(item.get("language") or "auto"),
+                goal_ids=[goal_id],
+                evidence_goal_ids=[goal_id],
+                evidence_refs=[evidence.evidence_id],
+                session_id=session_id,
+                phase="goal_cancellation_reentry",
+                context_updates={
+                    "trusted_goal_cancellation_evidence": [
+                        evidence.model_dump(mode="json")
+                    ],
+                    "goal_cancellation_reentry": {
+                        "phase": "goal_cancellation_reentry",
+                        "source_goal_ids": list(evidence.target_goal_ids),
+                        "evidence_refs": [evidence.evidence_id],
+                        "planner_authority": "planner",
+                    },
+                    "cognitive_opportunity": opportunity.prompt_projection(),
+                },
+                fast_workflow_stage="fast_planner_goal_cancellation_reentry",
+                response_source="fast_planner_goal_cancellation_reentry",
+                responsibilities_override=responsibilities,
+            )
+            if planner_response is None:
+                statuses[goal_id] = "no_change"
+                continue
+            statuses[goal_id] = await self._apply_planner_reentry_response(
+                planner_response, session_id=session_id
+            )
+        return statuses
+
+    def _launch_coaffected_goal_reentry(
+        self,
+        evidence: GoalCancellationEvidence,
+        *,
+        session_id: str | None,
+        excluded_goal_ids: set[str],
+    ) -> None:
+        if not set(evidence.coaffected_goal_ids) - excluded_goal_ids:
+            return
+        task = asyncio.create_task(
+            self._reenter_coaffected_goals_after_cancellation(
+                evidence,
+                session_id=session_id,
+                excluded_goal_ids=excluded_goal_ids,
+            ),
+            name=f"coaffected-goal-reentry:{evidence.evidence_id}",
+        )
+        result_tasks = getattr(self, "active_cognitive_runtime_tasks", None)
+        if not isinstance(result_tasks, dict):
+            result_tasks = {}
+            self.active_cognitive_runtime_tasks = result_tasks
+        result_tasks[task] = evidence.evidence_id
+        task.add_done_callback(self._cognitive_runtime_task_done)
+
     def _apply_cognitive_goal_state(
         self,
         resolution: CognitiveRuntimeResolution,
@@ -2789,6 +2891,11 @@ class VoiceAssistant:
                     "named_goal_cancellation": cancellation_metadata,
                     "goal_cancellation_evidence_id": cancellation_evidence.evidence_id,
                 }
+                self._launch_coaffected_goal_reentry(
+                    cancellation_evidence,
+                    session_id=session_id,
+                    excluded_goal_ids=set(reentry_goal_ids),
+                )
             else:
                 response = self.interaction_runtime.prepare_response(
                     response, session_id=session_id

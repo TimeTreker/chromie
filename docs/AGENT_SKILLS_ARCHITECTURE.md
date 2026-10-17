@@ -35,10 +35,14 @@ correlated Work; it does not expose other narrower-domain capabilities or make a
 new semantic choice. This preserves the Planner's existing HOW decision through
 canonical reconciliation without turning the Host into a capability selector.
 
-The selection decoder requires the `selected_agent_skills` array for both
-`select_skills` and `no_skill` decisions (empty only for `no_skill`) and bounds
-selection rationales. A model cannot spend the output budget on prose and omit
-the authoritative selection payload.
+The selection `response_format` schema sent to the model requires the
+`selected_agent_skills` array for both `select_skills` and `no_skill` decisions
+(empty only for `no_skill`) and caps `rationale` and `reason_summary` at 160
+characters, so a schema-honoring model server cannot spend the output budget on
+prose and omit the authoritative selection payload. The Host-side validator
+(`AgentSkillSelectionModelOutput`) is looser: it rejects `select_skills`
+without items, but treats an omitted array on `no_skill` as empty and accepts
+rationales up to 500 characters and a summary up to 800 characters.
 
 Selection makes at most one model invocation. The Host accepts its valid primary
 result or returns `model_contract_failed` with no selected Skill; semantic,
@@ -170,7 +174,7 @@ operations are **Capabilities**. The canonical vocabulary is:
     {
       "agent_skill_id": "chromie.weather-information",
       "version": "1.0.0",
-      "projection": "planner"
+      "projection": "fast_planner"
     }
   ],
   "steps": [
@@ -294,19 +298,22 @@ A weather Skill may expose:
 
 | Agent | Projection |
 |---|---|
-| Planner | Evidence strategy, capability options, freshness, alternatives, failure recovery, exact pre/post-evidence wording, and result relevance |
+| Planner | Evidence strategy, capability options, freshness, alternatives, failure recovery, and result relevance. The Planner is word-free: it states communication Needs, and Social Cognition authors the words. |
 
 Goal Association intentionally has no Agent Skill projection. Stable semantic
 representation rules such as typed location/time/resource bindings belong to the
 shared Goal/Resource contracts so canonical meaning does not depend on whether a
 domain Skill happened to load. Planner Skills begin at HOW, after canonical Goal
 identity exists. The Host loads a requested Planner projection only after that
-Planner has selected the Skill for one or more current canonical Goals.
+Planner has selected the Skill for one or more current canonical Goals. A
+UMI-triggered Fast Planner that runs before Goal Association has no canonical Goal
 identity yet, so its pre-association Agent-Skill path receives no historical
 active/recent Goal IDs and deterministically returns `no_skill` without a model call.
 This prevents an unrelated unfinished Goal from injecting a stale domain method into
 new user meaning. Domain-method selection begins only after Goal Association has
-established the relevant canonical Goal identity. The Host never infers the domain
+established the relevant canonical Goal identity. The early Planner therefore plans
+from the common Capability contracts and need-first search alone and is not delayed
+to wait for a Skill. The Host never infers the domain
 from phrases.
 
 ### Progressive disclosure
@@ -319,15 +326,20 @@ Skill index: ID, version, title, concise description, applicability metadata
 Agent selects candidate Skill IDs
         ↓
 load only the relevant Agent projection
-        ↓
-load references/examples only when requested within budget
 ```
+
+Packages have no `references/` or `examples/` loading stage today; the registry
+loads only metadata and the selected projection.
 
 This keeps prompts small, makes selection observable, and avoids turning the
 entire Skill library into permanent system-prompt text.
 
-The current implementation completes this flow for the five responsible Agent
-roles. Planner selection is narrowed to the Goal IDs accepted by the current
+The current implementation completes this flow for one Agent role, the Fast
+Planner (`fast_planner`, wired on `/fast-plan`). Social Cognition, UMI, Goal
+Association and Value Judgment receive no Agent Skill projection; Social
+Cognition's plan projection drops `selected_agent_skills`. Skill guidance about
+answer wording therefore reaches only the word-free Planner, which can carry it
+into its communication Need but cannot author the words. Planner selection is narrowed to the Goal IDs accepted by the current
 Goal Association result; retained Goals remain available to Goal Association
 for model-authored continuity, but an unrelated terminal Goal cannot contribute
 planner Skill provenance to a new Plan. Exact provenance validation remains
@@ -367,7 +379,7 @@ A Skill must not maintain hidden mutable state that competes with those systems.
 
 ## Proposed repository contract
 
-The first implementation should use a separate, read-only Agent Skill root:
+The implementation uses a separate, read-only Agent Skill root:
 
 ```text
 agent-skills/
@@ -375,19 +387,16 @@ agent-skills/
     skill.yaml
     SKILL.md
     projections/
-      goal_association.md
       fast_planner.md
-    references/
-    examples/
   weather-information/
     skill.yaml
     SKILL.md
     projections/
-      goal_association.md
       fast_planner.md
-    references/
-    examples/
 ```
+
+`fast_planner` is the only accepted projection key; any other key, such as
+`goal_association`, fails metadata validation.
 
 The initial package contract should include:
 
@@ -434,7 +443,10 @@ The following invariants are enforced:
 - `execution_authority` is none;
 - only owner-approved packages are model-visible;
 - a package cannot register a capability or provider;
-- unknown or malformed Skill packages fail closed and are not loaded;
+- unknown or malformed Skill packages fail closed: the loader raises
+  `AgentSkillLoadError` on the first malformed package, duplicate ID, unknown
+  parent or inheritance cycle, and `chromie-agent` refuses to start (it does
+  not skip the bad package and continue);
 - package content is mounted read-only in the maintained Compose profile;
 - startup retains bounded metadata summaries, not full `SKILL.md` or projection text;
 - explicit body/projection reads recheck the package digest before returning text;
@@ -560,9 +572,9 @@ A cognitive trace should eventually record:
     {
       "agent_skill_id": "chromie.weather-information",
       "version": "1.0.0",
-      "projection": "planner",
+      "projection": "fast_planner",
       "digest": "sha256:...",
-      "selected_by": "fast_planner",
+      "selected_by_agent_role": "fast_planner",
       "goal_ids": ["goal_weather_neixiang"]
     }
   ]
@@ -573,7 +585,10 @@ Important distinctions:
 
 - selected: the Agent chose the Skill;
 - loaded: the Host supplied a validated projection;
-- applied: the Plan cites the Skill as informing its method;
+- applied: the Plan cites the Skill as informing its method. Not yet
+  observable: the Host binds `CanonicalPlan.selected_agent_skills` from every
+  disclosed projection (`bind_agent_skill_provenance_to_plan`), independent of
+  the Planner's output, so today "applied" equals "loaded" in traces;
 - executed: only capability steps execute;
 - successful: provider and outcome evidence close the Goal.
 

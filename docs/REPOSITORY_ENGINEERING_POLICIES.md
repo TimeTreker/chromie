@@ -49,6 +49,13 @@ configuration, contracts, or current architecture claims still fail closed.
 | `architecture.legacy_phrase_agents` | Removed phrase/regex motion and pose agents cannot be restored or enabled through caller context. |
 | `memory.model_authored_update` | Session-memory meaning must come from a typed model-authored proposal; `MemoryAgent` may not classify raw text. |
 | `contracts.canonical_capability_identity` | Current model, Plan, API, trace, and evidence identities use canonical `capability_id` only; executable `skill_id` aliases are forbidden in live Chromie contracts. Agent Skill `agent_skill_id` and provider-local wire fields are separate namespaces. |
+| `python.unclassified_broad_exception` | Every broad runtime exception handler must be classified in `config/runtime_exception_boundaries.json` (`scripts/check_runtime_exception_boundaries.py`); an unlisted handler fails. |
+| `repository.obsolete_artifact` | Verified obsolete scaffolding (the removed tool client and retired phrase-agent prompts) may not be reintroduced. |
+| `repository.duplicated_mechanism` | Shared mechanisms may not be re-copied: bounded JSON-Schema type matching uses `shared/chromie_contracts/json_schema.py` and contract whitespace normalization uses `shared/chromie_contracts/text.py`. |
+
+The checker also emits two meta rules about its exception file: `policy.exception_config`
+(an invalid or malformed `config/repository_policy_exceptions.json` entry) and
+`policy.exception_stale` (an exception that no longer matches a live finding).
 
 The failure rules are intentionally narrower than a generic style linter. A broad
 handler that re-raises, emits diagnostics/evidence, or returns an explicit typed
@@ -168,7 +175,7 @@ This gate does not:
 
 ## Automatic evidence
 
-Focused tests inject one violation for each of the thirteen rule families,
+Focused tests inject violations for the rule families above,
 verify machine-readable output, verify exact exception matching, and require
 stale exceptions to fail. On 2026-07-31 the fresh canonical gate passed the
 policy checker together with unit, architecture, documentation, benchmark, and

@@ -9,7 +9,8 @@ fixed input-to-action mappings.
 ## Repository layout
 
 - `benchmark.schema.json`: versioned generated-inventory contract.
-- `manifests/suites.json`: authoritative source classification and taxonomy.
+- `manifests/suites.json`: compatibility redirect; `manifests/scenario_migration_v1.json`
+  is the source classification authority.
 - `inventory/core.py`: deterministic discovery, validation, and coverage report.
 - `modules/`, `integration/`, `e2e/`, `stress/`, `regression/`, `datasets/`:
   reserved homes for later benchmark phases; existing scenarios remain in place.
@@ -271,12 +272,12 @@ an Ollama-compatible endpoint and model (this command performs candidate inferen
 
 ```bash
 python scripts/run_workflow_replay.py --family normal_fast \
-  --candidate-role gi --candidate-url http://127.0.0.1:11434 \
+  --candidate-role umi --candidate-url http://127.0.0.1:11434 \
   --candidate-model YOUR_MODEL --candidate-timeout 60 \
   --evidence-dir .chromie/acceptance/workflow-candidate-new-run
 ```
 
-Supported roles are `gi`, `ga`, `fast`, `deep`. Remove `--family` to discover all
+Supported roles are `umi`, `ga`, `fast`. Remove `--family` to discover all
 eligible cases for that role. This mode excludes intentional model-fault/gap replies
 and cases that never invoke the selected role; the summary records exclusions and
 actual external call counts. There are 3,200 reference-only cases before role filtering.
@@ -534,7 +535,8 @@ the maintained Host text path with cognitive-runtime apply, shared conversation
 state for multi-turn cases, no speaker, and preview-only execution. It therefore
 exercises routing, Goal Association, planning, and response composition without
 executing proposed effects. It also verifies the quality-model identity exposed
-by Agent health and that the fixed fast roles remain `qwen3:4b`. The runner writes
+by Agent health and that the fast Planner model matches the active runtime
+profile's `AGENT_FAST_PLANNER_MODEL`. The runner writes
 `normalized.json`, `run.json`, and `review/review-bundle.json`. Give that review
 bundle to Codex or another declared LLM/human reviewer, fill the generated
 `review-template.json`, and apply the retained semantic verdict with
@@ -663,10 +665,11 @@ Validate the profile manifest with:
 python -m benchmarks.e2e.validate --check
 ```
 
-Run a cohort through a maintained first-party adapter boundary with:
+Run a cohort through the first-party adapter boundary with an operator-supplied
+harness (no harness module ships in this repository):
 
 ```bash
-export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=qualification_harness.live_service:invoke
+export CHROMIE_BENCHMARK_LIVE_SERVICE_CALLABLE=<module>:<function>  # operator-supplied harness; or set CHROMIE_BENCHMARK_LIVE_SERVICE_URL
 python -m benchmarks.e2e \
   --normalized benchmarks/reports/normalized_scenarios.json \
   --profile live_service_text \
@@ -784,7 +787,7 @@ Validate migration parity and run the file-backed suites with:
 
 ```bash
 python -m benchmarks.scenarios check
-python -m benchmarks.scenarios run --suite dialogue --no-write
+python -m benchmarks.scenarios run --suite cognitive_core_dialogue --no-write
 ```
 
 Compatibility entrypoints and their criteria-based removal schedules are stored
@@ -824,9 +827,11 @@ preserves measured units and supplied pronouns, and does not require uncertainty
 because a proper name is unfamiliar. Decomposition failures leave unalignable dimensions
 unscored. Raw content is retained for passes and failures; truncated completions fail.
 
-This bounded primary screen does not qualify all GI states or the complete Agent. The
-separate raw-model-potential probe retains the historical v1 oracle and its noncanonical
-contract; its results must not be substituted for production qualification. Historical v1
-artifacts and scores remain unchanged. Full GI comparisons must invoke `interpret_goal`,
-including only its source-based Deep delegation when unresolved meaning is present, and
-retain each actual request/response and canonical validation result.
+This bounded primary screen does not qualify all UMI states or the complete Agent. The
+separate raw-model-potential probe (`scripts/qualify_user_meaning_interpreter_model_potential.py`)
+reads the same `goal_interpreter_primary_v2.json` cohort under its own model-potential
+contract; its results must not be substituted for production qualification. The v1 oracle
+has been deleted; historical v1 artifacts and scores remain unchanged. Full UMI comparisons
+must invoke `interpret_user_meaning`, including only its source-based Deep delegation when
+meaning uncertainty is present, and retain each actual request/response and canonical
+validation result.

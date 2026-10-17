@@ -28,6 +28,11 @@ execution receipts, and final safety state.
 
 Use `user-outcome` while cognitive internals are evolving. Use `full` only for
 an explicit component claim, such as qualifying a Fast Planner optimization.
+The current-revision target-evidence interaction track is such a claim: it
+qualifies the implemented route, Planner path and contract boundaries of one
+committed revision, so it always runs `full`
+([Target evidence closure](TARGET_EVIDENCE_CLOSURE.md)). A `user-outcome` pass
+remains the release-behavior verdict and is not current-revision qualification.
 
 ## Stable observations
 
@@ -67,7 +72,7 @@ A case may declare:
 
 ## LLM integrity is a hard gate
 
-Fallback recovery cannot hide an incomplete LLM call. A case fails when any
+No fallback can hide an incomplete LLM call. A case fails when any
 critical stage records:
 
 - input or prompt truncation;
@@ -77,9 +82,11 @@ critical stage records:
 - request timeout or deadline exhaustion.
 
 These failures are distinct from ordinary semantic or contract diagnostics. A
-schema-valid but semantically wrong model answer may be recovered and diagnosed;
-a truncated or timed-out call is always incomplete evidence and therefore
-fails the end-to-end case.
+schema-valid but semantically wrong model answer is diagnosed, never repaired by a
+later call or fallback path (Charter principle 33); the case is judged on what the
+user actually received, and an observed Goal omission or other hard failure fails
+it ([Acceptance](ACCEPTANCE.md)). A truncated or timed-out call is always incomplete
+evidence and therefore fails the end-to-end case.
 
 The acceptance summary stores:
 
@@ -100,8 +107,9 @@ The acceptance summary stores:
 
 ## Qualification budgets
 
-The architecture-validation profile deliberately uses long budgets so the first
-question is whether the model and architecture can complete correctly:
+The architecture-validation overlay (`env/validation/architecture.env`) deliberately
+uses long budgets so the first question is whether the model and architecture can
+complete correctly:
 
 - 120 seconds for critical Agent model stages;
 - 150 seconds for corresponding host waits;
@@ -109,7 +117,10 @@ question is whether the model and architecture can complete correctly:
 - 1200 seconds for the outer live case;
 - 120 seconds for supervised skill execution.
 
-These are qualification budgets, not production latency targets. Once repeated
+The qualification operator mode (`env/modes/qualification.env`) instead allows 900
+seconds for the pipeline ([Acceptance](ACCEPTANCE.md)); a run is judged against the
+budget of the configuration it retained. These are qualification budgets, not
+production latency targets. Once repeated
 correctness is retained, latency can be optimized under a separate performance
 qualification without weakening the integrity gate.
 

@@ -601,6 +601,12 @@ def _social_response_timing_evidence(summary: dict[str, Any]) -> dict[str, Any]:
         },
         "derived": {
             "sc_decision_ms": interval(social_start, social_finish),
+            # INTERACTION-LATENCY-001 anchor: validated UMI handoff to the
+            # first valid Social Cognition commitment (includes Host/queue wait).
+            "umi_handoff_to_sc_commitment_ms": interval(
+                interpretation_done,
+                social_finish,
+            ),
             "sc_to_tts_schedule_ms": interval(social_finish, tts_schedule),
             "sc_to_first_provider_pcm_ms": interval(
                 social_finish,
@@ -881,18 +887,18 @@ def validate_live_text_result(
     summary["social_response_timing_evidence"] = timing_evidence
     timing_derived = timing_evidence["derived"]
     if case.max_warm_sc_decision_ms > 0:
-        planner_commit_ms = timing_derived["sc_decision_ms"]
+        handoff_to_commitment_ms = timing_derived["umi_handoff_to_sc_commitment_ms"]
         if (
             timing_evidence["social_cognition_status"] not in {"accepted", "resolved"}
-            or planner_commit_ms is None
+            or handoff_to_commitment_ms is None
         ):
             errors.append(
-                "Social Cognition decision timing is missing"
+                "UMI handoff to Social Cognition commitment timing is missing"
             )
-        elif planner_commit_ms > case.max_warm_sc_decision_ms:
+        elif handoff_to_commitment_ms > case.max_warm_sc_decision_ms:
             errors.append(
-                "Social Cognition decision exceeded target: "
-                f"{planner_commit_ms:.1f}ms > "
+                "UMI handoff to Social Cognition commitment exceeded target: "
+                f"{handoff_to_commitment_ms:.1f}ms > "
                 f"{case.max_warm_sc_decision_ms:.1f}ms"
             )
     if (

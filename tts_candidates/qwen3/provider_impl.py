@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import time
 from multiprocessing.connection import Connection
 from pathlib import Path
@@ -12,6 +11,7 @@ from typing import Any
 
 from candidate_provider import WorkerBackedCandidateProvider
 from provider import TTSModelArtifact, TTSProviderCapabilities
+from settings import TTSCandidateSettings, required_text
 from streaming_worker import StreamingProcessWorker
 
 
@@ -22,18 +22,10 @@ DEFAULT_MODEL_ID = "Qwen/Qwen3-TTS-12Hz-0.6B-Base"
 DEFAULT_MODEL_REVISION = "5d83992436eae1d760afd27aff78a71d676296fc"
 
 
-def required_env(name: str, default: str | None = None) -> str:
-    value = str(os.getenv(name, default or "")).strip()
-    if not value:
-        raise RuntimeError(f"{name} is required")
-    return value
-
-
 def reference_metadata() -> tuple[Path, str, str, str]:
-    wav_path = Path(required_env("TTS_REFERENCE_WAV", "/evaluation/reference.wav"))
-    metadata_path = Path(
-        required_env("TTS_REFERENCE_METADATA", "/evaluation/reference.json")
-    )
+    settings = TTSCandidateSettings.from_env()
+    wav_path = settings.reference_wav
+    metadata_path = settings.reference_metadata
     if not wav_path.is_file() or not metadata_path.is_file():
         raise RuntimeError(
             "TTS reference is missing; install it with scripts/tts_reference.py"
@@ -78,19 +70,19 @@ def worker_target(connection: Connection) -> None:
         from huggingface_hub import snapshot_download
         from qwen_tts import Qwen3TTSModel
 
-        model_id = required_env("QWEN3_TTS_MODEL_ID", DEFAULT_MODEL_ID)
-        model_revision = required_env(
+        model_id = required_text("QWEN3_TTS_MODEL_ID", DEFAULT_MODEL_ID)
+        model_revision = required_text(
             "QWEN3_TTS_MODEL_REVISION", DEFAULT_MODEL_REVISION
         )
         wav_path, ref_text, ref_sha, _ref_license = reference_metadata()
         model_path = snapshot_download(repo_id=model_id, revision=model_revision)
-        dtype_name = required_env("QWEN3_TTS_DTYPE", "bfloat16")
+        dtype_name = required_text("QWEN3_TTS_DTYPE", "bfloat16")
         dtype = getattr(torch, dtype_name)
         model = Qwen3TTSModel.from_pretrained(
             model_path,
-            device_map=required_env("QWEN3_TTS_DEVICE", "cuda:0"),
+            device_map=required_text("QWEN3_TTS_DEVICE", "cuda:0"),
             dtype=dtype,
-            attn_implementation=required_env("QWEN3_TTS_ATTENTION", "sdpa"),
+            attn_implementation=required_text("QWEN3_TTS_ATTENTION", "sdpa"),
         )
         voice_prompt = model.create_voice_clone_prompt(
             ref_audio=str(wav_path),
@@ -111,7 +103,7 @@ def worker_target(connection: Connection) -> None:
         connection.send({"type": "error", "message": f"Qwen startup failed: {exc}"})
         return
 
-    chunk_ms = int(os.getenv("TTS_TRANSPORT_CHUNK_MS", "120"))
+    chunk_ms = TTSCandidateSettings.from_env().transport_chunk_ms
     while True:
         payload = connection.recv()
         if payload.get("type") == "shutdown":
@@ -155,11 +147,11 @@ def worker_target(connection: Connection) -> None:
 
 def create_provider() -> WorkerBackedCandidateProvider:
     _wav_path, _ref_text, ref_sha, ref_license = reference_metadata()
-    software_revision = required_env(
+    software_revision = required_text(
         "QWEN3_TTS_SOURCE_REVISION", DEFAULT_SOFTWARE_REVISION
     )
-    model_id = required_env("QWEN3_TTS_MODEL_ID", DEFAULT_MODEL_ID)
-    model_revision = required_env("QWEN3_TTS_MODEL_REVISION", DEFAULT_MODEL_REVISION)
+    model_id = required_text("QWEN3_TTS_MODEL_ID", DEFAULT_MODEL_ID)
+    model_revision = required_text("QWEN3_TTS_MODEL_REVISION", DEFAULT_MODEL_REVISION)
     capabilities = TTSProviderCapabilities(
         provider_id=PROVIDER_ID,
         implementation="Qwen3-TTS transformers",
@@ -190,25 +182,16 @@ def create_provider() -> WorkerBackedCandidateProvider:
         speaker_profiles=True,
         voice_cloning=True,
     )
+    settings = TTSCandidateSettings.from_env()
     worker = StreamingProcessWorker(
         worker_target,
         name="qwen3-tts-worker",
-        startup_timeout_s=float(os.getenv("TTS_WORKER_STARTUP_TIMEOUT_SEC", "1200")),
-        cancel_drain_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC", "3")
-        ),
-        first_audio_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_FIRST_AUDIO_TIMEOUT_SEC", "20")
-        ),
-        request_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_REQUEST_TIMEOUT_SEC", "60")
-        ),
-        cold_first_audio_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_COLD_FIRST_AUDIO_TIMEOUT_SEC", "180")
-        ),
-        cold_request_timeout_s=float(
-            os.getenv("TTS_CANDIDATE_COLD_REQUEST_TIMEOUT_SEC", "240")
-        ),
+        startup_timeout_s=settings.worker_startup_timeout_s,
+        cancel_drain_timeout_s=settings.cancel_drain_timeout_s,
+        first_audio_timeout_s=settings.first_audio_timeout_s,
+        request_timeout_s=settings.request_timeout_s,
+        cold_first_audio_timeout_s=settings.cold_first_audio_timeout_s,
+        cold_request_timeout_s=settings.cold_request_timeout_s,
     )
     return WorkerBackedCandidateProvider(
         capabilities=capabilities,

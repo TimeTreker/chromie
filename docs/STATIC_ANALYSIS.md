@@ -66,8 +66,9 @@ contract rather than suppressing those errors or falsely treating them as new
 vocal-Issue regressions.
 
 The 2026-09-12 owner-authorized continuation activates the complete contract
-package after the fresh 30-module diagnostic passed. The scope contains 33 current
-Python files: 30 contracts and three tools. No module, import or diagnostic is
+package after the fresh 30-module diagnostic passed. `scripts/run_mypy.py` expands the
+package recursively, so the scope now contains 37 Python files: 34 contracts and three
+tools. No module, import or diagnostic is
 ignored to obtain this expansion. Further Orchestrator expansion remains queued
 until independently owned runtime boundaries are ready.
 

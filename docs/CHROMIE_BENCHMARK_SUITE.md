@@ -402,10 +402,14 @@ model identity when practical and use the same evidence capsule and rubric for
 every candidate. A reviewer must not judge its own production output when an
 independent reviewer is available. One LLM reviewer, including an interactive
 coding session, is useful diagnostic evidence when its identity and limitation
-are retained; it is not independent semantic closure. Model-selection or
-release claims require the declared independent human or multi-model review
-policy, and disagreements remain visible rather than being rewritten into a
-static answer key.
+are retained; it is not independent semantic closure. The declared independent
+multi-model policy (§7.3.1) or a human reviewer may close the semantic dimensions
+of a development or current-revision cohort. Model-selection and release claims
+additionally require human approval of the retained evidence
+([E2E execution](E2E_BENCHMARK_EXECUTION.md), stress `release_qualification`);
+a model consensus never substitutes for it. A human review is recorded as human
+review, not relabelled as the automated external adjudication a profile declares.
+Disagreements remain visible rather than being rewritten into a static answer key.
 
 Candidate cohorts may remain local evidence while they are being explored.
 Promotion into a maintained dataset requires normal scenario review,
@@ -805,7 +809,7 @@ actions.
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md) owns the
   development loop from observed interaction to retained scenario.
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)
-  owns current evidence levels and ability-class qualification.
+  owns ability-class qualification; [Acceptance](ACCEPTANCE.md) owns evidence levels.
 - [Acceptance](ACCEPTANCE.md) owns release and target evidence claims.
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md) owns conventional test
   hygiene and duplicate removal.

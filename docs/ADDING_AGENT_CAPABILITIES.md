@@ -71,8 +71,11 @@ feature.
 
 2. **Expose the capability in the registry.**
    - Add an `AgentManifest` and `ToolCapability` in
-     `agent/app/capabilities/local.py`, or provide an external manifest through
-     `AGENT_CAPABILITY_MANIFESTS`.
+     `agent/app/capabilities/local.py`. An external manifest supplied through
+     `AGENT_CAPABILITY_MANIFESTS` adds catalog entries for a remote provider
+     such as Soridormi (MCP transport); it cannot make a Chromie-side local tool
+     executable, because local execution needs a trusted handler (see "Bind
+     execution to the owning Provider").
    - Give it a stable globally unique name such as `chromie.weather.lookup`.
    - Include a semantic description, not phrase rules.
    - Include an `input_schema` with units, enums, ranges, required fields, and
@@ -88,6 +91,13 @@ feature.
    - `effects` should describe what the capability does, for example
      `read_only`, `external_read`, or `weather_lookup`.
    - `safety_class` should be `safe_read` for read-only lookups.
+   - The Trusted Capability Runtime registers a local tool only when all of
+     these hold (`orchestrator/runtime/agent_tool_provider.py`
+     `local_agent_tool_definitions`): transport `local_python`,
+     `llm_hints.interaction_executable = true`, `safety_class = "safe_read"`,
+     `execution.side_effect_free = true`, and no required confirmation. A tool
+     that misses any of them stays in the catalog but is silently not
+     registered for execution, and `LocalToolExecutor` refuses it.
    - Put common, safe, frequently requested tools in the `common` prompt tier by
      setting `llm_hints.prompt_tier = "common"` or adding the capability to
      `capabilities/prompt_tiers.json`.
@@ -98,6 +108,9 @@ feature.
      compact pre-result truth constraints for a Social Cognition Communicative Activity.
 
 4. **Bind execution to the owning Provider.**
+   - A local tool runs only through a handler registered by exact capability
+     ID in `LocalToolExecutor._handlers` (`agent/app/local_tool_execution.py`);
+     without one the call returns `provider_not_bound`.
    - The execution adapter must require an exact plan-selected `capability_id`
      and schema-valid arguments; it must not infer a call from route, intent, or
      user-text phrases.
@@ -133,10 +146,17 @@ feature.
      reconciliation, and unsupported or partial work fails honestly.
 
 8. **Audit the authoritative contract.**
-   - Run `python -m tools.chromie_cli capability check` for static validation.
-   - When the provider is available, run
-     `python -m tools.chromie_cli capability check --live` and review missing,
-     extra, and schema-drift findings.
+   - For a Chromie-side local tool, the registry, provider, and execution tests
+     listed under "Add tests" are the audit (for example `tests/test_agent_tool_provider.py`
+     and `tests/test_local_tool_execution.py`).
+     `python -m tools.chromie_cli capability check` validates one JSON
+     manifest (`capabilities/soridormi.json` by default) and does not load or
+     check local tools.
+   - For an external provider manifest, run
+     `python -m tools.chromie_cli capability check` for static validation and,
+     when the provider is available,
+     `python -m tools.chromie_cli capability check --live`, then review
+     missing, extra, and schema-drift findings.
    - Do not treat a provider's extra advertised tools as registered Chromie
      abilities. The manifest and live provider must be intentionally aligned
      before those tools can enter planning or execution.
@@ -162,7 +182,11 @@ safety_class: safe_read
 prompt_tier: common
 ```
 
-Its schema exposes `location`, `date`, and `units`. Goal Association preserves
+Its schema exposes `location` (required), optional `location_context`,
+`date` (`today` or `tomorrow`), `period` (`day`, `morning`, `afternoon`,
+`evening`, or `night`), and `units`. Its `llm_hints` also set
+`interaction_executable: true`, and its execution policy sets
+`side_effect_free: true`. Goal Association preserves
 the weather Goal and its continuity; the Planner may
 select `chromie.weather.lookup` only when the catalog and Goal require it. The
 Provider returns structured weather evidence, and only the evidence-bound

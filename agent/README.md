@@ -146,7 +146,9 @@ Goal Association keeps one semantic authority while separating implementation co
 
 The primary GA result contains `associations` and `new_goals`. A new-Goal row
 contains only `source_responsibility_refs`, `related_goal_ids`, and
-`supersedes_goal_ids`; Host copies UMI WHAT and GA relationship choices unchanged.
+`supersedes_goal_ids`: it is GA's report that the Responsibility has no retained
+association, and trusted code materializes the new Goal's identity, copying UMI
+WHAT and GA relationship choices unchanged.
 Only open supplied Goals can be superseded. Terminal Goals remain historical
 context. The former unassociated-ref-only collection is retired. GA does not
 require UMI to pre-extract media operations; Planner owns those arguments.
