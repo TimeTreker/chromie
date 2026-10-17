@@ -118,7 +118,7 @@ def _optional_path(
 
 def _device(values: Mapping[str, str], name: str) -> int | str | None:
     raw = _text(values, name, "")
-    if not raw or raw.casefold() in {"default", "system", "system_default", "none"}:
+    if not raw or raw.casefold() in {"auto", "default", "system", "system_default", "none"}:
         return None
     try:
         return int(raw)
@@ -183,6 +183,26 @@ class AudioDeviceSettings:
     output_block_ms: int
     output_blocksize: int
     output_latency: str
+
+    @classmethod
+    def from_env(
+        cls, values: Mapping[str, str] | None = None
+    ) -> "AudioDeviceSettings":
+        values = os.environ if values is None else values
+        return cls(
+            input_device=_device(values, "ORCH_INPUT_DEVICE"),
+            output_device=_device(values, "ORCH_OUTPUT_DEVICE"),
+            input_rate=_optional_int(values, "ORCH_INPUT_RATE", minimum=1),
+            input_channels=_int(values, "ORCH_INPUT_CHANNELS", 1, minimum=1),
+            input_block_ms=_int(values, "ORCH_INPUT_BLOCK_MS", 30, minimum=1),
+            input_blocksize=_int(values, "ORCH_INPUT_BLOCKSIZE", 0, minimum=0),
+            input_latency=_text(values, "ORCH_INPUT_LATENCY", "low") or "low",
+            output_rate=_optional_int(values, "ORCH_OUTPUT_RATE", minimum=1),
+            output_channels=_int(values, "ORCH_OUTPUT_CHANNELS", 2, minimum=1),
+            output_block_ms=_int(values, "ORCH_OUTPUT_BLOCK_MS", 30, minimum=1),
+            output_blocksize=_int(values, "ORCH_OUTPUT_BLOCKSIZE", 0, minimum=0),
+            output_latency=_text(values, "ORCH_OUTPUT_LATENCY", "low") or "low",
+        )
 
 
 @dataclass(frozen=True)
@@ -524,20 +544,7 @@ class HostSettingsSnapshot:
                     minimum=1000,
                 ),
             ),
-            audio_device=AudioDeviceSettings(
-                input_device=_device(values, "ORCH_INPUT_DEVICE"),
-                output_device=_device(values, "ORCH_OUTPUT_DEVICE"),
-                input_rate=_optional_int(values, "ORCH_INPUT_RATE", minimum=1),
-                input_channels=_int(values, "ORCH_INPUT_CHANNELS", 1, minimum=1),
-                input_block_ms=_int(values, "ORCH_INPUT_BLOCK_MS", 30, minimum=1),
-                input_blocksize=_int(values, "ORCH_INPUT_BLOCKSIZE", 0, minimum=0),
-                input_latency=_text(values, "ORCH_INPUT_LATENCY", "low") or "low",
-                output_rate=_optional_int(values, "ORCH_OUTPUT_RATE", minimum=1),
-                output_channels=_int(values, "ORCH_OUTPUT_CHANNELS", 2, minimum=1),
-                output_block_ms=_int(values, "ORCH_OUTPUT_BLOCK_MS", 30, minimum=1),
-                output_blocksize=_int(values, "ORCH_OUTPUT_BLOCKSIZE", 0, minimum=0),
-                output_latency=_text(values, "ORCH_OUTPUT_LATENCY", "low") or "low",
-            ),
+            audio_device=AudioDeviceSettings.from_env(values),
             cognition=CognitionSettings(
                 llm_url=_text(
                     values, "LLM_URL", "http://localhost:11434/api/generate"

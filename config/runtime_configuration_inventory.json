@@ -227,7 +227,6 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "orchestrator/clients/agent_client.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2457,7 +2456,6 @@
       "owners": [
         ".env.common",
         "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/session.py",
         "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
@@ -2534,7 +2532,6 @@
       "category": "service_internal",
       "key": "ORCH_INPUT_BLOCKSIZE",
       "owners": [
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2544,7 +2541,6 @@
       "key": "ORCH_INPUT_BLOCK_MS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2554,7 +2550,6 @@
       "key": "ORCH_INPUT_CHANNELS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2564,7 +2559,6 @@
       "key": "ORCH_INPUT_DEVICE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2582,7 +2576,6 @@
       "key": "ORCH_INPUT_LATENCY",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2592,7 +2585,6 @@
       "key": "ORCH_INPUT_RATE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2611,8 +2603,7 @@
       "category": "service_internal",
       "key": "ORCH_MIND_CONTEXT_MAX_CHARS",
       "owners": [
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/mind.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2620,8 +2611,7 @@
       "category": "service_internal",
       "key": "ORCH_MIND_PROFILE_PATH",
       "owners": [
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/mind.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2655,7 +2645,6 @@
       "category": "service_internal",
       "key": "ORCH_OUTPUT_BLOCKSIZE",
       "owners": [
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2665,7 +2654,6 @@
       "key": "ORCH_OUTPUT_BLOCK_MS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2675,7 +2663,6 @@
       "key": "ORCH_OUTPUT_CHANNELS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py",
         "scripts/voice_acceptance.py"
       ]
@@ -2686,7 +2673,6 @@
       "key": "ORCH_OUTPUT_DEVICE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py",
         "scripts/voice_acceptance.py"
       ]
@@ -2697,7 +2683,6 @@
       "key": "ORCH_OUTPUT_LATENCY",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2707,7 +2692,6 @@
       "key": "ORCH_OUTPUT_RATE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2886,8 +2870,7 @@
       "category": "service_internal",
       "key": "ORCH_SOCIAL_INTERACTION_STYLE_PRESET",
       "owners": [
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/mind.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {

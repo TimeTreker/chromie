@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, AsyncIterator
 from urllib.parse import quote
 
@@ -71,11 +70,8 @@ class AgentClient:
             100,
             int(effective_user_meaning_interpreter_timeout_ms),
         )
-        self.dag_engine_execution_token = (
-            str(dag_engine_execution_token).strip()
-            if dag_engine_execution_token is not None
-            else os.getenv("AGENT_DAG_ENGINE_EXECUTION_TOKEN", "").strip()
-        )
+        # Host settings own AGENT_DAG_ENGINE_EXECUTION_TOKEN and pass it in.
+        self.dag_engine_execution_token = str(dag_engine_execution_token or "").strip()
 
 
     async def review_attention(

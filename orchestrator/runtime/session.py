@@ -101,12 +101,12 @@ class SessionEventWriter:
     """Append session events as JSON Lines for acceptance evidence.
 
     The writer is intentionally dependency-free and best-effort: evidence
-    capture must never crash the realtime voice loop. The path is supplied by
-    ``ORCH_EVENT_LOG_PATH`` or directly in tests/embedding code.
+    capture must never crash the realtime voice loop. Host settings resolve
+    ``ORCH_EVENT_LOG_PATH`` and pass the path in; no path disables the writer.
     """
 
     def __init__(self, path: str | os.PathLike[str] | None = None) -> None:
-        raw = str(path or os.getenv("ORCH_EVENT_LOG_PATH", "")).strip()
+        raw = str(path or "").strip()
         self.path = Path(raw).expanduser().resolve() if raw else None
         self._lock = threading.Lock()
         if self.path is not None:
