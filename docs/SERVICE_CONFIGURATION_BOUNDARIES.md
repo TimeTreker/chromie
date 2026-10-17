@@ -47,6 +47,15 @@ model-source environment surface. `tts/server.py`, `tts/candidate_server.py`,
 and `tts/model_sources.py` receive one typed snapshot
 instead of reparsing environment values independently. Invalid ports, ranges,
 booleans, and missing immutable model references fail with the owning key.
+`tts.settings.TTSCandidateSettings` owns the worker-backed provider images
+(the default CosyVoice provider and the Qwen3 candidate under `tts_candidates/`):
+voice catalog root and default speaker, legacy reference paths, transport chunk
+size, and worker startup/request timeouts. Their provider model-source keys
+(`COSYVOICE3_*`, `QWEN3_TTS_*`) are read through `tts.settings.required_text` and
+`tts.settings.required_boolean`. `TTS_WORKER_STARTUP_TIMEOUT_SEC` has one parser
+in `tts/settings.py`; only its default differs between the Oute server (`600`) and
+the provider images (`1200`). `scripts/check_service_configuration_ownership.py`
+scans `tts_candidates/` as well as `tts/`.
 
 `agent.app.settings` now owns the Agent service and User Meaning Interpreter startup
 surfaces. Main composition, model clients, weather, capability planning,

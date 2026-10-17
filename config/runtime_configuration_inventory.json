@@ -3430,35 +3430,32 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_CANDIDATE_CANCEL_DRAIN_TIMEOUT_SEC",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts_candidates/cosyvoice/provider_impl.py",
-        "tts_candidates/qwen3/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_CANDIDATE_COLD_FIRST_AUDIO_TIMEOUT_SEC",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts_candidates/cosyvoice/provider_impl.py",
-        "tts_candidates/qwen3/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_CANDIDATE_COLD_REQUEST_TIMEOUT_SEC",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts_candidates/cosyvoice/provider_impl.py",
-        "tts_candidates/qwen3/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -3471,24 +3468,22 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_CANDIDATE_FIRST_AUDIO_TIMEOUT_SEC",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts_candidates/cosyvoice/provider_impl.py",
-        "tts_candidates/qwen3/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_CANDIDATE_REQUEST_TIMEOUT_SEC",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts_candidates/cosyvoice/provider_impl.py",
-        "tts_candidates/qwen3/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -3583,12 +3578,12 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_DEFAULT_SPEAKER",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts_candidates/cosyvoice/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -3920,7 +3915,7 @@
       "key": "TTS_TRANSPORT_CHUNK_MS",
       "owners": [
         "docker-compose.yml",
-        "tts_candidates/qwen3/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -3937,12 +3932,12 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_VOICE_ROOT",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts_candidates/cosyvoice/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -3958,14 +3953,12 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "TTS_WORKER_STARTUP_TIMEOUT_SEC",
       "owners": [
         ".env.common",
         "docker-compose.yml",
-        "tts/settings.py",
-        "tts_candidates/cosyvoice/provider_impl.py",
-        "tts_candidates/qwen3/provider_impl.py"
+        "tts/settings.py"
       ]
     },
     {
@@ -4072,9 +4065,9 @@
     "category_counts": {
       "acceptance_override": 30,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 118,
+      "profile_constant": 110,
       "public_choice": 9,
-      "service_internal": 232
+      "service_internal": 240
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
