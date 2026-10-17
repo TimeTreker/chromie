@@ -69,20 +69,22 @@ Each process has its own arbiter. It is not a distributed lock and cannot coordi
 Agent and Orchestrator processes by itself. Cross-process robot exclusivity remains
 Soridormi's responsibility.
 
-## Development install
+## Import root
 
-From the repository root:
-
-```bash
-pip install -e shared
-```
+The Host, the Agent image and the tests all import these packages from the
+repository root as `shared.chromie_contracts` and `shared.chromie_runtime`; the
+Agent image copies them to `/app/shared/`. Do not `pip install -e shared`: that
+installs them under the top-level names `chromie_contracts` and
+`chromie_runtime`, and a process that imports both roots gets duplicate Pydantic
+classes. `shared/pyproject.toml` only declares the Python floor and the exact
+dependency pins that release provenance checks.
 
 Example imports:
 
 ```python
-from chromie_contracts.interaction import InteractionResponse, CapabilityRequest
-from chromie_contracts.core_interpretation import CognitiveWorkRequest
-from chromie_runtime import ResourceArbiter
+from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
+from shared.chromie_runtime import ResourceArbiter
 ```
 
 Run the repository test suite after changing a contract because compatibility,

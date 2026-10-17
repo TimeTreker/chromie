@@ -17,8 +17,8 @@ if [[ "${3:-}" == "--make-default" ]] || [[ "${3:-}" == "1" ]] || [[ "${3:-}" ==
   MAKE_DEFAULT="1"
 fi
 
-# This helper is specific to the optional OuteTTS fallback. CosyVoice uses
-# scripts/tts_reference.py to install its authorized reference voice.
+# This helper is specific to the optional OuteTTS fallback. CosyVoice reads
+# the Git-controlled voice catalog in assets/tts/voices.
 # This uses the exact-transcript validation and pinned Whisper alignment path
 # built into tts/server.py. The runtime image supplies FFmpeg for decoding.
 docker compose --env-file .env.runtime -f docker-compose.yml --profile tts-evaluation exec -T \
