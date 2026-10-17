@@ -2,10 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import multiprocessing
+import sys
 import time
 import unittest
+from pathlib import Path
 
-from tts.cancellable_worker import RestartableProcessWorker
+# The TTS image runs these modules as top-level siblings; mirror that layout.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tts"))
+
+from cancellable_worker import RestartableProcessWorker  # noqa: E402
 
 
 def _fake_generation_worker(connection) -> None:

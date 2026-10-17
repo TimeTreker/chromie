@@ -364,6 +364,7 @@ def collect_provenance(
         "tts/Dockerfile",
         "tts/candidate_server.py",
         "tts/candidate_provider.py",
+        "tts/process_worker.py",
         "tts/streaming_worker.py",
         "tts_candidates/cosyvoice/Dockerfile",
         "tts_candidates/cosyvoice/provider_impl.py",
