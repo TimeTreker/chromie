@@ -64,7 +64,8 @@ authority, or failure semantics become clearer. See the size-review policy in
   retained and the default target-evidence profile closes, do not add product
   features, new architecture, new runtime switches, or new terminology unless
   the change directly closes those prerequisites or a demonstrated
-  safety/provenance blocker.
+  safety/provenance blocker. Root-cause repairs for the active Issue inside the
+  existing architecture are not growth and remain allowed.
 - When a delivery commit changes behavior, evidence, blockers or resume state,
   update `docs/STATUS.md`, `DEVELOPMENT_CHECKPOINT.md` and `HANDOFF.md` in that
   same commit by replacing their current sections: implemented scope, evidence
@@ -164,9 +165,11 @@ authority, or failure semantics become clearer. See the size-review policy in
   before selecting a fix. A focused `--only-case`/`--case` run is allowed after
   aggregate diagnosis to test one proposed change; rerun the complete cohort on
   the changed revision before another broad change or any revision-level claim.
-  A hard safety, provenance, service-integrity, or safe-idle failure may stop the
-  cohort early; retain one bundle at that stop and report the cohort as
-  incomplete rather than silently continuing or treating it as a pass.
+  A hard integrity failure stops the cohort before the next case, as the runner
+  does ([Acceptance](docs/ACCEPTANCE.md)): safety or safe-idle, provenance or Goal
+  omission, service, structured Runtime/model-contract, LLM-integrity or harness
+  failure. Retain one bundle at that stop and report the cohort as incomplete
+  rather than silently continuing or treating it as a pass.
 - Keep microphone, VAD, playback, interruption, conversation state, and Trusted
   Capability Runtime coordination in the host Orchestrator.
 - Keep embodied planning, execution, resource safety, stop/emergency behavior,
