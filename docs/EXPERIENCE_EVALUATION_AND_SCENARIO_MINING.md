@@ -153,7 +153,7 @@ uses deepthinking because the job needs slow semantic judgment over an entire
 thread:
 
 - infer the user's likely intent from the turn and prior context;
-- compare canonical Goal meaning, Planner speech/work, selected skills, and execution against that intent;
+- compare canonical Goal meaning, Planner Work, Social Cognition speech, selected skills, and execution against that intent;
 - notice when the robot used a social/body fallback for an unrelated task;
 - separate ASR, User Meaning Interpreter, Agent, Trusted Capability Runtime, TTS, and latency problems;
 - recommend whether the episode should become a regression scenario.

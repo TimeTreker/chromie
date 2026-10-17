@@ -117,7 +117,7 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 - **当前架构基线**：同一轮被接纳的含义（UMI 的 Responsibility / WHAT）同时进入
   Social Cognition、Goal Association 与 Planner：SC 决定是否、何时、如何交流；
   GA 唯一拥有 canonical Goal continuity；唯一的 Planner 负责 HOW 与 Work
-  （先声明 ability_needs，必要时检索能力库后再规划一次，Deep Planner 已退役）；
+  （先声明 ability_needs，必要时检索能力库后再规划一次）；
   Value Judgment 审查列入审查清单的效果；Trusted Capability Runtime 与 Provider
   执行并产生 Evidence，Evidence 再回流到 Planner 与 SC。UMI 的快速/深度两档只有
   认知深度差异，均不得写回复文本、创建 Work/Activity 或选择 Capability。

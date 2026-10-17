@@ -109,7 +109,7 @@ cancellation, result meaning and body recovery; Planner-owned WorkDAG with a
 mechanical DAGEngine; Continuous Mind wake/re-entry, bounded Situation,
 structured time conditions and context-activated Memory; layered prompt prefixes;
 semantic authority closure (`apply` is the only authoritative semantic path);
-the need-first one-Planner contract with the Deep Planner retired; and Value
+the need-first one-Planner contract; and Value
 Judgment.
 
 These foundations are maintained only while their automated contracts remain

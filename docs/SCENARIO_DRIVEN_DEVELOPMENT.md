@@ -188,7 +188,7 @@ User: 往前走十五秒，同时眨眼。
 Required assertions:
 
 - walking and blinking both remain in the semantic goal;
-- fast planning cannot execute only walking;
+- the Planner cannot execute only walking;
 - the Planner keeps the original utterance and can load any missing contract through need-first search;
 - low-consequence blink count may be model-resolved within schema;
 - unsupported concurrency produces a complete alternative;

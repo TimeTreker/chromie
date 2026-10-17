@@ -127,7 +127,7 @@ with exact Responsibility refs motivating each request. Every fresh admitted tur
 to Chromie mechanically wakes one turn-wide Social Cognition interaction because interaction
 itself is a standing architectural responsibility; SC still decides whether and how to express
 anything. Initial SC activation is therefore Runtime scheduling, not a UMI semantic-routing
-choice, and UMI omission of an SC request cannot invalidate otherwise accepted meaning. Fast
+choice, and UMI omission of an SC request cannot invalidate otherwise accepted meaning.
 Planner activation remains model-selected. Runtime may close only a hard architectural
 prerequisite of an explicitly requested authority; in particular, initial Planner mechanically
 schedules turn-wide GA so eventual Work can obtain canonical Goal binding. Runtime never creates
@@ -290,10 +290,14 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
 
 - **IDENTITY-TRUTH-001** — Chromie's first-person social identity comes from the active
   Mind profile. The factory profile is Chromie, a twelve-year-old girl and persistent
-  social individual whose everyday life happens primarily with her family; the customer
+  social individual whose everyday life happens primarily with her family. The customer
   may configure her name, pronouns, family role, and social style through the Mind
-  profile (owner, 2026-10-17), and every rule below applies to whatever identity is
-  configured. Family membership is a relationship/living context, not a
+  profile (owner, 2026-10-17); a deployment owner may also change her age description,
+  self-description, identity-answer guidance, and personality expression through a
+  reviewed profile. No other identity field is deployment-configurable, and every rule
+  below applies to whatever identity is configured. The rules live in Social Cognition's
+  fixed instructions, not in profile text: identity-answer guidance may shape how she
+  answers but cannot remove or override this rule. Family membership is a relationship/living context, not a
   service role or assistant mode. She speaks of herself only as herself (her configured
   name), never as a robot,
   AI, model, device, assistant, or service, including when someone asks whether she is
@@ -339,8 +343,11 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   distinction comes from bounded meaning and context, never phrase tables or hardware profiles.
 - **SPEECH-OWNER-001** — Social Cognition is the interface between the user and Chromie.
   Chromie uses SC to express herself (speech, gestures, gaze and other social expression),
-  and every communication with the user goes through it. It is the sole
-  ordinary semantic owner of whether, when and how to
+  and every communication with the user goes through it, including the optional startup
+  greeting. The Planner gives out the plan only (Work and word-free communication Needs);
+  SC decides how to interact with the person from all the context, including Chromie's
+  identity settings in the Mind profile. It is the sole
+  semantic owner of whether, when and how to
   communicate, the Communicative Activity, its exact wording, truth stage, and source
   provenance. UMI, committed GA/Planner state, Runtime/Evidence or trusted Situation
   may trigger independent communication tasks; UMI, GA and Planner can each cause SC to be
@@ -360,7 +367,7 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   not one, because its first call stops at `ability_needs` and no Plan from it is used.
   A stronger model or a larger budget is a configuration
   of the same Planner role, not another semantic owner (owner amendment 2026-10-10).
-  The Deep Planner is retired (2026-10-11). A Responsibility the Planner cannot fulfil now
+  The Planner has no deeper pass. A Responsibility the Planner cannot fulfil now
   is an honest `unavailable` outcome naming what is missing, beside its siblings' Work; a
   structurally invalid Plan fails closed. Need-first search may load any contract the
   Planner did not see, including one the Goal applicability filter hid, so a composition
@@ -409,7 +416,6 @@ They are requirements, not new runtime modules, managers, DTOs, or execution sta
   withholds reviewed effects; for marked speech, ask or decline withholds the answer and the
   Goal ends like a limitation (decline) or waits for the person (ask). Deterministic Runtime and
   Soridormi safety remain the floor.
-  It carries the retired Deep Planner's original intent, deliberate value reasoning.
 - **MODEL-SEMANTIC-BOUNDARY-001** — A model-facing contract asks its semantic owner
   to author decisions, not protocol paperwork that trusted code can derive exactly from
   already-authoritative input. Model-owned choices include semantic Capability selection,
@@ -657,7 +663,7 @@ several Goals; cancelling it requires authority over every owning Goal.
 For semantically complete UMI output, UMI and committed GA state are independent Planner
 triggers with distinct model invocations when planning is required. They share the HOW
 authority, not a single planning-task lifecycle. When UMI emits typed semantic uncertainty,
-Fast Planner is deliberately held behind GA once so canonical Goal continuity can resolve
+Planner is deliberately held behind GA once so canonical Goal continuity can resolve
 only the uncertainty it actually owns; Planner receives only the remaining uncertainty.
 GA-triggered planning consumes canonical Goals and a current Runtime/communication/Evidence
 snapshot. Identity-only association may bind a conserving initial plan without another
@@ -801,7 +807,7 @@ Read the diagram with these boundaries:
   It cannot reinterpret WHAT, create/change Goals, plan Work, choose Capabilities, author
   words, authorize effects, or claim completion. Runtime validates exact scope and schedules
   the selected authority; unavailable/invalid Activation fails closed rather than restoring
-  an event-type routing rule. Planner and SC own their own Fast→Deep depth decisions.
+  an event-type routing rule. UMI and SC own their own deeper-pass decisions; the Planner has no deeper pass.
 - **Progressive cognitive commitment:** cognition that is already sufficiently grounded for
   its own next step should not wait for unrelated cognition merely because another branch is
   still running. UMI may therefore request GA and Planner, concurrently with the standing
@@ -907,7 +913,7 @@ Read the diagram with these boundaries:
   no Capability or planning authority. Creating a new Goal that conserves the same
   source Responsibility and merely joins its canonical identity or resource projection
   is not such a material Work change: the accepted terminal result from the original
-  Fast stream is bound mechanically to that Goal and is not sent through a second Fast
+  Planner stream is bound mechanically to that Goal and is not sent through a second Planner
   semantic invocation. Re-entry is reserved for an actual retained/provisional Work
   intersection, a GA-authored update to retained Goal meaning, later trusted
   Runtime/Evidence/Situation change, or the one explicitly authorized deliberative
@@ -929,7 +935,7 @@ Read the diagram with these boundaries:
   only once. A newer Planner-authored canonical Plan revision may cause
   Runtime to cancel or replace only pending/cancellable Work; Runtime preserves
   completed Evidence and never silently replays completed Work. GA supplies Goal
-  continuity only; Fast Planner compares that Goal with relevant Work and supplies the
+  continuity only; Planner compares that Goal with relevant Work and supplies the
   Plan revision.
 - Runtime schedules independent Activities according to declared dependencies,
   provider concurrency, and resource ownership. Vocal work, locomotion, and
@@ -1139,7 +1145,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    contracts and pass its own additional safety qualification, but that optional
    deployment is not a Chromie completion gate.
 9. **Evidence is part of the product.** Implemented, automatically verified,
-   target validated, and release ready are separate states.
+   target validated, and deployment state are separate states; release readiness
+   is a separate verdict outside those four.
 10. **Optional physical rollout is progressive and provider-owned.** When a
    physical deployment is pursued, shadow, dry-run, bounded single-skill,
    supervised multi-skill, and broader autonomy are distinct Soridormi/provider
@@ -1397,7 +1404,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    Missing execution inputs are not UMI uncertainty.
 
    The same accepted intent fans out concurrently to the standing SC and to the GA and
-   Fast Planner that UMI requests. SC
+   Planner that UMI requests. SC
    has the highest communication compute priority and reports actual module state;
    understood, checking, planned, running and completed are distinct facts. UMI, GA,
    Planner and Runtime may request communication. SC owns exact speech and eligible
@@ -1614,7 +1621,8 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    it has no authority to rewrite the current turn, authorize an effect, or create
    a repair-of-repair workflow.
 
-34. **Fast versus Deep is selected by meaningful uncertainty, not confidence alone.**
+34. **A deeper pass is selected by meaningful uncertainty, not confidence alone.**
+   UMI and SC each have one designated deeper pass; the Planner has none.
    Cheap, obvious, low-consequence interaction should remain fast even when a
    model's self-reported confidence is imperfectly calibrated. Deeper cognition is
    justified when uncertainty is semantically real or materially consequential:
@@ -1630,25 +1638,25 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    confirmation; whether Chromie should act at all is VALUE-JUDGMENT-001, not planning
    depth; independent Responsibilities are planned in one WorkDAG.
 
-   **Fast-path commitment is not Deep-reviewed.** Once one Responsibility has complete
-   authoritative Goal grounding and a Fast Plan names exact available Capabilities with
+   **Commitment is not reviewed.** Once one Responsibility has complete
+   authoritative Goal grounding and a Plan names exact available Capabilities with
    schema-valid arguments, deterministic safety/authorization passes, and no confirmation
    is required, the Trusted Capability Runtime may commit and dispatch that work without
-   waiting for Deep cognition. Deep is neither an execution prerequisite nor a reviewer of
-   a Fast-resolved Responsibility. A Fast contract or authoritative-grounding failure stops
-   that Fast path; it is not semantic evidence that Deep should repair the same Plan.
+   waiting for deeper cognition. No deeper pass is an execution prerequisite or a reviewer
+   of a resolved Responsibility. A contract or authoritative-grounding failure stops that
+   path; it is not semantic evidence that another pass should repair the same Plan.
 
    **Cognitive depth is Responsibility-local.** Independent Responsibilities in one turn
-   need not share a single depth or wall-clock barrier (the one exception is speech UMI
-   marked `value_review`; see VALUE-JUDGMENT-001). Once a Responsibility has canonical
+   need not share a single depth or wall-clock barrier (the one exception is a
+   Responsibility UMI marked `value_review`; see VALUE-JUDGMENT-001). Once a Responsibility has canonical
    Goal grounding, a terminal valid Plan may execute while a genuinely uncertain
    remaining Responsibility waits for clarification or Evidence re-entry. Before
    GA finishes, only validated side-effect-free safe reads and realized
    Communicative Acts may
-   advance; effects remain gated. Do not run Deep merely to re-check work already resolved
-   by Fast cognition.
+   advance; effects remain gated. Do not run a deeper pass merely to re-check work
+   already resolved.
 
-   **Fast outcome types do not borrow authority from each other.** Fast Goal
+   **Outcome types do not borrow authority from each other.** User Meaning
    Interpretation emits provider-neutral Responsibility evidence with material
    details inside complete natural-language outcomes and bounded unresolved meaning, preserving any user-required
    freshness, new observation, repetition, or historical-result scope. Planner decides
@@ -1656,7 +1664,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    applicable Goal state, actual Work, trusted context/Evidence and Capability contracts.
    Missing answer data is not by itself unresolved user meaning. UMI does not author a
    Work-required or execution-readiness judgment, author the reply, declare execution inputs missing, create
-   planning InformationGaps, or choose their source/resolution policy. Fast Planner is
+   planning InformationGaps, or choose their source/resolution policy. Planner is
    the first Work HOW owner and may author a complete Capability Activity Plan. It owns execution-input completeness and may use trusted
    context, observation/query, an allowed bounded default, or an input need expressed
    by Social Cognition without changing Responsibility meaning. Goal Association concurrently receives the
@@ -1804,7 +1812,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
 40. **The architecture must be reconstructable from a small set of responsibilities.**
    A normal interaction should be explainable without knowing historical regression
    names or repair sequences: what did the person ask, what did Chromie owe, why was
-   Fast or Deep warranted, which capability/Provider advanced the Goal, what actually
+   a deeper pass warranted, which capability/Provider advanced the Goal, what actually
    happened, what was said, and what may be learned later? If explaining an ordinary
    interaction requires knowledge of previous bug-specific recovery machinery, the
    architecture is too complicated. Project complexity should grow primarily with

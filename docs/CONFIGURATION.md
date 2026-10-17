@@ -149,7 +149,7 @@ does not implement priority, preemption or a maximum queue wait.
 
 | Configuration | Actual support and qualification boundary |
 | --- | --- |
-| RTX 4090 Laptop / SGLang, three bounded running requests | One resident Qwen3.5-4B AWQ engine can admit the normal post-UMI SC + GA + Fast Planner fan-out with priority/preemption. The 49K cache covers one current full Planner request; three concurrent full-window requests are not claimed. Fresh 16GB+CosyVoice contention evidence is required before latency promotion. |
+| RTX 4090 Laptop / SGLang, three bounded running requests | One resident Qwen3.5-4B AWQ engine can admit the normal post-UMI SC + GA + Planner fan-out with priority/preemption. The 49K cache covers one current full Planner request; three concurrent full-window requests are not claimed. Fresh 16GB+CosyVoice contention evidence is required before latency promotion. |
 | RTX 5090 / SGLang, configured scheduling and presentation lease | The adapter may use provider scheduling and the qualified speech lease. Source support alone does not establish a foreground-wait bound or the target latency budget; retain same-profile contention and real Agent/playback evidence before promotion. |
 | Other profiles/providers | Only capabilities actually verified on that exact configuration may be claimed. Missing scheduling telemetry or untested contention remains unknown. |
 
@@ -189,7 +189,7 @@ UMI retains its 16K request limit, the other ordinary roles retain 32K, and the 
 and deliberative roles retain 49152 so complete re-entry packets requiring up to 42172 estimated tokens still
 fit with their unchanged output allowance and safety margin. SGLang owns three bounded
 running-request slots, priority/preemption, and one 49152-token shared cache so the normal
-post-UMI SC, GA and Fast Planner branches can be admitted together. This covers one
+post-UMI SC, GA and Planner branches can be admitted together. This covers one
 maximum-size Planner request plus smaller concurrent work, not three simultaneous full
 49K requests. Earlier laptop SGLang+CosyVoice evidence proved only the 32K cache topology;
 the promoted source configuration therefore requires fresh 49K shared-GPU qualification.
@@ -306,7 +306,7 @@ Fast DTO may receive one mechanical schema repair. When its schema-valid result 
 genuine ambiguity in intended outcome, scope, Goal relation, or referent, one source-based
 Deep UMI invocation re-reads the authoritative turn without receiving the Fast DTO. The
 primary result supplies per-Responsibility source-token evidence; no separate coverage,
-critic, reviewer, or resegmentation model call exists. Fast
+critic, reviewer, or resegmentation model call exists. The
 Planner—not UMI—owns execution-input resolution, source/default policy, blocking state,
 and clarification selection. One mechanically malformed DTO may be regenerated once at
 its current UMI stage; semantic failure otherwise fails closed as
@@ -435,7 +435,7 @@ retained. See
 | `AGENT_SKILL_SELECTION_TIMEOUT_MS` | Timeout for the single primary Agent Skill selection call; default `10000`. No model repair or reselection is performed. Explicit qualification mode raises it to `120000`. |
 | `AGENT_SKILL_SELECTION_MAX_CANDIDATES` | Maximum approved projection-compatible summaries disclosed to one selection call; default `12`. Deterministic bounding is retrieval only, not semantic selection. |
 | `AGENT_SKILL_SELECTION_MAX_SELECTED` | Maximum Skills the model may select in one result; default `4`. |
-| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for the Fast Planner (`/fast-plan`), the only role with a declared projection; default `1`. |
+| `AGENT_SKILL_PROGRESSIVE_DISCLOSURE_ENABLED` | Enable role-specific selection plus trusted projection injection for the Planner (`/fast-plan`), the only role with a declared projection; default `1`. |
 | `AGENT_SKILL_PROJECTION_MAX_CHARS` | Maximum UTF-8 character count for one disclosed projection; default `3000`. Oversized content is omitted, never truncated. |
 | `AGENT_SKILL_PROJECTION_TOTAL_MAX_CHARS` | Maximum aggregate disclosed projection characters for one Agent boundary; default `6000`. |
 | `AGENT_SKILL_PROJECTION_COUNT_LIMIT` | Maximum selected projections disclosed to one Agent boundary; default `4`. |
@@ -753,7 +753,7 @@ AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS=2048
 The legacy `OLLAMA_*` context names also supply Agent request budgets. All RTX 5090
 reasoning-role context settings are 65536; the provider is SGLang. Output ceilings
 remain role-specific and unchanged. Increasing the context addresses the reproduced
-full Fast request preflight failure without dropping authoritative prompt material.
+full Planner request preflight failure without dropping authoritative prompt material.
 
 Before inference, Chromie estimates prompt tokens from the complete user and
 system text, reserves the entire declared output budget and the configured
@@ -892,7 +892,7 @@ Generated `.env.runtime` remains the deployment authority. Services may copy tha
 | `AGENT_COGNITIVE_ACTIVATION_ENABLED` | `1` by default. Enables the narrow internal state-transition Activation model used before Goal-bound Planner or Goal-free SC re-entry. Disabling/unavailability fails closed; Runtime does not restore deterministic semantic wake routing. |
 | `AGENT_COGNITIVE_ACTIVATION_MODEL` | Defaults to `AGENT_FAST_PLANNER_MODEL`. It selects only among Host-supplied existing authorities; it owns no Goal, Work, wording, Capability, execution, or completion semantics. |
 | `AGENT_COGNITIVE_ACTIVATION_TIMEOUT_MS` / `AGENT_COGNITIVE_ACTIVATION_NUM_CTX` / `AGENT_COGNITIVE_ACTIVATION_NUM_PREDICT` | Timeout defaults to the active `AGENT_FAST_PLANNER_TIMEOUT_MS` budget (`60000` ms if unset); context/output defaults: `8192` / `384`. An explicit activation timeout overrides inheritance. Bounded one-call activation transaction; no repair or Deep pass. Compose forwards all five `AGENT_COGNITIVE_ACTIVATION_*` keys to `chromie-agent`. |
-| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Fast Planner after UMI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
+| `AGENT_GOAL_ASSOCIATION_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the primary model call. Goal Association runs concurrently with Planner after UMI and may emit a materially larger structured DTO, so the 2-second interaction target is measured separately rather than reused as a cognition kill switch. A latency miss remains a qualification failure. Timeout still returns a formal `fail_closed` resolution with no Goal or clarification authority. |
 | `AGENT_GOAL_ASSOCIATION_MIN_CONFIDENCE` | `0.65`; below-threshold existing-goal associations are rejected. |
 | `AGENT_GOAL_ASSOCIATION_MAX_ACTIVE_GOALS` | `8`; maximum bounded active-goal snapshots supplied to one call. |
 | `AGENT_GOAL_ASSOCIATION_NUM_CTX` | `4096`; prompt context budget. |
@@ -921,11 +921,11 @@ mapping, word-form normalization, resource-alignment workflow, coverage certific
 or certificate-repair fallback.
 | `ORCH_GOAL_ASSOCIATION_MODE` | `off` in `.env.common`; retained standalone diagnostic observer only. Goal Association is an integrated stage in the maintained Goal-driven Runtime and is never a fallback semantic authority. |
 | `ORCH_GOAL_ASSOCIATION_TIMEOUT_MS` | `65000` in maintained development modes; Host envelope around the 60-second Agent Goal Association watchdog. |
-| `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Fast Planner endpoint. |
+| `AGENT_FAST_PLANNER_ENABLED` | `1`; exposes the advisory Planner endpoint. |
 | `AGENT_FAST_PLANNER_MODEL` | `qwen3:4b` in common configuration; RTX 4090 Laptop uses its shared `qwen3.5:4b` model. |
-| `AGENT_FAST_PLANNER_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the one structured streaming Fast Planner invocation. The stream carries only a `terminal` or a typed `failure` frame, so timeout ownership is the complete terminal result. |
+| `AGENT_FAST_PLANNER_TIMEOUT_MS` | `60000` in maintained development modes; workflow-completion watchdog for the one structured streaming Planner invocation. The stream carries only a `terminal` or a typed `failure` frame, so timeout ownership is the complete terminal result. |
 There is one Planner (PLANNER-AUTHORITY-001): its depth comes from need-first library search, Evidence re-entry or clarification, never from a second planner pass. Model self-reported confidence is telemetry, never a standalone threshold. The Planner's own commitment bar is 0.75 prospective satisfaction (code constant `MINIMUM_PLAN_SATISFACTION`); a Plan below it becomes an honest limitation.
-| `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Fast Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |
+| `AGENT_FAST_PLANNER_NUM_CTX` | `8192`; bounded Planner context with room for the capability prompt and a complete multi-goal result. Qualification mode and the architecture-validation overlay use `40960` so retained post-Evidence prompts plus the structured-output reserve pass conservative preflight without changing the interactive profile. |
 | `AGENT_FAST_PLANNER_NUM_PREDICT` | `2048`; flat semantic planner-DTO JSON budget sized from live compound and multi-goal output evidence. |
 | `AGENT_FAST_PLANNER_MAX_CAPABILITIES` | `24`; maximum common catalog entries supplied. |
 | `ORCH_FAST_PLANNER_MODE` | `off` in `.env.common`; legacy standalone observer used only when unified mode is `off`. Fast Planning is integrated into the unified runtime. |
@@ -1099,7 +1099,7 @@ The image builds XGrammar 0.2.1's native library from exact source revision
 `5b4e9ce9e72524037ae24ecd831b9b6604d2eb48` with one parser repair: the
 unexpanded-rule marker is -2, outside the nonnegative expression-ID domain and
 distinct from the existing invalid-state marker -1. The original marker 128000
-collided with a real lookahead expression in the retained Fast schema and read
+collided with a real lookahead expression in the retained Planner schema and read
 rule -1, crashing the process. Package/API, schema conversion, model and decoding
 options stay pinned. The image build checks real parser acceptance/rejection and
 reset at expression IDs 127999/128000/128001. Image labels retain source/patch
@@ -1141,8 +1141,7 @@ repair when a reviewed upstream image implements that constructor contract.
 The request-format candidate also makes the pinned XGrammar dispatcher honor
 `x-guidance.whitespace_flexible` per schema, retaining the complete schema as its
 cache key. The Agent adds `false` to the two GA output-contract titles and the
-Agent Skill Selection output-contract title (the retired Deep Planner title was the
-other one). Deep/Skill calls had reproduced outside-string whitespace loops that
+Agent Skill Selection output-contract title. Skill calls had reproduced outside-string whitespace loops that
 exhausted their output budgets.
 UMI and other unannotated requests retain their existing formatting. No global compact
 flag or environment variable is added. This candidate requires the full qualification
@@ -1168,7 +1167,7 @@ and removes the obsolete candidate overlay. No new environment variable or seman
 authority is introduced. The existing standalone SGLang qualification Compose remains
 available for explicitly isolated provider experiments.
 
-Fast Planner's pre-association Goal continuity context projects complete semantic Goals,
+Planner's pre-association Goal continuity context projects complete semantic Goals,
 lifecycle status, open information gaps and last-update text from active and recent
 snapshots. Snapshot diagnostics and task implementation identity are excluded. The
 required projection has no separate character budget and is never truncated; the
@@ -1176,7 +1175,7 @@ transport admits the complete prompt against the configured model context budget
 (token preflight). The Host does not omit a Goal suffix or resolve conflicting
 versions.
 
-Fast Planner supplies one JSON Schema for its terminal Plan result; the stream carries
+Planner supplies one JSON Schema for its terminal Plan result; the stream carries
 only `terminal` or typed `failure` frames. Ollama receives that Schema through its native format field;
 SGLang receives its JSON-schema response format. The old tagged provider adapter is
 removed. The SGLang adapter exposes existing intersection shapes and preserves its

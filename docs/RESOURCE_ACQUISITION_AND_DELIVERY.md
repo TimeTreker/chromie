@@ -185,7 +185,7 @@ The default sequence is:
 ambient Soridormi perception → Chromie Situation
                               + activated Memory
                               + Evidence / Goal / current Work
-                              → Fast Planner
+                              → Planner
                                  ├─ enough context → execute
                                  └─ information gap → Active Perception Work
                                                         ↓
@@ -215,7 +215,7 @@ new Goal source references or relations to retained Goals; it cannot author new 
 meaning or a `resource_responsibility`. Host materializes a new Goal by preserving UMI's
 complete WHAT. UMI does not author `bindings` or a structured resource/parameter table.
 
-Planner extracts Capability parameters from that complete requirement. For Fast arguments,
+Planner extracts Capability parameters from that complete requirement. For Planner arguments,
 current-turn token spans cite original speech; contextual spans name the owning
 `source_responsibility_ref` and exact accepted outcome tokens, which are named in that
 Responsibility's own namespace (`r1.t0`, ...) so they cannot be confused with current-turn
@@ -303,7 +303,7 @@ alignment or residual-repair workflow.
 The acquisition and its evidence-dependent explanation also stay one semantic responsibility.
 Goal Association must not duplicate one information request into one capability Goal that
 retrieves evidence and another capability Goal whose only purpose is to answer from that same
-evidence. Host-bound Evidence re-enters the Fast Planner after acquisition, and
+evidence. Host-bound Evidence re-enters the Planner after acquisition, and
 Social Cognition authors the natural delivery. The GA primary result must represent that responsibility once. If it
 promotes an evidence-dependent answer into another provider-required Goal with no
 independent bindings/resource contract, trusted Responsibility-conservation and
@@ -322,7 +322,7 @@ When the selected capability explicitly owns source resolution and perception,
 an unbound source is instead realized as `{"status":"unknown"}` in its required
 provider argument. That provider-owned input is not a missing user input and
 has no citation. Otherwise the unbound source is only `{"status":"known"}` plus cited
-evidence of where. The Fast Planner never retypes a location, distance or direction
+evidence of where. The Planner never retypes a location, distance or direction
 into it; the provider resolves the place itself, reporting a typed non-completion when
 it cannot, and trusted code keeps the cited surface. If the person said where, the citation is the token span; Host materializes the
 exact quote as the canonical `source_quote`. If the current Situation observed it, the
@@ -337,7 +337,7 @@ object is the requested resource; that stays the Planner's semantic choice.
 
 Owner decision, 2026-10-09: when the person's stated place and a current observation of
 that resource disagree, Chromie trusts what it observes and cites the observation. The
-person's words stay context, as a human would say "I see it about 10 m ahead". The Fast
+person's words stay context, as a human would say "I see it about 10 m ahead". The Planner
 prompt carries the source guidance only when the output-mode-qualified catalog has a
 provider-owned source, and the Situation part only when citable observations exist. A
 source location supplied in the conversation is still retained with its actual
@@ -376,7 +376,7 @@ Fast User Meaning Interpretation
 Goal Association
   `-- associate/create canonical weather Goal and relate it to dinner
 
-Fast Planner
+Planner
   `-- exact weather read Capability + executable args
 
 Trusted Capability Runtime
@@ -447,7 +447,8 @@ For physical handover, plan-level completion requires the resource state to esta
 both `resource_acquired` and `resource_delivered`. For information resources, the
 provider plan must establish acquisition of trusted information evidence; the
 resource contract may declare `final_delivery_owner=planner_communicative_activity`, in
-which case Host Evidence binding and Fast Planner own the final human delivery.
+which case the Host binds the Evidence and Social Cognition authors the final human
+delivery; the Planner only establishes the result Need.
 
 This makes the boundary evolve naturally. If Soridormi currently advertises only
 `acquire_resource` and `deliver_resource`, the Planner may compose them (a resource Plan that
@@ -702,7 +703,7 @@ The adapter rejects a nominally successful response with no source evidence or
 no retrieval timestamp. The provider result is evidence material only; it cannot
 supply final personality speech.
 
-The Host verifies exact Evidence provenance and re-enters the Fast Planner with
+The Host verifies exact Evidence provenance and re-enters the Planner with
 it; Social Cognition authors the wording that delivers it. A more exact provider capability remains preferable when its scope
 matches, such as the structured weather contract.
 
