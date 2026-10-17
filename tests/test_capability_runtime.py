@@ -14,7 +14,7 @@ from orchestrator.runtime.capability_runtime import (
     MockCapabilityProvider,
     RuntimeAuthorization,
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
     local_speech_definition,
 )
@@ -110,7 +110,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     self, request, definition, context
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(exclusive_group=None))
         provider = SlowProvider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -171,7 +171,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     output={"args": dict(request.args)},
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_tool_definition(capability_id="chromie.weather.lookup"))
         provider = SlowProvider("mock.tool")
         runtime = CapabilityRuntime(registry)
@@ -247,7 +247,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     self, request, definition, context
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(exclusive_group=None))
         provider = SlowProvider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -288,7 +288,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     output={"done": True},
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_tool_definition(capability_id="chromie.progress"))
         provider = ProgressProvider("mock.tool")
         runtime = CapabilityRuntime(registry)
@@ -343,7 +343,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     output={"capability": request.capability_id},
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_tool_definition(capability_id="chromie.fast"))
         registry.register(_tool_definition(capability_id="chromie.slow"))
         provider = SplitProvider("mock.tool")
@@ -413,7 +413,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     output={"done": True},
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_tool_definition(capability_id="chromie.identity"))
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(SpoofingProvider("mock.tool"))
@@ -458,7 +458,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     output={"provider_state": "still_running"},
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_tool_definition(capability_id="chromie.non_terminal"))
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(NonTerminalProvider("mock.tool"))
@@ -498,7 +498,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.Event().wait()
                 raise AssertionError("cancelled capability resumed")
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(BlockingProvider("mock.body"))
@@ -539,7 +539,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_runtime_event_cursors_are_non_destructive_for_multiple_consumers(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_tool_definition(capability_id="chromie.cursor"))
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(MockCapabilityProvider("mock.tool"))
@@ -569,7 +569,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual([event.type for event in first], ["accepted", "running", "completed"])
 
     async def test_submit_validation_failure_does_not_leave_runtime_ownership(self) -> None:
-        runtime = CapabilityRuntime(CapabilityRegistry())
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         response = InteractionResponse(
             interaction_id="invalid-dispatch",
             capabilities=[
@@ -589,7 +589,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(observation.requests, [])
 
     def test_runtime_has_no_aggregate_execute_api(self) -> None:
-        runtime = CapabilityRuntime(CapabilityRegistry())
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         self.assertFalse(hasattr(runtime, "execute"))
 
     def test_soridormi_resource_outcome_schema_accepts_simulation_marker(self) -> None:
@@ -622,13 +622,13 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 ]
             }
         )
-        runtime = CapabilityRuntime(CapabilityRegistry())
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
 
         with self.assertRaisesRegex(ValueError, "must be unique"):
             await submit_and_wait_terminal(runtime, unsafe)
 
     async def test_soridormi_import_preserves_provider_confirmation_requirement(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -650,7 +650,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_soridormi_import_preserves_provider_confirmation_exemption(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -668,7 +668,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(registry.get("soridormi.nod_yes").requires_confirmation)
 
     async def test_soridormi_import_upserts_catalog_entries(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -735,7 +735,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_soridormi_import_accepts_nested_catalog_contracts(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -769,7 +769,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(definition.metadata["resource_claims"], ["head"])
 
     async def test_soridormi_import_rejects_duplicate_catalog_atomically(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [{"skill_id": "nod_yes", "available": True}]
         )
@@ -791,7 +791,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             registry.get("soridormi.wave_hand")
 
     async def test_soridormi_import_marks_absent_live_capabilities_unavailable(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {"skill_id": "nod_yes", "available": True},
@@ -813,7 +813,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_speech_only_request_completes(self) -> None:
         spoken: list[str] = []
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(
@@ -849,7 +849,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_failed_playback_start_barrier_prevents_following_body_effect(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         body = MockCapabilityProvider("mock.body")
@@ -923,7 +923,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 events.append("body_start")
                 return await super().execute(request, definition, context)
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         body = OrderedBodyProvider("mock.body")
@@ -954,7 +954,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(events, ["playback_start", "body_start"])
 
     async def test_action_only_request_reaches_mock_provider(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         provider = MockCapabilityProvider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -992,7 +992,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 events.append(("body_end", time.monotonic()))
                 return result
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         runtime = CapabilityRuntime(registry)
@@ -1029,7 +1029,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 active -= 1
                 return await super().execute(request, definition, context)
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for index in range(3):
             registry.register(
                 CapabilityDefinition(
@@ -1078,7 +1078,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 events.append(("end", request.request_id))
                 return await super().execute(request, definition, context)
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for index in range(4):
             registry.register(CapabilityDefinition(
                 capability_id=f"test.skill_{index}", provider_id="mock.body",
@@ -1112,7 +1112,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 active -= 1
                 return await super().execute(request, definition, context)
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         provider = ExclusiveProvider("mock.body")
         runtime = CapabilityRuntime(registry, max_concurrency=3)
@@ -1169,7 +1169,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         finally:
                             active -= 1
 
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 definitions = [
                     CapabilityDefinition(
                         capability_id=f"test.resource.{index}",
@@ -1222,7 +1222,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         cancellations.append(context.interaction_id)
                         await super().cancel(request, definition, context)
 
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 for index, resources in enumerate((["shared"], ["spare", "shared"], ["spare"])):
                     registry.register(CapabilityDefinition(
                         capability_id=f"test.resource.{index}", provider_id="mock.resource",
@@ -1317,7 +1317,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 )
 
         provider = CollisionProvider("mock.body", delay_s=5)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _body_definition(
                 exclusive_group=None,
@@ -1408,7 +1408,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 return await super().execute(request, definition, context)
 
         provider = IsolatedProvider("mock.body")
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(exclusive_group=None))
         runtime = CapabilityRuntime(registry, max_concurrency=3)
         runtime.register_provider(provider)
@@ -1488,7 +1488,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         speech_provider = LocalSpeechCapabilityProvider(speak)
@@ -1581,7 +1581,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         registry.register(_tool_definition(capability_id="chromie.weather"))
         motion_provider = MotionProvider("mock.body")
@@ -1652,7 +1652,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _tool_definition(
                 capability_id="chromie.keep",
@@ -1740,7 +1740,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_specific_goal_rule_survives_open_preflight_window(
         self,
     ) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _tool_definition(
                 capability_id="chromie.future_bound_task",
@@ -1812,7 +1812,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _tool_definition(
                 capability_id="chromie.unrelated_active",
@@ -1902,7 +1902,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_broader_rule_dominates_earlier_output_rule(
         self,
     ) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         speech_provider = LocalSpeechCapabilityProvider(
@@ -1989,7 +1989,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _tool_definition(
                 capability_id="chromie.cancel",
@@ -2083,7 +2083,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _tool_definition(
                 capability_id="chromie.shared",
@@ -2152,7 +2152,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _tool_definition(
                 capability_id="chromie.bound_task",
@@ -2236,7 +2236,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
         definition_b = definition_a.model_copy(
             update={"capability_id": "soridormi.motion_b"}
         )
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(definition_a)
         registry.register(definition_b)
         provider = Provider("mock.body")
@@ -2306,7 +2306,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
     async def test_specific_speech_goal_reports_shared_output_widening(
         self,
     ) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for capability_id in ("chromie.speech-a", "chromie.speech-b"):
             registry.register(
                 CapabilityDefinition(
@@ -2420,7 +2420,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await asyncio.Event().wait()
                 raise AssertionError("cancelled request resumed")
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _tool_definition(
                 capability_id="chromie.long_task",
@@ -2495,7 +2495,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _tool_definition(
                 capability_id="chromie.long_task",
@@ -2558,7 +2558,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 )
 
         definition = _body_definition(interruptible=False)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -2615,7 +2615,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     context,
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         barrier_definition = _tool_definition(
             capability_id="chromie.barrier",
             provider_id="mock.tool",
@@ -2735,7 +2735,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             await asyncio.Event().wait()
             raise AssertionError("cancelled speech resumed")
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         speech_provider = LocalSpeechCapabilityProvider(speak)
@@ -2818,7 +2818,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 raise ConnectionError("physical cancel failed")
 
         definition = _body_definition()
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -2883,7 +2883,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 await release_cancel.wait()
                 raise ConnectionError("shared physical cancel failure")
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         provider = Provider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -2964,7 +2964,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -3062,7 +3062,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -3173,7 +3173,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(definition)
         provider = Provider("mock.body")
         runtime = CapabilityRuntime(registry, max_concurrency=3)
@@ -3282,7 +3282,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 }
             }
         )
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(barrier_definition)
         registry.register(
             _tool_definition(capability_id="chromie.current-queued")
@@ -3354,7 +3354,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_sequential_requests_preserve_order(self) -> None:
         provider = MockCapabilityProvider("mock.body")
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(capability_id="soridormi.nod_yes"))
         registry.register(_body_definition(capability_id="soridormi.express_attention"))
         runtime = CapabilityRuntime(registry)
@@ -3396,7 +3396,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 events.append("body_end")
                 return await super().execute(request, definition, context)
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         runtime = CapabilityRuntime(registry)
@@ -3420,7 +3420,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_preflight_rejects_unknown_invalid_and_unconfirmed_capabilities(self) -> None:
         provider = MockCapabilityProvider("mock.body")
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(requires_confirmation=True))
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
@@ -3450,7 +3450,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_confirmation_proof_allows_request(self) -> None:
         provider = MockCapabilityProvider("mock.body")
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(requires_confirmation=True))
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
@@ -3466,7 +3466,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_timeout_calls_provider_cancel(self) -> None:
         provider = MockCapabilityProvider("mock.body", delay_s=0.2)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(timeout_ms=10))
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
@@ -3486,7 +3486,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 raise ConnectionError("provider disconnected during cancellation")
 
         provider = FailingCancelProvider("mock.body", delay_s=0.2)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(timeout_ms=10))
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
@@ -3514,7 +3514,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
                 raise ConnectionError("provider disconnected during cancellation")
 
         provider = FailingCancelProvider("mock.body", delay_s=5)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(provider)
@@ -3560,7 +3560,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
             lambda args: asyncio.sleep(5, result={"spoken": True})
         )
         body_provider = MockCapabilityProvider("mock.body", delay_s=5)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition())
         runtime = CapabilityRuntime(registry)
@@ -3612,7 +3612,7 @@ class CapabilityRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_interruption_omits_unstarted_sequential_request(self) -> None:
         provider = MockCapabilityProvider("mock.body", delay_s=5)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(
             _body_definition(
                 capability_id="soridormi.nod_yes",
@@ -3683,7 +3683,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
                 await release[request.request_id].wait()
                 return await super().execute(request, definition, context)
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(Provider("mock.body"))
@@ -3728,7 +3728,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
                         result = await super().execute(request, definition, context)
                         return result.model_copy(update={"status": status})
 
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 registry.register(_body_definition(exclusive_group=None))
                 runtime = CapabilityRuntime(registry)
                 runtime.register_provider(TerminalProvider("mock.body"))
@@ -3765,7 +3765,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
                     output={"args": request.args},
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(_body_definition(
             capability_id="test.wave", provider_id="mock.social", exclusive_group=None
@@ -3814,7 +3814,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(runtime.execution_state_is_current(snapshot))
 
     async def test_overlapping_plans_reject_late_commit_but_other_goals_proceed(self) -> None:
-        runtime = CapabilityRuntime(CapabilityRegistry())
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         older = await runtime.planning_state_snapshot(["goal-a"], "turn-old")
         newer = await runtime.planning_state_snapshot(["goal-a"], "turn-new")
         unrelated = await runtime.planning_state_snapshot(["goal-b"], "turn-b")
@@ -3827,7 +3827,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
             await runtime.reserve_planning_submission(unrelated, plan_id="b", fingerprint="fp-b", prepared_activity_ids=[])
 
     async def test_submission_is_bound_to_exact_plan_and_consumed_once(self) -> None:
-        runtime = CapabilityRuntime(CapabilityRegistry())
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
         guard = await runtime.reserve_planning_submission(snapshot, plan_id="plan-a", fingerprint="fp-a", prepared_activity_ids=[])
         response = InteractionResponse(interaction_id="response-a", metadata={
@@ -3841,7 +3841,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
             await runtime.accept_completed_planning_submission(response)
 
     async def test_owner_goal_change_after_reservation_rejected_at_dispatch(self) -> None:
-        runtime = CapabilityRuntime(CapabilityRegistry())
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         goal = {"goal_id": "goal-a", "description": "original"}
         runtime.goal_state_provider = lambda: [goal]
         snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")
@@ -3854,7 +3854,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
             ))
 
     async def test_omitted_prepared_work_remains_visible_to_later_goal_planning(self) -> None:
-        runtime = CapabilityRuntime(CapabilityRegistry())
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         await runtime.prepare_planner_work("turn-a", [
             {"activity_id": name, "source_responsibility_refs": ["r1"]} for name in ["keep", "adopt", "cancel"]
         ])
@@ -3870,7 +3870,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(later["prepared"][0]["source_goal_ids"], ["goal-a"])
 
     async def test_shared_work_is_one_request_and_partial_owner_cannot_cancel(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition(exclusive_group=None))
         provider = MockCapabilityProvider("mock.body", delay_s=0.1)
         runtime = CapabilityRuntime(registry)
@@ -3896,7 +3896,7 @@ class PlanningCommitTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(provider.calls), 1)
 
     async def test_own_publication_does_not_invalidate_guard_but_later_goal_change_does(self) -> None:
-        runtime = CapabilityRuntime(CapabilityRegistry())
+        runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         goal = {"goal_id": "goal-a", "description": "respond", "responsibility_status": "open"}
         runtime.goal_state_provider = lambda: [goal]
         snapshot = await runtime.planning_state_snapshot(["goal-a"], "turn-a")

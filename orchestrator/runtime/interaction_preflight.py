@@ -4,7 +4,7 @@ from typing import Any
 
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
 
-from .capability_runtime import CapabilityRegistry, _validate_json_schema
+from .capability_runtime import CapabilityDefinitionRegistry, _validate_json_schema
 
 
 PREFLIGHT_SCHEMA_VERSION = 1
@@ -14,7 +14,7 @@ PREFLIGHT_STRATEGY = "static_capability_preflight_v1"
 def annotate_preflight_validation(
     response: InteractionResponse,
     *,
-    registry: CapabilityRegistry,
+    registry: CapabilityDefinitionRegistry,
     provider_ids: set[str],
     confirmed_request_ids: set[str] | None = None,
     safety_monitor_active: bool = False,
@@ -63,7 +63,7 @@ def annotate_preflight_validation(
 def _preflight_capability_request(
     request: CapabilityRequest,
     *,
-    registry: CapabilityRegistry,
+    registry: CapabilityDefinitionRegistry,
     provider_ids: set[str],
     confirmed_request_ids: set[str],
     safety_monitor_active: bool,

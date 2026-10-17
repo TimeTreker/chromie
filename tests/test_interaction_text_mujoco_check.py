@@ -1143,9 +1143,9 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
 class ProviderStartObservationTests(unittest.IsolatedAsyncioTestCase):
     async def test_capability_runtime_empty_execution_observation_is_bounded(self) -> None:
-        from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
+        from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime
 
-        observation = await CapabilityRuntime(CapabilityRegistry()).execution_observation()
+        observation = await CapabilityRuntime(CapabilityDefinitionRegistry()).execution_observation()
         self.assertEqual(observation.open_interaction_ids, [])
         self.assertEqual(observation.executing_interaction_ids, [])
         self.assertEqual(observation.requests, [])

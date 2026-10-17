@@ -40,7 +40,7 @@ from .capability_runtime import (
     MediaPlaybackCapabilityProvider,
     RuntimeAuthorization,
     SessionControlCapabilityProvider,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
     CapabilityRuntimeResult,
     VocalPerformanceCapabilityProvider,
@@ -150,7 +150,7 @@ class InteractionRuntimeCoordinator:
         ) = None,
         speech_timeout_ms: int | None = None,
     ) -> None:
-        self.registry = CapabilityRegistry()
+        self.registry = CapabilityDefinitionRegistry()
         self.registry.register(local_speech_definition(timeout_ms=speech_timeout_ms))
         self.registry.register(session_interrupt_definition())
         self.registry.register(work_dag_capability_definition())

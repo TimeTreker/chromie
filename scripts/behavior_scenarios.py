@@ -42,7 +42,7 @@ from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.capability_runtime import (
     LocalSpeechCapabilityProvider,
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
     CapabilityRuntimeResult,
     RuntimeAuthorization,
@@ -237,7 +237,7 @@ class _CognitiveScenarioRuntime:
                 },
             )
             self.definitions[definition.capability_id] = definition
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for definition in self.definitions.values():
             registry.register(definition)
         self.runtime = CapabilityRuntime(registry)
@@ -330,7 +330,7 @@ class _CognitiveTurnScenarioRuntime:
         self.soridormi_invoker = None
         self.runtime: CapabilityRuntime | None = None
         if self.mode == "active_cancel":
-            registry = CapabilityRegistry()
+            registry = CapabilityDefinitionRegistry()
             registry.register(local_speech_definition())
             for definition in self.definitions.values():
                 registry.register(definition)

@@ -7,7 +7,7 @@ from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.models import CapabilityRegistry as AgentCapabilityRegistry
 from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.capability_runtime import (
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
     RuntimeAuthorization,
 )
@@ -150,7 +150,7 @@ class SemanticCapabilityFacadeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_validates_semantic_args_then_realizes_provider_args(self) -> None:
         invoker = _ExecutionInvoker()
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [turn_skill()])
         definition = registry.get("soridormi.turn_in_place")
         self.assertIn("direction", definition.input_schema["properties"])
@@ -220,7 +220,7 @@ class SemanticCapabilityFacadeTests(unittest.IsolatedAsyncioTestCase):
                 "count": {"type": "number", "minimum": 1, "maximum": 6}},
                 "additionalProperties": False},
         }
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [turn_skill(), blink])
         invoker = _ExecutionInvoker()
         items = []

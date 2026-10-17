@@ -188,7 +188,7 @@ class CapabilityDefinition(CapabilityIdentityModel):
         return self
 
 
-class CapabilityRegistry:
+class CapabilityDefinitionRegistry:
     def __init__(self) -> None:
         self._capabilities: dict[str, CapabilityDefinition] = {}
 
@@ -418,7 +418,7 @@ class _CancellationRule:
 class CapabilityRuntime:
     def __init__(
         self,
-        registry: CapabilityRegistry,
+        registry: CapabilityDefinitionRegistry,
         *,
         max_concurrency: int = 8,
         resource_arbiter: ResourceArbiter | None = None,

@@ -21,6 +21,7 @@ from pydantic.json_schema import JsonSchemaValue
 
 from shared.chromie_contracts.text import normalize_whitespace
 from shared.chromie_contracts.core_interpretation import CognitiveActivationRequest
+from shared.chromie_contracts.resource import REQUESTER_REFERENT_ID
 
 
 # Existing location-binding vocabulary shared by the decoder and Host validator.
@@ -350,7 +351,7 @@ class GoalAssociationModelResourceRecipient(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    description: str = Field(default="requester", min_length=1)
+    description: str = Field(default=REQUESTER_REFERENT_ID, min_length=1)
     referent_id: str | None = None
 
     normalize_text = field_validator("description", "referent_id", mode="before")(_normalize_text_value)

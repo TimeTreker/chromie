@@ -24,7 +24,7 @@ from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.capability_runtime import (
     LocalSpeechCapabilityProvider,
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
     local_speech_definition,
 )
@@ -1364,7 +1364,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
             class CancellationRuntime(CapabilityRuntime):
                 def __init__(self) -> None:
-                    super().__init__(CapabilityRegistry())
+                    super().__init__(CapabilityDefinitionRegistry())
                     self.cancelled: list[str] = []
 
                 async def cancel_interaction(self, interaction_id: str) -> None:
@@ -1475,7 +1475,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         class CancellationRuntime(CapabilityRuntime):
             def __init__(self) -> None:
-                super().__init__(CapabilityRegistry())
+                super().__init__(CapabilityDefinitionRegistry())
                 self.cancelled: list[str] = []
 
             async def cancel_interaction(self, interaction_id: str) -> None:
@@ -1641,7 +1641,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         class CancellationRuntime(CapabilityRuntime):
             def __init__(self) -> None:
-                super().__init__(CapabilityRegistry())
+                super().__init__(CapabilityDefinitionRegistry())
                 self.cancelled: list[str] = []
 
             async def cancel_interaction(self, interaction_id: str) -> None:
@@ -2460,7 +2460,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "scheduled",
         )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(

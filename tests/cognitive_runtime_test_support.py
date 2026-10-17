@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
 )
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
@@ -139,7 +139,7 @@ class FakeRuntime:
     def __init__(self, definitions: list[CapabilityDefinition] | None = None):
         self.definitions = {item.capability_id: item for item in (definitions or [])}
         self.ensure_calls: list[list[str]] = []
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for definition in definitions or []:
             registry.register(definition)
         self.runtime = CapabilityRuntime(registry)

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from agent.app.value_judgment import VALUE_JUDGMENT_SYSTEM_PROMPT, ValueJudgmentResolver
-from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
+from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime
 from orchestrator.runtime.cognitive_runtime import apply_value_judgment
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.interaction import InteractionResponse
@@ -121,7 +121,7 @@ def test_owner_review_list_covers_objects_walking_and_people_not_gestures():
 
 def test_withheld_effect_is_refused_before_any_provider_starts():
     async def run():
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         provider = MockCapabilityProvider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -226,7 +226,7 @@ def test_withheld_effect_never_joins_a_provider_local_body_group():
     from tests.test_execution_lanes import _GroupedBodyProvider, _definition
 
     async def run():
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for capability_id, group in (("soridormi.deliver", "hands"), ("soridormi.blink", "eyes"),
                                      ("soridormi.attend", "head")):
             registry.register(_definition(capability_id, group=group, resources=[group]))

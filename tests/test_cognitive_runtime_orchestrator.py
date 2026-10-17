@@ -74,8 +74,8 @@ class _State:
 
 class _InteractionRuntime:
     def __init__(self):
-        from orchestrator.runtime.capability_runtime import CapabilityRuntime, CapabilityRegistry
-        self.runtime = CapabilityRuntime(CapabilityRegistry())
+        from orchestrator.runtime.capability_runtime import CapabilityRuntime, CapabilityDefinitionRegistry
+        self.runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         self.prepared = []
 
     def prepare_response(self, response, *, session_id):
