@@ -974,13 +974,13 @@
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "GoalDrivenRuntimeCoordinator._resolve",
+      "symbol": "GoalDrivenRuntimeCoordinator._commit_planner_gaps",
       "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator.cognitive_runtime",
       "contract": "Record Planner InformationGap commit rejection and raise a typed cognitive-stage failure; never ask before the Planner-owned gap is atomically attached to its canonical Goal.",
       "review_status": "reviewed",
-      "body_sha256": "04507ba51c21aba82ba2f6a3207dfb9236ab3b2687924817be7a61e5a08b65c7",
+      "body_sha256": "b8ee276900eee8822351c28b7ae2f1a2f366842cc624095144a6428c7fbf5901",
       "failure_signals": [
         "raise"
       ]
@@ -988,25 +988,25 @@
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
       "symbol": "GoalDrivenRuntimeCoordinator._resolve",
-      "ordinal": 2,
+      "ordinal": 1,
       "classification": "fail_closed_boundary",
       "owner": "orchestrator",
       "contract": "Stop uncommitted Planner Work, join the same turn's admitted independent SC delivery, then expose the typed terminal Work-failure fact and bounded supported cause through a runtime-owned result Need to Social Cognition for a user-facing explanation while preserving the original failed result and authorizing no unvalidated Work. Retain secondary SC failures as diagnostics; outer cancellation still cancels delivery and propagates. Cleanup failures propagate rather than claiming success.",
       "review_status": "reviewed",
-      "body_sha256": "ac95bcd9bedce72614a5166dd556f3e8bc436c17f56636df4cbbe4bf73400718",
+      "body_sha256": "dff7b67b1dbc52e3f3c325f7197e931ea05159166e465cf1681bc0c894fa0dd3",
       "failure_signals": [
         "return"
       ]
     },
     {
       "path": "orchestrator/runtime/cognitive_runtime.py",
-      "symbol": "GoalDrivenRuntimeCoordinator._resolve.cancel_early_safe_reads",
+      "symbol": "GoalDrivenRuntimeCoordinator._cancel_early_safe_reads",
       "ordinal": 1,
       "classification": "diagnostic_cleanup",
       "owner": "orchestrator.cognitive_runtime",
       "contract": "Best-effort cancellation of safe reads a Fast Plan started before canonical Goal binding (failed turn or superseded speculative Plan); retain an observable failure status if cleanup itself fails.",
       "review_status": "reviewed",
-      "body_sha256": "7de9bc4f72ec18f5e7ec53062f64b4570d5b69aeab90f2f77752069d1ec13eb9",
+      "body_sha256": "17a5dacb1d43a4c7c839f87005ff7d82eae4175f4259e8d00cd6ee50aacfe41e",
       "failure_signals": [
         "diagnostic",
         "state_update"
