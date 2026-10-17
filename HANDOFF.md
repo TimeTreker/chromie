@@ -20,7 +20,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
 - Evidence: `.chromie/acceptance/everyday-20261016/` (README; `run6/`, `run7/`).
-- Last gate and strict replay: TODO-COUNTS.
+- Last gate and strict replay: pytest 3,948 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
 - `.env.runtime` may be in `mode:speech`; give the harness process
   `ORCH_ACTION_DRY_RUN=false CHROMIE_OPERATOR_MODE=voice_mujoco` instead of editing it.
 
