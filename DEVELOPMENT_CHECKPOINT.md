@@ -38,7 +38,7 @@ Verification of the UMI span repair: recorded UMI replays (the celebrate case 4/
 eight compound and information controls unchanged or better); workflow corpus freeze
 42 (`de7c4de6…`, every UMI request recaptured for the widened `value_review` mark, no
 reply re-authored; previous freeze 41 `a36b1ebf…`). Gate and strict replay at the
-delivery revision: pytest 3,951 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
+delivery revision: pytest 3,955 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
 
 ## Repairs in force from this Issue
 
