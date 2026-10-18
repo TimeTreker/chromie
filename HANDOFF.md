@@ -16,7 +16,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Last recorded live Agent: `chromie-agent:latest` = `rootcause18-20261016` (rollback
   image). No built image matches `main`: `rootcause19-20261016` predates the 2026-10-17
   source changes. Rebuild the Agent image from `main` before deploying.
-- Workflow corpus: freeze 43 (`09813fa8…`). Restore it with
+- Workflow corpus: freeze 44 (`c808be23…`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
 - Evidence: `.chromie/acceptance/everyday-20261016/` (README; `run6/`, `run7/`).

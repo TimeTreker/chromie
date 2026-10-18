@@ -328,7 +328,7 @@ Argument citations prove owned source presence, not semantic understanding. Comp
 meaning, conversions and Plan coverage still require retained semantic qualification.
 
 Trusted code checks only closed references, source membership and ordering,
-non-overlap, explicit-value provenance, and DTO shape. It does not use
+explicit-value provenance, and DTO shape. It does not use
 conjunction/action phrase rules, a second model auditor, or source resegmentation to
 reinterpret WHAT. Any malformed, semantic, or authority-invalid primary DTO fails
 closed without a second same-authority call; only genuine

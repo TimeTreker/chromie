@@ -206,11 +206,13 @@ def _derive_source_span_starts(
     request: UserMeaningInterpretationRequest,
     parsed: dict[str, Any],
 ) -> None:
-    """Complete each cited span from where the previous Responsibility's words end.
+    """Complete a cited span whose start the model left out.
 
-    The model names only each Responsibility's last token. In source order, a span starts
-    right after the previous span's end (the first at the turn's start), so independent
-    spans partition the turn. Equal ends stay a structural violation for validation.
+    Each Responsibility names the first and last token of the words it depends on.
+    When only the end is named, the span starts right after the previous cited
+    end in source order (the first at the turn's start), so end-only output still
+    reads as it did. Responsibilities may share words: a Responsibility ending on
+    an already cited token, with no start of its own, starts where that one does.
     """
 
     tokens = _source_tokens(request.text)
@@ -222,19 +224,16 @@ def _derive_source_span_starts(
         if end_ref in index_by_ref:
             cited.append((index_by_ref[end_ref], evidence))
     cited.sort(key=lambda pair: pair[0])
+    previous_start = 0
     previous_end = -1
     for end, evidence in cited:
-        start = previous_end + 1 if previous_end < end else end + 1
-        evidence["source_start_token_ref"] = (
-            str(tokens[start]["ref"]) if start < len(tokens) else evidence["source_end_token_ref"]
-        )
-        if start > end:
-            # Two Responsibilities ending on the same token share words.
-            raise _UserMeaningInterpretationSemanticStructureViolation(
-                "primary User Meaning Interpretation independent Responsibility source spans "
-                "overlap: equal end " + str(evidence["source_end_token_ref"])
-            )
-        previous_end = end
+        authored = str(evidence.get("source_start_token_ref") or "").strip()
+        if authored in index_by_ref:
+            start = index_by_ref[authored]
+        else:
+            start = previous_end + 1 if previous_end < end else previous_start
+            evidence["source_start_token_ref"] = str(tokens[min(start, end)]["ref"])
+        previous_start, previous_end = start, end
 
 
 def _validate_primary_source_evidence(
@@ -252,7 +251,7 @@ def _validate_primary_source_evidence(
     if not isinstance(responsibilities, list):
         return
 
-    cited_spans: list[tuple[int, int, str]] = []
+    seen: dict[tuple[int, int, str], str] = {}
     for index, item in enumerate(responsibilities):
         if not isinstance(item, dict):
             continue
@@ -277,19 +276,15 @@ def _validate_primary_source_evidence(
                 "primary User Meaning Interpretation source_evidence token endpoints are "
                 f"reversed: {local_ref}:{start_ref}:{end_ref}"
             )
-        cited_spans.append((start, end, local_ref))
-
-    cited_spans.sort()
-    for (_, previous_end, previous_ref), (start, _, current_ref) in zip(
-        cited_spans,
-        cited_spans[1:],
-        strict=False,
-    ):
-        if start <= previous_end:
+        key = (start, end, " ".join(str(item.get("outcome") or "").split()).casefold())
+        if key in seen:
+            # Shared words may carry distinct meanings (news and the feeling about it);
+            # the same words with the same outcome are one Responsibility stated twice.
             raise _UserMeaningInterpretationSemanticStructureViolation(
-                "primary User Meaning Interpretation independent Responsibility source spans "
-                f"overlap: {previous_ref}:{current_ref}"
+                "primary User Meaning Interpretation repeats one Responsibility over the same "
+                f"source span: {seen[key]}:{local_ref}"
             )
+        seen[key] = local_ref
 
 
 def _bounded_json(value: Any, *, max_chars: int = 4000) -> str:
@@ -687,8 +682,8 @@ class OllamaUserMeaningInterpreter:
             f"{json.dumps(_user_meaning_interpretation_source_turn_provenance(request), ensure_ascii=False, separators=(',', ':'))}\n"
             f"language_hint={request.language or 'auto'}\n\n"
             f"{clock_context}"
-            "Authoritative source tokens (each Responsibility.source_evidence names the last "
-            "token of its own words):\n"
+            "Authoritative source tokens (each Responsibility.source_evidence names the first "
+            "and last token of the words it depends on):\n"
             f"{required_json(_source_tokens(request.text), None, label='UMI authoritative source tokens')}\n\n"
             "Bounded Identity Context:\n"
             f"{_user_meaning_interpretation_identity_context(mind)}\n\n"
@@ -895,10 +890,11 @@ class OllamaUserMeaningInterpreter:
         schema["properties"]["cognitive_requests"]["maxItems"] = 2
         token_refs = [token["ref"] for token in _source_tokens(admitted_turn)]
         if token_refs:
-            # Each Responsibility needs only where its words end; Host derives where they
-            # start, so spans partition the turn and cannot overlap (live 2026-10-13: a
-            # lead-in question or news was cited twice and the whole turn failed, 503).
-            # A start stays admissible for frozen references and is never used.
+            # Each Responsibility names the first and last token of the words it depends
+            # on. Only the end is required: an absent start is derived from the previous
+            # cited end, so end-only output still reads as before. Spans may share words
+            # (news and the feeling about it in one clause); provenance is where the
+            # words are, not a partition of the turn.
             schema["$defs"]["ResponsibilitySourceEvidence"] = {
                 "type": "object",
                 "properties": {

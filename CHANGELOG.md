@@ -5,6 +5,17 @@ remains available in Git history.
 
 ## Unreleased
 
+### UMI Responsibilities may share source words (freeze 44, 2026-10-18)
+
+- A Responsibility's `source_evidence` names the first and last token of the
+  words it depends on. The model used to name only the end; the Host derived
+  every start so spans partitioned the turn, and two Responsibilities that needed
+  the same words (news and the feeling about it) failed the whole turn with a 503.
+  An authored start is now kept, an absent one is still derived from the previous
+  cited end, spans may share words, and only the same Responsibility repeated over
+  one span fails closed. Workflow corpus freeze 44 recaptures every UMI request;
+  no reply re-authored, every verdict equal to freeze 43.
+
 ### Remote inference disclosure policy (2026-10-18)
 
 - A remote provider (`AGENT_LLM_PROVIDER=anthropic` or `openai`) now needs

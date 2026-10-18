@@ -201,11 +201,12 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
             {"goal_association": ["r1", "r2"], "planner": ["r2"]},
         )
 
-    def test_primary_source_span_starts_where_the_previous_one_ends(self) -> None:
-        """UMI names only where each Responsibility's words end; the start is derived, so a
-        model-written start (even a reversed one) never decides the span."""
+    def test_primary_source_span_start_is_honoured_or_derived(self) -> None:
+        """UMI names the first and last token of the words a Responsibility depends on. A
+        start it leaves out is derived from the previous cited end, so end-only output
+        still reads as before; an authored start is kept."""
         parsed = _compound_output()
-        parsed["responsibilities"][0]["source_evidence"] = {"source_start_token_ref": "t2", "source_end_token_ref": "t0"}  # type: ignore[index]
+        parsed["responsibilities"][0]["source_evidence"] = {"source_end_token_ref": "t0"}  # type: ignore[index]
         parsed["responsibilities"][1]["source_evidence"] = {"source_end_token_ref": "t2"}  # type: ignore[index]
         decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
             UserMeaningInterpretationRequest(text="nod and blink"), json.dumps(parsed)
@@ -213,24 +214,49 @@ class UserMeaningInterpreterContractTests(unittest.TestCase):
         spans = [(item.source_evidence.source_start_token_ref, item.source_evidence.source_end_token_ref)
                  for item in decision.responsibilities]
         self.assertEqual(spans, [("t0", "t0"), ("t1", "t2")])
-
-    def test_primary_source_evidence_rejects_independent_overlap(self) -> None:
-        """Live 2026-10-13: a lead-in question was cited by two Responsibilities and the turn
-        failed (503). Derived spans partition the turn; only two Responsibilities ending on
-        the same token still share words and fail closed."""
-        parsed = _compound_output()
-        parsed["responsibilities"][1]["source_evidence"][  # type: ignore[index]
-            "source_start_token_ref"
-        ] = "t0"
-        OllamaUserMeaningInterpreter._validate_interpretation_content(
+        parsed["responsibilities"][1]["source_evidence"] = {"source_start_token_ref": "t0", "source_end_token_ref": "t2"}  # type: ignore[index]
+        decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
             UserMeaningInterpretationRequest(text="nod and blink"), json.dumps(parsed)
         )
-        parsed["responsibilities"][1]["source_evidence"][  # type: ignore[index]
-            "source_end_token_ref"
-        ] = "t0"
+        self.assertEqual(decision.responsibilities[1].source_evidence.source_start_token_ref, "t0")
+
+    def test_primary_source_evidence_allows_shared_words(self) -> None:
+        """Review 2026-10-18: independent Responsibilities may depend on the same words
+        (news and the feeling about it in one clause). Live 2026-10-13 a lead-in cited
+        twice failed the whole turn (503); shared provenance is now accepted."""
+        text = "I got promoted today, I'm so happy"
+        parsed = _compound_output()
+        parsed["responsibilities"][0].update({"outcome": "reply to the promotion news", "output_mode": "speech", "value_review": False})  # type: ignore[union-attr]
+        parsed["responsibilities"][0].pop("body_effect_family")  # type: ignore[union-attr]
+        parsed["responsibilities"][0]["source_evidence"] = {"source_start_token_ref": "t0", "source_end_token_ref": "t6"}  # type: ignore[index]
+        parsed["responsibilities"][1].update({"outcome": "share the happiness", "output_mode": "speech", "value_review": False})  # type: ignore[union-attr]
+        parsed["responsibilities"][1].pop("body_effect_family")  # type: ignore[union-attr]
+        parsed["responsibilities"][1]["source_evidence"] = {"source_start_token_ref": "t2", "source_end_token_ref": "t6"}  # type: ignore[index]
+        decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+            UserMeaningInterpretationRequest(text=text), json.dumps(parsed)
+        )
+        spans = [(item.source_evidence.source_start_token_ref, item.source_evidence.source_end_token_ref)
+                 for item in decision.responsibilities]
+        self.assertEqual(spans, [("t0", "t6"), ("t2", "t6")])
+        # An end already cited, with no start of its own, nests on the earlier span.
+        parsed["responsibilities"][1]["source_evidence"] = {"source_end_token_ref": "t6"}  # type: ignore[index]
+        decision = OllamaUserMeaningInterpreter._validate_interpretation_content(
+            UserMeaningInterpretationRequest(text=text), json.dumps(parsed)
+        )
+        self.assertEqual(decision.responsibilities[1].source_evidence.source_start_token_ref, "t0")
+
+    def test_primary_source_evidence_rejects_the_same_responsibility_twice(self) -> None:
+        parsed = _compound_output()
+        parsed["responsibilities"][1]["outcome"] = "nod"  # type: ignore[index]
+        parsed["responsibilities"][1]["source_evidence"] = {"source_start_token_ref": "t0", "source_end_token_ref": "t0"}  # type: ignore[index]
         with self.assertRaisesRegex(
-            _UserMeaningInterpretationSemanticStructureViolation, "spans overlap"
+            _UserMeaningInterpretationSemanticStructureViolation, "repeats one Responsibility"
         ):
+            OllamaUserMeaningInterpreter._validate_interpretation_content(
+                UserMeaningInterpretationRequest(text="nod and blink"), json.dumps(parsed)
+            )
+        parsed["responsibilities"][1]["source_evidence"] = {"source_start_token_ref": "t2", "source_end_token_ref": "t0"}  # type: ignore[index]
+        with self.assertRaisesRegex(ValueError, "reversed"):
             OllamaUserMeaningInterpreter._validate_interpretation_content(
                 UserMeaningInterpretationRequest(text="nod and blink"), json.dumps(parsed)
             )
@@ -343,7 +369,7 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
                 with self.subTest(language=text[:8], variant=build.__name__):
                     payload = build(request)
                     prompt = payload["messages"][1]["content"]
-                    table, _ = json.JSONDecoder().raw_decode(prompt.split("token of its own words):\n", 1)[1])
+                    table, _ = json.JSONDecoder().raw_decode(prompt.split("token of the words it depends on):\n", 1)[1])
                     self.assertEqual(table, expected)
                     evidence_schema = payload["format"]["$defs"]["ResponsibilitySourceEvidence"]
                     validator = Draft202012Validator(evidence_schema)
@@ -679,7 +705,7 @@ class UserMeaningInterpreterPromptTests(unittest.TestCase):
         refs = [item["ref"] for item in _source_tokens(text)]
         validator = Draft202012Validator(evidence)
         for ref in refs:
-            # Only the end is required; Host derives the start (an authored one is ignored).
+            # Only the end is required; Host derives an absent start from the previous cited end.
             self.assertTrue(validator.is_valid({"source_end_token_ref": ref}))
             self.assertTrue(validator.is_valid({"source_start_token_ref": ref, "source_end_token_ref": ref}))
         self.assertFalse(validator.is_valid({"source_start_token_ref": refs[0]}))
@@ -819,9 +845,11 @@ class UserMeaningInterpreterExecutionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(interpreter._chat.await_count, 1)
 
 
-    async def test_semantic_source_overlap_fails_closed_without_reviewer(self) -> None:
+    async def test_semantic_duplicate_responsibility_fails_closed_without_reviewer(self) -> None:
         interpreter = self._interpreter()
         invalid = _compound_output()
+        invalid["responsibilities"][1]["outcome"] = "nod"  # type: ignore[index]
+        invalid["responsibilities"][1]["source_evidence"]["source_start_token_ref"] = "t0"  # type: ignore[index]
         invalid["responsibilities"][1]["source_evidence"]["source_end_token_ref"] = "t0"  # type: ignore[index]
         interpreter._chat = mock.AsyncMock(  # type: ignore[method-assign]
             return_value={"message": {"content": json.dumps(invalid)}}

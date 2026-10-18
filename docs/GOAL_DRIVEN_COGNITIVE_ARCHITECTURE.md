@@ -2578,7 +2578,7 @@ Trusted validation checks only mechanics:
 
 - Responsibility identities are closed and unique;
 - source references belong to the authoritative admitted turn;
-- source spans are ordered, known and non-overlapping (UMI names where each Responsibility's words end; trusted code derives each start from the previous end, so independent spans partition the turn and only an equal end fails closed);
+- source spans cite known tokens in order (UMI names the first and last token of the words each Responsibility depends on; a start it leaves out is derived from the previous cited end); Responsibilities may share words, and only the same Responsibility repeated over the same span fails closed;
 - result types belong to the closed provider-neutral contract;
 - bindings, parameter tables, Goal relationship/identity and execution/provider fields are forbidden on live UMI output; complete material WHAT remains in the outcome;
 - unavailable provider support does not remove the semantic Responsibility.

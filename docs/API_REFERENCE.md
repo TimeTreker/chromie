@@ -272,7 +272,7 @@ executable args/actions, provider identity, execution methods,
 Activities, response wording, `route`, and `intent` are forbidden.
 
 UMI primary and depth use the same closed intent-only wire. Exact source spans are
-validated for identity, ordering and non-overlap. Both variants receive the complete
+validated for identity and ordering; Responsibilities may share source words. Both variants receive the complete
 authoritative token table; the existing transport budget rejects oversized input
 instead of silently dropping its tail. UMI and Fast share the ordered source-span
 decoder contract; backward endpoints are excluded before Host validation. This does

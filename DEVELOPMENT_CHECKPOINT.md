@@ -39,7 +39,9 @@ eight compound and information controls unchanged or better); workflow corpus fr
 42 (`de7c4de6…`, every UMI request recaptured for the widened `value_review` mark, no
 reply re-authored; previous freeze 41 `a36b1ebf…`). Freeze 43 (`09813fa8…`) then
 recaptured only the Planner request formats changed by the native disposition/step
-assignment branches (4,700 cases, 5,300 steps, 5 prototypes); every verdict unchanged. Gate and strict replay at the
+assignment branches (4,700 cases, 5,300 steps, 5 prototypes); every verdict unchanged. Freeze 44
+(`c808be23…`) recaptured every UMI request for shared source spans (6,000 cases, 6,500
+steps, 5 prototypes); every verdict and every reply's schema validity unchanged. Gate and strict replay at the
 delivery revision: pytest 3,955 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
 
 ## Repairs in force from this Issue
