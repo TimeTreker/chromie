@@ -35,6 +35,66 @@
     {
       "boolean": false,
       "category": "service_internal",
+      "key": "AGENT_ANTHROPIC_BASE_URL",
+      "owners": [
+        "agent/app/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_ANTHROPIC_EFFORT",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_ANTHROPIC_MAX_TOKENS_FLOOR",
+      "owners": [
+        "agent/app/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_ANTHROPIC_MODEL",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_ANTHROPIC_SERVER_SIDE_FALLBACK",
+      "owners": [
+        "agent/app/settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_ANTHROPIC_STRUCTURED_OUTPUT",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_ANTHROPIC_TIMEOUT_FLOOR_MS",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
       "key": "AGENT_CAPABILITY_CATALOG_REFRESH_SEC",
       "owners": [
         ".env.common",
@@ -609,6 +669,51 @@
       ]
     },
     {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_OPENAI_API_KEY_ENV",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_OPENAI_BASE_URL",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_OPENAI_MODEL",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_OPENAI_STRUCTURED_OUTPUT",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_OPENAI_TIMEOUT_FLOOR_MS",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
       "boolean": true,
       "category": "service_internal",
       "key": "AGENT_PLANNER_ENABLED",
@@ -1061,6 +1166,14 @@
         "agent/app/settings.py",
         "docker-compose.yml",
         "env/modes/qualification.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "ANTHROPIC_API_KEY",
+      "owners": [
+        "docker-compose.yml"
       ]
     },
     {
@@ -1970,6 +2083,14 @@
       "key": "OLLAMA_WARM_TIMEOUT_SECONDS",
       "owners": [
         ".env.common"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "OPENAI_API_KEY",
+      "owners": [
+        "docker-compose.yml"
       ]
     },
     {
@@ -3967,10 +4088,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 103,
       "public_choice": 9,
-      "service_internal": 238
+      "service_internal": 252
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 380
+    "total_keys": 394
   }
 }

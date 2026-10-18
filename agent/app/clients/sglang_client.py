@@ -70,6 +70,14 @@ class SGLangClient(OllamaClient):
             service_settings=service_settings,
         )
         self.priority_step = max(1, int(priority_step))
+        self._log_init()
+
+    def _request_headers(self) -> dict[str, str]:
+        """Per-request HTTP headers; the qualified local engine needs none."""
+
+        return {}
+
+    def _log_init(self) -> None:
         logger.info(
             "sglang_client_init purpose=%s compute_class=%s base_url=%s model=%s priority_step=%s",
             self.purpose,
@@ -208,6 +216,7 @@ class SGLangClient(OllamaClient):
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(self.timeout_ms / 1000.0),
                 trust_env=False,
+                headers=self._request_headers(),
             ) as client:
                 response = await client.post(url, json=payload)
             data = {"http_status": response.status_code, "body": response.text}
@@ -346,6 +355,7 @@ class SGLangClient(OllamaClient):
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(self.timeout_ms / 1000.0),
                 trust_env=False,
+                headers=self._request_headers(),
             ) as client:
                 async with client.stream(
                     "POST",

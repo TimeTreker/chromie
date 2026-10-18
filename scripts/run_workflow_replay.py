@@ -67,15 +67,17 @@ def main() -> int:
     parser.add_argument('--family', action='append', help='Focused diagnostic family; omit for an aggregate')
     parser.add_argument('--evidence-dir', type=Path, required=True, help='New, unused output directory')
     parser.add_argument('--candidate-role', choices=('umi', 'ga', 'fast'))
-    parser.add_argument('--candidate-url', help='Explicit Ollama-compatible service base URL; only the selected role is forwarded')
+    parser.add_argument('--candidate-provider', choices=('ollama', 'anthropic'), default='ollama',
+                        help='anthropic answers the selected role with Claude; reads ANTHROPIC_API_KEY')
+    parser.add_argument('--candidate-url', help='Explicit Ollama-compatible service base URL (optional base URL override for anthropic); only the selected role is forwarded')
     parser.add_argument('--candidate-model')
     parser.add_argument('--candidate-timeout', type=float, default=60)
     args = parser.parse_args()
-    selected = (args.candidate_role, args.candidate_url, args.candidate_model)
-    if any(selected) and not all(selected):
-        parser.error('candidate role, URL and model must be supplied together')
+    selected = (args.candidate_role, args.candidate_url or args.candidate_provider == 'anthropic', args.candidate_model)
+    if (args.candidate_role or args.candidate_url or args.candidate_model) and not all(selected):
+        parser.error('candidate role, URL and model must be supplied together (anthropic needs no URL)')
     candidate = {'role':args.candidate_role, 'url':args.candidate_url, 'model':args.candidate_model,
-                 'timeout':args.candidate_timeout} if all(selected) else None
+                 'timeout':args.candidate_timeout, 'provider':args.candidate_provider} if all(selected) else None
     if candidate and args.workers != 1:
         parser.error('candidate inference uses one worker to preserve provider concurrency')
     if sys.flags.optimize:

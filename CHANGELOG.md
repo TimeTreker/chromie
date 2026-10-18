@@ -5,6 +5,20 @@ remains available in Git history.
 
 ## Unreleased
 
+### Claude as a selectable inference provider (2026-10-18)
+
+- `AGENT_LLM_PROVIDER=anthropic` runs every Agent role, UMI included, on Claude
+  through the Anthropic Messages API with no code change; Ollama stays the default.
+  Local-only assumptions (context window preflight, `num_predict`, sampling options,
+  warmup, GPU-tuned timeouts) are translated or skipped at the provider boundary,
+  and the full request schema is re-validated before any role parser runs.
+- `AGENT_LLM_PROVIDER=openai` does the same for any other remote OpenAI-compatible
+  service (`AGENT_OPENAI_BASE_URL`, `AGENT_OPENAI_MODEL`, bearer key from
+  `OPENAI_API_KEY`), over the qualified SGLang request shape minus engine fields.
+- `scripts/run_workflow_replay.py --candidate-provider anthropic` answers one role
+  of the frozen corpus with Claude; a recorded-reference Messages endpoint replays
+  each role through the Claude wire path offline.
+
 ### Body target descriptions (owner decision, 2026-10-17)
 
 - Soridormi calls describe targets in one format: person by referent (the current

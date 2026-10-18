@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from ..inference_compute import CognitionComputeClass
 from ..settings import AgentServiceSettings
+from .anthropic_client import ClaudeClient
 from .ollama_client import OllamaClient
+from .openai_client import OpenAICompatibleClient
 from .sglang_client import SGLangClient
 
 
@@ -16,6 +18,22 @@ def build_model_client(
 ) -> OllamaClient:
     """Select one operator-configured transport without changing role semantics."""
 
+    if service_settings.llm_provider == "anthropic":
+        return ClaudeClient(
+            model,
+            timeout_ms=timeout_ms,
+            purpose=purpose,
+            compute_class=compute_class,
+            service_settings=service_settings,
+        )
+    if service_settings.llm_provider == "openai":
+        return OpenAICompatibleClient(
+            model,
+            timeout_ms=timeout_ms,
+            purpose=purpose,
+            compute_class=compute_class,
+            service_settings=service_settings,
+        )
     if service_settings.llm_provider == "sglang":
         return SGLangClient(
             service_settings.sglang_url,
