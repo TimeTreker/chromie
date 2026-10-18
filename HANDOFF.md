@@ -16,11 +16,11 @@ ordered open work are in [STATUS](docs/STATUS.md).
 - Last recorded live Agent: `chromie-agent:latest` = `rootcause18-20261016` (rollback
   image). No built image matches `main`: `rootcause19-20261016` predates the 2026-10-17
   source changes. Rebuild the Agent image from `main` before deploying.
-- Workflow corpus: freeze 41 (`a36b1ebf…`). Restore it with
+- Workflow corpus: freeze 42 (`de7c4de6…`). Restore it with
   `python -m benchmarks.regression restore-fixtures`; do not untar `frozen.tar.xz` over
   `workflow_scenarios/` (its inner `manifest.json` lacks the storage identity).
 - Evidence: `.chromie/acceptance/everyday-20261016/` (README; `run6/`, `run7/`).
-- Last gate and strict replay: pytest 3,948 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
+- Last gate and strict replay: pytest 3,951 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
 - `.env.runtime` may be in `mode:speech`; give the harness process
   `ORCH_ACTION_DRY_RUN=false CHROMIE_OPERATOR_MODE=voice_mujoco` instead of editing it.
 

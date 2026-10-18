@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "frozen_on": "2026-10-16",
+  "frozen_on": "2026-10-17",
   "author_model": "gpt-6-astra",
   "reference_kind": "assistant-authored and contract-reviewed, not independent ground truth",
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "44fbf59aaee33bb9e38d35b01383802633d9cfc56be5233c71a5c531d2fc0fea",
-    "workflow-conditional-dry.json": "256c69cca00071dc862776349a85ab7d76ac8f92768ea1ec6f2a2903c9fa7a49",
-    "workflow-conditional-rain.json": "57d4eff54c8c2efc987c8a8eded33283609b12c6432661b39ee5fa49a59322af",
-    "workflow-delayed.json": "889494cc4fc73a65eac220736c5def18cb7d950aa4c7bc7d894e2b9d931b5e0b",
-    "workflow-normal.json": "4af5c5999cb1ae1e956d2c49008cffb8d916d361a6bdb34712b9bf715b56ff0f"
+    "workflow-cancellation.json": "d7cf62e7ca8b064bd52391a6f5b13030992a545c91293bda115f01463d7df37e",
+    "workflow-conditional-dry.json": "25873b20944468e722e418ad027ebadd3b2a0265bd90c2ee0ea273fe6d3e59a9",
+    "workflow-conditional-rain.json": "34a4f6c9967509637c90a06e31cad3c45cee56265db42e1942003b95916127b9",
+    "workflow-delayed.json": "64cffad67ac8f63d43a947bc64b3a46488722033caffe6a3298ff720f7bc5ccc",
+    "workflow-normal.json": "dd21100e58c266f238d81c8776917242b961882cb90afeb79f3ed8032617827e"
   },
-  "freeze_revision": 41,
-  "freeze_note": "UMI span repair (2026-10-16). Every UMI request recaptured: Responsibilities are listed in source order, each ending later, and a reply to shared news ends where the sharing ends (live: 我考了满分！快跟我一起庆祝一下！ failed with equal ends). No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
+  "freeze_revision": 42,
+  "freeze_note": "UMI harmful-request mark (2026-10-17). Every UMI request recaptured: the UMI prompt says value_review is also true when doing or answering the request could hurt, humiliate, frighten or endanger someone (owner decision 2026-10-17), and the schema states value_review on every result type (required for speech, optional elsewhere; omitted means false). No reply re-authored; inputs, provider outcomes, expectations and splits unchanged; every case reaches its expected verdict; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }
