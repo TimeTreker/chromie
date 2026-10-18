@@ -154,7 +154,6 @@ def media_plan(
                     "rationale": "The exact media provider owns completion.",
                 }
             },
-            "goal_satisfaction": satisfaction(),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }

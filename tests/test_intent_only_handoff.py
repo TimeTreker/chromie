@@ -500,6 +500,7 @@ async def test_planner_owns_new_future_readiness_without_gi_time_fields(fault):
     request.context["goal_association_resolution"] = association.model_dump(mode="json")
     raw = json.loads((Path(__file__).resolve().parents[1] / "benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
     raw = json.loads(json.dumps(raw).replace("${goal}", goal_id))
+    raw.pop("goal_satisfaction", None)  # Retired from the stored reply: Host folds it from the per-Goal judgment.
     condition = raw["time_conditions"][0]
     condition["source_quote"] = due
     condition["due_at_ms"] = int(datetime.fromisoformat(due).timestamp() * 1000)
@@ -551,6 +552,7 @@ async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path)
     raw = json.loads((Path(__file__).resolve().parents[1] / "benchmarks/integration/scenarios/workflow-delayed.json").read_text())["model_steps"][2]["response"]
     raw = json.loads(json.dumps(raw).replace("${goal}", future))
     raw.pop("ability_needs", None)  # The resolver removes the need-first prefix before DTO validation.
+    raw.pop("goal_satisfaction", None)  # Retired from the stored reply: Host folds it from the per-Goal judgment.
     raw.update(disposition="mixed", steps=[{"step_id": "blink-now", "capability_id": "test.blink",
         "args": {"count": 3}, "depends_on": [], "source_goal_ids": [ready]}])
     raw["parameter_resolutions"] = [{"step_id": "blink-now", "parameter": "count",
@@ -560,7 +562,6 @@ async def test_new_future_goal_preserves_independent_ready_work(fault, tmp_path)
     raw["goal_outcomes"][ready] = {"disposition": "execute", "coverage": "complete", "step_ids": ["blink-now"],
         "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": [ready],
                          "unmet_goal_ids": [], "unmet_requirements": [], "rationale": "Immediate action."}}
-    raw["goal_satisfaction"].update(score=0.5, status="partial", satisfied_goal_ids=[ready])
     if fault == "early_work":
         raw["steps"][0]["source_goal_ids"].append(future)
     elif fault == "false_fulfillment":
@@ -658,7 +659,7 @@ async def test_canonical_fast_need_search_retains_original_intent_and_one_semant
     raw = multi_goal_plan(disposition="execute", coverage="complete", goal_summary=request.text,
         steps=[execute_step("turn", "test.turn", {"rotation_degrees":45}, ["g"], "Perform the requested turn.")],
         goal_outcomes={"g":execute_outcome("g",["turn"],"Execute the requested turn.")},
-        goal_satisfaction=exact_satisfaction(["g"]), parameter_resolutions=[{
+         parameter_resolutions=[{
             "step_id":"turn","parameter":"rotation_degrees","value":45,"strategy":"semantic_realization",
             "source_goal_ids":["g"],"source_quote":"45 degrees","confidence":1.,"blocking":False,
             "rationale":"Realize the exact requested rotation."}])

@@ -5,6 +5,28 @@ remains available in Git history.
 
 ## Unreleased
 
+### Host derives the Planner's aggregate goal_satisfaction (freeze 45, 2026-10-18)
+
+- The `/plan` model contract no longer has a model-writable Plan-level
+  `goal_satisfaction`: the decoder schema and `PlannerModelOutput`
+  (`additionalProperties: false`) reject it, and `satisfaction` is now required on
+  every Goal outcome of every answer, single-Goal included. Host folds the
+  aggregate mechanically from those judgments (lowest score, worst status, unions
+  of satisfied/unmet Goal IDs and unmet requirements, joined rationales) through
+  one shared helper (`derive_goal_satisfaction`), the rule the Evidence re-entry
+  lift already used; in the 6,000-case frozen corpus the model-written aggregate
+  equalled this fold in every reference. Plan metadata records
+  `model_authored_goal_satisfaction: false` and `host_derived_goal_satisfaction: true`.
+  Every semantic check (unavailable cannot claim exact, foreign Goal IDs,
+  conservation) now applies to the per-Goal values or the derived aggregate.
+  Removing the field from every schema pass and native assignment branch shrinks
+  the compact request schema from 138,295 to 101,519 bytes for one Goal and from
+  315,090 to 201,819 bytes for two. `/plan-advance` and the Evidence re-entry
+  output are unchanged. Authored workflow corpus references drop the retired
+  key (`current_contract_reference` projects it out of stored fast replies);
+  workflow corpus freeze 45 recaptures every Planner request and projects the
+  key out of stored fast replies; no reply otherwise re-authored.
+
 ### UMI Responsibilities may share source words (freeze 44, 2026-10-18)
 
 - A Responsibility's `source_evidence` names the first and last token of the

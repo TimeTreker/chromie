@@ -87,7 +87,6 @@ class ResourceAcquisitionContractTests(unittest.TestCase):
                         "rationale": "The advertised Capability set is selected.",
                     }
                 },
-                "goal_satisfaction": satisfaction,
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             }

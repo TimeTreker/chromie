@@ -35,11 +35,19 @@ from tests.planner_test_support import (
 
 
 def with_goal_satisfaction(raw):
-    """Author the per-Goal satisfaction the one Planner's decoder requires for completed Goals."""
+    """Author the per-Goal satisfaction every Goal outcome carries (Host folds the aggregate)."""
     for goal_id, outcome in raw.get("goal_outcomes", {}).items():
         if outcome.get("disposition") in {"execute", "respond"}:
             outcome.setdefault("satisfaction", {"score": 1.0, "status": "exact", "satisfied_goal_ids": [goal_id]})
+        else:
+            outcome.setdefault("satisfaction", {"score": 0.0, "status": "unsatisfied", "unmet_goal_ids": [goal_id],
+                                                "unmet_requirements": ["The Goal's requirement is not met."]})
     return raw
+
+
+def folded_unmet_goal_ids(raw):
+    """The unmet Goal IDs Host derives from a reply's per-Goal satisfaction judgments."""
+    return [gid for outcome in raw["goal_outcomes"].values() for gid in outcome["satisfaction"]["unmet_goal_ids"]]
 
 
 class PlannerWorkScopeValidationTests(unittest.TestCase):
@@ -308,7 +316,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
                     self.assertEqual(plan.disposition, raw["disposition"])
                     self.assertEqual(plan.steps, [])
                     self.assertEqual(plan.goal_outcomes[0].disposition, disposition)
-                    self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, raw["goal_satisfaction"]["unmet_goal_ids"])
+                    self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, folded_unmet_goal_ids(raw))
                     self.assertEqual(len(model.prompts), 1)
 
     def test_speech_schema_matches_host_aggregate_without_inventing_work(self):
@@ -352,25 +360,28 @@ class CanonicalPlanContractTests(unittest.TestCase):
                 plan = asyncio.run(PlannerResolver(fake, FullCatalog()).resolve(run_request))
                 self.assertNotIn("error", plan.metadata)
                 schema = fake.prompts[0][1]["response_format"]
-                for fault in ("nested_satisfied", "aggregate_exact"):
+                # The model writes satisfaction per Goal only; Host folds the aggregate. A
+                # satisfied limitation and a model-written aggregate are both rejected by
+                # the decoder schema and the DTO; the canonical conservation rule still
+                # rejects an aggregate that contradicts the limitation.
+                for fault in ("nested_satisfied", "model_written_aggregate"):
                     with self.subTest(sibling=sibling, disposition=disposition, fault=fault):
                         candidate = copy.deepcopy(raw)
                         goal_id = next(iter(candidate["goal_outcomes"]))
+                        exact = dict(score=1.0, status="exact", satisfied_goal_ids=list(candidate["goal_outcomes"]),
+                                     unmet_goal_ids=[], unmet_requirements=[])
                         if fault == "nested_satisfied":
                             candidate["goal_outcomes"][goal_id]["satisfaction"].update(
                                 score=0.75, status="substantial", satisfied_goal_ids=[goal_id],
                                 unmet_goal_ids=[], unmet_requirements=[],
                             )
                         else:
-                            candidate["goal_satisfaction"].update(
-                                score=1.0, status="exact", satisfied_goal_ids=list(candidate["goal_outcomes"]),
-                                unmet_goal_ids=[], unmet_requirements=[],
-                            )
+                            candidate["goal_satisfaction"] = dict(exact, rationale="Model-written aggregate.")
                         self.assertFalse(Draft202012Validator(schema).is_valid(candidate))
                         with self.assertRaisesRegex(ValueError, "satisfaction"):
                             PlannerModelOutput.model_validate(candidate)
                         canonical_candidate = plan.model_dump(mode="python")
-                        canonical_candidate["goal_satisfaction"] = candidate["goal_satisfaction"]
+                        canonical_candidate["goal_satisfaction"] = dict(exact, rationale="Contradicts the limitation.")
                         canonical_candidate["goal_outcomes"][0]["satisfaction"] = candidate["goal_outcomes"][goal_id]["satisfaction"]
                         with self.assertRaisesRegex(ValueError, "satisfaction"):
                             CanonicalPlan.model_validate(canonical_candidate)
@@ -434,11 +445,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "step_ids": [],
                 }
             },
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-info"],
-            },
         }
         ollama = SequencedOllama([with_goal_satisfaction(raw)])
 
@@ -491,14 +497,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "rationale": "Exact body action coverage.",
                 }
             },
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-blink"],
-                "unmet_goal_ids": [],
-                "unmet_requirements": [],
-                "rationale": "Exact body action coverage.",
-            },
             "unresolved": [],
             "parameter_resolutions": [],
             "plan_relation": "exact",
@@ -527,14 +525,6 @@ class PlannerResolverTests(unittest.TestCase):
             "goal_summary": "Walk forward for fifteen seconds.",
             "steps": [],
             "goal_outcomes": {'goal-walk': {'disposition': 'respond', 'coverage': 'complete', 'step_ids': [], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-walk'], 'unmet_goal_ids': [], 'unmet_requirements': [], 'rationale': 'Incorrectly declares the physical Goal complete.'}}},
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-walk"],
-                "unmet_goal_ids": [],
-                "unmet_requirements": [],
-                "rationale": "Incorrectly declares the physical Goal complete.",
-            },
             "unresolved": [],
             "parameter_resolutions": [],
             "plan_relation": "exact",
@@ -613,7 +603,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "rationale": reason,
                 }
             },
-            "goal_satisfaction": satisfaction,
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -702,7 +691,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "rationale": "Both advertised capability contracts are required.",
                 }
             },
-            "goal_satisfaction": satisfaction,
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -855,7 +843,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-action"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = SequencedOllama([parallel])
 
@@ -956,14 +943,6 @@ class PlannerResolverTests(unittest.TestCase):
                         "rationale": "No exact singing provider is registered.",
                     },
                 },
-                "goal_satisfaction": {
-                    "score": 0.5,
-                    "status": "partial",
-                    "satisfied_goal_ids": ["goal-walk"],
-                    "unmet_goal_ids": ["goal-sing"],
-                    "unmet_requirements": ["singing provider unavailable"],
-                    "rationale": "Walking is covered but singing is unavailable.",
-                },
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             }
@@ -1010,7 +989,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-action"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         run_request = canonical_plan_request("Walk while blinking and singing.")
         context = dict(run_request.context)
@@ -1076,7 +1054,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-action"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         run_request = canonical_plan_request("Walk for 2 seconds.")
         run_request.context["goal_association_resolution"]["new_goals"][0]["description"] = (
@@ -1135,7 +1112,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-action"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         run_request = canonical_plan_request("Walk for 2 seconds.")
         run_request.context["goal_association_resolution"]["new_goals"][0]["description"] = (
@@ -1200,7 +1176,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-action"],
                 },
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = SequencedOllama([parallel])
 
@@ -1251,7 +1226,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "satisfaction": {"score": 1.0, "status": "exact"},
                 },
             },
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = SequencedOllama([complete])
 
@@ -1296,7 +1270,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "satisfaction": {"score": 1.0, "status": "substantial"},
                 },
             },
-            "goal_satisfaction": {"score": 1.0, "status": "substantial"},
         }
         repaired = {
             **invalid,
@@ -1314,7 +1287,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "satisfaction": {"score": 1.0, "status": "exact"},
                 },
             },
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = SequencedOllama([repaired])
 
@@ -1420,14 +1392,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "rationale": "The blinking step owns this goal.",
                 },
             },
-            "goal_satisfaction": {
-                "score": 0.95,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-walk", "goal-blink"],
-                "unmet_goal_ids": ["goal-sing"],
-                "unmet_requirements": ["singing provider unavailable"],
-                "rationale": "Body work is covered but singing is unavailable.",
-            },
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -1490,14 +1454,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "rationale": "The blinking step owns this goal.",
                 },
             },
-            "goal_satisfaction": {
-                "score": 0.67,
-                "status": "partial",
-                "satisfied_goal_ids": ["goal-walk", "goal-blink"],
-                "unmet_goal_ids": ["goal-sing"],
-                "unmet_requirements": ["singing provider unavailable"],
-                "rationale": "Body work is covered but singing is unavailable.",
-            },
         }
         catalog = FullCatalog()
         catalog.items[0] = catalog.items[0].model_copy(update={"can_run_parallel": True})
@@ -1514,8 +1470,12 @@ class PlannerResolverTests(unittest.TestCase):
             [step.capability_id for step in plan.steps],
             ["soridormi.walk_forward", "soridormi.blink_eyes"],
         )
-        self.assertEqual(plan.goal_satisfaction.status, "partial")
+        # Host folds the aggregate: the unavailable singing Goal sets the worst status.
+        self.assertEqual(plan.goal_satisfaction.status, "unsatisfied")
+        self.assertEqual(plan.goal_satisfaction.score, 0.0)
         self.assertEqual(plan.goal_satisfaction.unmet_goal_ids, ["goal-sing"])
+        self.assertEqual(plan.goal_satisfaction.satisfied_goal_ids, ["goal-walk", "goal-blink"])
+        self.assertIs(plan.metadata["model_authored_goal_satisfaction"], False)
         self.assertEqual(len(ollama.prompts), 1)
         self.assertIn('playing a recording is not singing', ollama.prompts[0][0])
         # The one Planner's decoder itself admits "execute siblings, report singing
@@ -1547,7 +1507,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "reason_summary": "Execute the requested physical blink action.",
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -1620,14 +1579,8 @@ class PlannerResolverTests(unittest.TestCase):
                         "disposition": "execute",
                         "coverage": "complete",
                         "step_ids": ["walk"],
+                        "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-action"]},
                     }
-                },
-                "goal_satisfaction": {
-                    "score": 1.0,
-                    "status": "exact",
-                    "satisfied_goal_ids": ["goal-action"],
-                    "unmet_goal_ids": [],
-                    "unmet_requirements": [],
                 },
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
@@ -1681,14 +1634,6 @@ class PlannerResolverTests(unittest.TestCase):
                         "rationale": "Greet and blink.",
                     }
                 },
-                "goal_satisfaction": {
-                    "score": 1.0,
-                    "status": "exact",
-                    "satisfied_goal_ids": ["goal-greet"],
-                    "unmet_goal_ids": [],
-                    "unmet_requirements": [],
-                    "rationale": "Complete.",
-                },
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             },
@@ -1715,7 +1660,9 @@ class PlannerResolverTests(unittest.TestCase):
         self.assertEqual(schema["title"], "FastPlannerModelOutput")
         self.assertNotIn("goal_ids", schema["properties"])
         self.assertIn("confidence", schema["required"])
-        self.assertIn("goal_satisfaction", schema["required"])
+        # Host folds the aggregate; the model cannot write it.
+        self.assertNotIn("goal_satisfaction", schema["properties"])
+        self.assertNotIn("goal_satisfaction", schema["required"])
         self.assertIn("goal_outcomes", schema["required"])
         satisfaction_schema = schema["$defs"]["PlannerGoalSatisfaction"]
         self.assertIn(
@@ -1806,11 +1753,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "step_ids": ["step_blink_twice"],
                 },
             },
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": goal_ids,
-            },
         }
         ollama = SequencedOllama([with_goal_satisfaction(repaired)])
 
@@ -1833,7 +1775,8 @@ class PlannerResolverTests(unittest.TestCase):
         # Every exposed plan shape is a complete closed object; nothing outside it is required.
         for branch in plan_assignment_branches(ollama.prompts[0][1]["response_format"]):
             self.assertFalse(branch["additionalProperties"])
-            self.assertTrue({"disposition", "steps", "goal_outcomes", "goal_satisfaction"} <= set(branch["required"]))
+            self.assertTrue({"disposition", "steps", "goal_outcomes"} <= set(branch["required"]))
+            self.assertNotIn("goal_satisfaction", branch["properties"])
 
     def test_multi_goal_step_ownership_is_never_filled_from_all_host_goals(self):
         invalid = {
@@ -1859,7 +1802,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "step_ids": ["blink"],
                 },
             },
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = SequencedOllama([invalid, invalid])
         plan = asyncio.run(
@@ -1916,11 +1858,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "step_ids": ["step_joke"],
                 },
             },
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": goal_ids,
-            },
         }
 
         def outcome_satisfaction(goal_id):
@@ -1949,7 +1886,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "satisfaction": outcome_satisfaction("goal-joke"),
                 },
             },
-            "goal_satisfaction": invalid["goal_satisfaction"],
         }
         ollama = SequencedOllama([repaired])
 
@@ -2018,11 +1954,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "satisfaction": satisfaction("goal-blink"),
                 },
             },
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": goal_ids,
-            },
         }
         repaired = {
             "disposition": "mixed",
@@ -2045,7 +1976,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "satisfaction": satisfaction("goal-joke"),
                 },
             },
-            "goal_satisfaction": invalid["goal_satisfaction"],
         }
         ollama = SequencedOllama([repaired])
 
@@ -2099,11 +2029,6 @@ class PlannerResolverTests(unittest.TestCase):
                     },
                 },
             },
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": goal_ids,
-            },
         }
 
         with self.assertRaisesRegex(
@@ -2131,11 +2056,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": goal_ids,
-            },
         }
         execute_outcome = {
             "disposition": "execute",
@@ -2207,21 +2127,9 @@ class PlannerResolverTests(unittest.TestCase):
                     "step_ids": ["blink"],
                 },
             },
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "partial",
-                "satisfied_goal_ids": [],
-                "unmet_requirements": ["All goals are pending execution of steps."],
-            },
         }
         repaired = {
             **misunderstood,
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": goal_ids,
-                "unmet_requirements": [],
-            },
         }
         ollama = SequencedOllama([with_goal_satisfaction(repaired)])
 
@@ -2269,11 +2177,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-action"],
                 }
             ],
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-action"],
-            },
             "plan_relation": "safe_adjustment",
             "user_confirmation_required": True,
         }
@@ -2302,7 +2205,14 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-action"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
+            "goal_outcomes": {
+                "goal-action": {
+                    "disposition": "execute",
+                    "coverage": "complete",
+                    "step_ids": ["blink"],
+                    "satisfaction": {"score": 0.8, "status": "substantial", "satisfied_goal_ids": ["goal-action"]},
+                }
+            },
             "plan_relation": "alternative",
             "user_confirmation_required": False,
         }
@@ -2328,12 +2238,12 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-action"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
             "plan_relation": "alternative",
             "user_confirmation_required": True,
         }
 
-        with self.assertRaisesRegex(ValueError, "goal_outcomes keys must cover exactly"):
+        # Without goal_outcomes there is no per-Goal satisfaction for Host to fold.
+        with self.assertRaisesRegex(ValueError, "requires goal_outcomes"):
             validate_planner_model_output(
                 raw,
                 planner_tier="fast",
@@ -2369,7 +2279,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "step_ids": [],
                 }
             },
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = SequencedOllama([invalid])
 
@@ -2422,7 +2331,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "step_ids": ["status"],
                 },
             },
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         revised = {
             "disposition": "execute",
@@ -2445,7 +2353,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "step_ids": ["look"],
                 }
             },
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = SequencedOllama([with_goal_satisfaction(revised)])
 
@@ -2467,7 +2374,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "parameters": {"count": 2},
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
 
         plan = asyncio.run(
@@ -2512,7 +2418,6 @@ class PlannerResolverTests(unittest.TestCase):
             "steps": [],
             "unresolved": ["walking duration"],
         }
-        raw["goal_satisfaction"] = copy.deepcopy(raw["goal_outcomes"]["goal-action"]["satisfaction"])
         plan = asyncio.run(
             PlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(canonical_plan_request("往前走。"))
         )
@@ -2574,12 +2479,6 @@ class PlannerResolverTests(unittest.TestCase):
                         "unmet_goal_ids": ["goal-coffee"],
                     },
                 },
-            },
-            "goal_satisfaction": {
-                "score": 0.5,
-                "status": "partial",
-                "satisfied_goal_ids": ["goal-nod"],
-                "unmet_goal_ids": ["goal-coffee"],
             },
         }
         plan = asyncio.run(

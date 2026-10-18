@@ -59,7 +59,7 @@ def report(request):
                 goal_summary='Report the trusted control result.', response_text=speech,
                 steps=[], auxiliary_activities=[], unresolved=[],
                 parameter_resolutions=[], time_conditions=[], plan_relation='exact',
-                user_confirmation_required=False, goal_satisfaction=copy.deepcopy(satisfaction),
+                user_confirmation_required=False,
                 goal_outcomes={gid: dict(disposition='respond', coverage='complete',
                     response_text=speech, unresolved=[], step_ids=[], satisfaction=satisfaction,
                     rationale='Report the exact trusted control facts.')}))
@@ -100,8 +100,8 @@ def test_control_scope_rejects_false_completion_and_execution(resolver, mutation
         request, entries = case_request('en', 'cancelled')
         raw = report(request); gid = request.planner_reentry_scope.goal_ids[0]
         if mutation == 'fake_fulfillment':
-            for sat in (raw['goal_satisfaction'], raw['goal_outcomes'][gid]['satisfaction']):
-                sat.update(score=1, status='exact', satisfied_goal_ids=[gid], unmet_goal_ids=[], unmet_requirements=[])
+            raw['goal_outcomes'][gid]['satisfaction'].update(
+                score=1, status='exact', satisfied_goal_ids=[gid], unmet_goal_ids=[], unmet_requirements=[])
         elif mutation == 'confirmation':
             raw['user_confirmation_required'] = True
         elif mutation == 'reschedule':

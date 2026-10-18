@@ -44,7 +44,6 @@ def _execute_output(*, goal_id: str, capability_id: str, args: dict) -> dict:
                 "reason_summary": "Execute the grounded read.",
             }
         ],
-        "goal_satisfaction": _satisfaction(goal_id),
         "disposition": "execute",
         "coverage": "complete",
         "confidence": 1.0,

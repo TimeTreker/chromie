@@ -177,14 +177,6 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
                     "rationale": "A small bounded count is reversible and low consequence.",
                 }
             ],
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": [],
-                "unmet_goal_ids": [],
-                "unmet_requirements": [],
-                "rationale": "The requested blink is fully covered.",
-            },
         }
         plan = asyncio.run(
             PlannerResolver(FakeOllama([raw]), Catalog()).resolve(
@@ -232,12 +224,6 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
                     "rationale": "Duration materially changes motion exposure.",
                 }
             ],
-            "goal_satisfaction": {
-                "score": 0.4,
-                "status": "partial",
-                "unmet_goal_ids": ["goal-walk"],
-                "unmet_requirements": ["walking duration"],
-            },
         }
         plan = asyncio.run(
             PlannerResolver(FakeOllama([raw]), Catalog()).resolve(
@@ -279,11 +265,6 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
-            "goal_satisfaction": {
-                "score": 0.6,
-                "status": "partial",
-                "unmet_requirements": ["requested repeated blinking"],
-            },
         }
         exact = {
             "goal_outcomes": {
@@ -313,7 +294,6 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = FakeOllama([low, exact])
         plan = asyncio.run(
@@ -413,11 +393,6 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
-            "goal_satisfaction": {
-                "score": 0.3,
-                "status": "partial",
-                "unmet_requirements": ["duration"],
-            },
         }
         ollama = FakeOllama([raw])
         asyncio.run(

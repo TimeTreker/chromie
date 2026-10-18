@@ -224,8 +224,9 @@ def _raw_reference_case(family, action, value_index, form):
         reject(case,'fast')
     if family == 'acquisition_false_completion':
         raw = case['model_steps'][2]['response']
-        for sat in (raw['goal_satisfaction'],raw['goal_outcomes']['${goal}']['satisfaction']):
-            sat.update(score=1.0, status='exact', satisfied_goal_ids=['${goal}'], unmet_goal_ids=[], unmet_requirements=[])
+        # Host folds the Plan-level satisfaction, so the false completion lives in the per-Goal judgment.
+        raw['goal_outcomes']['${goal}']['satisfaction'].update(
+            score=1.0, status='exact', satisfied_goal_ids=['${goal}'], unmet_goal_ids=[], unmet_requirements=[])
         reject(case,'fast')
     if family in {'multi_goal','multi_goal_omission'}:
         second_action = 'walk' if action == 'blink' else 'blink'
@@ -254,7 +255,6 @@ def _raw_reference_case(family, action, value_index, form):
         extra_outcome = json.loads(json.dumps(raw['goal_outcomes']['${goal}']).replace('${goal}','${goal2}'))
         extra_outcome['step_ids'] = ['second-action']
         raw['goal_outcomes']['${goal2}'] = extra_outcome
-        raw['goal_satisfaction']['satisfied_goal_ids'].append('${goal2}')
         case['expected_provider_calls'].append({'capability':second_capability,'args':work['args']})
         if family == 'multi_goal_omission':
             del raw['goal_outcomes']['${goal2}']
@@ -279,9 +279,8 @@ def _speech_plan(raw, text, *, clarify=False):
     if clarify:
         raw['coverage'] = outcome['coverage'] = 'partial'
         raw['unresolved'] = outcome['unresolved'] = ['The requested time or referent is not determined.']
-        for sat in (raw['goal_satisfaction'],outcome['satisfaction']):
-            sat.update(score=0.0, status='unsatisfied', satisfied_goal_ids=[], unmet_goal_ids=['${goal}'],
-                unmet_requirements=['The user must supply the missing time or referent.'])
+        outcome['satisfaction'].update(score=0.0, status='unsatisfied', satisfied_goal_ids=[], unmet_goal_ids=['${goal}'],
+            unmet_requirements=['The user must supply the missing time or referent.'])
     return raw
 
 
@@ -399,7 +398,6 @@ def extended_case(family, action, value_index, form):
             extra_outcome.update(disposition='respond',step_ids=[],social_fixture_text=reply)
             extra_outcome['satisfaction']['satisfied_goal_ids'] = ['${goal2}']
             raw['goal_outcomes']['${goal2}'] = extra_outcome
-            raw['goal_satisfaction']['satisfied_goal_ids'].append('${goal2}')
             raw['social_fixture_text'] = reply
             raw['disposition'] = 'mixed'
         else:
@@ -473,12 +471,14 @@ def reference_case(family, action, value_index, form):
 
 
 def current_contract_reference(case):
-    """Author existing required WHAT metadata and remove retired GA wire fields.
+    """Author existing required WHAT metadata and remove retired GA and Planner wire fields.
 
     This is explicit corpus maintenance, never part of load_case or strict replay.
     The action is an authored scenario parameter, not inferred from model output.
     Prototype episodes all concern blinking; multi-Goal contrasts declare a second
-    walk for blink, otherwise a second blink. Fault payloads remain intact.
+    walk for blink, otherwise a second blink. Fault payloads remain intact. Stored fast
+    replies drop the retired Plan-level ``goal_satisfaction``: Host now folds it from the
+    per-Goal ``goal_outcomes[*].satisfaction`` the reply still carries.
     """
     case = copy.deepcopy(case)
     action = case.get('parameters', {}).get('action', 'blink')
@@ -497,6 +497,8 @@ def current_contract_reference(case):
                 raise ValueError('Nonempty retired GA decisions need explicit reference review')
             step['response'].pop('decision', None)
             step['response'].pop('non_goal_responsibility_refs', None)
+        elif step['role'] == 'fast' and isinstance(step['response'], dict):
+            step['response'].pop('goal_satisfaction', None)
     return case
 
 

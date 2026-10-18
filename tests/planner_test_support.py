@@ -316,7 +316,6 @@ def multi_goal_plan(
     goal_summary: str,
     steps: list[dict],
     goal_outcomes: dict[str, dict],
-    goal_satisfaction: dict,
     response_text: str = "",
     unresolved: list[str] | None = None,
     parameter_resolutions: list[dict] | None = None,
@@ -336,7 +335,6 @@ def multi_goal_plan(
         "unresolved": list(unresolved or []),
         "parameter_resolutions": list(parameter_resolutions or []),
         "goal_outcomes": goal_outcomes,
-        "goal_satisfaction": goal_satisfaction,
         "plan_relation": "exact",
         "user_confirmation_required": False,
     }
@@ -534,10 +532,6 @@ def speech_outcomes(disposition, sibling=False):
     texts = {"respond": "Hello.", "clarify": "Which sentence do you mean?",
              "unavailable": "I do not have the earlier sentence."}
     fulfilled = disposition == "respond"
-    assessment = satisfaction(ids, fulfilled)
-    if sibling and not fulfilled:
-        assessment["satisfied_goal_ids"] = [ids[1]]
-        assessment["unmet_goal_ids"] = [ids[0]]
     raw = {
         "disposition": "mixed" if sibling and not fulfilled else disposition,
         "coverage": "complete" if sibling or fulfilled else "partial",
@@ -549,7 +543,7 @@ def speech_outcomes(disposition, sibling=False):
                   "rationale": "Preserve this Goal's outcome."}
             for index, (gid, value) in enumerate(zip(ids, dispositions))
         },
-        "goal_satisfaction": assessment, "plan_relation": "exact", "user_confirmation_required": False,
+        "plan_relation": "exact", "user_confirmation_required": False,
     }
     run_request = canonical_plan_request("Say the sentence, then say goodnight.", goal_ids=ids)
     for goal in run_request.context["goal_association_resolution"]["new_goals"]:
@@ -583,7 +577,7 @@ def canonical_compound_body_case():
         ], 'cancel_activity_ids': [], 'unresolved': [], 'parameter_resolutions': [],
         'time_conditions': [], 'goal_outcomes': {goal_id: {'disposition': 'execute', 'coverage': 'complete',
             'step_ids': ['walk', 'blink'], 'unresolved': [], 'satisfaction': satisfaction,
-            'rationale': 'One complete source requests both effects.'}}, 'goal_satisfaction': satisfaction,
+            'rationale': 'One complete source requests both effects.'}},
         'plan_relation': 'exact', 'user_confirmation_required': False,
     }
     return request, raw

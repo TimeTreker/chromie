@@ -261,7 +261,11 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 in branch.get("properties", {}).get("disposition", {}).get("enum", [])
                 and "exact"
                 not in branch.get("properties", {})
-                .get("goal_satisfaction", {})
+                .get("goal_outcomes", {})
+                .get("properties", {})
+                .get("goal-weather", {})
+                .get("properties", {})
+                .get("satisfaction", {})
                 .get("properties", {})
                 .get("status", {})
                 .get("enum", [])
@@ -322,11 +326,12 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             == ["safe_adjustment", "alternative"]
         )
         self.assertEqual(
-            nonexact_satisfaction["then"]["properties"]["goal_satisfaction"]["properties"][
-                "status"
-            ]["enum"],
+            nonexact_satisfaction["then"]["properties"]["goal_outcomes"]["properties"]["goal-walk"][
+                "properties"
+            ]["satisfaction"]["properties"]["status"]["enum"],
             ["substantial"],
         )
+        self.assertNotIn("goal_satisfaction", nonexact_satisfaction["then"]["properties"])
         self.assertEqual(
             nonexact_satisfaction["then"]["properties"]["goal_outcomes"]["properties"]["goal-walk"][
                 "properties"
@@ -405,10 +410,10 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         goal = {"goal_id": "goal-blink", "object": {
             "bindings": {"count": {"entity_type": "count", "value": "4"}}}}
         output = PlannerModelOutput(disposition="execute", coverage="complete", confidence=1,
-            goal_satisfaction={"score": 1, "status": "exact", "satisfied_goal_ids": ["goal-blink"],
-                               "rationale": "Requested count is represented in the owned blink."},
             steps=[{"step_id": "blink", "capability_id": "soridormi.blink_eyes", "args": {"count": 4},
-                    "depends_on": [], "source_goal_ids": ["goal-blink"]}])
+                    "depends_on": [], "source_goal_ids": ["goal-blink"]}],
+            goal_outcomes={"goal-blink": {"disposition": "execute", "coverage": "complete", "step_ids": ["blink"],
+                "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-blink"]}}})
         capabilities = [{"capability_id": "soridormi.blink_eyes", "input_schema": argument_schema}]
         planner_validation.validate_goal_binding_argument_grounding(
             output, authoritative_goals=[goal], capabilities=capabilities)
@@ -569,7 +574,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                             "step_ids": [],
                         },
                     },
-                    "goal_satisfaction": {"score": 1.0, "status": "exact"},
                 }
             )
 
@@ -642,7 +646,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                         "rationale": "Incorrectly assigns motion to speech.",
                     }
                 },
-                "goal_satisfaction": satisfaction,
             }
         )
         with self.assertRaisesRegex(
@@ -756,7 +759,9 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(outcomes["required"], ["goal-weather"])
         self.assertEqual(outcomes["minProperties"], 1)
         self.assertEqual(outcomes["maxProperties"], 1)
-        self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
+        # Host folds the aggregate from the required per-Goal judgment.
+        self.assertNotIn("goal_satisfaction", schema["properties"])
+        self.assertIn("satisfaction", outcomes["properties"]["goal-weather"]["required"])
 
     def test_tool_route_work_schema_excludes_speech_authority(self) -> None:
         for tier in ("fast",):
@@ -792,11 +797,6 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
                 "coverage": "complete",
                 "confidence": 1.0,
                 "steps": steps,
-                "goal_satisfaction": {
-                    "score": 1.0,
-                    "status": "exact",
-                    "satisfied_goal_ids": ["goal-blink"],
-                },
             }
             for planner_tier in ("fast",):
                 with (
@@ -1069,7 +1069,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             "respond",
             schema["properties"]["disposition"]["enum"],
         )
-        self.assertFalse(_allows_null(schema["properties"]["goal_satisfaction"]))
+        self.assertNotIn("goal_satisfaction", schema["properties"])
 
 
 if __name__ == "__main__":
