@@ -1,5 +1,9 @@
 from __future__ import annotations
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, GoalDrivenRuntimeCoordinator, CognitiveRuntimePolicy
+from orchestrator.runtime.cognitive_runtime import (
+    GoalDrivenRuntimeCoordinator,
+    CognitiveRuntimePolicy,
+)
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 
 
@@ -8,6 +12,7 @@ from pydantic import ValidationError
 
 from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
 from shared.chromie_contracts.plan import CanonicalPlan, GoalSatisfactionAssessment
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def _satisfaction(goal_id: str) -> dict[str, object]:
@@ -160,7 +165,7 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
         async def resolve_social_cognition(self, session, *, request, **kwargs):
             return social_fixture_resolution(request, "I can see it now.")
 
-        async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+        async def resolve_plan(self, _session, *, request, timeout_ms):
             self.request = request
             return work_fixture(followup)
 
@@ -168,10 +173,10 @@ def test_terminal_evidence_reentry_exposes_prior_expectation_without_promoting_i
         async def build_social_cognition_response(self, **_kwargs):
             return InteractionResponse(interaction_id="after-observation", status="ok")
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Client()
     assistant.cognitive_runtime_policy = SimpleNamespace(
-        fast_planner_timeout_ms=3000,
+        planner_timeout_ms=3000,
         deliberative_timeout_ms=6000,
     )
     assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(

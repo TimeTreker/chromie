@@ -4,8 +4,10 @@
 **/.pytest_cache/
 **/.mypy_cache/
 .git/
-.env
-.env.*
+# Env files at any depth (for example orchestrator/.env.local) stay out of
+# every image build context.
+**/.env
+**/.env.*
 .venv/
 venv/
 hf_cache/

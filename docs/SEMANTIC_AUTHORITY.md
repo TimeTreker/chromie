@@ -140,7 +140,7 @@ or remain silent; it cannot predict unfinished Work decisions. Canonical Goal bi
 does not itself require another utterance. Required answer/input/confirmation Needs
 are joined to the exact validated Plan; factual results require admitted Evidence.
 
-For Goal-bound planning, each Fast or Deep invocation authors its complete Plan,
+For Goal-bound planning, each Planner invocation authors its complete Plan,
 per-Goal outcomes and grounding/coverage evidence in its primary result. A Goal
 with `entity_type=action_list` does not introduce an exception
 to Charter principles 30–31. A second model call must not audit, accept/reject,
@@ -155,7 +155,7 @@ Before commitment, genuinely unresolved HOW acquires what is missing within the 
 Planner: library contracts through need-first search (one more pass with the loaded
 contracts, never a review of the first), Evidence through staged re-entry, or the
 person's input through clarification; otherwise the Planner reports an honest
-limitation. The Deep Planner delegation was retired on 2026-10-11. A rejection is
+limitation. A rejection is
 terminal for that attempt, and a completed decision cannot be reopened by another
 model review. New authoritative Goal, Work, Evidence
 or Situation state may independently trigger the existing scoped Planner path.
@@ -165,7 +165,7 @@ only by the particular role's existing contract. The Planner does not invoke
 repair generations. GA's separately bounded container repair must
 preserve every primary claim through deterministic preflight and comparison; it
 does not authorize Planner review or semantic rewriting. See the
-[turn-loop depth and repair contract](COGNITIVE_TURN_LOOP.md#30-fastdeep-escalation-is-cognition-depth-not-repair).
+[turn-loop depth and repair contract](COGNITIVE_TURN_LOOP.md#30-deeper-passes-are-cognition-depth-not-repair).
 
 UMI's parser and projection have the following #40 classification. A deterministic
 operation is permitted because it preserves an explicit contract, not merely
@@ -190,8 +190,8 @@ Offline semantic qualification may review retained primary results under the
 evaluation evidence: they cannot replace candidate results, mutate Runtime state,
 or feed a repair back into the current online decision.
 
-`GET /semantic-authority` exposes the maintained machine-readable authority
-matrix from the Agent service (`semantic_authority_route_matrix()`). It covers the
+`semantic_authority_route_matrix()` (checked by `scripts/semantic_authority_audit.py`)
+is the maintained machine-readable authority matrix. It covers the
 three cognitive Runtime routes in the table above (`apply`, `report_only` and
 Goal-free Situation); the Gateway reflex and Agent-endpoint rows are pre-semantic or
 module-local and are documented here only.

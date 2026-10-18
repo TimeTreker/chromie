@@ -432,7 +432,7 @@ def fast_evidence_reentry_response_schema(
     respond_requires_commitment: bool = False,
     held_effect_goal_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Compact decoder contract for trusted Fast Planner Evidence re-entry.
+    """Compact decoder contract for trusted Planner Evidence re-entry.
 
     The model decides only post-execution next action and genuinely new Work. Host
     materializes the redundant Planner/CanonicalPlan envelope afterwards. Keeping this
@@ -752,10 +752,10 @@ def fast_multi_goal_response_schema(
 ) -> dict[str, Any]:
     """Return a decoder-tight, model-authored multi-goal plan schema.
 
-    The Fast Planner model authors the semantic plan itself: aggregate
+    The Planner model authors the semantic plan itself: aggregate
     disposition and coverage, executable steps, exact step ownership,
-    per-goal outcomes, response text, limitation judgments, and prospective
-    satisfaction.  The host adds only envelope identity fields after validation.
+    per-goal outcomes, limitation judgments, and prospective satisfaction. It
+    authors no wording: Social Cognition owns every user-facing word.  The host adds only envelope identity fields after validation.
 
     Every field needed by deterministic validation is required at the JSON
     decoder boundary.  A limitation is represented by model-authored per-goal
@@ -822,22 +822,7 @@ def fast_multi_goal_response_schema(
     # otherwise simple plans consume most of the decoder budget.  Keep the
     # semantic judgments model-authored while bounding their representation.
     bound_text(properties, "goal_summary", 240)
-    bound_text(
-        properties,
-        "response_text",
-        800,
-    )
     if requires_execution:
-        response_text_field = properties.get("response_text")
-        if isinstance(response_text_field, dict):
-            response_text_field["description"] = (
-                "Planner speech is empty for exact execution-only work without "
-                "confirmation. When user_confirmation_required=true, author the "
-                "exact confirmation question here, including for an exact Plan. A "
-                "safe-adjusted or alternative Plan must explain its material "
-                "change here, and a mixed Plan may carry the direct-response "
-                "Goal delta."
-            )
         if not response_goal_set:
             schema.setdefault("allOf", []).append(
                 {
@@ -939,11 +924,6 @@ def fast_multi_goal_response_schema(
             if field_name not in outcome_required:
                 outcome_required.append(field_name)
         outcome_properties = outcome_schema.get("properties", {})
-        bound_text(
-            outcome_properties,
-            "response_text",
-            0 if requires_execution and not response_goal_set else 800,
-        )
         bound_text(outcome_properties, "rationale", 200)
         outcome_unresolved = outcome_properties.get("unresolved")
         if isinstance(outcome_unresolved, dict):
@@ -1168,13 +1148,6 @@ def fast_multi_goal_response_schema(
                 disposition_field = specialized_outcome_properties.get("disposition")
                 if isinstance(disposition_field, dict):
                     disposition_field["enum"] = ["execute", "clarify", "unavailable"]
-                response_text_field = specialized_outcome_properties.get("response_text")
-                if isinstance(response_text_field, dict):
-                    response_text_field["maxLength"] = 0
-                    response_text_field["description"] = (
-                        "Execution Goals do not author speech; communication is "
-                        "owned by the response layer."
-                    )
                 branches = specialized_outcome.get("oneOf")
                 if isinstance(branches, list):
                     specialized_outcome["oneOf"] = [
@@ -1193,14 +1166,6 @@ def fast_multi_goal_response_schema(
                         "clarify",
                         "unavailable",
                     ]
-                response_text_field = specialized_outcome_properties.get("response_text")
-                if isinstance(response_text_field, dict):
-                    response_text_field.pop("maxLength", None)
-                    response_text_field.pop("minLength", None)
-                    response_text_field["description"] = (
-                        "Author the exact direct response for disposition=respond, "
-                        "or an empty string when the whole plan is unavailable."
-                    )
                 branches = specialized_outcome.get("oneOf")
                 if isinstance(branches, list):
                     specialized_outcome["oneOf"] = [

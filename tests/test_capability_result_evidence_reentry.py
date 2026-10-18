@@ -1,5 +1,9 @@
 from __future__ import annotations
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, GoalDrivenRuntimeCoordinator, CognitiveRuntimePolicy
+from orchestrator.runtime.cognitive_runtime import (
+    GoalDrivenRuntimeCoordinator,
+    CognitiveRuntimePolicy,
+)
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 
 
@@ -37,6 +41,7 @@ from shared.chromie_contracts.tool_result import (
     ToolResultEvidence,
     canonical_value_sha256,
 )
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def _work_result(plan):
@@ -88,13 +93,13 @@ def test_reentry_retains_failure_without_delegation_or_commit(failure_kind):
         failure = source_plan.model_copy(update={"goal_ids": ["foreign-goal"]})
     client = SimpleNamespace(
         resolve_cognitive_activation=AsyncMock(side_effect=allow_activation),
-        resolve_fast_plan=AsyncMock(return_value=failure),
+        resolve_plan=AsyncMock(return_value=failure),
     )
-    selected = client.resolve_fast_plan
+    selected = client.resolve_plan
     if failure_kind == "raised":
         selected.side_effect = TimeoutError("transport deadline")
     if failure_kind == "invalid_model_dto":
-        from agent.app.fast_planner import FastPlannerResolver
+        from agent.app.planner import PlannerResolver
         from agent.app.planner_model_contract import PlannerEvidenceReentryModelOutput
         from pydantic import ValidationError
 
@@ -112,13 +117,13 @@ def test_reentry_retains_failure_without_delegation_or_commit(failure_kind):
             })
         model = SimpleNamespace(generate=AsyncMock(side_effect=invalid.value))
         catalog = SimpleNamespace(prompt_entries=AsyncMock(return_value=[]))
-        resolver = FastPlannerResolver(model, catalog)
+        resolver = PlannerResolver(model, catalog)
 
         async def resolve_invalid(_session, *, request, **_kwargs):
             return await resolver.resolve(request)
 
         selected.side_effect = resolve_invalid
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = client
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(mode="apply")
     adapter = CanonicalPlanRuntimeAdapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True}))
@@ -149,7 +154,7 @@ def test_reentry_retains_failure_without_delegation_or_commit(failure_kind):
             session_id="session", phase="post_execution",
         ))
     # One Planner pass; a failure is retained and never delegated or repaired.
-    assert client.resolve_fast_plan.await_count == 1
+    assert client.resolve_plan.await_count == 1
     adapter.build_planner_owned_response.assert_not_awaited()
     stages = [call.kwargs for call in assistant.sessions.record_cognitive_stage.call_args_list]
     assert stages[-1]["status"] == "failed"
@@ -318,7 +323,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 return await _social_result(request, replanned)
             request = None
 
-            async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+            async def resolve_plan(self, _session, *, request, timeout_ms):
                 self.request = request
                 return _work_result(replanned)
 
@@ -332,9 +337,9 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     speech=[InteractionSpeech(text="上午不会下雨。")],
                 )
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = Client()
-        assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000)
+        assistant.cognitive_runtime_policy = SimpleNamespace(planner_timeout_ms=3000)
         assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=assistant.agent_client,
             adapter=Adapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})),
@@ -553,7 +558,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 return await _social_result(request, replanned)
             request = None
 
-            async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+            async def resolve_plan(self, _session, *, request, timeout_ms):
                 self.request = request
                 return _work_result(replanned)
 
@@ -565,10 +570,10 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     speech=[InteractionSpeech(text="It is time.")],
                 )
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = Client()
         assistant.cognitive_runtime_policy = SimpleNamespace(
-            fast_planner_timeout_ms=3000,
+            planner_timeout_ms=3000,
         )
         assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=assistant.agent_client,
@@ -667,7 +672,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                 return await _social_result(request, replanned)
             fast_calls = 0
 
-            async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+            async def resolve_plan(self, _session, *, request, timeout_ms):
                 self.fast_calls += 1
                 self.request = request
                 return _work_result(replanned)
@@ -680,10 +685,10 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
                     speech=[InteractionSpeech(text="I need to revise the approach.")],
                 )
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = Client()
         assistant.cognitive_runtime_policy = SimpleNamespace(
-            fast_planner_timeout_ms=3000,
+            planner_timeout_ms=3000,
         )
         assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
             agent_client=assistant.agent_client,
@@ -806,7 +811,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
         )
         captured: dict[str, object] = {}
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.session_log = lambda *_args, **_kwargs: None
 
         async def capture(**kwargs):
@@ -861,7 +866,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             "language": "zh-CN",
             "user_turn_envelope": {"normalized_input": {"text": "往前走一下", "language": "zh-CN"}},
         })
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.session_log = lambda *_args, **_kwargs: None
 
         def respond_with(error):
@@ -993,7 +998,7 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             },
         )
         captured: dict[str, object] = {}
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.session_log = lambda *_args, **_kwargs: None
 
         async def capture(**kwargs):
@@ -1050,14 +1055,14 @@ class PlannerEvidenceReentryContractTests(unittest.TestCase):
             async def resolve_cognitive_activation(self, session, *, request, timeout_ms):
                 return await allow_activation(session, request=request, timeout_ms=timeout_ms)
             async def resolve_social_cognition(self, session, *, request, **kwargs):
-                return await _social_result(request, replanned)
+                return await _social_result(request, original)
             called = False
 
-            async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+            async def resolve_plan(self, _session, *, request, timeout_ms):
                 self.called = True
                 raise AssertionError("Planner must not run without Responsibility provenance")
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.agent_client = Client()
         assistant.session_log = lambda *_args, **_kwargs: None
 
@@ -1130,16 +1135,16 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                     async def resolve_social_cognition(self, session, *, request, **kwargs):
                         return await _social_result(request, replanned)
                     request = None
-                    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+                    async def resolve_plan(self, _session, *, request, timeout_ms):
                         self.request = request
                         return _work_result(replanned)
                 class Adapter(CanonicalPlanRuntimeAdapter):
                     async def build_social_cognition_response(self, **kwargs):
                         return InteractionResponse(interaction_id="body-result", speech=[InteractionSpeech(text=wording,
                             metadata={"communicative_activity_ids": ["activity-new"], "turn_id": "turn"})])
-                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                assistant = bare_voice_assistant()
                 assistant.agent_client = Client()
-                assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000)
+                assistant.cognitive_runtime_policy = SimpleNamespace(planner_timeout_ms=3000)
                 ledger = InteractionLedger()
                 assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(agent_client=assistant.agent_client,
                     adapter=Adapter(InteractionRuntimeCoordinator(lambda _args: {"scheduled": True})),
@@ -1151,7 +1156,7 @@ class SocialSpeechAuthorityTests(unittest.IsolatedAsyncioTestCase):
                 assistant.get_http_session = session
                 delivered = dict(event_id="speech-sibling", session_id="sid", turn_id="turn", source_goal_ids=["goal-chat"],
                     text="A joke.", status="playback_completed", communicative_activity_ids=["activity-old"])
-                assistant._playback_state().turn_speech_events["sid"] = [delivered]
+                assistant.playback_delivery.turn_speech_events["sid"] = [delivered]
                 ledger.record_playback_event(delivered)
                 source = InteractionResponse(interaction_id="mixed", metadata={"turn_id": "turn",
                     "user_meaning_interpretation": {"responsibilities": [{"local_ref": "r1", "outcome": "Blink twice.",
@@ -1179,7 +1184,7 @@ async def test_agent_session_releases_idle_connections_before_the_agent_closes_t
     harmless request was declined as unjudgeable."""
     from uvicorn.config import Config
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.http_session = None
     session = await assistant.get_http_session()
     try:

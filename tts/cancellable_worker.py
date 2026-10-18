@@ -9,10 +9,12 @@ from contextlib import suppress
 from multiprocessing.connection import Connection
 from typing import Any
 
+from process_worker import ProcessWorkerLifecycle
+
 logger = logging.getLogger(__name__)
 
 
-class RestartableProcessWorker:
+class RestartableProcessWorker(ProcessWorkerLifecycle):
     """Single-command process worker that restarts on request cancellation.
 
     The worker target must send one startup message over its Connection. A
@@ -38,15 +40,6 @@ class RestartableProcessWorker:
         self._async_lock: asyncio.Lock | None = None
         self.restart_count = 0
         self.ready_payload: dict[str, Any] = {}
-
-    @property
-    def is_alive(self) -> bool:
-        return self._process is not None and self._process.is_alive()
-
-    def _lock(self) -> asyncio.Lock:
-        if self._async_lock is None:
-            self._async_lock = asyncio.Lock()
-        return self._async_lock
 
     async def start(self) -> None:
         async with self._lock():
@@ -131,14 +124,6 @@ class RestartableProcessWorker:
             detail = message.get("message") if isinstance(message, dict) else message
             raise RuntimeError(f"{self._name} failed to start: {detail}")
         self.ready_payload = dict(message)
-
-    def _stop_sync(self) -> None:
-        if self.is_alive and self._connection is not None:
-            with suppress(BrokenPipeError, EOFError, OSError):
-                self._connection.send({"type": "shutdown"})
-                if self._connection.poll(2.0):
-                    self._connection.recv()
-        self._terminate_sync()
 
     def _terminate_sync(self) -> None:
         connection = self._connection

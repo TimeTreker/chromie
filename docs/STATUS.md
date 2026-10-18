@@ -1,7 +1,8 @@
 # Chromie Current Status
 
 This file is the single current-state owner for implementation, verification,
-target validation and deployment status. It holds current facts only; replace a
+target validation and deployment status, and the single ordered open-work list.
+It holds current facts only; replace a
 row when it changes. Per-delivery history belongs in Git history and
 [CHANGELOG](../CHANGELOG.md); private run notes stay with their evidence under
 `.chromie/acceptance/*/README.md`. The current focus remains the Goal-driven
@@ -11,10 +12,10 @@ single-authority architecture.
 
 | Axis | Current evidence |
 | --- | --- |
-| Implementation | One Planner ([PLANNER-AUTHORITY-001](PROJECT_CHARTER.md)): need-first Work begins with `ability_needs`; a non-fitting need triggers one Agent library search and one more plan; with no usable Capability the Planner reports an honest `unavailable` limitation. The Deep Planner, `/deep-plan` and escalation are retired. Value Judgment (VALUE-JUDGMENT-001, `POST /value-judgment`) reviews the turn's first Plan, and any later re-entry Plan in the turn that adds a not-yet-judged Capability listed in `capabilities/value_review.json` (an already judged one reuses its verdict); `ask` adds a confirmation, `decline` or any failure withholds the reviewed effects before provider start. Social Cognition owns every user-facing Communicative Activity; while a turn waits for Value Judgment, ingress admits only an acknowledgement. An information Responsibility with citable current perception may be answered from that cited observation. Latest repair on `main`: UMI lists Responsibilities in word order and ends a reply to news where the sharing ends. |
-| Automatic verification | Last recorded canonical gate (`./scripts/run_tests.sh`, clean worktree, latest delivery): pytest 3,845 passed + 5 skipped, benchmarks 169, legacy Agent tests 20, policies, docs and test ownership pass. Workflow corpus freeze 41 (`a36b1ebf…`); strict replay 6,000/6,000 with zero model calls. The replay corpus runs with an empty value-review list, so it has no Value Judgment coverage. |
+| Implementation | One Planner ([PLANNER-AUTHORITY-001](PROJECT_CHARTER.md)): need-first Work begins with `ability_needs`; a non-fitting need triggers one Agent library search and one more plan; with no usable Capability the Planner reports an honest `unavailable` limitation. The Deep Planner, `/deep-plan` and escalation are retired. Value Judgment (VALUE-JUDGMENT-001, `POST /value-judgment`) reviews the turn's first Plan, and any later re-entry Plan in the turn that adds a not-yet-judged Capability listed in `capabilities/value_review.json` (an already judged one reuses its verdict); `ask` adds a confirmation, `decline` or any failure withholds the reviewed effects before provider start. Social Cognition owns every user-facing Communicative Activity. While a Responsibility UMI marked `value_review` waits for Value Judgment, ingress admits only an acknowledgement for its whole turn and sibling speech is answered after the verdict; a value-reviewed Capability alone does not hold back sibling speech. An information Responsibility with citable current perception may be answered from that cited observation. |
+| Automatic verification | Canonical gate (`./scripts/run_tests.sh`, clean worktree) at the delivery revision: pytest 3,955 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass. Workflow corpus freeze 42 (`de7c4de6…`; every UMI request recaptured for the widened `value_review` mark, no reply re-authored); strict replay with zero model calls: `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures. The replay corpus runs with an empty value-review list, so it has no Value Judgment coverage. |
 | Target validation | Everyday live-text cohort `scenarios/everyday/` (70 cases: 15-case `must_pass` smoke stage, then `core` and `challenge`) on Soridormi MuJoCo. Latest live runs on `rootcause18-20261016`: smoke 15/15 mechanical; core stopped at 4/55 on a hard UMI 503 that the latest repair addresses but which is not yet live. Core and challenge have not completed. Not qualified. No current-revision supervised physical audio or robot evidence (one historical physical voice turn is recorded in [Acceptance](ACCEPTANCE.md)). |
-| Deployment state | `chromie-agent:latest` = `rootcause18-20261016`; `rootcause19-20261016` (latest repair) built, not deployed. LLM serving uses SGLang per the maintained [hardware profiles](../HARDWARE_PROFILES.md). No release. Exact identities and commands: [Handoff](../HANDOFF.md). |
+| Deployment state | Last recorded live Agent: `chromie-agent:latest` = `rootcause18-20261016`. No built image matches current `main`: `rootcause19-20261016` predates the 2026-10-17 source changes, so the next deploy needs an image rebuilt from `main`. LLM serving uses SGLang per the maintained [hardware profiles](../HARDWARE_PROFILES.md). No release. Exact identities and commands: [Handoff](../HANDOFF.md). |
 
 Evidence: `.chromie/acceptance/everyday-20261016/` (README.md).
 
@@ -51,11 +52,13 @@ This describes current intended ownership, not full conformance; see the open wo
 
 ## Current open work
 
-Follow the [Roadmap migration order](../ROADMAP.md#social-cognition-migration)
-and the [checkpoint](../DEVELOPMENT_CHECKPOINT.md).
+This is the single ordered open-work list, blockers included. The
+[Roadmap](../ROADMAP.md#social-cognition-migration) owns longer-range delivery
+order; the [checkpoint](../DEVELOPMENT_CHECKPOINT.md) owns the active Issue,
+repairs and owner decisions in force.
 
-1. Deploy the latest Agent image and complete the everyday cohort: smoke, then
-   `core` and `challenge`.
+1. Rebuild the Agent image from `main`, deploy it (owner), and complete the
+   everyday cohort: smoke, then `core` and `challenge`.
 2. Known live defects: the homework decline offers reminders Chromie cannot set;
    "去那边等我" is acknowledged with "好的。" although no go-to-a-place ability exists;
    Value Judgment asks consent or meaning questions that belong elsewhere (hug);
@@ -66,11 +69,10 @@ and the [checkpoint](../DEVELOPMENT_CHECKPOINT.md).
 4. Review the SC fresh-turn silence finding; qualify
    Schema/DTO/native grammar, SC context budget and latency, provider scene and
    geographic Evidence, and Goal/action/provenance coverage.
-5. Narrow current-revision voice proof and the default
-   [target-evidence profile](TARGET_EVIDENCE_CLOSURE.md). Physical evidence stays supervised.
-6. Widen UMI's `value_review` mark from deception requests to other harmful requests
-   outside the Capability review list (owner decision 2026-10-17); pending a UMI corpus
-   re-freeze, since the UMI prompt and schema change every recorded replay request.
+5. After the cohort: narrow current-revision voice proof, then the default
+   [target-evidence profile](TARGET_EVIDENCE_CLOSURE.md). Physical microphone,
+   speaker and robot evidence stays supervised; text, discarded TTS and simulated
+   acquisition do not replace it.
 
 ## Evidence interpretation
 

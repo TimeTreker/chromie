@@ -14,7 +14,7 @@ from orchestrator.runtime.capability_runtime import (
     schema_valid_completion_evidence_policy,
 )
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.session import SessionTracker
 from shared.chromie_contracts.execution_outcome import claim_qualification_policy_sha256
 from shared.chromie_contracts.interaction import (
@@ -25,6 +25,7 @@ from shared.chromie_contracts.interaction import (
 )
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 _SCHEMA = {
@@ -126,7 +127,7 @@ class _AgentClient:
     def __init__(self) -> None:
         self.requests = []
 
-    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+    async def resolve_plan(self, _session, *, request, timeout_ms):
         del timeout_ms
         self.requests.append(request)
         evidence = request.context["trusted_terminal_evidence"][0]
@@ -301,7 +302,7 @@ def _response() -> InteractionResponse:
 
 
 def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.interaction_runtime = coordinator
     assistant.playback_delivery.playback_generation = 0
     assistant.sessions = _Sessions()
@@ -311,7 +312,7 @@ def _assistant(coordinator: InteractionRuntimeCoordinator) -> VoiceAssistant:
         adapter=CanonicalPlanRuntimeAdapter(coordinator),
         interaction_ledger=None,
     )
-    assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=1000)
+    assistant.cognitive_runtime_policy = SimpleNamespace(planner_timeout_ms=1000)
     assistant.active_interaction_task = None
     assistant.active_interaction_id = None
     assistant.active_interaction_tasks = {}
@@ -660,7 +661,7 @@ class _FollowUpProvider:
 
 
 class _FollowUpAgentClient(_AgentClient):
-    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+    async def resolve_plan(self, _session, *, request, timeout_ms):
         del timeout_ms
         self.requests.append(request)
         evidence = request.context["trusted_terminal_evidence"][0]
@@ -697,7 +698,7 @@ class _FollowUpAgentClient(_AgentClient):
                     "satisfied_goal_ids": goal_ids,
                 },
             )
-        return await super().resolve_fast_plan(
+        return await super().resolve_plan(
             _session,
             request=request,
             timeout_ms=1000,

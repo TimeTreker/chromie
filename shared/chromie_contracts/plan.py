@@ -7,7 +7,7 @@ from typing import Annotated, Any, Literal, Union, cast
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from .text import normalize_whitespace
+from .text import normalize_unique_text_list as _normalize_ids, normalize_whitespace
 from .agent_skill import PlanAgentSkillProvenance
 from .interaction import CapabilityIdentityModel, reject_forbidden_low_level_fields
 from .user_turn import UserTurnSourceSpan, user_turn_source_tokens
@@ -343,7 +343,7 @@ class FastPlannerProgressAct(_FastPlannerCommunicativeActBase):
             return normalized
         supplied = normalized.get("speech_act")
         if supplied not in (None, "") and supplied != expected:
-            raise ValueError("Fast Planner progress speech_act must match progress_kind")
+            raise ValueError("Planner progress speech_act must match progress_kind")
         normalized["speech_act"] = expected
         return normalized
 
@@ -740,7 +740,7 @@ def fast_planner_activity_request_id(turn_id: str, activity_id: str) -> str:
 
 
 class FastPlannerAdvance(BaseModel):
-    """Fast Planner's first Activity Plan over User Meaning Interpretation evidence.
+    """The Planner's first Activity Plan over User Meaning Interpretation evidence.
 
     User Meaning Interpretation owns contextual WHAT. This contract is the first
     planner-owned HOW decision and may contain speaking and Capability Activities;
@@ -787,16 +787,16 @@ class FastPlannerAdvance(BaseModel):
     def validate_advance_contract(self) -> "FastPlannerAdvance":
         authored_activity_roles = {item.role for item in self.activities}
         if self.disposition == "execute" and "capability" not in authored_activity_roles:
-            raise ValueError("executable Fast Planner disposition requires a Capability Activity")
+            raise ValueError("executable Planner disposition requires a Capability Activity")
         if self.disposition == "mixed" and "capability" not in authored_activity_roles and len(
             authored_activity_roles.intersection({"complete_response", "clarification", "unavailable"})
         ) < 2:
             raise ValueError(
-                "mixed Fast Planner requires Capability work or two independent "
+                "mixed Planner disposition requires Capability work or two independent "
                 "response/clarification/unavailable outcomes"
             )
         if self.disposition == "unavailable" and authored_activity_roles - {"unavailable"}:
-            raise ValueError("an unavailable Fast Planner decision carries only unavailable Activities")
+            raise ValueError("an unavailable Planner decision carries only unavailable Activities")
         if self.disposition == "respond" and not any(
             item.role == "complete_response" for item in self.activities
         ):
@@ -810,18 +810,18 @@ class FastPlannerAdvance(BaseModel):
             "unavailable",
         }:
             raise ValueError(
-                "non-complete Fast Planner output must clarify or report unavailable"
+                "non-complete Planner output must clarify or report unavailable"
             )
         activity_ids = [item.activity_id for item in self.activities]
         if len(activity_ids) != len(set(activity_ids)):
-            raise ValueError("Fast Planner Activity IDs must be unique")
+            raise ValueError("Planner Activity IDs must be unique")
         for activity in self.activities:
             unknown = set(activity.source_responsibility_refs) - set(
                 self.covered_responsibility_refs
             )
             if unknown:
                 raise ValueError(
-                    "Fast Planner Activity references uncovered Responsibility refs: "
+                    "Planner Activity references uncovered Responsibility refs: "
                     + ",".join(sorted(unknown))
                 )
         activity_roles_by_ref: dict[str, set[str]] = {}
@@ -910,7 +910,7 @@ class FastPlannerAdvanceModelOutput(BaseModel):
 
 
 class FastPlannerStreamTerminal(BaseModel):
-    """Terminal wire frame for the same Fast Planner semantic invocation."""
+    """Terminal wire frame for the same Planner semantic invocation."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -926,7 +926,7 @@ class FastPlannerStreamTerminal(BaseModel):
 
 
 class FastPlannerStreamFailure(BaseModel):
-    """Typed fail-closed terminal frame for a Fast Planner stream."""
+    """Typed fail-closed terminal frame for a Planner stream."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -974,23 +974,6 @@ FastPlannerStreamFrame = Annotated[
     ],
     Field(discriminator="frame_type"),
 ]
-
-
-def _normalize_ids(value: Any) -> list[str]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        value = [value]
-    if not isinstance(value, list):
-        raise ValueError("expected a list or string")
-    out: list[str] = []
-    seen: set[str] = set()
-    for item in value:
-        text = " ".join(str(item or "").strip().split())
-        if text and text not in seen:
-            seen.add(text)
-            out.append(text)
-    return out
 
 
 def _parameter_resolution_json_schema(schema: dict[str, Any]) -> None:

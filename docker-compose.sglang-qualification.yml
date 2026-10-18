@@ -6,6 +6,9 @@ services:
     gpus: all
     ipc: host
     ports:
+      # Same host port as the maintained SGLang chromie-llm (RTX 5090 and RTX
+      # 4090 Laptop profiles): run this overlay only on an Ollama profile, or
+      # with the maintained SGLang service stopped.
       - "127.0.0.1:30000:30000"
     environment:
       HF_TOKEN: ${HF_TOKEN:-}

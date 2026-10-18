@@ -147,7 +147,7 @@ implemented. The five Gateway responsibilities are explicit logical modules in t
 There is no independent Router service or `/route` compatibility API.
 
 Chromie never gives raw motor, joint, actuator, or torque controls to the
-language model. The legacy `hardware/` daemon is mock compatibility only.
+language model.
 
 ## Implemented core path and retained evidence
 
@@ -183,7 +183,7 @@ Retained target evidence additionally proves:
 
 - complete the everyday live-text cohort and repair its failures at their
   owners (see [Status](docs/STATUS.md#current-open-work));
-- clean full-matrix generated-speech acceptance after the post-merge fixes;
+- clean current-revision full-matrix generated-speech acceptance;
 - positive Agent Skill selection with trustworthy real provider-backed weather
   execution and follow-up conversation;
 - a reviewed SC-owned social expression live baseline;
@@ -360,23 +360,12 @@ documented in
 | `shared/` | Shared contracts and scheduling primitives |
 | `capabilities/` | Pinned external capability manifests and prompt-tier presets |
 | `agent-skills/` | Repository-owned passive Agent Skill packages; mounted read-only and never execution-authoritative |
-| `hardware/` | Legacy mock compatibility daemon |
 | `scripts/` | Startup, validation, evidence, and release tooling |
 | `docs/` | Project authority, interfaces, configuration, and decisions |
 | `release/` | Candidate compatibility and release assets |
 
 ## Read next
 
-- [Project Charter](docs/PROJECT_CHARTER.md): stable goal and boundaries
-- [Status](docs/STATUS.md): current implementation and evidence
-- [Roadmap](ROADMAP.md): delivery order and exit criteria
-- [Development Checkpoint](DEVELOPMENT_CHECKPOINT.md): exact resume point
-- [Human-Like Interaction Contract](docs/HUMAN_LIKE_INTERACTION_CONTRACT.md): behavior-change rules
-- [Cognitive Gateway](docs/COGNITIVE_GATEWAY.md): input, reflex, attention, and turn-admission boundary
-- [Cognitive Turn Loop](docs/COGNITIVE_TURN_LOOP.md): Core-managed delegation, evidence reconciliation, and final-response lifecycle
-- [Agent Skills Architecture](docs/AGENT_SKILLS_ARCHITECTURE.md): Agent, Agent Skill, Plan, and Capability boundaries
-- [Target Evidence Closure](docs/TARGET_EVIDENCE_CLOSURE.md): current source-bound evidence workflow
-- [Acceptance](docs/ACCEPTANCE.md): evidence levels and claim limits
-- [Operations Runbook](CHROMIE_RUNBOOK.md): startup and recovery
-- [User Manual](docs/USER_MANUAL.md): current simulator operation
-- [Documentation Index](docs/README.md): owner for every documentation fact
+Follow the [core reading path](docs/README.md#core-reading-path) in the
+Documentation Index, which owns the one ordered reading list. Operators also use
+the [User Manual](docs/USER_MANUAL.md) for current simulator operation.

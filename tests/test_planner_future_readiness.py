@@ -9,12 +9,13 @@ from unittest.mock import patch
 import pytest
 
 from benchmarks.datasets.fast_planner_daily_life.qualification import load_cases, materialize_catalog
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from shared.chromie_contracts import CognitiveWorkRequest
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_response, word_free_model_fixture, social_fixture_resolution
 from tests.test_planner_staged_progress import episode_runtime, read_reply, resolve, status
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def future_case(language='en'):
@@ -78,11 +79,11 @@ def test_future_goal_cannot_dispatch_even_with_exact_time_condition(tier):
         raw['steps'][0]['args']={'location':'Hangzhou','date':'2099-09-04','period':'night'}
         raw['time_conditions']=waiting_reply(request)['time_conditions']
         # Deliberately bypass Schema in this check: the Host must reject early Work too.
-        from agent.app.fast_planner import FastPlannerResolver
+        from agent.app.planner import PlannerResolver
         from benchmarks.datasets.fast_planner_daily_life.qualification import ReplayModel,StaticCatalog
         import json
         model=ReplayModel(json.dumps(raw))
-        cls=FastPlannerResolver
+        cls=PlannerResolver
         plan=await cls(model,StaticCatalog(catalog)).resolve(request)
         assert not plan.steps and plan.metadata.get('failure_class'), plan
         assert model.calls==1
@@ -119,10 +120,10 @@ def test_host_rejects_waiting_response_with_invalid_readiness_or_fulfillment(inv
         else:
             sat=raw['goal_satisfaction']
             sat.update(score=1.0,status='exact',satisfied_goal_ids=sat['unmet_goal_ids'],unmet_goal_ids=[],unmet_requirements=[])
-        from agent.app.fast_planner import FastPlannerResolver
+        from agent.app.planner import PlannerResolver
         from benchmarks.datasets.fast_planner_daily_life.qualification import ReplayModel,StaticCatalog
         import json
-        model=ReplayModel(json.dumps(raw));plan=await FastPlannerResolver(model,StaticCatalog(catalog)).resolve(request)
+        model=ReplayModel(json.dumps(raw));plan=await PlannerResolver(model,StaticCatalog(catalog)).resolve(request)
         assert plan.metadata.get('failure_class') and not plan.steps,plan
         assert model.calls==1
     asyncio.run(run())
@@ -202,7 +203,7 @@ def test_future_wait_preserves_an_independent_ready_action(tier):
 def test_time_crossing_during_inference_preserves_the_primary_waiting_decision(tier):
     async def run():
         from tests.test_planner_staged_progress import CheckedReply
-        from agent.app.fast_planner import FastPlannerResolver
+        from agent.app.planner import PlannerResolver
         from benchmarks.datasets.fast_planner_daily_life.qualification import StaticCatalog
         import json
         request,catalog=future_case();due=4092202800000
@@ -218,7 +219,7 @@ def test_time_crossing_during_inference_preserves_the_primary_waiting_decision(t
                 return answer
         model=SlowReply(json.dumps(word_free_model_fixture(waiting_reply(request))))
         with patch('agent.app.planner_context.datetime',Clock):
-            cls=FastPlannerResolver
+            cls=PlannerResolver
             plan=await cls(model,StaticCatalog(catalog)).resolve(request)
         assert model.calls==1 and plan.disposition=='respond' and not plan.steps,plan.metadata
         assert plan.time_conditions[0].due_at_ms==due
@@ -272,15 +273,15 @@ def test_future_intention_survives_restart_and_due_host_reentry_dispatches_once(
             requests=[]
             async def resolve_social_cognition(self, session, *, request, **kwargs):
                 return social_fixture_resolution(request)
-            async def resolve_fast_plan(self,_session,*,request,timeout_ms):
+            async def resolve_plan(self,_session,*,request,timeout_ms):
                 self.requests.append(request)
                 return await resolve(request,catalog,raw,'fast')
 
         client=Client()
-        host=VoiceAssistant.__new__(VoiceAssistant)
+        host=bare_voice_assistant()
         host.agent_client=client
         host.conversation_state=restored
-        host.cognitive_runtime_policy=SimpleNamespace(fast_planner_timeout_ms=3000,deliberative_timeout_ms=6000)
+        host.cognitive_runtime_policy=SimpleNamespace(planner_timeout_ms=3000,deliberative_timeout_ms=6000)
         host.cognitive_runtime=GoalDrivenRuntimeCoordinator(agent_client=client,adapter=adapter,policy=CognitiveRuntimePolicy(mode='apply'))
         logs=[]
         host.session_log=lambda *args,**kwargs: logs.append((args,kwargs))
@@ -325,7 +326,7 @@ def test_retained_goal_wake_rejects_unproven_or_stale_identity_before_inference(
     from shared.chromie_contracts.core_interpretation import PlannerReentryScope
     from shared.chromie_contracts.situation import CognitiveOpportunity
     from benchmarks.datasets.fast_planner_daily_life.qualification import ReplayModel,StaticCatalog
-    from agent.app.fast_planner import FastPlannerResolver
+    from agent.app.planner import PlannerResolver
 
     async def run():
         request,catalog=future_case()
@@ -347,7 +348,7 @@ def test_retained_goal_wake_rejects_unproven_or_stale_identity_before_inference(
         else:context['active_goal_snapshots'].append(copy.deepcopy(snapshot))
         incoming=request.model_copy(update={'context':context,'planner_reentry_scope':scope},deep=True)
         model=ReplayModel(json.dumps(word_free_model_fixture(waiting_reply(request))))
-        resolver=(FastPlannerResolver)(model,StaticCatalog(catalog))
+        resolver=(PlannerResolver)(model,StaticCatalog(catalog))
         with pytest.raises(ValueError):await resolver.resolve(incoming)
         assert model.calls==0
     asyncio.run(run())

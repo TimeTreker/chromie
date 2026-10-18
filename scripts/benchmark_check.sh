@@ -13,6 +13,7 @@ python -m benchmarks.e2e.validate --check
 python -m benchmarks.social_attention --check
 python -m benchmarks.stress.validate --check
 python -m benchmarks.scenarios check
+python scripts/general_ability_acceptance.py --mode check --no-write --scenario-root scenarios/everyday
 python -m benchmarks.mining.validate --check
 python -m pytest -q benchmarks/tests
 if [[ "$run_policy_check" == "1" ]]; then

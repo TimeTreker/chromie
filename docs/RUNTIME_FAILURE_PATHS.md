@@ -71,7 +71,7 @@ payload. Planner failures remain non-retryable and authorize no execution.
 Canonical planning uses `contract_failure` containment: an empty rejected Plan, without
 invented clarification speech, and no other planner repairs it. Streaming returns a typed `before_commit` failure.
 
-Fast's native argument contract requires a source span for a required, unbound
+The Planner's native argument contract requires a source span for a required, unbound
 string enum when none of its choices could be a literal copy from an owning
 Responsibility outcome. This exposes the existing Host provenance requirement
 before generation without choosing an enum value or translating user language.
@@ -79,7 +79,7 @@ Literal/case-only copies, typed bindings, declared realizations and trusted targ
 or verified-memory references retain their existing paths. Host still validates
 the selected span against the immutable input and its owning Responsibility.
 
-This includes rejected Fast Evidence re-entry DTOs, semantic-validation failures,
+This includes rejected Planner Evidence re-entry DTOs, semantic-validation failures,
 and authoritative-grounding mismatches: an exception is not a model-authored
 request for depth. Keep the original failure and zero new Work; there is no deeper
 planner to invoke. Compact re-entry projects the existing
@@ -98,20 +98,20 @@ Activation's bounded state retains acquisition step purpose and the Planner's
 satisfaction/unmet requirements alongside provider completion. A completed lookup
 is not proof of completed information delivery. Its native request uses the same
 compact JSON formatting as Planner to avoid an unbounded whitespace loop.
-Fast's verified-memory argument validator accepts an evidence/tool/material tuple
+The Planner's verified-memory argument validator accepts an evidence/tool/material tuple
 only from one exact trusted index entry and rejects conflicting current bindings;
 opaque evidence IDs need no user-token citation. Runtime independently checks
 freshness and material bindings when retrieving the result.
-The corresponding Fast Activity Schema also excludes evidence_id, tool_id and
+The corresponding Planner Activity Schema also excludes evidence_id, tool_id and
 material_args from UserTurn argument_sources: it must not force a model to invent
 user-token provenance for a tuple that the trusted memory index owns.
 The memory provider declares acquisition purpose through the existing resource
 contract, so retrieval completion cannot be mistaken for delivered information.
-Activation inherits the active Fast model timeout unless explicitly overridden;
+Activation inherits the active Planner model timeout unless explicitly overridden;
 the former independent 10-second default could expire while concurrent SC used
 the same serving model. Host and provider deadlines remain bounded; no retry or
 additional model call is introduced.
-Fast's bound-argument comparison uses the same material-value equivalence as
+The Planner's bound-argument comparison uses the same material-value equivalence as
 canonical Goal grounding. A capitalization difference cannot be accepted by one
 boundary and rejected by the other; incompatible values remain rejected.
 
@@ -143,12 +143,12 @@ references reduce repeated wire data without selecting meaning or relaxing Host
 provenance checks. Primary and source-based Deep use the same definition. Native
 Schema bytes are not necessarily model input tokens or inference latency savings.
 
-Canonical Fast uses the same request-local compact-JSON formatting as streaming
-Fast and Deep to prevent unbounded syntactic whitespace. No string postprocessing
+The canonical Planner request uses the same request-local compact-JSON formatting
+as the streaming Planner request to prevent unbounded syntactic whitespace. No string postprocessing
 or shared model setting changes occur. Cross-field Work restrictions remain in
 the authoritative Schema and DTO/Host validators: native decoder acceptance alone
 is not proof of Schema, DTO, Host or semantic correctness. Bounds shared by every
-valid Fast Work assignment are also exposed in native-visible fields; a
+valid Planner Work assignment are also exposed in native-visible fields; a
 response-only re-entry cannot emit completed Work again. Advance branches preserve
 UMI timing relations and provider compatibility before generation. Provider-required
 vocal sources may bind only the qualified vocal provider with the exact UMI-authored
@@ -158,7 +158,7 @@ invariants: execute/respond/mixed have complete accounting, and an unavailable
 decision carries only `unavailable` Activities and no new Capability commitment.
 Already-committed Work and later Evidence-triggered re-entry are unchanged. Full conditional
 Schema and DTO/Host validation remain independent. Expanding whole
-Fast Work assignments into native branches was rejected after production-schema
+Planner Work assignments into native branches was rejected after production-schema
 compiler/contrast failures; the retained projection does not select an assignment
 or establish semantic qualification of general Work.
 

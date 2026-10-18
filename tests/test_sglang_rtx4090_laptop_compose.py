@@ -56,13 +56,15 @@ def test_laptop_sglang_profile_uses_colon_free_served_alias() -> None:
         "AGENT_USER_MEANING_INTERPRETER_MODEL",
         "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
         "AGENT_GOAL_ASSOCIATION_MODEL",
-        "AGENT_FAST_PLANNER_MODEL",
+        "AGENT_PLANNER_MODEL",
         "AGENT_DELIBERATIVE_MODEL",
         "AGENT_SKILL_SELECTION_MODEL",
     ):
         assert values[key] == values["AGENT_MODEL"]
     assert values["OLLAMA_MODEL"] == "qwen3.5:4b"
-    assert values["TTS_COSYVOICE_OLLAMA_MODEL"] == "qwen3.5:4b"
+    # Compact cognition is off on this profile, so it sets no compact model.
+    assert values["TTS_COSYVOICE_COMPACT_COGNITION"] == "0"
+    assert "TTS_COSYVOICE_OLLAMA_MODEL" not in values
 
 
 def test_laptop_sglang_service_keeps_base_service_identity_and_pinned_model() -> None:

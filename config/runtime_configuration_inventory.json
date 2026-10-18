@@ -34,15 +34,6 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
-      "key": "ACTION_EXECUTOR_URL",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
       "category": "service_internal",
       "key": "AGENT_CAPABILITY_CATALOG_REFRESH_SEC",
       "owners": [
@@ -116,7 +107,9 @@
       "key": "AGENT_COGNITIVE_ACTIVATION_NUM_CTX",
       "owners": [
         "agent/app/settings.py",
-        "docker-compose.yml"
+        "docker-compose.yml",
+        "env/profiles/rtx4090_laptop.env",
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -236,7 +229,6 @@
         ".env.common",
         "agent/app/settings.py",
         "docker-compose.yml",
-        "orchestrator/clients/agent_client.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -445,89 +437,6 @@
     {
       "boolean": true,
       "category": "service_internal",
-      "key": "AGENT_FAST_PLANNER_ENABLED",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "AGENT_FAST_PLANNER_MAX_CAPABILITIES",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "AGENT_FAST_PLANNER_MODEL",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/profiles/default.env",
-        "env/profiles/jetson_agx_orin.env",
-        "env/profiles/jetson_orin_nano_super.env",
-        "env/profiles/jetson_thor.env",
-        "env/profiles/nvidia_ada.env",
-        "env/profiles/nvidia_blackwell.env",
-        "env/profiles/rtx4090.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_FAST_PLANNER_NUM_CTX",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/modes/qualification.env",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_FAST_PLANNER_NUM_PREDICT",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "AGENT_FAST_PLANNER_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "agent/app/settings.py",
-        "docker-compose.yml",
-        "env/modes/qualification.env",
-        "env/modes/services.env",
-        "env/modes/speech.env",
-        "env/modes/voice_mujoco.env",
-        "env/validation/architecture.env"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "service_internal",
       "key": "AGENT_GOAL_ASSOCIATION_ENABLED",
       "owners": [
         ".env.common",
@@ -697,6 +606,87 @@
       "key": "AGENT_OLLAMA_URL",
       "owners": [
         "agent/app/settings.py"
+      ]
+    },
+    {
+      "boolean": true,
+      "category": "service_internal",
+      "key": "AGENT_PLANNER_ENABLED",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_PLANNER_MAX_CAPABILITIES",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
+      "key": "AGENT_PLANNER_MODEL",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/profiles/default.env",
+        "env/profiles/jetson_agx_orin.env",
+        "env/profiles/jetson_orin_nano_super.env",
+        "env/profiles/jetson_thor.env",
+        "env/profiles/nvidia_ada.env",
+        "env/profiles/nvidia_blackwell.env",
+        "env/profiles/rtx4090.env",
+        "env/profiles/rtx4090_laptop.env",
+        "env/profiles/rtx5090.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_PLANNER_NUM_CTX",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/modes/qualification.env",
+        "env/profiles/rtx4090_laptop.env",
+        "env/profiles/rtx5090.env",
+        "env/validation/architecture.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_PLANNER_NUM_PREDICT",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/profiles/rtx4090_laptop.env",
+        "env/profiles/rtx5090.env",
+        "env/validation/architecture.env"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "AGENT_PLANNER_TIMEOUT_MS",
+      "owners": [
+        ".env.common",
+        "agent/app/settings.py",
+        "docker-compose.yml",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
+        "env/validation/architecture.env"
       ]
     },
     {
@@ -964,7 +954,7 @@
     },
     {
       "boolean": false,
-      "category": "profile_constant",
+      "category": "service_internal",
       "key": "AGENT_USER_MEANING_INTERPRETER_MODEL",
       "owners": [
         ".env.common",
@@ -978,8 +968,7 @@
         "env/profiles/nvidia_blackwell.env",
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env",
-        "orchestrator/runtime/host_settings.py"
+        "env/profiles/rtx5090.env"
       ]
     },
     {
@@ -1639,22 +1628,6 @@
       ]
     },
     {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "HARDWARE_HOST",
-      "owners": [
-        "hardware/daemon.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "HARDWARE_PORT",
-      "owners": [
-        "hardware/daemon.py"
-      ]
-    },
-    {
       "boolean": true,
       "category": "profile_constant",
       "key": "HF_HUB_OFFLINE",
@@ -1913,8 +1886,7 @@
         "env/profiles/rtx4090.env",
         "env/profiles/rtx4090_laptop.env",
         "env/profiles/rtx5090.env",
-        "env/validation/architecture.env",
-        "orchestrator/runtime/host_settings.py"
+        "env/validation/architecture.env"
       ]
     },
     {
@@ -2016,15 +1988,6 @@
     {
       "boolean": false,
       "category": "profile_constant",
-      "key": "ORCH_ACTION_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
       "key": "ORCH_ADDRESSEDNESS_ENGAGEMENT_TIMEOUT_SEC",
       "owners": [
         ".env.common",
@@ -2077,7 +2040,6 @@
       "key": "ORCH_ASR_TIMEOUT_MS",
       "owners": [
         ".env.common",
-        "orchestrator/clients/asr_client.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2120,8 +2082,7 @@
       "key": "ORCH_CAPABILITY_MAX_CONCURRENCY",
       "owners": [
         ".env.common",
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/interaction_coordinator.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2493,7 +2454,6 @@
       "owners": [
         ".env.common",
         "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/session.py",
         "scripts/chromie_psm_live_text_console.py",
         "scripts/closed_loop_e2e.py",
         "scripts/cognitive_gateway_core_live_text.py",
@@ -2517,29 +2477,6 @@
         "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py",
         "scripts/chromie_psm_live_text_console.py"
-      ]
-    },
-    {
-      "boolean": true,
-      "category": "profile_constant",
-      "key": "ORCH_FAST_PLANNER_MODE",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "acceptance_override",
-      "key": "ORCH_FAST_PLANNER_TIMEOUT_MS",
-      "owners": [
-        ".env.common",
-        "env/modes/qualification.env",
-        "env/modes/services.env",
-        "env/modes/speech.env",
-        "env/modes/voice_mujoco.env",
-        "env/validation/architecture.env",
-        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2570,7 +2507,6 @@
       "category": "service_internal",
       "key": "ORCH_INPUT_BLOCKSIZE",
       "owners": [
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2580,7 +2516,6 @@
       "key": "ORCH_INPUT_BLOCK_MS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2590,7 +2525,6 @@
       "key": "ORCH_INPUT_CHANNELS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2600,7 +2534,6 @@
       "key": "ORCH_INPUT_DEVICE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2618,7 +2551,6 @@
       "key": "ORCH_INPUT_LATENCY",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2628,7 +2560,6 @@
       "key": "ORCH_INPUT_RATE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2647,8 +2578,7 @@
       "category": "service_internal",
       "key": "ORCH_MIND_CONTEXT_MAX_CHARS",
       "owners": [
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/mind.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2656,8 +2586,7 @@
       "category": "service_internal",
       "key": "ORCH_MIND_PROFILE_PATH",
       "owners": [
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/mind.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -2691,7 +2620,6 @@
       "category": "service_internal",
       "key": "ORCH_OUTPUT_BLOCKSIZE",
       "owners": [
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2701,7 +2629,6 @@
       "key": "ORCH_OUTPUT_BLOCK_MS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2711,7 +2638,6 @@
       "key": "ORCH_OUTPUT_CHANNELS",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py",
         "scripts/voice_acceptance.py"
       ]
@@ -2722,7 +2648,6 @@
       "key": "ORCH_OUTPUT_DEVICE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py",
         "scripts/voice_acceptance.py"
       ]
@@ -2733,7 +2658,6 @@
       "key": "ORCH_OUTPUT_LATENCY",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2743,7 +2667,29 @@
       "key": "ORCH_OUTPUT_RATE",
       "owners": [
         "orchestrator/.env.local.example",
-        "orchestrator/audio_device_manager.py",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": true,
+      "category": "profile_constant",
+      "key": "ORCH_PLANNER_MODE",
+      "owners": [
+        ".env.common",
+        "orchestrator/runtime/host_settings.py"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "acceptance_override",
+      "key": "ORCH_PLANNER_TIMEOUT_MS",
+      "owners": [
+        ".env.common",
+        "env/modes/qualification.env",
+        "env/modes/services.env",
+        "env/modes/speech.env",
+        "env/modes/voice_mujoco.env",
+        "env/validation/architecture.env",
         "orchestrator/runtime/host_settings.py"
       ]
     },
@@ -2838,24 +2784,6 @@
       ]
     },
     {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_RUNTIME_READY_GREETING_MODEL",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "ORCH_RUNTIME_READY_GREETING_NUM_PREDICT",
-      "owners": [
-        ".env.common",
-        "orchestrator/runtime/host_settings.py"
-      ]
-    },
-    {
       "boolean": true,
       "category": "profile_constant",
       "key": "ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED",
@@ -2922,8 +2850,7 @@
       "category": "service_internal",
       "key": "ORCH_SOCIAL_INTERACTION_STYLE_PRESET",
       "owners": [
-        "orchestrator/runtime/host_settings.py",
-        "orchestrator/runtime/mind.py"
+        "orchestrator/runtime/host_settings.py"
       ]
     },
     {
@@ -3087,15 +3014,6 @@
       "boolean": false,
       "category": "profile_constant",
       "key": "PYTHON_IMAGE",
-      "owners": [
-        ".env.common",
-        "docker-compose.yml"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "PYTORCH_CUDA_ALLOC_CONF",
       "owners": [
         ".env.common",
         "docker-compose.yml"
@@ -3460,9 +3378,10 @@
     },
     {
       "boolean": false,
-      "category": "service_internal",
+      "category": "profile_constant",
       "key": "TTS_CANDIDATE_CUDA_IMAGE",
       "owners": [
+        ".env.common",
         "docker-compose.yml"
       ]
     },
@@ -3484,14 +3403,6 @@
         ".env.common",
         "docker-compose.yml",
         "tts/settings.py"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "service_internal",
-      "key": "TTS_CANDIDATE_STARTUP_TIMEOUT_SEC",
-      "owners": [
-        "docker-compose.yml"
       ]
     },
     {
@@ -3537,17 +3448,7 @@
       "category": "profile_constant",
       "key": "TTS_COSYVOICE_OLLAMA_MODEL",
       "owners": [
-        ".env.common",
-        "env/profiles/rtx4090_laptop.env"
-      ]
-    },
-    {
-      "boolean": false,
-      "category": "profile_constant",
-      "key": "TTS_COSYVOICE_OLLAMA_NUM_CTX",
-      "owners": [
-        "env/profiles/rtx4090_laptop.env",
-        "env/profiles/rtx5090.env"
+        ".env.common"
       ]
     },
     {
@@ -3825,7 +3726,6 @@
         ".env.common",
         "docker-compose.yml",
         "orchestrator/runtime/host_settings.py",
-        "scripts/voice_acceptance.py",
         "tts/settings.py"
       ]
     },
@@ -4065,12 +3965,12 @@
     "category_counts": {
       "acceptance_override": 30,
       "bounded_compatibility_alias": 0,
-      "profile_constant": 110,
+      "profile_constant": 103,
       "public_choice": 9,
-      "service_internal": 240
+      "service_internal": 238
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 389
+    "total_keys": 380
   }
 }

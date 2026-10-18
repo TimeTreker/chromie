@@ -25,8 +25,6 @@ class ServiceReadinessGate:
         *,
         asr_url: str,
         tts_url: str,
-        llm_url: str | None = None,
-        ollama_model: str | None = None,
         speaker_id: str = "default",
         get_http_session: Callable[[], Awaitable[aiohttp.ClientSession]] | None = None,
         agent_url: str | None = None,
@@ -34,8 +32,6 @@ class ServiceReadinessGate:
     ):
         self.asr_url = asr_url
         self.tts_url = tts_url
-        self.llm_url = llm_url
-        self.ollama_model = ollama_model
         self.speaker_id = speaker_id
         self.get_http_session = get_http_session
         self.agent_url = agent_url.rstrip("/") if agent_url else None

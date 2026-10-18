@@ -14,18 +14,20 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
-    CognitiveEvidenceRecorder,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
 from orchestrator.runtime.interaction_ledger import InteractionLedger
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.capability_runtime import (
-    LocalSpeechCapabilityProvider,
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
     local_speech_definition,
 )
 from shared.chromie_contracts.execution_outcome import (
@@ -61,6 +63,7 @@ from tests.cognitive_runtime_test_support import (
     walk_definition,
     work_fixture,
 )
+from orchestrator.runtime import planner_advance_projection
 
 
 class FailingPlannerAdapter(CanonicalPlanRuntimeAdapter):
@@ -208,7 +211,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             confidence=0.95,
         )
 
-        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        plan = planner_advance_projection.canonical_plan_from_fast_advance(
             advance=advance,
             association=association,
             user_text="Is anyone outside?",
@@ -321,7 +324,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
         class NoImplicitReplanClient(ScriptedClient):
-            async def resolve_fast_plan(self, *args, **kwargs):
+            async def resolve_plan(self, *args, **kwargs):
                 raise AssertionError("Runtime must not infer GA-triggered Planner re-entry")
 
         client = NoImplicitReplanClient(association=association, fast_plans=[])
@@ -615,9 +618,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 )()
 
         class ReplanningClient(ScriptedClient):
-            async def resolve_fast_plan(self, *args, **kwargs):
+            async def resolve_plan(self, *args, **kwargs):
                 events.append("planner_decided")
-                return await super().resolve_fast_plan(*args, **kwargs)
+                return await super().resolve_plan(*args, **kwargs)
 
         association = GoalAssociationResolution(
             resolution_status="resolved",
@@ -797,13 +800,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
     ):
         del intent
         core, envelope = admitted_core(
-            text, sid="sid-pr7", language="zh-CN", responsibilities=responsibilities
+            text, sid="sid-goal-runtime", language="zh-CN", responsibilities=responsibilities
         )
         return asyncio.run(
             coordinator.resolve(
                 object(),
                 text=text,
-                sid="sid-pr7",
+                sid="sid-goal-runtime",
                 core_interpretation=core,
                 context={"history": [], "active_goal_snapshots": []},
                 history=[],
@@ -936,7 +939,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     },
                 )
 
-            async def stream_fast_advance(self, *args, **kwargs):
+            async def stream_plan_advance(self, *args, **kwargs):
                 del args, kwargs
                 # _resolve deliberately yields once after starting GA, so the
                 # fail-closed GA task is already terminal at this boundary.
@@ -1364,7 +1367,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
             class CancellationRuntime(CapabilityRuntime):
                 def __init__(self) -> None:
-                    super().__init__(CapabilityRegistry())
+                    super().__init__(CapabilityDefinitionRegistry())
                     self.cancelled: list[str] = []
 
                 async def cancel_interaction(self, interaction_id: str) -> None:
@@ -1390,8 +1393,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     )()
 
             class SlowAssociationClient(ScriptedClient):
-                async def stream_fast_advance(self, *args, **kwargs):
-                    async for frame in super().stream_fast_advance(
+                async def stream_plan_advance(self, *args, **kwargs):
+                    async for frame in super().stream_plan_advance(
                         *args, **kwargs
                     ):
                         yield frame
@@ -1475,7 +1478,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         class CancellationRuntime(CapabilityRuntime):
             def __init__(self) -> None:
-                super().__init__(CapabilityRegistry())
+                super().__init__(CapabilityDefinitionRegistry())
                 self.cancelled: list[str] = []
 
             async def cancel_interaction(self, interaction_id: str) -> None:
@@ -1514,9 +1517,9 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 return type("Result", (), {"status": "completed"})()
 
         class ReplanningClient(ScriptedClient):
-            async def resolve_fast_plan(self, *args, **kwargs):
+            async def resolve_plan(self, *args, **kwargs):
                 events.append("canonical_fast_revision")
-                return await super().resolve_fast_plan(*args, **kwargs)
+                return await super().resolve_plan(*args, **kwargs)
 
         association = GoalAssociationResolution(
             resolution_status="resolved",
@@ -1641,7 +1644,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         class CancellationRuntime(CapabilityRuntime):
             def __init__(self) -> None:
-                super().__init__(CapabilityRegistry())
+                super().__init__(CapabilityDefinitionRegistry())
                 self.cancelled: list[str] = []
 
             async def cancel_interaction(self, interaction_id: str) -> None:
@@ -1906,7 +1909,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         observed: list[tuple[str, dict]] = []
 
         def retain_stage(sid: str, **stage: object) -> None:
-            self.assertEqual(sid, "sid-pr7")
+            self.assertEqual(sid, "sid-goal-runtime")
             observed.append((str(stage["stage"]), dict(stage)))
 
         coordinator = GoalDrivenRuntimeCoordinator(
@@ -1957,7 +1960,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         }
 
         interaction = coordinator._interaction_context(
-            sid="sid-pr7", context=context, goal_ids=[],
+            sid="sid-goal-runtime", context=context, goal_ids=[],
         )
 
         self.assertEqual(interaction["already_spoken"], [])
@@ -1971,7 +1974,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         ledger.record_playback_event(
             {
                 "event_id": "speech-existing",
-                "session_id": "sid-pr7",
+                "session_id": "sid-goal-runtime",
                 "turn_id": "turn-1",
                 "status": "playback_completed",
                 "text": "你好。",
@@ -1995,10 +1998,10 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 )
                 return await super().resolve_goal_association(*args, **kwargs)
 
-            async def stream_fast_advance(self, *args, **kwargs):
+            async def stream_plan_advance(self, *args, **kwargs):
                 request = kwargs.get("request")
                 self.fast_contexts.append(dict(getattr(request, "context", {}) or {}))
-                async for frame in super().stream_fast_advance(*args, **kwargs):
+                async for frame in super().stream_plan_advance(*args, **kwargs):
                     yield frame
 
         client = ContextClient()
@@ -2137,7 +2140,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "terminal_missing_ability",
         )
 
-    def test_fast_planner_advance_never_carries_a_refusal(self):
+    def test_planner_advance_never_carries_a_refusal(self):
         # Refusing is Value Judgment's; the Planner reports a limitation instead.
         with self.assertRaises(ValidationError):
             FastPlannerAdvance(
@@ -2148,7 +2151,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 activities=[],
                 confidence=0.95,
                 unresolved=["terminal bounded limitation"],
-                reason_summary="Fast Planner terminal refused decision.",
+                reason_summary="Planner terminal refused decision.",
             )
 
     def test_fast_unavailable_is_terminal_without_second_fast_call(self):
@@ -2163,7 +2166,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     activities=[],
                     confidence=0.95,
                     unresolved=["terminal bounded limitation"],
-                    reason_summary=f"Fast Planner terminal {disposition} decision.",
+                    reason_summary=f"Planner terminal {disposition} decision.",
                 )
                 client = ScriptedClient(
                     association=association,
@@ -2291,7 +2294,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         self.assertEqual(result.metadata["failure_stage"], "goal_association")
         self.assertCountEqual(client.calls, ["stream", "association"])
 
-    def test_fast_planner_owns_semantic_clarification_after_provisional_goal(self):
+    def test_planner_owns_semantic_clarification_after_provisional_goal(self):
         association = GoalAssociationResolution(
             resolution_status="resolved",
             turn_id="turn-needs-clarification",
@@ -2348,7 +2351,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
 
         core, envelope = admitted_core(
             "move over there",
-            sid="sid-pr7",
+            sid="sid-goal-runtime",
             language="en-US",
             meaning_uncertainties=["which destination 'there' refers to"],
         )
@@ -2356,7 +2359,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             coordinator.resolve(
                 object(),
                 text="move over there",
-                sid="sid-pr7",
+                sid="sid-goal-runtime",
                 core_interpretation=core,
                 context={"history": [], "active_goal_snapshots": []},
                 history=[],
@@ -2460,7 +2463,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             "scheduled",
         )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         runtime = CapabilityRuntime(registry)
         runtime.register_provider(
@@ -2969,22 +2972,22 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         )
 
     def test_mixed_speech_limitations_deliver_without_capability_work(self):
-        from tests.test_planner_canonical_contract import CanonicalPlanContractTests
+        from tests.planner_test_support import speech_outcomes
         from agent.app.planner_model_contract import PlannerModelOutput, materialize_planner_output
 
-        _, refused_raw = CanonicalPlanContractTests.speech_outcomes("unavailable", sibling=True)
+        _, refused_raw = speech_outcomes("unavailable", sibling=True)
         refused_goal = next(iter(refused_raw["goal_outcomes"]))
         refused_raw["goal_outcomes"][refused_goal]["disposition"] = "refused"
         with self.assertRaises(ValueError):
             PlannerModelOutput.model_validate(refused_raw)
         for disposition in ("clarify", "unavailable"):
             with self.subTest(disposition=disposition):
-                _, raw = CanonicalPlanContractTests.speech_outcomes(disposition, sibling=True)
+                _, raw = speech_outcomes(disposition, sibling=True)
                 plan = CanonicalPlan.model_validate(materialize_planner_output(
                     PlannerModelOutput.model_validate(raw), planner_tier="fast",
                     plan_id="mixed-speech", expected_goal_ids_for_turn=list(raw["goal_outcomes"]),
                 ))
-                work_request, _ = CanonicalPlanContractTests.speech_outcomes(disposition, sibling=True)
+                work_request, _ = speech_outcomes(disposition, sibling=True)
                 client = ScriptedClient(association=new_goal_association(), fast_plans=[])
                 coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
                     adapter=CanonicalPlanRuntimeAdapter(FakeRuntime()), policy=CognitiveRuntimePolicy(mode="apply"))
@@ -3057,7 +3060,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         from agent.app.planner_fallback import (
             materialize_planner_failure, materialize_planner_unavailable,
         )
-        from tests.fast_planner_test_support import _work_request
+        from tests.planner_test_support import _work_request
 
         request = _work_request(sid="planner-failure", text="Bring that to me.")
         feedback = [{"type": "parallel_resource_claim_conflict"}]
@@ -3505,13 +3508,13 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 self.calls.append("association")
                 return association
 
-            async def stream_fast_advance(self, *args, **kwargs):
+            async def stream_plan_advance(self, *args, **kwargs):
                 del args, kwargs
                 self.calls.append("stream")
                 await asyncio.sleep(0)
                 await committed.wait()
                 yield FastPlannerStreamFailure(
-                    turn_id="sid-pr7",
+                    turn_id="sid-goal-runtime",
                     failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",
@@ -3523,7 +3526,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
         client = Client()
 
         def apply_goal_state(_association, *, sid, user_text, source):
-            self.assertEqual(sid, "sid-pr7")
+            self.assertEqual(sid, "sid-goal-runtime")
             self.assertEqual(user_text, "hello")
             self.assertEqual(
                 source,
@@ -3572,18 +3575,18 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         )
         class ContractFailureClient(ScriptedClient):
-            async def stream_fast_advance(self, *args, **kwargs):
+            async def stream_plan_advance(self, *args, **kwargs):
                 del args, kwargs
                 self.calls.append("stream")
                 await asyncio.sleep(0)
                 yield FastPlannerStreamFailure(
-                    turn_id="sid-pr7",
+                    turn_id="sid-goal-runtime",
                     failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",
                     architecture_attribution="fast_planner",
                     retryable=False,
-                    reason="invalid Fast Planner contract",
+                    reason="invalid Planner contract",
                 )
 
         client = ContractFailureClient(
@@ -3627,18 +3630,18 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
             },
         )
         class ContractFailureClient(ScriptedClient):
-            async def stream_fast_advance(self, *args, **kwargs):
+            async def stream_plan_advance(self, *args, **kwargs):
                 del args, kwargs
                 self.calls.append("stream")
                 await asyncio.sleep(0)
                 yield FastPlannerStreamFailure(
-                    turn_id="sid-pr7",
+                    turn_id="sid-goal-runtime",
                     failure_stage="before_commit",
                     failure_class="structured_output_validation",
                     failure_domain="model_contract",
                     architecture_attribution="fast_planner",
                     retryable=False,
-                    reason="invalid Fast Planner contract",
+                    reason="invalid Planner contract",
                 )
 
         client = ContractFailureClient(
@@ -3990,8 +3993,8 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 self.planner_started = asyncio.Event()
                 self.release_planner = asyncio.Event()
 
-            async def stream_fast_advance(self, *args, **kwargs):
-                async for frame in super().stream_fast_advance(*args, **kwargs):
+            async def stream_plan_advance(self, *args, **kwargs):
+                async for frame in super().stream_plan_advance(*args, **kwargs):
                     if isinstance(frame, FastPlannerStreamTerminal):
                         self.planner_started.set()
                         await self.release_planner.wait()
@@ -4557,7 +4560,7 @@ class FastInformationAcquisitionLifecycleTests(unittest.TestCase):
             reason_summary="Acquire the requested information first.",
         )
 
-        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        plan = planner_advance_projection.canonical_plan_from_fast_advance(
             advance=advance,
             association=association,
             user_text="Please help me check the weather in Chongqing today.",
@@ -4596,23 +4599,23 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
             coverage="complete", goal_ids=["goal-1"], response_text="按新的要求来。", confidence=0.98)
 
         class Client(ScriptedClient):
-            async def stream_fast_advance(self, *args, **kwargs):
+            async def stream_plan_advance(self, *args, **kwargs):
                 umi_started.set()
                 try:
                     await asyncio.Event().wait()
                 finally:
                     umi_cancelled.set()
-                async for frame in super().stream_fast_advance(*args, **kwargs):
+                async for frame in super().stream_plan_advance(*args, **kwargs):
                     yield frame
 
             async def resolve_goal_association(self, *args, **kwargs):
                 await umi_started.wait()
                 return await super().resolve_goal_association(*args, **kwargs)
 
-            async def resolve_fast_plan(self, *args, **kwargs):
+            async def resolve_plan(self, *args, **kwargs):
                 self.request = kwargs["request"]
                 goal_planned.set()
-                return await super().resolve_fast_plan(*args, **kwargs)
+                return await super().resolve_plan(*args, **kwargs)
 
         client = Client(association=association, fast_plans=[plan])
         coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
@@ -4648,22 +4651,22 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
             metadata={"path_classification": "contract_failure", "failure_class": "dto_contract_invalid"})
 
         class Client(ScriptedClient):
-            async def stream_fast_advance(self, *args, **kwargs):
+            async def stream_plan_advance(self, *args, **kwargs):
                 await goal_planned.wait()
                 if umi_plan_fails:
                     yield FastPlannerStreamFailure(turn_id=kwargs["request"].sid, failure_stage="before_commit",
                         failure_class="fast_stream_contract_invalid", failure_domain="model_contract")
                     return
-                async for frame in super().stream_fast_advance(*args, **kwargs):
+                async for frame in super().stream_plan_advance(*args, **kwargs):
                     yield frame
 
-            async def resolve_fast_plan(self, *args, **kwargs):
+            async def resolve_plan(self, *args, **kwargs):
                 goal_planned.set()
                 if ga_returns_contract_failure:
                     return contract_failure
                 if ga_plan_fails:
                     raise RuntimeError("SGLang returned HTTP 400 before inference")
-                return await super().resolve_fast_plan(*args, **kwargs)
+                return await super().resolve_plan(*args, **kwargs)
 
         client = Client(association=association, fast_plans=[plan])
         coordinator = GoalDrivenRuntimeCoordinator(agent_client=client,
@@ -4696,7 +4699,7 @@ class IndependentPlanningTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(item["stage"] == "fast_planner_stream" for item in result.metadata["stage_diagnostics"]))
 
     async def test_safe_read_executes_before_ga_and_is_not_dispatched_again(self):
-        from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+        from orchestrator.runtime.builtin_capability_providers import MockCapabilityProvider
         from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 
         started = asyncio.Event()

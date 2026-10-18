@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Mapping
 
-from .env_values import parse_bool
+from .env_values import parse_bool, parse_float, parse_int
 
 
 def _text(values: Mapping[str, str], name: str, default: str = "") -> str:
@@ -24,11 +24,9 @@ def _integer(
     minimum: int,
     maximum: int,
 ) -> int:
-    try:
-        value = int(str(values.get(name, default)).strip())
-    except (TypeError, ValueError):
-        value = default
-    return max(minimum, min(maximum, value))
+    return parse_int(
+        values.get(name), name=name, default=default, minimum=minimum, maximum=maximum
+    )
 
 
 def _floating(
@@ -38,11 +36,9 @@ def _floating(
     minimum: float,
     maximum: float,
 ) -> float:
-    try:
-        value = float(str(values.get(name, default)).strip())
-    except (TypeError, ValueError):
-        value = default
-    return max(minimum, min(maximum, value))
+    return parse_float(
+        values.get(name), name=name, default=default, minimum=minimum, maximum=maximum
+    )
 
 
 def _csv(values: Mapping[str, str], name: str) -> frozenset[str]:

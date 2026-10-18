@@ -12,6 +12,7 @@ from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from orchestrator.runtime.session import SessionTracker, now_ms
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class _Asr:
@@ -25,7 +26,7 @@ class _Asr:
         self.sent.append(audio)
 
     async def recv(self) -> str:
-        return json.dumps({"type": "final", "text": self.text})
+        return json.dumps({"type": "final", "sequence": len(self.sent), "text": self.text})
 
     async def close(self) -> None:
         return None
@@ -41,7 +42,7 @@ class _StartOnlyVad:
 
 class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
     def _assistant(self, *, asr_text: str) -> tuple[VoiceAssistant, str, list[tuple[str | None, str]]]:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery = PlaybackDeliveryLifecycle(
             playback_generation=3
         )
@@ -97,7 +98,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
 
         await input_session_runtime_for(assistant)._feed_vad_pcm16(frame)
 
-        state = assistant._playback_state()
+        state = assistant.playback_delivery
         self.assertTrue(state.output_duck_matches(3, old_session_id))
         self.assertEqual(assistant.playback_delivery.playback_generation, 3)
         self.assertTrue(
@@ -144,7 +145,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(assistant.sessions.current_sid, old_session_id)
         self.assertEqual(assistant.playback_delivery.playback_generation, 3)
-        self.assertFalse(assistant._playback_state().output_duck_matches(3, old_session_id))
+        self.assertFalse(assistant.playback_delivery.output_duck_matches(3, old_session_id))
         self.assertEqual(invalidations, [])
         self.assertEqual(routes, [])
         self.assertTrue(
@@ -164,10 +165,10 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
         ) -> None:
             invalidations.append(cancel_cognitive_work)
             self.playback_delivery.playback_generation += 1
-            self._playback_state().cancel_output_duck()
+            self.playback_delivery.cancel_output_duck()
 
         async def abort_output(self: VoiceAssistant) -> None:
-            if not self.host._playback_state().output_duck_matches(3, old_session_id):
+            if not self.host.playback_delivery.output_duck_matches(3, old_session_id):
                 raise AssertionError(
                     "output generation must remain ducked until the stream is silent"
                 )
@@ -200,7 +201,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(aborts), 1)
         self.assertEqual(routes, [("Stop talking.", new_session_id)])
         self.assertEqual(assistant.playback_delivery.playback_generation, 4)
-        self.assertIsNone(assistant._playback_state().output_duck_generation)
+        self.assertIsNone(assistant.playback_delivery.output_duck_generation)
         self.assertTrue(
             any(
                 sid == new_session_id
@@ -222,7 +223,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
             session_id=old_session_id,
         )
         await asyncio.wait_for(
-            assistant._playback_state().output_duck_released.wait(),
+            assistant.playback_delivery.output_duck_released.wait(),
             timeout=0.1,
         )
 
@@ -253,7 +254,7 @@ class BargeInDuckingTests(unittest.IsolatedAsyncioTestCase):
 
         stream = _Stream()
         assistant.playback_delivery.output_stream = stream
-        state = assistant._playback_state()
+        state = assistant.playback_delivery
         state.begin_output_duck(
             generation=3,
             session_id=old_session_id,

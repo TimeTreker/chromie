@@ -33,18 +33,8 @@ class WorkDAGValidationResponse(BaseModel):
     warnings: list[str] = Field(default_factory=list)
 
 
-class WorkDAGDryRunRequest(BaseModel):
-    dag: WorkDAG
-    auto_confirm: bool = True
-
-
 class WorkDAGExecuteRequest(BaseModel):
     dag: WorkDAG
-
-
-class WorkDAGGuardedExecuteRequest(BaseModel):
-    dag: WorkDAG
-    confirmation_grant: str
 
 
 class WorkDAGConfirmationGrantRequest(BaseModel):

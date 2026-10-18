@@ -129,7 +129,7 @@ def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     value: dict[str, Any] = {}
     for key, item in pairs:
         if key in value:
-            raise PlannerDTOContractError(f"Fast Planner JSON object repeats key: {key}")
+            raise PlannerDTOContractError(f"Planner JSON object repeats key: {key}")
         value[key] = item
     return value
 
@@ -158,20 +158,20 @@ def ability_need_metadata(needs: list[PlannerAbilityNeed], searched: list[str], 
 def parse_fast_work_document(buffer: str) -> dict[str, Any]:
     """Require one finite, unambiguous complete Work object."""
     def reject_constant(value: str) -> Any:
-        raise PlannerDTOContractError(f"Fast Planner JSON contains nonfinite value: {value}")
+        raise PlannerDTOContractError(f"Planner JSON contains nonfinite value: {value}")
     value = json.loads(buffer, object_pairs_hook=_unique_json_object, parse_constant=reject_constant)
     if not isinstance(value, dict):
-        raise PlannerDTOContractError("Fast Planner Work result must be an object")
+        raise PlannerDTOContractError("Planner Work result must be an object")
     return value
 
 
-class FastPlannerResolver:
+class PlannerResolver:
     """Fast planning with common contracts, need-first and one library search."""
 
     TRACE_MODULE = TraceModule(
         name="agent.fast_planner",
         component_type="planner",
-        implementation="FastPlannerResolver",
+        implementation="PlannerResolver",
         schema_version=1,
     )
 
@@ -252,7 +252,7 @@ class FastPlannerResolver:
                     async for delta in deltas:
                         raw_text += delta
                         if len(raw_text) > 131072 or (raw_text.lstrip() and not raw_text.lstrip().startswith("{")):
-                            raise PlannerDTOContractError("Fast Planner Work stream is oversized or not a JSON object")
+                            raise PlannerDTOContractError("Planner Work stream is oversized or not a JSON object")
                         if needs_seen:
                             continue
                         prefix = complete_ability_needs(raw_text)
@@ -317,7 +317,7 @@ class FastPlannerResolver:
             else:
                 raise PlannerDTOContractError("Capability search budget exhausted before a Plan")
             advance = FastPlannerAdvance(turn_id=turn_id, **output.model_dump(exclude={"responsibility_decisions"}), metadata={
-                "semantic_authority": "fast_planner_model", "phase": "responsibility_work_plan",
+                "semantic_authority": "planner_model", "phase": "responsibility_work_plan",
                 "responsibility_decisions": authored_decisions,
                 **({"repeated_activity_normalization": repeated_activity_repairs} if repeated_activity_repairs else {}),
                 "execution_authority": "trusted_capability_runtime", "semantic_result_call_count": 1,
@@ -615,7 +615,7 @@ class FastPlannerResolver:
                     )
                     if not isinstance(raw, dict):
                         raise ValueError(
-                            "fast planner evidence re-entry response is not a JSON object"
+                            "planner evidence re-entry response is not a JSON object"
                         )
                     from jsonschema import Draft202012Validator
                     Draft202012Validator(response_schema).validate(raw)
@@ -647,7 +647,7 @@ class FastPlannerResolver:
                         attempt=1 + int(bool(loaded_capability_ids)),
                     )
                     if not isinstance(raw, dict):
-                        raise ValueError("fast planner response is not a JSON object")
+                        raise ValueError("planner response is not a JSON object")
                     needs = take_ability_needs(
                         raw, loaded_capability_ids=[item["capability_id"] for item in capability_payload]
                     )

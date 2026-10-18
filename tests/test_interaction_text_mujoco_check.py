@@ -308,13 +308,13 @@ def test_preview_checks_optional_defaults_from_retained_contract(
 async def test_live_check_consumes_social_delivery_without_replaying_it(
     tmp_path, already_delivered,
 ):
-    from orchestrator.runtime.capability_runtime import MockCapabilityProvider
+    from orchestrator.runtime.builtin_capability_providers import MockCapabilityProvider
     from orchestrator.runtime.cognitive_gateway import CognitiveGateway
     from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
     from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
     from orchestrator.runtime.interaction_ledger import InteractionLedger
     from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
-    from tests.test_planner_auxiliary_activity_contract import _definition
+    from tests.auxiliary_activity_test_support import social_capability_definition as _definition
 
     ledger = InteractionLedger()
     speak = AsyncMock(return_value={"scheduled": True})
@@ -1143,9 +1143,9 @@ class InteractionTextMujocoCheckTests(unittest.TestCase):
 
 class ProviderStartObservationTests(unittest.IsolatedAsyncioTestCase):
     async def test_capability_runtime_empty_execution_observation_is_bounded(self) -> None:
-        from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
+        from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime
 
-        observation = await CapabilityRuntime(CapabilityRegistry()).execution_observation()
+        observation = await CapabilityRuntime(CapabilityDefinitionRegistry()).execution_observation()
         self.assertEqual(observation.open_interaction_ids, [])
         self.assertEqual(observation.executing_interaction_ids, [])
         self.assertEqual(observation.requests, [])

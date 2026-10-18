@@ -8,9 +8,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
+from shared.chromie_runtime.env_values import InvalidBooleanSetting, parse_bool
 
-TRUE_VALUES = {"1", "true", "yes", "on"}
-FALSE_VALUES = {"0", "false", "no", "off"}
 
 BOOL_VARS = (
     "AGENT_ENABLE_READ_ONLY_DAG_EXECUTION",
@@ -52,7 +51,6 @@ POSITIVE_INT_VARS = (
     "ORCH_CAPABILITY_MAX_CONCURRENCY",
     "ORCH_AGENT_USER_MEANING_INTERPRETER_TIMEOUT_MS",
     "ORCH_ASR_TIMEOUT_MS",
-    "ORCH_ACTION_TIMEOUT_MS",
     "TTS_FLUSH_CHARS",
     "ORCH_TTS_CHUNK_CHARS",
     "ORCH_TTS_MIN_CHUNK_CHARS",
@@ -65,7 +63,6 @@ POSITIVE_INT_VARS = (
 
 URL_VARS = (
     "AGENT_URL",
-    "ACTION_EXECUTOR_URL",
     "ASR_URL",
     "TTS_URL",
     "LLM_URL",
@@ -111,10 +108,12 @@ class EnvSnapshot:
         return self.values.get(name, default)
 
     def bool_value(self, name: str, default: bool = False) -> bool:
-        parsed = parse_bool(self.values.get(name, ""))
-        if parsed is None:
+        """Read one flag with the runtime parser; ``validate_config`` reports invalid values."""
+
+        try:
+            return parse_bool(self.values.get(name), name=name, default=default)
+        except InvalidBooleanSetting:
             return default
-        return parsed
 
 
 def parse_env_file(path: Path) -> dict[str, str]:
@@ -141,13 +140,14 @@ def parse_env_file(path: Path) -> dict[str, str]:
     return values
 
 
-def parse_bool(value: str) -> bool | None:
-    lowered = value.strip().lower()
-    if lowered in TRUE_VALUES:
-        return True
-    if lowered in FALSE_VALUES:
+def is_valid_bool(name: str, value: str) -> bool:
+    """Return whether the services would accept ``value`` for flag ``name``."""
+
+    try:
+        parse_bool(value, name=name, default=False)
+    except InvalidBooleanSetting:
         return False
-    return None
+    return True
 
 
 def parse_positive_int(value: str) -> int | None:
@@ -258,7 +258,7 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
     values = snapshot.values
 
     for name in BOOL_VARS:
-        if name in values and parse_bool(values[name]) is None:
+        if name in values and not is_valid_bool(name, values[name]):
             diagnostics.append(
                 Diagnostic(
                     "failure",
@@ -352,7 +352,7 @@ def validate_config(snapshot: EnvSnapshot) -> list[Diagnostic]:
             Diagnostic(
                 "warning",
                 "legacy_action_dry_run_disabled",
-                "ORCH_ACTION_DRY_RUN=false can call the legacy mock hardware daemon",
+                "ORCH_ACTION_DRY_RUN=false permits live simulator or robot execution",
             )
         )
     return diagnostics

@@ -24,11 +24,16 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
 
     def probe(self, source: str, baseline: int | None = None) -> tuple[int, str]:
         config = json.loads(CONFIG.read_text(encoding="utf-8"))
+        source_file = config["voice_assistant"]["path"]
+        config["file_line_baselines"] = {
+            source_file: config["file_line_baselines"][source_file]
+        }
         if baseline is not None:
             config["voice_assistant"]["size_baselines"] = dict.fromkeys(
                 ("method_count", "property_count", "init_lines", "init_self_attributes"),
                 baseline,
             )
+            config["file_line_baselines"][source_file] = baseline
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             config_path = root / "rules.json"
@@ -64,7 +69,7 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
         lines[init.body[0].lineno - 1:init.body[0].lineno - 1] = [init_text]
         return "".join(lines)
 
-    def test_size_growth_is_reported_without_rejecting_owned_source(self) -> None:
+    def test_size_growth_above_baseline_is_rejected(self) -> None:
         variants = (
             ("init_lines", "        # Comment one.\n        # Comment two.\n", ""),
             ("init_self_attributes", "        self.probe_a = self.probe_b = self.probe_c = None\n", ""),
@@ -77,10 +82,24 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
                 if metric == "init_lines":
                     self.assertEqual(ast.dump(ast.parse(source)), ast.dump(ast.parse(self.current_source())))
                 status, output = self.probe(source)
-                self.assertEqual(status, 0, output)
-                self.assertIn(metric + "=", output)
-                self.assertIn("delta=+", output)
-                self.assertIn("informational", output)
+                self.assertEqual(status, 1, output)
+                self.assertIn(f"size_baselines.{metric} grew to", output)
+                self.assertIn("file_line_baselines[orchestrator/orchestrator.py] grew to", output)
+
+    def test_size_at_or_below_baseline_passes(self) -> None:
+        status, output = self.probe(self.current_source())
+        self.assertEqual(status, 0, output)
+        self.assertIn("delta=+0", output)
+        status, output = self.probe(self.current_source(), baseline=10000)
+        self.assertEqual(status, 0, output)
+        self.assertIn("delta=-", output)
+
+    def test_every_file_line_baseline_names_an_existing_file(self) -> None:
+        config = json.loads(CONFIG.read_text(encoding="utf-8"))
+        self.assertIn(config["voice_assistant"]["path"], config["file_line_baselines"])
+        for relative in config["file_line_baselines"]:
+            with self.subTest(path=relative):
+                self.assertTrue((ROOT / relative).is_file())
 
     def test_ownership_violations_block_above_and_below_size_baselines(self) -> None:
         variants = (
@@ -95,7 +114,6 @@ class RuntimeStructureRatchetTests(unittest.TestCase):
                     status, output = self.probe(source, baseline)
                     self.assertEqual(status, 1, output)
                     self.assertIn(error, output)
-                    self.assertIn("informational", output)
 
     def test_malformed_measurement_baseline_is_not_silently_ignored(self) -> None:
         status, output = self.probe(self.current_source(), baseline=-1)

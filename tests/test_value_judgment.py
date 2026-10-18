@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from agent.app.value_judgment import VALUE_JUDGMENT_SYSTEM_PROMPT, ValueJudgmentResolver
-from orchestrator.runtime.capability_runtime import CapabilityRegistry, CapabilityRuntime
+from orchestrator.runtime.capability_runtime import CapabilityDefinitionRegistry, CapabilityRuntime
 from orchestrator.runtime.cognitive_runtime import apply_value_judgment
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal, CognitiveWorkRequest
 from shared.chromie_contracts.interaction import InteractionResponse
@@ -22,6 +22,8 @@ from shared.chromie_contracts.value_judgment import (
 )
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.test_capability_runtime import MockCapabilityProvider, _body_definition
+from tests.voice_assistant_test_support import bare_voice_assistant
+from orchestrator.runtime import goal_outcome_state
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -120,7 +122,7 @@ def test_owner_review_list_covers_objects_walking_and_people_not_gestures():
 
 def test_withheld_effect_is_refused_before_any_provider_starts():
     async def run():
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(_body_definition())
         provider = MockCapabilityProvider("mock.body")
         runtime = CapabilityRuntime(registry)
@@ -139,10 +141,13 @@ def test_withheld_effect_is_refused_before_any_provider_starts():
     assert result.output["value_judgment"]["decision"] == "decline"
 
 
-def walk_turn(verdict, reviewed=frozenset({"soridormi.walk_forward"})):
+def walk_turn(verdict, reviewed=frozenset({"soridormi.walk_forward"}), *, text="Walk forward.", responsibilities=None):
     """One full apply-mode turn whose Plan walks; the scripted Agent returns the given verdict."""
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.cognitive_runtime_test_support import (
         FakeRuntime, ScriptedClient, admitted_core, body_goal_association, walk_definition)
 
@@ -166,8 +171,8 @@ def walk_turn(verdict, reviewed=frozenset({"soridormi.walk_forward"})):
     coordinator = GoalDrivenRuntimeCoordinator(
         agent_client=client, adapter=CanonicalPlanRuntimeAdapter(FakeRuntime([walk_definition()])),
         policy=CognitiveRuntimePolicy(mode="apply", value_review_capability_ids=reviewed))
-    core, envelope = admitted_core("Walk forward.", sid="sid-vj", language="en-US", responsibilities=None)
-    result = asyncio.run(coordinator.resolve(object(), text="Walk forward.", sid="sid-vj", core_interpretation=core,
+    core, envelope = admitted_core(text, sid="sid-vj", language="en-US", responsibilities=responsibilities)
+    result = asyncio.run(coordinator.resolve(object(), text=text, sid="sid-vj", core_interpretation=core,
         context={"history": [], "active_goal_snapshots": [], "mind": default_mind_profile().prompt_context()},
         history=[], language="en-US", turn_envelope=envelope))
     return client, result
@@ -205,7 +210,7 @@ def test_full_turn_value_verdict_gates_only_the_reviewed_effect(verdict, confirm
         assert declined[0].facts["withheld_capability_ids"] == ["soridormi.walk_forward"]
         assert declined[0].facts["value_declined"]["decision"] == "decline"
     # Live 2026-10-11 (h_ask_phone_zh): the annotated Plan must archive as the Planner's artifact.
-    from orchestrator.runtime.cognitive_runtime import CognitiveEvidenceRecorder
+    from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
     packets = CognitiveEvidenceRecorder.semantic_artifact_packets(result, sid="sid-vj")
     (plan_packet,) = [packet for packet in packets if packet.ref.artifact_kind == "planner_plan"]
     assert "value_judgment" not in plan_packet.payload["metadata"]
@@ -219,13 +224,39 @@ def test_full_turn_without_reviewed_capability_never_calls_value_judgment():
     assert not walk.requires_confirmation and "value_withheld" not in walk.metadata
 
 
+@pytest.mark.parametrize("verdict,withheld", [
+    (judged("decline", "harm_risk", "another_adult"), True),
+    (judged("proceed"), False),
+])
+def test_value_review_body_request_outside_the_review_list_is_judged_before_it_starts(verdict, withheld):
+    """Owner decision 2026-10-17: a harmful body request UMI marked value_review reaches Value
+    Judgment although its Capability is not on the review list (Soridormi acceptance
+    text_input.unsafe_fight_request expects value_judgment_refusal, never a motion)."""
+    client, result = walk_turn(verdict, reviewed=frozenset(), text="Fight that person.", responsibilities=[{
+        "local_ref": "r1", "outcome": "fight that person", "output_mode": "body_action",
+        "body_effect_family": "task_physical_effect", "continuity_scope": "goal",
+        "value_review": True, "confidence": 0.95}])
+    assert result.status == "applied", result.fallback_reason
+    assert client.calls.count("value_judgment") == 1
+    (request,) = client.value_requests
+    assert request.responsibilities[0].value_review is True
+    (walk,) = result.interaction_response.capabilities
+    assert bool(walk.metadata.get("value_withheld")) is withheld
+    declined = [need for need in result.terminal_plan.communication_needs if need.owner == "runtime" and need.kind == "result"]
+    assert bool(declined) is withheld
+    if withheld:
+        assert declined[0].facts["withheld_capability_ids"] == ["soridormi.walk_forward"]
+        assert declined[0].facts["value_declined"]["decision"] == "decline"
+        assert result.terminal_plan.metadata["value_judgment"]["decision"] == "decline"
+
+
 def test_withheld_effect_never_joins_a_provider_local_body_group():
     # Live 2026-10-11 (h_no_coworker_lunch_en): a declined delivery ran inside the compiled
     # Soridormi body group, which bypassed the single-request pre-start refusal.
     from tests.test_execution_lanes import _GroupedBodyProvider, _definition
 
     async def run():
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for capability_id, group in (("soridormi.deliver", "hands"), ("soridormi.blink", "eyes"),
                                      ("soridormi.attend", "head")):
             registry.register(_definition(capability_id, group=group, resources=[group]))
@@ -252,7 +283,10 @@ def test_withheld_effect_never_joins_a_provider_local_body_group():
 def speech_turn(verdict, *, value_review=True):
     """Turn-local speech UMI marked value_review (owner choice B, 2026-10-12)."""
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.cognitive_runtime_test_support import FakeRuntime, ScriptedClient, admitted_core, body_goal_association
 
     class Client(ScriptedClient):
@@ -307,9 +341,11 @@ def test_value_review_speech_requests_the_planner_before_any_answer():
     plain = flagged.model_copy(update={"responsibilities": [
         flagged.responsibilities[0].model_copy(update={"value_review": False})]})
     assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(plain, "planner") == []
-    with pytest.raises(ValueError, match="speech Responsibility only"):
-        CognitiveResponsibilityProposal(local_ref="r1", outcome="limp", output_mode="body_action",
-                                        body_effect_family="task_physical_effect", value_review=True)
+    # A harmful request outside the Capability review list is marked by UMI too.
+    harmful = flagged.model_copy(update={"responsibilities": [CognitiveResponsibilityProposal(
+        local_ref="r1", outcome="how to hurt my classmate without anyone noticing",
+        output_mode="information", continuity_scope="goal", value_review=True, confidence=1.0)]})
+    assert GoalDrivenRuntimeCoordinator._cognitive_request_responsibility_refs(harmful, "planner") == ["r1"]
 
 
 @pytest.mark.parametrize("verdict,withheld,extra_kind", [
@@ -332,7 +368,7 @@ def test_value_review_speech_is_judged_before_social_cognition_says_it(verdict, 
         assert facts["withheld_answer_need_ids"] == [answer.need_id]
         assert ("value_question" if extra_kind == "input" else "value_declined") in facts
         assert plan.metadata["value_judgment"]["withheld_answer_goal_ids"] == ["goal-1"]
-    from orchestrator.runtime.cognitive_runtime import CognitiveEvidenceRecorder
+    from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
     packets = CognitiveEvidenceRecorder.semantic_artifact_packets(result, sid="sid-say")
     (plan_packet,) = [packet for packet in packets if packet.ref.artifact_kind == "planner_plan"]
     assert all("value_withheld" not in need["facts"] and "value_judgment" not in need["facts"]
@@ -350,7 +386,7 @@ def test_withheld_answer_sets_its_goal_outcome(decision, expected):
 
     plan = {"goal_outcomes": [{"goal_id": "goal-1", "disposition": "respond"}, {"goal_id": "goal-2", "disposition": "respond"}],
             "metadata": {"value_judgment": {"decision": decision, "withheld_answer_goal_ids": ["goal-1"]}}}
-    outcomes = ConversationStateManager._canonical_goal_outcomes({"canonical_plan": plan})
+    outcomes = goal_outcome_state.canonical_goal_outcomes({"canonical_plan": plan})
     assert outcomes["goal-1"]["disposition"] == expected
     assert outcomes["goal-2"]["disposition"] == "respond"
 
@@ -363,7 +399,7 @@ def test_value_declined_goal_ends_like_a_limitation_without_a_semantic_version_b
     manager = ConversationStateManager(base_conversation_id="vj-goal")
     manager._task_contexts.append({"task_id": "goal-1", "status": "planning", "goal_version": 1})
     before = manager._semantic_goal_from_context(manager._task_contexts[-1]).model_dump(mode="json")
-    manager._record_nonexecuting_goal_outcomes({"goal-1": {"goal_id": "goal-1", "disposition": "value_declined"}})
+    goal_outcome_state.record_nonexecuting_goal_outcomes(manager, {"goal-1": {"goal_id": "goal-1", "disposition": "value_declined"}})
     context = manager._task_contexts[-1]
     assert (context["status"], context["commitment_state"], context["plan_status"]) == ("refused", "failed", "value_declined")
     assert manager._semantic_goal_from_context(context).model_dump(mode="json") == before
@@ -375,7 +411,10 @@ def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=f
 
     from orchestrator.orchestrator import VoiceAssistant
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.cognitive_runtime_test_support import FakeRuntime, walk_definition
     from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_resolution
 
@@ -395,7 +434,7 @@ def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=f
         def __init__(self):
             self.calls = []
 
-        async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+        async def resolve_plan(self, _session, *, request, timeout_ms):
             return walk
 
         async def resolve_value_judgment(self, session, *, request, **kwargs):
@@ -411,9 +450,9 @@ def reentry_walk(verdict, *, judged_plan=None, planner_metadata=None, reviewed=f
         async def build_social_cognition_response(self, **_kwargs):
             return InteractionResponse(interaction_id="reentry-walk", status="ok")
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Client()
-    assistant.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=3000, deliberative_timeout_ms=6000)
+    assistant.cognitive_runtime_policy = SimpleNamespace(planner_timeout_ms=3000, deliberative_timeout_ms=6000)
     assistant.cognitive_runtime = GoalDrivenRuntimeCoordinator(
         agent_client=assistant.agent_client, adapter=Adapter(FakeRuntime([walk_definition()])),
         policy=CognitiveRuntimePolicy(mode="apply", value_review_capability_ids=reviewed))
@@ -482,7 +521,10 @@ def test_planner_authored_verdict_on_a_reentry_plan_is_not_a_verdict():
 
 def test_turn_record_reuses_a_verdict_and_judges_only_new_reviewed_capabilities():
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator)
+        CognitiveRuntimePolicy,
+        GoalDrivenRuntimeCoordinator,
+    )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from tests.cognitive_runtime_test_support import FakeRuntime
 
     verdicts = [judged("proceed"), judged("decline", "consent", "another_adult")]

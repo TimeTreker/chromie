@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import time
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import dataclass
@@ -37,13 +36,15 @@ from shared.chromie_contracts.reflex import (
 
 from .capability_runtime import (
     CapabilityDispatchReceipt,
-    LocalSpeechCapabilityProvider,
-    MediaPlaybackCapabilityProvider,
     RuntimeAuthorization,
-    SessionControlCapabilityProvider,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
     CapabilityRuntimeResult,
+)
+from .builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
+    MediaPlaybackCapabilityProvider,
+    SessionControlCapabilityProvider,
     VocalPerformanceCapabilityProvider,
     local_speech_definition,
     media_playback_definitions,
@@ -72,6 +73,8 @@ from .conversation_memory_provider import (
 )
 from .interaction_preflight import annotate_preflight_validation
 
+logger = logging.getLogger(__name__)
+
 SpeechScheduler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
 SpeechCancelScheduler = Callable[
     [CapabilityRequest, dict[str, Any]],
@@ -82,17 +85,6 @@ CommunicativeGoalCompletionRecorder = Callable[
     [str | None, list[str], dict[str, Any]], None
 ]
 _WORK_DAG_CAPABILITY_ID = "chromie.work_dag.execute"
-
-
-def _float_env(name: str, default: float, *, minimum: float = 0.0) -> float:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        value = float(raw)
-    except ValueError:
-        return default
-    return max(minimum, value)
 
 
 @dataclass
@@ -162,20 +154,15 @@ class InteractionRuntimeCoordinator:
         ) = None,
         speech_timeout_ms: int | None = None,
     ) -> None:
-        self.registry = CapabilityRegistry()
+        self.registry = CapabilityDefinitionRegistry()
         self.registry.register(local_speech_definition(timeout_ms=speech_timeout_ms))
         self.registry.register(session_interrupt_definition())
         self.registry.register(work_dag_capability_definition())
         self.runtime = CapabilityRuntime(
             self.registry,
-            max_concurrency=max(
-                1,
-                int(
-                    max_concurrency
-                    if max_concurrency is not None
-                    else os.getenv("ORCH_CAPABILITY_MAX_CONCURRENCY", "8")
-                ),
-            ),
+            # Host settings own ORCH_CAPABILITY_MAX_CONCURRENCY; a bare
+            # construction uses the same code default.
+            max_concurrency=max(1, int(8 if max_concurrency is None else max_concurrency)),
         )
         self.runtime.register_provider(
             LocalSpeechCapabilityProvider(
@@ -219,10 +206,7 @@ class InteractionRuntimeCoordinator:
         self._catalog_refresh_ttl_s = (
             max(0.0, float(catalog_refresh_ttl_s))
             if catalog_refresh_ttl_s is not None
-            else _float_env(
-                "ORCH_SORIDORMI_CATALOG_REFRESH_TTL_S",
-                30.0,
-            )
+            else 30.0
         )
         self._catalog_lock = asyncio.Lock()
         self.interaction_ledger = interaction_ledger
@@ -469,7 +453,7 @@ class InteractionRuntimeCoordinator:
     ) -> list[str]:
         """Bind delivered Fast complete-response evidence to canonical Goal IDs.
 
-        Fast Planner may start a safe Communicative Activity before Goal Association
+        The Planner may start a safe Communicative Activity before Goal Association
         has produced canonical Goal identity.  Once GA is committed, this bridge
         attaches the already-running (or already-completed) ``chromie.speak``
         execution to the exact Goals owned by the Activity's Responsibility refs.

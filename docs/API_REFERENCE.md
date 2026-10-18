@@ -142,21 +142,18 @@ running.
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/health` | Return current model/runtime state, loaded capability sources, Planner availability, and WorkDAG diagnostic counters. |
-| `GET` | `/semantic-authority` | Return the machine-readable maintained single-authority matrix for Goal-driven `apply` and `report_only`. |
 | `POST` | `/cognitive-gateway/attention-review` | Focused pre-Core admission review; returns addressedness evidence only and fails open. |
 | `POST` | `/cognitive-core/interpret` | Envelope-first ordinary semantic User Meaning Interpretation inside the Core. |
 | `GET` | `/agent-skills` | Return bounded owner-approved Agent Skill metadata summaries and configured package provenance only; no Skill body or projection text. |
-| `POST` | `/agent-skills/select` | Let the declared responsible Agent role make a typed model-authored no/one/multi-Skill decision from bounded approved summaries; this endpoint does not load projections, mutate Plans, or execute Capabilities. |
-| `POST` | `/agent-skills/disclose` | Load only exact projections from a validated selection under digest and prompt-budget checks; it does not mutate Plans or execute Capabilities. |
 | `GET` | `/capabilities` | Return the active merged static capability registry and manifest sources. |
 | `GET` | `/capabilities/catalog` | Return the shared catalog, including last-known live named capabilities and refresh status. |
-| `POST` | `/capabilities/search` | Return a bounded model-neutral catalog view for inspection; it never scores language, suggests an ordinary route, or selects agents. |
 | `GET` | `/capabilities/llm-context?language=en&text=...` | Return concise LLM context for at most `limit` catalog entries (default `20`, capped at `64`); `text` is accepted at the interface but does not filter capabilities. |
 | `POST` | `/goal-association` | Resolve continuity-before-creation and independent Goal segmentation for the unified runtime; the endpoint itself does not mutate host state. |
 | `POST` | `/cognitive-activation` | Decide whether a trusted internal state transition should wake one of the exact existing authorities allowed by the Host scope. It cannot author Goal meaning, Work, wording, Capability selection, execution, or completion truth. |
-| `POST` | `/fast-plan` | Produce the one Planner's complete `CanonicalPlan` (need-first: an unmet ability loads library contracts and the Planner plans once with them); a limitation is an honest `unavailable` outcome whose every Goal carries a Planner `result` communication need, so Social Cognition says it in the same turn. `/deep-plan` was removed with the Deep Planner (2026-10-11). |
+| `POST` | `/plan` | Produce the one Planner's complete `CanonicalPlan` (need-first: an unmet ability loads library contracts and the Planner plans once with them); a limitation is an honest `unavailable` outcome whose every Goal carries a Planner `result` communication need, so Social Cognition says it in the same turn. `/deep-plan` was removed on 2026-10-11; there is no second planner. |
 | `POST` | `/value-judgment` | VALUE-JUDGMENT-001: one call returning `ValueJudgmentResult` (`affected`, `concern`, `decision` proceed/ask/decline, `reason`) for a `CognitiveWorkRequest` whose context carries the owner-approved Stable Mind. Never plans or words. Any failure returns `status=failed`, which withholds reviewed effects. |
 | `POST` | `/social-cognition` | One interaction-planning transaction for trusted UMI, Goal, Work, Evidence and Situation snapshots. Preserves pending communication obligations, exact acts and optional eligible expression; no task Work or Goal mutation. |
+| `POST` | `/social-cognition/startup-greeting` | Social Cognition's optional wake-up line from the owner-approved Mind and trusted local clock facts (`SocialStartupGreetingRequest`); returns `communicate` with exact words or `silence`. One model call, no Goal, Work or Evidence. |
 | `POST` | `/reflection` | Run selective slow-cognition Reflection for one trusted evidence-bound `CognitiveOpportunity`; it may propose future replan, clarification, correction, or bounded task/session Memory for still-open Responsibility but cannot reopen completed outcomes, execution authority, or history. |
 | `POST` | `/tools/execute` | Execute one exact planner-selected, explicitly interaction-executable safe read-only local capability and return structured evidence only. |
 
@@ -189,7 +186,7 @@ contract accepts (`AgentSkillProjectionName`); the
 weather package declares the grounded method as its parent and remains passive
 despite referencing required/optional Capabilities.
 
-`POST /agent-skills/select` accepts the responsible Agent projection name, the
+The Agent Skill selection service accepts the responsible Agent projection name, the
 current user text, bounded Goal context, optional bounded context summaries, and
 an optional explicit candidate-ID set. The Host performs only structural
 discovery: it filters by declared projection, validates explicit IDs, sorts and
@@ -209,7 +206,7 @@ whether this independent selection boundary is enabled plus its model and candid
 
 Catalog entries include `prompt_tier=common|rare`, plus
 `prompt_tier_locked`, `prompt_tier_source`, and `prompt_tier_reason`. The
-Fast Planner receives full unlocked `common` contracts and an index of every
+Planner receives full unlocked `common` contracts and an index of every
 entry, including unavailable and locked entries. Its Work begins with
 `ability_needs`: each needed ability once, its closest loaded Capability, a
 restatement of what that Capability does, and `fits`. When an ability does not fit,
@@ -235,11 +232,11 @@ nonverbally or stay silent; neither communication nor catalogue visibility prove
 or authorizes the requested effect. Search scores are relevance signals for catalog
 inspection endpoints, not User Meaning Interpretation execution authorization.
 
-`POST /agent-skills/disclose` accepts a previously validated selection and loads
+The disclosure service accepts a previously validated selection and loads
 only its exact matching role projections. The Loader rechecks package content,
 applies per-projection/aggregate/count budgets, omits rather than truncates
 oversized content, and returns typed failures plus a disclosure digest. Only the
-Fast Planner endpoint (`/fast-plan`) performs this selection/disclosure automatically;
+Planner endpoint (`/plan`) performs this selection/disclosure automatically;
 Goal Association, Fast-advance and Value Judgment receive no Agent Skill methods.
 Caller-supplied disclosure context is removed before trusted injection.
 
@@ -252,14 +249,12 @@ Important interaction-related endpoints are:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `POST` | `/fast-advance` | Stream one complete Fast Work result or typed failure as NDJSON; no presentation prefix. One bounded catalog lookup may precede the Work decision. |
+| `POST` | `/plan-advance` | Stream one complete Planner Work result or typed failure as NDJSON; no presentation prefix. One bounded catalog lookup may precede the Work decision. |
 | `POST` | `/goal-association` | Commit no Host state; return the model-authored canonical Goal association/segmentation proposal for Host application. |
-| `POST` | `/agent-skills/select` | Return a typed optional method selection authored for the declared Agent role from bounded approved summaries. |
-| `POST` | `/agent-skills/disclose` | Return exact bounded role projections from one validated selection without Plan mutation or execution. |
 | `POST` | `/tools/execute` | Trusted execution boundary for exact local safe-read capability requests already selected by the Goal-driven planner. |
 
-The maintained Goal-driven planning endpoints (`/fast-advance`, `/goal-association`,
-`/fast-plan`, `/value-judgment`, and `/reflection`) accept a typed
+The maintained Goal-driven planning endpoints (`/plan-advance`, `/goal-association`,
+`/plan`, `/value-judgment`, and `/reflection`) accept a typed
 `CognitiveWorkRequest`: `sid`, original `text`, optional `language`, first-class
 `responsibilities`, interpretation confidence/unresolved meaning, bounded `context`, and
 `history`. Re-entry requests additionally carry an immutable `planner_reentry_scope`;
@@ -288,12 +283,12 @@ source ref; Planner realizes inputs and scheduling. Source membership alone does
 not establish semantic completeness or correct conversion.
 
 Planning `InformationGap` creation/resolution, execution-input completeness, blocking
-status, source/default selection, and clarification selection belong to Fast Planner.
+status, source/default selection, and clarification selection belong to Planner.
 UMI carries complete Responsibility meaning, requested result type, source evidence
 and bounded unresolved meaning. GA owns Goal relations;
 its maintained schema contains no planning-gap or resolution-policy fields.
 
-`POST /fast-advance` consumes the authoritative user turn plus contextual Responsibility
+`POST /plan-advance` consumes the authoritative user turn plus contextual Responsibility
 evidence and makes one complete planning invocation, optionally preceded by a
 need-first pass that stops at `ability_needs` when a library search is needed.
 Neither call receives a candidate Plan to repair. The response media type is
@@ -366,7 +361,7 @@ Responsibility-to-Goal binding, the Host atomically attaches Planner gaps to the
 canonical Goal before clarification wording may be delivered. No Capability Activity,
 including a safe read, starts before the complete terminal
 result, canonical Goal binding, and full trusted Plan validation. GA emits no
-replan or compatibility flag. `/fast-plan` receives the Canonical Goal plus a bounded
+replan or compatibility flag. `/plan` receives the Canonical Goal plus a bounded
 `existing_work_activities` projection of relevant retained Runtime
 Work and active task bindings without cancelling
 first. The Planner explicitly sets `CanonicalPlanStep.reuse_activity_id` to an existing
@@ -389,11 +384,11 @@ before Work wait for the appropriate delivery/consent barrier; optional progress
 cannot delay task Work. Only an actually delivered covered answer can complete a
 responding Goal. A progress report cannot complete an executable Goal.
 
-On terminal Evidence re-entry, `/fast-plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Planner establishes the Work outcome and required communication facts. SC independently authors any post-Evidence words against that exact Goal/Evidence scope, execution status and epistemic strength. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. The re-entry decoder offers only what that validation accepts: `next_action` is `respond`, `execute`, `clarify` or `unavailable` (a failed or silent provider is `unavailable`; refusing is Value Judgment's, never a Planner next action on any pass), `respond` cites completed Evidence only, `respond`/`execute` keep no unresolved needs, `clarify` names at least one as a short fact the person can supply (never wording), and with no new Work the relation is `exact` without confirmation (adjusted or alternative Work is confirmed). New Work may cite completed Work in `depends_on` by its step_id or evidence_ref.
+On terminal Evidence re-entry, `/plan` receives the bounded current Responsibility/Goal/Situation/Work/Evidence state and an immutable `PlannerReentryScope`. The scope binds the exact trigger, affected Goal IDs, Evidence refs or opportunity identity, and originating Plan identity/fingerprint when available. Prompt projection, response schema, and final validation use only that Goal set; scope disagreement fails closed. The Planner may answer or author genuinely new follow-up Work for those Goals. Planner establishes the Work outcome and required communication facts. SC independently authors any post-Evidence words against that exact Goal/Evidence scope, execution status and epistemic strength. Trusted validation checks only closed schema and provenance mechanics; it cannot call a second model to qualify, review, or repair the response. The re-entry decoder offers only what that validation accepts: `next_action` is `respond`, `execute`, `clarify` or `unavailable` (a failed or silent provider is `unavailable`; refusing is Value Judgment's, never a Planner next action on any pass), `respond` cites completed Evidence only, `respond`/`execute` keep no unresolved needs, `clarify` names at least one as a short fact the person can supply (never wording), and with no new Work the relation is `exact` without confirmation (adjusted or alternative Work is confirmed). New Work may cite completed Work in `depends_on` by its step_id or evidence_ref.
 Satisfaction is prospective (the Goal once the selected action succeeds); outside
 reporting re-entries the decoder offers `respond` only at substantial or exact. Failure at this boundary fails closed; the Host never rewrites the sentence, and the person hears the Host's operational failure notice instead of silence.
 
-`POST /fast-plan` is the bounded re-entrant canonical Fast Planner endpoint, available only when `AGENT_FAST_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/fast-advance` may finish an easy turn directly after its terminal result is mechanically bound to GA's conserved Responsibility-to-Goal mapping. Creating a new resource Goal from that unchanged Responsibility does not call `/fast-plan` again. Actual provisional or retained Work, a GA-authored change to retained Goal meaning, trusted Evidence/result re-entry, or another material open-Responsibility event calls `/fast-plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
+`POST /plan` is the bounded re-entrant canonical Planner endpoint, available only when `AGENT_PLANNER_ENABLED=1` and Agent LLM use is enabled. A valid `/plan-advance` may finish an easy turn directly after its terminal result is mechanically bound to GA's conserved Responsibility-to-Goal mapping. Creating a new resource Goal from that unchanged Responsibility does not call `/plan` again. Actual provisional or retained Work, a GA-authored change to retained Goal meaning, trusted Evidence/result re-entry, or another material open-Responsibility event calls `/plan` with a bounded current Work snapshot. It decides whether existing Work remains in the complete desired Plan; GA and Orchestrator do not make that semantic choice. The endpoint never executes by itself, and trusted Runtime revalidates exact identity, version, authorization, resources, and safety before applying the Plan.
 
 `existing_work_activities` is the single bounded Planner input projection for same-turn provisional and retained Runtime Work. A Planner step selects
 reuse only by setting `reuse_activity_id` to one supplied stable identity while
@@ -421,7 +416,7 @@ Capability authorization and execution.
 
 Planner failure results (`path_classification=contract_failure`) contain no executable
 steps or invented response text and explicitly set `metadata.execution_allowed=False`;
-original rejection evidence is retained for the Runtime’s existing silent failure path. Fast repetition validation
+original rejection evidence is retained for the Runtime’s existing silent failure path. Planner repetition validation
 rejects a count-bound Capability without a count input: an unrelated duration or
 intensity value cannot witness repetition. Node-based repetition is not implied. The
 owner-authorized Soridormi `turn_in_place` catalog now supplies integer `count`
@@ -439,15 +434,15 @@ Plan. Its terminal `status` still describes Work; derived continuation requireme
 keep the Goal open. Re-entry must bind the source Plan ID/fingerprint, exact acquisition
 steps, and matching completed, schema-valid observations before the next conditional
 decision. A response settles the Goal only after delivered speech; a proposed effect
-still requires ordinary confirmation and terminal evidence. Canonical Fast requires
-nonempty top-level `response_text` containing the exact confirmation question whenever
-`user_confirmation_required=true`, including `plan_relation=exact`; the Host also
-rejects blank confirmation speech for any selected confirmation-gated Capability. Other Goal outcomes retain
+still requires ordinary confirmation and terminal evidence. A Plan that needs the
+person's consent carries a word-free confirmation Need; Social Cognition authors the
+question, and the Host rejects blank confirmation speech for any selected
+confirmation-gated Capability. Other Goal outcomes retain
 independent adequacy and completion checks.
 
-`POST /value-judgment` is available when Agent LLM use and the Fast Planner are enabled; it uses the Fast Planner model service and deadline with prompt family `value_judgment.primary`. The Orchestrator calls it in apply mode, before confirmation and dispatch, for the turn's first Plan and for any later Plan of the same turn (Planner state re-entry) that uses a Capability listed in `capabilities/value_review.json`, or realizes `value_review` speech, not yet judged in that turn; a verdict already given in the turn for the same Capability or Responsibility is reused without another call. Planner-authored copies of verdict annotations are discarded. The request is the turn's `CognitiveWorkRequest` with the planning context, including `context.mind`. The resolver refuses to judge without an owner-approved Stable Mind. Verdicts annotate only the reviewed steps: `proceed` leaves them unchanged; `ask` sets `requires_confirmation` and adds a runtime confirmation need whose facts carry `value_question`; `decline`, `failed`, or an unreachable endpoint marks them `value_withheld`, and Runtime refuses them before provider start with `reason_code=value_judgment_declined` and the verdict reason as the result message; a withheld request never joins a prepared or provider-local group. A decline also adds a Runtime-owned `result` communication need (facts `value_declined`, `withheld_capability_ids`), so Social Cognition declines in the same turn, and value-declined Evidence never re-enters the Planner. Social Cognition receives a value guard only when a need carries `value_question`, `value_declined` or `value_withheld`, or a `value_review` Responsibility has no reviewed need yet. Unreviewed steps in the same Plan are unaffected. UMI marks a speech Responsibility `value_review` when it asks Chromie to tell someone something untrue as if true, or to deceive or manipulate a person (owner choice B, 2026-10-12). Runtime then includes it in the Planner scope, and Value Judgment reviews the answer needs and steps that realize it. `proceed` leaves the answer free. `ask` marks the answer need `value_withheld` and adds a Runtime-owned `input` need with `value_question`. `decline` or a failed judgment marks it withheld and adds the `value_declined` result need. Conversation state records that Goal as `clarify` (ask) or `value_declined` (decline; it ends like a limitation, without a pre-dispatch responsibility change). Social Cognition never covers a withheld answer, and before a reviewed need exists it may only acknowledge such speech neutrally.
+`POST /value-judgment` is available when Agent LLM use and the Planner are enabled; it uses the Planner model service and deadline with prompt family `value_judgment.primary`. The Orchestrator calls it in apply mode, before confirmation and dispatch, for the turn's first Plan and for any later Plan of the same turn (Planner state re-entry) that uses a Capability listed in `capabilities/value_review.json`, or realizes `value_review` speech, not yet judged in that turn; a verdict already given in the turn for the same Capability or Responsibility is reused without another call. Planner-authored copies of verdict annotations are discarded. The request is the turn's `CognitiveWorkRequest` with the planning context, including `context.mind`. The resolver refuses to judge without an owner-approved Stable Mind. Verdicts annotate only the reviewed steps: `proceed` leaves them unchanged; `ask` sets `requires_confirmation` and adds a runtime confirmation need whose facts carry `value_question`; `decline`, `failed`, or an unreachable endpoint marks them `value_withheld`, and Runtime refuses them before provider start with `reason_code=value_judgment_declined` and the verdict reason as the result message; a withheld request never joins a prepared or provider-local group. A decline also adds a Runtime-owned `result` communication need (facts `value_declined`, `withheld_capability_ids`), so Social Cognition declines in the same turn, and value-declined Evidence never re-enters the Planner. Social Cognition receives a value guard only when a need carries `value_question`, `value_declined` or `value_withheld`, or a `value_review` Responsibility has no reviewed need yet. Unreviewed steps in the same Plan are unaffected. UMI marks a speech Responsibility `value_review` when it asks Chromie to tell someone something untrue as if true, or to deceive or manipulate a person (owner choice B, 2026-10-12). Runtime then includes it in the Planner scope, and Value Judgment reviews the answer needs and steps that realize it. `proceed` leaves the answer free. `ask` marks the answer need `value_withheld` and adds a Runtime-owned `input` need with `value_question`. `decline` or a failed judgment marks it withheld and adds the `value_declined` result need. Conversation state records that Goal as `clarify` (ask) or `value_declined` (decline; it ends like a limitation, without a pre-dispatch responsibility change). Social Cognition never covers a withheld answer, and before a reviewed need exists it may only acknowledge such speech neutrally.
 
-Canonical Plan contract (`/fast-plan`, `planner_tier=fast`; the only tier). The one Planner may execute, respond, clarify, or report unavailable; it never refuses (whether Chromie should act is Value Judgment's, and a body the provider cannot drive safely is an `unavailable` limitation), and its model DTOs reject a `refused` disposition. A per-Goal `unavailable` outcome may sit beside sibling Work in a `mixed` Plan for up to four Goals. Each Goal outcome is decoded as native per-disposition branches (coverage, `step_ids`, `unresolved` and communication ordering allowed by that disposition); an effectful Goal is never offered `respond` (for one Goal as for several, as Host enforces), and `time_conditions` follow `ability_needs` so future readiness is stated before any outcome; the top-level disposition and coverage remain model-authored and a contradiction with the Goal outcomes fails closed. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. Ordinary speech Goals use `respond` only when their requested content can be supplied truthfully; they may instead clarify or report unavailable; Social Cognition communicates a Value Judgment decline. An independent completed speech Goal may coexist with such a limitation in a zero-step `mixed` Plan. Every unmet Goal must remain unmet in per-Goal and aggregate satisfaction; complete coverage is accounting, not fulfillment. Zero-step mixed speech grants no executable work or confirmation authority. An explicit future `ready_at` may instead receive a scoped waiting acknowledgement with its exact Planner-authored time condition and original Goal still unmet. That condition wakes cognition later; it does not delay a step listed in the current Plan. New intent-only scheduling uses a Planner-authored exact `source_quote` and future time condition, without a UMI timer field. A newly waiting Goal may coexist with independently ready sibling Work; it remains unmet, owns no current executable step and wakes only at its validated time. Ready independent siblings and a timer for monitoring already-running Work retain their normal contracts. A trusted state wake with no new Goal Association result resolves only its exact persisted open Goal snapshots, bound to the matching CognitiveOpportunity. Missing, duplicated, mismatched or terminal snapshots fail before inference; no new Goal or association is authored by this projection. The primary request carries the captured Host clock comparison, including exact already-reached readiness times; old future-tense source wording cannot reschedule that same instant. Readiness itself grants no execution or completion authority. Canonical and streamed planning may combine an independent response with clarification or an honest limitation without a Capability Activity. Runtime preserves the question/waiting lifecycle or final limitation speech instead of labeling every mixed response pre-action. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. The Planner uses one primary model invocation (plus at most one need-first pass with loaded contracts) and fails closed on invalid output. Its commitment bar is 0.75 prospective satisfaction; a Plan it judges below the bar becomes an honest limitation. Structural, grounding, coverage, applicability and safety rejections fail closed and are never rewritten by another model pass.
+Canonical Plan contract (`/plan`, `planner_tier=fast`; the only tier). The one Planner may execute, respond, clarify, or report unavailable; it never refuses (whether Chromie should act is Value Judgment's, and a body the provider cannot drive safely is an `unavailable` limitation), and its model DTOs reject a `refused` disposition. A per-Goal `unavailable` outcome may sit beside sibling Work in a `mixed` Plan for up to four Goals. Each Goal outcome is decoded as native per-disposition branches (coverage, `step_ids`, `unresolved` and communication ordering allowed by that disposition); an effectful Goal is never offered `respond` (for one Goal as for several, as Host enforces), and `time_conditions` follow `ability_needs` so future readiness is stated before any outcome; the top-level disposition and coverage remain model-authored and a contradiction with the Goal outcomes fails closed. Complete multi-goal model output uses `goal_outcomes` as an exact object keyed once by every authoritative Goal ID; the host materializes the canonical outcome list in authoritative order. Per-goal and aggregate satisfaction are prospective plan-adequacy assessments, not execution evidence. A supplied low per-goal score remains authoritative; runtime validation does not invent a missing duplicate per-goal score when the exact keyed outcomes and aggregate judgment already establish coverage. Ordinary speech Goals use `respond` only when their requested content can be supplied truthfully; they may instead clarify or report unavailable; Social Cognition communicates a Value Judgment decline. An independent completed speech Goal may coexist with such a limitation in a zero-step `mixed` Plan. Every unmet Goal must remain unmet in per-Goal and aggregate satisfaction; complete coverage is accounting, not fulfillment. Zero-step mixed speech grants no executable work or confirmation authority. An explicit future `ready_at` may instead receive a scoped waiting acknowledgement with its exact Planner-authored time condition and original Goal still unmet. That condition wakes cognition later; it does not delay a step listed in the current Plan. New intent-only scheduling uses a Planner-authored exact `source_quote` and future time condition, without a UMI timer field. A newly waiting Goal may coexist with independently ready sibling Work; it remains unmet, owns no current executable step and wakes only at its validated time. Ready independent siblings and a timer for monitoring already-running Work retain their normal contracts. A trusted state wake with no new Goal Association result resolves only its exact persisted open Goal snapshots, bound to the matching CognitiveOpportunity. Missing, duplicated, mismatched or terminal snapshots fail before inference; no new Goal or association is authored by this projection. The primary request carries the captured Host clock comparison, including exact already-reached readiness times; old future-tense source wording cannot reschedule that same instant. Readiness itself grants no execution or completion authority. Canonical and streamed planning may combine an independent response with clarification or an honest limitation without a Capability Activity. Runtime preserves the question/waiting lifecycle or final limitation speech instead of labeling every mixed response pre-action. Parallel timing is accepted only from provider catalog entries that explicitly declare compatible parallel safety and resources. Otherwise the planner must fail closed or author a typed `safe_adjustment`/`alternative`; `plan_relation` and `user_confirmation_required` enforce user confirmation before the host transfers that judgment to canonical metadata. The Planner uses one primary model invocation (plus at most one need-first pass with loaded contracts) and fails closed on invalid output. Its commitment bar is 0.75 prospective satisfaction; a Plan it judges below the bar becomes an honest limitation. Structural, grounding, coverage, applicability and safety rejections fail closed and are never rewritten by another model pass.
 
 The retired `escalation_reason` field is rejected by Schema and Host. The Planner
 receives exact bounded UMI unresolved evidence and the requested response language.
@@ -525,7 +520,7 @@ unchanged to Planner. A `walk_velocity` provider can declare human
 `speed -> vx_mps` and `duration -> duration_s`; applicability depends on the exact
 live catalog, not a historical declaration. An explicit numeric request must
 not be replaced by a provider default. The Host does not invent or repair the
-semantic transformation. Both Fast advance and canonical Planner validation
+semantic transformation. Both streaming Planner advance and canonical Planner validation
 require `minimum_arguments` from every applicable realization contract whenever
 an owned Responsibility/Goal explicitly binds its `source_entity_type`, including
 optional and defaulted inputs. Other arguments and sibling Activities cannot
@@ -547,7 +542,7 @@ resource quantities retain their separate nested grounding contract.
 Terminal Capability results do not enter a separate interpretation endpoint. The
 Host validates and correlates the result, binds a `ToolResultEvidence` object to
 the exact immutable request Goal IDs, updates Goal/task state, and reactivates
-`POST /fast-plan` with a bounded Goal/Evidence snapshot. The re-entry Plan cannot
+`POST /plan` with a bounded Goal/Evidence snapshot. The re-entry Plan cannot
 widen the Goal set or schedule duplicate execution. Any spoken answer is a
 SC-owned post-evidence Communicative Activity with exact Evidence
 references; missing provenance fails closed rather than inferring a Goal from
@@ -613,7 +608,7 @@ still requires current-revision qualification.
 discourse mutations, progress bindings, clarification, or confidence and cannot be
 committed or passed to a Planner. When UMI retains genuine semantic ambiguity, GA may
 commit the narrowest source-grounded provisional Goal without deciding the missing
-meaning; Fast Planner alone decides whether to create a question-bearing gap. Model,
+meaning; Planner alone decides whether to create a question-bearing gap. Model,
 schema, audit, and retry failures never masquerade as user-resolvable ambiguity.
 Mode-specific vocal output remains Vocal but requires provider evidence; a
 generic `respond` outcome or ordinary TTS cannot close it. The eventual spoken
@@ -669,8 +664,12 @@ and a bounded latency budget. Target evidence is semantic only; installation cal
 coordinates are never part of the Chromie planning contract. Soridormi calls describe
 targets in the [body target format](EXECUTION_LANES_AND_COORDINATION.md#body-target-descriptions):
 the current speaker is `referent_id`/`target_ref` `"requester"`, objects by description
-and places by cited name. A look target is still copied only from trusted target
-evidence; the Host does not yet produce evidence for the current speaker on its own. The Soridormi adapter hides `target_yaw_rad`/`target_pitch_rad`
+and places by cited name. The reserved `"requester"` names the current speaker and
+needs no further target evidence: Soridormi resolves where that person is. The Soridormi
+adapter maps an explicit speaker reference in a gaze `target_ref` (`me`, `user`,
+`speaker`, `current_speaker`, `the requester`, case-insensitive) to `"requester"`; an
+empty or missing `target_ref` is never defaulted to the speaker and fails as
+`missing_target`. Any other look target is copied only from trusted target evidence. The Soridormi adapter hides `target_yaw_rad`/`target_pitch_rad`
 from the catalog and refuses requests carrying them (`body_frame_target_not_semantic`).
 Soridormi resolves the target from perception; a target it cannot find returns
 `completed: false`, surfaced as a failed result with Soridormi's typed reason (or
@@ -681,8 +680,9 @@ CanonicalPlan goals and cannot be replaced by auxiliary expression. Body and too
 capability catalog, the single Planner authority, schemas, and Trusted Capability
 Runtime validation rather than hidden phrase parsers or a retired routing layer. Plain walking requests
 use the default forward speed Soridormi declares in its `walk_velocity` schema. An explicit speed or other numeric value
-the person states is sent unchanged; Soridormi may refuse a value outside its limits,
-which Chromie reports as a limitation, but neither side silently runs a different value.
+the person states is sent unchanged; Soridormi may reject a value outside its limits,
+which Chromie reports as a limitation, or run the nearest supported value and report it in
+`value_adjustments`, but neither side silently runs a different value.
 Requests to joke or otherwise talk while walking use a `speech` Goal
 coordinated with the walking step; `chromie.speak` is a Host speech transport
 and is never a planner step. Requests to recite, sing, hum, or speak in a
@@ -765,14 +765,8 @@ that topology mechanically; it does not create replacement Work or user-facing m
 
 | Method | Path | Gate or authorization | Purpose |
 |---|---|---|---|
-| `POST` | `/work-dags/validate` | Always available | Validate WorkDAG structure, acyclicity, Capability references, and deterministic execution policy. |
-| `POST` | `/work-dags/dry-run` | Diagnostics bearer token | Produce a deterministic trace without remote side effects. |
-| `POST` | `/work-dags/execute-read-only` | `AGENT_ENABLE_READ_ONLY_DAG_EXECUTION=1` | Execute preflight-approved side-effect-free nodes. |
 | `POST` | `/work-dags/execute-planning` | `AGENT_ENABLE_PLANNING_DAG_EXECUTION=1` | Execute safe reads and `planning_only` provider operations in an already-authored WorkDAG. |
-| `POST` | `/work-dags/confirmation-grants` | Guarded execution enabled plus bearer token | Issue a short-lived, single-use grant bound to one WorkDAG and confirmed nodes. |
-| `POST` | `/work-dags/execute-guarded` | Guarded execution enabled plus bearer token | Execute authorized side effects; physical motion retains separate confirmation/safety proof requirements. |
 | `POST` | `/work-dags/{dag_id}/cancel` | DAGEngine execution bearer token | Cancel an active DAG or reserve a bounded cancel-before-start tombstone. |
-| `GET` | `/work-dags/{dag_id}/trace` | Diagnostics bearer token | Return the latest non-expired mechanical execution trace. |
 | `GET` | `/work-dags/engine/status` | Diagnostics bearer token | Return DAGEngine mode, active/waiting counters, and active DAG IDs. |
 
 Bearer format:
@@ -781,7 +775,7 @@ Bearer format:
 Authorization: Bearer <AGENT_DAG_ENGINE_EXECUTION_TOKEN>
 ```
 
-Dry-run, trace, and engine-status requests use `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN`.
+Engine-status requests use `AGENT_DAG_ENGINE_DIAGNOSTICS_TOKEN`.
 When that variable is blank, Agent falls back to `AGENT_DAG_ENGINE_EXECUTION_TOKEN`;
 when both are blank, diagnostic endpoints return 503. Invalid or missing credentials
 return 401.
@@ -816,23 +810,6 @@ WorkDAG `$ref` arguments may read `<node>.output[.<field>]`, `<node>.error`, or
 topology; semantic replanning after changed reality belongs to Planner and normally
 produces a revised/new WorkDAG. Goal Association never edits the DAG directly; a Goal change is input to Planner. Retaining the current WorkDAG is a valid NO_CHANGE decision.
 
-## Hardware compatibility HTTP API — port 8095
-
-This is the legacy mock-action daemon, not the Soridormi robot boundary.
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/health` | Return mock driver and robot state. |
-| `GET` | `/state` | Return current mock robot state. |
-| `POST` | `/actions` | Execute a namespaced compatibility action. |
-| `GET` | `/actions/{action_id}` | Return an in-memory action result. |
-| `POST` | `/emergency_stop` | Set mock emergency-stop state. |
-| `POST` | `/reset_emergency_stop` | Clear mock emergency-stop state. |
-
-The daemon rejects `unsafe.*` actions and actions that still require
-confirmation. In this revision it always constructs `MockRobotDriver`; serial
-configuration variables do not select a production backend.
-
 ## ASR WebSocket protocol — port 9001
 
 The ASR service accepts WebSocket connections and two message forms:
@@ -841,9 +818,11 @@ The ASR service accepts WebSocket connections and two message forms:
   `{"type":"pong","service":"asr",...}` with backend, mode, model revision,
   and bounded-concurrency metadata.
 - Binary PCM16 mono audio at `ASR_SAMPLE_RATE` -> one JSON final result:
-  `{"type":"final","text":"...","duration":<seconds>}`.
+  `{"type":"final","sequence":<n>,"text":"...","duration":<seconds>}`.
 
-Failures return `{"type":"error","message":"..."}`. The host Orchestrator
+Failures return `{"type":"error","sequence":<n>,"message":"..."}`. `sequence`
+numbers the utterances sent on one connection from 1; clients reject a reply
+whose sequence is not the utterance they are waiting for and reconnect. The host Orchestrator
 performs VAD and sends complete utterance audio; this service does not stream
 partial transcripts. Blocking final-backend inference runs in a bounded
 executor, so health/ping handling remains responsive while a transcription is
@@ -861,7 +840,6 @@ Supported default-provider JSON messages:
 | Request type | Result |
 |---|---|
 | `health` or `ping` | `pong` with provider contract/declaration, immutable model identity, sample rate, worker readiness, cancellation counters, and `speakers` (`default` plus every catalog profile, currently `["default", "chromie_en", "chromie_mixed", "chromie_zh"]`). |
-| `list_speakers` | The same `speakers` list: `default` (a language-routed logical ID) plus the committed catalog profiles. |
 | `synthesize_stream` | `start`, binary PCM16 chunks, then `end`; or `error`. |
 
 A synthesis request includes `text`, optional `speaker_id`, optional

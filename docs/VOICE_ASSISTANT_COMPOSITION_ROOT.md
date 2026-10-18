@@ -43,6 +43,22 @@ The root currently composes, among other collaborators:
 - Cognitive Gateway/Core clients for admitted-turn cognition;
 - trusted execution providers and evidence stores.
 
+Host behavior that runs against the root lives in function modules under
+`orchestrator/runtime/` that take the `VoiceAssistant` as `host`:
+`routed_turn_host` (routed-turn intake), `cognitive_pipeline_host` (goal-driven
+runtime application, Goal state and named-Goal cancellation),
+`confirmation_host` (pending-confirmation staging and replies),
+`reflex_cancellation_host` (reflex cancellation and receipt reconciliation),
+`cognitive_outcome_host` (cognitive execution closure and outcome delivery),
+`planner_reentry_host` (Planner re-entry after terminal results and provider
+state), `interaction_dispatch_host` (detached dispatch and terminal consumers),
+`interaction_speech_host` (Capability Runtime speech scheduling), `tts_echo`
+(ASR echo detection), `tts_text.split_tts_text` and the startup greeting
+functions in `runtime_ready_greeting`. `VoiceAssistant` keeps thin methods only
+where other modules, tests or live checks bind or replace a seam on the
+instance. These modules gain no semantic authority; the Host semantic-authority
+policy guards apply to them as to `orchestrator.py`.
+
 `RuntimeReadyGreetingCoordinator` may dispatch only exact maintained Social
 Attention capabilities supplied by the Host. It cannot create a conversation
 turn, infer a person or room state, interpret user intent, weaken confirmation,
@@ -50,34 +66,29 @@ or alter Soridormi safety.
 
 ## Mechanical structural baseline
 
-Blocking ownership rules and informational size baselines are owned by
-`config/runtime_structure_ratchets.json` and checked/reported by:
+Blocking ownership rules and size ratchets are owned by
+`config/runtime_structure_ratchets.json` and checked by:
 
 ```bash
 python scripts/check_runtime_structure.py
 ```
 
-The reviewed measurements at `bd955740` are retained with their full revision in
-the config; each run reports current values and signed deltas:
-
-| Measure | Measured baseline |
-|---|---:|
-| `VoiceAssistant` methods | 104 |
-| properties | 1 |
-| `__init__` lines | 304 |
-| initialized `self` attributes | 108 |
-
-These size values are informational in every delivery phase under approved #45;
-they do not prove that structural simplification is complete. Missing collaborators,
+The config holds the VoiceAssistant method, property, `__init__` line and
+initialized-attribute baselines, and line baselines for `orchestrator.py`, the
+other runtime files over 3,000 lines and the split former god files
+`capability_runtime.py` and `conversation_state.py`, measured at its
+`size_baseline_revision`.
+Each run reports current values and signed deltas, and fails if a value grows
+above its baseline. Staying under the baselines does not prove that structural
+simplification is complete. Missing collaborators,
 returned lifecycle state, forbidden compatibility methods and any direct legacy
-Host model call remain blocking. One Host model call still exists outside Social
-Cognition: when an owner explicitly sets `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1`
-and leaves `ORCH_RUNTIME_READY_GREETING_TEXT` empty,
-`VoiceAssistant._generate_runtime_ready_greeting` asks the Ollama `LLM_URL` for the
-startup line (one corrective retry). Maintained profiles disable startup speech, and
-`scripts/check_runtime_structure.py` counts only `process_llm_tts` calls, so its
-`direct_llm_calls=0` does not cover this path; it is the direct-LLM seam in the table
-below. The composition root has already moved transport, input/session,
+Host model call remain blocking. The Host makes no model call. When an owner
+explicitly sets `ORCH_RUNTIME_READY_GREETING_SPEECH_ENABLED=1` and leaves
+`ORCH_RUNTIME_READY_GREETING_TEXT` empty, `VoiceAssistant._generate_runtime_ready_greeting`
+sends the owner-approved Mind and trusted local clock facts to Social Cognition
+(`POST /social-cognition/startup-greeting`); SC decides whether to speak and authors the
+words, and the Host only validates delivery bounds. A configured text is the owner's own
+wording and is played as given. The composition root has already moved transport, input/session,
 shutdown, observability, confirmation bookkeeping, and other mechanical lifecycle concerns to
 their existing owners. Historical transitions belong in Git history/CHANGELOG.
 Review size deltas alongside ownership and readability; do not move code merely to
@@ -95,7 +106,6 @@ Further work is ordered by
 | playback delivery | keep synthesis, transport, playback barriers, echo handling, cancellation, and delivery evidence behind one collaborator |
 | audio-device lifecycle | keep OS-default detection, validated pending-device queueing, cross-device input reset, and output rollover as Host mechanics; device discovery stays in `AudioDeviceManager` and output I/O stays in `PlaybackTransport` |
 | input session lifecycle | keep microphone/VAD/ASR transport, injected audio, routed turns, idle sweeping, and deterministic task shutdown behind the session/lifecycle owners |
-| direct-LLM compatibility | the opt-in generated startup greeting is the remaining Host model call; move its wording to Social Cognition or keep only configured text, then remove it |
 | Cognitive Gateway/Core dispatch | one Host turn-execution owner that delegates semantic work without gaining semantic authority |
 | observability recording | storage and lifecycle sampling remain delegated with exact turn/session correlation |
 | stop, interruption, approval revocation, and active-Goal cancellation | fixed-reflex token revocation/audit bookkeeping stays with the existing confirmation token owner; interruption dispatch and Goal cancellation remain atomic Host/runtime responsibilities |

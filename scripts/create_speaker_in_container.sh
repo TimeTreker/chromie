@@ -4,12 +4,17 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+if [ "$#" -lt 2 ]; then
+  echo "usage: $0 /app/speakers/<reference>.wav <speaker_id> [--make-default] [transcript_path]" >&2
+  exit 2
+fi
+
 if [ ! -f .env.runtime ]; then
   ./scripts/build_runtime_env.sh
 fi
 
-WAV_PATH="${1:-/app/speakers/chromie_voice.wav}"
-SPEAKER_ID="${2:-chromie_voice}"
+WAV_PATH="$1"
+SPEAKER_ID="$2"
 MAKE_DEFAULT="0"
 TRANSCRIPT_PATH="${4:-${WAV_PATH%.*}.txt}"
 
@@ -17,8 +22,8 @@ if [[ "${3:-}" == "--make-default" ]] || [[ "${3:-}" == "1" ]] || [[ "${3:-}" ==
   MAKE_DEFAULT="1"
 fi
 
-# This helper is specific to the optional OuteTTS fallback. CosyVoice uses
-# scripts/tts_reference.py to install its authorized reference voice.
+# This helper is specific to the optional OuteTTS fallback. CosyVoice reads
+# the Git-controlled voice catalog in assets/tts/voices.
 # This uses the exact-transcript validation and pinned Whisper alignment path
 # built into tts/server.py. The runtime image supplies FFmpeg for decoding.
 docker compose --env-file .env.runtime -f docker-compose.yml --profile tts-evaluation exec -T \

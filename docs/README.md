@@ -19,7 +19,7 @@ correct the lower-authority document.
 | What owns ordinary communication in the accepted target? | [Social Cognition in the Project Charter](PROJECT_CHARTER.md#social-cognition--accepted-target-2026-09-14); [migration lifecycle](COGNITIVE_TURN_LOOP.md#social-cognition-lifecycle) and [implementation status](STATUS.md#social-cognition-migration) |
 | What admits interaction input before semantic cognition? | `docs/COGNITIVE_GATEWAY.md` |
 | What lifecycle carries one admitted turn through execution evidence and a final response? | `docs/COGNITIVE_TURN_LOOP.md` |
-| What exists and what evidence is retained? | `docs/STATUS.md` |
+| What exists, what evidence is retained, and what work is open next? | `docs/STATUS.md` |
 | What delivery line is next and what closes it? | `ROADMAP.md` |
 | What is the active Issue and where should development resume? | `DEVELOPMENT_CHECKPOINT.md` |
 | What exact commands, runtime identities, and private evidence paths resume the current checkpoint? | `HANDOFF.md` |
@@ -53,7 +53,7 @@ correct the lower-authority document.
 | Where is the reviewed Social Attention benchmark dataset? | `benchmarks/datasets/social_attention/README.md` |
 | Where are the isolated daily-life User Meaning Interpretation candidate scenarios and their review boundary? | `benchmarks/datasets/goal_interpretation_daily_life/README.md` |
 | Where are the daily-life Goal Association continuity scenarios and their contract-gap boundary? | `benchmarks/datasets/goal_association_daily_life/README.md` |
-| Where are the bilingual Fast Planner workflow, contract, architecture, and prompt qualification scenarios? | `benchmarks/datasets/fast_planner_daily_life/README.md` |
+| Where are the bilingual Planner workflow, contract, architecture, and prompt qualification scenarios? | `benchmarks/datasets/fast_planner_daily_life/README.md` |
 | How is the automated suite kept free of stale wrappers and duplicate coverage? | `docs/TEST_SUITE_MAINTENANCE.md` |
 | Which facts belong to behavior, architecture-policy, or generated-artifact tests? | `docs/TEST_OWNERSHIP.md` |
 | What keeps visible robot behavior natural and grounded? | `docs/HUMAN_LIKE_INTERACTION_CONTRACT.md` |
@@ -106,7 +106,7 @@ specialized document needs a real component, operator, or mechanical-contract ow
 - [Reviewed Social Attention Dataset](../benchmarks/datasets/social_attention/README.md)
 - [User Meaning Interpretation Daily-Life Dataset](../benchmarks/datasets/goal_interpretation_daily_life/README.md)
 - [Goal Association Daily-Life Dataset](../benchmarks/datasets/goal_association_daily_life/README.md)
-- [Fast Planner Daily-Life Qualification Work Area](../benchmarks/datasets/fast_planner_daily_life/README.md)
+- [Planner Daily-Life Qualification Work Area](../benchmarks/datasets/fast_planner_daily_life/README.md)
 - [Stress Benchmark Workloads](../benchmarks/stress/README.md)
 - [Stress and Behavior-Distribution Evaluation](STRESS_BENCHMARK_EVALUATION.md)
 - [Agent](../agent/README.md)
@@ -122,14 +122,12 @@ specialized document needs a real component, operator, or mechanical-contract ow
   - [Planner projection](../agent-skills/grounded-external-information/projections/fast_planner.md)
 - [Weather Information Skill](../agent-skills/weather-information/SKILL.md)
   - [Planner projection](../agent-skills/weather-information/projections/fast_planner.md)
-- [Legacy Hardware Daemon](../hardware/README.md)
 - [Hardware Profiles](../HARDWARE_PROFILES.md)
 
 ## Interaction and execution
 
 - [Cognitive Gateway/Core Source-Bound Qualification](COGNITIVE_GATEWAY_CORE_QUALIFICATION.md)
 - [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md)
-- [Agent Skills Architecture](AGENT_SKILLS_ARCHITECTURE.md)
 - [Goal-Driven Cognitive Runtime Rollout](COGNITIVE_RUNTIME_ROLLOUT.md)
 - [Single Semantic Planning Authority](SEMANTIC_AUTHORITY.md)
 - [Scenario-Driven Development](SCENARIO_DRIVEN_DEVELOPMENT.md)
@@ -140,7 +138,6 @@ specialized document needs a real component, operator, or mechanical-contract ow
 - [Continuous Scenario Mining and Review](../benchmarks/mining/README.md)
 - [End-to-End Benchmark Execution](E2E_BENCHMARK_EXECUTION.md)
 - [Test Suite Maintenance](TEST_SUITE_MAINTENANCE.md)
-- [Human-Like Interaction Contract](HUMAN_LIKE_INTERACTION_CONTRACT.md)
 - [General Ability Test Reconstruction](GENERAL_ABILITY_TEST_RECONSTRUCTION.md)
 - [User-Outcome Acceptance Framework](USER_OUTCOME_ACCEPTANCE.md)
 - [Social Attention Behavior Domain](SOCIAL_ATTENTION_BEHAVIOR_DOMAIN.md)
@@ -159,7 +156,7 @@ specialized document needs a real component, operator, or mechanical-contract ow
 
 ## Operations and release
 
-- [Bilingual OuteTTS Speaker Guide](../CHROMIE_BILINGUAL_SPEAKER_GUIDE.md)
+- [Bilingual OuteTTS Speaker Guide](BILINGUAL_SPEAKER_GUIDE.md)
 - [Built-In TTS Voice Catalog](../assets/tts/voices/README.md)
 - [Owner-Editable Mind Profile](../config/mind/README.md)
 - [Deployment](DEPLOYMENT.md)

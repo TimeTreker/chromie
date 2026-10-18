@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class PlaybackTransportExtractionTests(unittest.TestCase):
     def test_transport_is_owned_by_playback_lifecycle(self) -> None:
         lifecycle = PlaybackDeliveryLifecycle()
-        host = SimpleNamespace(_playback_state=lambda: lifecycle)
+        host = SimpleNamespace(playback_delivery=lifecycle)
 
         first = transport_for(host)
         second = transport_for(host)
@@ -101,7 +101,7 @@ class PlaybackCompletionEvidenceTests(unittest.IsolatedAsyncioTestCase):
                     normalized_text="Hello.", stage="result", purpose="answer", communicative_activity_ids=["speech-a"])
                 def resolve(generation, order, sid, **kwargs):
                     return lifecycle.resolve_playback_start_waiter(generation=generation, order=order, session_id=sid, **kwargs)
-                host = SimpleNamespace(_playback_state=lambda: lifecycle, playback_delivery=lifecycle, playback_start_key=lifecycle.key,
+                host = SimpleNamespace(playback_delivery=lifecycle, playback_start_key=lifecycle.key,
                     cancelled_playback_orders=set(), is_stale_playback=lambda *args: False,
                     sessions=SimpleNamespace(state={"sid": {}}, trace_mark=lambda *args, **kwargs: None, trace_context=lambda *args: nullcontext()),
                     output_rate=16000, session_log=lambda *args, **kwargs: None,
@@ -146,7 +146,7 @@ class PlaybackCompletionEvidenceTests(unittest.IsolatedAsyncioTestCase):
                 lifecycle.execution_starts[(1, 0, "sid")] = ExecutionStart(gate, "speech")
                 def resolve(generation, order, sid, **kwargs):
                     lifecycle.resolve_playback_start_waiter(generation=generation, order=order, session_id=sid, **kwargs)
-                host = SimpleNamespace(_playback_state=lambda: lifecycle, playback_delivery=lifecycle, playback_start_key=lifecycle.key,
+                host = SimpleNamespace(playback_delivery=lifecycle, playback_start_key=lifecycle.key,
                     cancelled_playback_orders=set(), is_stale_playback=lambda *args: False,
                     sessions=SimpleNamespace(state={"sid": {}}, trace_mark=lambda *args, **kwargs: None, trace_context=lambda *args: nullcontext()),
                     output_rate=16000, session_log=lambda *args, **kwargs: None,

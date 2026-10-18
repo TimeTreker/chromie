@@ -12,7 +12,6 @@ import hashlib
 import json
 import logging
 import os
-import tempfile
 import threading
 import time
 import uuid
@@ -21,6 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping, Sequence
 
+from .atomic_files import atomic_write_json as _atomic_write_json
 from .settings import RuntimePolicySettings
 
 TRACE_SCHEMA_VERSION = 1
@@ -845,29 +845,6 @@ class RuntimeTracer:
 
 
 runtime_tracer = RuntimeTracer()
-
-
-def _atomic_write_json(path: Path, payload: Mapping[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    temporary_path = Path(temporary)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, sort_keys=True, indent=2)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
-        if os.name != "nt":
-            directory = os.open(path.parent, os.O_RDONLY)
-            try:
-                os.fsync(directory)
-            finally:
-                os.close(directory)
-    finally:
-        temporary_path.unlink(missing_ok=True)
 
 
 def _safe_mapping(values: Mapping[str, Any], policy: TracePolicy) -> dict[str, Any]:

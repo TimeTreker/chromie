@@ -3,10 +3,14 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
+from datetime import datetime
 import logging
+import re
 from typing import Any
+import uuid
 
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityRequest
+from shared.chromie_contracts.social_cognition import SocialStartupGreetingRequest
 
 
 logger = logging.getLogger("chromie-orchestrator")
@@ -315,3 +319,162 @@ class RuntimeReadyGreetingCoordinator:
         logger.info(
             "Runtime ready greeting completed; live microphone turns are enabled"
         )
+
+
+def runtime_ready_greeting_time_context(
+    local_now: datetime | None = None,
+) -> dict[str, str]:
+    observed = local_now or datetime.now().astimezone()
+    if observed.tzinfo is None:
+        observed = observed.astimezone()
+    hour = observed.hour
+    if 5 <= hour < 11:
+        local_period = "morning"
+    elif 11 <= hour < 14:
+        local_period = "midday"
+    elif 14 <= hour < 18:
+        local_period = "afternoon"
+    elif 18 <= hour < 23:
+        local_period = "evening"
+    else:
+        local_period = "late_night"
+    offset = observed.strftime("%z")
+    if len(offset) == 5:
+        offset = f"{offset[:3]}:{offset[3:]}"
+    return {
+        "local_iso": observed.isoformat(timespec="minutes"),
+        "local_period": local_period,
+        "timezone": str(observed.tzname() or "local"),
+        "utc_offset": offset,
+        "weekday": observed.strftime("%A"),
+    }
+
+
+def validate_runtime_ready_greeting_completion(text: str) -> str:
+    if not re.search(r"[。！？!?]$", str(text or "").strip()):
+        raise RuntimeError(
+            "runtime ready greeting is not a complete punctuated sentence"
+        )
+    return text
+
+
+async def generate_runtime_ready_greeting(host: Any) -> tuple[str, str]:
+    """Return the startup line and its source; Social Cognition authors any words.
+
+    The Host is not a response author: it supplies trusted clock facts and the
+    owner-approved Mind, then only validates delivery bounds. An owner-configured
+    text is the owner's own wording and is played as given.
+    """
+    language = host.runtime_ready_greeting_language
+    try:
+        configured = host._validate_spoken_text_contract(
+            host.runtime_ready_greeting_text,
+            purpose="configured runtime ready greeting",
+            max_chars=24,
+            one_sentence=True,
+            language=language,
+        )
+    except RuntimeError:
+        configured = ""
+    if configured:
+        return configured, "configured"
+
+    try:
+        if not host.enable_agent:
+            raise RuntimeError("Social Cognition is unavailable without the Agent")
+        request = SocialStartupGreetingRequest(
+            request_id=f"startup-greeting:{uuid.uuid4().hex}",
+            language=language,
+            max_chars=24,
+            local_time=runtime_ready_greeting_time_context(),
+            context={"mind": host.mind.context()},
+        )
+        session = await host.get_http_session()
+        resolution = await host.agent_client.resolve_startup_greeting(
+            session,
+            request=request,
+            timeout_ms=host.runtime_ready_greeting_generation_timeout_ms,
+        )
+        if resolution.disposition == "silence":
+            logger.info(
+                "Runtime ready greeting: Social Cognition chose silence: %s",
+                resolution.reason_summary,
+            )
+            return "", "social_cognition:silence"
+        generated = host._validate_spoken_text_contract(
+            resolution.text,
+            purpose="runtime ready greeting",
+            max_chars=24,
+            one_sentence=True,
+            language=language,
+        )
+        validate_runtime_ready_greeting_completion(generated)
+        return generated, "social_cognition"
+    except Exception as exc:
+        logger.warning("Runtime ready greeting from Social Cognition failed: %s", exc)
+    try:
+        fallback = host._validate_spoken_text_contract(
+            host.runtime_ready_greeting_fallback_text,
+            purpose="runtime ready greeting fallback",
+            max_chars=24,
+            one_sentence=True,
+            language=language,
+        )
+    except RuntimeError as fallback_exc:
+        logger.warning("Runtime ready greeting fallback rejected: %s", fallback_exc)
+        return "", "unavailable"
+    return fallback, "fallback"
+
+
+def build_runtime_ready_greeting_coordinator(
+    host: Any,
+) -> RuntimeReadyGreetingCoordinator:
+    async def schedule_text(text: str) -> dict[str, Any]:
+        return await host.schedule_tts_text(text, session_id=None)
+
+    orientation_enabled = bool(
+        getattr(host, "enable_soridormi_capabilities", False)
+    )
+
+    async def execute_orientation() -> dict[str, Any]:
+        return await execute_default_runtime_ready_orientation(
+            host.interaction_runtime,
+            enable_soridormi_capabilities=getattr(
+                host, "enable_soridormi_capabilities", False
+            ),
+        )
+
+    return RuntimeReadyGreetingCoordinator(
+        policy=RuntimeReadyGreetingPolicy(
+            enabled=host.runtime_ready_greeting_enabled,
+            audio_input_mode=host.audio_input_mode,
+            audio_output_mode=host.audio_output_mode,
+            timeout_ms=host.runtime_ready_greeting_timeout_ms,
+            orientation_enabled=orientation_enabled,
+            orientation_timeout_ms=min(
+                5000, host.runtime_ready_greeting_timeout_ms
+            ),
+            speech_enabled=bool(
+                getattr(
+                    getattr(
+                        getattr(host, "host_settings", None),
+                        "playback",
+                        None,
+                    ),
+                    "ready_greeting_speech_enabled",
+                    getattr(
+                        host,
+                        "runtime_ready_greeting_speech_enabled",
+                        False,
+                    ),
+                )
+            ),
+        ),
+        generate_greeting=host._generate_runtime_ready_greeting,
+        is_valid_text=host.is_valid_tts_text,
+        schedule_text=schedule_text,
+        playback_start_key=host.playback_start_key,
+        playback_start_waiters=host.playback_delivery.playback_start_waiters,
+        next_playback_order=lambda: host.playback_delivery.next_playback_order,
+        execute_orientation=execute_orientation,
+    )

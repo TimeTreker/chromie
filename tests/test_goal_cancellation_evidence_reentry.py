@@ -10,6 +10,8 @@ from orchestrator.runtime.named_goal_cancellation import _build_confirmation_rem
 from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.interaction import InteractionResponse
 from shared.chromie_contracts.plan import CanonicalPlan
+from tests.voice_assistant_test_support import bare_voice_assistant
+from orchestrator.runtime import cognitive_pipeline_host
 
 
 class GoalCancellationEvidenceReentryTests(unittest.TestCase):
@@ -94,7 +96,7 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
             "approved")
 
     def test_cancellation_reentry_delegates_to_existing_planner_state_entry(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         captured = {}
 
         async def state_reentry(**kwargs):
@@ -181,7 +183,7 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
 
 
     def test_shared_stop_reenters_planner_for_coaffected_open_sibling(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         calls: list[dict] = []
         applied: list[InteractionResponse] = []
         provenance_requests: list[list[str]] = []
@@ -225,7 +227,8 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
         )
 
         statuses = asyncio.run(
-            assistant._reenter_coaffected_goals_after_cancellation(
+            cognitive_pipeline_host.reenter_coaffected_goals_after_cancellation(
+                assistant,
                 evidence,
                 session_id="sid",
                 excluded_goal_ids={"goal-walk"},
@@ -251,7 +254,8 @@ class GoalCancellationEvidenceReentryTests(unittest.TestCase):
         # A sibling already in the target re-entry scope is not re-entered twice.
         calls.clear()
         statuses = asyncio.run(
-            assistant._reenter_coaffected_goals_after_cancellation(
+            cognitive_pipeline_host.reenter_coaffected_goals_after_cancellation(
+                assistant,
                 evidence,
                 session_id="sid",
                 excluded_goal_ids={"goal-walk", "goal-wave"},

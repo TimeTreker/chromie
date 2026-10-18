@@ -1,10 +1,11 @@
 # Chromie Development Checkpoint
 
 This is the stable resume point: active Issue, implemented contract, evidence
-limits, owner decisions in force and ordered next work. Replace it on each
-delivery; do not append history. Current status lives in
-[STATUS](docs/STATUS.md), volatile commands and identities in [Handoff](HANDOFF.md),
-and earlier history in Git and the [CHANGELOG](CHANGELOG.md).
+limits, repairs and owner decisions in force, and the claim boundary. Replace it on
+each delivery; do not append history. Current status and the single ordered
+open-work list live in [STATUS](docs/STATUS.md#current-open-work), volatile commands
+and identities in [Handoff](HANDOFF.md), and earlier history in Git and the
+[CHANGELOG](CHANGELOG.md).
 
 The current focus remains Goal-driven single-authority architecture. The active
 delivery line remains canonical local verification, then current-revision voice
@@ -18,23 +19,26 @@ responsible owner. One invocation and one debug bundle per run; a hard failure i
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
 Evidence and per-run judgments: `.chromie/acceptance/everyday-20261016/` (README.md).
 
-## Resume point — 2026-10-16
+## Resume point — 2026-10-17
 
-- Latest delivered repair (UMI spans): the UMI prompt lists Responsibilities in word
+- Since the last live run, the 2026-10-17 audit fix PRs (#70, #71) and their
+  follow-up changed Agent, Orchestrator and shared-contract source. No built image
+  matches `main`; `rootcause19-20261016` predates these changes, so rebuild the
+  Agent image from `main` before the next live run.
+- Latest live-relevant repair (UMI spans): the UMI prompt lists Responsibilities in word
   order, each ending at a later token, and says a reply to news or feelings ends where
   the sharing ends (one aside example; placed inside the rule it retyped a time
   request as speech). Cause: in run 7, "我考了满分！快跟我一起庆祝一下！" ended both the
   celebration and the reply at the last token, so Host rejected overlapping spans (503).
-- Live: `chromie-agent:latest` = `rootcause18-20261016`. Built, not deployed:
-  `rootcause19-20261016` with the UMI span repair.
+- Last recorded live Agent: `chromie-agent:latest` = `rootcause18-20261016`.
 - Run 6 smoke on `rootcause18`: 15/15 mechanical ("把那个拿给我" → "你是说牛奶瓶还是水瓶呀？").
   Run 7 core stopped at 4/55 on the UMI 503 above.
 
-Verification of the latest delivery: recorded UMI replays (the celebrate case 4/4,
+Verification of the UMI span repair: recorded UMI replays (the celebrate case 4/4,
 eight compound and information controls unchanged or better); workflow corpus freeze
-41 (`a36b1ebf…`, every UMI request recaptured, no reply re-authored); strict replay
-6,000/6,000 with zero model calls; canonical gate in a clean worktree (pytest 3,845
-passed + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership).
+42 (`de7c4de6…`, every UMI request recaptured for the widened `value_review` mark, no
+reply re-authored; previous freeze 41 `a36b1ebf…`). Gate and strict replay at the
+delivery revision: pytest 3,955 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
 
 ## Repairs in force from this Issue
 
@@ -64,23 +68,22 @@ passed + 5 skipped, benchmarks 169, legacy 20, policies, docs, test ownership).
   nothing false about her nature (Charter and interaction contract).
 - An unsettled referent is resolved from the conversation when possible, otherwise
   Chromie asks the person.
-- Value Judgment reviews speech that UMI marks `value_review` (deception requests;
-  owner choice B, 2026-10-12, Charter VALUE-JUDGMENT-001); `protect_children` is not in
-  the Stable Mind (owner undecided).
+- Value Judgment reviews a Responsibility that UMI marks `value_review`: a deception
+  request (owner choice B, 2026-10-12) or a request whose doing or answering could hurt,
+  humiliate, frighten or endanger someone, whatever Capability it uses (owner decision
+  2026-10-17, Charter VALUE-JUDGMENT-001); `protect_children` is not in the Stable Mind
+  (owner undecided).
+- Soridormi calls describe body targets in one format: person by referent (the
+  current speaker is the reserved `"requester"`), object by description, place by
+  cited name; Soridormi resolves the physical target, Chromie never sends look
+  yaw/pitch, and a typed not-found is a reported limitation, never completion. SC
+  decoration may use expressive gestures Soridormi declares low-risk; locomotion stays
+  excluded (owner decision 2026-10-17).
 - UMI never authors `bindings`; Planner alone extracts Capability parameters.
 
-## Next work and blockers
+## Next work
 
-1. Deploy `rootcause19-20261016` (owner), rerun the smoke stage, then `core` and
-   `challenge`.
-2. Open defects: homework decline over-offers reminders; "去那边等我" acknowledged with
-   "好的。"; Value Judgment asks consent/meaning questions (hug); SC echoes the user's
-   words (celebrate). The corpus lacks SC and perceived-answer steps.
-3. Constrained Planner decoding is slow in grammar-heavy regions (about 12-15
-   tokens/s); a second Planner pass can miss the deadline.
-4. After the cohort: narrow current-revision voice proof, then default target-evidence
-   closure. Physical microphone, speaker and robot evidence remain supervised; text,
-   discarded TTS and simulated acquisition do not replace them.
+Ordered next work and blockers: [STATUS — Current open work](docs/STATUS.md#current-open-work).
 
 Claim boundary: no qualified cohort, no physical evidence and no release. Do not
 claim a native semantic pass or behavioral improvement beyond the judged runs.

@@ -26,21 +26,135 @@ class SourceReadFinding:
         return f"{self.path}:{self.line}: {self.message}"
 
 
-def _literal_python_path(node: ast.AST) -> bool:
-    return any(
-        isinstance(item, ast.Constant)
-        and isinstance(item.value, str)
-        and item.value.endswith(".py")
-        for item in ast.walk(node)
-    )
+_SOURCE_TEXT_READERS = frozenset({"read_text", "read_bytes", "open"})
+_SOURCE_INTROSPECTION = frozenset({"getsource", "getsourcelines"})
+_PATH_CALLS = frozenset(
+    {
+        "Path", "PurePath", "PosixPath", "joinpath", "resolve", "absolute",
+        "with_name", "with_suffix", "relative_to", "glob", "rglob", "iglob",
+        "sorted", "list", "tuple", "set", "items", "keys", "values",
+    }
+)
 
 
-def _reads_python_source(node: ast.Call) -> bool:
-    if isinstance(node.func, ast.Attribute) and node.func.attr == "read_text":
-        return _literal_python_path(node.func.value)
-    if isinstance(node.func, ast.Name) and node.func.id == "open" and node.args:
-        return _literal_python_path(node.args[0])
+def _call_name(node: ast.Call) -> str | None:
+    if isinstance(node.func, ast.Attribute):
+        return node.func.attr
+    if isinstance(node.func, ast.Name):
+        return node.func.id
+    return None
+
+
+def _is_python_literal(node: ast.AST) -> bool:
+    return isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.endswith(".py")
+
+
+def _is_path_shaped(node: ast.AST) -> bool:
+    """Whether an expression only builds, selects or lists paths."""
+    if isinstance(node, (ast.Constant, ast.Name, ast.Attribute, ast.JoinedStr)):
+        return True
+    if isinstance(node, ast.BinOp) and isinstance(node.op, (ast.Div, ast.Add)):
+        return _is_path_shaped(node.left) and _is_path_shaped(node.right)
+    if isinstance(node, ast.Starred):
+        return _is_path_shaped(node.value)
+    if isinstance(node, ast.Subscript):
+        return _is_path_shaped(node.value)
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set)):
+        return all(_is_path_shaped(item) for item in node.elts)
+    if isinstance(node, ast.Dict):
+        return all(key is not None and _is_path_shaped(key) for key in node.keys)
+    if isinstance(node, ast.Call):
+        if _call_name(node) not in _PATH_CALLS:
+            return False
+        receiver = [node.func.value] if isinstance(node.func, ast.Attribute) else []
+        return all(_is_path_shaped(item) for item in [*receiver, *node.args])
     return False
+
+
+class _SourceReadDetector:
+    """Find calls that read Python implementation text in one test module.
+
+    Detected forms: ``inspect.getsource``/``getsourcelines``; ``read_text``,
+    ``read_bytes`` or ``open`` on a path built from a ``.py`` literal, from a
+    name assigned such a path, from a loop over a ``*.py`` glob, or from a
+    module ``__file__``; and calls to a local helper that reads text when passed
+    a ``.py`` literal.
+    """
+
+    def __init__(self, tree: ast.Module) -> None:
+        self.tree = tree
+        self.python_path_names = self._python_path_names()
+        self.reader_helpers = self._reader_helpers()
+
+    def _mentions_python_path(self, node: ast.AST) -> bool:
+        for item in ast.walk(node):
+            if _is_python_literal(item):
+                return True
+            if isinstance(item, ast.Name) and item.id in self.python_path_names:
+                return True
+            if (
+                isinstance(item, ast.Attribute)
+                and item.attr == "__file__"
+                and not (isinstance(item.value, ast.Name) and item.value.id == "__file__")
+            ):
+                return True
+        return False
+
+    def _python_path_names(self) -> set[str]:
+        names: set[str] = set()
+        changed = True
+        while changed:
+            changed = False
+            for node in ast.walk(self.tree):
+                targets: list[ast.expr] = []
+                value: ast.AST | None = None
+                if isinstance(node, ast.Assign):
+                    targets, value = list(node.targets), node.value
+                elif isinstance(node, (ast.AnnAssign, ast.NamedExpr)) and node.value is not None:
+                    targets, value = [node.target], node.value
+                elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+                    targets, value = [node.target], node.iter
+                if value is None:
+                    continue
+                if not self._mentions_python_path_value(value, names):
+                    continue
+                for target in targets:
+                    for item in ast.walk(target):
+                        if isinstance(item, ast.Name) and item.id not in names:
+                            names.add(item.id)
+                            changed = True
+        return names
+
+    @staticmethod
+    def _mentions_python_path_value(value: ast.AST, names: set[str]) -> bool:
+        if not _is_path_shaped(value):
+            return False
+        return any(
+            _is_python_literal(item) or (isinstance(item, ast.Name) and item.id in names)
+            for item in ast.walk(value)
+        )
+
+    def _reader_helpers(self) -> set[str]:
+        helpers: set[str] = set()
+        for node in ast.walk(self.tree):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and any(
+                isinstance(item, ast.Call) and _call_name(item) in _SOURCE_TEXT_READERS
+                for item in ast.walk(node)
+            ):
+                helpers.add(node.name)
+        return helpers
+
+    def reads_python_source(self, node: ast.Call) -> bool:
+        name = _call_name(node)
+        if name in _SOURCE_INTROSPECTION:
+            return True
+        if name in {"read_text", "read_bytes"} and isinstance(node.func, ast.Attribute):
+            return self._mentions_python_path(node.func.value)
+        if name == "open" and isinstance(node.func, ast.Name) and node.args:
+            return self._mentions_python_path(node.args[0])
+        if name in self.reader_helpers and isinstance(node.func, ast.Name):
+            return any(_is_python_literal(item) for arg in node.args for item in ast.walk(arg))
+        return False
 
 
 def discover_python_source_readers(root: Path) -> dict[str, tuple[int, ...]]:
@@ -50,11 +164,12 @@ def discover_python_source_readers(root: Path) -> dict[str, tuple[int, ...]]:
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         except (OSError, UnicodeError, SyntaxError):
             continue
+        detector = _SourceReadDetector(tree)
         lines = tuple(
             sorted(
                 node.lineno
                 for node in ast.walk(tree)
-                if isinstance(node, ast.Call) and _reads_python_source(node)
+                if isinstance(node, ast.Call) and detector.reads_python_source(node)
             )
         )
         if lines:

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the deployed Gateway -> Core -> Fast Planner control-plane contract."""
+"""Validate the deployed Gateway -> Core -> Planner control-plane contract."""
 
 from __future__ import annotations
 
@@ -154,12 +154,12 @@ def run(base_url: str, *, timeout_s: float) -> dict[str, Any]:
         )
     planner_request = build_fast_plan_request(interpretation)
     status, plan_payload = _post_json(
-        f"{base_url.rstrip('/')}/fast-plan",
+        f"{base_url.rstrip('/')}/plan",
         planner_request.model_dump(mode="json", exclude_none=True),
         timeout_s=timeout_s,
     )
     if status != 200:
-        raise RuntimeError(f"Fast Planner returned HTTP {status}: {plan_payload!r}")
+        raise RuntimeError(f"Planner returned HTTP {status}: {plan_payload!r}")
     plan = CanonicalPlan.model_validate(plan_payload)
     if plan.planner_tier != "fast":
         raise AssertionError(f"unexpected planner tier: {plan.planner_tier!r}")

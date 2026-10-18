@@ -29,10 +29,11 @@ if command -v sha256sum >/dev/null 2>&1; then
 elif command -v shasum >/dev/null 2>&1; then
   REQUIREMENTS_HASH="$(shasum -a 256 "$REQ_FILE" | awk '{print $1}')"
 else
-  REQUIREMENTS_HASH="$(python - <<'PY'
+  REQUIREMENTS_HASH="$(python - "$REQ_FILE" <<'PY'
 from pathlib import Path
 import hashlib
-path = Path("orchestrator/requirements.txt")
+import sys
+path = Path(sys.argv[1])
 print(hashlib.sha256(path.read_bytes()).hexdigest())
 PY
 )"
@@ -52,8 +53,11 @@ if [ "$FORCE_INSTALL" != "1" ] && [ "$CURRENT_HASH" = "$PREVIOUS_HASH" ]; then
 fi
 
 # A stale or missing hash file must not force a network operation when the
-# active Python environment already satisfies the Orchestrator imports.
-if [ "$FORCE_INSTALL" != "1" ] && python - <<'PYIMPORT' >/dev/null 2>&1
+# active Python environment already satisfies the Orchestrator imports. The
+# import list mirrors orchestrator/requirements.txt, so it only stands in for
+# that file, not for an ORCH_REQUIREMENTS_FILE override.
+if [ "$FORCE_INSTALL" != "1" ] && [ "$REQ_FILE" = "orchestrator/requirements.txt" ] \
+  && python - <<'PYIMPORT' >/dev/null 2>&1
 import aiohttp
 import dotenv
 import httpx

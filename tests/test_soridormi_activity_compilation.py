@@ -11,7 +11,7 @@ from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.capability_runtime import (
     RuntimeAuthorization,
     CapabilityExecutionContext,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
 )
 from orchestrator.runtime.soridormi_capability_provider import (
@@ -207,7 +207,7 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
         *,
         activity_poll_interval_s: float = 0.1,
     ) -> CapabilityRuntime:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 _skill(
@@ -234,7 +234,7 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
         return runtime
 
     async def test_registry_preserves_nested_provider_contract_exactly(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 _skill(
@@ -420,7 +420,7 @@ class SoridormiActivityCompilationTests(unittest.IsolatedAsyncioTestCase):
     async def test_activity_cancel_uses_compiled_activity_identity(self) -> None:
         invoker = _ActivityInvoker()
         adapter = SoridormiCapabilityProvider(invoker)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 _skill(

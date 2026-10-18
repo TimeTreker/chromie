@@ -63,7 +63,7 @@ Planner owns:
 Social Cognition, not Planner, owns the exact natural wording of any Communicative
 Activity; the Planner model contract has no utterance field.
 
-There is one Planner pass (the Deep Planner was retired on 2026-10-11); terminal
+There is one Planner pass; terminal
 Evidence does not create a second semantic owner or an automatic deep-thinking stage.
 
 `CognitiveOpportunity` owns none of these decisions. It is only a bounded readiness

@@ -16,29 +16,22 @@ from jsonschema import Draft202012Validator, ValidationError as SchemaValidation
 
 from agent.app.capabilities.catalog import CatalogCapability
 from agent.app.clients.ollama_client import OllamaGenerationError
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_validation import (
     qualify_capability_catalog_for_output_modes,
     validate_planner_model_output,
 )
-from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-from tests.cognitive_work_test_support import cognitive_work_request
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.tool_result import canonical_value_sha256
 from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs
-
-
-class SequencedOllama:
-    def __init__(self, responses):
-        self.responses = list(responses)
-        self.prompts = []
-
-    async def generate(self, prompt, **kwargs):
-        self.prompts.append((prompt, kwargs))
-        value = self.responses.pop(0)
-        if isinstance(value, Exception):
-            raise value
-        return declared_ability_needs(value, kwargs.get("response_format"))
+from tests.planner_test_support import (
+    FullCatalog,
+    GranularResourceCatalog,
+    SequencedOllama,
+    canonical_compound_body_case,
+    canonical_plan_request,
+    speech_outcomes,
+)
 
 
 def with_goal_satisfaction(raw):
@@ -52,20 +45,19 @@ def with_goal_satisfaction(raw):
 class PlannerWorkScopeValidationTests(unittest.TestCase):
     def test_planner_model_cannot_author_auxiliary_social_activities(self):
         from pydantic import ValidationError
-        _, raw = _canonical_compound_body_case()
+        _, raw = canonical_compound_body_case()
         raw["auxiliary_activities"] = [{"capability_id": "soridormi.blink_eyes"}]
         with self.assertRaises(ValidationError) as failure:
             PlannerModelOutput.model_validate(raw)
         self.assertIn(("auxiliary_activities",), [e["loc"] for e in failure.exception.errors()])
 
     def test_planner_step_cannot_claim_an_unknown_goal(self):
-        request, raw = _canonical_compound_body_case()
+        request, raw = canonical_compound_body_case()
         model = SequencedOllama([raw])
-        asyncio.run(FastPlannerResolver(model, _compound_catalog()).resolve(request))
+        asyncio.run(PlannerResolver(model, _compound_catalog()).resolve(request))
         raw["steps"][1]["source_goal_ids"] = ["foreign-goal"]
         with self.assertRaises(SchemaValidationError):
             Draft202012Validator(model.prompts[0][1]["response_format"]).validate(declared_ability_needs(raw, model.prompts[0][1]["response_format"]))
-
 
 
 class PlannerCatalogQualificationTests(unittest.TestCase):
@@ -163,165 +155,6 @@ class PlannerCatalogQualificationTests(unittest.TestCase):
         )
 
 
-class FullCatalog:
-    def __init__(self):
-        self.items = [
-            CatalogCapability(
-                capability_id="soridormi.walk_forward",
-                agent_id="capability_agent",
-                description="Walk forward",
-                effects=["physical_motion"],
-                available=True,
-                interaction_executable=True,
-                prompt_tier="common",
-                input_schema={
-                    "type": "object",
-                    "properties": {"duration_s": {"type": "number", "minimum": 0.1}},
-                    "required": ["duration_s"],
-                },
-                can_run_parallel=False,
-                parallel_metadata_declared=True,
-                exclusive_group="base_motion",
-                resource_claims=["base_motion"],
-            ),
-            CatalogCapability(
-                capability_id="soridormi.blink_eyes",
-                agent_id="capability_agent",
-                description="Blink eyes",
-                effects=["visual_expression"],
-                available=True,
-                interaction_executable=True,
-                prompt_tier="common",
-                input_schema={
-                    "type": "object",
-                    "properties": {"count": {"type": "integer", "minimum": 1, "maximum": 10}},
-                    "required": ["count"],
-                },
-                can_run_parallel=True,
-                parallel_metadata_declared=True,
-                exclusive_group="eye_expression",
-                resource_claims=["eye_expression"],
-            ),
-            CatalogCapability(
-                capability_id="soridormi.look_at_person",
-                agent_id="capability_agent",
-                description="Look at a person",
-                effects=["physical_motion"],
-                available=True,
-                interaction_executable=True,
-                prompt_tier="common",
-                input_schema={
-                    "type": "object",
-                    "properties": {
-                        "duration_s": {"type": "number", "minimum": 0.1},
-                        "target_ref": {"type": "string"},
-                    },
-                    "required": ["duration_s", "target_ref"],
-                },
-            ),
-            CatalogCapability(
-                capability_id="rare.observe_doorway",
-                agent_id="capability_agent",
-                description="Observe doorway",
-                effects=["read_only"],
-                available=True,
-                interaction_executable=True,
-                prompt_tier="rare",
-                input_schema={"type": "object", "properties": {}},
-            ),
-            CatalogCapability(
-                capability_id="chromie.speak",
-                agent_id="capability_agent",
-                description="Speak text",
-                effects=["user_interaction", "audio_output"],
-                available=True,
-                interaction_executable=True,
-                prompt_tier="common",
-                input_schema={
-                    "type": "object",
-                    "properties": {"text": {"type": "string"}},
-                    "required": ["text"],
-                },
-            ),
-        ]
-        self.scopes = []
-
-    async def prompt_entries(self, **kwargs):
-        self.scopes.append(kwargs.get("scope"))
-        return self.items
-
-
-class GranularResourceCatalog(FullCatalog):
-    def __init__(self):
-        super().__init__()
-        self.items.extend(
-            [
-                CatalogCapability(
-                    capability_id="soridormi.acquire_resource",
-                    agent_id="capability_agent",
-                    description="Acquire a physical resource.",
-                    effects=["physical_motion", "object_manipulation"],
-                    available=True,
-                    interaction_executable=True,
-                    prompt_tier="common",
-                    input_schema={"type": "object", "properties": {}},
-                    hints={
-                        "semantic_scope": {
-                            "responsibility_type": "acquire_and_deliver_resource",
-                            "resource_kinds": ["physical_object"],
-                        },
-                        "resource_contract": {
-                            "plan_requires": [],
-                            "plan_provides": ["resource_acquired"],
-                            "completion_requires": ["resource_acquired"],
-                        },
-                    },
-                ),
-                CatalogCapability(
-                    capability_id="soridormi.deliver_resource",
-                    agent_id="capability_agent",
-                    description="Deliver an acquired physical resource.",
-                    effects=["physical_motion", "object_manipulation"],
-                    available=True,
-                    interaction_executable=True,
-                    prompt_tier="common",
-                    input_schema={"type": "object", "properties": {}},
-                    hints={
-                        "semantic_scope": {
-                            "responsibility_type": "acquire_and_deliver_resource",
-                            "resource_kinds": ["physical_object"],
-                            "delivery_modes": ["physical_handover"],
-                        },
-                        "resource_contract": {
-                            "plan_requires": ["resource_acquired"],
-                            "plan_provides": ["resource_delivered"],
-                            "completion_requires": ["resource_delivered"],
-                        },
-                    },
-                ),
-            ]
-        )
-
-
-def request(text="往前走15秒，然后眨眼。", *, goal_ids=None) -> CognitiveWorkRequest:
-    goal_ids = list(goal_ids or ["goal-action"])
-    return cognitive_work_request(
-        sid="sid-pr4",
-        text=text,
-        language="zh-CN",
-        context={
-            "fast_plan_resolution": {"disposition": "escalate", "coverage": "partial", "steps": []},
-            "goal_association_resolution": {
-                "associations": [],
-                "new_goals": [
-                    {"goal_id": goal_id, "description": f"Goal {goal_id}"} for goal_id in goal_ids
-                ],
-            },
-        },
-        history=[],
-    )
-
-
 class CanonicalPlanContractTests(unittest.TestCase):
     def test_single_goal_aggregate_cannot_be_mixed_in_the_decoder(self):
         for tier in ("fast",):
@@ -414,7 +247,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
         for text in ("The code word is amber.", "这次的口令是琥珀。"):
             for role in ("assistant", "user"):
                 with self.subTest(text=text, role=role):
-                    run_request, raw = self.speech_outcomes("unavailable")
+                    run_request, raw = speech_outcomes("unavailable")
                     entry = {
                         "role": role, "sid": "prior-turn", "text": text,
                         "metadata": {"source": "fast_planner_communicative_delivery" if role == "assistant" else "gateway", "retired_route": "obsolete_private_lane"},
@@ -424,7 +257,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
                         "context": {**run_request.context, "history": [{"role": "assistant", "text": "shadow_context_history"}]},
                     })
                     model = SequencedOllama([raw])
-                    asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
+                    asyncio.run(PlannerResolver(model, FullCatalog()).resolve(run_request))
                     packet = str(model.prompts[0][0])
                     projected, _ = json.JSONDecoder().raw_decode(packet.split("Trusted Work planning facts JSON:\n", 1)[1])
                     self.assertEqual(projected["Prior dialogue"], [{**entry, "metadata": {"source": entry["metadata"]["source"]}}])
@@ -433,10 +266,10 @@ class CanonicalPlanContractTests(unittest.TestCase):
                     self.assertEqual(len(model.prompts), 1)
 
     def test_deep_prior_dialogue_does_not_silently_truncate_required_text(self):
-        run_request, raw = self.speech_outcomes("unavailable")
+        run_request, raw = speech_outcomes("unavailable")
         run_request = run_request.model_copy(update={"history": [{"role": "assistant", "text": "x" * 32000}]})
         model = SequencedOllama([raw])
-        asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
+        asyncio.run(PlannerResolver(model, FullCatalog()).resolve(run_request))
         self.assertEqual(len(model.prompts), 1)
         packet = str(model.prompts[0][0])
         projected, _ = json.JSONDecoder().raw_decode(packet.split("Trusted Work planning facts JSON:\n", 1)[1])
@@ -446,7 +279,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
         marker = "UMI semantic uncertainty evidence (exact objects or empty):\n"
         for sibling in (False, True):
             for unresolved in ([], ["Which content?", '对象含有引号："小明"'], ["x" * 320]):
-                run_request, _ = self.speech_outcomes("clarify", sibling)
+                run_request, _ = speech_outcomes("clarify", sibling)
                 from shared.chromie_contracts.core_interpretation import UserMeaningUncertainty
                 uncertainties = [UserMeaningUncertainty(local_ref=f"u{i}", kind="referent", description=text,
                     responsibility_refs=[item.local_ref for item in run_request.responsibilities])
@@ -463,54 +296,13 @@ class CanonicalPlanContractTests(unittest.TestCase):
                         projected, _ = json.JSONDecoder().raw_decode(packet.split(marker, 1)[1])
                         self.assertEqual(projected, [item.model_dump(mode="json") for item in uncertainties])
 
-    @staticmethod
-    def speech_outcomes(disposition, sibling=False):
-        ids = ["goal-speech", "goal-goodnight"] if sibling else ["goal-speech"]
-        dispositions = [disposition, "respond"] if sibling else [disposition]
-
-        def satisfaction(goal_ids, complete):
-            return {
-                "score": 1.0 if complete else 0.0,
-                "status": "exact" if complete else "unsatisfied",
-                "satisfied_goal_ids": goal_ids if complete else [],
-                "unmet_goal_ids": [] if complete else goal_ids,
-                "unmet_requirements": [] if complete else ["Requested content is missing."],
-                "rationale": "Current content and limitation are preserved.",
-            }
-
-        texts = {"respond": "Hello.", "clarify": "Which sentence do you mean?",
-                 "unavailable": "I do not have the earlier sentence."}
-        fulfilled = disposition == "respond"
-        assessment = satisfaction(ids, fulfilled)
-        if sibling and not fulfilled:
-            assessment["satisfied_goal_ids"] = [ids[1]]
-            assessment["unmet_goal_ids"] = [ids[0]]
-        raw = {
-            "disposition": "mixed" if sibling and not fulfilled else disposition,
-            "coverage": "complete" if sibling or fulfilled else "partial",
-            "confidence": 1.0, "goal_summary": "Preserve independent speech outcomes.",
-            "steps": [], "unresolved": [], "parameter_resolutions": [], "time_conditions": [],
-            "goal_outcomes": {
-                gid: {"disposition": value, "coverage": "complete" if value == "respond" else "partial",
-                      "unresolved": ["Source sentence is ambiguous."] if value == "clarify" else [], "step_ids": [], "satisfaction": satisfaction([gid], value == "respond"),
-                      "rationale": "Preserve this Goal's outcome."}
-                for index, (gid, value) in enumerate(zip(ids, dispositions))
-            },
-            "goal_satisfaction": assessment, "plan_relation": "exact", "user_confirmation_required": False,
-        }
-        run_request = request("Say the sentence, then say goodnight.", goal_ids=ids)
-        for goal in run_request.context["goal_association_resolution"]["new_goals"]:
-            goal["metadata"] = {"output_mode": "speech"}
-        from tests.cognitive_work_test_support import word_free_model_fixture
-        return run_request, word_free_model_fixture(raw)
-
     def test_speech_limitations_survive_schema_host_and_materialization(self):
         for disposition in ("respond", "clarify", "unavailable"):
             for sibling in (False, True):
                 with self.subTest(disposition=disposition, sibling=sibling):
-                    run_request, raw = self.speech_outcomes(disposition, sibling)
+                    run_request, raw = speech_outcomes(disposition, sibling)
                     model = SequencedOllama([copy.deepcopy(raw)])
-                    plan = asyncio.run(FastPlannerResolver(model, FullCatalog()).resolve(run_request))
+                    plan = asyncio.run(PlannerResolver(model, FullCatalog()).resolve(run_request))
                     Draft202012Validator(model.prompts[0][1]["response_format"]).validate(declared_ability_needs(raw, model.prompts[0][1]["response_format"]))
                     self.assertNotIn("error", plan.metadata)
                     self.assertEqual(plan.disposition, raw["disposition"])
@@ -522,9 +314,9 @@ class CanonicalPlanContractTests(unittest.TestCase):
     def test_speech_schema_matches_host_aggregate_without_inventing_work(self):
         for sibling in (False, True):
             for disposition in ("respond", "clarify", "unavailable"):
-                run_request, raw = self.speech_outcomes(disposition, sibling)
+                run_request, raw = speech_outcomes(disposition, sibling)
                 fake = SequencedOllama([raw])
-                asyncio.run(FastPlannerResolver(fake, FullCatalog()).resolve(run_request))
+                asyncio.run(PlannerResolver(fake, FullCatalog()).resolve(run_request))
                 schema = fake.prompts[0][1]["response_format"]
                 # The deployed converter chooses anyOf before properties and
                 # does not intersect object allOf. Every native alternative
@@ -555,9 +347,9 @@ class CanonicalPlanContractTests(unittest.TestCase):
         for sibling in (False, True):
             # The one Planner's model-facing limitations; refusing on values is Value Judgment's.
             for disposition in ("clarify", "unavailable"):
-                run_request, raw = self.speech_outcomes(disposition, sibling)
+                run_request, raw = speech_outcomes(disposition, sibling)
                 fake = SequencedOllama([raw])
-                plan = asyncio.run(FastPlannerResolver(fake, FullCatalog()).resolve(run_request))
+                plan = asyncio.run(PlannerResolver(fake, FullCatalog()).resolve(run_request))
                 self.assertNotIn("error", plan.metadata)
                 schema = fake.prompts[0][1]["response_format"]
                 for fault in ("nested_satisfied", "aggregate_exact"):
@@ -584,7 +376,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
                             CanonicalPlan.model_validate(canonical_candidate)
 
     def test_speech_mixed_cannot_hide_execution_or_authorization(self):
-        _, raw = self.speech_outcomes("clarify", sibling=True)
+        _, raw = speech_outcomes("clarify", sibling=True)
         for field, value in (("user_confirmation_required", True), ("plan_relation", "alternative")):
             with self.subTest(field=field):
                 invalid = copy.deepcopy(raw)
@@ -611,7 +403,7 @@ class CanonicalPlanContractTests(unittest.TestCase):
 class PlannerResolverTests(unittest.TestCase):
     def test_terminal_evidence_reentry_uses_same_goal_shape_as_fast_planner(self):
         data = {"answer": "trusted current state"}
-        run_request = request("What is the current state?", goal_ids=["goal-info"])
+        run_request = canonical_plan_request("What is the current state?", goal_ids=["goal-info"])
         goal = run_request.context["goal_association_resolution"]["new_goals"][0]
         goal["metadata"] = {
             "output_mode": "information",
@@ -650,7 +442,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
         ollama = SequencedOllama([with_goal_satisfaction(raw)])
 
-        plan = asyncio.run(FastPlannerResolver(ollama, FullCatalog()).resolve(run_request))
+        plan = asyncio.run(PlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
         self.assertEqual(plan.disposition, "respond")
         self.assertEqual([(need.kind, need.source_goal_ids) for need in plan.communication_needs], [("answer", ["goal-info"])])
@@ -712,14 +504,14 @@ class PlannerResolverTests(unittest.TestCase):
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
-        run_request = request("Blink twice.", goal_ids=["goal-blink"])
+        run_request = canonical_plan_request("Blink twice.", goal_ids=["goal-blink"])
         goal = run_request.context["goal_association_resolution"]["new_goals"][0]
         goal["metadata"] = {
             "output_mode": "body_action",
         }
         ollama = SequencedOllama([raw])
 
-        plan = asyncio.run(FastPlannerResolver(ollama, FullCatalog()).resolve(run_request))
+        plan = asyncio.run(PlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual([step.capability_id for step in plan.steps], ["soridormi.blink_eyes"])
@@ -749,7 +541,7 @@ class PlannerResolverTests(unittest.TestCase):
             "user_confirmation_required": False,
         }
         ollama = SequencedOllama([invalid, invalid])
-        run_request = request(
+        run_request = canonical_plan_request(
             "Walk forward for fifteen seconds.",
             goal_ids=["goal-walk"],
         )
@@ -767,7 +559,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
 
         plan = asyncio.run(
-            FastPlannerResolver(
+            PlannerResolver(
                 ollama,
                 FullCatalog(),
             ).resolve(run_request.model_copy(update={"context": context}))
@@ -825,7 +617,7 @@ class PlannerResolverTests(unittest.TestCase):
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
-        run_request = request(reason, goal_ids=[goal_id])
+        run_request = canonical_plan_request(reason, goal_ids=[goal_id])
         context = dict(run_request.context)
         context["goal_association_resolution"] = {
             "associations": [],
@@ -850,7 +642,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
 
         plan = asyncio.run(
-            FastPlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(
+            PlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(
                 run_request.model_copy(update={"context": context})
             )
         )
@@ -864,7 +656,7 @@ class PlannerResolverTests(unittest.TestCase):
         self.assertTrue(plan.metadata["resource_contract_unavailable"])
         self.assertNotIn("failure_class", plan.metadata)
 
-    def test_deep_planner_composes_advertised_granular_resource_capabilities(self):
+    def test_planner_composes_advertised_granular_resource_capabilities(self):
         goal_id = "goal-resource"
         reason = "Fetch and hand over the red mug."
         satisfaction = {
@@ -914,7 +706,7 @@ class PlannerResolverTests(unittest.TestCase):
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
-        run_request = request(reason, goal_ids=[goal_id])
+        run_request = canonical_plan_request(reason, goal_ids=[goal_id])
         context = dict(run_request.context)
         context["goal_association_resolution"] = {
             "associations": [],
@@ -939,7 +731,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
 
         plan = asyncio.run(
-            FastPlannerResolver(
+            PlannerResolver(
                 SequencedOllama([raw]),
                 GranularResourceCatalog(),
             ).resolve(run_request.model_copy(update={"context": context}))
@@ -953,7 +745,7 @@ class PlannerResolverTests(unittest.TestCase):
         self.assertNotEqual(plan.metadata.get("execution_allowed"), False)
 
     def test_clear_goal_without_matching_capability_is_unavailable_not_clarify(self):
-        planner_request = request("Find a restaurant that is open now near People's Square.")
+        planner_request = canonical_plan_request("Find a restaurant that is open now near People's Square.")
         planner_request.context["interaction_context"] = {
             "events": [{"event_id": "ledger-deep-marker"}]
         }
@@ -1068,7 +860,7 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([parallel])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(request("Walk forward."))
+            PlannerResolver(ollama, FullCatalog()).resolve(canonical_plan_request("Walk forward."))
         )
 
         self.assertEqual(len(ollama.prompts), 1)
@@ -1086,7 +878,7 @@ class PlannerResolverTests(unittest.TestCase):
 
     def test_semantic_primary_plan_has_one_model_call_budget(self):
         goal_ids = ["goal-walk", "goal-sing"]
-        run_request = request(
+        run_request = canonical_plan_request(
             "Walk while singing.",
             goal_ids=goal_ids,
         )
@@ -1178,7 +970,7 @@ class PlannerResolverTests(unittest.TestCase):
 
         ollama = SequencedOllama([mixed_plan()])
 
-        plan = asyncio.run(FastPlannerResolver(ollama, FullCatalog()).resolve(run_request))
+        plan = asyncio.run(PlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "mixed")
@@ -1220,7 +1012,7 @@ class PlannerResolverTests(unittest.TestCase):
             ],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
-        run_request = request("Walk while blinking and singing.")
+        run_request = canonical_plan_request("Walk while blinking and singing.")
         context = dict(run_request.context)
         context["goal_association_resolution"] = {
             "associations": [],
@@ -1243,7 +1035,7 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([partial])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(
+            PlannerResolver(ollama, FullCatalog()).resolve(
                 run_request.model_copy(update={"context": context})
             )
         )
@@ -1286,7 +1078,7 @@ class PlannerResolverTests(unittest.TestCase):
             ],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
-        run_request = request("Walk for 2 seconds.")
+        run_request = canonical_plan_request("Walk for 2 seconds.")
         run_request.context["goal_association_resolution"]["new_goals"][0]["description"] = (
             "Walk for 2 seconds."
         )
@@ -1300,7 +1092,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
         ollama = SequencedOllama([invalid])
 
-        plan = asyncio.run(FastPlannerResolver(ollama, FullCatalog()).resolve(run_request))
+        plan = asyncio.run(PlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "execute")
@@ -1345,7 +1137,7 @@ class PlannerResolverTests(unittest.TestCase):
             ],
             "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
-        run_request = request("Walk for 2 seconds.")
+        run_request = canonical_plan_request("Walk for 2 seconds.")
         run_request.context["goal_association_resolution"]["new_goals"][0]["description"] = (
             "Walk for 2 seconds."
         )
@@ -1359,7 +1151,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
         ollama = SequencedOllama([invalid])
 
-        plan = asyncio.run(FastPlannerResolver(ollama, FullCatalog()).resolve(run_request))
+        plan = asyncio.run(PlannerResolver(ollama, FullCatalog()).resolve(run_request))
 
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.disposition, "execute")
@@ -1413,7 +1205,7 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([parallel])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(request("Walk while blinking."))
+            PlannerResolver(ollama, FullCatalog()).resolve(canonical_plan_request("Walk while blinking."))
         )
 
         self.assertEqual(len(ollama.prompts), 1)
@@ -1464,8 +1256,8 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([complete])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(
-                request("Walk for one second, then blink twice.", goal_ids=goal_ids)
+            PlannerResolver(ollama, FullCatalog()).resolve(
+                canonical_plan_request("Walk for one second, then blink twice.", goal_ids=goal_ids)
             )
         )
 
@@ -1527,8 +1319,8 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([repaired])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(
-                request("Blink twice and tell me a short joke.", goal_ids=goal_ids)
+            PlannerResolver(ollama, FullCatalog()).resolve(
+                canonical_plan_request("Blink twice and tell me a short joke.", goal_ids=goal_ids)
             )
         )
 
@@ -1539,7 +1331,7 @@ class PlannerResolverTests(unittest.TestCase):
 
     def test_vocal_compound_primary_result_preserves_body_execution_and_unavailability(self):
         goal_ids = ["goal-walk", "goal-sing", "goal-blink"]
-        run_request = request(
+        run_request = canonical_plan_request(
             "你好，你往前走个15秒，然后边走边唱歌，同时眨眼睛。",
             goal_ids=goal_ids,
         )
@@ -1711,7 +1503,7 @@ class PlannerResolverTests(unittest.TestCase):
         catalog.items[0] = catalog.items[0].model_copy(update={"can_run_parallel": True})
         ollama = SequencedOllama([repaired])
 
-        plan = asyncio.run(FastPlannerResolver(ollama, catalog).resolve(run_request))
+        plan = asyncio.run(PlannerResolver(ollama, catalog).resolve(run_request))
 
         self.assertEqual(plan.disposition, "mixed")
         self.assertEqual(
@@ -1779,8 +1571,8 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([repaired])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(
-                request("Blink twice and tell me a short joke.", goal_ids=goal_ids)
+            PlannerResolver(ollama, FullCatalog()).resolve(
+                canonical_plan_request("Blink twice and tell me a short joke.", goal_ids=goal_ids)
             )
         )
 
@@ -2023,8 +1815,8 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([with_goal_satisfaction(repaired)])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(
-                request(
+            PlannerResolver(ollama, FullCatalog()).resolve(
+                canonical_plan_request(
                     "Look at me for two seconds, then blink twice.",
                     goal_ids=goal_ids,
                 )
@@ -2068,11 +1860,11 @@ class PlannerResolverTests(unittest.TestCase):
         }
         ollama = SequencedOllama([invalid, invalid])
         plan = asyncio.run(
-            FastPlannerResolver(
+            PlannerResolver(
                 ollama,
                 FullCatalog(),
             ).resolve(
-                request(
+                canonical_plan_request(
                     "Walk and blink.",
                     goal_ids=["goal-walk", "goal-blink"],
                 )
@@ -2159,8 +1951,8 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([repaired])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(
-                request(
+            PlannerResolver(ollama, FullCatalog()).resolve(
+                canonical_plan_request(
                     "Blink twice and tell me a short joke.",
                     goal_ids=goal_ids,
                 )
@@ -2255,8 +2047,8 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([repaired])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(
-                request(
+            PlannerResolver(ollama, FullCatalog()).resolve(
+                canonical_plan_request(
                     "Blink twice and tell me a short joke.",
                     goal_ids=goal_ids,
                 )
@@ -2431,8 +2223,8 @@ class PlannerResolverTests(unittest.TestCase):
         ollama = SequencedOllama([with_goal_satisfaction(repaired)])
 
         plan = asyncio.run(
-            FastPlannerResolver(ollama, FullCatalog()).resolve(
-                request("Look at me, then blink.", goal_ids=goal_ids)
+            PlannerResolver(ollama, FullCatalog()).resolve(
+                canonical_plan_request("Look at me, then blink.", goal_ids=goal_ids)
             )
         )
 
@@ -2484,8 +2276,8 @@ class PlannerResolverTests(unittest.TestCase):
         }
 
         plan = asyncio.run(
-            FastPlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(
-                request("Blink safely.")
+            PlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(
+                canonical_plan_request("Blink safely.")
             )
         )
 
@@ -2552,7 +2344,7 @@ class PlannerResolverTests(unittest.TestCase):
                 "associations": [],
             }
         }
-        req = request("Blink twice.").model_copy(update={"context": context})
+        req = canonical_plan_request("Blink twice.").model_copy(update={"context": context})
         invalid = {
             "disposition": "execute",
             "coverage": "complete",
@@ -2578,7 +2370,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
         ollama = SequencedOllama([invalid])
 
-        plan = asyncio.run(FastPlannerResolver(ollama, FullCatalog()).resolve(req))
+        plan = asyncio.run(PlannerResolver(ollama, FullCatalog()).resolve(req))
 
         self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
@@ -2593,7 +2385,7 @@ class PlannerResolverTests(unittest.TestCase):
                 "associations": [],
             }
         }
-        req = request("Look at me.").model_copy(update={"context": context})
+        req = canonical_plan_request("Look at me.").model_copy(update={"context": context})
         invalid = {
             "disposition": "execute",
             "coverage": "complete",
@@ -2654,7 +2446,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
         ollama = SequencedOllama([with_goal_satisfaction(revised)])
 
-        plan = asyncio.run(FastPlannerResolver(ollama, FullCatalog()).resolve(req))
+        plan = asyncio.run(PlannerResolver(ollama, FullCatalog()).resolve(req))
 
         self.assertEqual(plan.goal_ids, ["goal-look"])
         self.assertEqual(len(plan.steps), 1)
@@ -2676,10 +2468,10 @@ class PlannerResolverTests(unittest.TestCase):
         }
 
         plan = asyncio.run(
-            FastPlannerResolver(
+            PlannerResolver(
                 SequencedOllama([invalid]),
                 FullCatalog(),
-            ).resolve(request("眨两下眼。"))
+            ).resolve(canonical_plan_request("眨两下眼。"))
         )
 
         self.assertEqual(plan.disposition, "unavailable")
@@ -2719,7 +2511,7 @@ class PlannerResolverTests(unittest.TestCase):
         }
         raw["goal_satisfaction"] = copy.deepcopy(raw["goal_outcomes"]["goal-action"]["satisfaction"])
         plan = asyncio.run(
-            FastPlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(request("往前走。"))
+            PlannerResolver(SequencedOllama([raw]), FullCatalog()).resolve(canonical_plan_request("往前走。"))
         )
         self.assertEqual(plan.disposition, "clarify")
         self.assertEqual(plan.steps, [])
@@ -2737,7 +2529,7 @@ class PlannerResolverTests(unittest.TestCase):
                 }
             ]
         )
-        asyncio.run(FastPlannerResolver(ollama, FullCatalog()).resolve(request("看看门口。")))
+        asyncio.run(PlannerResolver(ollama, FullCatalog()).resolve(canonical_plan_request("看看门口。")))
         prompt = ollama.prompts[0][0]
         system = ollama.prompts[0][1]["system"]
         self.assertIn('This is the one Planner decision', prompt)
@@ -2788,10 +2580,10 @@ class PlannerResolverTests(unittest.TestCase):
             },
         }
         plan = asyncio.run(
-            FastPlannerResolver(
+            PlannerResolver(
                 SequencedOllama([raw]),
                 FullCatalog(),
-            ).resolve(request("点头并准备咖啡。", goal_ids=["goal-nod", "goal-coffee"]))
+            ).resolve(canonical_plan_request("点头并准备咖啡。", goal_ids=["goal-nod", "goal-coffee"]))
         )
         self.assertEqual(plan.disposition, "mixed")
         self.assertEqual(
@@ -2801,38 +2593,6 @@ class PlannerResolverTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
-
-def _canonical_compound_body_case():
-    from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
-    text = 'Walk forward one second, then blink twice.'
-    goal_id = 'goal-compound'
-    request = CognitiveWorkRequest(
-        sid='canonical-compound', text=text, language='en-US', interpretation_confidence=1,
-        responsibilities=[CognitiveResponsibilityProposal(local_ref='r1', outcome=text,
-            output_mode='body_action', body_effect_family='task_physical_effect', confidence=1)],
-        context={'goal_association_resolution': {'associations': [], 'new_goals': [{
-            'goal_id': goal_id, 'description': text, 'source_responsibility_refs': ['r1'],
-            'metadata': {'output_mode': 'body_action', 'body_effect_families': ['task_physical_effect']},
-        }]}},
-    )
-    satisfaction = {'score': 1, 'status': 'exact', 'satisfied_goal_ids': [goal_id],
-        'unmet_goal_ids': [], 'unmet_requirements': [], 'rationale': 'Both requested effects are planned.'}
-    raw = {'disposition': 'execute', 'coverage': 'complete', 'confidence': 1, 'goal_summary': text,
-        'steps': [
-            {'step_id': 'walk', 'capability_id': 'soridormi.walk_forward', 'args': {'duration_s': 1},
-             'depends_on': [], 'source_goal_ids': [goal_id],
-             'reason_summary': 'Walk for the requested duration.'},
-            {'step_id': 'blink', 'capability_id': 'soridormi.blink_eyes', 'args': {'count': 2},
-             'depends_on': ['walk'], 'source_goal_ids': [goal_id],
-             'reason_summary': 'Blink the requested number of times.'},
-        ], 'cancel_activity_ids': [], 'unresolved': [], 'parameter_resolutions': [],
-        'time_conditions': [], 'goal_outcomes': {goal_id: {'disposition': 'execute', 'coverage': 'complete',
-            'step_ids': ['walk', 'blink'], 'unresolved': [], 'satisfaction': satisfaction,
-            'rationale': 'One complete source requests both effects.'}}, 'goal_satisfaction': satisfaction,
-        'plan_relation': 'exact', 'user_confirmation_required': False,
-    }
-    return request, raw
 
 
 def _compound_catalog():
@@ -2845,10 +2605,10 @@ def _compound_catalog():
 
 class PlannerCompoundResolverRegressionTests(unittest.TestCase):
     def test_compound_sibling_keeps_its_independent_count_default(self):
-        from agent.app.fast_planner import FastPlannerResolver
-        for resolver_type in [FastPlannerResolver]:
+        from agent.app.planner import PlannerResolver
+        for resolver_type in [PlannerResolver]:
             with self.subTest(resolver=resolver_type.__name__):
-                request, raw = _canonical_compound_body_case()
+                request, raw = canonical_compound_body_case()
                 goal = request.context['goal_association_resolution']['new_goals'][0]
                 goal['description'] += ' Then turn left.'
                 goal['object'] = {'bindings': {'count': {'entity_type': 'count', 'value': 2}}}
@@ -2874,10 +2634,10 @@ class PlannerCompoundResolverRegressionTests(unittest.TestCase):
                 Draft202012Validator(model.prompts[0][1]['response_format']).validate(declared_ability_needs(raw, model.prompts[0][1]['response_format']))
 
     def test_canonical_passes_preserve_count_without_requiring_it_on_walk(self):
-        from agent.app.fast_planner import FastPlannerResolver
-        for resolver_type in [FastPlannerResolver]:
+        from agent.app.planner import PlannerResolver
+        for resolver_type in [PlannerResolver]:
             with self.subTest(resolver=resolver_type.__name__):
-                request, raw = _canonical_compound_body_case()
+                request, raw = canonical_compound_body_case()
                 goal = request.context['goal_association_resolution']['new_goals'][0]
                 goal['object'] = {'bindings': {'count': {'entity_type': 'count', 'value': 2}}}
                 model = SequencedOllama([raw])
@@ -2888,10 +2648,10 @@ class PlannerCompoundResolverRegressionTests(unittest.TestCase):
                 Draft202012Validator(model.prompts[0][1]['response_format']).validate(declared_ability_needs(raw, model.prompts[0][1]['response_format']))
 
     def test_canonical_fast_and_deep_keep_compound_work_on_one_goal(self):
-        from agent.app.fast_planner import FastPlannerResolver
-        for resolver_type in [FastPlannerResolver]:
+        from agent.app.planner import PlannerResolver
+        for resolver_type in [PlannerResolver]:
             with self.subTest(resolver=resolver_type.__name__):
-                request, raw = _canonical_compound_body_case()
+                request, raw = canonical_compound_body_case()
                 model = SequencedOllama([raw])
                 plan = asyncio.run(resolver_type(model, _compound_catalog()).resolve(request))
                 self.assertEqual(plan.disposition, 'execute', plan)

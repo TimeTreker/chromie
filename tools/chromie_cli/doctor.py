@@ -133,7 +133,6 @@ def _service_checks(snapshot) -> list[Diagnostic]:
     diagnostics: list[Diagnostic] = []
     checks = {
         "agent": snapshot.get("AGENT_URL"),
-        "action_executor": snapshot.get("ACTION_EXECUTOR_URL"),
         "asr": snapshot.get("ASR_URL", "ws://127.0.0.1:9001"),
         "tts": snapshot.get("TTS_URL", "ws://127.0.0.1:5000"),
         "ollama": snapshot.get("LLM_URL", "http://127.0.0.1:11434/api/generate"),

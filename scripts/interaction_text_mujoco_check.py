@@ -573,7 +573,7 @@ def _planner_communication_already_scheduled(resolution: Any) -> bool:
     """Preserve output ordering after an apply-mode Planner speech commit.
 
     The production Host uses the same cognitive-resolution evidence to avoid
-    resetting playback when Fast Planner has already handed a Communicative
+    resetting playback when the Planner has already handed a Communicative
     Activity to the Host. The live diagnostic must not discard that queued
     speech or leave its session accounting unterminated before dispatching the
     canonical response.

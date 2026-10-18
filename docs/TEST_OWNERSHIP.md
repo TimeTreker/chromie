@@ -31,8 +31,7 @@ checks, primarily `scripts/check_repository_policies.py`. Tests should exercise
 the policy checker with synthetic violating trees instead of checking that one
 particular source string is absent. The registry may still list a reviewed
 `architecture_policy` source-reader where a structural boundary has no policy
-rule yet; it currently holds two, for the VoiceAssistant input-session and
-playback-transport extractions.
+rule yet; `config/test_source_ownership.json` lists each one with its reason.
 
 ## Generated-artifact contract tests
 
@@ -66,7 +65,12 @@ python scripts/check_test_ownership.py
 
 The checker rejects an unclassified test that reads a `.py` implementation file,
 invalid ownership categories, weak or unsafe registry entries, duplicate entries,
-and stale approvals. It is part of `./scripts/run_tests.sh`.
+and stale approvals. It is part of `./scripts/run_tests.sh`. It detects
+`inspect.getsource`/`getsourcelines`, and `read_text`, `read_bytes` or `open` on a
+path built from a `.py` literal, from a name assigned such a path, from a loop
+over a `*.py` glob, or from a module's `__file__`, plus local helpers that read
+text when called with a `.py` literal. Paths loaded from data at run time are not
+detected.
 
 The registry is not a blanket baseline. New user/runtime behavior must use
 executable assertions; new forbidden architecture belongs in the repository

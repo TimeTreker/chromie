@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from shared.chromie_contracts.mind import (
     MindProfile,
     SocialInteractionStyle,
-    active_customer_mind_profile_path,
     default_mind_profile,
-    default_mind_profile_path,
     load_mind_profile,
     validate_customer_mind_profile,
 )
@@ -47,40 +44,6 @@ class MindManager:
             profile,
             profile_path=settings.profile_path,
             context_max_chars=settings.context_max_chars,
-        )
-
-    @classmethod
-    def from_env(cls, *, project_root: Path | None = None) -> "MindManager":
-        raw_path = os.getenv("ORCH_MIND_PROFILE_PATH", "").strip()
-        if raw_path:
-            profile_path = Path(raw_path).expanduser()
-            if not profile_path.is_absolute() and project_root is not None:
-                profile_path = project_root / profile_path
-        else:
-            customer_path = (
-                active_customer_mind_profile_path(project_root)
-                if project_root is not None
-                else None
-            )
-            profile_path = (
-                customer_path
-                if customer_path is not None and customer_path.is_file()
-                else default_mind_profile_path(project_root)
-            )
-        profile = cls._load_profile(profile_path)
-        social_style_preset = os.getenv("ORCH_SOCIAL_INTERACTION_STYLE_PRESET", "").strip().lower()
-        if social_style_preset:
-            profile = profile.model_copy(
-                update={
-                    "social_interaction_style": SocialInteractionStyle(
-                        preset=social_style_preset
-                    )
-                }
-            )
-        return cls(
-            profile,
-            profile_path=profile_path,
-            context_max_chars=int(os.getenv("ORCH_MIND_CONTEXT_MAX_CHARS", "1600")),
         )
 
     @staticmethod

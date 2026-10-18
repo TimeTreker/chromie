@@ -204,7 +204,7 @@ def _validate_runtime_identity(
                     "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
                     "AGENT_USER_MEANING_INTERPRETER_MODEL",
                     "AGENT_GOAL_ASSOCIATION_MODEL",
-                    "AGENT_FAST_PLANNER_MODEL",
+                    "AGENT_PLANNER_MODEL",
                     "AGENT_DELIBERATIVE_MODEL",
                 }
                 for key in sorted(required_model_keys):

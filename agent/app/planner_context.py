@@ -13,7 +13,7 @@ from pydantic import ValidationError
 from .planner_grounding import _goal_binding_map
 from .planner_model_contract import is_planner_step_capability
 
-from shared.chromie_contracts.core_interpretation import PlannerReentryScope
+from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest, PlannerReentryScope
 from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.execution_outcome import ExecutionOutcomeBundle
 from shared.chromie_contracts.goal import ActiveGoalSnapshot, GoalAssociationResolution
@@ -1081,23 +1081,6 @@ def evidence_bound_dialogue(
     return out[-max(1, int(limit)) :]
 
 
-def gateway_speech_act(request: Any) -> str:
-    """Return immutable Gateway speech-act evidence from the admitted turn envelope."""
-
-    if getattr(request, "turn_envelope", None) is not None:
-        return " ".join(
-            str(request.turn_envelope.attention.speech_act or "").strip().split()
-        ).casefold()
-    context = request.context if isinstance(request.context, dict) else {}
-    envelope = context.get("user_turn_envelope")
-    if not isinstance(envelope, dict):
-        return ""
-    attention = envelope.get("attention")
-    if not isinstance(attention, dict):
-        return ""
-    return " ".join(str(attention.get("speech_act") or "").strip().split()).casefold()
-
-
 def planner_context_capability_eligible(item: Any, context: dict[str, Any]) -> bool:
     """Honor provider-declared nonempty Planner context prerequisites.
 
@@ -1118,7 +1101,7 @@ def planner_context_capability_eligible(item: Any, context: dict[str, Any]) -> b
 
 
 def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False) -> dict[str, Any]:
-    """Project one catalog entry onto Fast Planner's read-only capability surface."""
+    """Project one catalog entry onto the Planner's read-only capability surface."""
 
     payload = {
         "capability_id": item.capability_id,

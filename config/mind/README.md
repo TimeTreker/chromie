@@ -19,10 +19,14 @@ speaks only as herself, never as a robot, AI, model, assistant, or service, and
 never asserts a falsehood about her nature.
 
 Concrete identity values belong here, not in Python defaults. A deployment owner
-(operator, not the project owner who approves the Charter) may edit
-`identity.name`, `identity.age_description`, `identity.short_self_description`,
-`identity.identity_answer_guidance`, pronouns, role wording, and the reviewed
-mind policies without changing application code.
+(operator, not the project owner who approves the Charter) may edit the customer
+fields above (`identity.name`, pronouns, `identity.family_role`, social style) and
+also `identity.age_description`, `identity.short_self_description`,
+`identity.identity_answer_guidance`, and personality expression, without changing
+application code. No other identity field is deployment-configurable.
+`IDENTITY-TRUTH-001` lives in Social Cognition's fixed instructions, not in this
+file, so `identity_answer_guidance` may shape how she answers but cannot remove or
+override it.
 
 For normal customer setup, do not edit the factory file. Preview bounded settings:
 

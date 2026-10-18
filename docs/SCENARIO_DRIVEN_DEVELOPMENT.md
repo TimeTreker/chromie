@@ -188,7 +188,7 @@ User: 往前走十五秒，同时眨眼。
 Required assertions:
 
 - walking and blinking both remain in the semantic goal;
-- fast planning cannot execute only walking;
+- the Planner cannot execute only walking;
 - the Planner keeps the original utterance and can load any missing contract through need-first search;
 - low-consequence blink count may be model-resolved within schema;
 - unsupported concurrency produces a complete alternative;
@@ -359,7 +359,7 @@ rule for the fixture. Rerun the focused case with repeatable `--case`, then the
 whole daily-life cohort, its applicable general-ability class, and the canonical
 repository gates. Repeat until every deterministic boundary passes and the
 predeclared semantic threshold or per-case requirement is met; stop as
-[LLM prompt qualification](LLM_PROMPT_QUALIFICATION_METHOD.md) Phase 8 describes
+[LLM prompt qualification](LLM_PROMPT_QUALIFICATION_METHOD.md#stop-deliberately) describes
 when the remaining semantic misses are classified with evidence and share no
 unresolved boundary (Charter principle 36).
 
@@ -409,7 +409,10 @@ versions, authorization, and signal quality.
 - **Level B** — deployed local services: container health, HTTP/WebSocket
   interfaces, model presence, control-plane round trips.
 - **Level C** — live simulator / MCP: deployed models with live Soridormi MuJoCo
-  execution and retained traces (live-text general-ability runs are Level C).
+  execution and retained traces. Only an `--execute` live-text run whose summary
+  shows successful Trusted Capability Runtime execution and safe idle is Level C;
+  a preview-only live-text run executes no named skill and supports only Level B
+  claims.
 - **Level D** — target GPU/audio/hardware: physical audio alone is valid Level D
   evidence for the voice device path; a physical robot is optional.
 

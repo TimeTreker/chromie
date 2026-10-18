@@ -6,10 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from orchestrator.runtime.cognitive_runtime import (
-    CognitiveEvidenceRecorder,
-    CognitiveRuntimeResolution,
-)
+from orchestrator.runtime.cognitive_runtime import CognitiveRuntimeResolution
+from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
     CoreInterpretationResult,
@@ -432,7 +430,7 @@ def test_social_lineage_is_transport_metadata_not_model_prompt_content() -> None
 def test_plan_lineage_reaches_interaction_and_capability_runtime() -> None:
     import asyncio
 
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.semantic_artifact import (
         SemanticArtifactLineage,
         semantic_artifact_ref,
@@ -466,10 +464,10 @@ def test_live_turn_lineage_reaches_final_interaction_without_model_bookkeeping()
     import asyncio
 
     from orchestrator.runtime.cognitive_runtime import (
-        CanonicalPlanRuntimeAdapter,
         CognitiveRuntimePolicy,
         GoalDrivenRuntimeCoordinator,
     )
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
     from shared.chromie_contracts.semantic_artifact import SemanticArtifactLineage
     from tests.cognitive_runtime_test_support import (
         FakeRuntime,

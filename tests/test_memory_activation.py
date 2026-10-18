@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.memory import MemoryEntry, MemoryStore
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def test_memory_store_activates_old_relevant_entry_before_recent_noise() -> None:
@@ -190,7 +191,7 @@ def test_build_context_uses_disclosure_safe_memory_projection_not_raw_snapshot()
 
     from orchestrator.orchestrator import VoiceAssistant
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.is_playing_audio = False
     assistant.playback_delivery.playback_generation = 0
     assistant.action_dry_run = False

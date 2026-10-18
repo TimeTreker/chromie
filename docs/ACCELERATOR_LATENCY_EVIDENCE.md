@@ -179,7 +179,7 @@ unsafe idle is a hard failure; it cannot be averaged into a latency pass.
 Concurrency qualification compares the maintained running-request setting with
 at most one bounded candidate per hardware profile under shared LLM/TTS load. The
 maintained SGLang overlays now run three bounded running requests so SC, GA and the
-Fast Planner can be admitted together ([Configuration](CONFIGURATION.md)); the
+Planner can be admitted together ([Configuration](CONFIGURATION.md)); the
 two-request (`max_running_requests=2`) settings in the dated records below are retained
 evidence for that earlier candidate and do not qualify the three-request topology. It must show that user-observable response and TTS work are not
 starved by deliberative or optional background work, and must retain the current
@@ -213,7 +213,7 @@ priority fields.
 On 2026-09-14, after dual-engine resource probes, the owner explicitly selected
 one resident Gemma 12B SGLang instance shared by all cognition roles. SC, UMI, GA
 and Planner retain independent semantic authority and request context. The order
-is SC > UMI > GA > Fast Planner > deliberative Work > background, mapped by the
+is SC > UMI > GA > Planner > deliberative Work > background, mapped by the
 default step to 500/400/300/200/100/0. Depth does not lower UMI urgency; bounded Deep SC
 keeps the Charter's deliberative class.
 Here "deliberative Work" means the `DELIBERATIVE` compute class only. The configuration
@@ -358,7 +358,7 @@ production UMI/Planner payloads or microphone-to-speaker latency:
 | Measurement | SGLang AWQ | Maintained Ollama Q4_K_M |
 | --- | --- | --- |
 | Fast UMI first delta | 91.294 ms (49.384–99.433) | 27,473.888 ms (23,220.009–29,466.147) |
-| Fast Planner first delta | 85.856 ms (49.872–88.760) | 64.209 ms (63.804–77.632), after Deep finishes |
+| Planner first delta | 85.856 ms (49.872–88.760) | 64.209 ms (63.804–77.632), after Deep finishes |
 | Complete foreground window | 279.363 ms (201.700–285.325) | 27,686.594 ms (23,414.119–29,654.988) |
 | TTS first audio under tested workload | 3,530.734 ms (2,865.601–4,266.149) | 6,493.102 ms (4,557.640–7,112.504) |
 
@@ -539,11 +539,12 @@ remained exactly 5,091 tokens. Do not retain that flag as a Chromie optimization
 This proves physical SGLang + CosyVoice co-residency on the 16 GB laptop, but **does not qualify
 the topology for Chromie cognition**. The maintained laptop UMI request budget is 16K and other
 semantic roles retain 32K request budgets; 5,091 tokens cannot represent that deployment. Do not
-trade away the two-request concurrency requirement merely to make the canary fit, because
-foreground progress while Deep remains active is the reason for evaluating SGLang.
+trade away the maintained concurrent-request requirement merely to make the canary fit, because
+foreground progress while deliberative work remains active is the reason for evaluating SGLang.
 
 The next laptop gate is therefore a quantized SGLang-served model/artifact comparison. Hold the
-semantic contracts, `max_running_requests=2`, resident TTS, priority semantics, and target context
+semantic contracts, the maintained three-request topology (`max_running_requests=3`, see
+[Configuration](CONFIGURATION.md)), resident TTS, priority semantics, and target context
 topology fixed while changing only the exact model artifact/runtime quantization. Resource fit must
 be proven before running semantic-role promotion. Only after a candidate has a production-sized
 context pool should the frozen UMI semantic cohort and then protocol-5 contention/lease/revocation
@@ -575,7 +576,7 @@ optional TTS warm/baseline
   -> start long DELIBERATIVE stream with context pressure
   -> wait until it is actively decoding
   -> inject INTERACTIVE Fast-UMI canary
-  -> while Deep remains active, inject INTERACTIVE Fast-Planner canary
+  -> while Deep remains active, inject INTERACTIVE Planner canary
   -> optionally synthesize TTS in the same contention window
   -> require foreground completion before Deep finishes
   -> require Deep to complete cleanly afterwards
@@ -624,12 +625,12 @@ latency degrades materially while Deep remains active, qualify the provider's ge
 primitive before proposing Agent integration.
 
 For SGLang, `--presentation-lease-mode in_place` changes only the contention transaction after
-the Fast-Planner canary has produced its synthetic PresentationCommit boundary:
+the Planner canary has produced its synthetic PresentationCommit boundary:
 
 ```text
 Deep actively decoding
   -> Fast UMI completes under INTERACTIVE priority
-  -> Fast Planner completes under INTERACTIVE priority
+  -> Planner completes under INTERACTIVE priority
   -> POST /pause_generation {"mode":"in_place"}
   -> allow already-buffered SSE delivery to settle
   -> synthesize TTS while SGLang inference is quiescent
@@ -689,14 +690,14 @@ claim microphone detection, playback interruption, or Agent policy. The correct 
 
 ```text
 Deep actively decoding
-  -> Fast UMI + Fast Planner complete
+  -> Fast UMI + Planner complete
   -> pause_generation(mode=in_place)
   -> start TTS while Deep is quiescent
   -> first TTS audio arrives (synthetic interruption trigger)
   -> close the old TTS websocket to cancel synthesis
   -> continue_generation(torch_empty_cache=false)
   -> immediately inject a new Fast-UMI canary
-  -> run a new Fast-Planner canary to the next synthetic PresentationCommit
+  -> run a new Planner canary to the next synthetic PresentationCommit
   -> pause_generation(mode=in_place) again
   -> synthesize the replacement response while Deep is quiescent
   -> require zero Deep deltas during that recovery TTS
@@ -732,7 +733,7 @@ be silently mixed with the corrected transaction.
 The retained RTX 5090 protocol-5 round-trip series closes the synthetic provider-compute phase:
 20/20 samples passed; original and interrupted foreground work completed before Deep in every
 trial; both presentation leases held Deep at zero new content deltas during TTS and Deep resumed
-afterward in every trial. Observed P99s were about 41.7 ms Fast-UMI TTFT, 40.6 ms Fast-Planner
+afterward in every trial. Observed P99s were about 41.7 ms Fast-UMI TTFT, 40.6 ms Planner
 TTFT, 54.6 ms interruption-trigger-to-new-UMI-first-delta, 307.1 ms interruption-trigger-to-new
 Planner completion, 2.95 ms reacquire-pause, 4.71 ms reacquire-continue, and 3.79 ms
 resume-to-next-Deep-delta. Replacement TTS no longer showed the invalid protocol-4 ~14 s tail:
@@ -839,7 +840,7 @@ not a candidate-provider pass.
 Run the control against the already deployed model topology, with TTS alive. A single-model
 profile needs only the base model identity. A multi-model profile must override the exact routes
 that differ from the base. For example, the maintained RTX 5090 profile currently routes Fast UMI
-and deliberative cognition through `gemma4:12b`, while Fast Planner uses `qwen3.5:9b`:
+and deliberative cognition through `gemma4:12b`, while Planner uses `qwen3.5:9b`:
 
 ```bash
 python scripts/qualify_inference_provider.py \
@@ -859,7 +860,7 @@ python scripts/qualify_inference_provider.py \
   --output .chromie/acceptance/inference-runtime/ollama-provider-control.json
 ```
 
-The base identity therefore applies to both `fast_umi` and `deliberative`; only Fast Planner is
+The base identity therefore applies to both `fast_umi` and `deliberative`; only Planner is
 overridden. This matters because the first foreground transaction can contend with Deep on the
 same Gemma runner before the later Planner transaction reaches the already-resident Qwen runner.
 Do not collapse those two stages into one generic "foreground model" in evidence.
@@ -877,7 +878,7 @@ configuration into a provider-specific directory, then summarize those immutable
 `scripts/summarize_inference_provider_evidence.py`. The summary reuses Chromie's maintained latency
 distribution implementation and refuses to combine samples whose provider/model revision/runtime
 image/CUDA/accelerator/source revision/scheduler operator record/workload configuration differ.
-It reports p50/p90/p95/p99 for Fast-UMI TTFT, Fast-Planner TTFT, the complete foreground window,
+It reports p50/p90/p95/p99 for Fast-UMI TTFT, Planner TTFT, the complete foreground window,
 Deep timing, TTS timing, peak VRAM, and GPU utilization. It does not invent a promotion threshold.
 
 Use `scripts/run_inference_contention_series.py` instead of manually copying a command N times.
@@ -922,7 +923,7 @@ every new run. The historical control route was:
 ```text
 Deep deliberative load    -> gemma4:12b
 Fast UMI canary            -> gemma4:12b
-Fast Planner canary       -> qwen3.5:9b
+Planner canary       -> qwen3.5:9b
 TTS                       -> live shared-GPU service
 ```
 
@@ -951,7 +952,7 @@ scheduler-isolated three-provider comparison may be added. Do not weaken model q
 force artifact symmetry; serving-runtime qualification and model-role qualification remain
 separate decisions.
 
-This phase is provider-level scheduling evidence. The Fast-UMI/Fast-Planner strings are
+This phase is provider-level scheduling evidence. The Fast-UMI/Planner strings are
 canaries, not production semantic transactions, and
 `chromie-presentation-commit-ready` is not a real `PresentationCommit`. A provider pass does
 not prove Chromie interaction latency, semantic correctness, audible playback, simulator

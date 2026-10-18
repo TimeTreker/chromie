@@ -47,11 +47,19 @@
       "_legacy_agent_authority_context"
     ],
     "size_baselines": {
-      "method_count": 104,
+      "method_count": 79,
       "property_count": 1,
-      "init_lines": 304,
-      "init_self_attributes": 108
+      "init_lines": 300,
+      "init_self_attributes": 104
     }
   },
-  "size_baseline_revision": "bd9557407504f4ce28e955df726f1a3dc6b04af7"
+  "file_line_baselines": {
+    "agent/app/planner_schema.py": 3124,
+    "agent/app/planner_validation.py": 3559,
+    "orchestrator/orchestrator.py": 1994,
+    "orchestrator/runtime/capability_runtime.py": 2676,
+    "orchestrator/runtime/cognitive_runtime.py": 3690,
+    "orchestrator/runtime/conversation_state.py": 2418
+  },
+  "size_baseline_revision": "33279855fad390b68cba496ee5cc373f02cf570e"
 }

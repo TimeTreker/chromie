@@ -17,7 +17,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 import time
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -28,9 +27,9 @@ import httpx
 import websockets
 
 try:
-    from evidence_io import git_revision as _git_revision
+    from evidence_io import git_revision as _git_revision, write_json as _write_json
 except ImportError:  # imported as scripts.qualify_inference_provider
-    from scripts.evidence_io import git_revision as _git_revision
+    from scripts.evidence_io import git_revision as _git_revision, write_json as _write_json
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -387,23 +386,6 @@ def _accelerator_identity() -> dict[str, Any]:
             }
         )
     return {"status": "observed", "devices": devices}
-
-
-def _write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(
-        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-    )
-    temporary_path = Path(temporary)
-    try:
-        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-            json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
-        os.replace(temporary_path, path)
-    finally:
-        temporary_path.unlink(missing_ok=True)
 
 
 def _reasoning_control_identity(provider: str, model: str) -> dict[str, Any]:
@@ -1529,7 +1511,7 @@ async def _qualify_foreground_under_deep_load(
     deep_active_at_fast_planner_start = not deep_task.done()
     if not deep_active_at_fast_planner_start and require_foreground_before_deep:
         raise QualificationFailure(
-            "deliberative request ended before Fast Planner contention could be observed"
+            "deliberative request ended before Planner contention could be observed"
         )
     fast_planner = await _observe_stream(
         client,
@@ -1815,7 +1797,7 @@ async def _qualify_foreground_under_deep_load(
     foreground_completed_before_deep = fast_planner.finished_s < deep.finished_s
     if not foreground_completed_before_deep and require_foreground_before_deep:
         raise QualificationFailure(
-            "foreground Fast UMI + Fast Planner did not complete while deliberation remained active"
+            "foreground Fast UMI + Planner did not complete while deliberation remained active"
         )
 
     if presentation_lease is not None:
@@ -2423,7 +2405,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     for route, label in (
         ("fast-umi", "Fast User Meaning Interpretation canary"),
-        ("fast-planner", "Fast Planner canary"),
+        ("fast-planner", "Planner canary"),
         ("deliberative", "deliberative load"),
     ):
         dest = route.replace("-", "_")

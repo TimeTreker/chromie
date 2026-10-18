@@ -20,9 +20,9 @@ async def _to_thread_inline(function, /, *args, **kwargs):
 
 
 def _new_voice_assistant():
-    from orchestrator.orchestrator import VoiceAssistant
+    from tests.voice_assistant_test_support import bare_voice_assistant
 
-    return VoiceAssistant.__new__(VoiceAssistant)
+    return bare_voice_assistant()
 
 
 class FakeSoundDevice:

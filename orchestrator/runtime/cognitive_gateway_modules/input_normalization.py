@@ -52,7 +52,7 @@ class InputNormalization:
             session_id=resolved_session_id,
             conversation_id=resolved_conversation_id,
             channel=channel,
-            received_at=self._aware_now(),
+            received_at=aware_clock_now(self._clock),
             original_text=text or "",
             normalized_text=normalize_turn_text(text or ""),
             language=self._resolve_language(text or "", language),
@@ -95,11 +95,14 @@ class InputNormalization:
             return capture
         return replace(capture, conversation_id=normalized)
 
-    def _aware_now(self) -> datetime:
-        value = self._clock()
-        if value.tzinfo is None or value.utcoffset() is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value
+
+def aware_clock_now(clock: Callable[[], datetime]) -> datetime:
+    """Read ``clock`` and treat a naive reading as UTC."""
+
+    value = clock()
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value
 
 
-__all__ = ["InputNormalization", "NormalizedTurnCapture"]
+__all__ = ["InputNormalization", "NormalizedTurnCapture", "aware_clock_now"]

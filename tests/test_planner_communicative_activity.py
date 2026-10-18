@@ -18,6 +18,7 @@ from shared.chromie_contracts.plan import (
     FastPlannerProgressAct,
     communication_need_id,
 )
+from orchestrator.runtime import planner_advance_projection
 
 
 class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
@@ -88,7 +89,7 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
             confidence=0.98,
         )
 
-        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        plan = planner_advance_projection.canonical_plan_from_fast_advance(
             advance=advance,
             association=association,
             user_text="你好",
@@ -131,7 +132,7 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
             confidence=1.0,
         )
 
-        need = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        need = planner_advance_projection.canonical_plan_from_fast_advance(
             advance=advance, association=association, user_text="hi, how are you?",
         ).communication_needs[0]
 
@@ -186,7 +187,7 @@ class PlannerOwnedCommunicativeActivityTests(unittest.TestCase):
             confidence=1.0,
         )
 
-        plan = GoalDrivenRuntimeCoordinator._canonical_plan_from_fast_advance(
+        plan = planner_advance_projection.canonical_plan_from_fast_advance(
             advance=advance,
             association=association,
             user_text="点两下头，再跟我说声你好。",

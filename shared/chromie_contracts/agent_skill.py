@@ -127,6 +127,28 @@ class AgentSkillProjectionDeclaration(BaseModel):
         return _normalize_relative_markdown_path(value)
 
 
+def _normalize_agent_skill_id(value: Any) -> str:
+    return _normalize_identifier(value, field_name="agent_skill_id")
+
+
+def _validate_semantic_version(value: Any) -> str:
+    text = str(value or "").strip()
+    if not _SEMANTIC_VERSION.fullmatch(text):
+        raise ValueError("version must be a valid semantic version")
+    return text
+
+
+def _normalize_text(value: Any) -> str:
+    return " ".join(str(value or "").strip().split())
+
+
+def _validate_content_digest(value: Any) -> str:
+    text = str(value or "").strip().lower()
+    if not _SHA256.fullmatch(text):
+        raise ValueError("content_digest must use sha256:<64 lowercase hex>")
+    return text
+
+
 class AgentSkillMetadata(BaseModel):
     """Strict, passive metadata for one owner-reviewed Agent Skill package."""
 
@@ -153,31 +175,13 @@ class AgentSkillMetadata(BaseModel):
     ] = Field(default_factory=tuple, max_length=5)
     projections: tuple[AgentSkillProjectionDeclaration, ...] = Field(min_length=1, max_length=5)
 
-    @field_validator("agent_skill_id", mode="before")
-    @classmethod
-    def normalize_agent_skill_id(cls, value: Any) -> str:
-        return _normalize_identifier(value, field_name="agent_skill_id")
+    normalize_agent_skill_id = field_validator("agent_skill_id", mode="before")(_normalize_agent_skill_id)
 
-    @field_validator("version", mode="before")
-    @classmethod
-    def validate_semantic_version(cls, value: Any) -> str:
-        text = str(value or "").strip()
-        if not _SEMANTIC_VERSION.fullmatch(text):
-            raise ValueError("version must be a valid semantic version")
-        return text
+    validate_semantic_version = field_validator("version", mode="before")(_validate_semantic_version)
 
-    @field_validator("title", "description", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> str:
-        return " ".join(str(value or "").strip().split())
+    normalize_text = field_validator("title", "description", mode="before")(_normalize_text)
 
-    @field_validator("content_digest", mode="before")
-    @classmethod
-    def validate_content_digest(cls, value: Any) -> str:
-        text = str(value or "").strip().lower()
-        if not _SHA256.fullmatch(text):
-            raise ValueError("content_digest must use sha256:<64 lowercase hex>")
-        return text
+    validate_content_digest = field_validator("content_digest", mode="before")(_validate_content_digest)
 
     @field_validator("extends", mode="before")
     @classmethod
@@ -288,10 +292,7 @@ class AgentSkillSelectionGoalContext(BaseModel):
     information_domain: AgentSkillApplicableInformationDomain | Literal[""] = ""
     resource_kind: Literal["", "physical_object", "information"] = ""
 
-    @field_validator("goal_id", "description", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> str:
-        return " ".join(str(value or "").strip().split())
+    normalize_text = field_validator("goal_id", "description", mode="before")(_normalize_text)
 
     @field_validator("bindings", "success_criteria", mode="before")
     @classmethod
@@ -331,10 +332,7 @@ class AgentSkillSelectionRequest(BaseModel):
         max_length=64,
     )
 
-    @field_validator("sid", "turn_id", "text", "language", mode="before")
-    @classmethod
-    def normalize_text(cls, value: Any) -> str:
-        return " ".join(str(value or "").strip().split())
+    normalize_text = field_validator("sid", "turn_id", "text", "language", mode="before")(_normalize_text)
 
     @field_validator("context_summary", mode="before")
     @classmethod
@@ -370,6 +368,21 @@ class AgentSkillSelectionRequest(BaseModel):
         return self
 
 
+def _normalize_goal_ids(value: Any) -> tuple[str, ...]:
+    if value is None:
+        return ()
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("relevant_goal_ids must be an array")
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in value:
+        text = " ".join(str(item or "").strip().split())
+        if text and text not in seen:
+            seen.add(text)
+            out.append(text)
+    return tuple(out)
+
+
 class AgentSkillSelectionModelItem(BaseModel):
     """Exact structured item authored by the responsible Agent's model."""
 
@@ -382,39 +395,13 @@ class AgentSkillSelectionModelItem(BaseModel):
     rationale: str = Field(min_length=1, max_length=500)
     confidence: float = Field(ge=0.0, le=1.0)
 
-    @field_validator("agent_skill_id", mode="before")
-    @classmethod
-    def normalize_agent_skill_id(cls, value: Any) -> str:
-        return _normalize_identifier(value, field_name="agent_skill_id")
+    normalize_agent_skill_id = field_validator("agent_skill_id", mode="before")(_normalize_agent_skill_id)
 
-    @field_validator("version", mode="before")
-    @classmethod
-    def validate_semantic_version(cls, value: Any) -> str:
-        text = str(value or "").strip()
-        if not _SEMANTIC_VERSION.fullmatch(text):
-            raise ValueError("version must be a valid semantic version")
-        return text
+    validate_semantic_version = field_validator("version", mode="before")(_validate_semantic_version)
 
-    @field_validator("relevant_goal_ids", mode="before")
-    @classmethod
-    def normalize_goal_ids(cls, value: Any) -> tuple[str, ...]:
-        if value is None:
-            return ()
-        if not isinstance(value, (list, tuple)):
-            raise ValueError("relevant_goal_ids must be an array")
-        out: list[str] = []
-        seen: set[str] = set()
-        for item in value:
-            text = " ".join(str(item or "").strip().split())
-            if text and text not in seen:
-                seen.add(text)
-                out.append(text)
-        return tuple(out)
+    normalize_goal_ids = field_validator("relevant_goal_ids", mode="before")(_normalize_goal_ids)
 
-    @field_validator("rationale", mode="before")
-    @classmethod
-    def normalize_rationale(cls, value: Any) -> str:
-        return " ".join(str(value or "").strip().split())
+    normalize_rationale = field_validator("rationale", mode="before")(_normalize_text)
 
 
 class AgentSkillSelectionModelOutput(BaseModel):
@@ -430,10 +417,7 @@ class AgentSkillSelectionModelOutput(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     reason_summary: str = Field(min_length=1, max_length=800)
 
-    @field_validator("reason_summary", mode="before")
-    @classmethod
-    def normalize_reason(cls, value: Any) -> str:
-        return " ".join(str(value or "").strip().split())
+    normalize_reason = field_validator("reason_summary", mode="before")(_normalize_text)
 
     @model_validator(mode="after")
     def validate_decision_shape(self) -> "AgentSkillSelectionModelOutput":
@@ -460,47 +444,15 @@ class SelectedAgentSkill(BaseModel):
     rationale: str = Field(min_length=1, max_length=500)
     confidence: float = Field(ge=0.0, le=1.0)
 
-    @field_validator("agent_skill_id", mode="before")
-    @classmethod
-    def normalize_agent_skill_id(cls, value: Any) -> str:
-        return _normalize_identifier(value, field_name="agent_skill_id")
+    normalize_agent_skill_id = field_validator("agent_skill_id", mode="before")(_normalize_agent_skill_id)
 
-    @field_validator("version", mode="before")
-    @classmethod
-    def validate_semantic_version(cls, value: Any) -> str:
-        text = str(value or "").strip()
-        if not _SEMANTIC_VERSION.fullmatch(text):
-            raise ValueError("version must be a valid semantic version")
-        return text
+    validate_semantic_version = field_validator("version", mode="before")(_validate_semantic_version)
 
-    @field_validator("content_digest", mode="before")
-    @classmethod
-    def validate_content_digest(cls, value: Any) -> str:
-        text = str(value or "").strip().lower()
-        if not _SHA256.fullmatch(text):
-            raise ValueError("content_digest must use sha256:<64 lowercase hex>")
-        return text
+    validate_content_digest = field_validator("content_digest", mode="before")(_validate_content_digest)
 
-    @field_validator("relevant_goal_ids", mode="before")
-    @classmethod
-    def normalize_goal_ids(cls, value: Any) -> tuple[str, ...]:
-        if value is None:
-            return ()
-        if not isinstance(value, (list, tuple)):
-            raise ValueError("relevant_goal_ids must be an array")
-        out: list[str] = []
-        seen: set[str] = set()
-        for item in value:
-            text = " ".join(str(item or "").strip().split())
-            if text and text not in seen:
-                seen.add(text)
-                out.append(text)
-        return tuple(out)
+    normalize_goal_ids = field_validator("relevant_goal_ids", mode="before")(_normalize_goal_ids)
 
-    @field_validator("rationale", mode="before")
-    @classmethod
-    def normalize_rationale(cls, value: Any) -> str:
-        return " ".join(str(value or "").strip().split())
+    normalize_rationale = field_validator("rationale", mode="before")(_normalize_text)
 
 
 class PlanAgentSkillProvenance(BaseModel):
@@ -521,18 +473,9 @@ class PlanAgentSkillProvenance(BaseModel):
     selection_rationale: str = Field(min_length=1, max_length=500)
     selection_confidence: float = Field(ge=0.0, le=1.0)
 
-    @field_validator("agent_skill_id", mode="before")
-    @classmethod
-    def normalize_agent_skill_id(cls, value: Any) -> str:
-        return _normalize_identifier(value, field_name="agent_skill_id")
+    normalize_agent_skill_id = field_validator("agent_skill_id", mode="before")(_normalize_agent_skill_id)
 
-    @field_validator("version", mode="before")
-    @classmethod
-    def validate_semantic_version(cls, value: Any) -> str:
-        text = str(value or "").strip()
-        if not _SEMANTIC_VERSION.fullmatch(text):
-            raise ValueError("version must be a valid semantic version")
-        return text
+    validate_semantic_version = field_validator("version", mode="before")(_validate_semantic_version)
 
     @field_validator(
         "disclosure_digest",
@@ -563,10 +506,7 @@ class PlanAgentSkillProvenance(BaseModel):
             raise ValueError("Plan Agent Skill provenance requires relevant Goal IDs")
         return tuple(out)
 
-    @field_validator("selection_rationale", mode="before")
-    @classmethod
-    def normalize_rationale(cls, value: Any) -> str:
-        return " ".join(str(value or "").strip().split())
+    normalize_rationale = field_validator("selection_rationale", mode="before")(_normalize_text)
 
     @model_validator(mode="after")
     def validate_planner_projection(self) -> "PlanAgentSkillProvenance":
@@ -663,18 +603,9 @@ class DisclosedAgentSkillProjection(BaseModel):
     source: str = Field(min_length=1)
     char_count: int = Field(ge=1)
 
-    @field_validator("agent_skill_id", mode="before")
-    @classmethod
-    def normalize_agent_skill_id(cls, value: Any) -> str:
-        return _normalize_identifier(value, field_name="agent_skill_id")
+    normalize_agent_skill_id = field_validator("agent_skill_id", mode="before")(_normalize_agent_skill_id)
 
-    @field_validator("version", mode="before")
-    @classmethod
-    def validate_semantic_version(cls, value: Any) -> str:
-        text = str(value or "").strip()
-        if not _SEMANTIC_VERSION.fullmatch(text):
-            raise ValueError("version must be a valid semantic version")
-        return text
+    validate_semantic_version = field_validator("version", mode="before")(_validate_semantic_version)
 
     @field_validator("content_digest", "projection_digest", mode="before")
     @classmethod
@@ -684,21 +615,7 @@ class DisclosedAgentSkillProjection(BaseModel):
             raise ValueError("projection provenance digests must use sha256:<64 lowercase hex>")
         return text
 
-    @field_validator("relevant_goal_ids", mode="before")
-    @classmethod
-    def normalize_goal_ids(cls, value: Any) -> tuple[str, ...]:
-        if value is None:
-            return ()
-        if not isinstance(value, (list, tuple)):
-            raise ValueError("relevant_goal_ids must be an array")
-        out: list[str] = []
-        seen: set[str] = set()
-        for item in value:
-            text = " ".join(str(item or "").strip().split())
-            if text and text not in seen:
-                seen.add(text)
-                out.append(text)
-        return tuple(out)
+    normalize_goal_ids = field_validator("relevant_goal_ids", mode="before")(_normalize_goal_ids)
 
     @model_validator(mode="after")
     def validate_projection_identity(self) -> "DisclosedAgentSkillProjection":

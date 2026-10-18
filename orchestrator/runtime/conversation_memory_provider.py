@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from agent.app.capabilities.loader import build_configured_registry, parse_manifest_paths
+from shared.chromie_runtime.env_values import parse_bool
 from shared.chromie_contracts.interaction import (
     CapabilityRequest,
     CapabilityResult,
@@ -113,7 +114,11 @@ def host_runtime_memory_definitions(
             continue
         if tool.agent_id != "chromie.memory":
             continue
-        if not _truthy(tool.llm_hints.get("interaction_executable")):
+        if not parse_bool(
+            tool.llm_hints.get("interaction_executable"),
+            name=f"{tool.name} llm_hints.interaction_executable",
+            default=False,
+        ):
             continue
         if tool.safety_class != "safe_read" or not tool.execution.side_effect_free:
             continue
@@ -154,12 +159,6 @@ def host_runtime_memory_definitions(
             )
         )
     return definitions
-
-
-def _truthy(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 __all__ = [

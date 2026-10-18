@@ -18,7 +18,7 @@ microservice per cognitive role. The Cognitive Gateway itself remains Host-owned
 The service is **not** a second orchestration runtime. The retired `AgentRuntime`,
 `InteractionRuntime`, specialized semantic Agent pipeline, `/run`, `/interaction`,
 `/agents`, independent response-authoring stage, and Tool Result Interpreter
-surfaces have been removed, and so has the Deep Planner (2026-10-11). SC owns Communicative Acts;
+surfaces have been removed. There is one Planner. SC owns Communicative Acts;
 the Planner receives bounded Responsibility/Goal/Work/Evidence state on initial and
 event-driven re-entry. Re-entry includes one immutable exact affected-Goal scope;
 unrelated sibling Work remains outside the Planner transaction; relevant sibling speech
@@ -30,7 +30,7 @@ provider behind the Capability boundary.
 
 UMI-triggered and GA/Evidence-triggered Planner calls have independent task identities. Canonical Planner results can reuse a subset of `existing_work_activities`, add steps, and explicitly cancel named Activities with `cancel_activity_ids`. Omission preserves existing Work. The role Memory projection uses already filtered entries; Runtime owns commit and dispatch validation. See [Cognitive Turn Loop](../docs/COGNITIVE_TURN_LOOP.md) and [Memory Extraction](../docs/MEMORY_EXTRACTION.md).
 
-Fast and Deep admit a complete, fully bound information-acquisition stage with an
+The Planner admits a complete, fully bound information-acquisition stage with an
 honest partial whole-Goal score and explicit per-Goal/aggregate deferred obligations.
 The acquisition result leaves the Goal open. Matching completed Evidence and source
 Plan identity permit a new Planner decision; effect confirmation and response-delivery
@@ -76,10 +76,9 @@ result type are exact Host projections of UMI. SC owns communication and Social
 Attention, receives the same intent concurrently, and has first compute priority.
 
 Planner owns Activity decomposition, capability choice, argument realization and
-waiting. Fast receives complete common contracts plus the full library index; one
-bounded detail request can precede its complete plan. Indexed rare entries do not
-by themselves require Deep. Locked or unavailable capabilities grant no execution.
-Fast `argument_sources` now carry closed `UserTurnEnvelope` token spans instead of
+waiting. It receives complete common contracts plus the full library index; one
+bounded detail request can precede its complete plan. Locked or unavailable capabilities grant no execution.
+Planner `argument_sources` carry closed `UserTurnEnvelope` token spans instead of
 model-retyped quotes. Trusted code materializes canonical `source_quote` text from those
 spans; canonical parameter resolutions and time conditions retain their existing quote
 forms. Provenance still does not prove semantic conversion accuracy.
@@ -164,7 +163,7 @@ GA may regenerate one unambiguously malformed object/array container only after
 the complete original claims pass deterministic preflight. Acceptance compares
 every authored field/value with that lossless projection. Unknown fields, invalid
 optional meaning, conflicting decisions and any semantic change reject; preprocessing
-cannot delete them to salvage the result. See the [turn-loop contract](../docs/COGNITIVE_TURN_LOOP.md#30-fastdeep-escalation-is-cognition-depth-not-repair).
+cannot delete them to salvage the result. See the [turn-loop contract](../docs/COGNITIVE_TURN_LOOP.md#30-deeper-passes-are-cognition-depth-not-repair).
 
 WorkDAG endpoints are deterministic validation/execution infrastructure. The retired LLM `WorkDAGPlanner` bridge has been removed; WorkDAG infrastructure does not own cognitive planning.
 
@@ -173,18 +172,17 @@ WorkDAG endpoints are deterministic validation/execution infrastructure. The ret
 Important endpoints include:
 
 - `GET /health`
-- `GET /semantic-authority`
 - `GET /capabilities`
 - `GET /capabilities/catalog`
-- `POST /capabilities/search`
 - User Meaning Interpretation / cognitive-core endpoints
 - `POST /goal-association`
-- `POST /fast-advance`
-- `POST /fast-plan`
+- `POST /plan-advance`
+- `POST /plan`
 - `POST /value-judgment`
 - `POST /social-cognition` (shared interaction planning, including Goal-free Situation)
-- Agent Skill selection/disclosure endpoints
-- WorkDAG validate/dry-run/guarded execution/trace diagnostics
+- `POST /social-cognition/startup-greeting` (optional SC wake-up line)
+- `GET /agent-skills`
+- WorkDAG planning execution, cancellation and DAGEngine status
 
 See [`../docs/API_REFERENCE.md`](../docs/API_REFERENCE.md) for the exact maintained API surface.
 

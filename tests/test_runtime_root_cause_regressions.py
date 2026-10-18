@@ -35,6 +35,9 @@ from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconcil
 from shared.chromie_contracts.interaction import CapabilityRequest
 from shared.chromie_contracts.plan import CanonicalPlan
 from shared.chromie_contracts.plan import canonical_plan_fingerprint
+from tests.voice_assistant_test_support import bare_voice_assistant
+from orchestrator.runtime import runtime_ready_greeting
+from orchestrator.runtime import tts_echo
 
 
 class _SequenceOllama:
@@ -889,27 +892,38 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
 
     def test_wake_up_greeting_rejects_incomplete_clause(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "complete punctuated"):
-            VoiceAssistant._validate_runtime_ready_greeting_completion("六点半啦，我困了，你吃晚")
+            runtime_ready_greeting.validate_runtime_ready_greeting_completion("六点半啦，我困了，你吃晚")
         self.assertEqual(
-            VoiceAssistant._validate_runtime_ready_greeting_completion("嗨，我醒啦！"),
+            runtime_ready_greeting.validate_runtime_ready_greeting_completion("嗨，我醒啦！"),
             "嗨，我醒啦！",
         )
 
     def test_wake_up_prompt_uses_grounded_time_without_unverified_state(self) -> None:
-        assistant = object.__new__(VoiceAssistant)
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._owner_identity_json = lambda: "{}"  # type: ignore[method-assign]
-        assistant._owner_mind_summary = lambda: "{}"  # type: ignore[method-assign]
-        prompt = assistant._runtime_ready_greeting_prompt()
+        from agent.app.social_cognition import (
+            SOCIAL_COGNITION_STARTUP_GREETING_PROMPT,
+            social_startup_greeting_prompt,
+        )
+        from shared.chromie_contracts.mind import default_mind_profile
+        from shared.chromie_contracts.social_cognition import SocialStartupGreetingRequest
 
-        self.assertIn("Grounded local temporal context JSON", prompt)
+        request = SocialStartupGreetingRequest(
+            request_id="startup-greeting:regression",
+            language="zh-CN",
+            local_time=runtime_ready_greeting.runtime_ready_greeting_time_context(),
+            context={"mind": default_mind_profile().prompt_context(max_chars=5000)},
+        )
+        prompt = social_startup_greeting_prompt(request)
+
+        self.assertIn("Trusted startup context JSON", prompt)
         self.assertIn("local_period", prompt)
-        self.assertIn("Do not quote the exact clock time", prompt)
-        self.assertIn("Do not invent meals, hunger, sleepiness, weather", prompt)
-        self.assertIn("Do not ask a question or end mid-clause", prompt)
+        system = SOCIAL_COGNITION_STARTUP_GREETING_PROMPT
+        self.assertIn("quote the clock time", system)
+        self.assertIn("Do not invent meals, hunger, sleepiness, weather", system)
+        self.assertIn("or ask any question", system)
+        self.assertIn("End the line with sentence punctuation", system)
 
     async def test_vad_segment_started_during_playback_keeps_barge_in_threshold(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.target_asr_rate = 16000
         assistant.max_vad_utterance_ms = 20000
         assistant.min_audio_ms = 100
@@ -935,7 +949,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(created, [])
 
     def test_tts_echo_match_rejects_concatenated_robot_speech(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.tts_text_by_generation = {
             4: [
                 "我会先眨两下眼睛，再往前走15秒。",
@@ -943,7 +957,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ]
         }
 
-        likely, ratio, coverage = assistant._likely_tts_echo(
+        likely, ratio, coverage = tts_echo.likely_tts_echo(
+            assistant,
             "我会先眨两下眼睛，再往前走15秒，刚才没成功。",
             playback_generation_at_start=4,
         )
@@ -953,7 +968,7 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(coverage, 0.88)
 
     def test_tts_echo_match_uses_best_chunk_for_asr_distortion(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.tts_text_by_generation = {
             4: [
                 "Once upon a time, a long,",
@@ -962,7 +977,8 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
             ]
         }
 
-        likely, ratio, _ = assistant._likely_tts_echo(
+        likely, ratio, _ = tts_echo.likely_tts_echo(
+            assistant,
             "Once upon a time along says why.",
             playback_generation_at_start=4,
         )
@@ -971,10 +987,11 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertGreaterEqual(ratio, 0.78)
 
     def test_tts_echo_match_keeps_real_barge_in(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.tts_text_by_generation = {5: ["我会先眨两下眼睛，再往前走15秒。"]}
 
-        likely, _, _ = assistant._likely_tts_echo(
+        likely, _, _ = tts_echo.likely_tts_echo(
+            assistant,
             "停一下，我不是让你先眨眼。",
             playback_generation_at_start=5,
         )
@@ -982,13 +999,14 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(likely)
 
     def test_tts_echo_match_catches_exact_post_playback_acoustic_tail(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.tts_text_by_generation = {8: ["Okay, I'll do that for you."]}
-        playback = assistant._playback_state()
+        playback = assistant.playback_delivery
         playback.last_completed_playback_generation = 8
         playback.last_playback_end_monotonic_ms = 1000.0
 
-        likely, ratio, coverage = assistant._likely_tts_echo(
+        likely, ratio, coverage = tts_echo.likely_tts_echo(
+            assistant,
             "Okay, I'll do that for you.",
             playback_generation_at_start=8,
             started_during_playback=False,
@@ -1000,13 +1018,14 @@ class RuntimeRootCauseRegressionTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(coverage, 1.0)
 
     def test_tts_echo_match_does_not_suppress_late_user_repeat(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.tts_text_by_generation = {8: ["Okay, I'll do that for you."]}
-        playback = assistant._playback_state()
+        playback = assistant.playback_delivery
         playback.last_completed_playback_generation = 8
         playback.last_playback_end_monotonic_ms = 1000.0
 
-        likely, _, _ = assistant._likely_tts_echo(
+        likely, _, _ = tts_echo.likely_tts_echo(
+            assistant,
             "Okay, I'll do that for you.",
             playback_generation_at_start=8,
             started_during_playback=False,

@@ -84,7 +84,7 @@ AGENT_MODEL
 OLLAMA_MODEL
 AGENT_USER_MEANING_INTERPRETER_MODEL
 AGENT_GOAL_ASSOCIATION_MODEL
-AGENT_FAST_PLANNER_MODEL
+AGENT_PLANNER_MODEL
 AGENT_DELIBERATIVE_MODEL
 AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL
 ```
@@ -103,7 +103,7 @@ human-facing interaction deadlines. Both profiles reserve each stage's complete
 declared output budget plus a 2048-token safety margin before inference and
 reject prompt or completion truncation as an LLM-budget failure. RTX 5090 keeps
 its declared shared Gemma4-12B SGLang profile. RTX 4090 Laptop assigns every LLM role to
-one `qwen3.5:4b` model served by its own pinned SGLang AWQ override, retains the 16K/512
+one Qwen3.5-4B model served as `chromie-qwen35-4b` by its own pinned SGLang AWQ override, retains the 16K/512
 User Meaning Interpretation request budget, reserves 48K for the Planner and deliberative roles, and keeps 32K for
 other downstream roles. One resident engine avoids cross-role weight/context reloads while
 SGLang can run up to three requests and apply the existing compute-class priority/preemption
@@ -136,8 +136,8 @@ qualification watchdog merely because that profile was auto-detected.
 | `jetson_agx_orin` | AGX Orin | `gemma4:e2b` | `qwen3:4b` | 2048 |
 | `jetson_thor` | AGX Thor placeholder profile | `gemma4:12b` | `qwen3:4b` | 4096 |
 
-On the Ollama profiles the quality model is `AGENT_MODEL` and the deliberative
-roles (`AGENT_DELIBERATIVE_MODEL`: Social Cognition's deep client and
+On the Ollama profiles the quality model is `AGENT_MODEL`, and the same model is
+assigned to the deliberative roles (`AGENT_DELIBERATIVE_MODEL`: Social Cognition's deep client and
 Reflection). The fast model is used by User Meaning Interpretation (Fast and Deep), Cognitive
 Gateway attention, Goal Association and the Planner (including terminal Evidence
 re-entry). RTX 5090 and RTX 4090 Laptop assign every role to one SGLang engine.

@@ -11,7 +11,7 @@ from orchestrator.runtime.episode import (
 )
 from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
 )
 from shared.chromie_contracts import (
@@ -161,7 +161,7 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
             annotate_preflight_validation,
         )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         response = annotate_preflight_validation(
             InteractionResponse(
                 capabilities=[
@@ -199,7 +199,7 @@ class CapabilityTerminologyContractTests(unittest.TestCase):
             self.assertFalse(hasattr(runtime_module, name), name)
 
         self.assertTrue(issubclass(CapabilityDefinition, object))
-        self.assertTrue(issubclass(CapabilityRegistry, object))
+        self.assertTrue(issubclass(CapabilityDefinitionRegistry, object))
         self.assertTrue(issubclass(CapabilityRuntime, object))
 
 

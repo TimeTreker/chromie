@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from functools import partial
 
 from pydantic import ValidationError
 
 from agent.app.capabilities.catalog import CatalogCapability
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_fast_validation import qualify_fast_canonical_plan
 from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
@@ -16,16 +17,9 @@ from shared.chromie_contracts.plan import (
     GoalSatisfactionAssessment,
     PlanParameterResolution,
 )
+from tests.model_fakes import ScriptedOllama
 
-
-class FakeOllama:
-    def __init__(self, responses):
-        self.responses = list(responses)
-        self.prompts = []
-
-    async def generate(self, prompt, **kwargs):
-        self.prompts.append(prompt)
-        return declared_ability_needs(self.responses.pop(0), kwargs.get("response_format"))
+FakeOllama = partial(ScriptedOllama, shape=declared_ability_needs)
 
 
 class Catalog:
@@ -64,7 +58,7 @@ class Catalog:
 
 def request(text: str, *, goal_ids: list[str]) -> CognitiveWorkRequest:
     return cognitive_work_request(
-        sid="sid-pr5",
+        sid="sid-goal-satisfaction",
         text=text,
         language="zh-CN",
         context={
@@ -193,7 +187,7 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
             },
         }
         plan = asyncio.run(
-            FastPlannerResolver(FakeOllama([raw]), Catalog()).resolve(
+            PlannerResolver(FakeOllama([raw]), Catalog()).resolve(
                 request("眨眨眼睛。", goal_ids=["goal-blink"])
             )
         )
@@ -246,7 +240,7 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
             },
         }
         plan = asyncio.run(
-            FastPlannerResolver(FakeOllama([raw]), Catalog()).resolve(
+            PlannerResolver(FakeOllama([raw]), Catalog()).resolve(
                 request("往前走。", goal_ids=["goal-walk"])
             )
         )
@@ -323,7 +317,7 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
         }
         ollama = FakeOllama([low, exact])
         plan = asyncio.run(
-            FastPlannerResolver(
+            PlannerResolver(
                 ollama,
                 Catalog(),
             ).resolve(request("多眨几下眼睛。", goal_ids=["goal-blink"]))
@@ -427,12 +421,12 @@ class PlannerGoalSatisfactionTests(unittest.TestCase):
         }
         ollama = FakeOllama([raw])
         asyncio.run(
-            FastPlannerResolver(ollama, Catalog()).resolve(
+            PlannerResolver(ollama, Catalog()).resolve(
                 request("往前走。", goal_ids=["goal-walk"])
             )
         )
-        self.assertIn("Satisfaction measures prospective Goal fulfillment", ollama.prompts[0])
-        self.assertIn("minimum_goal_satisfaction", ollama.prompts[0])
+        self.assertIn("Satisfaction measures prospective Goal fulfillment", ollama.prompts[0][0])
+        self.assertIn("minimum_goal_satisfaction", ollama.prompts[0][0])
 
 
 if __name__ == "__main__":

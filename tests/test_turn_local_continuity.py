@@ -177,7 +177,7 @@ class TurnLocalAgent:
             reason_summary="No canonical Goal is needed after continuity inspection.",
         )
 
-    async def stream_fast_advance(self, *args, **kwargs):
+    async def stream_plan_advance(self, *args, **kwargs):
         raise AssertionError("turn-local interaction must not invoke Fast Planner")
         yield  # pragma: no cover
 
@@ -374,7 +374,7 @@ async def test_goal_scoped_meaning_does_not_wake_planner_without_model_request()
             self.goal_association_calls += 1
             return body_goal_association(source_ref="r1")
 
-        async def stream_fast_advance(self, *args, **kwargs):
+        async def stream_plan_advance(self, *args, **kwargs):
             self.planner_calls += 1
             raise AssertionError("Runtime must not infer Planner activation from continuity_scope")
             yield  # pragma: no cover
@@ -515,7 +515,7 @@ async def test_late_ga_failure_cannot_turn_delivered_joke_into_user_visible_fail
                 },
             )
 
-        async def stream_fast_advance(self, *args, **kwargs):
+        async def stream_plan_advance(self, *args, **kwargs):
             raise AssertionError("Planner was not requested in this containment test")
             yield  # pragma: no cover
 
@@ -592,7 +592,7 @@ async def test_late_fast_planner_failure_cannot_invalidate_delivered_conversatio
             del args, kwargs
             return new_goal_association("goal-identity")
 
-        async def stream_fast_advance(self, session, *, request, timeout_ms):
+        async def stream_plan_advance(self, session, *, request, timeout_ms):
             del session, timeout_ms
             yield FastPlannerStreamFailure(
                 turn_id=request.sid,
@@ -753,14 +753,14 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
             self.social_calls = 0
             self.state_seen = asyncio.Event()
 
-        async def resolve_fast_plan(self, *args, **kwargs):
+        async def resolve_plan(self, *args, **kwargs):
             await self.state_seen.wait()
             raise CognitiveStageFailure("fast_planner", {
                 "failure_class": "structured_output_validation",
                 "failure_domain": "model_contract", "retryable": False,
             })
 
-        async def stream_fast_advance(self, *args, **kwargs):
+        async def stream_plan_advance(self, *args, **kwargs):
             # The first plan fails too: a valid first plan would now be retained
             # (IndependentPlanningTests), so only a late failure of every plan
             # exercises the delivered-response containment this test protects.
@@ -831,8 +831,8 @@ async def test_silent_goal_update_keeps_delivered_initial_response_on_late_work_
         assert state.active_goal_snapshots()[0]["responsibility_status"] == "open"
 
 
-def test_umi_states_value_review_for_speech_only() -> None:
-    """Owner choice B (2026-10-12): UMI records whether requested speech would deceive."""
+def test_umi_states_value_review_for_every_result_type() -> None:
+    """UMI records whether a request would deceive or harm, whatever its result type."""
     schema = OllamaUserMeaningInterpreter._user_meaning_interpretation_response_schema(
         admitted_turn="Tell my teacher I was ill."
     )
@@ -840,5 +840,7 @@ def test_umi_states_value_review_for_speech_only() -> None:
     speech = next(item for item in branches if item["properties"]["output_mode"].get("const") == "speech")
     assert speech["properties"]["value_review"]["type"] == "boolean"
     assert "value_review" in speech["required"]
-    assert list(speech["properties"]).index("value_review") > list(speech["properties"]).index("outcome")
-    assert all("value_review" not in item["properties"] for item in branches if item is not speech)
+    for branch in branches:
+        assert branch["properties"]["value_review"]["type"] == "boolean"
+        assert list(branch["properties"]).index("value_review") > list(branch["properties"]).index("outcome")
+    assert "hurt" in speech["properties"]["value_review"]["description"]

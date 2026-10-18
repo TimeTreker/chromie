@@ -5,7 +5,6 @@ import json
 import logging
 import os
 import re
-import tempfile
 import time
 from collections import deque
 from dataclasses import dataclass, field
@@ -13,6 +12,7 @@ from pathlib import Path
 from typing import Any, Deque, Iterable, Literal, cast
 
 from shared.chromie_contracts.memory import resolve_memory_cognitive_roles
+from shared.chromie_runtime.atomic_files import atomic_write_json
 
 
 logger = logging.getLogger("chromie.orchestrator.memory")
@@ -616,28 +616,15 @@ class ProtectedDurableMemoryStore:
     def persist(self) -> None:
         if not self.enabled:
             return
-        self.path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "schema_version": self.schema_version,
             "entries": self.store.snapshot(),
         }
-        descriptor, temporary = tempfile.mkstemp(
-            prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent
-        )
-        temporary_path = Path(temporary)
         try:
-            os.fchmod(descriptor, 0o600)
-            with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
-                json.dump(payload, handle, ensure_ascii=False, sort_keys=True, indent=2)
-                handle.write("\n")
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary_path, self.path)
-            os.chmod(self.path, 0o600)
+            atomic_write_json(self.path, payload, mode=0o600)
             self.last_error = None
         except Exception as exc:
             self.last_error = f"{type(exc).__name__}: {exc}"
-            temporary_path.unlink(missing_ok=True)
             logger.error("durable_memory_persist_failed: %s", self.last_error)
             raise
 

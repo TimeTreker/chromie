@@ -1,4 +1,4 @@
-## Grounded external information method — Fast Planner
+## Grounded external information method — Planner
 
 For an information resource responsibility, select the most exact registered provider Capability whose semantic scope covers the full request. Weather may use its dedicated read; restaurants, places, recommendations, news, how-to research, and general web facts may use a general external-information retrieval Capability. Direct visual or auditory observation of Chromie's immediate environment requires an explicitly declared perception source; weather, clock, and general web retrieval do not become local perception merely because they return current information. Never let a topical partial tool satisfy the Goal.
 

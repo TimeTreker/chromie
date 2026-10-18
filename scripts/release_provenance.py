@@ -17,13 +17,14 @@ from typing import Any
 
 try:
     from evidence_io import sha256_file as sha256
+    from generate_runtime_env import MODEL_PLAN_KEYS
 except ImportError:  # imported as scripts.release_provenance
     from scripts.evidence_io import sha256_file as sha256
+    from scripts.generate_runtime_env import MODEL_PLAN_KEYS
 
 REQUIREMENT_FILES = (
     "agent/requirements.txt",
     "asr/requirements.txt",
-    "hardware/requirements.txt",
     "orchestrator/requirements.txt",
     "requirements-test.txt",
     "tts/requirements.txt",
@@ -32,6 +33,21 @@ PROJECT_IMAGE_NAMES = (
     "chromie-asr",
     "chromie-tts",
     "chromie-agent",
+)
+# Built from llm/sglang/Dockerfile by the SGLang hardware-profile overlays.
+SGLANG_IMAGE_NAME = "chromie-sglang"
+# Base images of repository-built images: (Dockerfile, its ARG, the env key
+# docker-compose.yml passes to that ARG).
+BASE_IMAGE_ARGS = (
+    ("asr/Dockerfile", "ASR_CUDA_IMAGE", "ASR_CUDA_IMAGE"),
+    ("tts_candidates/cosyvoice/Dockerfile", "CUDA_IMAGE", "TTS_CANDIDATE_CUDA_IMAGE"),
+)
+# Every Ollama model key a hardware profile may assign. The lock must name each
+# model these keys select on any Ollama profile.
+OLLAMA_ROLE_MODEL_KEYS = (
+    *MODEL_PLAN_KEYS,
+    "AGENT_SKILL_SELECTION_MODEL",
+    "TTS_COSYVOICE_OLLAMA_MODEL",
 )
 MUTABLE_TAGS = {"latest", "main", "master", "stable", "edge"}
 
@@ -147,20 +163,54 @@ def required_env(env: dict[str, str], name: str) -> str:
     return value
 
 
+def _inference_provider(env: dict[str, str]) -> str:
+    return str(env.get("AGENT_LLM_PROVIDER") or "ollama").strip().casefold()
+
+
+def project_image_names(env: dict[str, str]) -> tuple[str, ...]:
+    if _inference_provider(env) == "sglang":
+        return (*PROJECT_IMAGE_NAMES, SGLANG_IMAGE_NAME)
+    return PROJECT_IMAGE_NAMES
+
+
 def declared_images(root: Path, env: dict[str, str]) -> list[str]:
     tag = required_env(env, "CHROMIE_IMAGE_TAG")
-    images = [f"{name}:{tag}" for name in PROJECT_IMAGE_NAMES]
-    images.append(required_env(env, "OLLAMA_IMAGE"))
+    images = [f"{name}:{tag}" for name in project_image_names(env)]
+    if _inference_provider(env) != "sglang":
+        images.append(required_env(env, "OLLAMA_IMAGE"))
     images.append(env.get("PYTHON_IMAGE", "python:3.12.10-slim-bookworm"))
-    for dockerfile, key in (
-        ("asr/Dockerfile", "ASR_CUDA_IMAGE"),
-        ("tts_candidates/cosyvoice/Dockerfile", "TTS_CANDIDATE_CUDA_IMAGE"),
-    ):
+    for dockerfile, arg, key in BASE_IMAGE_ARGS:
         text = (root / dockerfile).read_text(encoding="utf-8") if (root / dockerfile).is_file() else ""
-        match = re.search(rf"^ARG {key}=([^\s]+)", text, re.MULTILINE)
+        match = re.search(rf"^ARG {arg}=([^\s]+)", text, re.MULTILINE)
         default = match.group(1) if match else ""
-        images.append(env.get(key, default))
+        images.append(env.get(key) or default)
     return [item for item in images if item]
+
+
+def effective_ollama_models(env: dict[str, str]) -> list[str]:
+    """Return the Ollama models the launchers actually run for ``env``.
+
+    Mirrors scripts/compact_cognition.sh: with the CosyVoice3 backend and
+    TTS_COSYVOICE_COMPACT_COGNITION=1 every cognitive role runs
+    TTS_COSYVOICE_OLLAMA_MODEL; Agent Skill selection keeps its own model.
+    """
+
+    backend = str(env.get("CHROMIE_TTS_BACKEND") or "cosyvoice3").strip().casefold()
+    compact = backend in {"cosyvoice", "cosyvoice3"} and (
+        str(env.get("TTS_COSYVOICE_COMPACT_COGNITION") or "1").strip() == "1"
+    )
+    if compact:
+        candidates = [env.get("TTS_COSYVOICE_OLLAMA_MODEL") or "qwen3:4b"]
+    else:
+        candidates = [env.get(key) for key in MODEL_PLAN_KEYS]
+    if str(env.get("AGENT_SKILL_SELECTION_ENABLED") or "1").strip().casefold() in {"1", "true", "yes", "on"}:
+        candidates.append(env.get("AGENT_SKILL_SELECTION_MODEL"))
+    models: list[str] = []
+    for candidate in candidates:
+        value = str(candidate or "").strip()
+        if value and value not in models:
+            models.append(value)
+    return models
 
 
 def mutable_image_errors(images: list[str]) -> list[str]:
@@ -193,9 +243,9 @@ def inspect_image(image: str) -> dict[str, Any]:
     }
 
 
-def pip_freeze(image: str) -> list[str]:
+def pip_freeze(image: str, python: str = "python") -> list[str]:
     output = subprocess.check_output(
-        ["docker", "run", "--rm", "--entrypoint", "python", image, "-m", "pip", "freeze", "--all"],
+        ["docker", "run", "--rm", "--entrypoint", python, image, "-m", "pip", "freeze", "--all"],
         text=True,
         stderr=subprocess.STDOUT,
     )
@@ -241,6 +291,8 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
 
     asr_lock = lock.get("asr", {})
     agent_models: set[str] = set()
+    role_models: set[str] = set()
+    common_values = parse_env(root / ".env.common")
     for profile in sorted((root / "env" / "profiles").glob("*.env")):
         values = parse_env(profile)
         model = values.get("ASR_MODEL")
@@ -255,6 +307,10 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
             provider = values.get("AGENT_LLM_PROVIDER", "ollama").strip().casefold()
             if provider == "ollama":
                 agent_models.add(values["AGENT_MODEL"])
+                merged = {**common_values, **values}
+                role_models.update(
+                    merged[key] for key in OLLAMA_ROLE_MODEL_KEYS if merged.get(key)
+                )
             elif provider == "sglang":
                 served = lock.get("sglang", {}).get("candidate_served_models", {})
                 configured = {
@@ -297,13 +353,25 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
         errors.append(
             "release/model-lock.json agent_models do not match maintained hardware profiles"
         )
-    inference_provider = str(common.get("AGENT_LLM_PROVIDER") or "ollama").strip().casefold()
+    locked_roles = set(ollama.get("role_models", []))
+    if role_models != locked_roles:
+        errors.append(
+            "release/model-lock.json role_models do not match the Ollama role models "
+            f"of the maintained hardware profiles: {sorted(role_models)}"
+        )
+    inference_provider = _inference_provider(common)
     if inference_provider == "ollama":
         user_meaning_interpreter_model = common.get("AGENT_USER_MEANING_INTERPRETER_MODEL")
         if user_meaning_interpreter_model and user_meaning_interpreter_model not in set(
             ollama.get("user_meaning_interpreter_models", [])
         ):
             errors.append("AGENT_USER_MEANING_INTERPRETER_MODEL is absent from release/model-lock.json")
+        unlocked = sorted(set(effective_ollama_models(common)) - locked_roles)
+        if unlocked:
+            errors.append(
+                "running Ollama model(s) are absent from release/model-lock.json role_models: "
+                + ", ".join(unlocked)
+            )
     elif inference_provider == "sglang":
         served = lock.get("sglang", {}).get("candidate_served_models", {})
         if not isinstance(served, dict) or not served:
@@ -314,7 +382,7 @@ def model_lock_errors(root: Path, env: dict[str, str] | None = None) -> list[str
                 "AGENT_USER_MEANING_INTERPRETER_MODEL",
                 "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
                 "AGENT_GOAL_ASSOCIATION_MODEL",
-                "AGENT_FAST_PLANNER_MODEL",
+                "AGENT_PLANNER_MODEL",
                 "AGENT_DELIBERATIVE_MODEL",
                 "AGENT_SKILL_SELECTION_MODEL",
             )
@@ -365,6 +433,7 @@ def collect_provenance(
         "tts/Dockerfile",
         "tts/candidate_server.py",
         "tts/candidate_provider.py",
+        "tts/process_worker.py",
         "tts/streaming_worker.py",
         "tts_candidates/cosyvoice/Dockerfile",
         "tts_candidates/cosyvoice/provider_impl.py",
@@ -395,22 +464,25 @@ def collect_provenance(
             except ValueError as exc:
                 runtime_errors.append(str(exc))
             else:
-                for name in PROJECT_IMAGE_NAMES:
+                for name in project_image_names(env):
                     image = f"{name}:{tag}"
                     try:
-                        resolved_dependencies[image] = pip_freeze(image)
+                        # Use the interpreter the SGLang Compose entrypoint runs.
+                        python = "python3" if name == SGLANG_IMAGE_NAME else "python"
+                        resolved_dependencies[image] = pip_freeze(image, python)
                     except subprocess.CalledProcessError as exc:
                         runtime_errors.append(f"could not capture pip freeze for {image}: {exc}")
         else:
             runtime_errors.append("docker executable is unavailable; image digests and resolved dependencies were not captured")
 
-        try:
-            resolved_ollama = ollama_models(
-                env.get("OLLAMA_URL", "http://127.0.0.1:11434"),
-                [env.get("AGENT_MODEL", "gemma4:e2b"), env.get("AGENT_USER_MEANING_INTERPRETER_MODEL", "qwen3:4b")],
-            )
-        except Exception as exc:  # release diagnostics should preserve all failures
-            runtime_errors.append(f"could not capture Ollama model digests: {exc}")
+        if _inference_provider(env) == "ollama":
+            try:
+                resolved_ollama = ollama_models(
+                    env.get("OLLAMA_URL", "http://127.0.0.1:11434"),
+                    effective_ollama_models(env),
+                )
+            except Exception as exc:  # release diagnostics should preserve all failures
+                runtime_errors.append(f"could not capture Ollama model digests: {exc}")
 
     complete = not source_errors and not runtime_errors
     return {

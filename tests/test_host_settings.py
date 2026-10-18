@@ -52,10 +52,10 @@ class HostSettingsSnapshotTests(unittest.TestCase):
                 "OLLAMA_NUM_CTX": "4096",
                 "AGENT_LLM_PROMPT_CHARS_PER_TOKEN_ESTIMATE": "2.5",
                 "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS": "1024",
-                "AGENT_FAST_PLANNER_MODEL": "fast-model",
-                "AGENT_FAST_PLANNER_NUM_CTX": "12288",
-                "AGENT_FAST_PLANNER_NUM_PREDICT": "512",
-                "AGENT_FAST_PLANNER_TIMEOUT_MS": "7000",
+                "AGENT_PLANNER_MODEL": "fast-model",
+                "AGENT_PLANNER_NUM_CTX": "12288",
+                "AGENT_PLANNER_NUM_PREDICT": "512",
+                "AGENT_PLANNER_TIMEOUT_MS": "7000",
             },
         )
 
@@ -63,8 +63,7 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         self.assertEqual(model.keep_alive, "8h")
         self.assertEqual(model.prompt_chars_per_token_estimate, 2.5)
         self.assertEqual(model.context_safety_margin_tokens, 1024)
-        self.assertEqual(model.ready_greeting_fallback_model, "fast-model")
-        self.assertEqual(model.ready_greeting_num_ctx, 12288)
+        self.assertFalse(hasattr(model, "ready_greeting_fallback_model"))
 
 
     def test_extended_host_collaborator_settings_are_typed_once(self) -> None:
@@ -136,6 +135,23 @@ class HostSettingsSnapshotTests(unittest.TestCase):
         )
         default = HostSettingsSnapshot.from_env(project_root=Path("/tmp"), environ={})
         self.assertEqual(settings, default)
+
+    def test_numbers_share_the_boolean_empty_value_rule(self) -> None:
+        settings = HostSettingsSnapshot.from_env(
+            project_root=Path("/tmp"),
+            environ={"ORCH_CAPABILITY_MAX_CONCURRENCY": " "},
+        )
+        default = HostSettingsSnapshot.from_env(project_root=Path("/tmp"), environ={})
+        self.assertEqual(settings, default)
+        for raw, message in (("many", "must be an integer"), ("0", "must be >= 1")):
+            with self.subTest(raw=raw), self.assertRaisesRegex(
+                HostConfigurationError,
+                f"ORCH_CAPABILITY_MAX_CONCURRENCY {message}",
+            ):
+                HostSettingsSnapshot.from_env(
+                    project_root=Path("/tmp"),
+                    environ={"ORCH_CAPABILITY_MAX_CONCURRENCY": raw},
+                )
 
     def test_invalid_choice_fails_closed_instead_of_silent_default(self) -> None:
         with self.assertRaisesRegex(

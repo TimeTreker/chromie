@@ -169,7 +169,7 @@ async def apply_pending_input_device_change(host: Any) -> bool:
             break
     host.vad.reset()
     host.input_turn_lifecycle.vad_leftover = b""
-    duck_state = host._playback_state()
+    duck_state = host.playback_delivery
     if duck_state.output_duck_generation is not None:
         # Local import avoids making the audio-device policy own playback
         # transport construction while still releasing an old-device duck.

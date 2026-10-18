@@ -2,18 +2,12 @@
 
 ## Status
 
-**Implementation:** ownership migration exists; known contract conflicts remain in the audit.
-
-**Automatic verification:** the canonical local gate currently fails; existing source
-tests and retained scenarios cover diagnostic operation, validated apply, honest
-Planner limitation, trusted terminal host validation, atomic Goal-state application,
-SC communication projection, fail-closed disablement, and evidence classification.
-
-**Target validation:** open. This documentation reconciliation adds no live model-stack,
-MuJoCo or physical evidence; retained revision-bound proof belongs in Status/Handoff.
-
-**Deployment state:** not established. This rollout does not widen
-simulator, microphone, speaker, or physical-robot support claims.
+Current implementation, automatic verification, target validation and deployment
+state are owned by [Current Status](STATUS.md). Source tests and retained scenarios
+cover diagnostic operation, validated apply, honest Planner limitation, trusted
+terminal host validation, atomic Goal-state application, SC communication
+projection, fail-closed disablement, and evidence classification. This rollout does
+not widen simulator, microphone, speaker, or physical-robot support claims.
 
 This document is the operational companion to
 [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md).
@@ -119,15 +113,14 @@ The defaults are:
 ```env
 ORCH_COGNITIVE_RUNTIME_TIMEOUT_MS=300000
 ORCH_GOAL_ASSOCIATION_TIMEOUT_MS=65000
-ORCH_FAST_PLANNER_TIMEOUT_MS=65000
+ORCH_PLANNER_TIMEOUT_MS=65000
 ORCH_DELIBERATIVE_TIMEOUT_MS=125000  # deliberative SC/Reflection deadline
 ```
 
 These development watchdogs bound one admitted semantic workflow while the selected
 model/profile remains unqualified; they do not replace or satisfy the stricter Charter
 latency targets for first useful speech. A target miss remains a retained failure even
-when the workflow later completes. There is one Planner pass (the Deep Planner was
-retired on 2026-10-11). It may regenerate once only for a mechanically malformed DTO.
+when the workflow later completes. There is one Planner pass. It may regenerate once only for a mechanically malformed DTO.
 Semantic rejection is terminal, and Host validation cannot spend the remaining runtime
 budget on another semantic planning pass.
 
@@ -259,7 +252,7 @@ A record includes:
 
 - mode, status, and lane;
 - Goal Association result;
-- Fast and terminal plan summaries;
+- streamed and terminal plan summaries;
 - Goal satisfaction;
 - response-composition status and plan fingerprint;
 - trusted interaction skill IDs;
@@ -322,7 +315,7 @@ The retained `cognitive_runtime` scenario family covers:
 
 ### Chat apply
 
-A complete Fast response becomes the authoritative chat interaction without an
+A complete Social Cognition reply becomes the authoritative chat interaction without an
 effectful skill.
 
 ### Compound walk-and-blink alternative
@@ -462,7 +455,7 @@ explicitly invoked and likewise grants no execution authority.
 Before widening the enabled provider/capability surface, review:
 
 1. Does Goal Association preserve existing Goals instead of creating duplicates?
-2. Do Fast plans apply only with complete high-confidence coverage?
+2. Do Plans apply only with complete high-confidence coverage?
 3. Do compound Goals that cannot be fully planned end honestly without leaking partial skills?
 4. Does the Planner avoid semantic replanning and DTO regeneration, failing closed before terminal Host validation?
 5. Are material alternatives held for request-bound approval?

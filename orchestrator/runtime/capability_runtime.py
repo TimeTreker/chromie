@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import inspect
 import copy
 import hashlib
 import json
@@ -9,7 +8,6 @@ import logging
 from collections import deque
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Literal, Protocol
 from uuid import uuid4
@@ -17,10 +15,10 @@ from uuid import uuid4
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from shared.chromie_runtime import ResourceArbiter
-from orchestrator.runtime.scheduler import CoordinatedStart, CoordinatedStartError, ExecutionStart, current_execution_start
+from orchestrator.runtime.scheduler import CoordinatedStart, CoordinatedStartError, ExecutionStart
 from contextlib import nullcontext
 from shared.chromie_contracts.execution_outcome import ClaimQualificationPolicy
-from shared.chromie_contracts.json_schema import json_schema_validation_errors
+from shared.chromie_contracts.json_schema import require_json_schema as _validate_json_schema
 from shared.chromie_contracts.interaction import (
     CapabilityIdentityModel,
     CapabilityRequest,
@@ -29,26 +27,15 @@ from shared.chromie_contracts.interaction import (
     CapabilityTraceEvent,
     InteractionResponse,
     InteractionSpeech,
-    MEDIA_CAPABILITY_IDS,
-    MediaPlaybackEvidence,
-    MediaProviderDeclaration,
     VOCAL_PERFORMANCE_CAPABILITY_ID,
-    VOCAL_MODES,
-    VocalPerformanceDelivery,
-    VocalProviderDeclaration,
     reject_forbidden_low_level_fields,
-    media_capability_input_schema,
-    media_capability_output_schema,
-    vocal_performance_input_schema,
-    vocal_performance_output_schema,
 )
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
     CancellationDispatchReceipt,
-    CancellationProviderFailure,
-    CancellationRequestBinding,
     CancellationScope,
 )
+from orchestrator.runtime import capability_cancellation
 
 def schema_valid_completion_evidence_policy(
     *,
@@ -140,7 +127,6 @@ _RESULT_AUTHORITY_METADATA_KEYS = (
 )
 
 
-
 class CapabilityDefinition(CapabilityIdentityModel):
     version: str = Field(default="0.1.0", min_length=1)
     provider_id: str = Field(min_length=1)
@@ -188,7 +174,7 @@ class CapabilityDefinition(CapabilityIdentityModel):
         return self
 
 
-class CapabilityRegistry:
+class CapabilityDefinitionRegistry:
     def __init__(self) -> None:
         self._capabilities: dict[str, CapabilityDefinition] = {}
 
@@ -260,7 +246,6 @@ class CapabilityRegistry:
                     }
                 )
         self._capabilities = updated
-
 
 
 class CapabilityExecutionContext(BaseModel):
@@ -409,16 +394,10 @@ class CapabilityRuntimeExecutionObservation(BaseModel):
     prepared_planner_work: list[dict[str, Any]] = Field(default_factory=list)
 
 
-@dataclass(frozen=True)
-class _CancellationRule:
-    directive: CancellationDirective
-    effective_scope: CancellationScope
-
-
 class CapabilityRuntime:
     def __init__(
         self,
-        registry: CapabilityRegistry,
+        registry: CapabilityDefinitionRegistry,
         *,
         max_concurrency: int = 8,
         resource_arbiter: ResourceArbiter | None = None,
@@ -448,7 +427,7 @@ class CapabilityRuntime:
             str,
             dict[str, tuple[CapabilityRequest, CapabilityDefinition]],
         ] = {}
-        self._cancellation_rules: dict[str, list[_CancellationRule]] = {}
+        self._cancellation_rules: dict[str, list[capability_cancellation.CancellationRule]] = {}
         self._prepared_planner_work: dict[str, list[dict[str, Any]]] = {}
         self.goal_state_provider: Callable[[], list[dict[str, Any]]] | None = None
         self._goal_state_versions: dict[str, str] = {}
@@ -527,7 +506,7 @@ class CapabilityRuntime:
                 metadata = request.metadata if isinstance(request.metadata, dict) else {}
                 if not self._request_affects_planning_state(request):
                     continue
-                if not (goals.intersection(self._request_goal_ids(request)) or metadata.get("turn_id") == turn_id):
+                if not (goals.intersection(capability_cancellation.request_goal_ids(request)) or metadata.get("turn_id") == turn_id):
                     continue
                 active = self._active.get((interaction_id, request_id))
                 work[interaction_id + "/" + request_id] = {
@@ -887,7 +866,7 @@ class CapabilityRuntime:
                 "capability_version": definition.version,
                 "args": dict(request.args),
                 "timing": request.timing,
-                "source_goal_ids": sorted(self._request_goal_ids(request)),
+                "source_goal_ids": sorted(capability_cancellation.request_goal_ids(request)),
                 "canonical_plan_id": str(
                     request.metadata.get("canonical_plan_id") or ""
                 ),
@@ -1096,7 +1075,7 @@ class CapabilityRuntime:
                     scopes = {
                         "goal:" + goal
                         for request in planning_requests
-                        for goal in self._request_goal_ids(request)
+                        for goal in capability_cancellation.request_goal_ids(request)
                     }
                     scopes.update(
                         "turn:" + str(request.metadata["turn_id"])
@@ -1401,7 +1380,8 @@ class CapabilityRuntime:
         reason_code = str(result.reason_code or "")
         cancellation_scope = ""
         if reason_code == "cancelled_before_start":
-            rule = self._matching_cancellation_rule(
+            rule = capability_cancellation.matching_cancellation_rule(
+                self,
                 interaction_id,
                 request,
                 definition,
@@ -1440,598 +1420,7 @@ class CapabilityRuntime:
         self,
         directive: CancellationDirective,
     ) -> CancellationDispatchReceipt:
-        """Select active and queued work using trusted runtime bindings."""
-
-        requested_scope = directive.requested_scope
-        async with self._active_lock:
-            known_interactions = {
-                *self._open_interactions,
-                *self._scheduled,
-                *(key[0] for key in self._active),
-            }
-            if requested_scope in {
-                "output_only",
-                "current_interaction",
-                "specific_goal",
-            }:
-                base_interaction_ids = (
-                    [directive.foreground_interaction_id]
-                    if directive.foreground_interaction_id in known_interactions
-                    else []
-                )
-            else:
-                base_interaction_ids = sorted(known_interactions)
-
-            base_scheduled_items: list[tuple[str, CapabilityRequest, CapabilityDefinition]] = []
-            for interaction_id in base_interaction_ids:
-                for request, definition in self._scheduled.get(
-                    interaction_id,
-                    {},
-                ).values():
-                    base_scheduled_items.append((interaction_id, request, definition))
-
-            effective_scope = requested_scope
-            widened = False
-            widening_reason = ""
-            stale_binding_request_keys: set[tuple[str, str]] = set()
-            shared_owner_conflict_request_keys: set[tuple[str, str]] = set()
-            base_selected: list[tuple[str, CapabilityRequest, CapabilityDefinition]] = []
-            for interaction_id, request, definition in base_scheduled_items:
-                if requested_scope == "specific_goal":
-                    binding = self._specific_goal_binding(
-                        directive,
-                        request,
-                    )
-                    if binding == "stale":
-                        stale_binding_request_keys.add((interaction_id, request.request_id))
-                        continue
-                    if binding == "shared_owner_conflict":
-                        shared_owner_conflict_request_keys.add((interaction_id, request.request_id))
-                        continue
-                    if binding == "match":
-                        base_selected.append((interaction_id, request, definition))
-                    continue
-                if self._scope_matches_definition(
-                    requested_scope,
-                    definition,
-                ):
-                    base_selected.append((interaction_id, request, definition))
-
-            # Provider-global cancellation has collateral effect only when an
-            # eligible provider request has actually started. Arbiter waiters
-            # and not-yet-started requests are cancelled locally and must not
-            # trigger a provider call or scope widening.
-            global_domains_required: set[CancellationDomain] = set()
-            for interaction_id, request, definition in base_selected:
-                active_item = self._active.get((interaction_id, request.request_id))
-                if (
-                    active_item is None
-                    or (active_item[0].done() and active_item[3].provider_cancel_future is None)
-                    or not active_item[3].provider_started
-                    or not request.cancellable
-                    or not definition.interruptible
-                    or not self._provider_cancellation_is_global(definition)
-                ):
-                    continue
-                global_domains_required.update(definition.cancellation_domains)
-
-            domain_scope: dict[CancellationDomain, CancellationScope] = {
-                "output": "output_only",
-                "media_output": "media_output",
-                "embodied_motion": "embodied_motion",
-            }
-            all_scheduled_items = [
-                (interaction_id, request, definition)
-                for interaction_id in sorted(known_interactions)
-                for request, definition in self._scheduled.get(
-                    interaction_id,
-                    {},
-                ).values()
-            ]
-            selected_by_key = {
-                (interaction_id, request.request_id): (
-                    interaction_id,
-                    request,
-                    definition,
-                )
-                for interaction_id, request, definition in base_selected
-            }
-            selection_scope_by_key: dict[
-                tuple[str, str],
-                CancellationScope,
-            ] = {key: requested_scope for key in selected_by_key}
-            rules_to_install: dict[
-                str,
-                list[_CancellationRule],
-            ] = {}
-
-            if global_domains_required and requested_scope != "global_emergency":
-                if directive.target_request_ids:
-                    selected_keys = {
-                        (interaction_id, request.request_id)
-                        for interaction_id, request, _definition in base_selected
-                    }
-                    collateral = any(
-                        (interaction_id, request.request_id) not in selected_keys
-                        and global_domains_required.intersection(definition.cancellation_domains)
-                        for interaction_id, request, definition in all_scheduled_items
-                    )
-                    if collateral:
-                        raise ValueError("scoped Planner cancellation cannot widen to other Work")
-                widened = True
-                ordered_domains = sorted(global_domains_required)
-                widening_reason = (
-                    "provider_supports_only_global_embodied_motion_cancel"
-                    if ordered_domains == ["embodied_motion"]
-                    else "provider_supports_only_global_output_cancel"
-                    if ordered_domains == ["output"]
-                    else (
-                        "provider_supports_only_global_domain_cancel:" + ",".join(ordered_domains)
-                    )
-                )
-                global_scopes = {domain_scope[item] for item in global_domains_required}
-                if requested_scope == "specific_goal" and len(global_scopes) == 1:
-                    effective_scope = next(iter(global_scopes))
-                for interaction_id, request, definition in all_scheduled_items:
-                    matching_domains = global_domains_required.intersection(
-                        definition.cancellation_domains
-                    )
-                    if not matching_domains:
-                        continue
-                    key = (interaction_id, request.request_id)
-                    selected_by_key[key] = (
-                        interaction_id,
-                        request,
-                        definition,
-                    )
-                    item_scope = max(
-                        (domain_scope[item] for item in matching_domains),
-                        key=self._scope_priority,
-                    )
-                    selection_scope_by_key[key] = self._dominant_scope(
-                        selection_scope_by_key.get(key, "none"),
-                        item_scope,
-                    )
-                for interaction_id in sorted(known_interactions):
-                    for item_scope in sorted(
-                        global_scopes,
-                        key=self._scope_priority,
-                    ):
-                        rules_to_install.setdefault(
-                            interaction_id,
-                            [],
-                        ).append(
-                            _CancellationRule(
-                                directive=directive,
-                                effective_scope=item_scope,
-                            )
-                        )
-                for interaction_id in base_interaction_ids:
-                    rules_to_install.setdefault(
-                        interaction_id,
-                        [],
-                    ).append(
-                        _CancellationRule(
-                            directive=directive,
-                            effective_scope=requested_scope,
-                        )
-                    )
-            else:
-                specific_goal_bound_to_open_interaction = (
-                    requested_scope == "specific_goal" and bool(base_interaction_ids)
-                )
-                should_install = (
-                    bool(base_selected)
-                    or (
-                        requested_scope
-                        in {
-                            "output_only",
-                            "media_output",
-                            "embodied_motion",
-                            "current_interaction",
-                            "global_emergency",
-                        }
-                    )
-                    or specific_goal_bound_to_open_interaction
-                )
-                if should_install:
-                    for interaction_id in base_interaction_ids:
-                        rules_to_install.setdefault(
-                            interaction_id,
-                            [],
-                        ).append(
-                            _CancellationRule(
-                                directive=directive,
-                                effective_scope=requested_scope,
-                            )
-                        )
-
-            for interaction_id, new_rules in rules_to_install.items():
-                rules = self._cancellation_rules.setdefault(
-                    interaction_id,
-                    [],
-                )
-                for rule in new_rules:
-                    if rule not in rules:
-                        rules.append(rule)
-
-            completed_active_keys = {
-                key
-                for key, item in self._active.items()
-                if (item[0].done() and item[3].provider_cancel_future is None)
-            }
-            for key in completed_active_keys:
-                selected_by_key.pop(key, None)
-                selection_scope_by_key.pop(key, None)
-
-            selected = list(selected_by_key.values())
-            selected_keys = set(selected_by_key)
-            active_selected = [
-                (
-                    key,
-                    item,
-                    selection_scope_by_key[key],
-                )
-                for key, item in self._active.items()
-                if (
-                    key in selected_keys
-                    and (not item[0].done() or item[3].provider_cancel_future is not None)
-                )
-            ]
-
-            locally_cancelled_items: list[
-                tuple[
-                    asyncio.Task[CapabilityResult],
-                    CapabilityRequest,
-                    CapabilityDefinition,
-                    CapabilityExecutionContext,
-                ]
-            ] = []
-            provider_cancel_items: list[
-                tuple[
-                    asyncio.Task[CapabilityResult],
-                    CapabilityRequest,
-                    CapabilityDefinition,
-                    CapabilityExecutionContext,
-                ]
-            ] = []
-            non_interruptible_keys: set[tuple[str, str]] = set()
-            active_keys: set[tuple[str, str]] = set()
-            for key, item, item_scope in active_selected:
-                task, request, definition, context = item
-                if task.done():
-                    # The local provider coroutine may already have observed
-                    # task cancellation while _run_one still awaits the
-                    # provider-cancel dispatch assigned to this context.
-                    # Keep that exact dispatch visible to concurrent callers.
-                    active_keys.add(key)
-                    context.cancellation_scope = self._dominant_scope(
-                        context.cancellation_scope,
-                        item_scope,
-                    )
-                    context.cancellation_reason_code = f"cancelled_{context.cancellation_scope}"
-                    provider_cancel_items.append(item)
-                    continue
-                if context.provider_started:
-                    active_keys.add(key)
-                if not context.provider_started:
-                    context.cancellation_scope = self._dominant_scope(
-                        context.cancellation_scope,
-                        item_scope,
-                    )
-                    context.cancellation_reason_code = f"cancelled_{context.cancellation_scope}"
-                    task.cancel()
-                    locally_cancelled_items.append(item)
-                elif request.cancellable and definition.interruptible:
-                    context.cancellation_scope = self._dominant_scope(
-                        context.cancellation_scope,
-                        item_scope,
-                    )
-                    context.cancellation_reason_code = f"cancelled_{context.cancellation_scope}"
-                    task.cancel()
-                    locally_cancelled_items.append(item)
-                    provider_cancel_items.append(item)
-                else:
-                    non_interruptible_keys.add(key)
-
-            provider_groups: dict[
-                tuple[str, ...],
-                list[
-                    tuple[
-                        asyncio.Task[CapabilityResult],
-                        CapabilityRequest,
-                        CapabilityDefinition,
-                        CapabilityExecutionContext,
-                    ]
-                ],
-            ] = {}
-            for item in provider_cancel_items:
-                _, request, definition, context = item
-                provider_activity_id = str(
-                    context.provider_state.get("provider_activity_id") or ""
-                ).strip()
-                if provider_activity_id:
-                    group_key = (
-                        "provider_activity",
-                        definition.provider_id,
-                        provider_activity_id,
-                    )
-                elif self._provider_cancellation_is_global(definition):
-                    group_key = (
-                        "global_domain",
-                        definition.provider_id,
-                        *sorted(definition.cancellation_domains),
-                    )
-                else:
-                    group_key = (
-                        "request",
-                        context.interaction_id,
-                        request.request_id,
-                    )
-                provider_groups.setdefault(group_key, []).append(item)
-
-            provider_group_futures: list[
-                tuple[
-                    list[
-                        tuple[
-                            asyncio.Task[CapabilityResult],
-                            CapabilityRequest,
-                            CapabilityDefinition,
-                            CapabilityExecutionContext,
-                        ]
-                    ],
-                    asyncio.Future[str | None],
-                ]
-            ] = []
-            for group_items in provider_groups.values():
-                first_future = group_items[0][3].provider_cancel_future
-                same_future_for_all = first_future is not None and all(
-                    item[3].provider_cancel_future is first_future for item in group_items
-                )
-                same_source_for_all = all(
-                    item[3].provider_cancel_source_turn_id == directive.source_turn_id
-                    for item in group_items
-                )
-                prior_dispatch_succeeded = all(
-                    item[3].provider_cancel_error is None for item in group_items
-                )
-                same_dispatch = same_future_for_all and (
-                    not first_future.done() or same_source_for_all or prior_dispatch_succeeded
-                )
-                existing_future = first_future if same_dispatch else None
-                if existing_future is None:
-                    representative = group_items[0]
-                    _, request, definition, context = representative
-                    existing_future = asyncio.create_task(
-                        self._invoke_provider_cancel(
-                            self._providers[definition.provider_id],
-                            request,
-                            definition,
-                            tuple(item[3] for item in group_items),
-                        )
-                    )
-                for item in group_items:
-                    item[3].provider_cancel_requested = True
-                    item[3].provider_cancel_future = existing_future
-                    item[3].provider_cancel_source_turn_id = directive.source_turn_id
-                provider_group_futures.append((group_items, existing_future))
-
-            interaction_ids = sorted(
-                {
-                    *base_interaction_ids,
-                    *rules_to_install,
-                }
-            )
-            # Preserve the trusted plan/scheduling order in cancellation
-            # evidence. Request IDs are opaque digests and must never become a
-            # semantic ordering key; changing a DTO field name may change those
-            # digests without changing the Plan.
-            selected_binding_order = tuple(selected_by_key)
-            active_binding_order = tuple(
-                key for key in selected_binding_order if key in active_keys
-            )
-            queued_binding_order = tuple(
-                key for key in selected_binding_order if key not in active_keys
-            )
-
-        provider_results = await asyncio.gather(
-            *(asyncio.shield(future) for _, future in provider_group_futures),
-            return_exceptions=True,
-        )
-        provider_failures: dict[tuple[str, str], str] = {}
-        for (group_items, _), result in zip(
-            provider_group_futures,
-            provider_results,
-            strict=True,
-        ):
-            if isinstance(result, BaseException):
-                error = f"{type(result).__name__}:{result}"
-            else:
-                error = str(result or "")
-            if not error:
-                continue
-            for _, request, _, context in group_items:
-                provider_failures[(context.interaction_id, request.request_id)] = error
-        await asyncio.gather(
-            *(item[0] for item in locally_cancelled_items),
-            return_exceptions=True,
-        )
-        for _, request, _, context in provider_cancel_items:
-            if context.provider_cancel_error:
-                provider_failures[(context.interaction_id, request.request_id)] = (
-                    context.provider_cancel_error
-                )
-
-        affected_goal_ids = {
-            goal_id for _, request, _ in selected for goal_id in self._request_goal_ids(request)
-        }
-        cancel_requested_keys = {
-            (context.interaction_id, request.request_id)
-            for _, request, _, context in provider_cancel_items
-        }
-
-        def binding(key: tuple[str, str]) -> CancellationRequestBinding:
-            return CancellationRequestBinding(
-                interaction_id=key[0],
-                request_id=key[1],
-            )
-
-        return CancellationDispatchReceipt(
-            source_turn_id=directive.source_turn_id,
-            requested_scope=requested_scope,
-            effective_scope=effective_scope,
-            interaction_ids=tuple(sorted(interaction_ids)),
-            target_goal_ids=directive.target_goal_ids,
-            expected_plan_id=directive.expected_plan_id,
-            expected_plan_fingerprint=(directive.expected_plan_fingerprint),
-            affected_goal_ids=tuple(sorted(affected_goal_ids)),
-            selected_request_bindings=tuple(binding(key) for key in selected_binding_order),
-            active_request_bindings=tuple(binding(key) for key in active_binding_order),
-            queued_request_bindings=tuple(binding(key) for key in queued_binding_order),
-            cancel_requested_request_bindings=tuple(
-                binding(key) for key in sorted(cancel_requested_keys)
-            ),
-            non_interruptible_request_bindings=tuple(
-                binding(key) for key in sorted(non_interruptible_keys)
-            ),
-            shared_owner_conflict_request_bindings=tuple(
-                binding(key) for key in sorted(shared_owner_conflict_request_keys)
-            ),
-            stale_binding_request_bindings=tuple(
-                binding(key) for key in sorted(stale_binding_request_keys)
-            ),
-            provider_cancel_failure_evidence=tuple(
-                CancellationProviderFailure(
-                    interaction_id=interaction_id,
-                    request_id=request_id,
-                    error=provider_failures[(interaction_id, request_id)],
-                )
-                for interaction_id, request_id in sorted(provider_failures)
-            ),
-            widened=widened,
-            widening_reason=widening_reason,
-        )
-
-    @staticmethod
-    def _scope_matches_definition(
-        scope: CancellationScope,
-        definition: CapabilityDefinition,
-    ) -> bool:
-        if scope in {"current_interaction", "global_emergency"}:
-            return True
-        if scope == "output_only":
-            return "output" in definition.cancellation_domains
-        if scope == "media_output":
-            return "media_output" in definition.cancellation_domains
-        if scope == "embodied_motion":
-            return "embodied_motion" in definition.cancellation_domains
-        return False
-
-    @staticmethod
-    def _provider_cancellation_is_global(
-        definition: CapabilityDefinition,
-    ) -> bool:
-        return (
-            str(definition.metadata.get("cancellation_granularity") or "request") == "global_domain"
-        )
-
-    @staticmethod
-    def _scope_priority(scope: CancellationScope) -> int:
-        return {
-            "none": 0,
-            "output_only": 10,
-            "media_output": 15,
-            "specific_goal": 20,
-            "embodied_motion": 25,
-            "current_interaction": 30,
-            "global_emergency": 40,
-        }[scope]
-
-    @classmethod
-    def _dominant_scope(
-        cls,
-        first: CancellationScope,
-        second: CancellationScope,
-    ) -> CancellationScope:
-        return second if cls._scope_priority(second) >= cls._scope_priority(first) else first
-
-    @staticmethod
-    def _request_goal_ids(request: CapabilityRequest) -> set[str]:
-        values: set[str] = set()
-        for metadata in (
-            request.metadata,
-            request.args.get("metadata"),
-        ):
-            if not isinstance(metadata, dict):
-                continue
-            for key in ("source_goal_ids", "covers_goal_ids"):
-                raw = metadata.get(key)
-                if isinstance(raw, str):
-                    raw = [raw]
-                if not isinstance(raw, (list, tuple)):
-                    continue
-                values.update(str(item).strip() for item in raw if str(item).strip())
-        return values
-
-    @classmethod
-    def _specific_goal_binding(
-        cls,
-        directive: CancellationDirective,
-        request: CapabilityRequest,
-    ) -> Literal[
-        "match",
-        "no_match",
-        "stale",
-        "shared_owner_conflict",
-    ]:
-        if directive.target_request_ids and request.request_id not in directive.target_request_ids:
-            return "no_match"
-        goal_ids = cls._request_goal_ids(request)
-        targets = set(directive.target_goal_ids)
-        if not goal_ids.intersection(targets):
-            return "no_match"
-        metadata = request.metadata
-        if str(metadata.get("canonical_plan_id") or "") != str(
-            directive.expected_plan_id or ""
-        ) or str(metadata.get("canonical_plan_fingerprint") or "") != str(
-            directive.expected_plan_fingerprint or ""
-        ):
-            return "stale"
-        if not goal_ids.issubset(targets):
-            return "shared_owner_conflict"
-        return "match"
-
-    def _matching_cancellation_rule(
-        self,
-        interaction_id: str,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-    ) -> _CancellationRule | None:
-        matching: list[tuple[int, _CancellationRule]] = []
-        for index, rule in enumerate(self._cancellation_rules.get(interaction_id, ())):
-            if rule.effective_scope == "specific_goal":
-                if (
-                    self._specific_goal_binding(
-                        rule.directive,
-                        request,
-                    )
-                    == "match"
-                ):
-                    matching.append((index, rule))
-            elif self._scope_matches_definition(
-                rule.effective_scope,
-                definition,
-            ):
-                matching.append((index, rule))
-        if not matching:
-            return None
-        return max(
-            matching,
-            key=lambda item: (
-                self._scope_priority(item[1].effective_scope),
-                item[0],
-            ),
-        )[1]
+        return await capability_cancellation.cancel_scope(self, directive)
 
     def scheduler_status(self) -> CapabilityRuntimeSchedulerStatus:
         snapshot = self._resource_arbiter.snapshot()
@@ -2531,7 +1920,8 @@ class CapabilityRuntime:
                 rule
                 for (request, definition) in items
                 if (
-                    rule := self._matching_cancellation_rule(
+                    rule := capability_cancellation.matching_cancellation_rule(
+                        self,
                         interaction_id,
                         request,
                         definition,
@@ -2542,7 +1932,7 @@ class CapabilityRuntime:
             if cancellation_rules:
                 scope = max(
                     (rule.effective_scope for rule in cancellation_rules),
-                    key=self._scope_priority,
+                    key=capability_cancellation.scope_priority,
                 )
                 interaction_scheduled = self._scheduled.get(interaction_id)
                 if interaction_scheduled is not None:
@@ -2646,7 +2036,7 @@ class CapabilityRuntime:
                 if context.cancellation_scope != "none"
             ]
             if active_scopes:
-                scope = max(active_scopes, key=self._scope_priority)
+                scope = max(active_scopes, key=capability_cancellation.scope_priority)
                 cancel_error = await self._cancel_provider(
                     provider,
                     items[0][0],
@@ -2983,7 +2373,8 @@ class CapabilityRuntime:
         active_key = (interaction_id, request.request_id)
         prestart_result: CapabilityResult | None = None
         async with self._active_lock:
-            cancellation_rule = self._matching_cancellation_rule(
+            cancellation_rule = capability_cancellation.matching_cancellation_rule(
+                self,
                 interaction_id,
                 request,
                 definition,
@@ -3283,690 +2674,3 @@ class CapabilityRuntime:
         return error
 
 
-SpeechHandler = Callable[[dict[str, Any]], dict[str, Any] | Awaitable[dict[str, Any]]]
-SpeechCancelHandler = Callable[
-    [CapabilityRequest, dict[str, Any]],
-    None | Awaitable[None],
-]
-
-VocalPerformanceHandler = Callable[
-    [dict[str, Any]],
-    VocalPerformanceDelivery
-    | dict[str, Any]
-    | Awaitable[VocalPerformanceDelivery | dict[str, Any]],
-]
-VocalPerformanceCancelHandler = Callable[
-    [CapabilityRequest, dict[str, Any]],
-    None | Awaitable[None],
-]
-
-MediaPlaybackHandler = Callable[
-    [str, dict[str, Any]],
-    MediaPlaybackEvidence | dict[str, Any] | Awaitable[MediaPlaybackEvidence | dict[str, Any]],
-]
-MediaPlaybackCancelHandler = Callable[
-    [CapabilityRequest, dict[str, Any]],
-    None | Awaitable[None],
-]
-
-
-class VocalPerformanceCapabilityProvider:
-    """Adapt one qualified vocal backend to the exact public Capability.
-
-    The backend may change, but its declaration and execution evidence are
-    checked here before a completed result can cross the Trusted Capability
-    Runtime boundary. Unsupported modes return a typed refusal rather than
-    reaching the backend or being downgraded to ordinary speech.
-    """
-
-    def __init__(
-        self,
-        declaration: VocalProviderDeclaration,
-        handler: VocalPerformanceHandler,
-        cancel_handler: VocalPerformanceCancelHandler | None = None,
-    ) -> None:
-        self.declaration = declaration
-        self.provider_id = declaration.provider_id
-        self._handler = handler
-        self._cancel_handler = cancel_handler
-        self.cancelled_request_ids: set[str] = set()
-
-    def _output(
-        self,
-        *,
-        requested_mode: str,
-        completed: bool,
-        delivered_mode: str | None = None,
-        delivery: VocalPerformanceDelivery | None = None,
-        reason: str = "",
-    ) -> dict[str, Any]:
-        evidence = self.declaration.mode_evidence.get(requested_mode)  # type: ignore[arg-type]
-        return {
-            "completed": completed,
-            "requested_mode": requested_mode,
-            "delivered_mode": delivered_mode,
-            "provider_id": self.provider_id,
-            "provider_contract_version": self.declaration.contract_version,
-            "evidence_level": evidence.level if evidence is not None else None,
-            "provider_evidence_refs": (
-                list(evidence.artifact_refs) if evidence is not None else []
-            ),
-            "delivery_evidence_id": (delivery.delivery_evidence_id if delivery is not None else ""),
-            "playback_started": bool(delivery is not None and delivery.playback_started),
-            "playback_completed": bool(delivery is not None and delivery.playback_completed),
-            "audio_duration_ms": (delivery.audio_duration_ms if delivery is not None else 0.0),
-            "sample_format": (delivery.sample_format if delivery is not None else ""),
-            "sample_rate": delivery.sample_rate if delivery is not None else 0,
-            "timing_marks_emitted": (
-                list(delivery.timing_marks_emitted) if delivery is not None else []
-            ),
-            "reason": reason,
-        }
-
-    async def execute(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> CapabilityResult:
-        requested_mode = str(request.args.get("mode") or "").strip()
-        if requested_mode not in self.declaration.supported_modes:
-            return CapabilityResult(
-                request_id=request.request_id,
-                capability_id=request.capability_id,
-                capability_version=definition.version,
-                status="refused",
-                provider_id=self.provider_id,
-                output=self._output(
-                    requested_mode=requested_mode,
-                    completed=False,
-                    reason=("requested vocal mode is not advertised by this qualified provider"),
-                ),
-                reason_code="vocal_mode_unavailable",
-                message=(
-                    f"vocal mode {requested_mode!r} is unavailable; supported "
-                    f"modes are {self.declaration.supported_modes}"
-                ),
-            )
-
-        try:
-            raw = self._handler(dict(request.args))
-            raw_delivery = await raw if inspect.isawaitable(raw) else raw
-            delivery = (
-                raw_delivery
-                if isinstance(raw_delivery, VocalPerformanceDelivery)
-                else VocalPerformanceDelivery.model_validate(raw_delivery)
-            )
-            invalid_reason = ""
-            if delivery.delivered_mode != requested_mode:
-                invalid_reason = "provider returned a different vocal mode"
-            elif not delivery.playback_started or not delivery.playback_completed:
-                invalid_reason = "audible playback did not complete"
-            elif delivery.sample_format not in self.declaration.sample_formats:
-                invalid_reason = "provider returned an undeclared sample format"
-            elif delivery.sample_rate not in self.declaration.sample_rates:
-                invalid_reason = "provider returned an undeclared sample rate"
-            elif not set(delivery.timing_marks_emitted).issubset(
-                self.declaration.timing_mark_types
-            ):
-                invalid_reason = "provider returned undeclared timing marks"
-            if invalid_reason:
-                return CapabilityResult(
-                    request_id=request.request_id,
-                    capability_id=request.capability_id,
-                    capability_version=definition.version,
-                    status="failed",
-                    provider_id=self.provider_id,
-                    output=self._output(
-                        requested_mode=requested_mode,
-                        completed=False,
-                        delivered_mode=delivery.delivered_mode,
-                        delivery=delivery,
-                        reason=invalid_reason,
-                    ),
-                    reason_code="invalid_vocal_delivery_evidence",
-                    message=invalid_reason,
-                )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            return CapabilityResult(
-                request_id=request.request_id,
-                capability_id=request.capability_id,
-                capability_version=definition.version,
-                status="failed",
-                provider_id=self.provider_id,
-                output=self._output(
-                    requested_mode=requested_mode,
-                    completed=False,
-                    reason="provider did not return valid vocal delivery evidence",
-                ),
-                reason_code="invalid_vocal_delivery_evidence",
-                message=str(exc) or type(exc).__name__,
-            )
-
-        return CapabilityResult(
-            request_id=request.request_id,
-            capability_id=request.capability_id,
-            capability_version=definition.version,
-            status="completed",
-            provider_id=self.provider_id,
-            output=self._output(
-                requested_mode=requested_mode,
-                completed=True,
-                delivered_mode=delivery.delivered_mode,
-                delivery=delivery,
-            ),
-        )
-
-    async def cancel(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> None:
-        self.cancelled_request_ids.add(request.request_id)
-        if self._cancel_handler is None:
-            return
-        raw = self._cancel_handler(request, dict(context.provider_state))
-        if inspect.isawaitable(raw):
-            await raw
-
-
-class MediaPlaybackCapabilityProvider:
-    """Adapt one qualified peer media backend to ``chromie.media.*``.
-
-    Media is Activity work even though it shares a physical speaker with
-    Vocal. Every result retains the exact operation, persistent playback
-    identity, bounded progress, and the declared ducking policy.
-    """
-
-    _ALLOWED_STATES = {
-        "play": {"playing", "completed"},
-        "pause": {"paused"},
-        "resume": {"playing", "completed"},
-        "seek": {"playing", "paused", "completed"},
-        "stop": {"stopped", "completed"},
-        "volume": {"playing", "paused", "completed"},
-        "status": {"starting", "playing", "paused", "completed", "stopped", "failed"},
-    }
-
-    def __init__(
-        self,
-        declaration: MediaProviderDeclaration,
-        handler: MediaPlaybackHandler,
-        cancel_handler: MediaPlaybackCancelHandler | None = None,
-    ) -> None:
-        self.declaration = declaration
-        self.provider_id = declaration.provider_id
-        self._handler = handler
-        self._cancel_handler = cancel_handler
-        self.cancelled_request_ids: set[str] = set()
-
-    @staticmethod
-    def _operation_for(capability_id: str) -> str:
-        for operation, exact_id in MEDIA_CAPABILITY_IDS.items():
-            if capability_id == exact_id:
-                return operation
-        return ""
-
-    def _output(
-        self,
-        *,
-        operation: str,
-        capability_id: str,
-        completed: bool,
-        evidence: MediaPlaybackEvidence | None = None,
-        reason: str = "",
-    ) -> dict[str, Any]:
-        qualification = self.declaration.operation_evidence.get(operation)  # type: ignore[arg-type]
-        return {
-            "completed": completed,
-            "operation": operation,
-            "capability_id": capability_id,
-            "provider_id": self.provider_id,
-            "provider_contract_version": self.declaration.contract_version,
-            "evidence_level": qualification.level if qualification is not None else None,
-            "provider_evidence_refs": (
-                list(qualification.artifact_refs) if qualification is not None else []
-            ),
-            "playback_id": evidence.playback_id if evidence is not None else "",
-            "state": evidence.state if evidence is not None else None,
-            "media_kind": evidence.media_kind if evidence is not None else "",
-            "media_ref": evidence.media_ref if evidence is not None else "",
-            "position_ms": evidence.position_ms if evidence is not None else 0,
-            "duration_ms": evidence.duration_ms if evidence is not None else None,
-            "volume": evidence.volume if evidence is not None else 0.0,
-            "delivery_evidence_id": (evidence.delivery_evidence_id if evidence is not None else ""),
-            "mixer_policy": self.declaration.mixer_policy,
-            "ducking_active": bool(evidence is not None and evidence.ducking_active),
-            "reason": reason,
-        }
-
-    async def execute(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> CapabilityResult:
-        operation = self._operation_for(request.capability_id)
-        if operation not in self.declaration.supported_operations:
-            return CapabilityResult(
-                request_id=request.request_id,
-                capability_id=request.capability_id,
-                capability_version=definition.version,
-                status="refused",
-                provider_id=self.provider_id,
-                output=self._output(
-                    operation=operation,
-                    capability_id=request.capability_id,
-                    completed=False,
-                    reason="requested media operation is not advertised by this provider",
-                ),
-                reason_code="media_operation_unavailable",
-                message=(
-                    f"media operation {operation!r} is unavailable; supported operations "
-                    f"are {self.declaration.supported_operations}"
-                ),
-            )
-
-        try:
-            raw = self._handler(operation, dict(request.args))
-            raw_evidence = await raw if inspect.isawaitable(raw) else raw
-            evidence = (
-                raw_evidence
-                if isinstance(raw_evidence, MediaPlaybackEvidence)
-                else MediaPlaybackEvidence.model_validate(raw_evidence)
-            )
-            invalid_reason = ""
-            if evidence.operation != operation:
-                invalid_reason = "provider returned a different media operation"
-            elif evidence.state not in self._ALLOWED_STATES[operation]:
-                invalid_reason = (
-                    f"provider returned state={evidence.state!r} incompatible with "
-                    f"operation={operation!r}"
-                )
-            elif evidence.media_kind not in self.declaration.supported_media_kinds:
-                invalid_reason = "provider returned an undeclared media kind"
-            if invalid_reason:
-                return CapabilityResult(
-                    request_id=request.request_id,
-                    capability_id=request.capability_id,
-                    capability_version=definition.version,
-                    status="failed",
-                    provider_id=self.provider_id,
-                    output=self._output(
-                        operation=operation,
-                        capability_id=request.capability_id,
-                        completed=False,
-                        evidence=evidence,
-                        reason=invalid_reason,
-                    ),
-                    reason_code="invalid_media_lifecycle_evidence",
-                    message=invalid_reason,
-                )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            return CapabilityResult(
-                request_id=request.request_id,
-                capability_id=request.capability_id,
-                capability_version=definition.version,
-                status="failed",
-                provider_id=self.provider_id,
-                output=self._output(
-                    operation=operation,
-                    capability_id=request.capability_id,
-                    completed=False,
-                    reason="provider did not return valid media lifecycle evidence",
-                ),
-                reason_code="invalid_media_lifecycle_evidence",
-                message=str(exc) or type(exc).__name__,
-            )
-
-        return CapabilityResult(
-            request_id=request.request_id,
-            capability_id=request.capability_id,
-            capability_version=definition.version,
-            status="completed",
-            provider_id=self.provider_id,
-            output=self._output(
-                operation=operation,
-                capability_id=request.capability_id,
-                completed=True,
-                evidence=evidence,
-            ),
-        )
-
-    async def cancel(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> None:
-        self.cancelled_request_ids.add(request.request_id)
-        if self._cancel_handler is None:
-            return
-        raw = self._cancel_handler(request, dict(context.provider_state))
-        if inspect.isawaitable(raw):
-            await raw
-
-
-class LocalSpeechCapabilityProvider:
-    provider_id = "chromie.local_speech"
-    supports_coordinated_start = True
-
-    def __init__(
-        self,
-        handler: SpeechHandler,
-        cancel_handler: SpeechCancelHandler | None = None,
-    ) -> None:
-        self._handler = handler
-        self._cancel_handler = cancel_handler
-        self.cancelled_request_ids: set[str] = set()
-
-    async def execute(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> CapabilityResult:
-        args = dict(request.args)
-        if context.start_gate is not None:
-            args["metadata"] = {**args.get("metadata", {}), "wait_for_voice_release": True}
-        token = current_execution_start.set(context.start_gate)
-        try:
-            raw = self._handler(args)
-            output = await raw if inspect.isawaitable(raw) else raw
-        finally:
-            current_execution_start.reset(token)
-        metadata = args.get("metadata")
-        playback_barrier = bool(
-            isinstance(metadata, dict) and metadata.get("wait_for_playback_start") is True
-        )
-        playback_started = bool(isinstance(output, dict) and output.get("playback_started") is True)
-        voice_release_required = bool(
-            isinstance(metadata, dict) and metadata.get("wait_for_voice_release") is True
-        )
-        voice_released = bool(
-            isinstance(output, dict) and output.get("voice_released") is True
-        )
-        if voice_release_required and not voice_released:
-            return CapabilityResult(
-                request_id=request.request_id,
-                capability_id=request.capability_id,
-                capability_version=definition.version,
-                status="failed",
-                provider_id=self.provider_id,
-                output=output if isinstance(output, dict) else {},
-                reason_code="personal_voice_not_released",
-                message="personal Vocal resource was not released after speech",
-            )
-        if playback_barrier and not playback_started:
-            return CapabilityResult(
-                request_id=request.request_id,
-                capability_id=request.capability_id,
-                capability_version=definition.version,
-                status="failed",
-                provider_id=self.provider_id,
-                output=output if isinstance(output, dict) else {},
-                reason_code="playback_not_started",
-                message=(
-                    "required pre-action speech did not begin playback; "
-                    "following requests were not authorized to start"
-                ),
-            )
-        return CapabilityResult(
-            request_id=request.request_id,
-            capability_id=request.capability_id,
-            capability_version=definition.version,
-            status="completed",
-            provider_id=self.provider_id,
-            output=output,
-        )
-
-    async def cancel(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> None:
-        self.cancelled_request_ids.add(request.request_id)
-        if self._cancel_handler is None:
-            return
-        # The host speech handler may still be awaiting playback-start evidence
-        # when its task is cancelled, so no completed scheduling receipt is
-        # guaranteed here.  The host therefore treats missing receipt data as
-        # requiring a conservative global output abort.
-        raw = self._cancel_handler(request, {})
-        if inspect.isawaitable(raw):
-            await raw
-
-
-class SessionControlCapabilityProvider:
-    provider_id = "chromie.session_control"
-
-    async def execute(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> CapabilityResult:
-        return CapabilityResult(
-            request_id=request.request_id,
-            capability_id=request.capability_id,
-            capability_version=definition.version,
-            status="completed",
-            provider_id=self.provider_id,
-            output={"control": "interrupt_acknowledged"},
-        )
-
-    async def cancel(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> None:
-        return None
-
-
-class MockCapabilityProvider:
-    def __init__(
-        self,
-        provider_id: str = "mock",
-        *,
-        delay_s: float = 0.0,
-    ) -> None:
-        self.provider_id = provider_id
-        self.delay_s = delay_s
-        self.calls: list[CapabilityRequest] = []
-        self.cancelled_request_ids: list[str] = []
-
-    async def execute(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> CapabilityResult:
-        self.calls.append(request)
-        if self.delay_s:
-            await asyncio.sleep(self.delay_s)
-        return CapabilityResult(
-            request_id=request.request_id,
-            capability_id=request.capability_id,
-            capability_version=definition.version,
-            status="completed",
-            provider_id=self.provider_id,
-            output={"args": request.args},
-        )
-
-    async def cancel(
-        self,
-        request: CapabilityRequest,
-        definition: CapabilityDefinition,
-        context: CapabilityExecutionContext,
-    ) -> None:
-        self.cancelled_request_ids.append(request.request_id)
-
-
-def local_speech_definition(*, timeout_ms: int | None = None) -> CapabilityDefinition:
-    return CapabilityDefinition(
-        capability_id="chromie.speak",
-        version="1.0.0",
-        provider_id=LocalSpeechCapabilityProvider.provider_id,
-        description="Speak text through Chromie's TTS and playback path.",
-        input_schema={
-            "type": "object",
-            "properties": {
-                "text": {"type": "string", "minLength": 1},
-                "style": {"type": "string"},
-                "priority": {"type": "string"},
-                "interruptible": {"type": "boolean"},
-                "metadata": {"type": "object"},
-            },
-            "required": ["text"],
-            "additionalProperties": False,
-        },
-        timeout_ms=max(30000, int(timeout_ms or 30000)),
-        interruptible=True,
-        can_run_parallel=True,
-        exclusive_group="chromie.voice",
-        cancellation_domains=("output",),
-        metadata={
-            "cancellation_granularity": "global_domain",
-            "effects": ["user_interaction", "audio_output"],
-            "safety_class": "low_risk_action",
-            "execution_lane": "vocal",
-            "parallel_metadata_declared": True,
-            "resource_claims": ["chromie.voice"],
-        },
-    )
-
-
-def vocal_performance_definition(
-    declaration: VocalProviderDeclaration,
-) -> CapabilityDefinition:
-    """Return the Host-owned definition for one qualified vocal provider."""
-
-    return CapabilityDefinition(
-        capability_id=VOCAL_PERFORMANCE_CAPABILITY_ID,
-        version="1.0.0",
-        provider_id=declaration.provider_id,
-        description=(
-            "Perform one exact provider-qualified vocal mode through Chromie's playback boundary."
-        ),
-        # The runtime accepts every typed public mode so a stale or malicious
-        # request receives a correlated unavailable result from the provider
-        # negotiation boundary instead of an uncaught schema exception.
-        input_schema=vocal_performance_input_schema(list(VOCAL_MODES)),
-        output_schema=vocal_performance_output_schema(),
-        available=True,
-        requires_confirmation=False,
-        interruptible=declaration.request_cancellation,
-        can_run_parallel=True,
-        exclusive_group="chromie.voice",
-        timeout_ms=120000,
-        idempotent=False,
-        cancellation_domains=("output",),
-        metadata={
-            "effects": ["user_interaction", "audio_output", "vocal_performance"],
-            "safety_class": "low_risk_action",
-            "execution_lane": "vocal",
-            "parallel_metadata_declared": True,
-            "resource_claims": ["chromie.voice"],
-            "cancellation_granularity": "request",
-            "supported_vocal_modes": list(declaration.supported_modes),
-            "native_text_streaming": declaration.native_text_streaming,
-            "native_audio_streaming": declaration.native_audio_streaming,
-            "request_cancellation": declaration.request_cancellation,
-            "timing_mark_types": list(declaration.timing_mark_types),
-            "sample_formats": list(declaration.sample_formats),
-            "sample_rates": list(declaration.sample_rates),
-            "max_concurrency": declaration.max_concurrency,
-            "provider_contract_version": declaration.contract_version,
-            "provider_declaration": declaration.model_dump(mode="json"),
-        },
-    )
-
-
-def media_playback_definitions(
-    declaration: MediaProviderDeclaration,
-) -> list[CapabilityDefinition]:
-    """Return Host-owned definitions for one qualified peer media provider."""
-
-    definitions: list[CapabilityDefinition] = []
-    for operation in declaration.supported_operations:
-        capability_id = MEDIA_CAPABILITY_IDS[operation]
-        effectful = operation != "status"
-        definitions.append(
-            CapabilityDefinition(
-                capability_id=capability_id,
-                version="1.0.0",
-                provider_id=declaration.provider_id,
-                description=(
-                    f"Apply exact media lifecycle operation {operation!r} through "
-                    "Chromie's peer media provider."
-                ),
-                input_schema=media_capability_input_schema(
-                    operation,
-                    declaration.supported_media_kinds,
-                ),
-                output_schema=media_capability_output_schema(),
-                available=True,
-                requires_confirmation=False,
-                interruptible=(declaration.request_cancellation and effectful),
-                can_run_parallel=True,
-                exclusive_group=(None if operation == "play" else "chromie.media.control"),
-                timeout_ms=120000 if operation == "play" else 10000,
-                idempotent=operation in {"pause", "resume", "stop", "volume", "status"},
-                cancellation_domains=(("media_output",) if effectful else ()),
-                metadata={
-                    "effects": (
-                        ["read_only", "media_playback", "playback_status"]
-                        if operation == "status"
-                        else ["audio_output", "media_playback", "playback_lifecycle"]
-                    ),
-                    "safety_class": "safe_read" if operation == "status" else "low_risk_action",
-                    "execution_lane": "activity",
-                    "parallel_metadata_declared": True,
-                    "resource_claims": ["audio_output.media"],
-                    "cancellation_granularity": "request",
-                    "media_operation": operation,
-                    "persistent_playback": declaration.persistent_playback,
-                    "progress_reporting": declaration.progress_reporting,
-                    "mixer_policy": declaration.mixer_policy,
-                    "ducking_gain_db": declaration.ducking_gain_db,
-                    "duck_attack_ms": declaration.duck_attack_ms,
-                    "duck_release_ms": declaration.duck_release_ms,
-                    "supported_media_kinds": list(declaration.supported_media_kinds),
-                    "provider_contract_version": declaration.contract_version,
-                    "provider_declaration": declaration.model_dump(mode="json"),
-                },
-            )
-        )
-    return definitions
-
-
-def session_interrupt_definition() -> CapabilityDefinition:
-    return CapabilityDefinition(
-        capability_id="session.interrupt",
-        version="1.0.0",
-        provider_id=SessionControlCapabilityProvider.provider_id,
-        description="Acknowledge a host session interrupt already applied by the coordinator.",
-        input_schema={
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-        timeout_ms=300,
-        interruptible=False,
-        can_run_parallel=True,
-        idempotent=True,
-        metadata={"control": "session_interrupt"},
-    )
-
-
-def _validate_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> None:
-    errors = json_schema_validation_errors(value, schema, path=path)
-    if errors:
-        raise ValueError(errors[0])

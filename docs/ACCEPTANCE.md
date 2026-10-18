@@ -13,9 +13,8 @@ so it is recorded as owner acceptance rather than a fabricated harness pass, and
 qualifies no revision: the narrow current-revision voice proof, target validation
 and any later revision that changes VAD, ASR or audio-device code still need
 retained, revision-bound evidence. Its scope is microphone
-and ASR; it does not clear the separately observed SC generation failure or the
-incomplete injected-text model/Runtime cohort. See the current
-[checkpoint](../DEVELOPMENT_CHECKPOINT.md) for those remaining failures.
+and ASR; it establishes no Social Cognition or injected-text cohort result. Open
+work is listed in [Current Status](STATUS.md#current-open-work).
 
 For live text/simulator acceptance, a primary `session_done` is not sufficient
 while that session still owns pending Social Cognition or auxiliary execution.
@@ -194,9 +193,9 @@ readiness are owned by [Current Status](STATUS.md), with the exact revision and
 retained artifacts in [Development Checkpoint](../DEVELOPMENT_CHECKPOINT.md) and
 [Handoff](../HANDOFF.md). Source tests and offline model qualification do not
 establish a current live voice, simulator, physical audio or robot pass. The latest
-retained live aggregate at `f5522f87` stopped at User Meaning Interpretation before Planner
-or execution; its 51-case cohort is incomplete. Current target qualification and
-release readiness remain open until the required current-revision evidence closes.
+live runs and their cohort state are recorded in the Status target-validation row.
+Current target qualification and release readiness remain open until the required
+current-revision evidence closes.
 
 ### Historical evidence by area
 
@@ -347,8 +346,10 @@ Manual review of all workflow outputs found no recurrence of the audit's hard
 semantic blockers: family answers were direct, stable knowledge was correct,
 session memory recalled blue, the weather correction switched location, the
 umbrella response led with the recommendation, multipart responses stayed
-grounded, and ordered stories were complete and unique. That inspection does
-not substitute for or relabel the skipped external semantic adjudication.
+grounded, and ordered stories were complete and unique. That inspection is recorded
+as manual review, not relabelled as the skipped external semantic adjudication; a
+human closure of semantic dimensions follows the
+[Benchmark Suite](CHROMIE_BENCHMARK_SUITE.md) review rule and is recorded as such.
 Generated speech and acoustic loopback do not prove a physical microphone,
 speaker, human pronunciation, or physical robot.
 
@@ -411,15 +412,16 @@ audio-device quality.
 
 ## Proof-before-refactor live voice profile
 
-With the canonical local gate restored, the active repository Issue is to retain
-the smallest complete current-revision live loop before structural refactoring:
+Narrow current-revision voice proof (an open work item in
+[Current Status](STATUS.md#current-open-work)) retains the smallest complete
+current-revision live loop before structural refactoring:
 
 ```text
 physical microphone
 → ASR final utterance
 → Cognitive Gateway admission
-→ Goal-driven chat handling
-→ validated speech
+→ Goal-driven turn handling
+→ Social Cognition speech
 → TTS scheduling and audible playback
 ```
 
@@ -444,7 +446,8 @@ running service fingerprint, effective host environment, and captured runtime
 identity on the same configuration authority.
 
 The default verifier still requires the full seven-case matrix, Soridormi
-source binding, and both applied `chat` and `robot_action` lanes. The separate
+source binding, and correlated applied cognitive events for every case (at least
+two for `follow-up`). The separate
 `current-revision-live-voice` profile verifies the honest smaller claim:
 
 ```bash
@@ -584,7 +587,7 @@ sentence. Select it with `--scenario-root scenarios/everyday`; the script defaul
 `scenarios/general_ability`. Its smoke stage runs first; a hard smoke failure stops core and challenge (no `--keep-going`).
 It is the owner's live behavior target and the active Issue's cohort. It is a different
 claim from current-revision qualification: the target-evidence closure interaction track
-runs the manifest-pinned `scenarios/general_ability` cases (Phase 6 below) and never the
+runs the manifest-pinned `scenarios/general_ability` cases ([source-bound target-evidence closure](#source-bound-target-evidence-closure)) and never the
 everyday cohort. Report each pass under its own claim; neither substitutes for the other.
 
 The general-ability live cohort has three ordered stages: 55 `must_pass`, 16 `core`, and 8
@@ -851,7 +854,7 @@ not a substitute for ignored `.chromie/` live evidence. Sanitization removes kno
 credentials and local identity but may retain private conversation content, so the
 report and archive still require human review before sharing.
 
-### Fast Planner multi-goal qualification
+### Planner multi-goal qualification
 
 The repository implements the accepted
 [Goal-Driven Cognitive Architecture](GOAL_DRIVEN_COGNITIVE_ARCHITECTURE.md).
@@ -963,17 +966,18 @@ failures must be fixed through general model, prompt, context, contract,
 architecture, or provider improvements; they must not introduce phrase-specific
 Host behavior rules.
 
-## Model-assisted routing guardrails
+## Model-assisted interpretation guardrails
 
-The fast User Meaning Interpretation model is accepted only as an advisory semantic interpreter.
-Level A routing evidence must continue to prove:
+User Meaning Interpretation is the WHAT authority; its output is still schema-validated
+and never authorizes an effect. Level A admission and interpretation evidence must
+continue to prove:
 
 - deterministic stop, cancel, emergency, silence, and unusable-audio paths do
   not depend on model output;
 - semantic ambient suppression is isolated to a structured addressedness and
   speech-act contract, requires inactive host engagement plus high confidence,
   cannot authorize effects, suppresses only explicitly ambient acts, makes one
-  model call, and fails open to the original route on invalid, low-confidence,
+  model call, and fails open to Core admission on invalid, low-confidence,
   or contradictory output (including an `addressed=false` directed/unclear
   pair) without a repair call; deterministic code must not invent the ambient
   label;
@@ -981,10 +985,10 @@ Level A routing evidence must continue to prove:
   `user_meaning_interpretation/inactive_direct_weather_question_false_addressedness` scenario
   replays the inactive host context, grounded weather-tool decision, and false
   high-confidence question review through the real User Meaning Interpretation recovery pipeline;
-- model routes are bounded by capability-catalog candidates and schema
-  finalization;
-- low-confidence, ambiguous, unsupported, or unavailable routes clarify, refuse,
-  ignore, or fall back safely;
+- Planner Capability selection is bounded by capability-catalog candidates and
+  schema finalization;
+- low-confidence, ambiguous, unsupported, or unavailable meaning or Work is
+  clarified, reported as an honest limitation, ignored, or failed closed;
 - native InteractionRuntime and the host Trusted Capability Runtime re-resolve capabilities
   before execution;
 - Soridormi task preview, refusal, events, cancellation, and safe-idle status
@@ -1408,7 +1412,7 @@ procedure before further motion.
 
 ## Source-bound target-evidence closure
 
-Phase 6 uses the `current_revision_qualification` target-evidence profile. The profile is
+Source-bound target-evidence closure uses the `current_revision_qualification` profile. The profile is
 not another behavior evaluator: it binds reports from the existing source qualification,
 General Ability live-text runner, Provider Fault Matrix, Gateway/Core, Agent Skill/weather,
 Social Attention, and LAN procedures to one clean Git revision. Source-only green tests
@@ -1421,7 +1425,7 @@ Level-A general-ability scenarios, and the local deterministic provider fault ma
 addition to the ordinary repository/static/full-suite gates. Missing pinned analyzers or
 test dependencies block qualification rather than becoming a pass.
 
-For the Phase 6 live interaction track the coordinator owns the exact case selection and
+For the closure live interaction track the coordinator owns the exact case selection and
 invokes General Ability with `--execute`, `--assertion-scope full`, Goal-driven runtime
 `apply`, and the retained runtime identity. The track requires Chinese and English
 effectful cases, cancellation, provider-backed weather/Evidence re-entry, multi-goal mixed
@@ -1713,7 +1717,8 @@ The current development compatibility policy lists `synthetic`,
 `virtual-mic`, and `acoustic` as eligible generated-speech modes. That policy
 does not turn them into human voice-device evidence. Before a bundle can enter
 policy evaluation, the verifier also requires the goal-driven acceptance
-override, correlated applied `chat` and `robot_action` cognitive events,
+override, correlated applied cognitive events for every case (at least two for
+`follow-up`),
 exclusive Soridormi `sim` provider events, clean matching checkouts, and an
 endpoint-reported Soridormi revision. The current runner records only a
 `declared_paired_checkout`, so it cannot yet produce a policy-ready bundle.
@@ -1921,7 +1926,7 @@ and only `supervised` adds human speech and operator observations.
 | Case | User input | Required evidence |
 |---|---|---|
 | Speech only | General question | ASR final text, prepared speech with zero body skills, correlated TTS schedule, playback start/end, and clean session completion. Audible output is additionally judged only when the selected mode uses a physical output device. |
-| Speech plus body skill | “Nod” or equivalent, then “Yes” | Exact nod/count proposal; request-bound confirmation prompt scheduled and fully played before approval; requested, approved, and authorized events bound by confirmation ID and fingerprint; completed skill result; safe idle. |
+| Speech plus body skill | A body request that requires confirmation (the runner's case still uses “Nod”), then “Yes” | Exact skill/argument proposal; request-bound confirmation prompt scheduled and fully played before approval; requested, approved, and authorized events bound by confirmation ID and fingerprint; completed skill result; safe idle. |
 | Refusal | Valid body request, then “No thanks” | Requested, denied, and rejected events bound by confirmation ID and fingerprint; no Soridormi result; completed denial speech output. |
 | Barge-in | Interrupt while speaking | Active old-session playback linked to the new interrupt session, deterministic interrupt route, and no old-session playback after interruption completes. |
 | Body cancellation | Confirm, then interrupt a cancellable simulated skill | Bound approval, host-observed Trusted Capability Runtime cancellation, host interruption completion, and post-cancellation safe-idle/no-active-task status. This does not claim a provider cancel RPC unless a provider event explicitly records one. |

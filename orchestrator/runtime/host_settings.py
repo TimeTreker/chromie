@@ -13,7 +13,13 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from shared.chromie_contracts.mind import active_customer_mind_profile_path
-from shared.chromie_runtime.env_values import InvalidBooleanSetting, parse_bool
+from shared.chromie_runtime.env_values import (
+    InvalidBooleanSetting,
+    InvalidNumericSetting,
+    parse_bool,
+    parse_float,
+    parse_int,
+)
 
 
 class HostConfigurationError(ValueError):
@@ -44,21 +50,16 @@ def _int(
     minimum: int | None = None,
     maximum: int | None = None,
 ) -> int:
-    raw = values.get(name)
-    if raw is None:
-        value = default
-    else:
-        try:
-            value = int(str(raw).strip())
-        except ValueError as exc:
-            raise HostConfigurationError(
-                f"{name} must be an integer; got {raw!r}"
-            ) from exc
-    if minimum is not None and value < minimum:
-        raise HostConfigurationError(f"{name} must be >= {minimum}; got {value}")
-    if maximum is not None and value > maximum:
-        raise HostConfigurationError(f"{name} must be <= {maximum}; got {value}")
-    return value
+    try:
+        return parse_int(
+            values.get(name),
+            name=name,
+            default=default,
+            minimum=minimum,
+            maximum=maximum,
+        )
+    except InvalidNumericSetting as exc:
+        raise HostConfigurationError(str(exc)) from exc
 
 
 def _float(
@@ -69,21 +70,16 @@ def _float(
     minimum: float | None = None,
     maximum: float | None = None,
 ) -> float:
-    raw = values.get(name)
-    if raw is None:
-        value = default
-    else:
-        try:
-            value = float(str(raw).strip())
-        except ValueError as exc:
-            raise HostConfigurationError(
-                f"{name} must be a number; got {raw!r}"
-            ) from exc
-    if minimum is not None and value < minimum:
-        raise HostConfigurationError(f"{name} must be >= {minimum}; got {value}")
-    if maximum is not None and value > maximum:
-        raise HostConfigurationError(f"{name} must be <= {maximum}; got {value}")
-    return value
+    try:
+        return parse_float(
+            values.get(name),
+            name=name,
+            default=default,
+            minimum=minimum,
+            maximum=maximum,
+        )
+    except InvalidNumericSetting as exc:
+        raise HostConfigurationError(str(exc)) from exc
 
 
 
@@ -122,7 +118,7 @@ def _optional_path(
 
 def _device(values: Mapping[str, str], name: str) -> int | str | None:
     raw = _text(values, name, "")
-    if not raw or raw.casefold() in {"default", "system", "system_default", "none"}:
+    if not raw or raw.casefold() in {"auto", "default", "system", "system_default", "none"}:
         return None
     try:
         return int(raw)
@@ -187,6 +183,26 @@ class AudioDeviceSettings:
     output_block_ms: int
     output_blocksize: int
     output_latency: str
+
+    @classmethod
+    def from_env(
+        cls, values: Mapping[str, str] | None = None
+    ) -> "AudioDeviceSettings":
+        values = os.environ if values is None else values
+        return cls(
+            input_device=_device(values, "ORCH_INPUT_DEVICE"),
+            output_device=_device(values, "ORCH_OUTPUT_DEVICE"),
+            input_rate=_optional_int(values, "ORCH_INPUT_RATE", minimum=1),
+            input_channels=_int(values, "ORCH_INPUT_CHANNELS", 1, minimum=1),
+            input_block_ms=_int(values, "ORCH_INPUT_BLOCK_MS", 30, minimum=1),
+            input_blocksize=_int(values, "ORCH_INPUT_BLOCKSIZE", 0, minimum=0),
+            input_latency=_text(values, "ORCH_INPUT_LATENCY", "low") or "low",
+            output_rate=_optional_int(values, "ORCH_OUTPUT_RATE", minimum=1),
+            output_channels=_int(values, "ORCH_OUTPUT_CHANNELS", 2, minimum=1),
+            output_block_ms=_int(values, "ORCH_OUTPUT_BLOCK_MS", 30, minimum=1),
+            output_blocksize=_int(values, "ORCH_OUTPUT_BLOCKSIZE", 0, minimum=0),
+            output_latency=_text(values, "ORCH_OUTPUT_LATENCY", "low") or "low",
+        )
 
 
 @dataclass(frozen=True)
@@ -255,16 +271,14 @@ class CognitionSettings:
     llm_url: str
     ollama_model: str
     agent_url: str
-    action_executor_url: str
     agent_timeout_ms: int
     user_meaning_interpreter_timeout_ms: int
-    action_timeout_ms: int
     action_dry_run: bool
     enable_agent: bool
     enable_interaction_response: bool
     enable_soridormi_capabilities: bool
-    fast_planner_mode: str
-    fast_planner_timeout_ms: int
+    planner_mode: str
+    planner_timeout_ms: int
     deliberative_timeout_ms: int
     goal_association_mode: str
     goal_association_timeout_ms: int
@@ -284,8 +298,6 @@ class ModelGenerationSettings:
     keep_alive: str
     prompt_chars_per_token_estimate: float
     context_safety_margin_tokens: int
-    ready_greeting_fallback_model: str
-    ready_greeting_num_ctx: int
 
 
 @dataclass(frozen=True)
@@ -316,8 +328,6 @@ class PlaybackSettings:
     ready_greeting_text: str
     ready_greeting_fallback_text: str
     ready_greeting_language: str
-    ready_greeting_model: str
-    ready_greeting_num_predict: int
     ready_greeting_generation_timeout_ms: int
     ready_greeting_timeout_ms: int
 
@@ -371,12 +381,6 @@ class HostSettingsSnapshot:
     ) -> "HostSettingsSnapshot":
         values = os.environ if environ is None else environ
         ollama_model = _text(values, "OLLAMA_MODEL", "gemma4:e2b") or "gemma4:e2b"
-        ollama_num_ctx = _int(values, "OLLAMA_NUM_CTX", 2048, minimum=512)
-        ready_greeting_fallback_model = (
-            _text(values, "AGENT_FAST_PLANNER_MODEL")
-            or _text(values, "AGENT_USER_MEANING_INTERPRETER_MODEL")
-            or ollama_model
-        )
         max_text_chars = _int(values, "TTS_MAX_TEXT_CHARS", 220, minimum=20)
         presentation_compute_lease_enabled = _bool(
             values, "ORCH_PRESENTATION_COMPUTE_LEASE_ENABLED", False
@@ -471,15 +475,6 @@ class HostSettingsSnapshot:
                 _text(values, "ORCH_RUNTIME_READY_GREETING_LANGUAGE", "zh-CN")
                 or "zh-CN"
             ),
-            ready_greeting_model=_text(
-                values, "ORCH_RUNTIME_READY_GREETING_MODEL", ""
-            ),
-            ready_greeting_num_predict=_int(
-                values,
-                "ORCH_RUNTIME_READY_GREETING_NUM_PREDICT",
-                32,
-                minimum=8,
-            ),
             ready_greeting_generation_timeout_ms=_int(
                 values,
                 "ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS",
@@ -530,29 +525,13 @@ class HostSettingsSnapshot:
                     minimum=1000,
                 ),
             ),
-            audio_device=AudioDeviceSettings(
-                input_device=_device(values, "ORCH_INPUT_DEVICE"),
-                output_device=_device(values, "ORCH_OUTPUT_DEVICE"),
-                input_rate=_optional_int(values, "ORCH_INPUT_RATE", minimum=1),
-                input_channels=_int(values, "ORCH_INPUT_CHANNELS", 1, minimum=1),
-                input_block_ms=_int(values, "ORCH_INPUT_BLOCK_MS", 30, minimum=1),
-                input_blocksize=_int(values, "ORCH_INPUT_BLOCKSIZE", 0, minimum=0),
-                input_latency=_text(values, "ORCH_INPUT_LATENCY", "low") or "low",
-                output_rate=_optional_int(values, "ORCH_OUTPUT_RATE", minimum=1),
-                output_channels=_int(values, "ORCH_OUTPUT_CHANNELS", 2, minimum=1),
-                output_block_ms=_int(values, "ORCH_OUTPUT_BLOCK_MS", 30, minimum=1),
-                output_blocksize=_int(values, "ORCH_OUTPUT_BLOCKSIZE", 0, minimum=0),
-                output_latency=_text(values, "ORCH_OUTPUT_LATENCY", "low") or "low",
-            ),
+            audio_device=AudioDeviceSettings.from_env(values),
             cognition=CognitionSettings(
                 llm_url=_text(
                     values, "LLM_URL", "http://localhost:11434/api/generate"
                 ),
                 ollama_model=ollama_model,
                 agent_url=_text(values, "AGENT_URL", "http://127.0.0.1:8092"),
-                action_executor_url=_text(
-                    values, "ACTION_EXECUTOR_URL", "http://127.0.0.1:8095"
-                ),
                 agent_timeout_ms=_int(
                     values, "ORCH_AGENT_TIMEOUT_MS", 9000, minimum=100
                 ),
@@ -562,9 +541,6 @@ class HostSettingsSnapshot:
                     9000,
                     minimum=100,
                 ),
-                action_timeout_ms=_int(
-                    values, "ORCH_ACTION_TIMEOUT_MS", 5000, minimum=100
-                ),
                 action_dry_run=_bool(values, "ORCH_ACTION_DRY_RUN", True),
                 enable_agent=_bool(values, "ORCH_ENABLE_AGENT", False),
                 enable_interaction_response=_bool(
@@ -573,14 +549,14 @@ class HostSettingsSnapshot:
                 enable_soridormi_capabilities=_bool(
                     values, "ORCH_ENABLE_SORIDORMI_CAPABILITIES", False
                 ),
-                fast_planner_mode=_choice(
+                planner_mode=_choice(
                     values,
-                    "ORCH_FAST_PLANNER_MODE",
+                    "ORCH_PLANNER_MODE",
                     "off",
                     {"off", "report_only"},
                 ),
-                fast_planner_timeout_ms=_int(
-                    values, "ORCH_FAST_PLANNER_TIMEOUT_MS", 65000, minimum=100
+                planner_timeout_ms=_int(
+                    values, "ORCH_PLANNER_TIMEOUT_MS", 65000, minimum=100
                 ),
                 deliberative_timeout_ms=_int(
                     values, "ORCH_DELIBERATIVE_TIMEOUT_MS", 125000, minimum=100
@@ -799,13 +775,6 @@ class HostSettingsSnapshot:
                     "AGENT_LLM_CONTEXT_SAFETY_MARGIN_TOKENS",
                     512,
                     minimum=0,
-                ),
-                ready_greeting_fallback_model=ready_greeting_fallback_model,
-                ready_greeting_num_ctx=_int(
-                    values,
-                    "AGENT_FAST_PLANNER_NUM_CTX",
-                    ollama_num_ctx,
-                    minimum=512,
                 ),
             ),
             playback=playback,

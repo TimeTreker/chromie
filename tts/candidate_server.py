@@ -135,11 +135,6 @@ async def handler(ws: Any) -> None:
                         "speakers": await provider.list_speakers(),
                     },
                 )
-            elif msg_type == "list_speakers":
-                await send_json(
-                    ws,
-                    {"type": "speakers", "speakers": await provider.list_speakers()},
-                )
             elif msg_type == "synthesize_stream":
                 if not await synthesize_until_disconnect(ws, normalized_request(data)):
                     return

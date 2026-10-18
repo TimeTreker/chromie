@@ -1,0 +1,22 @@
+"""Append-only JSONL journal helpers shared by the episode and experience recorders."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+
+def append_jsonl(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
+
+
+def float_or_none(value: Any) -> float | None:
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None

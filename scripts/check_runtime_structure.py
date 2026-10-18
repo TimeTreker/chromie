@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Enforce VoiceAssistant ownership boundaries and report size for review."""
+"""Enforce VoiceAssistant ownership boundaries and size ratchets.
+
+VoiceAssistant counts and the line counts of the listed runtime files may not
+grow above the baselines recorded in config/runtime_structure_ratchets.json.
+Shrinking is always allowed; lower the baseline in the same change to lock it in.
+"""
 
 from __future__ import annotations
 
@@ -41,6 +46,18 @@ def _parent_functions(tree: ast.AST) -> dict[int, str]:
         for child in ast.walk(node):
             parents[id(child)] = node.name
     return parents
+
+
+def _check_ratchet(name: str, value: int, baseline: object, errors: list[str]) -> None:
+    if type(baseline) is not int or baseline < 0:
+        errors.append(f"{name} must be a non-negative integer")
+        return
+    print(f"  {name}={value} baseline={baseline} delta={value - baseline:+d}")
+    if value > baseline:
+        errors.append(
+            f"{name} grew to {value} above its baseline {baseline}; move the new code to "
+            "its owner instead of growing this file or class"
+        )
 
 
 def check() -> list[str]:
@@ -85,13 +102,21 @@ def check() -> list[str]:
     if not isinstance(baselines, dict):
         errors.append("voice_assistant.size_baselines must be an object")
         baselines = {}
-    print(f"Runtime size measurements (informational; baseline revision {config.get('size_baseline_revision')}):")
+    print(f"Runtime size ratchets (baseline revision {config.get('size_baseline_revision')}):")
     for name, value in measurements.items():
-        baseline = baselines.get(name)
-        if type(baseline) is not int or baseline < 0:
-            errors.append(f"voice_assistant.size_baselines.{name} must be a non-negative integer")
+        _check_ratchet(f"voice_assistant.size_baselines.{name}", value, baselines.get(name), errors)
+
+    file_baselines = config.get("file_line_baselines")
+    if not isinstance(file_baselines, dict) or not file_baselines:
+        errors.append("file_line_baselines must be a non-empty object")
+        file_baselines = {}
+    for relative, baseline in sorted(file_baselines.items()):
+        path = ROOT / relative
+        if not path.is_file():
+            errors.append(f"file_line_baselines names a missing file: {relative}")
             continue
-        print(f"  {name}={value} baseline={baseline} delta={value - baseline:+d}")
+        lines = len(path.read_text(encoding="utf-8").splitlines())
+        _check_ratchet(f"file_line_baselines[{relative}]", lines, baseline, errors)
 
     for collaborator in rule["required_collaborators"]:
         if collaborator not in init_attributes:

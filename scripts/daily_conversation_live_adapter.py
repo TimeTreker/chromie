@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.evidence_io import scenario_turns as _turns  # noqa: E402
 from scripts.interaction_text_mujoco_check import (  # noqa: E402
     build_parser as build_live_parser,
     run_check,
@@ -30,27 +31,12 @@ QUALITY_HEALTH_FIELDS = (
     "goal_association_model",
 )
 FAST_HEALTH_FIELDS = (
-    "fast_planner_model",
+    "planner_model",
 )
 
 
 def _safe_id(value: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_.-]+", "-", value).strip("-.") or "scenario"
-
-
-def _turns(inputs: Mapping[str, Any]) -> list[str]:
-    text = inputs.get("text")
-    turns = inputs.get("turns")
-    if isinstance(text, str) and text.strip() and turns is None:
-        return [text.strip()]
-    if (
-        isinstance(turns, list)
-        and turns
-        and all(isinstance(item, str) and item.strip() for item in turns)
-        and text is None
-    ):
-        return [item.strip() for item in turns]
-    raise ValueError("scenario inputs must contain either non-empty text or non-empty turns")
 
 
 def _live_args(
@@ -188,15 +174,15 @@ def _structural_invariants(
 
 
 def _configured_fast_model(environ: Mapping[str, str] | None = None) -> str | None:
-    """Return the fast Planner model the active runtime profile configures.
+    """Return the Planner model the active runtime profile configures.
 
     The live text path loads the generated runtime environment before each turn,
-    so this reads the profile's own ``AGENT_FAST_PLANNER_MODEL`` rather than a
+    so this reads the profile's own ``AGENT_PLANNER_MODEL`` rather than a
     hard-coded model name.
     """
 
     env = os.environ if environ is None else environ
-    value = str(env.get("AGENT_FAST_PLANNER_MODEL") or "").strip()
+    value = str(env.get("AGENT_PLANNER_MODEL") or "").strip()
     return value or None
 
 

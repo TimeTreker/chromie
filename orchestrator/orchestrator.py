@@ -1,17 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from difflib import SequenceMatcher
-import hashlib
-import json
 import logging
 import math
 import os
 import re
-import threading
 import time
-import unicodedata
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -43,45 +37,22 @@ from scipy import signal
 from orchestrator.audio_device_manager import AudioDeviceManager
 from orchestrator.readiness import ServiceReadinessGate
 from orchestrator.vad import VAD
-from orchestrator.clients.action_client import ActionClient
 from orchestrator.runtime.audio_device_lifecycle import (
     audio_device_monitor,
-    set_input_device_params,
-    set_output_device_params,
     uses_followed_system_default,
 )
 from orchestrator.runtime.confirmation import (
     ConfirmationDialogue,
     ConfirmationReplyMeaning,
     PendingConfirmation,
-    confirmation_meaning_from_goal_association,
-    pending_confirmation_goal_ids,
-    reconcile_revoked_confirmation_for_reflex,
-    revoke_pending_confirmation_for_reflex,
-    revoked_confirmation_evidence_for_reflex,
-)
-from orchestrator.runtime.named_goal_cancellation import (
-    ActiveGoalCancellationRequiresRuntimeDispatch,
-    NamedGoalCancellationClosureError,
-    cancellation_target_goal_ids,
-    replacement_target_goal_ids,
-    dispatch_named_goal_cancellation,
-    goal_cancellation_failure_evidence,
-    goal_cancellation_success_evidence,
-    dispatch_goal_replacement,
 )
 from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
-    CognitiveEvidenceRecorder,
     CognitiveRuntimePolicy,
     CognitiveRuntimeResolution,
-    CognitiveStageFailure,
     GoalDrivenRuntimeCoordinator,
 )
-from orchestrator.runtime.cognitive_activation import (
-    activation_requested,
-    resolve_cognitive_activation,
-)
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.cognitive_evidence import CognitiveEvidenceRecorder
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.cognitive_gateway import (
     CognitiveGateway,
@@ -104,62 +75,22 @@ from orchestrator.runtime.goal_list_console import (
 )
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.input_session_runtime import input_session_runtime_for
-from orchestrator.runtime.outcome_delivery import build_host_outcome_delivery
-from orchestrator.runtime.outcome_reconciliation import planner_execution_outcome_truth
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.playback_transport import transport_for as playback_transport_for
 from orchestrator.runtime.observability_recording import (
-    record_cognitive_gateway_evidence,
-    record_cognitive_runtime_evidence,
-    record_execution_experience_safely,
     schedule_accelerator_sample,
 )
-from orchestrator.runtime.response_plan import validate_immediate_response_plan
-from orchestrator.runtime.runtime_ready_greeting import (
-    RuntimeReadyGreetingCoordinator,
-    RuntimeReadyGreetingPolicy,
-    execute_default_runtime_ready_orientation,
-)
 from orchestrator.runtime.situation import (
-    build_provider_state_situation_observation,
-    build_situation_projection,
-    derive_situation_revision_opportunity,
     run_time_condition_wake_loop,
 )
-from orchestrator.runtime.planner_reentry import (
-    execution_outcome_user_text,
-    fresh_capability_state_projection,
-    incremental_execution_outcome_truth,
-    planner_reentry_repeats_completed_activity,
-    planner_reentry_responsibilities,
-    meaningful_provider_state,
-    provider_state_relevance,
-    terminal_evidence_relevance,
-    terminal_result_waits_for_batch_closure,
-)
-from orchestrator.runtime.tts_text import (
-    ends_with_tts_sentence_boundary,
-    should_merge_tts_chunks,
-    split_oversized_tts_unit,
-    split_tts_clause_units,
-    split_tts_sentence_units,
-)
 from orchestrator.runtime.shutdown_lifecycle import shutdown_voice_assistant
-from orchestrator.runtime.session import (
-    now_ms,
-    record_session_workflow_stage,
-    summarize_provider_start_evidence,
-)
 from orchestrator.runtime.capability_runtime import CapabilityRuntimeResult
 from shared.chromie_contracts.core_interpretation import (
     CognitiveResponsibilityProposal,
-    CognitiveWorkRequest,
     CoreInterpretationResult,
-    PlannerReentryScope,
 )
 from shared.chromie_contracts.interaction import (
     InteractionResponse,
-    InteractionSpeech,
     CapabilityRequest,
     CapabilityResult,
 )
@@ -170,24 +101,11 @@ from shared.chromie_contracts.value_judgment import (
 )
 from shared.chromie_contracts.plan import (
     CanonicalPlan,
-    SocialCommunicationNeed,
-    canonical_plan_fingerprint,
-    communication_need_id,
 )
-from shared.chromie_contracts.social_cognition import SocialCognitionRequest
-from shared.chromie_contracts.reflection import ReflectionRequest
-from shared.chromie_contracts.execution_outcome import (
-    ExecutionEvidence,
-    aggregate_execution_status,
-    goal_completion_qualification_summary,
-)
-from shared.chromie_contracts.situation import CognitiveOpportunity, SituationProjection
-from shared.chromie_contracts.control import GoalCancellationEvidence
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
     ToolExecutionResponse,
     ToolResultEvidence,
-    canonical_value_sha256,
 )
 from shared.chromie_contracts.reflex import (
     CancellationDirective,
@@ -196,21 +114,23 @@ from shared.chromie_contracts.reflex import (
 )
 from shared.chromie_contracts.user_turn import (
     UserTurnEnvelope,
-    user_turn_prohibits_speech,
 )
 from shared.chromie_contracts.semantic_authority import (
     SemanticAuthorityClaim,
     context_with_semantic_authority,
 )
-from shared.chromie_runtime.ollama_non_thinking import (
-    enforce_non_thinking_ollama_response,
-)
-from shared.chromie_runtime.llm_diagnostics import (
-    log_llm_call_evidence,
-    new_llm_call_id,
-    ollama_completion_diagnostics,
-    ollama_prompt_preflight_diagnostics,
-)
+from tts.text_normalization import has_speakable_content, strip_speech_markup
+from orchestrator.runtime import cognitive_outcome_host
+from orchestrator.runtime import cognitive_pipeline_host
+from orchestrator.runtime import confirmation_host
+from orchestrator.runtime import interaction_dispatch_host
+from orchestrator.runtime import interaction_speech_host
+from orchestrator.runtime import planner_reentry_host
+from orchestrator.runtime import reflex_cancellation_host
+from orchestrator.runtime import routed_turn_host
+from orchestrator.runtime import runtime_ready_greeting
+from orchestrator.runtime import tts_echo
+from orchestrator.runtime import tts_text
 
 logging.basicConfig(
     level=os.getenv("LOG_LEVEL", "INFO"),
@@ -251,8 +171,8 @@ class VoiceAssistant:
         self.addressedness_engagement_timeout_s = (
             session_settings.addressedness_engagement_timeout_s
         )
-        self.fast_planner_mode = cognition_settings.fast_planner_mode
-        self.fast_planner_timeout_ms = cognition_settings.fast_planner_timeout_ms
+        self.planner_mode = cognition_settings.planner_mode
+        self.planner_timeout_ms = cognition_settings.planner_timeout_ms
         self.deliberative_timeout_ms = cognition_settings.deliberative_timeout_ms
         self.goal_association_mode = cognition_settings.goal_association_mode
         self.goal_association_timeout_ms = (
@@ -271,13 +191,8 @@ class VoiceAssistant:
         )
 
         self.agent_url = cognition_settings.agent_url
-        self.action_executor_url = cognition_settings.action_executor_url
         self.action_dry_run = cognition_settings.action_dry_run
         self.agent_client = build_agent_client(self.host_settings)
-        self.action_client = ActionClient(
-            self.action_executor_url,
-            cognition_settings.action_timeout_ms,
-        )
         self.asr_timeout_s = max(0.001, audio_settings.asr_timeout_ms / 1000.0)
 
         self.min_rms = audio_settings.min_rms
@@ -362,10 +277,6 @@ class VoiceAssistant:
         self.runtime_ready_greeting_language = (
             playback_settings.ready_greeting_language
         )
-        self.runtime_ready_greeting_model = playback_settings.ready_greeting_model
-        self.runtime_ready_greeting_num_predict = (
-            playback_settings.ready_greeting_num_predict
-        )
         self.runtime_ready_greeting_generation_timeout_ms = (
             playback_settings.ready_greeting_generation_timeout_ms
         )
@@ -443,10 +354,9 @@ class VoiceAssistant:
             self.discard_playback_realtime,
         )
         logger.info(
-            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s action_url=%s dry_run=%s cognitive_runtime_mode=%s",
+            "Control plane: cognitive_gateway=embedded cognitive_core=%s enabled=%s dry_run=%s cognitive_runtime_mode=%s",
             self.agent_url,
             self.enable_agent,
-            self.action_executor_url,
             self.action_dry_run,
             self.cognitive_runtime_mode,
         )
@@ -485,7 +395,7 @@ class VoiceAssistant:
         self.cognitive_runtime_policy = CognitiveRuntimePolicy(
             mode=self.cognitive_runtime_mode,
             goal_association_timeout_ms=self.goal_association_timeout_ms,
-            fast_planner_timeout_ms=self.fast_planner_timeout_ms,
+            planner_timeout_ms=self.planner_timeout_ms,
             deliberative_timeout_ms=self.deliberative_timeout_ms,
             value_review_capability_ids=load_value_review_capability_ids(
                 PROJECT_ROOT / VALUE_REVIEW_RELATIVE_PATH
@@ -544,43 +454,13 @@ class VoiceAssistant:
     def maybe_session_done(self, sid: Optional[str]) -> None:
         self.sessions.maybe_done(sid)
 
-    def _playback_state(self) -> PlaybackDeliveryLifecycle:
-        state = self.__dict__.get("playback_delivery")
-        if not isinstance(state, PlaybackDeliveryLifecycle):
-            state = PlaybackDeliveryLifecycle()
-            self.__dict__["playback_delivery"] = state
-        return state
-
-    def _input_turn_state(self) -> InputTurnLifecycle:
-        state = self.__dict__.get("input_turn_lifecycle")
-        if not isinstance(state, InputTurnLifecycle):
-            state = InputTurnLifecycle()
-            self.__dict__["input_turn_lifecycle"] = state
-        return state
-
-    @property
-    def playback_delivery(self) -> PlaybackDeliveryLifecycle:
-        return self._playback_state()
-
-    @playback_delivery.setter
-    def playback_delivery(self, value: PlaybackDeliveryLifecycle) -> None:
-        self.__dict__["playback_delivery"] = value
-
-    @property
-    def input_turn_lifecycle(self) -> InputTurnLifecycle:
-        return self._input_turn_state()
-
-    @input_turn_lifecycle.setter
-    def input_turn_lifecycle(self, value: InputTurnLifecycle) -> None:
-        self.__dict__["input_turn_lifecycle"] = value
-
     def playback_start_key(
         self,
         generation: int,
         order: int,
         session_id: Optional[str],
     ) -> tuple[int, int, str | None]:
-        return self._playback_state().key(generation, order, session_id)
+        return self.playback_delivery.key(generation, order, session_id)
 
     def _register_turn_speech_event(
         self,
@@ -610,7 +490,7 @@ class VoiceAssistant:
         subject_refs: list[str] | None = None,
         origin_session_id: str | None = None,
     ) -> dict[str, Any] | None:
-        return self._playback_state().register_turn_speech_event(
+        return self.playback_delivery.register_turn_speech_event(
             session_id=session_id,
             origin_session_id=origin_session_id,
             generation=generation,
@@ -637,12 +517,11 @@ class VoiceAssistant:
             subject_refs=subject_refs,
         )
 
-
     def _delivered_turn_speech_events(
         self,
         session_id: str,
     ) -> list[dict[str, Any]]:
-        return self._playback_state().delivered_turn_speech_events(session_id)
+        return self.playback_delivery.delivered_turn_speech_events(session_id)
 
     def resolve_playback_start_waiter(
         self,
@@ -653,7 +532,7 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        resolved = self._playback_state().resolve_playback_start_waiter(
+        resolved = self.playback_delivery.resolve_playback_start_waiter(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -675,7 +554,7 @@ class VoiceAssistant:
         started: bool,
         reason: str,
     ) -> None:
-        for _, order, session_id in self._playback_state().resolve_all_playback_start_waiters(
+        for _, order, session_id in self.playback_delivery.resolve_all_playback_start_waiters(
             started=started,
             reason=reason,
         ):
@@ -686,8 +565,7 @@ class VoiceAssistant:
                 started,
                 reason,
             )
-        self._playback_state().resolve_all_playback_release_waiters(reason=reason)
-
+        self.playback_delivery.resolve_all_playback_release_waiters(reason=reason)
 
     async def wait_for_playback_start(
         self,
@@ -697,7 +575,7 @@ class VoiceAssistant:
         session_id: Optional[str],
         timeout_s: float,
     ) -> bool:
-        started = await self._playback_state().wait_for_playback_start(
+        started = await self.playback_delivery.wait_for_playback_start(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -720,7 +598,7 @@ class VoiceAssistant:
         session_id: str | None,
         reason: str,
     ) -> bool:
-        cancelled = self._playback_state().cancel_order_before_start(
+        cancelled = self.playback_delivery.cancel_order_before_start(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -783,95 +661,13 @@ class VoiceAssistant:
         return sid
 
     def normalize_tts_candidate(self, text: str) -> str:
-        text = (text or "").strip()
-        text = text.replace("```", " ").replace("`", " ").replace("**", " ")
-        text = re.sub(r"[*_#>\[\]{}|]+", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
+        text = strip_speech_markup(text)
         text = re.sub(r"^[-•]+\s*", "", text).strip()
         text = re.sub(r"\s+([,.;:!?])", r"\1", text)
         return text
 
     def is_valid_tts_text(self, text: str) -> bool:
-        text = self.normalize_tts_candidate(text)
-        if len(text) < 2:
-            return False
-        if re.fullmatch(r"\d+[\.)]?", text):
-            return False
-        return any(ch.isalnum() or "\u4e00" <= ch <= "\u9fff" for ch in text)
-
-    def split_tts_text(self, text: str) -> list[str]:
-        candidate = self.normalize_tts_candidate(text)
-        if not self.is_valid_tts_text(candidate):
-            return []
-        if not getattr(self, "tts_text_chunking_enabled", True):
-            return [candidate]
-        max_text_chars = max(20, int(getattr(self, "tts_max_text_chars", 220)))
-        limit = max(
-            20,
-            min(
-                max_text_chars,
-                int(getattr(self, "tts_chunk_chars", getattr(self, "tts_flush_chars", 160))),
-            ),
-        )
-        contains_cjk = any("\u4e00" <= char <= "\u9fff" for char in candidate)
-        if contains_cjk:
-            limit = min(
-                limit,
-                max(12, int(getattr(self, "tts_cjk_chunk_chars", 36))),
-            )
-        first_limit = int(getattr(self, "tts_first_chunk_chars", min(limit, 16)) or 0)
-        first_limit = max(4, min(limit, first_limit)) if first_limit > 0 else limit
-        hard_limit = min(max_text_chars, limit) if contains_cjk else max_text_chars
-
-        raw_chunks: list[str] = []
-        min_chars = max(1, int(getattr(self, "tts_min_chunk_chars", 40)))
-        if contains_cjk:
-            min_chars = min(
-                min_chars,
-                max(1, int(getattr(self, "tts_cjk_min_chunk_chars", 8))),
-            )
-            clause_trigger = max(limit, min_chars * 2)
-        else:
-            clause_trigger = max(80, min(limit, hard_limit) // 2, min_chars * 3)
-        for unit in split_tts_sentence_units(candidate):
-            for clause in split_tts_clause_units(
-                unit,
-                min_chars=min_chars,
-                trigger_chars=clause_trigger,
-            ):
-                raw_chunks.extend(split_oversized_tts_unit(clause, hard_limit))
-        if not raw_chunks:
-            return [candidate]
-
-        chunks: list[str] = []
-        current = ""
-        grouped_chunks = raw_chunks
-        if (
-            first_limit < limit
-            and len(raw_chunks) > 1
-            and len(raw_chunks[0]) <= first_limit
-            and ends_with_tts_sentence_boundary(raw_chunks[0])
-        ):
-            chunks.append(raw_chunks[0])
-            grouped_chunks = raw_chunks[1:]
-        for chunk in grouped_chunks:
-            merged = f"{current} {chunk}".strip() if current else chunk
-            if not current:
-                current = chunk
-            elif should_merge_tts_chunks(
-                current,
-                chunk,
-                limit=limit,
-                hard_limit=hard_limit,
-                min_chars=min_chars,
-            ):
-                current = merged
-            else:
-                chunks.append(current)
-                current = chunk
-        if current:
-            chunks.append(current)
-        return chunks or [candidate]
+        return has_speakable_content(self.normalize_tts_candidate(text), min_chars=2)
 
     def save_audio(self, data: bytes, prefix: str, session_id: Optional[str] = None) -> None:
         if not self.save_audio_enabled or not data:
@@ -948,117 +744,6 @@ class VoiceAssistant:
     def is_stale_playback(self, generation: int, session_id: Optional[str]) -> bool:
         return generation != self.playback_delivery.playback_generation or session_id != self.session_id
 
-    @staticmethod
-    def _normalize_echo_text(text: str) -> str:
-        normalized = unicodedata.normalize("NFKC", str(text or "")).casefold()
-        return "".join(char for char in normalized if char.isalnum())
-
-    def _remember_tts_text(self, generation: int, text: str) -> None:
-        normalized = self.normalize_tts_candidate(text)
-        if not normalized:
-            return
-        store = self.playback_delivery.tts_text_by_generation
-        if not isinstance(store, dict):
-            store = {}
-            self.playback_delivery.tts_text_by_generation = store
-        history = store.setdefault(int(generation), [])
-        history.append(normalized)
-        # Retain only the current and a few recent generations.  A delayed ASR
-        # response may arrive after playback advances, but old dialogue must not
-        # accumulate for the lifetime of the process.
-        minimum_generation = int(generation) - 3
-        for old_generation in list(store):
-            if old_generation < minimum_generation:
-                store.pop(old_generation, None)
-
-    def _likely_tts_echo(
-        self,
-        transcript: str,
-        *,
-        playback_generation_at_start: int | None,
-        started_during_playback: bool = True,
-        capture_started_monotonic_ms: float | None = None,
-        post_playback_tail_ms: float = 500.0,
-    ) -> tuple[bool, float, float]:
-        if playback_generation_at_start is None:
-            return False, 0.0, 0.0
-        if not started_during_playback:
-            playback_state = self._playback_state()
-            last_generation = playback_state.last_completed_playback_generation
-            playback_end_ms = playback_state.last_playback_end_monotonic_ms
-            if (
-                last_generation != int(playback_generation_at_start)
-                or playback_end_ms is None
-                or capture_started_monotonic_ms is None
-                or capture_started_monotonic_ms > playback_end_ms + max(0.0, float(post_playback_tail_ms))
-            ):
-                return False, 0.0, 0.0
-        store = self.playback_delivery.tts_text_by_generation
-        if not isinstance(store, dict):
-            store = {}
-        spoken_parts = store.get(
-            int(playback_generation_at_start),
-            [],
-        )
-        transcript_key = self._normalize_echo_text(transcript)
-        part_keys = [
-            key
-            for part in spoken_parts
-            if (key := self._normalize_echo_text(part))
-        ]
-        if len(transcript_key) < 2 or not part_keys:
-            return False, 0.0, 0.0
-        # One retained output recording corresponds to one scheduled TTS order.
-        # Compare ASR against each order first so a short replay is not diluted
-        # by an entire multi-sentence generation.  Adjacent and whole-generation
-        # candidates retain coverage for VAD segments that cross order bounds.
-        candidate_keys = list(part_keys)
-        candidate_keys.extend(
-            left + right
-            for left, right in zip(part_keys, part_keys[1:], strict=False)
-        )
-        candidate_keys.append("".join(part_keys))
-
-        best_ratio = 0.0
-        best_coverage = 0.0
-        best_strength = -1.0
-        for spoken_key in dict.fromkeys(candidate_keys):
-            if transcript_key in spoken_key:
-                return True, 1.0, 1.0
-            matcher = SequenceMatcher(
-                None,
-                transcript_key,
-                spoken_key,
-                autojunk=False,
-            )
-            ratio = float(matcher.ratio())
-            longest = max(
-                (block.size for block in matcher.get_matching_blocks()),
-                default=0,
-            )
-            transcript_coverage = float(
-                longest / max(1, len(transcript_key))
-            )
-            strength = max(ratio / 0.78, transcript_coverage / 0.88)
-            if strength > best_strength:
-                best_ratio = ratio
-                best_coverage = transcript_coverage
-                best_strength = strength
-        if started_during_playback:
-            likely = bool(
-                best_ratio >= 0.78
-                or (best_coverage >= 0.88 and len(transcript_key) >= 6)
-            )
-        else:
-            # Outside active playback require a much stronger textual match.
-            # This catches speaker/acoustic tails without swallowing an ordinary
-            # person who happens to respond with vaguely similar wording.
-            likely = bool(
-                best_ratio >= 0.94
-                or (best_coverage >= 0.98 and len(transcript_key) >= 6)
-            )
-        return likely, best_ratio, best_coverage
-
     async def schedule_tts_sentence(
         self,
         sentence: str,
@@ -1085,14 +770,14 @@ class VoiceAssistant:
             self.playback_delivery.synthesis_order += 1
         if self.is_stale_playback(generation, session_id):
             return {"scheduled": False, "reason": "stale_playback"}
-        self._remember_tts_text(generation, sentence)
+        tts_echo.remember_tts_text(self, generation, sentence)
         key = self.playback_start_key(generation, order, session_id)
         from orchestrator.runtime.scheduler import current_execution_start
         execution_start = current_execution_start.get()
         if execution_start is not None:
-            self._playback_state().execution_starts[key] = execution_start
+            self.playback_delivery.execution_starts[key] = execution_start
         self.playback_delivery.playback_start_waiters[key] = asyncio.get_running_loop().create_future()
-        self._playback_state().create_playback_release_waiter(
+        self.playback_delivery.create_playback_release_waiter(
             generation=generation,
             order=order,
             session_id=session_id,
@@ -1112,7 +797,7 @@ class VoiceAssistant:
         text: str,
         session_id: Optional[str],
     ) -> dict[str, Any]:
-        chunks = self.split_tts_text(text)
+        chunks = tts_text.split_tts_text(self, text)
         if not chunks:
             normalized = self.normalize_tts_candidate(text)
             self.session_log(
@@ -1159,498 +844,23 @@ class VoiceAssistant:
         request: CapabilityRequest,
         scheduled: dict[str, Any],
     ) -> None:
-        """Cancel one goal-bound speech request at the shared output boundary.
-
-        Pending chunks are invalidated by exact generation/order.  Once any
-        chunk may have started, Chromie's playback resource is global, so the
-        only truthful cancellation is a shared output abort.  Capability Runtime
-        marks that provider as global-domain and records every coaffected Goal.
-        """
-
-        metadata = request.args.get("metadata")
-        session_id = (
-            metadata.get("session_id")
-            if isinstance(metadata, dict)
-            else None
-        )
-        cancelled_orders = self._cancel_scheduled_playback_before_start(
-            scheduled,
-            session_id=session_id,
-            reason="named_goal_speech_cancelled",
-        )
-        raw_orders = scheduled.get("orders")
-        if not isinstance(raw_orders, list):
-            raw_orders = [scheduled.get("order")]
-        expected_orders = {
-            int(item)
-            for item in raw_orders
-            if isinstance(item, int)
-            or (isinstance(item, str) and item.isdigit())
-        }
-        needs_global_abort = bool(
-            not scheduled
-            or scheduled.get("scheduled") is not True
-            or scheduled.get("playback_started") is True
-            or expected_orders - set(cancelled_orders)
-        )
-        if needs_global_abort:
-            self._invalidate_output_state(cancel_cognitive_work=False)
-            await playback_transport_for(self).abort_output_stream()
-        self.session_log(
-            session_id,
-            "interaction_speech_cancelled: request_id=%s pending_orders=%s "
-            "global_abort=%s",
-            request.request_id,
-            ",".join(str(item) for item in sorted(cancelled_orders)),
-            needs_global_abort,
-        )
+        return await interaction_speech_host.cancel_interaction_speech(self, request, scheduled)
 
     async def _schedule_interaction_speech(
         self,
         args: dict[str, Any],
     ) -> dict[str, Any]:
-        metadata = args.get("metadata")
-        session_id = (
-            metadata.get("session_id")
-            if isinstance(metadata, dict)
-            else None
-        )
-        origin_session_id = metadata.get("origin_session_id") if isinstance(metadata, dict) else None
-        voice_release_required = bool(
-            isinstance(metadata, dict)
-            and metadata.get("wait_for_voice_release") is True
-        )
-
-        async def wait_for_voice_release(
-            generation: int,
-            orders: list[int],
-            playback_started: bool,
-        ) -> bool:
-            if not voice_release_required or not playback_started or not orders:
-                return False
-            raw_timeout_ms = (
-                metadata.get("voice_release_timeout_ms", 30000)
-                if isinstance(metadata, dict)
-                else 30000
-            )
-            try:
-                timeout_ms = max(1000, int(raw_timeout_ms))
-            except (TypeError, ValueError):
-                timeout_ms = 30000
-            return await self._playback_state().wait_for_playback_release(
-                generation=generation,
-                order=orders[-1],
-                session_id=session_id,
-                timeout_s=timeout_ms / 1000.0,
-            )
-
-        if (
-            isinstance(metadata, dict)
-            and metadata.get("reuse_current_turn_speech") is True
-        ):
-            raw_generation = metadata.get("reused_speech_generation")
-            raw_orders = metadata.get("reused_speech_orders")
-            event_id = str(metadata.get("reused_speech_event_id") or "").strip()
-            try:
-                generation = int(raw_generation)
-            except (TypeError, ValueError):
-                return {
-                    "scheduled": False,
-                    "reason": "reused_speech_missing_generation",
-                    "reused": True,
-                }
-            orders = [
-                int(item)
-                for item in (raw_orders if isinstance(raw_orders, list) else [])
-                if isinstance(item, int)
-            ]
-            if not orders:
-                return {
-                    "scheduled": False,
-                    "reason": "reused_speech_missing_orders",
-                    "reused": True,
-                }
-
-            def current_status() -> str:
-                events = self._playback_state().turn_speech_events.get(
-                    str(origin_session_id or session_id or ""),
-                    [],
-                )
-                for item in reversed(events):
-                    if event_id and str(item.get("event_id") or "") != event_id:
-                        continue
-                    raw_event_generation = item.get("generation")
-                    try:
-                        event_generation = int(raw_event_generation)
-                    except (TypeError, ValueError):
-                        event_generation = -1
-                    if event_generation != generation:
-                        continue
-                    item_orders = item.get("orders")
-                    if not isinstance(item_orders, list) or orders[0] not in item_orders:
-                        continue
-                    if self.normalize_tts_candidate(str(args.get("text") or "")) != item.get("text"):
-                        raise ValueError("Communicative Activity wording cannot change under one identity")
-                    return str(item.get("status") or "")
-                return ""
-
-            status = current_status()
-            from orchestrator.runtime.scheduler import current_execution_start
-
-            execution_start = current_execution_start.get()
-            if execution_start is not None:
-                if status in {"playback_started", "playback_completed"}:
-                    await execution_start.group.ready_after_observed_start(
-                        execution_start.member
-                    )
-                elif status == "scheduled":
-                    key = self.playback_start_key(
-                        generation,
-                        orders[0],
-                        session_id,
-                    )
-                    self._playback_state().execution_starts[key] = execution_start
-                    status_after_binding = current_status()
-                    if status_after_binding in {
-                        "playback_started",
-                        "playback_completed",
-                    }:
-                        self._playback_state().execution_starts.pop(key, None)
-                        await execution_start.group.ready_after_observed_start(
-                            execution_start.member
-                        )
-                        status = status_after_binding
-            playback_started = status in {
-                "playback_started",
-                "playback_completed",
-            }
-            playback_barrier = (
-                metadata.get("wait_for_playback_start") is True
-                or voice_release_required
-            )
-            if playback_barrier and not playback_started:
-                default_playback_timeout_ms = int(
-                    getattr(
-                        getattr(
-                            getattr(self, "host_settings", None),
-                            "playback",
-                            None,
-                        ),
-                        "playback_start_timeout_ms",
-                        20000,
-                    )
-                )
-                try:
-                    timeout_ms = int(
-                        metadata.get(
-                            "playback_start_timeout_ms",
-                            default_playback_timeout_ms,
-                        )
-                    )
-                except (TypeError, ValueError):
-                    timeout_ms = default_playback_timeout_ms
-                playback_started = await self.wait_for_playback_start(
-                    generation=generation,
-                    order=orders[0],
-                    session_id=session_id,
-                    timeout_s=max(0.001, timeout_ms / 1000.0),
-                )
-                playback_started = playback_started or current_status() in {
-                    "playback_started",
-                    "playback_completed",
-                }
-                if not playback_started:
-                    status_after_wait = current_status()
-                    reused_request = {
-                        "scheduled": True,
-                        "generation": generation,
-                        "order": orders[0],
-                        "orders": orders,
-                    }
-                    if status_after_wait == "scheduled":
-                        self._cancel_scheduled_playback_before_start(
-                            reused_request,
-                            session_id=session_id,
-                            reason="reused_speech_delivery_not_observed",
-                        )
-                        status_after_wait = current_status()
-                    if status_after_wait in {
-                        "playback_started",
-                        "playback_completed",
-                    }:
-                        playback_started = True
-                    elif status_after_wait in {"not_delivered", ""}:
-                        fallback_metadata = dict(metadata)
-                        fallback_metadata["reuse_current_turn_speech"] = False
-                        fallback_metadata.pop("reused_speech_generation", None)
-                        fallback_metadata.pop("reused_speech_orders", None)
-                        fallback_metadata.pop("reused_speech_status", None)
-                        fallback_metadata.pop("reused_speech_event_id", None)
-                        fallback_metadata[
-                            "fallback_for_undelivered_speech_event_id"
-                        ] = event_id
-                        fallback_args = dict(args)
-                        fallback_args["metadata"] = fallback_metadata
-                        fallback = await self._schedule_interaction_speech(
-                            fallback_args
-                        )
-                        fallback["reused"] = False
-                        fallback[
-                            "fallback_for_undelivered_speech_event_id"
-                        ] = event_id
-                        return fallback
-            return {
-                "scheduled": True,
-                "reused": True,
-                "speech_event_id": event_id or None,
-                "generation": generation,
-                "order": orders[0],
-                "orders": orders,
-                "chunks": len(orders),
-                "playback_started": playback_started,
-                "voice_release_required": voice_release_required,
-                "voice_released": await wait_for_voice_release(
-                    generation, orders, playback_started
-                ),
-                "status": current_status() or status or "scheduled",
-            }
-
-        # Semantic idempotency is keyed by exact Planner Communicative Activity
-        # identity, not by transport generation/order and not by wording similarity.
-        # If the same Activity is materialized twice during reconciliation or a
-        # retry, reuse the already-scheduled/delivered audio rather than creating
-        # a second user-facing act.
-        semantic_activity_ids: list[str] = []
-        if isinstance(metadata, dict):
-            raw_activity_ids = metadata.get("communicative_activity_ids")
-            if isinstance(raw_activity_ids, str):
-                raw_activity_ids = [raw_activity_ids]
-            if isinstance(raw_activity_ids, list):
-                semantic_activity_ids.extend(
-                    str(item).strip()
-                    for item in raw_activity_ids
-                    if str(item).strip()
-                )
-            fast_activity_id = str(metadata.get("fast_activity_id") or "").strip()
-            if fast_activity_id and fast_activity_id not in semantic_activity_ids:
-                semantic_activity_ids.append(fast_activity_id)
-        reuse_args = None
-        async with self._playback_state().speech_submission_lock:
-            if semantic_activity_ids:
-                existing_event = self._playback_state().find_turn_speech_event_for_activities(
-                    session_id=origin_session_id or session_id,
-                    turn_id=(
-                        str(metadata.get("turn_id") or session_id or "")
-                        if isinstance(metadata, dict)
-                        else str(session_id or "")
-                    ),
-                    communicative_activity_ids=semantic_activity_ids,
-                    reusable_statuses={"scheduled", "playback_started", "playback_completed", "playback_interrupted", "not_delivered"},
-                )
-                if existing_event is not None:
-                    if self.normalize_tts_candidate(str(args.get("text") or "")) != existing_event.get("text"):
-                        raise ValueError("Communicative Activity wording cannot change under one identity")
-                    if existing_event.get("status") == "not_delivered":
-                        existing_event = None
-                if existing_event is not None:
-                    existing_orders = existing_event.get("orders")
-                    if isinstance(existing_orders, list) and existing_orders:
-                        reuse_metadata = dict(metadata or {})
-                        reuse_metadata.update(
-                            {
-                                "reuse_current_turn_speech": True,
-                                "reused_speech_event_id": existing_event.get("event_id"),
-                                "reused_speech_generation": existing_event.get("generation"),
-                                "reused_speech_orders": list(existing_orders),
-                                "reused_speech_status": existing_event.get("status"),
-                                "semantic_idempotent_reuse": True,
-                            }
-                        )
-                        reuse_args = dict(args)
-                        reuse_args["metadata"] = reuse_metadata
-            if reuse_args is None:
-                text = str(args.get("text") or "")
-                scheduled = await self.schedule_tts_text(text, session_id)
-                if scheduled.get("scheduled") is True:
-                    raw_orders = scheduled.get("orders")
-                    if not isinstance(raw_orders, list):
-                        raw_orders = [scheduled.get("order")]
-                    orders = [
-                        int(item)
-                        for item in raw_orders
-                        if isinstance(item, int)
-                        or (isinstance(item, str) and item.isdigit())
-                    ]
-                    speech_event = self._register_turn_speech_event(
-                        session_id=session_id,
-                        origin_session_id=origin_session_id,
-                        generation=int(scheduled.get("generation") or 0),
-                        orders=orders,
-                        text=text,
-                        stage=(
-                            str(metadata.get("phase") or "interaction_speech")
-                            if isinstance(metadata, dict)
-                            else "interaction_speech"
-                        ),
-                        purpose=(
-                            str(
-                                metadata.get("speech_act")
-                                or metadata.get("delivery_role")
-                                or "response"
-                            )
-                            if isinstance(metadata, dict)
-                            else "response"
-                        ),
-                        commitment=(
-                            str(metadata.get("commitment_state") or "")
-                            if isinstance(metadata, dict)
-                            else ""
-                        ),
-                        fast_activity_id=(
-                            str(metadata.get("fast_activity_id") or "")
-                            if isinstance(metadata, dict)
-                            else ""
-                        ),
-                        communicative_activity_ids=(
-                            list(metadata.get("communicative_activity_ids") or [])
-                            if isinstance(metadata, dict)
-                            and isinstance(metadata.get("communicative_activity_ids"), list)
-                            else []
-                        ),
-                        addressed_need_ids=(
-                            metadata.get("addressed_need_ids") if isinstance(metadata, dict) else None
-                        ),
-                        source_responsibility_refs=(
-                            metadata.get("source_responsibility_refs") if isinstance(metadata, dict) else None
-                        ),
-                        wording_owner=(
-                            str(metadata.get("wording_owner") or "") if isinstance(metadata, dict) else ""
-                        ),
-                        turn_id=(
-                            str(metadata.get("turn_id") or session_id or "")
-                            if isinstance(metadata, dict)
-                            else str(session_id or "")
-                        ),
-                        source_goal_ids=(
-                            list(metadata.get("source_goal_ids") or [])
-                            if isinstance(metadata, dict)
-                            and isinstance(metadata.get("source_goal_ids"), list)
-                            else []
-                        ),
-                        canonical_plan_id=(
-                            str(metadata.get("canonical_plan_id") or "")
-                            if isinstance(metadata, dict)
-                            else ""
-                        ),
-                        canonical_plan_fingerprint=(
-                            str(metadata.get("canonical_plan_fingerprint") or "")
-                            if isinstance(metadata, dict)
-                            else ""
-                        ),
-                        goal_association_fingerprint=(
-                            str(metadata.get("goal_association_fingerprint") or "")
-                            if isinstance(metadata, dict)
-                            else ""
-                        ),
-                        delivery_role=(
-                            str(metadata.get("delivery_role") or "response")
-                            if isinstance(metadata, dict)
-                            else "response"
-                        ),
-                        claims=(
-                            list(metadata.get("claims") or [])
-                            if isinstance(metadata, dict)
-                            and isinstance(metadata.get("claims"), list)
-                            else []
-                        ),
-                        must_not_claim_completion=(
-                            metadata.get("must_not_claim_completion")
-                            if isinstance(metadata, dict)
-                            and isinstance(metadata.get("must_not_claim_completion"), bool)
-                            else None
-                        ),
-                        cognitive_opportunity_id=(
-                            str(metadata.get("cognitive_opportunity_id") or "")
-                            if isinstance(metadata, dict)
-                            else ""
-                        ),
-                        situation_signature=(
-                            str(metadata.get("situation_signature") or "")
-                            if isinstance(metadata, dict)
-                            else ""
-                        ),
-                        subject_refs=(
-                            list(metadata.get("subject_refs") or [])
-                            if isinstance(metadata, dict)
-                            and isinstance(metadata.get("subject_refs"), list)
-                            else []
-                        ),
-                    )
-                    if speech_event is not None:
-                        scheduled["speech_event_id"] = speech_event["event_id"]
-        if reuse_args is not None:
-            return await self._schedule_interaction_speech(reuse_args)
-        if (
-            isinstance(metadata, dict)
-            and (
-                metadata.get("wait_for_playback_start") is True
-                or voice_release_required
-            )
-            and scheduled.get("scheduled") is True
-        ):
-            default_playback_timeout_ms = int(
-                getattr(
-                    getattr(
-                        getattr(self, "host_settings", None),
-                        "playback",
-                        None,
-                    ),
-                    "playback_start_timeout_ms",
-                    20000,
-                )
-            )
-            raw_timeout_ms = metadata.get(
-                "playback_start_timeout_ms",
-                default_playback_timeout_ms,
-            )
-            try:
-                timeout_ms = int(raw_timeout_ms)
-            except (TypeError, ValueError):
-                timeout_ms = default_playback_timeout_ms
-            playback_started = await self.wait_for_playback_start(
-                generation=int(scheduled["generation"]),
-                order=int(scheduled["order"]),
-                session_id=session_id,
-                timeout_s=max(0.001, timeout_ms / 1000.0),
-            )
-            scheduled["playback_started"] = playback_started
-            if not playback_started:
-                scheduled["cancelled_orders"] = self._cancel_scheduled_playback_before_start(
-                    scheduled,
-                    session_id=session_id,
-                    reason="required_playback_start_not_observed",
-                )
-        if voice_release_required and scheduled.get("scheduled") is True:
-            raw_orders = scheduled.get("orders")
-            if not isinstance(raw_orders, list):
-                raw_orders = [scheduled.get("order")]
-            orders = [int(item) for item in raw_orders if isinstance(item, int)]
-            playback_started = bool(scheduled.get("playback_started"))
-            scheduled["voice_release_required"] = True
-            scheduled["voice_released"] = await wait_for_voice_release(
-                int(scheduled.get("generation") or 0),
-                orders,
-                playback_started,
-            )
-        return scheduled
+        return await interaction_speech_host.schedule_interaction_speech(self, args)
 
     def ensure_playback_worker(self) -> None:
         playback_task = self.playback_delivery.playback_task
         if playback_task is None or playback_task.done():
             self.playback_delivery.playback_task = asyncio.create_task(playback_transport_for(self).playback_worker())
-        self.session_idle_sweeper_task = asyncio.create_task(
-            input_session_runtime_for(self)._session_idle_sweeper()
-        )
+        sweeper_task = getattr(self, "session_idle_sweeper_task", None)
+        if sweeper_task is None or sweeper_task.done():
+            self.session_idle_sweeper_task = asyncio.create_task(
+                input_session_runtime_for(self)._session_idle_sweeper()
+            )
 
     async def reset_playback_ordering(self):
         async with self.playback_delivery.order_lock:
@@ -1668,37 +878,6 @@ class VoiceAssistant:
                 except asyncio.QueueEmpty:
                     break
         self.ensure_playback_worker()
-
-
-
-
-
-    def _owner_identity_json(self) -> str:
-        try:
-            context = self.mind.context()
-            identity = context.get("identity", {}) if isinstance(context, dict) else {}
-        except Exception as exc:
-            logger.warning("direct_llm_identity_failed: %s", exc)
-            identity = {}
-        if not isinstance(identity, dict):
-            identity = {}
-        return json.dumps(identity, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-
-
-
-    def _owner_mind_summary(self) -> str:
-        try:
-            summary = self.mind.prompt_summary()
-        except Exception as exc:
-            logger.warning("direct_llm_mind_summary_failed: %s", exc)
-            summary = ""
-        summary = " ".join(str(summary or "").split())
-        if not summary:
-            return "Owner-approved mind summary unavailable; rely on the supplied Self model JSON."
-        if len(summary) > 1200:
-            return summary[:1200].rstrip() + "..."
-        return summary
-
 
     def _log_goal_list(
         self,
@@ -1879,7 +1058,6 @@ class VoiceAssistant:
             ),
         }
 
-
     def _record_experience(
         self,
         *,
@@ -1967,48 +1145,12 @@ class VoiceAssistant:
                 len(episode.turns),
             )
 
-    @staticmethod
-    def _safe_immediate_route_speech(text: str | None) -> str | None:
-        """Apply only transport-safe checks to source-authored immediate speech.
-
-        Semantic wording is owned by the Planner's Communicative Activity. Typed
-        Planner provenance carries the mechanical claim boundary; the Host does not add a
-        second semantic LLM or infer meaning from phrases, keywords, or punctuation.
-        """
-
-        cleaned = " ".join((text or "").strip().split())
-        if not cleaned or len(cleaned) > 120:
-            return None
-        lowered = cleaned.casefold()
-        if any(marker in lowered for marker in (
-            "soridormi.",
-            "chromie.",
-        )):
-            return None
-        if any(ord(char) < 32 and char not in {"\t", "\n", "\r"} for char in cleaned):
-            return None
-        return cleaned
-
-
-
-
-
-
-
-
     def _cognitive_gateway_adapter(self) -> CognitiveGateway:
         adapter = getattr(self, "cognitive_gateway", None)
         if adapter is None:
             adapter = CognitiveGateway()
             self.cognitive_gateway = adapter
         return adapter
-
-    def _current_conversation_id(self, session_id: str) -> str:
-        conversation_id = str(
-            getattr(getattr(self, "conversation_state", None), "conversation_id", "")
-            or ""
-        ).strip()
-        return conversation_id or session_id
 
     def _metadata_with_turn_envelope(
         self,
@@ -2067,7 +1209,6 @@ class VoiceAssistant:
             ),
         )
 
-
     async def _run_cognitive_runtime_pipeline(
         self,
         session: aiohttp.ClientSession,
@@ -2079,297 +1220,16 @@ class VoiceAssistant:
         record_evidence: bool = True,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> CognitiveRuntimeResolution:
-        started_ms = now_ms()
-        if turn_envelope is None:
-            resolution = CognitiveRuntimeResolution(
-                mode=self.cognitive_runtime_mode,
-                status="error",
-                timings_ms={"total": round(now_ms() - started_ms, 1)},
-                fallback_reason="missing_admitted_user_turn_envelope",
-                metadata={
-                    "failure_stage": "cognitive_gateway_admission",
-                    "failure_class": "missing_user_turn_envelope",
-                    "failure_domain": "contract",
-                    "architecture_attribution": "cognitive_gateway",
-                    "retryable": False,
-                },
-            )
-            if record_evidence:
-                record_cognitive_runtime_evidence(
-                    getattr(self, "cognitive_evidence", None),
-                    resolution,
-                    session_id=session_id,
-                    user_text=user_text,
-                    session_log=self.session_log,
-                )
-            self.session_log(
-                session_id,
-                "cognitive_runtime_rejected: reason=missing_admitted_user_turn_envelope",
-            )
-            return resolution
-        authority_context = self._cognitive_core_authority_context(
-            context,
-            session_id=session_id,
-            observer=self.cognitive_runtime_mode != "apply",
-        )
-        resolved_text = user_text
-        resolved_session_id = session_id
-        resolved_language = core_interpretation.language or (
-            "zh-CN" if self._looks_zh(user_text) else "en-US"
-        )
-        resolved_history = authority_context.get("history", [])
-        if turn_envelope is not None:
-            projection = self._cognitive_gateway_adapter().project_for_core(
-                turn_envelope,
-                current_text=user_text,
-                current_session_id=session_id,
-                context=authority_context,
-            )
-            resolved_text = projection.text
-            resolved_session_id = projection.sid
-            resolved_language = projection.language
-            authority_context = projection.context
-            resolved_history = projection.history
-        try:
-            resolution = await asyncio.wait_for(
-                self.cognitive_runtime.resolve(
-                    session,
-                    text=resolved_text,
-                    sid=resolved_session_id,
-                    core_interpretation=core_interpretation,
-                    context=authority_context,
-                    history=resolved_history,
-                    language=resolved_language,
-                    turn_envelope=turn_envelope,
-                ),
-                timeout=self.cognitive_runtime_timeout_ms / 1000.0,
-            )
-        except Exception as exc:
-            status = "error"
-            is_timeout = isinstance(exc, (asyncio.TimeoutError, TimeoutError))
-            resolution = CognitiveRuntimeResolution(
-                mode=self.cognitive_runtime_mode,
-                status=status,
-                turn_envelope=turn_envelope,
-                timings_ms={"total": round(now_ms() - started_ms, 1)},
-                fallback_reason=f"{type(exc).__name__}: {str(exc)[:500]}",
-                metadata={
-                    "foreground_deadline_ms": self.cognitive_runtime_timeout_ms,
-                    "failure_stage": "cognitive_runtime_foreground",
-                    "failure_class": (
-                        "foreground_deadline_exceeded"
-                        if is_timeout
-                        else type(exc).__name__
-                    ),
-                    "failure_domain": (
-                        "interaction_deadline" if is_timeout else "cognitive_runtime"
-                    ),
-                    "architecture_attribution": "not_evaluated",
-                    "retryable": is_timeout,
-                },
-            )
-        if turn_envelope is not None and resolution.turn_envelope is None:
-            resolution = resolution.model_copy(
-                update={"turn_envelope": turn_envelope}
-            )
-
-        trace_reference = resolution.metadata.get("runtime_trace")
-        if isinstance(trace_reference, dict):
-            self.sessions.update_trace_correlations(
-                session_id,
-                cognitive_trace_id=trace_reference.get("trace_id"),
-            )
-
-        if record_evidence:
-            record_cognitive_runtime_evidence(
-                getattr(self, "cognitive_evidence", None),
-                resolution, session_id=session_id, user_text=user_text,
-                session_log=self.session_log,
-            )
-
-        terminal = resolution.terminal_plan
-        failure_stage = str(resolution.metadata.get("failure_stage") or "none")
-        failure_class = str(resolution.metadata.get("failure_class") or "none")
-        attribution = str(
-            resolution.metadata.get("architecture_attribution") or "not_evaluated"
-        )
-        self.session_log(
-            session_id,
-            "cognitive_runtime_done: mode=%s status=%s total_ms=%.1f "
-            "planner=%s disposition=%s steps=%s failure_stage=%s failure_class=%s "
-            "architecture_attribution=%s fallback=%s",
-            resolution.mode,
-            resolution.status,
-            float(resolution.timings_ms.get("total", now_ms() - started_ms)),
-            terminal.planner_tier if terminal is not None else "none",
-            terminal.disposition if terminal is not None else "none",
-            len(terminal.steps) if terminal is not None else 0,
-            failure_stage,
-            failure_class,
-            attribution,
-            resolution.fallback_reason or "none",
-        )
-        return resolution
-
-
-
-    def _goal_cancellation_operational_fail_safe(
-        self,
-        user_text: str,
-        *,
-        evidence: GoalCancellationEvidence,
-    ) -> InteractionResponse:
-        """Return one conservative warning only when Planner re-entry is unavailable.
-
-        This is an operational safety fallback, not ordinary cancellation dialogue:
-        it makes no claim that cancellation succeeded or failed and exposes no
-        internal closure stage. The normal path is Planner-authored from Evidence.
-        """
-
-        text = (
-            "刚才那个停止我没确认好，先别当作已经停了。"
-            if self._looks_zh(user_text)
-            else "I couldn't verify that stop, so don't assume it stopped."
-        )
-        response = self._host_speech_response(
-            text,
-            style="warning",
-            source="host_goal_cancellation_operational_fail_safe",
-        )
-        return response.model_copy(
-            deep=True,
-            update={
-                "metadata": {
-                    **response.metadata,
-                    "operational_fail_safe": True,
-                    "goal_cancellation_evidence": evidence.model_dump(
-                        mode="json"
-                    ),
-                }
-            },
-        )
-
-    async def _dispatch_named_goal_cancellation(
-        self,
-        resolution: CognitiveRuntimeResolution,
-        *,
-        session_id: str,
-        user_text: str,
-        language: str,
-    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-        """Bridge the Core's semantic target to trusted cancellation closure."""
-
-        return await dispatch_named_goal_cancellation(
-            conversation_state=self.conversation_state,
-            interaction_runtime=self.interaction_runtime,
-            confirmation_dialogue=getattr(self, "confirmation_dialogue", None),
-            resolution=resolution,
-            session_id=session_id,
+        return await cognitive_pipeline_host.run_cognitive_runtime_pipeline(
+            self,
+            session,
             user_text=user_text,
-            language=language,
+            session_id=session_id,
+            context=context,
+            core_interpretation=core_interpretation,
+            record_evidence=record_evidence,
+            turn_envelope=turn_envelope,
         )
-
-    async def _reenter_coaffected_goals_after_cancellation(
-        self,
-        evidence: GoalCancellationEvidence,
-        *,
-        session_id: str | None,
-        excluded_goal_ids: set[str],
-    ) -> dict[str, str]:
-        """Re-enter the Planner for still-open siblings a shared stop halted.
-
-        Provider-widened cancellation can stop a sibling Goal's Work while its
-        responsibility stays open. The same trusted cancellation Evidence wakes
-        the Planner for each such Goal from its retained provenance, so the
-        Planner (never the Host) decides whether to resume, re-plan, or report.
-        """
-
-        sibling_goal_ids = [
-            goal_id
-            for goal_id in evidence.coaffected_goal_ids
-            if goal_id not in excluded_goal_ids
-        ]
-        provenance_fn = getattr(self.conversation_state, "goal_reentry_provenance", None)
-        if not sibling_goal_ids or not callable(provenance_fn):
-            return {}
-        statuses: dict[str, str] = {}
-        for item in provenance_fn(sibling_goal_ids):
-            goal_id = str(item.get("goal_id") or "")
-            source_text = str(item.get("source_text") or "").strip()
-            try:
-                responsibilities = [
-                    CognitiveResponsibilityProposal.model_validate(raw)
-                    for raw in item.get("responsibilities") or []
-                ]
-            except (TypeError, ValueError):
-                responsibilities = []
-            if not responsibilities or not source_text:
-                statuses[goal_id] = "missing_responsibility_provenance"
-                continue
-            opportunity = CognitiveOpportunity.create(
-                trigger="execution_outcome",
-                goal_ids=[goal_id],
-                evidence_refs=[evidence.evidence_id],
-                reason_codes=[evidence.reason_code],
-                recommended_cognition="fast",
-            )
-            planner_response = await self._planner_state_reentry_response(
-                source_response=None,
-                canonical_plan=None,
-                user_request=source_text,
-                language=str(item.get("language") or "auto"),
-                goal_ids=[goal_id],
-                evidence_goal_ids=[goal_id],
-                evidence_refs=[evidence.evidence_id],
-                session_id=session_id,
-                phase="goal_cancellation_reentry",
-                context_updates={
-                    "trusted_goal_cancellation_evidence": [
-                        evidence.model_dump(mode="json")
-                    ],
-                    "goal_cancellation_reentry": {
-                        "phase": "goal_cancellation_reentry",
-                        "source_goal_ids": list(evidence.target_goal_ids),
-                        "evidence_refs": [evidence.evidence_id],
-                        "planner_authority": "planner",
-                    },
-                    "cognitive_opportunity": opportunity.prompt_projection(),
-                },
-                fast_workflow_stage="fast_planner_goal_cancellation_reentry",
-                response_source="fast_planner_goal_cancellation_reentry",
-                responsibilities_override=responsibilities,
-            )
-            if planner_response is None:
-                statuses[goal_id] = "no_change"
-                continue
-            statuses[goal_id] = await self._apply_planner_reentry_response(
-                planner_response, session_id=session_id
-            )
-        return statuses
-
-    def _launch_coaffected_goal_reentry(
-        self,
-        evidence: GoalCancellationEvidence,
-        *,
-        session_id: str | None,
-        excluded_goal_ids: set[str],
-    ) -> None:
-        if not set(evidence.coaffected_goal_ids) - excluded_goal_ids:
-            return
-        task = asyncio.create_task(
-            self._reenter_coaffected_goals_after_cancellation(
-                evidence,
-                session_id=session_id,
-                excluded_goal_ids=excluded_goal_ids,
-            ),
-            name=f"coaffected-goal-reentry:{evidence.evidence_id}",
-        )
-        result_tasks = getattr(self, "active_cognitive_runtime_tasks", None)
-        if not isinstance(result_tasks, dict):
-            result_tasks = {}
-            self.active_cognitive_runtime_tasks = result_tasks
-        result_tasks[task] = evidence.evidence_id
-        task.add_done_callback(self._cognitive_runtime_task_done)
 
     def _apply_cognitive_goal_state(
         self,
@@ -2378,89 +1238,12 @@ class VoiceAssistant:
         session_id: str,
         user_text: str,
     ) -> list[dict[str, Any]]:
-        association = resolution.goal_association
-        if association is None:
-            return []
-        replacement_goal_ids = {
-            goal_id
-            for goal in association.new_goals
-            for goal_id in goal.supersedes_goal_ids
-        }
-        if replacement_goal_ids:
-            raise ActiveGoalCancellationRequiresRuntimeDispatch(
-                sorted(replacement_goal_ids)
-            )
-        cancel_goal_ids = {
-            goal_id
-            for item in association.associations
-            if item.relationship == "cancel"
-            for goal_id in item.target_goal_ids
-        }
-        if cancel_goal_ids:
-            snapshots = self.conversation_state.active_goal_snapshots(
-                limit=self.conversation_state.max_pending_tasks
-            )
-            runtime_bound: list[str] = []
-            for snapshot in snapshots:
-                goal_id = str(snapshot.get("goal_id") or "").strip()
-                if goal_id not in cancel_goal_ids:
-                    continue
-                status = str(snapshot.get("status") or "").strip()
-                metadata = snapshot.get("metadata")
-                if not isinstance(metadata, dict):
-                    metadata = {}
-                remaining = metadata.get("remaining_request_ids")
-                if isinstance(remaining, str):
-                    remaining = [remaining]
-                has_remaining = bool(
-                    isinstance(remaining, list)
-                    and any(str(item).strip() for item in remaining)
-                )
-                exact_binding = all(
-                    str(metadata.get(key) or "").strip()
-                    for key in (
-                        "interaction_id",
-                        "canonical_plan_id",
-                        "canonical_plan_fingerprint",
-                    )
-                )
-                if (
-                    status
-                    in {
-                        "awaiting_confirmation",
-                        "committed",
-                        "scheduled",
-                        "running",
-                        "paused",
-                    }
-                    or has_remaining
-                    or exact_binding
-                ):
-                    runtime_bound.append(goal_id)
-            if runtime_bound:
-                raise ActiveGoalCancellationRequiresRuntimeDispatch(
-                    runtime_bound
-                )
-        results = self.conversation_state.apply_goal_association_resolution(
-            association,
-            sid=session_id,
+        return cognitive_pipeline_host.apply_cognitive_goal_state(
+            self,
+            resolution,
+            session_id=session_id,
             user_text=user_text,
-            source="goal_driven_cognitive_runtime",
-            atomic=True,
         )
-        rejected = [
-            item
-            for item in results
-            if item.get("applied") is False
-            and item.get("reason") != "operation_already_applied"
-        ]
-        if rejected:
-            raise ValueError(
-                "goal-state commit rejected: "
-                + json.dumps(rejected, ensure_ascii=False)
-            )
-        return results
-
 
     def _commit_goal_association_state(
         self,
@@ -2470,42 +1253,13 @@ class VoiceAssistant:
         user_text: str,
         source: str,
     ) -> list[dict[str, Any]]:
-        """Commit the validated Goal Association DTO without semantic reinterpretation."""
-
-        results = self.conversation_state.apply_goal_association_resolution(
+        return cognitive_pipeline_host.commit_goal_association_state(
+            self,
             association,
             sid=sid,
             user_text=user_text,
             source=source,
-            atomic=True,
         )
-        applied = [item for item in results if item.get("applied") is True]
-        if applied:
-            created = [item for item in applied if item.get("operation") == "create"]
-            try:
-                snapshot = self.conversation_state.snapshot()
-                active_goals = self.conversation_state.active_goal_snapshots(
-                    limit=self.conversation_state.max_pending_tasks
-                )
-                recent_goals = snapshot.get("recent_goal_snapshots")
-                if not isinstance(recent_goals, list):
-                    recent_goals = []
-                self._log_goal_list(
-                    sid,
-                    phase="after_association",
-                    active_goals=active_goals,
-                    recent_terminal_goals=recent_goals,
-                    applied_operations=applied,
-                )
-            except (AttributeError, KeyError, RuntimeError, TypeError, ValueError) as exc:
-                # Observability must never turn committed Goal state into a failed turn.
-                logger.warning(
-                    "goal_list_after_association_log_failed: applied=%s error_type=%s error=%s",
-                    len(applied),
-                    type(exc).__name__,
-                    exc,
-                )
-        return results
 
     def _commit_planner_information_gaps(
         self,
@@ -2516,9 +1270,8 @@ class VoiceAssistant:
         user_text: str,
         source: str,
     ) -> list[dict[str, Any]]:
-        """Persist Fast-Planner gaps after deterministic Goal identity binding."""
-
-        return self.conversation_state.apply_planner_information_gaps(
+        return cognitive_pipeline_host.commit_planner_information_gaps(
+            self,
             gaps_by_goal_id,
             turn_id=turn_id,
             sid=sid,
@@ -2550,1078 +1303,8 @@ class VoiceAssistant:
         core_interpretation_latency_ms: float,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> bool:
-        if (
-            self.cognitive_runtime_mode != "apply"
-            or not self.enable_agent
-            or not self.enable_interaction_response
-        ):
-            return False
-
-        # Maintained apply mode fans UMI out to independent SC and task planning.
-        # User Meaning Interpretation contributes Responsibility evidence only.
-        fast_first_hedge = None
-        runtime_context = dict(context)
-        self.session_log(
-            session_id,
-            "goal_progress_communication_owner=social_cognition work_owner=planner umi_speech_bypassed=true",
-        )
-        resolution = await self._run_cognitive_runtime_pipeline(
-            session,
-            user_text=user_text,
-            session_id=session_id,
-            context=runtime_context,
-            core_interpretation=core_interpretation,
-            record_evidence=False,
-            turn_envelope=turn_envelope,
-        )
-        if turn_envelope is not None and resolution.turn_envelope is None:
-            resolution = resolution.model_copy(
-                update={"turn_envelope": turn_envelope}
-            )
-        planner_speech_events = [
-            event
-            for event in self._playback_state().turn_speech_events.get(
-                str(session_id or ""), []
-            )
-            if isinstance(event, dict)
-            and str(event.get("status") or "")
-            in {"scheduled", "playback_started", "playback_completed"}
-            and (
-                event.get("fast_activity_id")
-                or event.get("communicative_activity_ids")
-            )
-        ]
-        fast_planner_vocal_scheduled = bool(
-            (
-                resolution.fast_advance is not None
-                and resolution.metadata.get("fast_vocal_activity_ids")
-            )
-            or planner_speech_events
-        )
-        summary = self._cognitive_resolution_summary(resolution)
-        if resolution.status != "applied" or resolution.interaction_response is None:
-            sessions = getattr(self, "sessions", None)
-            if sessions is not None and session_id in sessions.state:
-                sessions.state[session_id]["semantic_status"] = "failed"
-            fallback_started_ms = now_ms()
-            fast_first_scheduled = fast_planner_vocal_scheduled
-            delivered_social = (
-                resolution.interaction_response is not None
-                and resolution.interaction_response.metadata.get("presentation_already_dispatched") is True
-            )
-            safe_response = resolution.interaction_response if delivered_social else self._cognitive_core_exception_safe_response(
-                user_text,
-                context=context,
-                failure_stage=str(
-                    resolution.metadata.get("failure_stage")
-                    or "cognitive_runtime"
-                ),
-                failure_class=str(
-                    resolution.metadata.get("failure_class")
-                    or resolution.fallback_reason
-                    or resolution.status
-                ),
-                failure_error=str(resolution.fallback_reason or ""),
-            )
-            # Preserve the exact independently delivered SC response. A Work
-            # failure remains failed evidence; it does not authorize a second
-            # greeting or a generic Host apology over that completed act.
-            if not delivered_social:
-                record_session_workflow_stage(
-                    self,
-                    session_id,
-                    stage="fallback_speech",
-                    started_monotonic_ms=fallback_started_ms,
-                    finished_monotonic_ms=now_ms(),
-                    status="selected" if safe_response.speech else "silent",
-                    input_payload={
-                        "cognitive_runtime_status": resolution.status,
-                        "failure_stage": resolution.metadata.get("failure_stage"),
-                        "fallback_reason": resolution.fallback_reason,
-                        "user_text": user_text,
-                        "early_communication_already_scheduled": fast_first_scheduled,
-                    },
-                    output_payload=safe_response,
-                    errors=list(resolution.metadata.get("stage_diagnostics") or []),
-                )
-            self.conversation_state.record_user_turn(
-                session_id,
-                user_text,
-                metadata=self._metadata_with_turn_envelope(
-                    {
-                        "source": "goal_driven_cognitive_runtime",
-                        "semantic_task_resolution_authoritative": True,
-                        "cognitive_runtime_resolution": summary,
-                        "semantic_status": "failed",
-                        "semantic_failure_stage": str(
-                            resolution.metadata.get("failure_stage")
-                            or "cognitive_runtime"
-                        ),
-                        "semantic_failure_class": str(
-                            resolution.metadata.get("failure_class")
-                            or resolution.fallback_reason
-                            or resolution.status
-                        ),
-                        "canonical_goal_committed": (
-                            resolution.metadata.get("goal_state_commit_stage")
-                            == "goal_association"
-                        ),
-                    },
-                    turn_envelope,
-                ),
-            )
-            self.conversation_state.record_interaction_response(session_id, safe_response)
-            record_cognitive_runtime_evidence(
-                getattr(self, "cognitive_evidence", None),
-                resolution, session_id=session_id, user_text=user_text,
-                session_log=self.session_log,
-            )
-            if delivered_social:
-                self._finish_delivered_social_session(session_id, safe_response)
-                return True
-            self._launch_interaction(
-                safe_response,
-                session_id,
-                reset_playback=not (
-                    fast_first_scheduled
-                    or resolution.metadata.get("social_cognition_started")
-                ),
-            )
-            return True
-
-        response = resolution.interaction_response.model_copy(deep=True)
-        planner_source_plan = resolution.terminal_plan
-        cancellation_goal_ids = cancellation_target_goal_ids(resolution)
-        replacement_goal_ids = replacement_target_goal_ids(resolution)
-        cancellation_reentry_source_response = response
-        cancellation_reentry_source_plan: CanonicalPlan | None = None
-        pending_confirmation = getattr(
-            getattr(self, "confirmation_dialogue", None), "pending", None
-        )
-        if (
-            cancellation_goal_ids
-            and pending_confirmation is not None
-            and cancellation_goal_ids.intersection(
-                pending_confirmation_goal_ids(pending_confirmation)
-            )
-        ):
-            cancellation_reentry_source_response = (
-                pending_confirmation.response.model_copy(deep=True)
-            )
-            raw_pending_plan = cancellation_reentry_source_response.metadata.get(
-                "canonical_plan"
-            )
-            if isinstance(raw_pending_plan, dict):
-                try:
-                    cancellation_reentry_source_plan = CanonicalPlan.model_validate(
-                        raw_pending_plan
-                    )
-                except (TypeError, ValueError):
-                    cancellation_reentry_source_plan = None
-        try:
-            response_metadata = self._metadata_with_turn_envelope(
-                {
-                    **response.metadata,
-                    "language": core_interpretation.language,
-                    "cognitive_runtime_resolution": summary,
-                    "user_meaning_interpretation": core_interpretation.model_dump(mode="json"),
-                    "experience_context": {
-                        "user_text": user_text,
-                        "user_meaning_interpretation_confidence": core_interpretation.confidence,
-                        "user_meaning_uncertainties": [
-                            item.model_dump(mode="json")
-                            for item in core_interpretation.meaning_uncertainties
-                        ],
-                        "user_meaning_interpretation_latency_ms": core_interpretation_latency_ms,
-                        "cognitive_runtime_latency_ms": float(
-                            resolution.timings_ms.get("total", 0.0)
-                        ),
-                    },
-                },
-                turn_envelope,
-            )
-            response = response.model_copy(
-                deep=True,
-                update={
-                    "metadata": response_metadata,
-                },
-            )
-            if planner_source_plan is None:
-                raw_plan = response.metadata.get("canonical_plan")
-                if isinstance(raw_plan, dict):
-                    planner_source_plan = CanonicalPlan.model_validate(raw_plan)
-            if replacement_goal_ids:
-                goal_state_results, replacement_metadata = (
-                    await dispatch_goal_replacement(
-                        conversation_state=self.conversation_state,
-                        interaction_runtime=self.interaction_runtime,
-                        confirmation_dialogue=getattr(self, "confirmation_dialogue", None),
-                        resolution=resolution,
-                        session_id=session_id,
-                        user_text=user_text,
-                        language=core_interpretation.language,
-                    )
-                )
-                self.interaction_runtime.runtime.refresh_planning_submission_after_goal_commit(response)
-                response = self.interaction_runtime.prepare_response(
-                    response, session_id=session_id
-                )
-                response.metadata = {
-                    **response.metadata,
-                    "goal_state_results": goal_state_results,
-                    "goal_replacement": replacement_metadata,
-                }
-                resolution.goal_state_results = goal_state_results
-                resolution.metadata = {
-                    **resolution.metadata,
-                    "host_commit_status": "goal_replacement_work_stopped_and_committed",
-                    "goal_replacement": replacement_metadata,
-                }
-            elif cancellation_goal_ids:
-                goal_state_results, cancellation_metadata = (
-                    await self._dispatch_named_goal_cancellation(
-                        resolution,
-                        session_id=session_id,
-                        user_text=user_text,
-                        language=core_interpretation.language,
-                    )
-                )
-                association = resolution.goal_association
-                if association is None:
-                    raise ValueError(
-                        "named cancellation requires Goal Association provenance"
-                    )
-                cancellation_evidence = goal_cancellation_success_evidence(
-                    source_turn_id=association.turn_id,
-                    metadata=cancellation_metadata,
-                )
-                cancellation_metadata = {
-                    **cancellation_metadata,
-                    "evidence": cancellation_evidence.model_dump(mode="json"),
-                }
-                planner_response: InteractionResponse | None = None
-                released_goal_ids = list(
-                    cancellation_evidence.released_confirmation_goal_ids
-                )
-                reentry_source_response = response
-                reentry_source_plan = planner_source_plan
-                reentry_goal_ids = list(cancellation_evidence.target_goal_ids)
-                if released_goal_ids and cancellation_reentry_source_plan is not None:
-                    reentry_source_response = cancellation_reentry_source_response
-                    reentry_source_plan = cancellation_reentry_source_plan
-                    reentry_goal_ids = list(
-                        dict.fromkeys(
-                            [
-                                *cancellation_evidence.target_goal_ids,
-                                *released_goal_ids,
-                            ]
-                        )
-                    )
-                if reentry_source_plan is not None:
-                    planner_response = (
-                        await self._planner_state_reentry_response(
-                            source_response=reentry_source_response,
-                            canonical_plan=reentry_source_plan,
-                            user_request=user_text,
-                            language=core_interpretation.language,
-                            goal_ids=reentry_goal_ids,
-                            evidence_goal_ids=list(cancellation_evidence.target_goal_ids),
-                            evidence_refs=[cancellation_evidence.evidence_id],
-                            session_id=session_id,
-                            phase="goal_cancellation_reentry",
-                            context_updates={
-                                "trusted_goal_cancellation_evidence": [
-                                    cancellation_evidence.model_dump(mode="json")
-                                ],
-                                "goal_cancellation_reentry": {
-                                    "phase": "goal_cancellation_reentry",
-                                    "source_goal_ids": list(
-                                        cancellation_evidence.target_goal_ids
-                                    ),
-                                    "evidence_refs": [cancellation_evidence.evidence_id],
-                                    "planner_authority": "planner",
-                                },
-                            },
-                            fast_workflow_stage=(
-                                "fast_planner_goal_cancellation_reentry"
-                            ),
-                            response_source=(
-                                "fast_planner_goal_cancellation_reentry"
-                            ),
-                        )
-                    )
-                if planner_response is None:
-                    # Control state is already reconciled. Never resurrect the old
-                    # prospective Planner wording or invent Host completion speech.
-                    response = response.model_copy(
-                        deep=True,
-                        update={
-                            "speech": [],
-                            "capabilities": [],
-                            "requires_confirmation": False,
-                        },
-                    )
-                else:
-                    response = planner_response
-                response = response.model_copy(
-                    deep=True,
-                    update={
-                        "metadata": self._metadata_with_turn_envelope(
-                            {
-                                **response.metadata,
-                                "cognitive_runtime_apply": True,
-                                "goal_state_results": goal_state_results,
-                                "named_goal_cancellation": cancellation_metadata,
-                                "cognitive_runtime_resolution": summary,
-                            },
-                            turn_envelope,
-                        )
-                    },
-                )
-                response = self.interaction_runtime.prepare_response(
-                    response, session_id=session_id
-                )
-                resolution.interaction_response = response
-                resolution.goal_state_results = goal_state_results
-                resolution.metadata = {
-                    **resolution.metadata,
-                    "host_commit_status": (
-                        "named_goal_cancellation_dispatched_and_reconciled"
-                    ),
-                    "named_goal_cancellation": cancellation_metadata,
-                    "goal_cancellation_evidence_id": cancellation_evidence.evidence_id,
-                }
-                self._launch_coaffected_goal_reentry(
-                    cancellation_evidence,
-                    session_id=session_id,
-                    excluded_goal_ids=set(reentry_goal_ids),
-                )
-            else:
-                response = self.interaction_runtime.prepare_response(
-                    response, session_id=session_id
-                )
-                if (
-                    str(
-                        resolution.metadata.get("goal_state_commit_stage")
-                        or ""
-                    )
-                    == "goal_association"
-                ):
-                    goal_state_results = list(resolution.goal_state_results)
-                else:
-                    goal_state_results = self._apply_cognitive_goal_state(
-                        resolution,
-                        session_id=session_id,
-                        user_text=user_text,
-                    )
-                response.metadata = {
-                    **response.metadata,
-                    "goal_state_results": goal_state_results,
-                }
-                resolution.goal_state_results = goal_state_results
-                resolution.metadata = {
-                    **resolution.metadata,
-                    "host_commit_status": "prepared_and_goal_state_committed",
-                }
-        except Exception as exc:
-            cancellation_failure_evidence: GoalCancellationEvidence | None = None
-            if cancellation_goal_ids:
-                association = resolution.goal_association
-                source_turn_id = (
-                    association.turn_id
-                    if association is not None
-                    else str(session_id or "named_goal_cancellation")
-                )
-                cancellation_failure_evidence = goal_cancellation_failure_evidence(
-                    source_turn_id=source_turn_id,
-                    target_goal_ids=cancellation_goal_ids,
-                    exc=exc,
-                )
-            self.session_log(
-                session_id,
-                "cognitive_runtime_commit_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-            fast_first_scheduled = fast_planner_vocal_scheduled
-            resolution = resolution.model_copy(
-                deep=True,
-                update={
-                    "status": "error",
-                    "fallback_reason": f"host_commit_failed:{type(exc).__name__}:{str(exc)[:300]}",
-                    "interaction_response": None,
-                    "metadata": {
-                        **resolution.metadata,
-                        "host_commit_status": "rejected",
-                    },
-                },
-            )
-            summary = self._cognitive_resolution_summary(resolution)
-            safe_response: InteractionResponse
-            if cancellation_failure_evidence is not None:
-                planner_failure_response: InteractionResponse | None = None
-                try:
-                    if planner_source_plan is not None:
-                        planner_failure_response = (
-                            await self._planner_state_reentry_response(
-                                source_response=response,
-                                canonical_plan=planner_source_plan,
-                                user_request=user_text,
-                                language=core_interpretation.language,
-                                goal_ids=list(
-                                    cancellation_failure_evidence.target_goal_ids
-                                ),
-                                evidence_goal_ids=list(
-                                    cancellation_failure_evidence.target_goal_ids
-                                ),
-                                evidence_refs=[
-                                    cancellation_failure_evidence.evidence_id
-                                ],
-                                session_id=session_id,
-                                phase="goal_cancellation_reentry",
-                                context_updates={
-                                    "trusted_goal_cancellation_evidence": [
-                                        cancellation_failure_evidence.model_dump(
-                                            mode="json"
-                                        )
-                                    ],
-                                    "goal_cancellation_reentry": {
-                                        "phase": "goal_cancellation_reentry",
-                                        "source_goal_ids": list(
-                                            cancellation_failure_evidence.target_goal_ids
-                                        ),
-                                        "evidence_refs": [
-                                            cancellation_failure_evidence.evidence_id
-                                        ],
-                                        "planner_authority": "planner",
-                                    },
-                                },
-                                fast_workflow_stage=(
-                                    "fast_planner_goal_cancellation_reentry"
-                                ),
-                                response_source=(
-                                    "fast_planner_goal_cancellation_reentry"
-                                ),
-                            )
-                        )
-                except Exception as reentry_exc:
-                    self.session_log(
-                        session_id,
-                        "goal_cancellation_planner_reentry_failed: "
-                        "error_type=%s error=%s",
-                        type(reentry_exc).__name__,
-                        reentry_exc,
-                    )
-                safe_response = (
-                    planner_failure_response
-                    or self._goal_cancellation_operational_fail_safe(
-                        user_text,
-                        evidence=cancellation_failure_evidence,
-                    )
-                )
-                safe_response = safe_response.model_copy(
-                    deep=True,
-                    update={
-                        "metadata": self._metadata_with_turn_envelope(
-                            {
-                                **safe_response.metadata,
-                                "goal_cancellation_evidence": (
-                                    cancellation_failure_evidence.model_dump(
-                                        mode="json"
-                                    )
-                                ),
-                            },
-                            turn_envelope,
-                        )
-                    },
-                )
-            else:
-                safe_response = self._cognitive_core_exception_safe_response(
-                    user_text,
-                    context=context,
-                    failure_stage="host_commit",
-                    failure_class=type(exc).__name__,
-                    failure_error=str(exc),
-                )
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="fallback_speech",
-                started_monotonic_ms=now_ms(),
-                finished_monotonic_ms=now_ms(),
-                status="selected",
-                input_payload={
-                    "failure_stage": "host_commit",
-                    "fallback_reason": resolution.fallback_reason,
-                    "user_text": user_text,
-                },
-                output_payload=safe_response,
-                errors=[
-                    {"error_type": type(exc).__name__, "error": str(exc)}
-                ],
-            )
-            self.conversation_state.record_user_turn(
-                session_id,
-                user_text,
-                metadata=self._metadata_with_turn_envelope(
-                    {
-                        "source": "goal_driven_cognitive_runtime",
-                        "semantic_task_resolution_authoritative": True,
-                        "cognitive_runtime_resolution": summary,
-                    },
-                    turn_envelope,
-                ),
-            )
-            self.conversation_state.record_interaction_response(session_id, safe_response)
-            record_cognitive_runtime_evidence(
-                getattr(self, "cognitive_evidence", None),
-                resolution, session_id=session_id, user_text=user_text,
-                session_log=self.session_log,
-            )
-            self._launch_interaction(
-                safe_response, session_id, reset_playback=not fast_first_scheduled
-            )
-            return True
-
-        self.conversation_state.record_user_turn(
-            session_id,
-            user_text,
-            metadata=self._metadata_with_turn_envelope(
-                {
-                    "source": "goal_driven_cognitive_runtime",
-                    "confidence": core_interpretation.confidence,
-                    "semantic_task_resolution_authoritative": True,
-                    "cognitive_runtime_resolution": summary,
-                    **(
-                        {
-                            "semantic_status": "terminal_without_canonical_goal",
-                            "canonical_goal_committed": False,
-                        }
-                        if resolution.metadata.get("terminal_user_meaning_interpretation") is True
-                        else {}
-                    ),
-                },
-                turn_envelope,
-            ),
-        )
-        record_cognitive_runtime_evidence(
-            getattr(self, "cognitive_evidence", None),
-            resolution, session_id=session_id, user_text=user_text,
-            session_log=self.session_log,
-        )
-        self.session_log(
-            session_id,
-            "cognitive_interaction_ready: speech=%s capabilities=%s requires_confirmation=%s",
-            len(response.speech),
-            len(response.capabilities),
-            response.requires_confirmation,
-        )
-        for request in response.capabilities:
-            self.session_log(
-                session_id,
-                "cognitive_capability_proposed: request_id=%s capability_id=%s timing=%s "
-                "requires_confirmation=%s args=%s",
-                request.request_id,
-                request.capability_id,
-                request.timing,
-                request.requires_confirmation,
-                json.dumps(request.args, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
-            )
-        fast_first_scheduled = fast_planner_vocal_scheduled
-        if response.metadata.get("presentation_already_dispatched") is True:
-            # SC may have delivered a social-only interaction while GA completed
-            # its continuity check. Preserve that exact response in conversation
-            # history, but never schedule the already-dispatched presentation twice.
-            self.conversation_state.record_interaction_response(
-                session_id, response
-            )
-            self._finish_delivered_social_session(session_id, response)
-            return True
-        if await self._stage_interaction_confirmation(
-            response,
-            session_id,
-            language=core_interpretation.language,
-            reset_playback=not fast_first_scheduled,
-        ):
-            return True
-        await self.interaction_runtime.runtime.record_planning_submission(
-            response, lambda: self.conversation_state.record_interaction_response(session_id, response),
-        )
-        self._launch_interaction(
-            response, session_id, reset_playback=not (fast_first_scheduled or resolution.metadata.get("social_cognition_started"))
-        )
-        return True
-
-
-
-
-
-
-    async def handle_routed_text(
-        self,
-        user_text: str,
-        session_id: str,
-        *,
-        channel: str = "voice",
-    ) -> None:
-        gateway = self._cognitive_gateway_adapter()
-        turn_capture = gateway.capture(
-            user_text,
-            session_id=session_id,
-            conversation_id=self._current_conversation_id(session_id),
-            channel=channel,
-        )
-        reflex_outcome = turn_capture.reflex_candidate
-        residual_semantic_input = bool(
-            reflex_outcome.action == "interrupt"
-            and reflex_outcome.cancellation_scope == "output_only"
-            and reflex_outcome.metadata.get("residual_semantic_input") is True
-        )
-        boundary = None
-        if reflex_outcome.action == "interrupt":
-            self.session_log(
-                session_id,
-                "cognitive_gateway_reflex_detected: action=%s trigger=%s scope=%s confidence=%.2f",
-                reflex_outcome.action,
-                reflex_outcome.trigger,
-                reflex_outcome.cancellation_scope,
-                reflex_outcome.confidence,
-            )
-            revoked_confirmation = revoke_pending_confirmation_for_reflex(
-                getattr(self, "confirmation_dialogue", None),
-                cancellation_scope=reflex_outcome.cancellation_scope,
-                interaction_registry=getattr(
-                    getattr(self, "interaction_runtime", None),
-                    "registry",
-                    None,
-                ),
-            )
-            # The approval token is revoked synchronously before the first
-            # await, so slow trusted-provider cancellation cannot leave an old
-            # action approvable. Persistence and goal-state reconciliation run
-            # only after interruption has begun, so they cannot delay stopping.
-            try:
-                cancellation_receipt = await self._apply_reflex_cancellation(
-                    reflex_outcome,
-                    source_turn_id=session_id,
-                )
-            except BaseException:
-                # The approval token was already revoked synchronously. If the
-                # operational dispatch itself cannot return a receipt, retain
-                # that revocation through the compatibility state path before
-                # propagating the failure.
-                reconcile_revoked_confirmation_for_reflex(
-                    revoked_confirmation,
-                    conversation_state=getattr(self, "conversation_state", None),
-                    session_id=session_id,
-                    cancellation_scope=reflex_outcome.cancellation_scope,
-                    interaction_registry=getattr(
-                        getattr(self, "interaction_runtime", None),
-                        "registry",
-                        None,
-                    ),
-                    session_log=self.session_log,
-                )
-                raise
-            cancellation_reconciliation = (
-                self._reconcile_reflex_cancellation_receipt(
-                    cancellation_receipt,
-                    revoked_confirmation,
-                    session_id,
-                    user_text=user_text,
-                    cancellation_scope=reflex_outcome.cancellation_scope,
-                    )
-            )
-            cancelled_confirmation = dict(
-                cancellation_reconciliation.get(
-                    "cancelled_confirmation"
-                )
-                or {}
-            )
-            reflex_metadata = dict(reflex_outcome.metadata)
-            if cancelled_confirmation:
-                reflex_metadata["cancelled_confirmation"] = (
-                    cancelled_confirmation
-                )
-            reflex_metadata["cancellation_goal_reconciliation"] = (
-                cancellation_reconciliation
-            )
-            reflex_outcome = reflex_outcome.model_copy(
-                update={"metadata": reflex_metadata}
-            )
-            turn_capture = gateway.with_reflex_outcome(
-                turn_capture,
-                reflex_outcome,
-            )
-            if residual_semantic_input:
-                # Cancel first, then evaluate idle expiry before this receipt
-                # updates last_activity_ms. Active work keeps its existing
-                # conversation through the usual boundary owner.
-                boundary = self.conversation_state.prepare_for_user_text(
-                    user_text, session_id
-                )
-                turn_capture = gateway.with_conversation_id(
-                    turn_capture, boundary.get("conversation_id")
-                )
-            turn_envelope = gateway.for_reflex(turn_capture)
-            record_cognitive_gateway_evidence(
-                getattr(self, "cognitive_evidence", None),
-                turn_envelope,
-                user_text=user_text,
-                session_log=self.session_log,
-            )
-            self.conversation_state.record_user_turn(
-                session_id,
-                user_text,
-                metadata=self._metadata_with_turn_envelope(
-                    {
-                        "source": "cognitive_gateway_reflex",
-                        "confidence": reflex_outcome.confidence,
-                        "reflex_outcome": reflex_outcome.model_dump(mode="json"),
-                        "cancellation_dispatch_receipt": (
-                            cancellation_receipt.model_dump(mode="json")
-                        ),
-                        "cancellation_goal_reconciliation": (
-                            cancellation_reconciliation
-                        ),
-                    },
-                    turn_envelope,
-                ),
-            )
-            self.session_log(
-                session_id,
-                "cognitive_gateway_reflex_applied: action=%s trigger=%s user_meaning_interpretation_bypassed=%s",
-                reflex_outcome.action,
-                reflex_outcome.trigger,
-                not residual_semantic_input,
-            )
-            if not residual_semantic_input:
-                state = self.sessions.state.get(session_id)
-                if state is not None:
-                    state["llm_done"] = True
-                self.maybe_session_done(session_id)
-                return
-
-        if reflex_outcome.action == "ignore":
-            turn_envelope = gateway.for_suppression(turn_capture)
-            record_cognitive_gateway_evidence(
-                getattr(self, "cognitive_evidence", None),
-                turn_envelope,
-                user_text=user_text,
-                session_log=self.session_log,
-            )
-            self.conversation_state.record_user_turn(
-                session_id,
-                user_text,
-                metadata=self._metadata_with_turn_envelope(
-                    {
-                        "source": "cognitive_gateway_reflex",
-                        "confidence": reflex_outcome.confidence,
-                        "reflex_outcome": reflex_outcome.model_dump(mode="json"),
-                    },
-                    turn_envelope,
-                ),
-            )
-            self.session_log(
-                session_id,
-                "cognitive_gateway_reflex_applied: action=%s trigger=%s user_meaning_interpretation_bypassed=True",
-                reflex_outcome.action,
-                reflex_outcome.trigger,
-            )
-            state = self.sessions.state.get(session_id)
-            if state is not None:
-                state["llm_done"] = True
-            self.maybe_session_done(session_id)
-            return
-
-        if boundary is None:
-            boundary = self.conversation_state.prepare_for_user_text(user_text, session_id)
-        turn_capture = gateway.with_conversation_id(
-            turn_capture,
-            boundary.get("conversation_id"),
-        )
-        if boundary.get("started_new"):
-            self.session_log(
-                session_id,
-                "conversation_boundary: started_new=True conversation_id=%s reason=%s",
-                boundary.get("conversation_id"),
-                boundary.get("reason"),
-            )
-
-        session = await self.get_http_session()
-        context = self.build_context(session_id)
-        if residual_semantic_input:
-            # The protective receipt is retained before admission. It is this
-            # turn's evidence, not a previously accepted dialogue turn.
-            context["history"] = [
-                item for item in context.get("history", [])
-                if not (item.get("role") == "user" and item.get("sid") == session_id)
-            ]
-        interaction_ledger = getattr(
-            getattr(self, "cognitive_runtime", None),
-            "interaction_ledger",
-            None,
-        )
-        if interaction_ledger is not None:
-            context["interaction_context"] = interaction_ledger.context(
-                str(session_id or ""),
-                turn_id=turn_capture.turn_id,
-            ).model_dump(mode="json")
-        turn_capture = gateway.with_conversation_id(
-            turn_capture,
-            context.get("conversation_id"),
-        )
-        self.sessions.update_trace_correlations(
-            session_id,
-            conversation_id=context.get("conversation_id"),
-        )
-        self.session_log(
-            session_id,
-            "context_snapshot: conversation_id=%s history_turns=%s pending_tasks=%s engagement=%s",
-            context.get("conversation_id"),
-            len(context.get("history", [])),
-            len(context.get("active_pending_tasks", [])),
-            json.dumps(
-                context.get("interaction_engagement", {}),
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-            ),
-        )
-        self._log_goal_list(
-            session_id,
-            phase="before_turn",
-            active_goals=context.get("active_goal_snapshots") or [],
-            recent_terminal_goals=context.get("recent_goal_snapshots") or [],
-        )
-        context_snapshot = gateway.assemble_context(turn_capture, context)
-        if residual_semantic_input:
-            # The protective control has already run. Preserve its envelope and
-            # admit the unchanged whole utterance to the one semantic authority.
-            turn_envelope = gateway.for_reflex(turn_capture, context=context)
-            record_cognitive_gateway_evidence(
-                getattr(self, "cognitive_evidence", None),
-                turn_envelope,
-                user_text=user_text,
-                context_snapshot=context_snapshot,
-                session_log=self.session_log,
-            )
-        else:
-            attention_request = gateway.attention_request(
-                turn_capture,
-                context_snapshot,
-            )
-            attention_started_ms = now_ms()
-            attention_errors: list[dict[str, str]] = []
-            try:
-                review_attention = self.agent_client.review_attention
-                attention_review = await review_attention(
-                    session,
-                    request=attention_request,
-                )
-            except Exception as exc:
-                attention_errors.append(
-                    {"error_type": type(exc).__name__, "error": str(exc)}
-                )
-                logger.warning(
-                    "Cognitive Gateway attention review failed open: %s",
-                    exc,
-                )
-                attention_review = gateway.attention_fail_open(
-                    attention_request,
-                    reason=f"attention review unavailable: {type(exc).__name__}",
-                )
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="cognitive_gateway_attention",
-                started_monotonic_ms=attention_started_ms,
-                finished_monotonic_ms=now_ms(),
-                status=("failed_open" if attention_errors else "accepted"),
-                input_payload={
-                    "user_turn": turn_capture,
-                    "context_snapshot": context_snapshot,
-                },
-                output_payload=attention_review,
-                errors=attention_errors,
-            )
-            turn_envelope = gateway.admit_attention(
-                turn_capture,
-                context_snapshot,
-                attention_review,
-            )
-            record_cognitive_gateway_evidence(
-                getattr(self, "cognitive_evidence", None),
-                turn_envelope,
-                user_text=user_text,
-                context_snapshot=context_snapshot,
-                attention_review=attention_review,
-                session_log=self.session_log,
-            )
-            self.session_log(
-                session_id,
-                "cognitive_gateway_attention_done: disposition=%s speech_act=%s confidence=%.2f source=%s",
-                attention_review.disposition,
-                attention_review.speech_act,
-                attention_review.confidence,
-                attention_review.source,
-            )
-            if turn_envelope.admission == "suppress":
-                self.conversation_state.record_user_turn(
-                    session_id,
-                    user_text,
-                    metadata=self._metadata_with_turn_envelope(
-                        {
-                            "source": attention_review.source,
-                            "confidence": attention_review.confidence,
-                            "speech_act": attention_review.speech_act,
-                            "reason": attention_review.reason,
-                        },
-                        turn_envelope,
-                    ),
-                )
-                state = self.sessions.state.get(session_id)
-                if state is not None:
-                    state["llm_done"] = True
-                self.maybe_session_done(session_id)
-                return
-
-            # A pending confirmation is resolved only by input the Gateway has
-            # admitted. Noise/filler ignored by the reflex and room speech that
-            # Attention Review suppressed returned above, so neither can reach
-            # the model call that approves or denies a pending action.
-            if await self._handle_confirmation_reply(
-                user_text,
-                session_id,
-                turn_envelope=turn_envelope,
-            ):
-                return
-
-        context["user_turn_envelope"] = turn_envelope.model_dump(mode="json")
-
-        # Admission is already trusted dialogue evidence even though Goal
-        # Association has not run yet. Publish only the user utterance here so a
-        # concurrent follow-up can resolve ellipsis/reference against it. Canonical
-        # Goal and Task state remains model-owned and is committed later.
-        self.conversation_state.record_accepted_user_turn(
-            session_id,
-            user_text,
-            metadata=self._metadata_with_turn_envelope(
-                {
-                    "source": "cognitive_gateway_admitted_dialogue",
-                    "admission": turn_envelope.admission,
-                },
-                turn_envelope,
-            ),
-        )
-        core_start_ms = now_ms()
-        self.session_log(
-            session_id,
-            "cognitive_core_start: text_chars=%s text=%r admission=%s",
-            len(user_text),
-            user_text,
-            turn_envelope.admission,
-        )
-        try:
-            core_interpretation = await self.agent_client.interpret_turn(
-                session,
-                turn_envelope=turn_envelope,
-                context_snapshot=context_snapshot,
-            )
-            core_interpretation_latency_ms = now_ms() - core_start_ms
-            self.session_log(
-                session_id,
-                "cognitive_core_done: core_ms=%.1f responsibilities=%s confidence=%.2f unresolved=%s authority=%s",
-                core_interpretation_latency_ms,
-                len(core_interpretation.responsibilities),
-                core_interpretation.confidence,
-                len(core_interpretation.meaning_uncertainties),
-                core_interpretation.authority,
-            )
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="user_meaning_interpretation",
-                started_monotonic_ms=core_start_ms,
-                finished_monotonic_ms=now_ms(),
-                status="accepted",
-                input_payload={
-                    "user_turn_envelope": turn_envelope,
-                    "context_snapshot": context_snapshot,
-                },
-                output_payload={
-                    "core_interpretation": core_interpretation,
-                },
-                errors=[],
-            )
-        except Exception as exc:
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="user_meaning_interpretation",
-                started_monotonic_ms=core_start_ms,
-                finished_monotonic_ms=now_ms(),
-                status="failed",
-                input_payload={
-                    "user_turn_envelope": turn_envelope,
-                    "context_snapshot": context_snapshot,
-                },
-                output_payload=None,
-                errors=[
-                    {"error_type": type(exc).__name__, "error": str(exc)}
-                ],
-            )
-            self.session_log(session_id, "cognitive_core_exception: core_ms=%.1f error=%s", now_ms() - core_start_ms, exc)
-            logger.warning("Cognitive Core interpretation failed; falling back safely: %s", exc)
-            safe_response = self._cognitive_core_exception_safe_response(
-                user_text,
-                context=context,
-                failure_stage="user_meaning_interpretation",
-                failure_class=type(exc).__name__,
-                failure_error=str(exc),
-            )
-            self.conversation_state.record_user_turn(
-                session_id,
-                user_text,
-                metadata=self._metadata_with_turn_envelope(
-                    {
-                        "source": "cognitive_core_exception",
-                        "error": str(exc),
-                        "semantic_status": "failed",
-                        "semantic_failure_stage": "user_meaning_interpretation",
-                        "semantic_failure_class": type(exc).__name__,
-                        "canonical_goal_committed": False,
-                    },
-                    turn_envelope,
-                ),
-            )
-            self.session_log(
-                session_id,
-                "cognitive_core_exception_safe_fallback: embodied=%s text=%r",
-                bool(safe_response.metadata.get("embodied_request")),
-                user_text,
-            )
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="fallback_speech",
-                started_monotonic_ms=now_ms(),
-                finished_monotonic_ms=now_ms(),
-                status="selected",
-                input_payload={
-                    "failure_stage": "user_meaning_interpretation",
-                    "user_text": user_text,
-                },
-                output_payload=safe_response,
-                errors=[
-                    {"error_type": type(exc).__name__, "error": str(exc)}
-                ],
-            )
-            self.conversation_state.record_interaction_response(session_id, safe_response)
-            self._launch_interaction(safe_response, session_id)
-            return
-
-        handled = await self._try_apply_cognitive_runtime(
+        return await cognitive_pipeline_host.try_apply_cognitive_runtime(
+            self,
             session,
             user_text=user_text,
             session_id=session_id,
@@ -3630,39 +1313,20 @@ class VoiceAssistant:
             core_interpretation_latency_ms=core_interpretation_latency_ms,
             turn_envelope=turn_envelope,
         )
-        if handled:
-            return
 
-        # The maintained architecture has no compatibility fallback. Once Goal
-        # Interpretation has produced Responsibility evidence, execution may only
-        # continue through the goal-driven Cognitive Runtime. A disabled or
-        # unavailable runtime therefore fails closed instead of reconstructing a
-        # retired route/intent projection or entering a second semantic pipeline.
-        safe_response = self._cognitive_core_exception_safe_response(
+    async def handle_routed_text(
+        self,
+        user_text: str,
+        session_id: str,
+        *,
+        channel: str = "voice",
+    ) -> None:
+        return await routed_turn_host.handle_routed_text(
+            self,
             user_text,
-            context=context,
-            failure_stage="cognitive_runtime_entry",
-            failure_class="runtime_unavailable",
-        )
-        self.conversation_state.record_user_turn(
             session_id,
-            user_text,
-            metadata=self._metadata_with_turn_envelope(
-                {
-                    "source": "goal_driven_cognitive_runtime",
-                    "semantic_status": "failed",
-                    "semantic_failure_stage": "cognitive_runtime_entry",
-                    "semantic_failure_class": "runtime_unavailable",
-                    "canonical_goal_committed": False,
-                    "user_meaning_interpretation": core_interpretation.model_dump(mode="json"),
-                },
-                turn_envelope,
-            ),
+            channel=channel,
         )
-        self.conversation_state.record_interaction_response(session_id, safe_response)
-        self._launch_interaction(safe_response, session_id)
-        return
-
 
     async def _stage_interaction_confirmation(
         self,
@@ -3672,86 +1336,13 @@ class VoiceAssistant:
         language: str | None,
         reset_playback: bool = True,
     ) -> bool:
-        confirmation_request_ids = (
-            await self.interaction_runtime.confirmation_request_ids(response)
-        )
-        if not confirmation_request_ids:
-            return False
-
-        confirmation_prompt = str(
-            (response.metadata or {}).get("confirmation_prompt") or ""
-        ).strip()
-        pending = self.confirmation_dialogue.begin(
+        return await confirmation_host.stage_interaction_confirmation(
+            self,
             response,
-            confirmed_request_ids=confirmation_request_ids,
-            origin_session_id=session_id,
-            conversation_id=self.conversation_state.conversation_id,
-            prompt_override=confirmation_prompt or None,
-        )
-        self.session_log(
             session_id,
-            "confirmation_requested: confirmation_id=%s interaction_id=%s "
-            "request_ids=%s fingerprint=%s expires_at=%.3f",
-            pending.confirmation_id,
-            response.interaction_id,
-            ",".join(sorted(pending.confirmed_request_ids)),
-            pending.fingerprint,
-            pending.expires_at,
-        )
-        prompt_response = self._host_speech_response(
-            pending.prompt,
-            style="confirm",
-        )
-        prompt_response = prompt_response.model_copy(
-            deep=True,
-            update={
-                "metadata": {
-                    **prompt_response.metadata,
-                    **({"user_turn_envelope": response.metadata["user_turn_envelope"]}
-                       if isinstance(response.metadata.get("user_turn_envelope"), dict) else {}),
-                    "history_after_successful_delivery": True,
-                    "confirmation_id": pending.confirmation_id,
-                }
-            },
-        )
-        record_confirmation_scope = getattr(
-            self.conversation_state,
-            "record_confirmation_scope",
-            None,
-        )
-        if callable(record_confirmation_scope):
-            record_confirmation_scope(
-                sid=session_id,
-                confirmation_id=pending.confirmation_id,
-                interaction_id=response.interaction_id,
-                fingerprint=pending.fingerprint,
-                expires_at=pending.expires_at,
-                response=response,
-                confirmed_request_ids=set(pending.confirmed_request_ids),
-            )
-        else:  # pragma: no cover - compatibility with lightweight test doubles
-            self.conversation_state.record_pending_task(
-                sid=session_id,
-                task_type="confirmation",
-                status="awaiting_confirmation",
-                summary=", ".join(
-                    request.capability_id
-                    for request in response.capabilities
-                    if request.request_id in pending.confirmed_request_ids
-                ),
-                metadata={
-                    "confirmation_id": pending.confirmation_id,
-                    "interaction_id": response.interaction_id,
-                    "fingerprint": pending.fingerprint,
-                    "expires_at": pending.expires_at,
-                },
-            )
-        self._launch_interaction(
-            prompt_response,
-            session_id,
+            language=language,
             reset_playback=reset_playback,
         )
-        return True
 
     async def _handle_confirmation_reply(
         self,
@@ -3760,110 +1351,12 @@ class VoiceAssistant:
         *,
         turn_envelope: UserTurnEnvelope | None = None,
     ) -> bool:
-        pending = self.confirmation_dialogue.pending
-        if pending is None:
-            return False
-        meaning = await self._resolve_pending_confirmation_meaning(
+        return await confirmation_host.handle_confirmation_reply(
+            self,
             user_text,
-            session_id=session_id,
-            pending=pending,
-        )
-        resolution = self.confirmation_dialogue.resolve(
-            meaning,
-            expected_confirmation_id=pending.confirmation_id,
-        )
-        if resolution.decision == "not_confirmation":
-            return False
-
-        self.conversation_state.record_user_turn(
             session_id,
-            user_text,
-            metadata=self._metadata_with_turn_envelope(
-                {
-                    "confirmation_id": resolution.confirmation_id,
-                    "fingerprint": resolution.fingerprint,
-                },
-                turn_envelope,
-            ),
+            turn_envelope=turn_envelope,
         )
-        self.session_log(
-            session_id,
-            "confirmation_reply: confirmation_id=%s decision=%s fingerprint=%s",
-            resolution.confirmation_id,
-            resolution.decision,
-            resolution.fingerprint,
-        )
-        if resolution.confirmation_id:
-            resolve_confirmation_scope = getattr(
-                self.conversation_state,
-                "resolve_confirmation_scope",
-                None,
-            )
-            handled = bool(
-                callable(resolve_confirmation_scope)
-                and resolve_confirmation_scope(
-                    confirmation_id=resolution.confirmation_id,
-                    decision=resolution.decision,
-                )
-            )
-            if not handled:
-                pending_status = {
-                    "approved": "done",
-                    "expired": "expired",
-                }.get(resolution.decision, "cancelled")
-                self.conversation_state.update_pending_task_status(
-                    metadata_key="confirmation_id",
-                    metadata_value=resolution.confirmation_id,
-                    status=pending_status,
-                )
-
-        if resolution.decision == "approved":
-            if resolution.response is None:
-                raise RuntimeError(
-                    "approved confirmation resolution is missing its bound response"
-                )
-            self.session_log(
-                session_id,
-                "confirmation_authorized: confirmation_id=%s interaction_id=%s "
-                "request_ids=%s fingerprint=%s",
-                resolution.confirmation_id,
-                resolution.response.interaction_id,
-                ",".join(sorted(resolution.confirmed_request_ids)),
-                resolution.fingerprint,
-            )
-            self.conversation_state.record_interaction_response(
-                session_id,
-                resolution.response,
-                confirmed_request_ids=set(resolution.confirmed_request_ids),
-            )
-            self._launch_interaction(
-                resolution.response,
-                session_id,
-                confirmed_request_ids=set(resolution.confirmed_request_ids),
-            )
-            return True
-
-        self.session_log(
-            session_id,
-            "confirmation_rejected: confirmation_id=%s reason=%s fingerprint=%s",
-            resolution.confirmation_id,
-            resolution.decision,
-            resolution.fingerprint,
-        )
-        # Confirmation state is deterministic authorization truth, not a speech
-        # author.  A rejected/expired/ambiguous token therefore closes fail-safe
-        # without inventing Host dialogue.  A later Planner opportunity may choose
-        # a communicative Activity from the updated Goal/Situation state.
-        sessions = getattr(self, "sessions", None)
-        state_map = getattr(sessions, "state", None)
-        if isinstance(state_map, dict):
-            state = state_map.get(session_id)
-            if isinstance(state, dict):
-                state["llm_done"] = True
-        maybe_session_done = getattr(self, "maybe_session_done", None)
-        if sessions is not None and callable(maybe_session_done):
-            maybe_session_done(session_id)
-        return True
 
     async def _resolve_pending_confirmation_meaning(
         self,
@@ -3872,75 +1365,12 @@ class VoiceAssistant:
         session_id: str,
         pending: PendingConfirmation,
     ) -> ConfirmationReplyMeaning:
-        """Ask Goal Association for meaning; never infer it from user phrases."""
-
-        pending_goal_ids = pending_confirmation_goal_ids(pending)
-        if not pending_goal_ids:
-            self.session_log(
-                session_id,
-                "confirmation_semantics_failed_closed: confirmation_id=%s reason=missing_goal_scope",
-                pending.confirmation_id,
-            )
-            return "ambiguous"
-        context = self.build_context(session_id)
-        context = {
-            **context,
-            "pending_confirmation_scope": {
-                "confirmation_id": pending.confirmation_id,
-                "goal_ids": sorted(pending_goal_ids),
-            },
-        }
-        request = CognitiveWorkRequest(
-            sid=session_id,
-            text=user_text,
-            language="zh-CN" if self._looks_zh(user_text) else "en-US",
-            responsibilities=[
-                CognitiveResponsibilityProposal(
-                    local_ref="pending_confirmation_reply",
-                    outcome=user_text,
-                    confidence=1.0,
-                )
-            ],
-            interpretation_confidence=1.0,
-            context=context,
-            history=list(context.get("history", [])),
+        return await confirmation_host.resolve_pending_confirmation_meaning(
+            self,
+            user_text,
+            session_id=session_id,
+            pending=pending,
         )
-        try:
-            session = await self.get_http_session()
-            association = await self.agent_client.resolve_goal_association(
-                session,
-                request=request,
-                timeout_ms=self.goal_association_timeout_ms,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "confirmation_semantics_failed_closed: confirmation_id=%s reason=%s error=%s",
-                pending.confirmation_id,
-                type(exc).__name__,
-                str(exc)[:300],
-            )
-            return "ambiguous"
-        meaning = confirmation_meaning_from_goal_association(
-            association,
-            pending_goal_ids=pending_goal_ids,
-        )
-        self.session_log(
-            session_id,
-            "confirmation_semantics_resolved: confirmation_id=%s meaning=%s relationships=%s targets=%s",
-            pending.confirmation_id,
-            meaning,
-            ",".join(item.relationship for item in association.associations) or "none",
-            ",".join(
-                sorted(
-                    goal_id
-                    for item in association.associations
-                    for goal_id in item.target_goal_ids
-                )
-            )
-            or "none",
-        )
-        return meaning
 
     def _reconcile_reflex_cancellation_receipt(
         self,
@@ -3951,137 +1381,13 @@ class VoiceAssistant:
         user_text: str,
         cancellation_scope: str,
     ) -> dict[str, Any]:
-        """Commit a broad fixed-reflex receipt and confirmation as one state update."""
-
-        confirmation_evidence = revoked_confirmation_evidence_for_reflex(
+        return reflex_cancellation_host.reconcile_reflex_cancellation_receipt(
+            self,
+            receipt,
             pending,
+            session_id,
+            user_text=user_text,
             cancellation_scope=cancellation_scope,
-            interaction_registry=getattr(
-                getattr(self, "interaction_runtime", None),
-                "registry",
-                None,
-            ),
-        )
-        apply_receipt = getattr(
-            getattr(self, "conversation_state", None),
-            "apply_reflex_cancellation_receipt",
-            None,
-        )
-        if not callable(apply_receipt):
-            cancelled_confirmation = reconcile_revoked_confirmation_for_reflex(
-                pending,
-                conversation_state=getattr(self, "conversation_state", None),
-                session_id=session_id,
-                cancellation_scope=cancellation_scope,
-                interaction_registry=getattr(
-                    getattr(self, "interaction_runtime", None),
-                    "registry",
-                    None,
-                ),
-                session_log=self.session_log,
-            )
-            return {
-                "status": "compatibility_fallback",
-                "goal_state_results": [],
-                "cancelled_confirmation": cancelled_confirmation,
-            }
-        try:
-            results = apply_receipt(
-                receipt,
-                revoked_confirmation=confirmation_evidence,
-                sid=session_id,
-                user_text=user_text,
-                source="cognitive_gateway_fixed_reflex",
-            )
-        except Exception as exc:
-            cancelled_confirmation = reconcile_revoked_confirmation_for_reflex(
-                pending,
-                conversation_state=getattr(self, "conversation_state", None),
-                session_id=session_id,
-                cancellation_scope=cancellation_scope,
-                interaction_registry=getattr(
-                    getattr(self, "interaction_runtime", None),
-                    "registry",
-                    None,
-                ),
-                session_log=self.session_log,
-            )
-            self.session_log(
-                session_id,
-                "cognitive_gateway_reflex_goal_reconciliation_failed: "
-                "scope=%s error=%s:%s",
-                cancellation_scope,
-                type(exc).__name__,
-                str(exc)[:300],
-            )
-            return {
-                "status": "uncertain",
-                "goal_state_results": [],
-                "cancelled_confirmation": cancelled_confirmation,
-                "error": f"{type(exc).__name__}:{str(exc)[:300]}",
-            }
-        rejected = [
-            item
-            for item in results
-            if item.get("applied") is False
-            and item.get("reason") != "operation_already_applied"
-        ]
-        if rejected:
-            cancelled_confirmation = reconcile_revoked_confirmation_for_reflex(
-                pending,
-                conversation_state=getattr(self, "conversation_state", None),
-                session_id=session_id,
-                cancellation_scope=cancellation_scope,
-                interaction_registry=getattr(
-                    getattr(self, "interaction_runtime", None),
-                    "registry",
-                    None,
-                ),
-                session_log=self.session_log,
-            )
-            return {
-                "status": "uncertain",
-                "goal_state_results": results,
-                "cancelled_confirmation": cancelled_confirmation,
-                "error": "atomic_reflex_cancellation_state_commit_rejected",
-            }
-        if confirmation_evidence:
-            self.session_log(
-                session_id,
-                "cognitive_gateway_confirmation_cancelled: "
-                "confirmation_id=%s fingerprint=%s scope=%s widened=%s",
-                str(confirmation_evidence.get("confirmation_id") or "<unknown>"),
-                str(confirmation_evidence.get("fingerprint") or "<unknown>"),
-                cancellation_scope,
-                bool(confirmation_evidence.get("confirmation_scope_widened")),
-            )
-        return {
-            "status": "reconciled",
-            "goal_state_results": results,
-            "cancelled_confirmation": confirmation_evidence,
-        }
-
-    @staticmethod
-    def _operational_failure_notice(
-        *,
-        zh: bool,
-        failure_stage: str | None,
-        failure_class: str | None,
-        failure_error: str | None,
-    ) -> str:
-        """Return a human-safe operational notice; diagnostics stay in metadata/logs."""
-
-        stage = str(failure_stage or "").strip().casefold()
-        if "user_meaning" in stage or "interpret" in stage:
-            return (
-                "刚才那句我没理解清楚，你能再说一次吗？"
-                if zh
-                else "I didn't understand that clearly. Could you say it again?"
-            )
-        return (
-            "我这边刚才出了点问题，没能把这件事完成。"
-            if zh
-            else "I ran into a problem and couldn't complete that."
         )
 
     def _cognitive_core_exception_safe_response(
@@ -4093,50 +1399,13 @@ class VoiceAssistant:
         failure_class: str | None = None,
         failure_error: str | None = None,
     ) -> InteractionResponse:
-        """Return one non-semantic operational fallback after Core failure.
-
-        The Host does not classify the user's request to choose different
-        wording. Exact effect safety is already enforced by the absence of a
-        validated Canonical Plan and Trusted Capability Runtime execution.
-        """
-
-        # Cognition is unavailable at this boundary. Keep the emergency
-        # fail-closed utterance tiny and natural; detailed operational identity
-        # remains in response metadata/logs rather than becoming robot speech.
-        envelope = (context or {}).get("user_turn_envelope")
-        zh = self._looks_zh(user_text)
-        text = self._operational_failure_notice(
-            zh=zh,
+        return cognitive_outcome_host.cognitive_core_exception_safe_response(
+            self,
+            user_text,
+            context=context,
             failure_stage=failure_stage,
             failure_class=failure_class,
             failure_error=failure_error,
-        )
-        response = self._host_speech_response(
-            text,
-            style="warning",
-            source="host_cognitive_core_exception_safe_fallback",
-        )
-        failure_metadata: dict[str, Any] = {}
-        if failure_stage or failure_class or failure_error:
-            failure_metadata = {
-                "semantic_status": "failed",
-                "semantic_failure_stage": str(failure_stage or "cognition"),
-                "semantic_failure_class": str(
-                    failure_class or "semantic_failure"
-                ),
-                "semantic_failure_error": str(failure_error or ""),
-            }
-        return response.model_copy(
-            update={
-                "speech": [] if user_turn_prohibits_speech(envelope) else response.speech,
-                "metadata": {
-                    **response.metadata,
-                    **({"user_turn_envelope": envelope} if isinstance(envelope, dict) else {}),
-                    "effect_execution": "not_authorized",
-                    "semantic_fallback": False,
-                    **failure_metadata,
-                }
-            }
         )
 
     @staticmethod
@@ -4194,47 +1463,6 @@ class VoiceAssistant:
             dag_id,
         )
 
-    def _cognitive_turn_closure_adapter(self) -> CognitiveTurnClosure:
-        closure = getattr(self, "cognitive_turn_closure", None)
-        if closure is None:
-            closure = CognitiveTurnClosure(self.interaction_runtime)
-            self.cognitive_turn_closure = closure
-        return closure
-
-    def _record_cognitive_outcome_evidence(
-        self,
-        bundle: Any,
-        *,
-        session_id: str | None,
-        final_response: InteractionResponse | None,
-        delivery_status: str,
-        suppression_reason: str = "",
-        goal_state_results: list[dict[str, Any]] | None = None,
-        execution: CapabilityRuntimeResult | None = None,
-    ) -> None:
-        recorder = getattr(self, "cognitive_evidence", None)
-        if recorder is None or not hasattr(recorder, "record_outcome"):
-            return
-        try:
-            recorder.record_outcome(
-                bundle,
-                sid=str(session_id or bundle.turn_id),
-                final_response=final_response,
-                delivery_status=delivery_status,
-                suppression_reason=suppression_reason,
-                goal_state_results=goal_state_results,
-                capability_traces=(
-                    execution.traces if execution is not None else ()
-                ),
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "cognitive_outcome_evidence_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-
     def _outcome_response_is_stale(
         self,
         *,
@@ -4261,219 +1489,12 @@ class VoiceAssistant:
         session_id: str | None,
         detached_delivery: bool = False,
     ) -> str:
-        try:
-            delivery_session_id = session_id
-            if detached_delivery and isinstance(
-                response.metadata.get("deferred_outcome_delivery"), dict
-            ):
-                # A response intentionally held behind a newer turn is no longer
-                # ordered inside its original playback session. Current-session
-                # re-entry must retain its sid so TTS ordering can accept it;
-                # dropping every detached delivery to sid=None makes valid
-                # evidence-bound speech stale immediately.
-                delivery_session_id = None
-                response = response.model_copy(update={"speech": [
-                    speech.model_copy(update={"metadata": {
-                        **speech.metadata, "origin_session_id": session_id,
-                    }}) for speech in response.speech
-                ]})
-            dispatch = await self.interaction_runtime.submit_response(
-                response,
-                session_id=delivery_session_id,
-            )
-            if isinstance(response.metadata.get("social_cognition_resolution"), dict) and response.metadata.get("authority_scope") != "goal_free_situation":
-                self.cognitive_runtime.schedule_social_expression(response, session_id=delivery_session_id)
-            execution = await self.interaction_runtime.wait_dispatch(dispatch)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "cognitive_outcome_response_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-            for speech in response.speech:
-                self.conversation_state.update_pending_task_status_for_request_id(
-                    request_id=speech.id,
-                status="failed",
-            )
-            return "speech_runtime_failed"
-
-        delivered_count = await self._record_successfully_delivered_speech(
+        return await cognitive_outcome_host.execute_cognitive_outcome_response(
+            self,
             response,
-            execution,
             session_id=session_id,
-            log_event="cognitive_outcome_history_after_delivery",
+            detached_delivery=detached_delivery,
         )
-        for result in execution.results:
-            self.conversation_state.update_pending_task_status_for_request_id(
-                request_id=result.request_id,
-                status=result.status,
-            )
-        self.session_log(
-            session_id,
-            "cognitive_outcome_response_done: status=%s speech=%s results=%s",
-            execution.status,
-            len(response.speech),
-            len(execution.results),
-        )
-        state = self.sessions.state.get(session_id or "")
-        if state is not None:
-            state["response_chars"] = state.get("response_chars", 0) + sum(
-                len(item.text) for item in response.speech
-            )
-        if (
-            execution.status == "completed"
-            and delivered_count == len(response.speech)
-        ):
-            return "speech_runtime_completed"
-        if execution.status == "completed":
-            return "speech_runtime_delivery_unverified"
-        return f"speech_runtime_{execution.status}"
-
-    async def _record_successfully_delivered_speech(
-        self,
-        response: InteractionResponse,
-        execution: CapabilityRuntimeResult,
-        *,
-        session_id: str | None,
-        log_event: str,
-    ) -> int:
-        """Expose only speech the runtime proves was delivered.
-
-        Confirmation prompts are operational turns: recording them before the
-        speech provider succeeds would let unheard text influence later model
-        context and confirmation resolution.
-        """
-
-        results_by_request = {
-            result.request_id: result for result in execution.results
-        }
-        delivered_speech = []
-        for speech in response.speech:
-            result = results_by_request.get(speech.id)
-            if result is None or result.capability_id != "chromie.speak" or result.status != "completed":
-                continue
-            if not isinstance(result.output, dict):
-                continue
-            if await self._playback_state().wait_for_speech_completion(session_id, result.output):
-                delivered_speech.append(speech)
-        if not delivered_speech:
-            self.session_log(
-                session_id,
-                "%s: delivered_speech=0 runtime_status=%s",
-                log_event,
-                execution.status,
-            )
-            return 0
-        if any(speech.metadata.get("wording_owner") == "social_cognition" for speech in delivered_speech):
-            await self.interaction_runtime.record_social_delivery(response, execution, session_id=session_id)
-        delivered_response = response.model_copy(
-            deep=True,
-            update={
-                "speech": delivered_speech,
-                "capabilities": [],
-                "requires_confirmation": False,
-            },
-        )
-        try:
-            # This delivery helper is also used by bounded non-turn cognition.
-            # Retain only speech the Runtime proves was delivered; never reinterpret
-            # that communicative delta as replacement executable Work.
-            self.conversation_state.record_interaction_response(
-                session_id,
-                delivered_response,
-                bind_planned_execution=False,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "%s_failed: error_type=%s error=%s",
-                log_event,
-                type(exc).__name__,
-                exc,
-            )
-            return 0
-        self.session_log(
-            session_id,
-            "%s: delivered_speech=%s runtime_status=%s",
-            log_event,
-            len(delivered_speech),
-            execution.status,
-        )
-        return len(delivered_speech)
-
-    def _schedule_outcome_reflection(
-        self, *, response: InteractionResponse, plan: CanonicalPlan, bundle: Any,
-        opportunities: list[Any], session_id: str | None, generation: int,
-    ) -> None:
-        """Learn from recorded outcomes under the existing detached-task lifecycle.
-
-        Optional learning has one in-flight slot and one bounded deadline. It
-        cannot hold foreground result planning or request another review of it.
-        """
-        reflection_call = getattr(getattr(self, "agent_client", None), "resolve_reflection", None)
-        if not opportunities or not callable(reflection_call):
-            return
-        tasks = getattr(self, "active_cognitive_runtime_tasks", None)
-        if not isinstance(tasks, dict):
-            tasks = {}
-            self.active_cognitive_runtime_tasks = tasks
-        if any(not task.done() and task.get_name().startswith("outcome-reflection:") for task in tasks):
-            self.session_log(session_id, "selective_reflection_skipped: reason=background_slot_busy")
-            return
-        try:
-            mind = self.mind.context()
-            reflection_context = {
-                "mind": {key: mind[key] for key in (
-                    "owner_approved", "profile_id", "version", "worldview", "household_values", "core_principles"
-                ) if key in mind},
-                "active_goal_snapshots": self.conversation_state.active_goal_snapshots(),
-                "recent_goal_snapshots": self.conversation_state.recent_goal_snapshots(),
-                "execution_outcome_bundle": bundle.model_dump(mode="json", exclude_none=True),
-                "canonical_plan": plan.model_dump(mode="json", exclude_none=True),
-            }
-            for source, target in (("goal_association", "goal_association_resolution"), ("situation", "situation")):
-                projection = response.metadata.get(source)
-                if isinstance(projection, dict):
-                    reflection_context[target] = dict(projection)
-            requests = [ReflectionRequest(
-                sid=session_id, text=execution_outcome_user_text(response, plan),
-                language=str(response.metadata.get("language") or "en-US"),
-                opportunity=opportunity,
-                context={**reflection_context, "cognitive_opportunity": opportunity.prompt_projection()},
-                history=self.conversation_state.get_history(),
-            ) for opportunity in opportunities]
-        except Exception as exc:
-            self.session_log(session_id, "selective_reflection_context_rejected: error=%s", exc)
-            return
-
-        async def learn_forward() -> None:
-            timeout_ms = self.cognitive_runtime_policy.deliberative_timeout_ms
-            try:
-                async with asyncio.timeout(timeout_ms / 1000):
-                    session = await self.get_http_session()
-                    for request in requests:
-                        result = await reflection_call(session, request=request, timeout_ms=timeout_ms)
-                        if generation != self.playback_delivery.playback_generation:
-                            self.session_log(session_id, "selective_reflection_suppressed: reason=stale_generation")
-                            return
-                        state_results = self.conversation_state.apply_reflection_resolution(result, sid=session_id)
-                        response.metadata.setdefault("reflection_resolutions", []).append(result.prompt_projection())
-                        response.metadata.setdefault("reflection_state_results", []).extend(state_results)
-                        # Only the state owner's bounded Memory proposals can affect
-                        # future cognition. Advisory actions never bypass handled-
-                        # Evidence suppression or trigger a second Planner result.
-                        self.session_log(session_id, "selective_reflection_recorded: opportunity=%s", request.opportunity.opportunity_id)
-            except asyncio.CancelledError:
-                raise
-            except Exception as exc:
-                self.session_log(session_id, "selective_reflection_unavailable: error_type=%s error=%s", type(exc).__name__, exc)
-
-        task = asyncio.create_task(learn_forward(), name=f"outcome-reflection:{response.interaction_id}")
-        tasks[task] = response.interaction_id
-        task.add_done_callback(self._cognitive_runtime_task_done)
 
     async def _close_cognitive_execution(
         self,
@@ -4485,396 +1506,15 @@ class VoiceAssistant:
         provider_status: dict[str, Any] | None,
         suppress_final_reason: str | None = None,
     ) -> str:
-        closure = self._cognitive_turn_closure_adapter()
-        interaction_ledger = getattr(
-            getattr(self, "interaction_runtime", None),
-            "interaction_ledger",
-            None,
-        )
-        try:
-            plan = closure.canonical_plan(response)
-        except Exception as exc:
-            plan = None
-            self.session_log(
-                session_id,
-                "cognitive_outcome_plan_rejected: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-            response.metadata["execution_outcome_error"] = (
-                f"plan_rejected:{type(exc).__name__}"
-            )
-        if plan is None:
-            return "not_applicable"
-
-        try:
-            bundle = closure.build(
-                response=response,
-                execution=execution,
-                session_id=session_id,
-                provider_status=provider_status,
-            )
-            if bundle is None:  # pragma: no cover - guarded by plan above
-                raise ValueError("effectful cognitive turn produced no outcome")
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "cognitive_outcome_reconciliation_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-            response.metadata["execution_outcome_error"] = (
-                f"reconciliation_failed:{type(exc).__name__}"
-            )
-            # No trusted outcome bundle exists at this boundary. Preserve the
-            # diagnostic fact and fail closed; Host cannot infer result meaning or
-            # manufacture a post-execution utterance without trusted Evidence.
-            return "reconciliation_failed"
-
-        response.metadata["execution_outcome_bundle"] = bundle.model_dump(
-            mode="json"
-        )
-        if interaction_ledger is not None:
-            try:
-                interaction_ledger.record_execution_outcome(
-                    bundle,
-                    session_id=str(session_id or bundle.turn_id),
-                )
-            except Exception as exc:
-                response.metadata["interaction_ledger_error"] = (
-                    type(exc).__name__
-                )
-                self.session_log(
-                    session_id,
-                    "interaction_ledger_outcome_append_failed: "
-                    "error_type=%s error=%s",
-                    type(exc).__name__,
-                    exc,
-                )
-        goal_state_results: list[dict[str, Any]] = []
-        responsibility_results: list[dict[str, Any]] = []
-        try:
-            goal_state_results = (
-                self.conversation_state.record_execution_outcome_bundle(
-                    bundle,
-                    sid=session_id,
-                )
-            )
-            responsibility_results = (
-                self.conversation_state.reconcile_execution_outcome_responsibilities(
-                    bundle,
-                    sid=session_id,
-                )
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "cognitive_outcome_goal_state_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-            response.metadata["execution_outcome_goal_state_error"] = (
-                type(exc).__name__
-            )
-            # Evidence is retained, but Goal/Responsibility state did not commit.
-            # Do not let Host turn that implementation failure into result meaning.
-            self._record_cognitive_outcome_evidence(
-                bundle,
-                session_id=session_id,
-                final_response=None,
-                delivery_status="goal_state_commit_failed",
-                suppression_reason="goal_state_commit_failed",
-                execution=execution,
-            )
-            return "goal_state_commit_failed"
-
-        response.metadata["execution_outcome_goal_state_results"] = (
-            goal_state_results
-        )
-        response.metadata["responsibility_reconciliation_results"] = (
-            responsibility_results
-        )
-        cognitive_opportunities = (
-            self.conversation_state.derive_execution_cognitive_opportunities(
-                bundle
-            )
-        )
-        response.metadata["cognitive_opportunities"] = [
-            item.prompt_projection() for item in cognitive_opportunities
-        ]
-        if cognitive_opportunities:
-            self.session_log(
-                session_id,
-                "cognitive_opportunity_raised: count=%s goals=%s modes=%s",
-                len(cognitive_opportunities),
-                ",".join(
-                    goal_id
-                    for item in cognitive_opportunities
-                    for goal_id in item.goal_ids
-                ),
-                ",".join(
-                    item.recommended_cognition
-                    for item in cognitive_opportunities
-                ),
-            )
-        slow_opportunities = [
-            item
-            for item in cognitive_opportunities
-            if item.recommended_cognition == "slow"
-        ]
-
-        self.session_log(
-            session_id,
-            "cognitive_outcome_reconciled: outcome_id=%s aggregate=%s goals=%s evidence=%s",
-            bundle.outcome_id,
-            bundle.aggregate_status,
-            len(bundle.goal_outcomes),
-            len(bundle.evidence),
-        )
-
-        stale_outcome = self._outcome_response_is_stale(
-            generation=generation,
-            session_id=session_id,
-        )
-        current_session_id = self.session_id
-        outcome_delivery = build_host_outcome_delivery(self)
-        defer_for_ordinary_overlap = (
-            stale_outcome
-            and outcome_delivery.is_ordinary_overlap(
-                origin_session_id=session_id,
-                current_session_id=current_session_id,
-                generation_changed=(generation != self.playback_delivery.playback_generation),
-                execution_status=str(execution.status),
-                aggregate_status=str(bundle.aggregate_status),
-            )
-        )
-        if stale_outcome and not defer_for_ordinary_overlap:
-            self.session_log(
-                session_id,
-                "cognitive_outcome_response_suppressed: reason=stale_turn",
-            )
-            self._record_cognitive_outcome_evidence(
-                bundle,
-                session_id=session_id,
-                final_response=None,
-                delivery_status="suppressed",
-                suppression_reason="stale_turn",
-                goal_state_results=goal_state_results,
-                execution=execution,
-            )
-            return "suppressed_stale"
-        if defer_for_ordinary_overlap:
-            self.session_log(
-                session_id,
-                "cognitive_outcome_response_deferred: reason=ordinary_overlap current_sid=%s",
-                current_session_id,
-            )
-        if suppress_final_reason is not None:
-            self._record_cognitive_outcome_evidence(
-                bundle,
-                session_id=session_id,
-                final_response=None,
-                delivery_status="suppressed",
-                suppression_reason=suppress_final_reason,
-                goal_state_results=goal_state_results,
-                execution=execution,
-            )
-            return f"suppressed_{suppress_final_reason}"
-        delivered_incremental_evidence = {
-            str(item).strip()
-            for item in response.metadata.get(
-                "incremental_result_delivery_evidence_ids",
-                [],
-            )
-            if str(item).strip()
-        }
-        planner_handled_incremental_evidence = {
-            str(item).strip()
-            for item in response.metadata.get(
-                "incremental_planner_reentry_evidence_ids",
-                [],
-            )
-            if str(item).strip()
-        }
-        terminal_evidence_ids = {item.evidence_id for item in bundle.evidence}
-        completed_evidence_ids = {
-            item.evidence_id
-            for item in bundle.evidence
-            if item.status == "completed"
-        }
-        if (
-            bundle.aggregate_status == "completed"
-            and completed_evidence_ids
-            and completed_evidence_ids.issubset(delivered_incremental_evidence)
-        ):
-            self.session_log(
-                session_id,
-                "cognitive_outcome_response_suppressed: "
-                "reason=incremental_result_already_delivered evidence=%s",
-                len(completed_evidence_ids),
-            )
-            self._record_cognitive_outcome_evidence(
-                bundle,
-                session_id=session_id,
-                final_response=None,
-                delivery_status="incremental_result_delivery_completed",
-                suppression_reason="incremental_result_already_delivered",
-                goal_state_results=goal_state_results,
-                execution=execution,
-            )
-            return "incremental_result_delivery_completed"
-        if (
-            terminal_evidence_ids
-            and terminal_evidence_ids.issubset(
-                planner_handled_incremental_evidence
-            )
-        ):
-            self.session_log(
-                session_id,
-                "cognitive_outcome_response_suppressed: "
-                "reason=incremental_planner_reentry_already_handled evidence=%s",
-                len(terminal_evidence_ids),
-            )
-            self._record_cognitive_outcome_evidence(
-                bundle,
-                session_id=session_id,
-                final_response=None,
-                delivery_status="incremental_planner_reentry_handled",
-                suppression_reason="incremental_planner_reentry_already_handled",
-                goal_state_results=goal_state_results,
-                execution=execution,
-            )
-            return "incremental_planner_reentry_handled"
-
-        final_response = None
-        try:
-            final_response = await self._plan_evidence_bound_capability_result_response(
-                source_response=response,
-                bundle=bundle,
-                plan=plan,
-                session_id=session_id,
-            )
-            self._schedule_outcome_reflection(
-                response=response, plan=plan, bundle=bundle, opportunities=slow_opportunities,
-                session_id=session_id, generation=generation,
-            )
-
-            if final_response is None:
-                self.session_log(
-                    session_id,
-                    "planner_evidence_reentry_response_unavailable: "
-                    "aggregate=%s evidence=%s action=retain_evidence_no_speech",
-                    bundle.aggregate_status,
-                    len(bundle.evidence),
-                )
-                self._record_cognitive_outcome_evidence(
-                    bundle,
-                    session_id=session_id,
-                    final_response=None,
-                    delivery_status="planner_reentry_unavailable",
-                    suppression_reason="planner_reentry_unavailable",
-                    goal_state_results=goal_state_results,
-                    execution=execution,
-                )
-                return "planner_reentry_unavailable"
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "cognitive_outcome_response_rejected: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-            if final_response is None:
-                # An error after Work is never silent (owner, 2026-10-15): the person
-                # hears the operational notice; the error stays in its metadata.
-                envelope = response.metadata.get("user_turn_envelope") if isinstance(response.metadata, dict) else None
-                normalized_input = envelope.get("normalized_input") if isinstance(envelope, dict) else None
-                final_response = self._cognitive_core_exception_safe_response(
-                    str(normalized_input.get("text") or "") if isinstance(normalized_input, dict) else "",
-                    context={"user_turn_envelope": envelope},
-                    failure_stage="cognitive_outcome_response",
-                    failure_class=type(exc).__name__,
-                    failure_error=str(exc),
-                )
-
-        if defer_for_ordinary_overlap:
-            goal_ids = tuple(
-                str(item.goal_id)
-                for item in bundle.goal_outcomes
-                if str(item.goal_id or "").strip()
-            )
-            window = await outcome_delivery.wait_for_window(
-                origin_session_id=str(session_id),
-                source_goal_ids=goal_ids,
-                timeout_s=max(
-                    5.0,
-                    min(
-                        120.0,
-                        float(
-                            getattr(
-                                getattr(
-                                    getattr(self, "host_settings", None),
-                                    "session",
-                                    None,
-                                ),
-                                "idle_timeout_ms",
-                                120000.0,
-                            )
-                        )
-                        / 1000.0,
-                    ),
-                ),
-            )
-            if window.status != "ready":
-                suppression_reason = (
-                    "goal_invalidated_before_deferred_delivery"
-                    if window.status == "goal_invalidated"
-                    else "ordinary_overlap_delivery_timeout"
-                )
-                self.session_log(
-                    session_id,
-                    "cognitive_outcome_response_suppressed: reason=%s waited_for=%s",
-                    suppression_reason,
-                    ",".join(window.waited_for_session_ids),
-                )
-                self._record_cognitive_outcome_evidence(
-                    bundle,
-                    session_id=session_id,
-                    final_response=None,
-                    delivery_status="suppressed",
-                    suppression_reason=suppression_reason,
-                    goal_state_results=goal_state_results,
-                    execution=execution,
-                )
-                return f"suppressed_{window.status}"
-            final_response.metadata["deferred_outcome_delivery"] = {
-                "reason": "ordinary_overlap",
-                "origin_session_id": session_id,
-                "waited_for_session_ids": list(window.waited_for_session_ids),
-                "source_goal_ids": list(goal_ids),
-            }
-            self.session_log(
-                session_id,
-                "cognitive_outcome_response_delivery_ready: reason=ordinary_overlap waited_for=%s",
-                ",".join(window.waited_for_session_ids),
-            )
-
-        delivery_status = await self._apply_planner_reentry_response(
-            final_response,
-            session_id=session_id,
-        )
-        response.metadata["post_execution_response"] = final_response.model_dump(
-            mode="json"
-        )
-        self._record_cognitive_outcome_evidence(
-            bundle,
-            session_id=session_id,
-            final_response=final_response,
-            delivery_status=delivery_status,
-            goal_state_results=goal_state_results,
+        return await cognitive_outcome_host.close_cognitive_execution(
+            self,
+            response=response,
             execution=execution,
+            session_id=session_id,
+            generation=generation,
+            provider_status=provider_status,
+            suppress_final_reason=suppress_final_reason,
         )
-        return delivery_status
 
     async def _reenter_cognition_for_terminal_capability(
         self,
@@ -4884,552 +1524,13 @@ class VoiceAssistant:
         session_id: str | None,
         generation: int,
     ) -> None:
-        """Turn one exact terminal Runtime result into an internal cognitive event.
-
-        The result is never encoded as a user message and never decides a response
-        by callback convention. Runtime owns the lifecycle fact, deterministic
-        closure creates terminal Evidence, and a bounded CognitiveOpportunity
-        reactivates Planner against the still-current Responsibility, Goal,
-        Situation, Work, and Evidence state. Planner may answer, author genuinely
-        new follow-up Work, clarify, refuse, or make no useful outward change.
-        """
-
-        try:
-            evidence = self._cognitive_turn_closure_adapter().build_terminal_evidence(
-                response=response,
-                result=result,
-                session_id=session_id,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "incremental_terminal_evidence_rejected: request_id=%s "
-                "error_type=%s error=%s",
-                result.request_id,
-                type(exc).__name__,
-                exc,
-            )
-            return
-        if evidence is None:
-            return
-
-        reason_codes = [
-            value
-            for value in (
-                evidence.reason_code,
-                f"execution_{evidence.status}",
-            )
-            if value
-        ]
-        opportunity = CognitiveOpportunity.create(
-            trigger="execution_outcome",
-            goal_ids=list(evidence.source_goal_ids),
-            evidence_refs=[evidence.evidence_id],
-            reason_codes=reason_codes[:8],
-            recommended_cognition=(
-                "fast" if evidence.status == "completed" else "slow"
-            ),
-        )
-        response.metadata.setdefault(
-            "incremental_cognitive_opportunities",
-            [],
-        ).append(opportunity.prompt_projection())
-        self.session_log(
-            session_id,
-            "incremental_cognitive_opportunity: opportunity_id=%s request_id=%s "
-            "goals=%s status=%s",
-            opportunity.opportunity_id,
-            evidence.request_id,
-            ",".join(evidence.source_goal_ids),
-            evidence.status,
-        )
-
-        relevant, relevance_reason = terminal_evidence_relevance(
-            source_response=response,
-            evidence=evidence,
-            goal_bindings=self.conversation_state.goal_cancellation_bindings(
-                evidence.source_goal_ids
-            ),
-        )
-        if not relevant:
-            self.session_log(
-                session_id,
-                "incremental_cognitive_reentry_suppressed: request_id=%s reason=%s",
-                evidence.request_id,
-                relevance_reason,
-            )
-            suppressed = response.metadata.setdefault(
-                "suppressed_terminal_reentry",
-                [],
-            )
-            suppressed.append(
-                {
-                    "request_id": evidence.request_id,
-                    "evidence_id": evidence.evidence_id,
-                    "reason": relevance_reason,
-                }
-            )
-            return
-        if self._outcome_response_is_stale(
+        return await planner_reentry_host.reenter_cognition_for_terminal_capability(
+            self,
+            response=response,
+            result=result,
+            session_id=session_id,
             generation=generation,
-            session_id=session_id,
-        ):
-            # Ordinary overlap delivery is resolved by the final outcome path;
-            # never interrupt a newer user turn with an early sibling result.
-            self.session_log(
-                session_id,
-                "incremental_cognitive_reentry_deferred: request_id=%s reason=turn_overlap",
-                evidence.request_id,
-            )
-            return
-        observation = evidence.observation
-        if evidence.status == "completed" and (
-            observation is None
-            or observation.status != "available"
-            or not observation.schema_validated
-        ):
-            # A provider-completed event without qualified observation is not
-            # admitted as successful factual Evidence. Aggregate closure retains
-            # the failure/qualification details and may raise a slower opportunity.
-            return
-
-        try:
-            result_response = await self._plan_incremental_terminal_result_response(
-                source_response=response,
-                evidence=evidence,
-                opportunity=opportunity,
-                session_id=session_id,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "incremental_planner_evidence_reentry_rejected: request_id=%s "
-                "error_type=%s error=%s",
-                evidence.request_id,
-                type(exc).__name__,
-                exc,
-            )
-            return
-        if result_response is None:
-            return
-
-        # Planner has consumed this Evidence once a valid next-state decision exists.
-        # Record semantic consumption before realization so aggregate closure cannot
-        # plan from the same Evidence again merely because the new Activity is still
-        # being accepted or executed asynchronously. Any later Runtime failure is a
-        # new state transition with its own Evidence/CognitiveOpportunity.
-        handled = response.metadata.setdefault(
-            "incremental_planner_reentry_evidence_ids",
-            [],
         )
-        if evidence.evidence_id not in handled:
-            handled.append(evidence.evidence_id)
-
-        apply_status = await self._apply_planner_reentry_response(
-            result_response,
-            session_id=session_id,
-        )
-        if apply_status == "speech_runtime_completed":
-            delivered = response.metadata.setdefault(
-                "incremental_result_delivery_evidence_ids",
-                [],
-            )
-            if evidence.evidence_id not in delivered:
-                delivered.append(evidence.evidence_id)
-        self.session_log(
-            session_id,
-            "incremental_cognitive_reentry_done: request_id=%s evidence_id=%s apply=%s",
-            evidence.request_id,
-            evidence.evidence_id,
-            apply_status,
-        )
-
-
-    async def _plan_incremental_terminal_result_response(
-        self,
-        *,
-        source_response: InteractionResponse,
-        evidence: ExecutionEvidence,
-        opportunity: CognitiveOpportunity,
-        session_id: str | None,
-    ) -> InteractionResponse | None:
-        observation = evidence.observation
-        if evidence.status == "completed" and (
-            observation is None
-            or observation.status != "available"
-            or not observation.schema_validated
-        ):
-            return None
-        metadata = (
-            source_response.metadata
-            if isinstance(source_response.metadata, dict)
-            else {}
-        )
-        envelope = metadata.get("user_turn_envelope")
-        normalized_input = (
-            envelope.get("normalized_input")
-            if isinstance(envelope, dict)
-            else None
-        )
-        user_request = (
-            str(normalized_input.get("text") or "").strip()
-            if isinstance(normalized_input, dict)
-            else ""
-        )
-        if not user_request:
-            return None
-        language = str(
-            metadata.get("language")
-            or (
-                normalized_input.get("language")
-                if isinstance(normalized_input, dict)
-                else ""
-            )
-            or "en-US"
-        )
-        evidence_data = (
-            dict(observation.data)
-            if observation is not None
-            and observation.status == "available"
-            and observation.schema_validated
-            else {}
-        )
-        bounded_evidence = ToolResultEvidence(
-            evidence_id=evidence.evidence_id,
-            tool_id=evidence.capability_id,
-            status=evidence.status,
-            data=evidence_data,
-            output_sha256=canonical_value_sha256(evidence_data),
-        )
-        try:
-            canonical_plan = CanonicalPlan.model_validate(
-                metadata.get("canonical_plan") or {}
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "incremental_evidence_reentry_rejected: request_id=%s "
-                "error_type=%s error=%s",
-                evidence.request_id,
-                type(exc).__name__,
-                exc,
-            )
-            return None
-        goal_ids = list(evidence.source_goal_ids)
-        evidence_refs = [bounded_evidence.evidence_id]
-        extra_context = {
-            "incremental_terminal_evidence": True,
-            "terminal_request_id": evidence.request_id,
-            "terminal_capability_id": evidence.capability_id,
-            "terminal_status": evidence.status,
-            "cognitive_opportunity": opportunity.prompt_projection(),
-        }
-        try:
-            execution_truth = incremental_execution_outcome_truth(
-                evidence=evidence,
-                plan=canonical_plan,
-            )
-        except ValueError as exc:
-            self.session_log(
-                session_id,
-                "incremental_evidence_reentry_rejected: request_id=%s "
-                "error_type=%s error=%s",
-                evidence.request_id,
-                type(exc).__name__,
-                exc,
-            )
-            return None
-        return await self._planner_state_reentry_response(
-            source_response=source_response,
-            canonical_plan=canonical_plan,
-            user_request=user_request,
-            language=language,
-            goal_ids=goal_ids,
-            evidence_goal_ids=goal_ids,
-            evidence_refs=evidence_refs,
-            session_id=session_id,
-            phase="capability_result_reentry",
-            context_updates={
-                "trusted_terminal_evidence": [bounded_evidence.model_dump(mode="json")],
-                "trusted_execution_outcome": execution_truth,
-                "result_evidence_refs": evidence_refs,
-                "result_evidence_reentry": {
-                    "phase": "capability_result_reentry",
-                    "source_goal_ids": goal_ids,
-                    "evidence_refs": evidence_refs,
-                    "planner_authority": "planner",
-                },
-                **extra_context,
-            },
-            fast_workflow_stage="fast_planner_evidence_reentry",
-            response_source="fast_planner_evidence_reentry",
-            repeat_check_evidence=[bounded_evidence],
-            repeat_check_context=extra_context,
-        )
-
-
-    async def _reenter_cognition_for_provider_state(
-        self,
-        *,
-        response: InteractionResponse,
-        event: Any,
-        provider_state: dict[str, Any],
-        session_id: str | None,
-    ) -> None:
-        """Reactivate Planner for one meaningful live provider-state transition.
-
-        Runtime state is bounded provenance, not a fabricated user turn and not
-        completion Evidence.  Heartbeats/percentage churn are filtered before this
-        method is called.
-        """
-
-        request = next(
-            (item for item in response.capabilities if item.request_id == event.request_id),
-            None,
-        )
-        if request is None:
-            return
-        goal_ids = [
-            str(value).strip()
-            for value in request.metadata.get("source_goal_ids") or []
-            if str(value).strip()
-        ]
-        if not goal_ids:
-            return
-        relevant, relevance_reason = provider_state_relevance(
-            source_response=response,
-            request_id=event.request_id,
-            source_goal_ids=goal_ids,
-            goal_bindings=self.conversation_state.goal_cancellation_bindings(goal_ids),
-        )
-        if not relevant:
-            self.session_log(
-                session_id,
-                "provider_state_reentry_suppressed: request_id=%s reason=%s",
-                event.request_id,
-                relevance_reason,
-            )
-            return
-        metadata = response.metadata if isinstance(response.metadata, dict) else {}
-        envelope = metadata.get("user_turn_envelope")
-        normalized_input = (
-            envelope.get("normalized_input") if isinstance(envelope, dict) else None
-        )
-        user_request = (
-            str(normalized_input.get("text") or "").strip()
-            if isinstance(normalized_input, dict)
-            else ""
-        )
-        if not user_request:
-            return
-        try:
-            canonical_plan = CanonicalPlan.model_validate(
-                metadata.get("canonical_plan") or {}
-            )
-        except (TypeError, ValueError) as exc:
-            self.session_log(
-                session_id,
-                "provider_state_reentry_rejected: request_id=%s error_type=%s error=%s",
-                event.request_id,
-                type(exc).__name__,
-                exc,
-            )
-            return
-        situation_observation = build_provider_state_situation_observation(
-            context=self.build_context(session_id),
-            turn_id=str(
-                metadata.get("turn_id")
-                or f"provider-state:{event.dispatch_id}:{event.request_id}"
-            ),
-            goal_ids=goal_ids,
-            dispatch_id=event.dispatch_id,
-            request_id=event.request_id,
-            capability_id=event.capability_id,
-            provider_id=event.provider_id,
-            sequence=event.sequence,
-            provider_state=provider_state,
-        )
-        opportunity = derive_situation_revision_opportunity(
-            situation_observation,
-        )
-        if opportunity is None:
-            return
-        response.metadata.setdefault(
-            "incremental_cognitive_opportunities", []
-        ).append(opportunity.prompt_projection())
-        if opportunity.recommended_cognition == "local":
-            self.session_log(
-                session_id,
-                "provider_state_reentry_local: request_id=%s opportunity_id=%s",
-                event.request_id,
-                opportunity.opportunity_id,
-            )
-            return
-        source_ref = situation_observation.source_refs[0]
-        bounded_event = {
-            "source_ref": source_ref,
-            "sequence": event.sequence,
-            "dispatch_id": event.dispatch_id,
-            "request_id": event.request_id,
-            "capability_id": event.capability_id,
-            "provider_id": event.provider_id,
-            "state": dict(provider_state),
-        }
-        planner_response = await self._planner_state_reentry_response(
-            source_response=response,
-            canonical_plan=canonical_plan,
-            user_request=user_request,
-            language=str(metadata.get("language") or "en-US"),
-            goal_ids=goal_ids,
-            evidence_goal_ids=[],
-            evidence_refs=[],
-            session_id=session_id,
-            phase="situation_revision_reentry",
-            context_updates={
-                "situation": situation_observation.projection.prompt_projection(),
-                "situation_revision_observation": situation_observation.model_dump(
-                    mode="json"
-                ),
-                "trusted_provider_state_event": bounded_event,
-                "provider_state_reentry": {
-                    "source_goal_ids": goal_ids,
-                    "situation_source_refs": list(
-                        situation_observation.source_refs
-                    ),
-                    "planner_authority": "planner",
-                },
-                "cognitive_opportunity": opportunity.prompt_projection(),
-            },
-            fast_workflow_stage="fast_planner_situation_revision_reentry",
-            response_source="fast_planner_situation_revision_reentry",
-        )
-        if planner_response is None:
-            return
-        await self._apply_planner_reentry_response(
-            planner_response, session_id=session_id
-        )
-
-
-    async def _revalidate_restored_goals_from_provider_state(self) -> None:
-        candidates = self.conversation_state.runtime_revalidation_candidates()
-        if not candidates:
-            return
-        body_capability_ids = sorted(
-            {
-                capability_id
-                for candidate in candidates
-                for capability_id in candidate.get("capability_ids") or []
-                if str(capability_id).startswith("soridormi.")
-            }
-        )
-        if body_capability_ids:
-            try:
-                await asyncio.wait_for(
-                    self.interaction_runtime.refresh_soridormi_catalog(force=True),
-                    timeout=5.0,
-                )
-            except (TimeoutError, RuntimeError) as exc:
-                self.session_log(
-                    None,
-                    "restored_goal_revalidation_deferred: reason=provider_state_unavailable error_type=%s",
-                    type(exc).__name__,
-                )
-                return
-
-        for candidate in candidates:
-            goal_id = str(candidate.get("goal_id") or "").strip()
-            user_request = str(candidate.get("source_text") or "").strip()
-            raw_responsibilities = candidate.get("responsibilities")
-            capability_ids = [
-                str(item).strip()
-                for item in candidate.get("capability_ids") or []
-                if str(item).strip()
-            ]
-            if not goal_id or not user_request or not isinstance(raw_responsibilities, list):
-                continue
-            if not capability_ids:
-                self.session_log(
-                    None,
-                    "restored_goal_revalidation_deferred: goal_id=%s reason=no_prior_capability_binding",
-                    goal_id,
-                )
-                continue
-            responsibilities: list[CognitiveResponsibilityProposal] = []
-            try:
-                responsibilities = [
-                    CognitiveResponsibilityProposal.model_validate(item)
-                    for item in raw_responsibilities
-                    if isinstance(item, dict)
-                ]
-            except (TypeError, ValueError) as exc:
-                self.session_log(
-                    None,
-                    "restored_goal_revalidation_rejected: goal_id=%s reason=invalid_responsibility_provenance error_type=%s",
-                    goal_id,
-                    type(exc).__name__,
-                )
-                continue
-            if not responsibilities:
-                self.session_log(
-                    None,
-                    "restored_goal_revalidation_deferred: goal_id=%s reason=missing_responsibility_provenance",
-                    goal_id,
-                )
-                continue
-
-            provider_state = fresh_capability_state_projection(
-                capability_ids,
-                capability_definition=self.interaction_runtime.capability_definition,
-            )
-            restored_marker = str(candidate.get("restored_ms") or "unknown").strip()
-            source_ref = f"runtime-state:restart:{goal_id}:{restored_marker}"[:200]
-            opportunity = CognitiveOpportunity.create(
-                trigger="provider_state",
-                goal_ids=[goal_id],
-                evidence_refs=[],
-                reason_codes=["restored_goal_fresh_provider_state"],
-                recommended_cognition="fast",
-            )
-            planner_response = await self._planner_state_reentry_response(
-                source_response=None,
-                canonical_plan=None,
-                user_request=user_request,
-                language=str(candidate.get("language") or "auto"),
-                goal_ids=[goal_id],
-                evidence_goal_ids=[],
-                evidence_refs=[],
-                session_id=None,
-                phase="restored_provider_state_revalidation",
-                context_updates={
-                    "trusted_provider_state_event": {
-                        "source_ref": source_ref,
-                        "source": "restart_provider_revalidation",
-                        "capabilities": provider_state,
-                    },
-                    "provider_state_reentry": {
-                        "source_goal_ids": [goal_id],
-                        "state_refs": [source_ref],
-                        "planner_authority": "planner",
-                        "restored_goal": True,
-                    },
-                    "cognitive_opportunity": opportunity.prompt_projection(),
-                },
-                fast_workflow_stage="fast_planner_restored_provider_state_reentry",
-                response_source="fast_planner_restored_provider_state_reentry",
-                responsibilities_override=responsibilities,
-            )
-            if planner_response is None:
-                continue
-            completed = self.conversation_state.complete_runtime_revalidation(
-                [goal_id],
-                source_ref=source_ref,
-            )
-            if goal_id not in completed:
-                continue
-            await self._apply_planner_reentry_response(
-                planner_response,
-                session_id=None,
-            )
 
     async def _apply_planner_reentry_response(
         self,
@@ -5437,52 +1538,11 @@ class VoiceAssistant:
         *,
         session_id: str | None,
     ) -> str:
-        """Apply a Planner delta without turning asynchronous cognition into a join.
-
-        Speech-only deltas use the ordinary delivery path. A new safe/authorized
-        Capability delta is submitted through the same detached Runtime boundary as
-        foreground work, so its own terminal events can create later opportunities.
-        Confirmation-requiring Work is not auto-authorized by an internal event.
-        """
-
-        if not response.capabilities:
-            return await self._execute_cognitive_outcome_response(
-                response,
-                session_id=session_id,
-                detached_delivery=True,
-            )
-        confirmation_ids = await self.interaction_runtime.confirmation_request_ids(response)
-        if confirmation_ids:
-            confirmation_session_id = str(
-                session_id
-                or response.metadata.get("parent_interaction_id")
-                or response.interaction_id
-            )
-            staged = await self._stage_interaction_confirmation(
-                response,
-                confirmation_session_id,
-                language=str(response.metadata.get("language") or "auto"),
-                reset_playback=False,
-            )
-            if staged:
-                self.session_log(
-                    confirmation_session_id,
-                    "planner_reentry_confirmation_staged: requests=%s",
-                    ",".join(sorted(confirmation_ids)),
-                )
-                return "planner_reentry_confirmation_staged"
-            return "planner_reentry_confirmation_required"
-        await self.interaction_runtime.runtime.record_planning_submission(
-            response, lambda: self.conversation_state.record_interaction_response(session_id, response),
-        )
-        await self._dispatch_detached_interaction(
+        return await planner_reentry_host.apply_planner_reentry_response(
+            self,
             response,
-            session_id,
-            confirmed_request_ids=None,
-            reset_playback=False,
-            mark_session_done=False,
+            session_id=session_id,
         )
-        return "planner_reentry_dispatched"
 
     async def _planner_state_reentry_response(
         self,
@@ -5504,877 +1564,25 @@ class VoiceAssistant:
         repeat_check_evidence: list[ToolResultEvidence] | None = None,
         repeat_check_context: dict[str, Any] | None = None,
     ) -> InteractionResponse | None:
-        """Reactivate the same Planner from one trusted state transition.
-
-        The Host supplies bounded facts and provenance only. It does not convert
-        those facts into dialogue or a replacement Goal/Plan.
-        """
-
-        normalized_goal_ids = list(
-            dict.fromkeys(
-                str(item).strip() for item in goal_ids if str(item).strip()
-            )
-        )
-        normalized_evidence_goal_ids = list(
-            dict.fromkeys(
-                str(item).strip()
-                for item in evidence_goal_ids
-                if str(item).strip()
-            )
-        )
-        normalized_evidence_refs = list(
-            dict.fromkeys(
-                str(item).strip() for item in evidence_refs if str(item).strip()
-            )
-        )
-        opportunity_projection = context_updates.get("cognitive_opportunity")
-        opportunity: CognitiveOpportunity | None = None
-        if isinstance(opportunity_projection, dict):
-            try:
-                opportunity = CognitiveOpportunity.model_validate(opportunity_projection)
-            except (TypeError, ValueError):
-                opportunity = None
-        opportunity_ref = opportunity.opportunity_id if opportunity is not None else ""
-        provided_situation: SituationProjection | None = None
-        raw_situation = context_updates.get("situation")
-        if isinstance(raw_situation, dict):
-            try:
-                provided_situation = SituationProjection.model_validate(raw_situation)
-            except (TypeError, ValueError) as exc:
-                self.session_log(
-                    session_id,
-                    "planner_state_reentry_rejected: reason=invalid_situation "
-                    "error_type=%s error=%s",
-                    type(exc).__name__,
-                    exc,
-                )
-                return None
-        if opportunity is not None and opportunity.situation_digest:
-            if (
-                provided_situation is None
-                or provided_situation.digest != opportunity.situation_digest
-            ):
-                self.session_log(
-                    session_id,
-                    "planner_state_reentry_rejected: "
-                    "reason=situation_opportunity_digest_mismatch",
-                )
-                return None
-        if not normalized_evidence_refs and (
-            opportunity is None
-            or set(opportunity.goal_ids) != set(normalized_goal_ids)
-        ):
-            self.session_log(
-                session_id,
-                "planner_state_reentry_rejected: "
-                "reason=missing_or_mismatched_non_evidence_opportunity",
-            )
-            return None
-        reentry_ref = (
-            normalized_evidence_refs[0]
-            if normalized_evidence_refs
-            else opportunity_ref
-        )
-        if not normalized_goal_ids or not reentry_ref:
-            return None
-        metadata = (
-            source_response.metadata
-            if source_response is not None
-            and isinstance(source_response.metadata, dict)
-            else {}
-        )
-        association = metadata.get("goal_association")
-        if source_response is not None:
-            if not isinstance(association, dict):
-                self.session_log(
-                    session_id,
-                    "planner_state_reentry_rejected: reason=missing_goal_association",
-                )
-                return None
-            association_goal_ids = {
-                str(goal_id).strip()
-                for item in association.get("associations") or []
-                if isinstance(item, dict)
-                for goal_id in item.get("target_goal_ids") or []
-            } | {
-                str(item.get("goal_id") or "").strip()
-                for item in association.get("new_goals") or []
-                if isinstance(item, dict)
-            }
-            if not set(normalized_goal_ids).issubset(association_goal_ids):
-                raise ValueError(
-                    "Planner state re-entry Goal binding is not present in Goal Association"
-                )
-        responsibilities = list(responsibilities_override or [])
-        if not responsibilities and source_response is not None:
-            responsibilities = planner_reentry_responsibilities(
-                source_response=source_response,
-                goal_ids=normalized_goal_ids,
-            )
-        if not responsibilities:
-            self.session_log(
-                session_id,
-                "planner_state_reentry_rejected: "
-                "reason=missing_responsibility_provenance",
-            )
-            return None
-
-        # Re-entry is an exact Goal subset, not the originating turn replayed with
-        # a hint. Remove excluded sibling semantic material before Planner sees the
-        # state so a per-result response cannot narrate another Goal's effect.
-        scoped_goal_set = set(normalized_goal_ids)
-        scoped_responsibility_refs = {
-            item.local_ref for item in responsibilities
-        }
-        if isinstance(association, dict):
-            scoped_new_goals: list[dict[str, Any]] = []
-            for item in association.get("new_goals") or []:
-                if (
-                    not isinstance(item, dict)
-                    or str(item.get("goal_id") or "").strip()
-                    not in scoped_goal_set
-                ):
-                    continue
-                scoped_goal = dict(item)
-                # source_text can contain excluded sibling responsibilities from
-                # the originating multi-Goal turn.  The scoped description,
-                # bindings, and success criteria retain this Goal's exact meaning.
-                scoped_goal.pop("source_text", None)
-                scoped_new_goals.append(scoped_goal)
-            association = {
-                **association,
-                "associations": [
-                    dict(item)
-                    for item in association.get("associations") or []
-                    if isinstance(item, dict)
-                    and scoped_goal_set.intersection(
-                        str(value).strip()
-                        for value in item.get("target_goal_ids") or []
-                        if str(value).strip()
-                    )
-                ],
-                "new_goals": scoped_new_goals,
-            }
-
-        sid = str(
-            session_id
-            or (canonical_plan.plan_id if canonical_plan is not None else "")
-            or f"restored:{normalized_goal_ids[0]}"
-        )
-        context = self._cognitive_core_authority_context(
-            self.build_context(sid),
-            session_id=sid,
-            observer=False,
-        )
-        context.update(context_updates)
-        # State re-entry deliberately uses a synthetic Work-request SID and may
-        # narrow one original multi-Goal turn to a strict Goal subset.  Carrying
-        # the full originating UserTurnEnvelope inside this new CognitiveWorkRequest
-        # would therefore assert a false transport identity: its session/text belong
-        # to the admitted source turn, not to this scoped state transition.  Keep the
-        # immutable envelope on source_response and project only read-only source
-        # provenance plus the scoped UMI Responsibilities below.
-        context.pop("user_turn_envelope", None)
-        source_envelope = metadata.get("user_turn_envelope")
-        source_original_input = (
-            source_envelope.get("original_input")
-            if isinstance(source_envelope, dict)
-            else None
-        )
-        source_normalized_input = (
-            source_envelope.get("normalized_input")
-            if isinstance(source_envelope, dict)
-            else None
-        )
-        source_original_text = (
-            source_original_input.get("text")
-            if isinstance(source_original_input, dict)
-            else None
-        )
-        source_normalized_text = (
-            source_normalized_input.get("text")
-            if isinstance(source_normalized_input, dict)
-            else None
-        )
-        if (
-            isinstance(source_original_text, str)
-            and source_original_text
-            and (
-                not isinstance(source_normalized_text, str)
-                or " ".join(source_original_text.strip().split())
-                == " ".join(source_normalized_text.strip().split())
-            )
-        ):
-            context["source_turn_provenance"] = {
-                "schema_version": 1,
-                "turn_id": str(
-                    source_envelope.get("turn_id")
-                    or metadata.get("turn_id")
-                    or ""
-                ),
-                "original_text": source_original_text,
-                "original_text_sha256": hashlib.sha256(
-                    source_original_text.encode("utf-8")
-                ).hexdigest(),
-                "language": str(
-                    (
-                        source_normalized_input.get("language")
-                        if isinstance(source_normalized_input, dict)
-                        else language
-                    )
-                    or language
-                    or "auto"
-                ),
-                "authority": "read_only_source_provenance",
-            }
-        if isinstance(association, dict):
-            context["goal_association_resolution"] = association
-        if canonical_plan is not None:
-            plan_projection = canonical_plan.prompt_projection()
-            selected_step_ids = {
-                step.step_id
-                for step in canonical_plan.steps
-                if scoped_goal_set.intersection(step.source_goal_ids)
-            }
-            plan_projection.update(
-                {
-                    "goal_ids": normalized_goal_ids,
-                    "response_text": "",
-                    "steps": [
-                        item
-                        for item in plan_projection.get("steps") or []
-                        if isinstance(item, dict)
-                        and str(item.get("step_id") or "") in selected_step_ids
-                    ],
-                    "goal_outcomes": [
-                        item
-                        for item in plan_projection.get("goal_outcomes") or []
-                        if isinstance(item, dict)
-                        and str(item.get("goal_id") or "") in scoped_goal_set
-                    ],
-                    "parameter_resolutions": [
-                        item
-                        for item in plan_projection.get("parameter_resolutions") or []
-                        if isinstance(item, dict)
-                        and str(item.get("step_id") or "") in selected_step_ids
-                    ],
-                    "time_conditions": [
-                        item
-                        for item in plan_projection.get("time_conditions") or []
-                        if isinstance(item, dict)
-                        and str(item.get("goal_id") or "") in scoped_goal_set
-                    ],
-                }
-            )
-            context["canonical_plan_resolution"] = plan_projection
-            planner_reentry_expectations = [
-                {
-                    "step_id": step.step_id,
-                    "source_goal_ids": list(step.source_goal_ids),
-                    "step_purpose": step.step_purpose,
-                    "expected_outcome": step.expected_outcome,
-                }
-                for step in canonical_plan.steps
-                if step.expected_outcome
-                and set(step.source_goal_ids) & set(normalized_goal_ids)
-            ]
-            if planner_reentry_expectations:
-                # Planner-authored prospective expectations are hypotheses to compare
-                # with fresh trusted Evidence, never Host-created Evidence themselves.
-                context["planner_reentry_expectations"] = planner_reentry_expectations
-        # A state re-entry is an exact Goal-subset transaction. The full immutable
-        # UserTurnEnvelope can contain excluded sibling semantics, so it remains on
-        # the source response. Its exact wording is exposed separately above as
-        # read-only provenance, while only authoritative scoped UMI Responsibility
-        # outcomes become request.text. Canonical Goal and Plan projections retain
-        # the scoped bindings and execution correlation.
-        scoped_request_text = "\n".join(
-            dict.fromkeys(
-                item.outcome.strip()
-                for item in responsibilities
-                if item.outcome.strip()
-            )
-        )
-        if isinstance(metadata.get("user_meaning_interpretation"), dict):
-            source_interpretation = dict(metadata["user_meaning_interpretation"])
-            source_interpretation["responsibilities"] = [
-                item
-                for item in source_interpretation.get("responsibilities") or []
-                if isinstance(item, dict)
-                and str(item.get("local_ref") or "")
-                in scoped_responsibility_refs
-            ]
-            context["core_interpretation"] = source_interpretation
-        if provided_situation is not None:
-            if not set(normalized_goal_ids).issubset(
-                set(provided_situation.focus_goal_ids)
-            ):
-                self.session_log(
-                    session_id,
-                    "planner_state_reentry_rejected: "
-                    "reason=situation_goal_binding_mismatch",
-                )
-                return None
-            situation = provided_situation
-        else:
-            situation = build_situation_projection(
-                context=context,
-                turn_id=str(
-                    metadata.get("turn_id")
-                    or f"state:{reentry_ref}"
-                ),
-                focus_goal_ids=normalized_goal_ids,
-                revision=1,
-            )
-        context["situation"] = situation.prompt_projection()
-        interaction_ledger = getattr(
-            getattr(self, "cognitive_runtime", None),
-            "interaction_ledger",
-            None,
-        )
-        if interaction_ledger is not None:
-            context["interaction_context"] = interaction_ledger.context(
-                sid,
-                goal_ids=normalized_goal_ids,
-                turn_id=str(metadata.get("turn_id") or ""),
-            ).model_dump(mode="json")
-
-        source_plan_id = canonical_plan.plan_id if canonical_plan is not None else ""
-        source_plan_fingerprint = (
-            canonical_plan_fingerprint(canonical_plan)
-            if canonical_plan is not None
-            else ""
-        )
-        reentry_scope = PlannerReentryScope(
-            trigger=phase,
-            goal_ids=normalized_goal_ids,
-            evidence_refs=normalized_evidence_refs,
-            opportunity_id=opportunity_ref,
-            source_plan_id=source_plan_id,
-            source_plan_fingerprint=source_plan_fingerprint,
-        )
-        request = CognitiveWorkRequest(
-            sid=f"{sid}:state:{reentry_ref}"[:160],
-            text=scoped_request_text,
-            language=language,
-            responsibilities=responsibilities,
-            interpretation_confidence=1.0,
-            planner_reentry_scope=reentry_scope,
-            context=context,
-            history=list(context.get("history") or []),
-        )
-        planning_runtime = self.cognitive_runtime.adapter.interaction_runtime.runtime
-        planning_snapshot = await planning_runtime.planning_state_snapshot(
-            normalized_goal_ids, str(metadata.get("turn_id") or request.sid),
-        )
-        context["existing_work_activities"] = planning_runtime.planning_work_activities(planning_snapshot)
-        request = request.model_copy(deep=True, update={"context": context})
-
-        activation_trigger = {
-            "capability_result_reentry": "execution_outcome",
-            "post_execution": "post_execution",
-            "goal_cancellation_reentry": "goal_cancellation",
-            "situation_revision_reentry": (
-                "provider_state"
-                if context_updates.get("trusted_provider_state_event") is not None
-                else "situation_revision"
-            ),
-            "time_condition_reentry": "time_condition",
-            "restored_provider_state_revalidation": "restored_provider_state",
-        }.get(phase)
-        if activation_trigger is None:
-            self.session_log(
-                session_id,
-                "planner_state_reentry_rejected: reason=unknown_activation_trigger phase=%s",
-                phase,
-            )
-            return None
-        activation_source_refs = list(normalized_evidence_refs)
-        if not activation_source_refs and opportunity is not None:
-            activation_source_refs = list(opportunity.source_refs)
-        activation = await resolve_cognitive_activation(
+        return await planner_reentry_host.planner_state_reentry_response(
             self,
-            trigger=activation_trigger,
-            allowed_authorities=["planner"],
-            goal_ids=normalized_goal_ids,
-            responsibilities=responsibilities,
-            source_refs=activation_source_refs,
+            source_response=source_response,
+            canonical_plan=canonical_plan,
+            user_request=user_request,
+            language=language,
+            goal_ids=goal_ids,
+            evidence_goal_ids=evidence_goal_ids,
+            evidence_refs=evidence_refs,
             session_id=session_id,
-            request_id=f"activation:{phase}:{reentry_ref}"[:200],
-            state={
-                "goal_association": context.get("goal_association_resolution"),
-                "goal_state": context.get("active_goal_snapshots", []),
-                "canonical_plan": context.get("canonical_plan_resolution"),
-                "existing_work_activities": context.get("existing_work_activities", []),
-                "situation": context.get("situation"),
-                "trusted_state_change": dict(context_updates),
-            },
+            phase=phase,
+            context_updates=context_updates,
+            fast_workflow_stage=fast_workflow_stage,
+            response_source=response_source,
+            responsibilities_override=responsibilities_override,
+            parent_interaction_id=parent_interaction_id,
+            repeat_check_evidence=repeat_check_evidence,
+            repeat_check_context=repeat_check_context,
         )
-        if not activation_requested(activation, "planner"):
-            self.session_log(
-                session_id,
-                "planner_state_reentry_not_requested: phase=%s ref=%s",
-                phase,
-                reentry_ref,
-            )
-            return None
-
-        session = await self.get_http_session()
-        workflow_input = {
-            "source_goal_ids": normalized_goal_ids,
-            "evidence_goal_ids": normalized_evidence_goal_ids,
-            "evidence_refs": normalized_evidence_refs,
-            "phase": phase,
-        }
-        async def resolve_reentry_plan(operation, workflow_stage, stage_metadata):
-            started_ms = now_ms()
-            result = None
-            try:
-                result = await operation
-                failure = self.cognitive_runtime._optional_stage_failure_metadata(
-                    workflow_stage, result.metadata,
-                )
-                if self.cognitive_runtime._fast_plan_path(result) == "contract_failure":
-                    raise CognitiveStageFailure(
-                        workflow_stage,
-                        failure or self.cognitive_runtime._stage_failure_metadata(
-                            workflow_stage, result.metadata,
-                            default_failure_class="fast_planner_contract_failure",
-                        ),
-                    )
-                if set(result.goal_ids) != set(normalized_goal_ids):
-                    raise ValueError("Planner state re-entry changed the bound Goal set")
-            except Exception as exc:
-                record_session_workflow_stage(
-                    self, session_id, stage=workflow_stage,
-                    started_monotonic_ms=started_ms, finished_monotonic_ms=now_ms(),
-                    status="failed", input_payload=workflow_input, output_payload=result,
-                    errors=[{"error_type": type(exc).__name__, "error": str(exc)}],
-                    metadata={**stage_metadata, **getattr(exc, "failure_metadata", {})},
-                )
-                raise
-            record_session_workflow_stage(
-                self, session_id, stage=workflow_stage,
-                started_monotonic_ms=started_ms, finished_monotonic_ms=now_ms(),
-                status="resolved", input_payload=workflow_input, output_payload=result,
-                errors=[], metadata=stage_metadata,
-            )
-            return result
-
-        # Activation decides whether Planner should run; the one Planner owns HOW and
-        # nothing re-plans its decision. Runtime never selects reasoning depth from
-        # event type or a Host-authored readiness mode.
-        replanned: CanonicalPlan | None = await resolve_reentry_plan(
-            self.agent_client.resolve_fast_plan(
-                session, request=request,
-                timeout_ms=self.cognitive_runtime_policy.fast_planner_timeout_ms,
-            ), fast_workflow_stage, {"planner_pass": "fast"},
-        )
-
-        if replanned is None:
-            return None
-        if (
-            source_response is not None
-            and repeat_check_evidence
-            and planner_reentry_repeats_completed_activity(
-                source_response=source_response,
-                plan=replanned,
-                extra_context=repeat_check_context,
-                evidence=repeat_check_evidence,
-            )
-        ):
-            raise ValueError(
-                "Planner state re-entry attempted to repeat the completed terminal Activity"
-            )
-        runtime_errors = await self.cognitive_runtime.adapter.validation_errors(replanned)
-        if runtime_errors:
-            raise ValueError("Runtime rejected state re-entry Plan: " + json.dumps(runtime_errors))
-        # Reviewed effects never start without a verdict: a re-entry Plan that adds a
-        # value-reviewed Capability or value_review speech not yet judged in this turn
-        # goes through Value Judgment, exactly as the turn's first Plan does.
-        replanned = await self.cognitive_runtime.apply_value_judgment_gate(
-            session, sid=sid, text=request.text, plan=replanned, work_request=request,
-            goal_ids_by_responsibility=self.cognitive_runtime.goal_ids_by_responsibility_projection(association),
-            turn_id=str(metadata.get("turn_id") or ""), judged_plan=canonical_plan,
-        )
-        if any(step.metadata.get("value_confirmation_required") for step in replanned.steps):
-            replanned = self.cognitive_runtime.with_runtime_confirmation_need(replanned)
-        async with planning_runtime.planning_commit_scope(planning_snapshot):
-            known_ids = {item["activity_id"] for item in context["existing_work_activities"]}
-            if set(replanned.cancel_activity_ids) - known_ids:
-                raise ValueError("Planner cancellation names unknown Work")
-            replanned, _work_status = await self.cognitive_runtime._apply_retained_work_reconciliation(
-                plan=replanned, activities=context["existing_work_activities"],
-                turn_id=planning_snapshot["turn_id"],
-            )
-            cancelled_bindings = {
-                item["runtime_binding"]["interaction_id"] + "/" + item["activity_id"]
-                for item in context["existing_work_activities"]
-                if item["activity_id"] in replanned.cancel_activity_ids and item.get("origin") == "retained_runtime"
-            }
-            await planning_runtime.validate_planning_state(planning_snapshot, cancelled_bindings=cancelled_bindings)
-            planning_commit = await planning_runtime.reserve_planning_submission(
-                planning_snapshot, plan_id=replanned.plan_id, fingerprint=canonical_plan_fingerprint(replanned),
-                prepared_activity_ids=[*replanned.cancel_activity_ids, *(step.reuse_activity_id for step in replanned.steps)],
-            )
-        response = await self.cognitive_runtime.resolve_plan_interaction(
-            session, plan=replanned, work_request=request,
-            session_id=sid,
-            language=language,
-            context=context, evidence_refs=normalized_evidence_refs,
-        )
-        response.metadata.update(
-            {
-                "planning_commit": planning_commit,
-                "retained_work_activities": [item for item in context["existing_work_activities"]
-                    if item.get("origin") == "retained_runtime" and item["activity_id"] not in replanned.cancel_activity_ids],
-                "planner_state_reentry": True,
-                "planner_state_reentry_phase": phase,
-                "planner_state_reentry_ref": reentry_ref,
-                "planner_state_reentry_evidence_refs": normalized_evidence_refs,
-                **(
-                    {"goal_association": association}
-                    if isinstance(association, dict)
-                    else {}
-                ),
-                **(
-                    {
-                        "parent_interaction_id": str(
-                            parent_interaction_id
-                            or (source_response.interaction_id if source_response is not None else "")
-                        ).strip()
-                    }
-                    if parent_interaction_id
-                    or source_response is not None
-                    else {}
-                ),
-            }
-        )
-        if isinstance(metadata.get("user_meaning_interpretation"), dict):
-            response.metadata["user_meaning_interpretation"] = dict(
-                metadata["user_meaning_interpretation"]
-            )
-        evidence_goal_set = set(normalized_evidence_goal_ids)
-        for speech in response.speech:
-            if speech.metadata.get("wording_owner") == "social_cognition":
-                # SC's exact scope and truth stage are already validated. The
-                # source Plan/Evidence remains context, not permission to widen
-                # a Goal-free acknowledgement or promote it to a result claim.
-                continue
-            existing_source_goal_ids = {
-                str(item).strip()
-                for item in (
-                    speech.metadata.get("source_goal_ids")
-                    or speech.metadata.get("covers_goal_ids")
-                    or []
-                )
-                if str(item).strip()
-            }
-            speech.metadata.update(
-                {
-                    "source": "planner_state_reentry",
-                    "phase": phase,
-                    **(
-                        {"source_goal_ids": normalized_goal_ids}
-                        if not existing_source_goal_ids
-                        else {}
-                    ),
-                }
-            )
-            speech_goal_ids = existing_source_goal_ids or set(normalized_goal_ids)
-            if normalized_evidence_refs and (
-                not speech.metadata.get("truth_stage")
-                and (not evidence_goal_set or speech_goal_ids & evidence_goal_set)
-            ):
-                speech.metadata["truth_stage"] = "post_evidence"
-            if normalized_evidence_refs and (
-                not speech.metadata.get("evidence_refs")
-                and (not evidence_goal_set or speech_goal_ids & evidence_goal_set)
-            ):
-                speech.metadata["evidence_refs"] = normalized_evidence_refs
-        response.metadata.update(
-            {
-                "source": response_source,
-                "phase": phase,
-                "source_goal_ids": normalized_goal_ids,
-                "evidence_refs": normalized_evidence_refs,
-                "planner_reentry_plan": replanned.model_dump(
-                    mode="json", exclude_none=True
-                ),
-            }
-        )
-        return response
-
-    async def _optional_completed_resource_social_response(
-        self,
-        *,
-        source_response: InteractionResponse,
-        bundle: Any,
-        plan: CanonicalPlan,
-        session_id: str | None,
-        language: str,
-        user_request: str,
-        evidence_refs: list[str],
-        goal_ids: list[str],
-        selected_execution_evidence: list[ExecutionEvidence],
-    ) -> InteractionResponse | None:
-        """Give SC one optional, evidence-bound handover-completion opportunity.
-
-        Planner owns Work and Runtime owns completion truth.  A completed physical
-        resource handover may still have a natural social close (for example,
-        "Here you are").  Runtime exposes that trusted result as an optional
-        communication Need; Social Cognition alone decides speech or silence.
-        """
-
-        completed_resource = [
-            item
-            for item in selected_execution_evidence
-            if item.status == "completed"
-            and item.capability_id == "soridormi.acquire_and_deliver_resource"
-        ]
-        if bundle.aggregate_status != "completed" or not completed_resource:
-            return None
-        if not evidence_refs or not goal_ids:
-            return None
-
-        turn_envelope = (
-            source_response.metadata.get("user_turn_envelope")
-            if isinstance(source_response.metadata, dict)
-            else None
-        )
-        normalized_input = (
-            turn_envelope.get("normalized_input")
-            if isinstance(turn_envelope, dict)
-            else None
-        )
-        turn_id = str(
-            (turn_envelope or {}).get("turn_id")
-            or source_response.metadata.get("turn_id")
-            or session_id
-            or "terminal-resource-delivery"
-        )
-        source_turn = {
-            "turn_id": turn_id,
-            "original_text": (
-                str(normalized_input.get("text") or "").strip()
-                if isinstance(normalized_input, dict)
-                else user_request
-            ),
-        }
-        interaction_ledger = getattr(self.cognitive_runtime, "interaction_ledger", None)
-        interaction_context = (
-            interaction_ledger.context(
-                session_id, goal_ids=goal_ids, turn_id=turn_id
-            ).model_dump(mode="json")
-            if interaction_ledger is not None
-            else {
-                "events": [],
-                "already_spoken": [],
-                "pending_speech": [],
-                "prior_delivered_speech": [],
-            }
-        )
-        need = SocialCommunicationNeed(
-            need_id=communication_need_id(plan.plan_id, "resource_delivery_completed"),
-            owner="runtime",
-            kind="result",
-            source_goal_ids=goal_ids,
-            reference_id=plan.plan_id,
-            facts={
-                "status": "completed",
-                "result_kind": "resource_delivery_handover",
-                "optional_completion_update": True,
-            },
-            # Built after the handover completed: the ordering is already met, and
-            # this independent SC interaction transports immediate acts only (live
-            # 2026-10-15: a `final` "给你。" was rejected and the handover was silent).
-            delivery_phase="immediate",
-            after_step_ids=[item.step_id for item in plan.steps],
-        )
-        request = SocialCognitionRequest(
-            request_id=(
-                "sc:terminal-resource:"
-                + hashlib.sha256(
-                    f"{plan.plan_id}:{','.join(evidence_refs)}".encode("utf-8")
-                ).hexdigest()[:96]
-            ),
-            trigger="evidence",
-            source_refs=list(evidence_refs),
-            language=language,
-            source_turn=source_turn,
-            goal_ids=list(goal_ids),
-            evidence_refs=list(evidence_refs),
-            communication_needs=[need],
-            context={
-                "interaction_context": interaction_context,
-                "work_result": {
-                    "status": "completed",
-                    "result_kind": "resource_delivery_handover",
-                    "evidence_refs": list(evidence_refs),
-                },
-            },
-        )
-        generation = int(self.playback_delivery.playback_generation)
-        resolved = await self.cognitive_runtime.resolve_social_interaction(
-            await self.get_http_session(),
-            request=request,
-            session_id=str(session_id or "terminal-resource-delivery"),
-            snapshot_is_current=lambda: not self._outcome_response_is_stale(
-                generation=generation, session_id=session_id
-            ),
-            primary_plan=plan,
-        )
-        if resolved is None:
-            return None
-        _resolution, response = resolved
-        return response
-
-    async def _requested_result_evidence_social_response(
-        self,
-        *,
-        source_response: InteractionResponse,
-        plan: CanonicalPlan,
-        session_id: str | None,
-        language: str,
-        user_request: str,
-        evidence: list[ToolResultEvidence],
-        goal_ids: list[str],
-        extra_context: dict[str, Any],
-    ) -> InteractionResponse | None:
-        """Give SC terminal Evidence for a result the person asked to be told.
-
-        Every communication with the user goes through Social Cognition. When Activation or
-        the Planner chose no next Work for terminal Evidence whose Goal carries an
-        ``information`` Responsibility, SC still receives that Evidence directly
-        with one Runtime result Need and decides how to communicate it (speech,
-        gesture, gaze). The Planner path already invokes SC itself, so this runs
-        only when that path produced nothing.
-        """
-
-        if not evidence or not goal_ids:
-            return None
-        result_goal_ids: list[str] = []
-        responsibilities: dict[str, CognitiveResponsibilityProposal] = {}
-        for goal_id in goal_ids:
-            goal_responsibilities = [
-                item
-                for item in planner_reentry_responsibilities(
-                    source_response=source_response, goal_ids=[goal_id],
-                )
-                if item.output_mode == "information"
-            ]
-            if goal_responsibilities:
-                result_goal_ids.append(goal_id)
-                for item in goal_responsibilities:
-                    responsibilities.setdefault(item.local_ref, item)
-        if not result_goal_ids:
-            return None
-        evidence_refs = [item.evidence_id for item in evidence]
-        turn_envelope = (
-            source_response.metadata.get("user_turn_envelope")
-            if isinstance(source_response.metadata, dict)
-            else None
-        )
-        normalized_input = (
-            turn_envelope.get("normalized_input")
-            if isinstance(turn_envelope, dict)
-            else None
-        )
-        turn_id = str(
-            (turn_envelope or {}).get("turn_id")
-            or source_response.metadata.get("turn_id")
-            or session_id
-            or "terminal-requested-result"
-        )
-        source_turn = {
-            "turn_id": turn_id,
-            "original_text": (
-                str(normalized_input.get("text") or "").strip()
-                if isinstance(normalized_input, dict)
-                else user_request
-            ),
-        }
-        interaction_ledger = getattr(self.cognitive_runtime, "interaction_ledger", None)
-        interaction_context = (
-            interaction_ledger.context(
-                session_id, goal_ids=result_goal_ids, turn_id=turn_id
-            ).model_dump(mode="json")
-            if interaction_ledger is not None
-            else {
-                "events": [],
-                "already_spoken": [],
-                "pending_speech": [],
-                "prior_delivered_speech": [],
-            }
-        )
-        status = aggregate_execution_status([item.status for item in evidence])
-        need = SocialCommunicationNeed(
-            need_id=communication_need_id(plan.plan_id, "requested_result_evidence"),
-            owner="runtime",
-            kind="result",
-            source_goal_ids=result_goal_ids,
-            source_responsibility_refs=list(responsibilities),
-            reference_id=plan.plan_id,
-            facts={
-                "status": status,
-                "result_kind": "requested_information",
-                "required_result_update": True,
-            },
-            delivery_phase="immediate",
-            after_step_ids=[item.step_id for item in plan.steps],
-        )
-        request = SocialCognitionRequest(
-            request_id=(
-                "sc:terminal-result:"
-                + hashlib.sha256(
-                    f"{plan.plan_id}:{','.join(evidence_refs)}".encode("utf-8")
-                ).hexdigest()[:96]
-            ),
-            trigger="evidence",
-            source_refs=list(evidence_refs),
-            language=language,
-            responsibilities=list(responsibilities.values()),
-            source_turn=source_turn,
-            goal_ids=list(result_goal_ids),
-            evidence_refs=list(evidence_refs),
-            communication_needs=[need],
-            context={
-                "interaction_context": interaction_context,
-                "trusted_terminal_evidence": [
-                    item.model_dump(mode="json") for item in evidence
-                ],
-                **{
-                    key: extra_context[key]
-                    for key in ("trusted_execution_outcome", "goal_statuses")
-                    if key in extra_context
-                },
-                "work_result": {
-                    "status": status,
-                    "result_kind": "requested_information",
-                    "evidence_refs": list(evidence_refs),
-                },
-            },
-        )
-        self.session_log(
-            session_id,
-            "terminal_evidence_social_cognition: goals=%s evidence=%s reason=no_planner_communication",
-            ",".join(result_goal_ids),
-            len(evidence_refs),
-        )
-        generation = int(self.playback_delivery.playback_generation)
-        resolved = await self.cognitive_runtime.resolve_social_interaction(
-            await self.get_http_session(),
-            request=request,
-            session_id=str(session_id or "terminal-requested-result"),
-            snapshot_is_current=lambda: not self._outcome_response_is_stale(
-                generation=generation, session_id=session_id
-            ),
-            primary_plan=plan,
-        )
-        if resolved is None:
-            return None
-        _resolution, response = resolved
-        return response
 
     async def _plan_evidence_bound_capability_result_response(
         self,
@@ -6384,221 +1592,13 @@ class VoiceAssistant:
         plan: Any,
         session_id: str | None,
     ) -> InteractionResponse | None:
-        """Reactivate Fast Planner from bounded terminal Evidence.
-
-        Complete observations stay in the immutable ExecutionOutcomeBundle. The
-        Host preserves exact Goal/Plan/request binding, Fast Planner selects the
-        still-needed Communicative Activity, and Runtime validates its evidence
-        provenance before delivery.
-        """
-
-        metadata = source_response.metadata if isinstance(source_response.metadata, dict) else {}
-        envelope = metadata.get("user_turn_envelope")
-        normalized_input = (
-            envelope.get("normalized_input")
-            if isinstance(envelope, dict)
-            else None
+        return await planner_reentry_host.plan_evidence_bound_capability_result_response(
+            self,
+            source_response=source_response,
+            bundle=bundle,
+            plan=plan,
+            session_id=session_id,
         )
-        language = str(
-            metadata.get("language")
-            or (normalized_input.get("language") if isinstance(normalized_input, dict) else "")
-            or "en-US"
-        )
-
-        delivered_incremental_evidence = {
-            str(item).strip()
-            for item in metadata.get(
-                "incremental_result_delivery_evidence_ids",
-                [],
-            )
-            if str(item).strip()
-        }
-        planner_handled_incremental_evidence = {
-            str(item).strip()
-            for item in metadata.get(
-                "incremental_planner_reentry_evidence_ids",
-                [],
-            )
-            if str(item).strip()
-        }
-        evidence: list[ToolResultEvidence] = []
-        selected_execution_evidence: list[ExecutionEvidence] = []
-        for item in bundle.evidence:
-            if item.evidence_id in delivered_incremental_evidence:
-                continue
-            if item.evidence_id in planner_handled_incremental_evidence:
-                continue
-            if item.reason_code == "value_judgment_declined":
-                # Declined by Value Judgment and already communicated; never re-planned.
-                continue
-            observation = item.observation
-            observation_data = (
-                dict(observation.data)
-                if observation is not None
-                and observation.status == "available"
-                and observation.schema_validated
-                else {}
-            )
-            evidence.append(
-                ToolResultEvidence(
-                    evidence_id=item.evidence_id,
-                    tool_id=item.capability_id,
-                    status=item.status,
-                    data=observation_data,
-                    output_sha256=canonical_value_sha256(observation_data),
-                )
-            )
-            selected_execution_evidence.append(item)
-        if not evidence:
-            return None
-
-        user_request = (
-            str(normalized_input.get("text") or "").strip()
-            if isinstance(normalized_input, dict)
-            else ""
-        )
-        if not user_request:
-            return None
-        plan_goal_ids = set(plan.executable_goal_ids())
-        goal_ids = list(
-            dict.fromkeys(
-                goal_id
-                for item in selected_execution_evidence
-                for goal_id in item.source_goal_ids
-                if goal_id in plan_goal_ids
-            )
-        )
-        if not goal_ids:
-            return None
-        try:
-            evidence_refs = [item.evidence_id for item in evidence]
-            selected_evidence_ids = set(evidence_refs)
-            selected_goal_ids = set(goal_ids)
-            projected_bundle = bundle.model_dump(mode="json", exclude_none=True)
-            projected_bundle["canonical_goal_ids"] = goal_ids
-            projected_bundle["non_execution_goal_ids"] = []
-            projected_bundle["evidence"] = [
-                item
-                for item in projected_bundle.get("evidence") or []
-                if isinstance(item, dict)
-                and str(item.get("evidence_id") or "") in selected_evidence_ids
-            ]
-            projected_bundle["goal_outcomes"] = [
-                item
-                for item in projected_bundle.get("goal_outcomes") or []
-                if isinstance(item, dict)
-                and str(item.get("goal_id") or "") in selected_goal_ids
-            ]
-            projected_bundle["aggregate_status"] = aggregate_execution_status(
-                [item.status for item in selected_execution_evidence]
-            )
-            projected_truth = planner_execution_outcome_truth(bundle)
-            projected_truth["aggregate_status"] = projected_bundle["aggregate_status"]
-            projected_truth["goal_outcomes"] = [
-                item
-                for item in projected_truth.get("goal_outcomes") or []
-                if str(item.get("goal_id") or "") in selected_goal_ids
-            ]
-            projected_truth["evidence"] = [
-                item
-                for item in projected_truth.get("evidence") or []
-                if str(item.get("evidence_id") or "") in selected_evidence_ids
-            ]
-            extra_context = {
-                "execution_outcome_bundle": projected_bundle,
-                "trusted_execution_outcome": projected_truth,
-                "aggregate_status": projected_bundle["aggregate_status"],
-                "goal_statuses": [
-                    {
-                        "goal_id": item.goal_id,
-                        "status": item.status,
-                        "completion_qualification": (
-                            goal_completion_qualification_summary(bundle, item)
-                        ),
-                    }
-                    for item in bundle.goal_outcomes
-                    if item.goal_id in selected_goal_ids
-                ],
-            }
-            planner_response = await self._planner_state_reentry_response(
-                source_response=source_response,
-                canonical_plan=plan,
-                user_request=user_request,
-                language=language,
-                goal_ids=goal_ids,
-                evidence_goal_ids=goal_ids,
-                evidence_refs=evidence_refs,
-                session_id=session_id,
-                phase="post_execution",
-                context_updates={
-                    "trusted_terminal_evidence": [
-                        item.model_dump(mode="json") for item in evidence
-                    ],
-                    "result_evidence_refs": evidence_refs,
-                    "result_evidence_reentry": {
-                        "phase": "post_execution",
-                        "source_goal_ids": goal_ids,
-                        "evidence_refs": evidence_refs,
-                        "planner_authority": "planner",
-                    },
-                    **extra_context,
-                },
-                fast_workflow_stage="fast_planner_evidence_reentry",
-                response_source="fast_planner_evidence_reentry",
-                repeat_check_evidence=evidence,
-                repeat_check_context=extra_context,
-            )
-            if planner_response is not None:
-                # resolve_plan_interaction already gave SC this exact Evidence
-                # (trigger=evidence): one SC communication, never a second one.
-                return planner_response
-            resource_response = await self._optional_completed_resource_social_response(
-                source_response=source_response,
-                bundle=bundle,
-                plan=plan,
-                session_id=session_id,
-                language=language,
-                user_request=user_request,
-                evidence_refs=evidence_refs,
-                goal_ids=goal_ids,
-                selected_execution_evidence=selected_execution_evidence,
-            )
-            if resource_response is not None:
-                return resource_response
-            # Activation/Planner chose no next Work. Terminal Evidence still reaches
-            # SC directly, so a result the person asked for is never dropped.
-            return await self._requested_result_evidence_social_response(
-                source_response=source_response,
-                plan=plan,
-                session_id=session_id,
-                language=language,
-                user_request=user_request,
-                evidence=evidence,
-                goal_ids=goal_ids,
-                extra_context=extra_context,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "planner_evidence_reentry_failed: error_type=%s error=%s",
-                type(exc).__name__,
-                exc,
-            )
-            # Whatever failed after this Work, say so with the operational notice instead
-            # of ending silently (live 2026-10-12: three failed re-entries left the person
-            # with only "Got it."; owner 2026-10-15: any error gets at least one notice,
-            # after a Host contract error left a completed weather read unanswered).
-            stage_failure = isinstance(exc, CognitiveStageFailure)
-            return self._cognitive_core_exception_safe_response(
-                user_request,
-                context={"user_turn_envelope": envelope},
-                failure_stage=exc.stage if stage_failure else "fast_planner_evidence_reentry",
-                failure_class=(
-                    str(exc.failure_metadata.get("failure_class") or "")
-                    if stage_failure else type(exc).__name__
-                ),
-                failure_error=str(exc),
-            )
 
     def _launch_interaction(
         self,
@@ -6609,38 +1609,13 @@ class VoiceAssistant:
         reset_playback: bool = True,
         mark_session_done: bool = True,
     ) -> None:
-        """Launch every InteractionResponse through the non-blocking dispatch boundary."""
-
-        if user_turn_prohibits_speech(response.metadata.get("user_turn_envelope")):
-            response = response.model_copy(update={"speech": []})
-
-        task = asyncio.create_task(
-            self._dispatch_detached_interaction(
-                response,
-                session_id,
-                confirmed_request_ids=confirmed_request_ids,
-                reset_playback=reset_playback,
-                mark_session_done=mark_session_done,
-            )
-        )
-        active_tasks = getattr(self, "active_interaction_tasks", None)
-        if not isinstance(active_tasks, dict):
-            active_tasks = {}
-            self.active_interaction_tasks = active_tasks
-        active_tasks[task] = response.interaction_id
-        self.active_interaction_task = task
-        self.active_interaction_id = response.interaction_id
-        task.add_done_callback(self._interaction_task_done)
-
-    @staticmethod
-    def _uses_detached_cognitive_capability_runtime(
-        response: InteractionResponse,
-    ) -> bool:
-        metadata = response.metadata if isinstance(response.metadata, dict) else {}
-        return bool(
-            metadata.get("cognitive_runtime_apply") is True
-            and isinstance(metadata.get("canonical_plan"), dict)
-            and response.capabilities
+        return interaction_dispatch_host.launch_interaction(
+            self,
+            response,
+            session_id,
+            confirmed_request_ids=confirmed_request_ids,
+            reset_playback=reset_playback,
+            mark_session_done=mark_session_done,
         )
 
     async def _dispatch_detached_interaction(
@@ -6652,113 +1627,14 @@ class VoiceAssistant:
         reset_playback: bool,
         mark_session_done: bool,
     ) -> Any:
-        """Submit trusted provider work and end the foreground Python task.
-
-        Terminal work is consumed by a separate result task. The Capability
-        Runtime, not this foreground call stack, keeps request ownership alive.
-        """
-
-        if reset_playback:
-            await self.reset_playback_ordering()
-        generation = int(self.playback_delivery.playback_generation)
-        started_ms = now_ms()
-        try:
-            dispatch = await self.interaction_runtime.submit_response(
-                response,
-                session_id=session_id,
-                confirmed_request_ids=confirmed_request_ids,
-            )
-        except Exception as exc:
-            record_session_workflow_stage(
-                self,
-                session_id,
-                stage="trusted_capability_runtime_dispatch",
-                started_monotonic_ms=started_ms,
-                finished_monotonic_ms=now_ms(),
-                status="failed",
-                input_payload={"interaction_response": response},
-                output_payload=None,
-                errors=[{"error_type": type(exc).__name__, "error": str(exc)}],
-                metadata=summarize_provider_start_evidence(response),
-            )
-            raise
-
-        if isinstance(response.metadata.get("social_cognition_resolution"), dict):
-            self.cognitive_runtime.schedule_social_expression(response, session_id=session_id)
-        receipt = dispatch.receipt
-        record_session_workflow_stage(
+        return await interaction_dispatch_host.dispatch_detached_interaction(
             self,
+            response,
             session_id,
-            stage="trusted_capability_runtime_dispatch",
-            started_monotonic_ms=started_ms,
-            finished_monotonic_ms=now_ms(),
-            status="accepted" if receipt is not None else "terminal_before_dispatch",
-            input_payload={"interaction_response": dispatch.source_response},
-            output_payload=(
-                receipt
-                if receipt is not None
-                else dispatch.immediate_execution
-            ),
-            errors=[],
-            metadata=summarize_provider_start_evidence(dispatch.source_response),
+            confirmed_request_ids=confirmed_request_ids,
+            reset_playback=reset_playback,
+            mark_session_done=mark_session_done,
         )
-        self.session_log(
-            session_id,
-            "capability_runtime_detached: interaction_id=%s dispatch_id=%s requests=%s",
-            dispatch.source_response.interaction_id,
-            receipt.dispatch_id if receipt is not None else "none",
-            len(receipt.request_ids) if receipt is not None else 0,
-        )
-
-        result_consumer = (
-            self._consume_detached_cognitive_dispatch
-            if self._uses_detached_cognitive_capability_runtime(response)
-            else self._consume_detached_non_cognitive_dispatch
-        )
-
-        async def consume_and_finalize_session() -> CapabilityRuntimeResult:
-            try:
-                return await result_consumer(
-                    dispatch,
-                    session_id=session_id,
-                    generation=generation,
-                    confirmed_request_ids=confirmed_request_ids,
-                )
-            finally:
-                # A dispatch receipt transfers provider ownership but does not prove
-                # that response speech was even scheduled.  Closing the session at
-                # receipt time lets the next voice turn invalidate that still-pending
-                # speech as stale.  Finalize only after Runtime has consumed the
-                # detached response (including its playback-start barrier).
-                if mark_session_done:
-                    state = self.sessions.state.get(session_id or "")
-                    if state is not None:
-                        state["llm_done"] = True
-                        state["response_chars"] = state.get(
-                            "response_chars", 0
-                        ) + sum(
-                            len(item.text)
-                            for item in dispatch.runtime_response.speech
-                        )
-                    self.maybe_session_done(session_id)
-
-        result_task = asyncio.create_task(
-            consume_and_finalize_session(),
-            name=(
-                "capability-result-reentry:"
-                f"{dispatch.source_response.interaction_id}:"
-                f"{receipt.dispatch_id if receipt is not None else 'immediate'}"
-            ),
-        )
-        self.sessions.track_capability_dispatch(session_id, result_task)
-        result_tasks = getattr(self, "active_cognitive_runtime_tasks", None)
-        if not isinstance(result_tasks, dict):
-            result_tasks = {}
-            self.active_cognitive_runtime_tasks = result_tasks
-        result_tasks[result_task] = dispatch.source_response.interaction_id
-        result_task.add_done_callback(self._cognitive_runtime_task_done)
-
-        return receipt
 
     def start_soridormi_ambient_perception(self) -> asyncio.Task | None:
         """Start the one mechanical ambient scene poll for this Host, if enabled.
@@ -6803,27 +1679,13 @@ class VoiceAssistant:
         generation: int,
         confirmed_request_ids: set[str] | None,
     ) -> CapabilityRuntimeResult:
-        """Consume a non-cognitive dispatch without reopening the foreground turn."""
-
-        execution = await self.interaction_runtime.wait_dispatch(dispatch)
-        response = dispatch.source_response
-        for result in execution.results:
-            self.conversation_state.update_pending_task_status_for_request_id(
-                request_id=result.request_id, status=result.status
-            )
-        if response.metadata.get("history_after_successful_delivery") is True:
-            await self._record_successfully_delivered_speech(
-                response, execution, session_id=session_id,
-                log_event="interaction_history_after_delivery",
-            )
-        record_execution_experience_safely(
-            prepare_response=self._prepared_interaction_response_for_record,
-            record_experience=self._record_experience,
-            session_log=self.session_log,
-            response=response, execution=execution, session_id=session_id,
+        return await interaction_dispatch_host.consume_detached_non_cognitive_dispatch(
+            self,
+            dispatch,
+            session_id=session_id,
+            generation=generation,
             confirmed_request_ids=confirmed_request_ids,
         )
-        return execution
 
     async def _consume_detached_cognitive_dispatch(
         self,
@@ -6833,210 +1695,13 @@ class VoiceAssistant:
         generation: int,
         confirmed_request_ids: set[str] | None,
     ) -> CapabilityRuntimeResult:
-        """Consume Runtime events after the originating foreground task ended."""
-
-        response = dispatch.source_response
-        receipt = dispatch.receipt
-        started_ms = now_ms()
-        source_capability_request_ids = {
-            request.request_id for request in response.capabilities
-        }
-        runtime_capability_request_ids = {
-            request.request_id
-            for request in dispatch.runtime_response.capabilities
-        }
-        terminal_capability_ids: set[str] = set()
-
-        preexecuted_capability_results = [
-            result
-            for result in dispatch.preexecuted_results
-            if result.request_id in source_capability_request_ids
-        ]
-        for result in preexecuted_capability_results:
-            terminal_capability_ids.add(result.request_id)
-            if runtime_capability_request_ids and not terminal_result_waits_for_batch_closure(
-                source_capability_count=len(source_capability_request_ids),
-                status=result.status,
-            ):
-                await self._reenter_cognition_for_terminal_capability(
-                    response=response,
-                    result=result,
-                    session_id=session_id,
-                    generation=generation,
-                )
-            elif runtime_capability_request_ids:
-                self.session_log(
-                    session_id,
-                    "incremental_cognitive_reentry_deferred: request_id=%s "
-                    "reason=batch_closure",
-                    result.request_id,
-                )
-
-        if receipt is not None:
-            cursor = receipt.event_cursor
-            runtime_terminal_ids: set[str] = set()
-            provider_state_signatures: dict[str, dict[str, Any]] = {}
-            while len(runtime_terminal_ids) < len(runtime_capability_request_ids):
-                event = await self.interaction_runtime.runtime.wait_runtime_event(
-                    cursor,
-                    dispatch_id=receipt.dispatch_id,
-                )
-                cursor = event.sequence
-                if event.request_id not in runtime_capability_request_ids:
-                    continue
-                if event.type == "progress" and not event.terminal:
-                    projected_state = meaningful_provider_state(event.progress)
-                    if projected_state and provider_state_signatures.get(
-                        event.request_id
-                    ) != projected_state:
-                        provider_state_signatures[event.request_id] = dict(
-                            projected_state
-                        )
-                        await self._reenter_cognition_for_provider_state(
-                            response=response,
-                            event=event,
-                            provider_state=projected_state,
-                            session_id=session_id,
-                        )
-                    continue
-                if (
-                    not event.terminal
-                    or event.result is None
-                    or event.request_id in runtime_terminal_ids
-                ):
-                    continue
-                runtime_terminal_ids.add(event.request_id)
-                terminal_capability_ids.add(event.request_id)
-                self.session_log(
-                    session_id,
-                    "capability_terminal_reentry_event: dispatch_id=%s request_id=%s "
-                    "capability_id=%s status=%s remaining=%s",
-                    receipt.dispatch_id,
-                    event.request_id,
-                    event.capability_id,
-                    event.type,
-                    max(
-                        0,
-                        len(source_capability_request_ids)
-                        - len(terminal_capability_ids),
-                    ),
-                )
-                if terminal_result_waits_for_batch_closure(
-                    source_capability_count=len(source_capability_request_ids),
-                    status=event.result.status,
-                ):
-                    self.session_log(
-                        session_id,
-                        "incremental_cognitive_reentry_deferred: request_id=%s "
-                        "reason=batch_closure",
-                        event.request_id,
-                    )
-                else:
-                    await self._reenter_cognition_for_terminal_capability(
-                        response=response,
-                        result=event.result,
-                        session_id=session_id,
-                        generation=generation,
-                    )
-
-        try:
-            execution = await self.interaction_runtime.wait_dispatch(
-                dispatch
-            )
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "detached_capability_completion_failed: interaction_id=%s "
-                "error_type=%s error=%s",
-                response.interaction_id,
-                type(exc).__name__,
-                exc,
-            )
-            execution = CapabilityRuntimeResult(
-                interaction_id=response.interaction_id,
-                status="failed",
-            )
-
-        record_session_workflow_stage(
+        return await interaction_dispatch_host.consume_detached_cognitive_dispatch(
             self,
-            session_id,
-            stage="trusted_capability_runtime_completion",
-            started_monotonic_ms=started_ms,
-            finished_monotonic_ms=now_ms(),
-            status=execution.status,
-            input_payload={
-                "interaction_id": response.interaction_id,
-                "dispatch_id": receipt.dispatch_id if receipt is not None else "",
-            },
-            output_payload=execution,
-            errors=[
-                {
-                    "request_id": result.request_id,
-                    "capability_id": result.capability_id,
-                    "status": result.status,
-                    "reason_code": result.reason_code,
-                    "message": result.message,
-                }
-                for result in execution.results
-                if result.status not in {"completed", "success"}
-            ],
-            metadata=summarize_provider_start_evidence(response, execution),
-        )
-        self.session_log(
-            session_id,
-            "detached_capability_runtime_done: interaction_id=%s status=%s "
-            "results=%s runtime_ms=%.1f",
-            response.interaction_id,
-            execution.status,
-            len(execution.results),
-            now_ms() - started_ms,
-        )
-        for result in execution.results:
-            self.conversation_state.update_pending_task_status_for_request_id(
-                request_id=result.request_id,
-                status=result.status,
-            )
-
-        has_soridormi_request = any(
-            request.capability_id.startswith("soridormi.")
-            for request in response.capabilities
-        )
-        provider_status = (
-            await self._record_soridormi_post_status(session_id)
-            if has_soridormi_request
-            else None
-        )
-        completed_request_ids = {
-            result.request_id for result in execution.results
-        }
-        if execution.status != "completed":
-            for request in response.capabilities:
-                if request.request_id in completed_request_ids:
-                    continue
-                self.conversation_state.update_pending_task_status_for_request_id(
-                    request_id=request.request_id,
-                    status="not_run",
-                )
-        closure_status = await self._close_cognitive_execution(
-            response=response,
-            execution=execution,
+            dispatch,
             session_id=session_id,
             generation=generation,
-            provider_status=provider_status,
-        )
-        response.metadata["cognitive_turn_closure_status"] = closure_status
-        record_execution_experience_safely(
-            prepare_response=self._prepared_interaction_response_for_record,
-            record_experience=self._record_experience,
-            session_log=self.session_log,
-            response=response,
-            execution=execution,
-            session_id=session_id,
             confirmed_request_ids=confirmed_request_ids,
         )
-        return execution
 
     def _interaction_task_done(self, task: asyncio.Task) -> None:
         active_tasks = getattr(self, "active_interaction_tasks", None)
@@ -7073,45 +1738,7 @@ class VoiceAssistant:
         self,
         session_id: str | None,
     ) -> dict[str, Any] | None:
-        invoker = getattr(self.interaction_runtime, "soridormi_invoker", None)
-        if invoker is None:
-            self.session_log(
-                session_id,
-                "soridormi_post_status_failed: reason=provider_unavailable",
-            )
-            return None
-        try:
-            outcome = await asyncio.wait_for(
-                invoker.invoke("soridormi.robot.get_status", {}),
-                timeout=5.0,
-            )
-        except Exception as exc:
-            self.session_log(
-                session_id,
-                "soridormi_post_status_failed: reason=%s",
-                type(exc).__name__,
-            )
-            return None
-        if outcome.status != "success":
-            self.session_log(
-                session_id,
-                "soridormi_post_status_failed: reason=%s",
-                outcome.error or outcome.status,
-            )
-            return None
-        status = outcome.output if isinstance(outcome.output, dict) else {}
-        self.session_log(
-            session_id,
-            "soridormi_post_status: mode=%s backend=%s safe_idle=%s "
-            "active_task_present=%s emergency_stop=%s fallen=%s",
-            status.get("mode"),
-            status.get("backend"),
-            status.get("safe_idle"),
-            status.get("active_task") is not None,
-            status.get("emergency_stop"),
-            status.get("fallen"),
-        )
-        return status
+        return await interaction_dispatch_host.record_soridormi_post_status(self, session_id)
 
     def _prepared_interaction_response_for_record(
         self,
@@ -7129,14 +1756,13 @@ class VoiceAssistant:
             confirmed_request_ids=confirmed_request_ids,
         )
 
-
     def _invalidate_output_state(
         self,
         *,
         cancel_cognitive_work: bool = True,
     ) -> None:
         self.playback_delivery.playback_generation += 1
-        self._playback_state().cancel_output_duck()
+        self.playback_delivery.cancel_output_duck()
         self.resolve_all_playback_start_waiters(
             started=False,
             reason="interrupt",
@@ -7229,383 +1855,11 @@ class VoiceAssistant:
         *,
         source_turn_id: str,
     ) -> CancellationDispatchReceipt:
-        """Apply one closed reflex scope without semantic goal guessing."""
-
-        scope = outcome.cancellation_scope
-        if scope == "none":
-            raise ValueError("reflex cancellation requires a concrete scope")
-        if scope == "specific_goal":
-            raise ValueError(
-                "specific_goal cancellation requires the Core's exact "
-                "committed plan binding and cannot originate from ReflexOutcome"
-            )
-        if scope in {"current_interaction", "global_emergency"}:
-            input_session_runtime_for(self)._cancel_active_routed_turns(
-                excluding=asyncio.current_task(),
-                cancel_all=(scope == "global_emergency"),
-                reason=f"protective_reflex:{scope}",
-            )
-        active_interaction_id = ""
-        active_tasks = getattr(self, "active_interaction_tasks", None)
-        active_host_interactions: list[
-            tuple[asyncio.Task, str]
-        ] = []
-        if isinstance(active_tasks, dict):
-            active_host_interactions = [
-                (task, str(interaction_id).strip())
-                for task, interaction_id in active_tasks.items()
-                if not task.done() and str(interaction_id).strip()
-            ]
-            if active_host_interactions:
-                active_interaction_id = active_host_interactions[-1][1]
-        if not active_interaction_id:
-            active_task = getattr(
-                self,
-                "active_interaction_task",
-                None,
-            )
-            legacy_interaction_id = str(
-                getattr(self, "active_interaction_id", None) or ""
-            ).strip()
-            if active_task is None or not active_task.done():
-                active_interaction_id = legacy_interaction_id
-            if (
-                active_task is not None
-                and not active_task.done()
-                and legacy_interaction_id
-                and all(
-                    item[0] is not active_task
-                    for item in active_host_interactions
-                )
-            ):
-                active_host_interactions.append(
-                    (active_task, legacy_interaction_id)
-                )
-        runtime_open_interaction_ids: list[str] = []
-        runtime = getattr(
-            getattr(self, "interaction_runtime", None),
-            "runtime",
-            None,
-        )
-        observe_execution = getattr(runtime, "execution_observation", None)
-        if callable(observe_execution):
-            try:
-                observation = await observe_execution()
-                runtime_open_interaction_ids = [
-                    str(item).strip()
-                    for item in observation.open_interaction_ids
-                    if str(item).strip()
-                ]
-            except Exception as exc:
-                logger.warning(
-                    "Runtime execution observation failed during cancellation: %s",
-                    exc,
-                )
-        if not active_interaction_id and runtime_open_interaction_ids:
-            # Detached capability work intentionally outlives the foreground
-            # interaction task. Runtime ownership is therefore the authoritative
-            # fallback for current-interaction cancellation scope.
-            active_interaction_id = runtime_open_interaction_ids[-1]
-        if scope == "global_emergency":
-            host_scope_interaction_ids = tuple(
-                sorted(
-                    {
-                        interaction_id
-                        for _, interaction_id in active_host_interactions
-                    }.union(runtime_open_interaction_ids)
-                )
-            )
-        elif (
-            scope in {"output_only", "current_interaction"}
-            and active_interaction_id
-        ):
-            host_scope_interaction_ids = (active_interaction_id,)
-        else:
-            host_scope_interaction_ids = ()
-        receipt = CancellationDispatchReceipt(
+        return await reflex_cancellation_host.apply_reflex_cancellation(
+            self,
+            outcome,
             source_turn_id=source_turn_id,
-            requested_scope=scope,
-            effective_scope=scope,
         )
-        dispatch_failures: list[str] = []
-        emergency_evidence: dict[str, Any] = {}
-        phase_operations: list[tuple[str, Any]] = []
-
-        # Safety dispatches lead the first phase. Output teardown can wait on a
-        # device write lock; it must never serialize motion cancellation or an
-        # emergency stop behind that audio cleanup.
-        if scope == "global_emergency":
-            emergency_stop = getattr(
-                self.interaction_runtime,
-                "emergency_stop",
-                None,
-            )
-            if callable(emergency_stop):
-                phase_operations.append(
-                    (
-                        "emergency_stop",
-                        emergency_stop(reason=outcome.reason),
-                    )
-                )
-            else:
-                emergency_evidence = {
-                    "status": "unavailable",
-                    "reason": "emergency_stop_dispatch_unsupported",
-                }
-                dispatch_failures.append(
-                    "emergency_stop:dispatch_unsupported"
-                )
-
-        runtime_dispatch_required = not (
-            scope in {"output_only", "current_interaction"}
-            and not active_interaction_id
-        )
-        runtime_operation_kind = ""
-        if runtime_dispatch_required:
-            directive = CancellationDirective(
-                source_turn_id=source_turn_id,
-                requested_scope=scope,
-                foreground_interaction_id=(
-                    active_interaction_id
-                    if scope
-                    in {
-                        "output_only",
-                        "current_interaction",
-                        "specific_goal",
-                    }
-                    else None
-                ),
-                target_goal_ids=outcome.target_goal_ids,
-                reason=outcome.reason,
-            )
-            cancel_scope = getattr(
-                self.interaction_runtime,
-                "cancel_scope",
-                None,
-            )
-            if callable(cancel_scope):
-                runtime_operation_kind = "runtime_scope"
-                phase_operations.append(
-                    (
-                        runtime_operation_kind,
-                        cancel_scope(directive),
-                    )
-                )
-            else:
-                dispatch_failures.append(
-                    "capability_runtime:scoped_dispatch_unsupported"
-                )
-
-        if scope in {
-            "output_only",
-            "current_interaction",
-            "global_emergency",
-        }:
-            try:
-                self._invalidate_output_state(
-                    cancel_cognitive_work=False,
-                )
-                self._schedule_output_abort(
-                    new_session_id=source_turn_id,
-                    log_event=False,
-                )
-            except Exception as exc:
-                dispatch_failures.append(
-                    "output_invalidation:"
-                    f"{type(exc).__name__}:{str(exc)[:300]}"
-                )
-
-        phase_results = await asyncio.gather(
-            *(operation for _, operation in phase_operations),
-            return_exceptions=True,
-        )
-        for (operation_kind, _), result in zip(
-            phase_operations,
-            phase_results,
-            strict=True,
-        ):
-            if operation_kind == "runtime_scope":
-                if isinstance(result, BaseException):
-                    dispatch_failures.append(
-                        "capability_runtime:"
-                        f"{type(result).__name__}:{str(result)[:300]}"
-                    )
-                elif isinstance(result, CancellationDispatchReceipt):
-                    receipt = result
-                else:
-                    dispatch_failures.append(
-                        "capability_runtime:invalid_dispatch_receipt"
-                    )
-            elif operation_kind == "emergency_stop":
-                if isinstance(result, BaseException):
-                    emergency_evidence = {
-                        "status": "failed",
-                        "reason": (
-                            f"{type(result).__name__}:{str(result)[:300]}"
-                        ),
-                    }
-                    dispatch_failures.append(
-                        "emergency_stop:"
-                        f"{type(result).__name__}:{str(result)[:300]}"
-                    )
-                elif isinstance(result, dict):
-                    emergency_evidence = result
-                else:
-                    emergency_evidence = {
-                        "status": "failed",
-                        "reason": "invalid_emergency_stop_evidence",
-                    }
-                    dispatch_failures.append(
-                        "emergency_stop:invalid_evidence"
-                    )
-        receipt = receipt.model_copy(
-            update={
-                "interaction_ids": tuple(
-                    sorted(
-                        {
-                            *receipt.interaction_ids,
-                            *host_scope_interaction_ids,
-                        }
-                    )
-                ),
-                "host_interaction_ids": tuple(
-                    sorted(
-                        {
-                            *receipt.host_interaction_ids,
-                            *host_scope_interaction_ids,
-                        }
-                    )
-                ),
-                "dispatch_failures": tuple(
-                    dict.fromkeys(
-                        [
-                            *receipt.dispatch_failures,
-                            *dispatch_failures,
-                        ]
-                    )
-                ),
-                "emergency_stop_evidence": (
-                    emergency_evidence
-                    if scope == "global_emergency"
-                    else receipt.emergency_stop_evidence
-                ),
-                "output_invalidation_requested": (
-                    receipt.output_invalidation_requested
-                    or scope
-                    in {
-                        "output_only",
-                        "current_interaction",
-                        "global_emergency",
-                    }
-                ),
-            }
-        )
-
-        # A provider task may have been inside the speech scheduler while
-        # runtime cancellation ran. Invalidate once more so no late synthesis
-        # can re-enter playback. Device teardown remains detached: a blocked
-        # audio driver must not keep this protective reflex active or delay a
-        # later emergency reflex.
-        if scope in {
-            "output_only",
-            "current_interaction",
-            "global_emergency",
-        }:
-            try:
-                self._invalidate_output_state(
-                    cancel_cognitive_work=False,
-                )
-            except Exception as exc:
-                receipt = receipt.model_copy(
-                    update={
-                        "dispatch_failures": tuple(
-                            dict.fromkeys(
-                                [
-                                    *receipt.dispatch_failures,
-                                    "output_reinvalidation:"
-                                    f"{type(exc).__name__}:"
-                                    f"{str(exc)[:300]}",
-                                ]
-                            )
-                        )
-                    }
-                )
-
-        host_task_cancel_requested: list[str] = []
-        host_cancel_candidates: list[tuple[asyncio.Task, str]] = []
-        if scope == "global_emergency":
-            # Global emergency is also a host-workflow boundary. If the
-            # runtime dispatch fails before it can install durable rules, no
-            # older preflight interaction may survive and start work later.
-            host_cancel_candidates = list(active_host_interactions)
-        elif (
-            scope == "current_interaction"
-            and not receipt.selected_request_bindings
-        ):
-            host_cancel_candidates = [
-                (task, interaction_id)
-                for task, interaction_id in active_host_interactions
-                if interaction_id == active_interaction_id
-            ]
-        current_task = asyncio.current_task()
-        for task, interaction_id in host_cancel_candidates:
-            if (
-                task is not None
-                and task is not current_task
-                and not task.done()
-            ):
-                task.cancel()
-                if interaction_id:
-                    host_task_cancel_requested.append(
-                        interaction_id
-                    )
-        if host_task_cancel_requested:
-            receipt = receipt.model_copy(
-                update={
-                    "host_task_cancel_requested_interaction_ids": tuple(
-                        sorted(
-                            {
-                                *receipt.host_task_cancel_requested_interaction_ids,
-                                *host_task_cancel_requested,
-                            }
-                        )
-                    )
-                }
-            )
-
-        self.session_log(
-            source_turn_id,
-            "cognitive_gateway_cancellation_dispatched: "
-            "requested_scope=%s effective_scope=%s interactions=%s "
-            "selected=%s active=%s queued=%s non_interruptible=%s "
-            "provider_failures=%s dispatch_failures=%s",
-            receipt.requested_scope,
-            receipt.effective_scope,
-            ",".join(receipt.interaction_ids) or "none",
-            len(receipt.selected_request_bindings),
-            len(receipt.active_request_bindings),
-            len(receipt.queued_request_bindings),
-            len(receipt.non_interruptible_request_bindings),
-            len(receipt.provider_cancel_failure_evidence),
-            len(receipt.dispatch_failures),
-        )
-        emergency_status = str(
-            receipt.emergency_stop_evidence.get("status") or ""
-        )
-        if scope == "global_emergency" and emergency_status != "success":
-            self.session_log(
-                source_turn_id,
-                "cognitive_gateway_emergency_stop_unconfirmed: status=%s "
-                "evidence=%s",
-                emergency_status or "missing",
-                json.dumps(
-                    receipt.emergency_stop_evidence,
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ),
-            )
-        return receipt
 
     async def interrupt(self, new_session_id: Optional[str] = None):
         await self.interrupt_output(new_session_id, log_event=False)
@@ -7627,32 +1881,6 @@ class VoiceAssistant:
             active.cancel()
         if new_session_id:
             self.session_log(new_session_id, "interrupt_previous_audio_done: playback_generation=%s", self.playback_delivery.playback_generation)
-
-    @staticmethod
-    def _spoken_text_response_schema(
-        *,
-        max_chars: int,
-        semantic_state: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
-        properties: dict[str, Any] = {
-            "text": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": max_chars,
-            }
-        }
-        required = ["text"]
-        for key, value in (semantic_state or {}).items():
-            if key == "text":
-                raise ValueError("semantic_state must not redefine text")
-            properties[key] = {"type": "string", "const": value}
-            required.append(key)
-        return {
-            "type": "object",
-            "properties": properties,
-            "required": required,
-            "additionalProperties": False,
-        }
 
     def _validate_spoken_text_contract(
         self,
@@ -7689,307 +1917,13 @@ class VoiceAssistant:
             raise RuntimeError(f"{purpose} did not use the required Chinese language")
         return normalized
 
-    def _decode_spoken_text_envelope(
-        self,
-        data: dict[str, Any],
-        *,
-        purpose: str,
-        max_chars: int,
-        one_sentence: bool = False,
-        require_terminal_punctuation: bool = False,
-        language: str | None = None,
-        suppressed_thinking_chars: int = 0,
-        expected_semantic_state: dict[str, str] | None = None,
-    ) -> str:
-        thinking = data.get("thinking")
-        if isinstance(thinking, str):
-            suppressed_thinking_chars += len(thinking)
-        if suppressed_thinking_chars:
-            logger.warning(
-                "%s suppressed non-spoken model thinking: chars=%s",
-                purpose,
-                suppressed_thinking_chars,
-            )
-
-        done_reason = str(data.get("done_reason") or "").strip().lower()
-        if done_reason and done_reason != "stop":
-            raise RuntimeError(
-                f"{purpose} did not complete normally: done_reason={done_reason}"
-            )
-
-        raw_response = data.get("response")
-        if not isinstance(raw_response, str):
-            raise RuntimeError(f"{purpose} returned no response string")
-        try:
-            envelope = json.loads(raw_response)
-        except json.JSONDecodeError as exc:
-            raise RuntimeError(
-                f"{purpose} returned non-JSON output; refusing to speak it"
-            ) from exc
-        expected_state = dict(expected_semantic_state or {})
-        expected_keys = {"text", *expected_state}
-        if not isinstance(envelope, dict) or set(envelope) != expected_keys:
-            raise RuntimeError(
-                f"{purpose} returned an invalid spoken-output envelope"
-            )
-        mismatched_state = {
-            key: {"expected": value, "actual": envelope.get(key)}
-            for key, value in expected_state.items()
-            if envelope.get(key) != value
-        }
-        if mismatched_state:
-            raise RuntimeError(
-                f"{purpose} changed authoritative semantic state: "
-                + json.dumps(mismatched_state, ensure_ascii=False, sort_keys=True)
-            )
-        return self._validate_spoken_text_contract(
-            envelope.get("text", ""),
-            purpose=purpose,
-            max_chars=max_chars,
-            one_sentence=one_sentence,
-            require_terminal_punctuation=require_terminal_punctuation,
-            language=language,
-        )
-
-    @staticmethod
-    def _runtime_ready_greeting_time_context(
-        local_now: datetime | None = None,
-    ) -> dict[str, str]:
-        observed = local_now or datetime.now().astimezone()
-        if observed.tzinfo is None:
-            observed = observed.astimezone()
-        hour = observed.hour
-        if 5 <= hour < 11:
-            local_period = "morning"
-        elif 11 <= hour < 14:
-            local_period = "midday"
-        elif 14 <= hour < 18:
-            local_period = "afternoon"
-        elif 18 <= hour < 23:
-            local_period = "evening"
-        else:
-            local_period = "late_night"
-        offset = observed.strftime("%z")
-        if len(offset) == 5:
-            offset = f"{offset[:3]}:{offset[3:]}"
-        return {
-            "local_iso": observed.isoformat(timespec="minutes"),
-            "local_period": local_period,
-            "timezone": str(observed.tzname() or "local"),
-            "utc_offset": offset,
-            "weekday": observed.strftime("%A"),
-        }
-
-    def _runtime_ready_greeting_prompt(
-        self,
-        *,
-        local_now: datetime | None = None,
-    ) -> str:
-        language = self.runtime_ready_greeting_language
-        identity_json = self._owner_identity_json()
-        mind_summary = self._owner_mind_summary()
-        time_context = json.dumps(
-            self._runtime_ready_greeting_time_context(local_now),
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        )
-        return (
-            "The person described by the owner-approved identity JSON below has just woken up "
-            "and can now hear and talk with her family; she lives with her family and has her own interests. "
-            "Write exactly one complete, very short greeting she naturally says after waking up. "
-            "Sound like that configured identity (factory: a smart, warm twelve-year-old girl), "
-            "not a device, service agent, or adult professional. "
-            f"Speak only in {language}. "
-            "Do not explain the task, analyze the request, expose reasoning, or mention "
-            "the prompt. Do not mention readiness, startup, initialization, systems, "
-            "services, models, being an assistant, or operational status. Do not "
-            "introduce yourself, repeat your name or age, or ask what help is required. "
-            "Use the supplied local period only as quiet grounding, not as a command "
-            "to announce the time of day. Prefer the spontaneous first-person delight "
-            "of someone who has just opened her eyes at home, such as naturally showing that "
-            "she is awake and looking forward to being together. Do not default to a "
-            "formal morning, afternoon, or evening salutation. Do not quote the exact "
-            "clock time, calendar date, or weekday. "
-            "Do not invent meals, hunger, sleepiness, weather, or another personal "
-            "state. Do not ask a question or end mid-clause. "
-            "No individual family member has been identified at startup. Use no "
-            "vocative, addressee noun, personal name, kinship term, social category, "
-            "or relationship label at all. Speak naturally into the shared room without "
-            "naming an addressee; a cheerful first-person wake-up line is preferred over "
-            "a formal greeting. Return only a JSON "
-            "object with one field named text. The text value is the complete spoken "
-            "sentence, normally four to twelve Chinese characters and never more "
-            "than twenty-four characters. Prefer a complete greeting over filling "
-            "the available length.\n\n"
-            f"Grounded local temporal context JSON: {time_context}\n"
-            f"Owner-approved identity JSON: {identity_json}\n"
-            f"Owner-approved mind summary: {mind_summary}\n"
-        )
-
-    @staticmethod
-    def _validate_runtime_ready_greeting_completion(text: str) -> str:
-        if not re.search(r"[。！？!?]$", str(text or "").strip()):
-            raise RuntimeError(
-                "runtime ready greeting is not a complete punctuated sentence"
-            )
-        return text
-
     async def _generate_runtime_ready_greeting(self) -> tuple[str, str]:
-        try:
-            configured = self._validate_spoken_text_contract(
-                self.runtime_ready_greeting_text,
-                purpose="configured runtime ready greeting",
-                max_chars=24,
-                one_sentence=True,
-                language=self.runtime_ready_greeting_language,
-            )
-        except RuntimeError:
-            configured = ""
-        if configured:
-            return configured, "configured"
-
-        model = (
-            self.runtime_ready_greeting_model
-            or self.host_settings.model_generation.ready_greeting_fallback_model
-            or self.ollama_model
-        )
-        payload = {
-            "model": model,
-            "prompt": self._runtime_ready_greeting_prompt(),
-            "stream": False,
-            "think": False,
-            "format": self._spoken_text_response_schema(max_chars=24),
-            "keep_alive": self.host_settings.model_generation.keep_alive,
-            "options": {
-                "num_ctx": self.host_settings.model_generation.ready_greeting_num_ctx,
-                "num_predict": self.runtime_ready_greeting_num_predict,
-                "temperature": 0.55,
-                "top_p": 0.9,
-            },
-        }
-        timeout_s = self.runtime_ready_greeting_generation_timeout_ms / 1000.0
-
-        async def request_greeting(request_payload: dict[str, Any]) -> dict[str, Any]:
-            session = await self.get_http_session()
-            async with session.post(self.llm_url, json=request_payload) as response:
-                body = await response.text()
-                if response.status != 200:
-                    raise RuntimeError(
-                        f"runtime greeting model returned HTTP {response.status}: "
-                        f"{body[:300]}"
-                    )
-                provider_data = json.loads(body)
-                return enforce_non_thinking_ollama_response(
-                    provider_data, structured_output=True
-                ).response
-
-        generation_error: Exception | None = None
-        for attempt in range(2):
-            request_payload = dict(payload)
-            if attempt:
-                request_payload["prompt"] = (
-                    f"{payload['prompt']}\n"
-                    "The previous candidate violated the greeting contract. "
-                    "Choose a different short, time-grounded greeting without "
-                    "self-introduction, age, invented personal state, or any addressee "
-                    "noun, name, social category, or relationship label."
-                )
-            try:
-                data = await asyncio.wait_for(
-                    request_greeting(request_payload),
-                    timeout=timeout_s,
-                )
-                generated = self._decode_spoken_text_envelope(
-                    data,
-                    purpose="runtime ready greeting",
-                    max_chars=24,
-                    one_sentence=True,
-                    language=self.runtime_ready_greeting_language,
-                )
-                self._validate_runtime_ready_greeting_completion(generated)
-                return generated, f"llm:{model}"
-            except Exception as exc:
-                generation_error = exc
-                logger.warning(
-                    "Runtime ready greeting generation attempt %s failed: %s",
-                    attempt + 1,
-                    exc,
-                )
-        logger.warning(
-            "Runtime ready greeting generation failed after retries: %s",
-            generation_error,
-        )
-        try:
-            fallback = self._validate_spoken_text_contract(
-                self.runtime_ready_greeting_fallback_text,
-                purpose="runtime ready greeting fallback",
-                max_chars=24,
-                one_sentence=True,
-                language=self.runtime_ready_greeting_language,
-            )
-        except RuntimeError as fallback_exc:
-            logger.warning("Runtime ready greeting fallback rejected: %s", fallback_exc)
-            return "", "unavailable"
-        return fallback, "fallback"
-
-    def _build_runtime_ready_greeting_coordinator(
-        self,
-    ) -> RuntimeReadyGreetingCoordinator:
-        async def schedule_text(text: str) -> dict[str, Any]:
-            return await self.schedule_tts_text(text, session_id=None)
-
-        orientation_enabled = bool(
-            getattr(self, "enable_soridormi_capabilities", False)
-        )
-
-        async def execute_orientation() -> dict[str, Any]:
-            return await execute_default_runtime_ready_orientation(
-                self.interaction_runtime,
-                enable_soridormi_capabilities=getattr(
-                    self, "enable_soridormi_capabilities", False
-                ),
-            )
-
-        return RuntimeReadyGreetingCoordinator(
-            policy=RuntimeReadyGreetingPolicy(
-                enabled=self.runtime_ready_greeting_enabled,
-                audio_input_mode=self.audio_input_mode,
-                audio_output_mode=self.audio_output_mode,
-                timeout_ms=self.runtime_ready_greeting_timeout_ms,
-                orientation_enabled=orientation_enabled,
-                orientation_timeout_ms=min(
-                    5000, self.runtime_ready_greeting_timeout_ms
-                ),
-                speech_enabled=bool(
-                    getattr(
-                        getattr(
-                            getattr(self, "host_settings", None),
-                            "playback",
-                            None,
-                        ),
-                        "ready_greeting_speech_enabled",
-                        getattr(
-                            self,
-                            "runtime_ready_greeting_speech_enabled",
-                            False,
-                        ),
-                    )
-                ),
-            ),
-            generate_greeting=self._generate_runtime_ready_greeting,
-            is_valid_text=self.is_valid_tts_text,
-            schedule_text=schedule_text,
-            playback_start_key=self.playback_start_key,
-            playback_start_waiters=self.playback_delivery.playback_start_waiters,
-            next_playback_order=lambda: self.playback_delivery.next_playback_order,
-            execute_orientation=execute_orientation,
-        )
+        return await runtime_ready_greeting.generate_runtime_ready_greeting(self)
 
     async def _announce_runtime_ready(self) -> None:
         """Delegate startup orientation and optional speech to one collaborator."""
 
-        await self._build_runtime_ready_greeting_coordinator().announce()
+        await runtime_ready_greeting.build_runtime_ready_greeting_coordinator(self).announce()
 
     async def wait_for_interaction_services(
         self, *, require_asr: bool = True, deadline_s: float | None = None,
@@ -7998,8 +1932,6 @@ class VoiceAssistant:
         gate = ServiceReadinessGate(
             asr_url=self.asr_url,
             tts_url=self.tts_url,
-            llm_url=self.llm_url,
-            ollama_model=self.ollama_model,
             speaker_id=self.speaker_id,
             get_http_session=self.get_http_session,
             agent_url=self.agent_url,
@@ -8030,7 +1962,7 @@ class VoiceAssistant:
         self.start_soridormi_ambient_perception()
         if self.conversation_state.runtime_revalidation_candidates():
             task = asyncio.create_task(
-                self._revalidate_restored_goals_from_provider_state(),
+                planner_reentry_host.revalidate_restored_goals_from_provider_state(self),
                 name="restored-goal-provider-revalidation",
             )
             self.active_cognitive_runtime_tasks[task] = (
@@ -8042,7 +1974,6 @@ class VoiceAssistant:
             await input_runtime.injected_audio_stream()
         else:
             await input_runtime.mic_stream()
-
 
 
 async def main():

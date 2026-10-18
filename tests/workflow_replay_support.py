@@ -21,17 +21,26 @@ from unittest.mock import patch
 from agent.app.clients.ollama_client import OllamaClient
 from agent.app.cognitive_core.user_meaning_interpreter.model_interpreter import OllamaUserMeaningInterpreter
 from agent.app.cognitive_core.user_meaning_interpreter.schema import UserMeaningInterpretationRequest
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.goal_association import GoalAssociationResolver
 from agent.app.settings import AgentServiceSettings
 from benchmarks.datasets.fast_planner_daily_life.qualification import StaticCatalog
 from benchmarks.integration.model_replay import ModelReplay, ReplayServer
 from orchestrator.orchestrator import VoiceAssistant
 from orchestrator.runtime.capability_runtime import (
-    CapabilityDefinition, LocalSpeechCapabilityProvider, MockCapabilityProvider,
-    local_speech_definition, RuntimeAuthorization,
+    CapabilityDefinition,
+    RuntimeAuthorization,
 )
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter, CognitiveRuntimePolicy, GoalDrivenRuntimeCoordinator
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
+    MockCapabilityProvider,
+    local_speech_definition,
+)
+from orchestrator.runtime.cognitive_runtime import (
+    CognitiveRuntimePolicy,
+    GoalDrivenRuntimeCoordinator,
+)
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.outcome_reconciliation import ExecutionOutcomeReconciler
@@ -42,6 +51,7 @@ from shared.chromie_contracts.interaction import CapabilityResult
 from tests.capability_runtime_test_support import submit_and_wait_terminal
 from tests.cognitive_runtime_test_support import FakeRuntime
 from tests.cognitive_work_test_support import PlannerActivationFixture, social_fixture_response, social_fixture_resolution
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class UnexpectedAdmission(AssertionError):
@@ -106,7 +116,7 @@ class Episode(PlannerActivationFixture):
         def model(role):
             return OllamaClient(base_url=url, model='fixture-'+role, purpose=role, timeout_ms=timeout_ms, service_settings=settings)
         self.ga = GoalAssociationResolver(model('ga'), num_ctx=131072, num_predict=2048)
-        self.planner = FastPlannerResolver(model('fast'), StaticCatalog(self.catalog), num_ctx=131072, num_predict=2048)
+        self.planner = PlannerResolver(model('fast'), StaticCatalog(self.catalog), num_ctx=131072, num_predict=2048)
         definitions = [CapabilityDefinition(capability_id=c['capability_id'], provider_id='workflow-fixture',
             input_schema=c['input_schema'], output_schema=case['provider_schemas'][c['capability_id']],
             requires_confirmation=c.get('requires_confirmation', False),
@@ -129,7 +139,7 @@ class Episode(PlannerActivationFixture):
                       if need.reference_id in self.social_words), "Fixture response.")
         return social_fixture_resolution(request, words)
 
-    async def resolve_fast_plan(self, _session, *, request, timeout_ms):
+    async def resolve_plan(self, _session, *, request, timeout_ms):
         self.last_request = request
         return await self.plan(request)
 
@@ -146,10 +156,10 @@ class Episode(PlannerActivationFixture):
         return result
 
     def host(self, request):
-        host = VoiceAssistant.__new__(VoiceAssistant)
+        host = bare_voice_assistant()
         host.agent_client = self
         host.conversation_state = self.manager
-        host.cognitive_runtime_policy = SimpleNamespace(fast_planner_timeout_ms=self.model_timeout_ms)
+        host.cognitive_runtime_policy = SimpleNamespace(planner_timeout_ms=self.model_timeout_ms)
         host.cognitive_runtime = GoalDrivenRuntimeCoordinator(agent_client=self, adapter=self.adapter, policy=CognitiveRuntimePolicy(mode='apply'))
         host.session_log = lambda *a, **kw: self.events.append({'host_log': str(a), 'fields': str(kw)})
         host.build_context = lambda _sid: copy.deepcopy(request.context)

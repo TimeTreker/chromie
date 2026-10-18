@@ -29,14 +29,11 @@ def json_schema_validation_errors(
     schema: dict[str, Any],
     *,
     path: str,
-    validate_array_bounds: bool = True,
 ) -> list[str]:
     """Validate Chromie's intentionally bounded JSON-Schema subset.
 
     The helper owns mechanism only.  Callers remain free to return the error
-    list or fail closed on the first error.  ``validate_array_bounds`` keeps
-    the legacy local-tool contract unchanged while removing its duplicated
-    validator implementation.
+    list or fail closed on the first error with :func:`require_json_schema`.
     """
 
     if not schema:
@@ -90,16 +87,14 @@ def json_schema_validation_errors(
                         item,
                         child_schema,
                         path=f"{path}.{key}",
-                        validate_array_bounds=validate_array_bounds,
                     )
                 )
 
     if isinstance(value, list):
-        if validate_array_bounds:
-            if "minItems" in schema and len(value) < schema["minItems"]:
-                errors.append(f"{path} has fewer than {schema['minItems']} items")
-            if "maxItems" in schema and len(value) > schema["maxItems"]:
-                errors.append(f"{path} has more than {schema['maxItems']} items")
+        if "minItems" in schema and len(value) < schema["minItems"]:
+            errors.append(f"{path} has fewer than {schema['minItems']} items")
+        if "maxItems" in schema and len(value) > schema["maxItems"]:
+            errors.append(f"{path} has more than {schema['maxItems']} items")
         item_schema = schema.get("items")
         if isinstance(item_schema, dict):
             for index, item in enumerate(value):
@@ -108,11 +103,18 @@ def json_schema_validation_errors(
                         item,
                         item_schema,
                         path=f"{path}[{index}]",
-                        validate_array_bounds=validate_array_bounds,
                     )
                 )
 
     return errors
+
+
+def require_json_schema(value: Any, schema: dict[str, Any], *, path: str) -> None:
+    """Raise ``ValueError`` with the first schema violation, if any."""
+
+    errors = json_schema_validation_errors(value, schema, path=path)
+    if errors:
+        raise ValueError(errors[0])
 
 
 def expose_intersection_shapes(node: Any) -> None:

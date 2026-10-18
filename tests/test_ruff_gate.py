@@ -70,6 +70,27 @@ class RuffGateTests(unittest.TestCase):
         self.assertNotIn('select = ["ALL"]', text)
         self.assertNotIn("extend-select", text)
 
+    def test_gate_checks_name_resolution_over_the_whole_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+            fake = self._fake_ruff(directory, run_ruff.RUFF_VERSION)
+            log = directory / "calls.txt"
+            fake.write_text(
+                fake.read_text(encoding="utf-8").replace(
+                    "if sys.argv[1:2] == ['check']:\n",
+                    "if sys.argv[1:2] == ['check']:\n"
+                    f"    open({str(log)!r}, 'a').write(' '.join(sys.argv[1:]) + '\\n')\n"
+                    "    raise SystemExit(1 if '.' in sys.argv[1:] else 0)\n",
+                ),
+                encoding="utf-8",
+            )
+            result = run_ruff.run_ruff(ruff_command=str(fake))
+            calls = log.read_text(encoding="utf-8").splitlines()
+        self.assertEqual(result, 1)
+        self.assertEqual(len(calls), 2)
+        self.assertTrue(calls[1].endswith("--select F601,F811,F821,F822 ."))
+        self.assertTrue({"F601", "F821", "F822"} <= set(run_ruff.TREE_WIDE_RULES))
+
     def test_test_dependencies_pin_ruff(self) -> None:
         requirements = (ROOT / "requirements-test.txt").read_text(encoding="utf-8")
         self.assertIn(f"ruff=={run_ruff.RUFF_VERSION}", requirements.splitlines())

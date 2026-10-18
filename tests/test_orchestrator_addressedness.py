@@ -4,11 +4,12 @@ import time
 import unittest
 
 from orchestrator.orchestrator import VoiceAssistant
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 class OrchestratorAddressednessTests(unittest.TestCase):
     def _assistant(self) -> VoiceAssistant:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.addressedness_gate_enabled = True
         assistant.addressedness_engagement_timeout_s = 45.0
         return assistant

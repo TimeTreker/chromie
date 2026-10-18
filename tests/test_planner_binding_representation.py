@@ -1292,7 +1292,7 @@ def test_communication_order_preserves_gi_relation_after_exact_ga_join():
 
 
 def test_compound_repetition_uses_its_own_step_and_provider_format():
-    from tests.test_fast_planner_streaming_commit import _compound_count_case
+    from tests.test_planner_streaming_commit import _compound_count_case
     from shared.chromie_contracts.user_turn import UserTurnSourceSpan, resolve_user_turn_source_span
     for variant in ['compound_defaults', 'omitted_turn_default', 'matching_turn_count', 'distinct_explicit_count',
                     'missing_count', 'wrong_nod_count', 'nondefault_turn_count', 'duration_masks_count', 'single_wrong_count']:

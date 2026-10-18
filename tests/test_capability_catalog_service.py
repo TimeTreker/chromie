@@ -868,5 +868,27 @@ class CapabilityCatalogServiceTests(unittest.IsolatedAsyncioTestCase):
         )
 
 
+
+class ManifestBooleanHintTests(unittest.TestCase):
+    def test_unknown_safety_hint_fails_closed_with_an_error(self) -> None:
+        with self.assertRaisesRegex(ValueError, "safety_sensitive must be a boolean"):
+            CapabilityCatalog._manifest_flag(
+                {"safety_sensitive": "required"}, "safety_sensitive", "robot.arm"
+            )
+        with self.assertRaisesRegex(ValueError, "prompt_tier_locked must be a boolean"):
+            CapabilityCatalog._prompt_tier_lock_flag({"prompt_tier_locked": "locked"})
+
+    def test_manifest_hints_use_the_shared_boolean_vocabulary(self) -> None:
+        self.assertTrue(
+            CapabilityCatalog._prompt_tier_lock_flag({"safety_sensitive": "yes"})
+        )
+        self.assertFalse(CapabilityCatalog._prompt_tier_lock_flag({}))
+        self.assertFalse(
+            CapabilityCatalog._manifest_flag(
+                {"interaction_executable": ""}, "interaction_executable", "x"
+            )
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

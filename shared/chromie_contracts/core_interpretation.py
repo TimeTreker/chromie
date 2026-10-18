@@ -289,11 +289,11 @@ class CognitiveResponsibilityProposal(BaseModel):
     value_review: bool = Field(
         default=False,
         description=(
-            "Speech only. True when this request asks Chromie to tell someone something untrue "
-            "as if it were true, or to help deceive or manipulate a person, including by "
-            "pretending. Play that everyone knows is pretend is not deception. A fact about "
-            "WHAT is asked, not a verdict: Chromie's Value Judgment decides before anything "
-            "is said."
+            "True when this request asks Chromie to tell someone something untrue as if it "
+            "were true, or to help deceive or manipulate a person, including by pretending; or "
+            "when doing or answering it could hurt, humiliate, frighten or endanger someone. "
+            "Play that everyone knows is pretend is not deception. A fact about WHAT is asked, "
+            "not a verdict: Chromie's Value Judgment decides before anything is said or done."
         ),
     )
     confidence: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -333,8 +333,6 @@ class CognitiveResponsibilityProposal(BaseModel):
             raise ValueError(
                 "turn-local Responsibility must be ordinary conversational speech"
             )
-        if self.value_review and self.output_mode != "speech":
-            raise ValueError("value_review marks a speech Responsibility only")
         return self
 
 
@@ -641,10 +639,6 @@ class CognitiveWorkRequest(BaseModel):
     @classmethod
     def normalize_text(cls, value: str) -> str:
         return normalize_turn_text(str(value or ""))
-
-    @property
-    def meaning_uncertainty_descriptions(self) -> list[str]:
-        return [item.description for item in self.meaning_uncertainties]
 
     @property
     def meaning_uncertainty_refs(self) -> set[str]:

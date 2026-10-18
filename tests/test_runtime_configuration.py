@@ -44,7 +44,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(settings.cognition.agent_timeout_ms, 9000)
         self.assertEqual(settings.cognition.user_meaning_interpreter_timeout_ms, 9000)
         self.assertEqual(settings.cognition.goal_association_timeout_ms, 65000)
-        self.assertEqual(settings.cognition.fast_planner_timeout_ms, 65000)
+        self.assertEqual(settings.cognition.planner_timeout_ms, 65000)
         self.assertEqual(settings.cognition.deliberative_timeout_ms, 125000)
         self.assertEqual(settings.cognition.runtime_timeout_ms, 300000)
         self.assertEqual(settings.model_generation.keep_alive, "24h")
@@ -163,7 +163,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertEqual(values["TTS_PYTORCH_ALLOC_CONF"], "expandable_segments:True")
         self.assertEqual(values["ORCH_COGNITIVE_RUNTIME_MODE"], "apply")
         self.assertEqual(values["ORCH_GOAL_ASSOCIATION_MODE"], "off")
-        self.assertEqual(values["ORCH_FAST_PLANNER_MODE"], "off")
+        self.assertEqual(values["ORCH_PLANNER_MODE"], "off")
         self.assertNotIn("ORCH_DEEP_PLANNER_MODE", values)  # one Planner (PLANNER-AUTHORITY-001)
         self.assertNotIn("ORCH_RESPONSE_COMPOSER_MODE", values)
 
@@ -190,8 +190,9 @@ class RuntimeConfigurationTests(unittest.TestCase):
             "",
         )
         self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_LANGUAGE"], "zh-CN")
-        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_MODEL"], "")
-        self.assertEqual(values["ORCH_RUNTIME_READY_GREETING_NUM_PREDICT"], "32")
+        # Social Cognition authors any generated greeting; the Host has no model knobs.
+        self.assertNotIn("ORCH_RUNTIME_READY_GREETING_MODEL", values)
+        self.assertNotIn("ORCH_RUNTIME_READY_GREETING_NUM_PREDICT", values)
         self.assertEqual(
             values["ORCH_RUNTIME_READY_GREETING_GENERATION_TIMEOUT_MS"],
             "15000",
@@ -226,10 +227,11 @@ class RuntimeConfigurationTests(unittest.TestCase):
             profile,
         )
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=chromie-qwen35-4b", profile)
-        self.assertIn("AGENT_FAST_PLANNER_MODEL=chromie-qwen35-4b", profile)
+        self.assertIn("AGENT_PLANNER_MODEL=chromie-qwen35-4b", profile)
         self.assertIn("AGENT_DELIBERATIVE_MODEL=chromie-qwen35-4b", profile)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", profile)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", profile)
+        self.assertNotIn("TTS_COSYVOICE_OLLAMA_", profile)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", profile)
         self.assertIn("OLLAMA_NUM_PARALLEL=1", profile)
         self.assertIn("AGENT_USER_MEANING_INTERPRETER_LLM_NUM_CTX=16384", profile)
@@ -249,7 +251,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("AGENT_USER_MEANING_INTERPRETER_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_GOAL_ASSOCIATION_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_DELIBERATIVE_MODEL=chromie-gemma4-12b", rtx5090)
-        self.assertIn("AGENT_FAST_PLANNER_MODEL=chromie-gemma4-12b", rtx5090)
+        self.assertIn("AGENT_PLANNER_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("AGENT_SKILL_SELECTION_MODEL=chromie-gemma4-12b", rtx5090)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", rtx5090)
         self.assertIn("OLLAMA_REQUIRE_ALL_WARM_MODELS_RESIDENT=1", rtx5090)
@@ -257,7 +259,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("OLLAMA_KV_CACHE_TYPE=q8_0", rtx5090)
         self.assertNotIn("AGENT_RESPONSE_COMPOSER_MODEL", rtx5090)
         self.assertIn("TTS_COSYVOICE_COMPACT_COGNITION=0", rtx5090)
-        self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX=65536", rtx5090)
+        self.assertNotIn("TTS_COSYVOICE_OLLAMA_", rtx5090)
         self.assertIn("OLLAMA_MAX_LOADED_MODELS=1", rtx5090)
         self.assertIn("OLLAMA_NUM_CTX=65536", rtx5090)
         self.assertIn("AGENT_COGNITIVE_GATEWAY_ATTENTION_NUM_CTX=65536", rtx5090)
@@ -372,6 +374,63 @@ class RuntimeConfigurationTests(unittest.TestCase):
             )
             self.assertEqual(idle.returncode, 0, idle.stderr)
 
+    def test_compact_cognition_helper_replaces_every_role_model_only_for_cosyvoice(self) -> None:
+        helper = ROOT / "scripts" / "compact_cognition.sh"
+        script = (
+            'set -euo pipefail; source "$1"; '
+            'if chromie_apply_compact_cognition "$2"; then echo applied; else echo skipped; fi; '
+            'for key in "${CHROMIE_COMPACT_COGNITION_MODEL_KEYS[@]}" OLLAMA_MAX_LOADED_MODELS '
+            'AGENT_PLANNER_NUM_CTX; do printf "%s=%s\\n" "$key" "${!key-}"; done'
+        )
+        base_env = {
+            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "TTS_COSYVOICE_OLLAMA_MODEL": "compact:model",
+            "AGENT_MODEL": "role:model",
+            "AGENT_PLANNER_NUM_CTX": "12345",
+            "OLLAMA_MAX_LOADED_MODELS": "2",
+        }
+
+        def run(backend: str, **extra: str) -> dict[str, str]:
+            result = subprocess.run(
+                ["bash", "-c", script, "compact", str(helper), backend],
+                env={**base_env, **extra},
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            lines = result.stdout.splitlines()
+            values = dict(line.split("=", 1) for line in lines[1:])
+            values["outcome"] = lines[0]
+            return values
+
+        applied = run("cosyvoice3")
+        self.assertEqual(applied["outcome"], "applied")
+        for key in (
+            "AGENT_USER_MEANING_INTERPRETER_MODEL",
+            "AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL",
+            "AGENT_MODEL",
+            "AGENT_GOAL_ASSOCIATION_MODEL",
+            "AGENT_COGNITIVE_ACTIVATION_MODEL",
+            "AGENT_PLANNER_MODEL",
+            "AGENT_DELIBERATIVE_MODEL",
+            "OLLAMA_MODEL",
+        ):
+            self.assertEqual(applied[key], "compact:model", key)
+        self.assertEqual(applied["OLLAMA_MAX_LOADED_MODELS"], "1")
+        # Generated role contexts are preserved.
+        self.assertEqual(applied["AGENT_PLANNER_NUM_CTX"], "12345")
+
+        for backend, extra in (
+            ("oute", {}),
+            ("qwen3", {}),
+            ("cosyvoice3", {"TTS_COSYVOICE_COMPACT_COGNITION": "0"}),
+        ):
+            with self.subTest(backend=backend, extra=extra):
+                skipped = run(backend, **extra)
+                self.assertEqual(skipped["outcome"], "skipped")
+                self.assertEqual(skipped["AGENT_MODEL"], "role:model")
+                self.assertEqual(skipped["OLLAMA_MAX_LOADED_MODELS"], "2")
+
     def test_start_chromie_uses_cosyvoice_by_default_with_explicit_fallbacks(self) -> None:
         launcher = (ROOT / "scripts" / "start_chromie.sh").read_text(
             encoding="utf-8"
@@ -388,25 +447,14 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("TTS_URL=ws://127.0.0.1:5000", launcher)
         self.assertIn("TTS_SPEAKER_ID=default", launcher)
         self.assertIn('echo "ORCH_TTS_CONCURRENCY=1"', launcher)
-        self.assertIn("TTS_COSYVOICE_OLLAMA_MODEL:-qwen3:4b", launcher)
-        self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", launcher)
-        self.assertIn("context_fallback=${COSYVOICE_BRAIN_NUM_CTX}", launcher)
-        self.assertIn("TTS_COSYVOICE_OLLAMA_NUM_CTX:-8192", services)
-        self.assertIn("context_fallback=$COSYVOICE_BRAIN_NUM_CTX", services)
-        self.assertIn(
-            '${AGENT_DELIBERATIVE_NUM_CTX:-$COSYVOICE_BRAIN_NUM_CTX}',
-            services,
-        )
-        self.assertNotIn(
-            'EFFECTIVE_DELIBERATIVE_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"',
-            launcher,
-        )
-        self.assertNotIn(
-            'export AGENT_DELIBERATIVE_NUM_CTX="$COSYVOICE_BRAIN_NUM_CTX"',
-            services,
-        )
+        # All three launchers share one compact-cognition rule.
+        for source in (launcher, services, orchestrator):
+            self.assertIn('source "$ROOT_DIR/scripts/compact_cognition.sh"', source)
+            self.assertIn("chromie_apply_compact_cognition", source)
+            self.assertNotIn("COSYVOICE_BRAIN_", source)
+            self.assertNotIn("TTS_COSYVOICE_OLLAMA_NUM_CTX", source)
+        self.assertIn('"${CHROMIE_COMPACT_COGNITION_MODEL_KEYS[@]}"', services)
         self.assertNotIn("AGENT_TOOL_RESULT_INTERPRETER_MODEL", services)
-        self.assertIn("EFFECTIVE_OLLAMA_MAX_LOADED_MODELS=1", launcher)
         self.assertNotIn("EFFECTIVE_TOOL_RESULT_INTERPRETER_MODEL", launcher)
         verifier = (ROOT / "scripts" / "verify_runtime_profile.sh").read_text(
             encoding="utf-8"
@@ -488,7 +536,7 @@ class RuntimeConfigurationTests(unittest.TestCase):
             ),
             "User Meaning Interpretation": "EFFECTIVE_AGENT_USER_MEANING_INTERPRETER_MODEL",
             "Goal Association": "EFFECTIVE_GOAL_ASSOCIATION_MODEL",
-            "Fast Planner": "EFFECTIVE_FAST_PLANNER_MODEL",
+            "Planner": "EFFECTIVE_PLANNER_MODEL",
             "Deliberative": "EFFECTIVE_DELIBERATIVE_MODEL",
         }
         for role, variable in expected_roles.items():

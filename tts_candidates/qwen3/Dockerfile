@@ -6,6 +6,12 @@ ARG QWEN3_TTS_SOURCE_REVISION
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 ARG TTS_CUDA_ARCH=89
 ARG CHROMIE_BUILD_PROFILE=unknown
+ARG HTTP_PROXY
+ARG HTTPS_PROXY
+ARG http_proxy
+ARG https_proxy
+ARG NO_PROXY
+ARG no_proxy
 
 LABEL org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}" \
       org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"
@@ -28,12 +34,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Ubuntu 22.04 ships Python 3.10, below the repository's declared 3.11 floor
 # (shared/pyproject.toml, scripts/check_python_runtime.py) for the shared tts/*
 # modules this image runs. Bootstrap a pinned uv and build the venv on a
-# managed CPython 3.11.
+# managed CPython 3.11. The interpreter is pinned exactly; 3.11.16 is the
+# newest 3.11 build in uv 0.12.20's embedded download list, so changing either
+# pin is a deliberate image change.
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
 RUN python3 -m pip install --no-cache-dir uv==0.12.20 && \
-    uv python install 3.11 && \
-    uv venv --seed --python 3.11 /opt/venv && \
-    /opt/venv/bin/python -c "import sys; assert sys.version_info[:2] == (3, 11), sys.version"
+    uv python install 3.11.16 && \
+    uv venv --seed --python 3.11.16 /opt/venv && \
+    /opt/venv/bin/python -c "import sys; assert sys.version_info[:3] == (3, 11, 16), sys.version"
 ENV PATH=/opt/venv/bin:$PATH
 RUN pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1
 
@@ -60,7 +68,7 @@ RUN pip install --no-deps /opt/Qwen3-TTS && \
       websockets==16.0
 
 WORKDIR /app
-COPY tts/provider.py tts/streaming_worker.py tts/candidate_provider.py tts/candidate_server.py tts/settings.py ./
+COPY tts/provider.py tts/process_worker.py tts/streaming_worker.py tts/candidate_provider.py tts/candidate_server.py tts/settings.py ./
 COPY tts_candidates/qwen3/provider_impl.py ./
 
 EXPOSE 5000

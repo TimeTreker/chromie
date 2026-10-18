@@ -29,6 +29,33 @@ from check_runtime_exception_boundaries import (  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_EXCEPTIONS = Path("config/repository_policy_exceptions.json")
+# VoiceAssistant behavior implemented outside orchestrator.py, held to the
+# same Host semantic-authority guards as the composition root.
+VOICE_ASSISTANT_HOST_MODULES = (
+    "orchestrator/runtime/cognitive_outcome_host.py",
+    "orchestrator/runtime/cognitive_pipeline_host.py",
+    "orchestrator/runtime/confirmation_host.py",
+    "orchestrator/runtime/interaction_dispatch_host.py",
+    "orchestrator/runtime/interaction_speech_host.py",
+    "orchestrator/runtime/planner_reentry_host.py",
+    "orchestrator/runtime/reflex_cancellation_host.py",
+    "orchestrator/runtime/routed_turn_host.py",
+)
+# Goal-driven runtime classes split out of cognitive_runtime.py, held to the
+# same source guards as that module.
+COGNITIVE_RUNTIME_MODULES = (
+    "orchestrator/runtime/canonical_plan_adapter.py",
+    "orchestrator/runtime/cognitive_evidence.py",
+    "orchestrator/runtime/planner_advance_projection.py",
+)
+# ConversationStateManager behavior split out of conversation_state.py, held to
+# the same source guards as that module.
+CONVERSATION_STATE_MODULES = (
+    "orchestrator/runtime/goal_association_state.py",
+    "orchestrator/runtime/goal_cancellation_state.py",
+    "orchestrator/runtime/goal_outcome_state.py",
+    "orchestrator/runtime/goal_planning_state.py",
+)
 
 RULE_PRODUCTION_ASSERT = "python.production_assert"
 RULE_SILENT_BROAD_EXCEPTION = "python.silent_broad_exception"
@@ -412,6 +439,7 @@ def audit_agent_skill_authority(root: Path) -> list[PolicyFinding]:
     forbidden_modules = {"subprocess", "runpy", "importlib", "ctypes"}
     forbidden_names = {
         "CapabilityRegistry",
+        "CapabilityDefinitionRegistry",
         "CapabilityProvider",
         "CapabilityDefinition",
         "CapabilityRuntime",
@@ -819,7 +847,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             ),
             "Goal Association trusted validation must conserve the primary result rather than trigger another semantic authority",
         ),
-        "agent/app/fast_planner.py": (
+        "agent/app/planner.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
             (
                 "fast_planner.first_response.truth_check",
@@ -833,7 +861,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "fast_repair_response_schema",
                 "max_contract_repairs",
             ),
-            "Fast Planner must close semantics in one primary result rather than invoke a same-owner reviewer or repair generation",
+            "The Planner must close semantics in one primary result rather than invoke a same-owner reviewer or repair generation",
         ),
         "agent/app/planner_model_contract.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -1022,6 +1050,12 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
             "runtime configuration may not expose semantic phrase tables",
         ),
     }
+    for relative in VOICE_ASSISTANT_HOST_MODULES:
+        source_checks[relative] = source_checks["orchestrator/orchestrator.py"]
+    for relative in COGNITIVE_RUNTIME_MODULES:
+        source_checks[relative] = source_checks["orchestrator/runtime/cognitive_runtime.py"]
+    for relative in CONVERSATION_STATE_MODULES:
+        source_checks[relative] = source_checks["orchestrator/runtime/conversation_state.py"]
     for relative, (rule_id, tokens, message) in source_checks.items():
         path = root / relative
         if not path.is_file():
@@ -1047,8 +1081,10 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/cognitive_core/user_meaning_interpreter/schema.py",
         "agent/app/schema.py",
         "orchestrator/orchestrator.py",
+        *VOICE_ASSISTANT_HOST_MODULES,
         "orchestrator/runtime/confirmation.py",
         "orchestrator/runtime/conversation_state.py",
+        *CONVERSATION_STATE_MODULES,
         "orchestrator/runtime/session.py",
         "shared/chromie_contracts/semantic_task.py",
         "shared/chromie_contracts/perception.py",
@@ -1058,6 +1094,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
         "agent/app/capabilities/validator.py",
         "orchestrator/runtime/confirmation.py",
         "orchestrator/runtime/conversation_state.py",
+        *CONVERSATION_STATE_MODULES,
         "shared/chromie_contracts/semantic_task.py",
     }
     forbidden_name_fragments = (
@@ -1167,6 +1204,7 @@ def audit_repository_hygiene(root: Path) -> list[PolicyFinding]:
         "agent/app/capabilities/validator.py",
         "agent/app/local_tool_execution.py",
         "orchestrator/runtime/capability_runtime.py",
+        "orchestrator/runtime/builtin_capability_providers.py",
     )
     for relative in duplicated_schema_targets:
         path = root / relative
@@ -1555,6 +1593,8 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
 
     for relative in (
         "orchestrator/runtime/capability_runtime.py",
+        "orchestrator/runtime/builtin_capability_providers.py",
+        "orchestrator/runtime/capability_cancellation.py",
         "orchestrator/runtime/interaction_coordinator.py",
     ):
         path = root / relative
@@ -1609,6 +1649,10 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             "social_attention_opportunity",
         ),
     }
+    for relative in COGNITIVE_RUNTIME_MODULES:
+        retired_social_planner_tokens[relative] = retired_social_planner_tokens[
+            "orchestrator/runtime/cognitive_runtime.py"
+        ]
     for relative, tokens in retired_social_planner_tokens.items():
         path = root / relative
         if not path.is_file():
@@ -1634,7 +1678,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
 
     retired_split_fast_presentation_tokens = {
         "agent/app/main.py": ("/fast-first-response",),
-        "agent/app/fast_planner.py": ("resolve_first_response",),
+        "agent/app/planner.py": ("resolve_first_response",),
         "agent/app/settings.py": (
             "fast_first_response_model",
             "fast_first_response_timeout_ms",
@@ -1661,7 +1705,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                     symbol="<retired-split-fast-presentation>",
                     message=(
                         "the retired separate Fast presentation endpoint/model/DTO "
-                        "must not return beside the single typed Fast Planner stream"
+                        "must not return beside the single typed Planner stream"
                     ),
                 )
             )
@@ -1682,13 +1726,15 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
         "shared/chromie_contracts/interaction.py",
         "shared/chromie_contracts/__init__.py",
         "orchestrator/runtime/capability_runtime.py",
+        "orchestrator/runtime/builtin_capability_providers.py",
+        "orchestrator/runtime/capability_cancellation.py",
         "orchestrator/runtime/capability_adapters.py",
         "orchestrator/runtime/interaction_coordinator.py",
         "orchestrator/runtime/outcome_reconciliation.py",
         "orchestrator/runtime/interaction_preflight.py",
         "orchestrator/runtime/episode.py",
         "orchestrator/runtime/experience.py",
-        "agent/app/fast_planner.py",
+        "agent/app/planner.py",
     )
     for relative in canonical_runtime_files:
         path = root / relative
@@ -1711,7 +1757,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                 )
 
     canonical_source_checks = {
-        "agent/app/fast_planner.py": (
+        "agent/app/planner.py": (
             "FINAL ALLOWED EXECUTABLE SKILL IDS",
             "exact supplied skill IDs",
             "Skills are plan leaves",
@@ -1734,6 +1780,14 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
             '"skill_id": "chromie.speak"',
         ),
     }
+    for relative in COGNITIVE_RUNTIME_MODULES:
+        canonical_source_checks[relative] = canonical_source_checks[
+            "orchestrator/runtime/cognitive_runtime.py"
+        ]
+    for relative in CONVERSATION_STATE_MODULES:
+        canonical_source_checks[relative] = canonical_source_checks[
+            "orchestrator/runtime/conversation_state.py"
+        ]
     for relative, tokens in canonical_source_checks.items():
         path = root / relative
         if not path.is_file():

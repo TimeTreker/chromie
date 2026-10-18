@@ -193,7 +193,8 @@ python scripts/run_workflow_replay.py \
 python -m pytest -q tests/test_workflow_replay.py
 ```
 
-The source gate and replay runner restore missing expanded inputs from the
+The source gate, the replay runner and `tests/conftest.py` (whenever pytest
+collects `tests/test_workflow_replay.py`) restore missing expanded inputs from the
 manifest's checksum-pinned `frozen.tar.xz`, retained in the checkout. A shallow
 checkout needs no historical fetch for this freeze. Historical manifests that pin
 a Git revision still require explicit `restore-fixtures --fetch` when that revision
@@ -533,10 +534,10 @@ python scripts/run_daily_conversation_benchmark.py \
 The live adapter receives each normalized scenario on standard input and uses
 the maintained Host text path with cognitive-runtime apply, shared conversation
 state for multi-turn cases, no speaker, and preview-only execution. It therefore
-exercises routing, Goal Association, planning, and response composition without
+exercises User Meaning Interpretation, Goal Association, planning, and Social Cognition without
 executing proposed effects. It also verifies the quality-model identity exposed
-by Agent health and that the fast Planner model matches the active runtime
-profile's `AGENT_FAST_PLANNER_MODEL`. The runner writes
+by Agent health and that the Planner model matches the active runtime
+profile's `AGENT_PLANNER_MODEL`. The runner writes
 `normalized.json`, `run.json`, and `review/review-bundle.json`. Give that review
 bundle to Codex or another declared LLM/human reviewer, fill the generated
 `review-template.json`, and apply the retained semantic verdict with
@@ -620,15 +621,15 @@ See the corpus
 [Issue #34](https://github.com/TimeTreker/chromie/issues/34) for its ownership,
 claim boundary, and retained prompt-qualification evidence.
 
-## Fast Planner daily-life qualification corpus
+## Planner daily-life qualification corpus
 
 `datasets/fast_planner_daily_life/scenarios/` contains 204 current-production-
-shaped Fast scenarios in 51 one-axis bilingual contrast sets. The case count is
+shaped Planner scenarios in 51 one-axis bilingual contrast sets. The case count is
 derived from 17 design-owned Planner capacities, three materially different
 daily-life families per capacity, supported/boundary conditions, and English/
 Chinese realizations. The matrix covers streaming Responsibility planning,
-canonical primary Goals, and scoped Evidence/Work re-entry. The sibling Deep tree
-contains 40 separately qualified primary/re-entry cases across ten applicable
+canonical primary Goals, and scoped Evidence/Work re-entry. The sibling
+`deep_primary`/`deep_reentry` fixtures contain 40 separately qualified primary/re-entry cases across ten applicable
 capacities.
 
 The manifest owns the inventory, authority exclusions, coverage dimensions, and

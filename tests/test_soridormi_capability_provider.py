@@ -9,7 +9,7 @@ from agent.app.tool_invocation import ToolCallOutcome, ToolInvocationContext
 from orchestrator.runtime.capability_runtime import (
     RuntimeAuthorization,
     CapabilityExecutionContext,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
 )
 from orchestrator.runtime.soridormi_capability_provider import (
@@ -67,7 +67,7 @@ class _RecordingInvoker:
 
 class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
     def test_imports_bounded_long_running_resource_skill_timeout(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [{
             "skill_id": "acquire_and_deliver_resource",
             "available": True,
@@ -88,7 +88,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def _runtime(self, invoker: _RecordingInvoker) -> CapabilityRuntime:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -117,7 +117,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         return runtime
 
     def test_imported_embodied_skill_has_host_owned_completion_evidence_policy(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -259,7 +259,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                 ),
             }
         )
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -323,7 +323,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(execute_context.safety_monitor_active)
 
     def test_sc_preflight_preserves_owner_risk_and_confirmation_boundaries(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [{
             "skill_id": "blink_eyes", "available": True,
             "parameters_schema": {"type": "object"},
@@ -357,7 +357,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_social_preflight_does_not_override_provider_confirmation(self) -> None:
         invoker = _RecordingInvoker()
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -421,7 +421,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                 )
             }
         )
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -489,7 +489,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                 ),
             }
         )
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -555,7 +555,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_goal_grounded_preflight_does_not_override_provider_confirmation(self) -> None:
         invoker = _RecordingInvoker()
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -676,7 +676,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(chromie_intent["soridormi_owns_pose_estimation"])
 
     async def test_catalog_preserves_unavailable_capability_reason(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -886,7 +886,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
 
 
     def test_resource_capability_rejects_completed_without_full_delivery_evidence(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -946,7 +946,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_granular_resource_capability_uses_its_own_completion_contract(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -991,7 +991,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         self.assertIsNone(failure)
 
     async def test_fetch_and_deliver_preserves_scope_and_complete_resource_evidence(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -1119,7 +1119,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
     async def test_look_target_body_coordinates_never_cross_the_contract(self) -> None:
         """Chromie describes whom to look at; Soridormi resolves where that is."""
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [self._look_at_person_skill()])
         definition = registry.get("soridormi.look_at_person")
         assert definition is not None
@@ -1154,7 +1154,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
     async def test_look_at_me_targets_the_requester(self) -> None:
         """"Look at me" names the current speaker; Soridormi resolves where they are."""
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [self._look_at_person_skill()])
         definition = registry.get("soridormi.look_at_person")
         assert definition is not None
@@ -1185,8 +1185,36 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertEqual(planned["parameters"]["target_ref"], expected)
 
+    async def test_a_missing_gaze_target_is_never_defaulted_to_the_speaker(self) -> None:
+        registry = CapabilityDefinitionRegistry()
+        import_soridormi_capability_catalog(registry, [self._look_at_person_skill()])
+        definition = registry.get("soridormi.look_at_person")
+        assert definition is not None
+        for args in ({"target_ref": ""}, {"target_ref": "  "}, {}):
+            with self.subTest(args=args):
+                invoker = _RecordingInvoker()
+                result = await SoridormiCapabilityProvider(invoker).execute(
+                    CapabilityRequest(
+                        request_id="look-none",
+                        capability_id="soridormi.look_at_person",
+                        args=args,
+                    ),
+                    definition,
+                    CapabilityExecutionContext(
+                        interaction_id="look", trace=CapabilityTrace(
+                            interaction_id="look", request_id="look-none",
+                            capability_id="soridormi.look_at_person",
+                            provider_id="soridormi.mcp",
+                        ),
+                    ),
+                )
+                self.assertEqual(
+                    (result.status, result.reason_code), ("failed", "missing_target")
+                )
+                self.assertEqual(invoker.calls, [])
+
     async def test_current_speaker_recipient_is_sent_as_requester(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [{
             "skill_id": "acquire_and_deliver_resource",
             "available": True,
@@ -1275,7 +1303,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         # An activity member whose status says completed but whose own evidence says
         # it did not complete is not completion.
         request = CapabilityRequest(request_id="look-1", capability_id="soridormi.nod_yes")
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry, [{"skill_id": "nod_yes", "available": True}])
         definition = registry.get("soridormi.nod_yes")
         [member] = SoridormiCapabilityProvider(_RecordingInvoker())._member_results_from_activity(
@@ -1293,7 +1321,7 @@ class SoridormiCapabilityProviderTests(unittest.IsolatedAsyncioTestCase):
         """Social Cognition covers gestures; walking is never decoration."""
 
         def definition_for(item: dict[str, Any]):
-            registry = CapabilityRegistry()
+            registry = CapabilityDefinitionRegistry()
             import_soridormi_capability_catalog(registry, [{
                 "available": True,
                 "requires_confirmation": False,

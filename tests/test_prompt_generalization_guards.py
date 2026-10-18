@@ -58,9 +58,9 @@ def test_goal_association_prompt_does_not_embed_weather_or_tonight_templates() -
     # Schema/DTO/Host in test_goal_association_resolver, not exact prompt wording.
 
 
-def test_fast_planner_truth_prompt_preserves_epistemic_strength_without_phrase_table() -> None:
+def test_planner_truth_prompt_preserves_epistemic_strength_without_phrase_table() -> None:
     source = (
-        _text("agent/app/fast_planner.py")
+        _text("agent/app/planner.py")
         + _text("agent/app/planner_prompt.py")
     )
     for literal in (
@@ -87,7 +87,7 @@ def test_weather_capability_prompt_metadata_has_no_place_phrase_table() -> None:
 def test_concrete_cases_remain_as_regression_evidence_outside_production_prompts() -> None:
     umi_tests = _text("tests/test_user_meaning_interpreter_llm_prompt.py") + "\n".join(
         p.read_text() for p in (ROOT / "benchmarks/datasets/goal_interpretation_daily_life/scenarios").rglob("*.json"))
-    fast_tests = _text("tests/test_fast_planner_resolver.py")
+    fast_tests = _text("tests/test_planner_resolver.py")
     ga_tests = _text("tests/test_goal_association_resolver.py") + "\n".join(
         p.read_text() for p in (ROOT / "benchmarks/datasets/goal_association_daily_life/scenarios").rglob("*.json"))
     primary = "\n".join(p.read_text() for p in

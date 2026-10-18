@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from shared.chromie_contracts.interaction import InteractionResponse
+from shared.chromie_runtime.atomic_files import atomic_write_json, atomic_write_text
 from shared.chromie_runtime.log_colors import colorize_for_cli
 from shared.chromie_runtime.resource_sampling import (
     RESOURCE_SAMPLE_MODULE,
@@ -101,12 +102,12 @@ class SessionEventWriter:
     """Append session events as JSON Lines for acceptance evidence.
 
     The writer is intentionally dependency-free and best-effort: evidence
-    capture must never crash the realtime voice loop. The path is supplied by
-    ``ORCH_EVENT_LOG_PATH`` or directly in tests/embedding code.
+    capture must never crash the realtime voice loop. Host settings resolve
+    ``ORCH_EVENT_LOG_PATH`` and pass the path in; no path disables the writer.
     """
 
     def __init__(self, path: str | os.PathLike[str] | None = None) -> None:
-        raw = str(path or os.getenv("ORCH_EVENT_LOG_PATH", "")).strip()
+        raw = str(path or "").strip()
         self.path = Path(raw).expanduser().resolve() if raw else None
         self._lock = threading.Lock()
         if self.path is not None:
@@ -1547,21 +1548,8 @@ class SessionTracker:
                 json_path = self.workflow_report_root / f"{stem}.json"
                 markdown_path = self.workflow_report_root / f"{stem}.md"
                 with self._workflow_report_lock:
-                    json_temp = json_path.with_suffix(".json.tmp")
-                    markdown_temp = markdown_path.with_suffix(".md.tmp")
-                    json_temp.write_text(
-                        json.dumps(
-                            report,
-                            ensure_ascii=False,
-                            indent=2,
-                            sort_keys=True,
-                        )
-                        + "\n",
-                        encoding="utf-8",
-                    )
-                    markdown_temp.write_text(markdown, encoding="utf-8")
-                    os.replace(json_temp, json_path)
-                    os.replace(markdown_temp, markdown_path)
+                    atomic_write_json(json_path, report)
+                    atomic_write_text(markdown_path, markdown)
                 paths = {"json": str(json_path), "markdown": str(markdown_path)}
             except Exception as exc:  # evidence capture must not break runtime
                 logger.warning("Could not write session workflow report: %s", exc)
@@ -1682,24 +1670,8 @@ class SessionTracker:
         try:
             self.workflow_report_root.mkdir(parents=True, exist_ok=True)
             with self._workflow_report_lock:
-                json_temp = json_path.with_suffix(".json.tmp")
-                markdown_temp = markdown_path.with_suffix(".md.tmp")
-                json_temp.write_text(
-                    json.dumps(
-                        rollup,
-                        ensure_ascii=False,
-                        indent=2,
-                        sort_keys=True,
-                    )
-                    + "\n",
-                    encoding="utf-8",
-                )
-                markdown_temp.write_text(
-                    "\n".join(markdown_lines),
-                    encoding="utf-8",
-                )
-                os.replace(json_temp, json_path)
-                os.replace(markdown_temp, markdown_path)
+                atomic_write_json(json_path, rollup)
+                atomic_write_text(markdown_path, "\n".join(markdown_lines))
         except Exception as exc:  # evidence capture must not break runtime
             logger.warning("Could not write conversation workflow report: %s", exc)
             return {}

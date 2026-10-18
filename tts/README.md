@@ -138,13 +138,9 @@ Response:
 identity, declared capabilities, worker readiness, cancellation counters, and
 backend-specific metadata.
 
-### List speakers
+### Speakers
 
-```json
-{"type": "list_speakers"}
-```
-
-CosyVoice exposes the three built-in profiles plus `default`. `default` is a
+The health `pong` lists the speakers. CosyVoice exposes the three built-in profiles plus `default`. `default` is a
 language-routed logical ID; Qwen uses the committed `chromie_mixed` profile.
 The network endpoint does not mutate the source-controlled catalog.
 
@@ -233,6 +229,6 @@ or audible artifacts. See
 ## Speaker-reference authoring
 
 For the optional Oute bilingual-reference workflow, see the
-[Chromie Bilingual Speaker Guide](../CHROMIE_BILINGUAL_SPEAKER_GUIDE.md).
+[Chromie Bilingual Speaker Guide](../docs/BILINGUAL_SPEAKER_GUIDE.md).
 The default CosyVoice path continues to use the versioned references under
 `assets/tts/voices/`.

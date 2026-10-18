@@ -29,6 +29,8 @@ from shared.chromie_contracts.situation import (
     SituationRevisionObservation,
     SituationSourceRef,
 )
+from tests.model_fakes import FakeOllama
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 
@@ -206,18 +208,6 @@ class EmptyCatalog:
         return []
 
 
-class FakeOllama:
-    def __init__(self, output: dict[str, object]) -> None:
-        self.output = output
-        self.calls = 0
-        self.prompt = ""
-
-    async def generate(self, prompt: str, **_kwargs):
-        self.calls += 1
-        self.prompt = prompt
-        return self.output
-
-
 def request_for(observation: SituationRevisionObservation) -> SocialCognitionRequest:
     opportunity = derive_situation_revision_opportunity(observation)
     assert opportunity is not None
@@ -301,7 +291,7 @@ def test_voice_assistant_uses_social_cognition_without_goal_work_api() -> None:
                 reason_summary="Small family greeting.",
             )
 
-        async def resolve_fast_plan(self, *_args, **_kwargs):
+        async def resolve_plan(self, *_args, **_kwargs):
             self.planner_calls += 1
             raise AssertionError("Goal-bound Planner API requires Goal provenance")
 
@@ -309,10 +299,10 @@ def test_voice_assistant_uses_social_cognition_without_goal_work_api() -> None:
             self.planner_calls += 1
             raise AssertionError("Goal-bound Deep API requires Goal provenance")
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
-        mode="apply", fast_planner_timeout_ms=3000
+        mode="apply", planner_timeout_ms=3000
     )
     assistant.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
     assistant.sessions = SimpleNamespace(current_sid=None)
@@ -418,10 +408,10 @@ def test_routine_presence_still_uses_core_semantic_judgment_not_host_rules() -> 
                 reason_summary="No useful outward social delta now.",
             )
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
-        mode="apply", fast_planner_timeout_ms=3000
+        mode="apply", planner_timeout_ms=3000
     )
     assistant.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
     assistant.sessions = SimpleNamespace(current_sid=None)
@@ -475,10 +465,10 @@ def test_trusted_audience_is_used_by_memory_privacy_gate() -> None:
                 reason_summary="No speech needed.",
             )
 
-    assistant = VoiceAssistant.__new__(VoiceAssistant)
+    assistant = bare_voice_assistant()
     assistant.agent_client = Agent()
     assistant.cognitive_runtime_policy = CognitiveRuntimePolicy(
-        mode="apply", fast_planner_timeout_ms=3000
+        mode="apply", planner_timeout_ms=3000
     )
     assistant.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
     assistant.sessions = SimpleNamespace(current_sid=None)
@@ -561,7 +551,7 @@ def test_goal_free_apply_path_treats_silence_and_no_change_as_success() -> None:
             self.delivered = 0
             self.agent_client = Agent()
             self.cognitive_runtime_policy = CognitiveRuntimePolicy(
-                mode="apply", fast_planner_timeout_ms=3000
+                mode="apply", planner_timeout_ms=3000
             )
             self.cognitive_runtime = SimpleNamespace(interaction_ledger=None)
             self.sessions = SimpleNamespace(current_sid=None)
@@ -742,7 +732,7 @@ async def test_host_validates_complete_social_cognition_result_before_any_memory
         cognitive_runtime=SimpleNamespace(interaction_ledger=None), session_log=lambda *args: None,
         sessions=SimpleNamespace(current_sid=None), get_http_session=session,
         agent_client=SimpleNamespace(resolve_cognitive_activation=allow_activation, resolve_social_cognition=resolve),
-        cognitive_runtime_policy=CognitiveRuntimePolicy(mode="apply", fast_planner_timeout_ms=3000))
+        cognitive_runtime_policy=CognitiveRuntimePolicy(mode="apply", planner_timeout_ms=3000))
     with pytest.raises(ValueError):
         await resolve_goal_free_situation_response(host, observation=observation, opportunity=opportunity,
             session_id="sid", language="en-US")
@@ -801,8 +791,8 @@ async def test_newer_situation_supersedes_inflight_speech_and_memory():
 
 @pytest.mark.asyncio
 async def test_environment_nonverbal_sc_uses_existing_soridormi_expression_runtime():
-    from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
-    from tests.test_planner_auxiliary_activity_contract import _Runtime, _definition
+    from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
+    from tests.auxiliary_activity_test_support import RecordingCapabilityRuntime as _Runtime, social_capability_definition as _definition
 
     provider = _Runtime([_definition()])
     async def resolve(_session, *, request, **kwargs):

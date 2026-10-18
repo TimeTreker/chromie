@@ -209,7 +209,7 @@ check_control_plane_http() {
     --timeout-seconds "$SMOKE_TIMEOUT_SECONDS"
 }
 
-run_step "Run deployed Gateway-to-Core-to-Fast-Planner control-plane round trip" check_control_plane_http || true
+run_step "Run deployed Gateway-to-Core-to-Planner control-plane round trip" check_control_plane_http || true
 
 check_asr_websocket() {
   docker exec -i chromie-asr python - <<'PY'

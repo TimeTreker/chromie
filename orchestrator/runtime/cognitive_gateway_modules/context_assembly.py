@@ -11,6 +11,7 @@ from shared.chromie_contracts.user_turn import (
     GatewayContextSnapshot,
 )
 
+from .input_normalization import aware_clock_now
 from .protective_reflex import GatewayTurnCapture
 
 
@@ -51,7 +52,7 @@ class ContextAssembly:
         context: dict[str, Any] | None,
     ) -> GatewayContextSnapshot:
         copied = self.project_context(context)
-        captured_at = self._aware_now()
+        captured_at = aware_clock_now(self._clock)
         references = self._references(copied, captured_at=captured_at)
         encoded = json.dumps(
             copied,
@@ -155,12 +156,6 @@ class ContextAssembly:
                 )
             )
         return tuple(references)
-
-    def _aware_now(self) -> datetime:
-        value = self._clock()
-        if value.tzinfo is None or value.utcoffset() is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value
 
 
 __all__ = ["ContextAssembly"]

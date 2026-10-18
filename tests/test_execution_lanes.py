@@ -6,14 +6,16 @@ import asyncio
 import time
 import unittest
 
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.capability_runtime import (
-    MockCapabilityProvider,
     RuntimeAuthorization,
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityResult,
     CapabilityRuntime,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    MockCapabilityProvider,
     local_speech_definition,
     vocal_performance_definition,
 )
@@ -85,11 +87,20 @@ class _GroupedBodyProvider(MockCapabilityProvider):
     def __init__(self, *, delay_s: float = 0.0) -> None:
         super().__init__("body", delay_s=delay_s)
         self.group_calls: list[list[str]] = []
+        self.in_flight: list[tuple[float, float]] = []
+
+    async def execute(self, request, definition, context):
+        started = time.perf_counter()
+        result = await super().execute(request, definition, context)
+        self.in_flight.append((started, time.perf_counter()))
+        return result
 
     async def execute_group(self, items):
         self.group_calls.append([request.request_id for request, _, _ in items])
+        started = time.perf_counter()
         if self.delay_s:
             await asyncio.sleep(self.delay_s)
+        self.in_flight.append((started, time.perf_counter()))
         return [
             CapabilityResult(
                 request_id=request.request_id,
@@ -101,6 +112,20 @@ class _GroupedBodyProvider(MockCapabilityProvider):
             )
             for request, definition, _ in items
         ]
+
+
+class _TimedSpeechProvider(MockCapabilityProvider):
+    """Record when each speech call is in flight so overlap is observed, not timed."""
+
+    def __init__(self, provider_id: str, *, delay_s: float = 0.0) -> None:
+        super().__init__(provider_id, delay_s=delay_s)
+        self.in_flight: list[tuple[float, float]] = []
+
+    async def execute(self, request, definition, context):
+        started = time.perf_counter()
+        result = await super().execute(request, definition, context)
+        self.in_flight.append((started, time.perf_counter()))
+        return result
 
 
 class _InteractionRuntimeView:
@@ -416,11 +441,11 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_capability_runtime_overlaps_speech_and_walk(self) -> None:
         response, walk = await self._response()
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(local_speech_definition())
         registry.register(walk)
         runtime = CapabilityRuntime(registry, max_concurrency=3)
-        speech_provider = MockCapabilityProvider(
+        speech_provider = _TimedSpeechProvider(
             local_speech_definition().provider_id,
             delay_s=0.08,
         )
@@ -428,15 +453,19 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(speech_provider)
         runtime.register_provider(body_provider)
 
-        started = time.perf_counter()
         result = await submit_and_wait_terminal(runtime,
             response,
             authorization=RuntimeAuthorization(),
         )
-        elapsed = time.perf_counter() - started
 
         self.assertEqual(result.status, "completed")
-        self.assertLess(elapsed, 0.20)
+        # The lanes overlap when each provider starts before the other finishes.
+        # Observing the in-flight windows avoids a wall-clock bound that a slow
+        # CI scheduler can miss even though the lanes did run together.
+        (speech_started, speech_finished), = speech_provider.in_flight
+        (walk_started, walk_finished), = body_provider.in_flight
+        self.assertLess(speech_started, walk_finished)
+        self.assertLess(walk_started, speech_finished)
         self.assertEqual(len(speech_provider.calls), 1)
         self.assertEqual(
             speech_provider.calls[0].metadata["execution_lane"],
@@ -470,7 +499,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             _definition(f"test.output.{index}", group=f"group.{index}", resources=["shared"])
             for index in range(2)
         ]
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for definition in definitions:
             registry.register(definition)
         runtime = CapabilityRuntime(registry, max_concurrency=2)
@@ -550,7 +579,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                     ))
                 if conflict == "serial":
                     definitions[0].can_run_parallel = False
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 for definition in definitions:
                     registry.register(definition)
                 runtime = CapabilityRuntime(registry, max_concurrency=3)
@@ -599,7 +628,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
                         cancellations.append(context.interaction_id)
                         await super().cancel(request, definition, context)
 
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 for index in range(2):
                     registry.register(_definition(
                         f"soridormi.member{index}", group=f"group{index}", resources=[f"resource{index}"],
@@ -681,7 +710,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         )
         speech_definition = local_speech_definition()
         vocal_definition = vocal_performance_definition(declaration)
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         registry.register(speech_definition)
         registry.register(vocal_definition)
         runtime = CapabilityRuntime(registry, max_concurrency=2)
@@ -709,7 +738,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
             await submit_and_wait_terminal(runtime, response)
 
     def test_soridormi_import_preserves_provider_body_lanes(self) -> None:
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         import_soridormi_capability_catalog(registry,
             [
                 {
@@ -774,7 +803,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                     output={"completed": True},
                 )
 
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for name, lane in [
             ("voice-a", "vocal"),
             ("body-a", "activity"),
@@ -828,7 +857,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                 starts[request.request_id] = time.monotonic()
                 return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
                     status="completed", provider_id=self.provider_id, output={"completed": True})
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for name, lane in [("voice", "vocal"), ("body", "activity")]:
             definition = _definition("test." + name, group=name, resources=[name])
             definition.metadata["execution_lane"] = lane
@@ -860,7 +889,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                         starts.append(request.request_id)
                         return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
                             status="completed", provider_id=self.provider_id, output={"completed": True})
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 for name, lane in [("voice", "vocal"), ("body", "activity")]:
                     definition = _definition("test." + name, group=name, resources=[name])
                     definition.metadata["execution_lane"] = lane
@@ -905,7 +934,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                 effects.append(request.request_id)
                 return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
                     provider_id=self.provider_id, status="completed", output={"completed": True})
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for name, lane in (("voice", "vocal"), ("body", "activity")):
             definition = _definition("test." + name, group=name, resources=[name])
             definition.metadata["execution_lane"] = lane
@@ -937,7 +966,7 @@ class PreparedLaneStartTests(unittest.IsolatedAsyncioTestCase):
                         effects.append(request.request_id)
                         return CapabilityResult(request_id=request.request_id, capability_id=request.capability_id,
                             provider_id=self.provider_id, status="completed", output={"completed": True})
-                registry = CapabilityRegistry()
+                registry = CapabilityDefinitionRegistry()
                 requests = []
                 for name, lane in (("voice", "vocal"), ("body-a", "activity"), ("body-b", "activity")):
                     definition = _definition("test." + name, group=name, resources=[name])

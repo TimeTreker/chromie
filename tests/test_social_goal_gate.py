@@ -9,10 +9,10 @@ from agent.app.goal_association_contract import GoalSegmentationModelOutput
 from agent.app.goal_association_schema import goal_association_response_schema
 from agent.app.social_cognition import social_cognition_response_schema
 from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal
 from shared.chromie_contracts.goal import GoalAssociation, GoalAssociationResolution
 from shared.chromie_contracts.plan import (
@@ -133,7 +133,7 @@ async def test_conversational_ping_wakes_planner_only_after_ga_finds_goal() -> N
                 }],
             )
 
-        async def resolve_fast_plan(self, session, *, request, **kwargs):
+        async def resolve_plan(self, session, *, request, **kwargs):
             del session, kwargs
             assert ga_done is True
             calls.append("planner:" + ",".join(
@@ -153,7 +153,7 @@ async def test_conversational_ping_wakes_planner_only_after_ga_finds_goal() -> N
                 )],
             )
 
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             del session, kwargs
             assert ga_done is True
             calls.append("planner:" + ",".join(
@@ -267,7 +267,7 @@ async def test_mixed_greeting_and_work_plans_only_work_concurrently_with_ga() ->
                 need_outcomes={},
             )
 
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             del session, kwargs
             planner_refs[:] = [item.local_ref for item in request.responsibilities]
             calls.append("planner:" + ",".join(planner_refs))
@@ -443,7 +443,7 @@ async def test_goal_scope_beyond_the_first_plan_is_planned_once_over_ga_goals() 
                 or [{"activity_id": "ack", "text": "Okay.", "function": "acknowledge", "truth_stage": "context_grounded"}],
             )
 
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             del session, kwargs
             refs = [item.local_ref for item in request.responsibilities]
             calls.append("planner:" + ",".join(refs))
@@ -512,7 +512,7 @@ async def test_a_scope_extension_replaces_the_speculative_prepared_work() -> Non
                 or [{"activity_id": "ack", "text": "Okay.", "function": "acknowledge", "truth_stage": "context_grounded"}],
             )
 
-        async def stream_fast_advance(self, session, *, request, **kwargs):
+        async def stream_plan_advance(self, session, *, request, **kwargs):
             del session, kwargs
             refs = [item.local_ref for item in request.responsibilities]
             calls.append("planner:" + ",".join(refs))

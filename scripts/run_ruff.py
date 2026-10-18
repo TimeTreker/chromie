@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Run the pinned high-signal Ruff ratchet over its explicit source scope."""
+"""Run the pinned high-signal Ruff ratchet over its explicit source scope.
+
+A second pass checks the whole Python tree for the Pyflakes name-resolution and
+duplicate-key defects in TREE_WIDE_RULES, which must never appear anywhere.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +18,9 @@ ROOT = Path(__file__).resolve().parents[1]
 RUFF_VERSION = "0.16.0"
 DEFAULT_SCOPE = ROOT / "config" / "ruff_scope.txt"
 DEFAULT_CONFIG = ROOT / "ruff.toml"
+# Undefined names, undefined __all__ exports and redefined unused names are
+# checked over every Python file Ruff discovers, not only the ratchet scope.
+TREE_WIDE_RULES = ("F601", "F811", "F821", "F822")
 _VERSION_PATTERN = re.compile(r"^ruff\s+(?P<version>\S+)$")
 
 
@@ -102,7 +109,20 @@ def run_ruff(
         f"@{scope_path}",
     ]
     completed = subprocess.run(command, cwd=ROOT, check=False)
-    return completed.returncode
+    tree_wide = subprocess.run(
+        [
+            ruff_command,
+            "check",
+            "--config",
+            str(config_path),
+            "--select",
+            ",".join(TREE_WIDE_RULES),
+            ".",
+        ],
+        cwd=ROOT,
+        check=False,
+    )
+    return completed.returncode or tree_wide.returncode
 
 
 def main(argv: list[str] | None = None) -> int:

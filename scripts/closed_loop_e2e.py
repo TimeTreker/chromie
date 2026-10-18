@@ -679,7 +679,7 @@ async def synthesize_text(
     request_id: str,
     timeout_s: float,
 ) -> AudioData:
-    client = TTSClient(tts_url, default_sample_rate=24000)
+    client = TTSClient(tts_url)
     pcm, rate = await asyncio.wait_for(
         client.synthesize(
             text=text,

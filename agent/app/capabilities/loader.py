@@ -6,6 +6,8 @@ from pathlib import Path
 from collections.abc import Mapping
 from typing import Any
 
+from shared.chromie_contracts.text import split_comma_separated
+
 from ..settings import AgentServiceSettings, agent_service_settings
 
 from .local import build_chromie_registry
@@ -21,12 +23,7 @@ class ConfiguredRegistry:
     manifest_files: list[str]
 
 
-def parse_manifest_paths(raw: str | None) -> list[str]:
-    """Parse a comma-separated list of manifest files or directories."""
-
-    if not raw:
-        return []
-    return [item.strip() for item in raw.split(",") if item.strip()]
+parse_manifest_paths = split_comma_separated
 
 
 def _expand_environment(value: Any, *, source: Path, environment: Mapping[str, str]) -> Any:

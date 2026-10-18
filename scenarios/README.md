@@ -85,8 +85,8 @@ scenarios/
 ```
 
 Each file contains exactly one scenario object. The file stem must match the
-scenario `id`; for example `user_meaning_interpretation/normal_greeting.json` must contain
-`"id": "normal_greeting"`.
+scenario `id`; for example `user_meaning_interpretation/ambiguous_move_there.json` must contain
+`"id": "ambiguous_move_there"`.
 
 The maintained scenario registry is defined by `scripts/behavior_scenarios.py`.
 Historical `scenarios/dialogue/` route-decision fixtures and their generator were retired

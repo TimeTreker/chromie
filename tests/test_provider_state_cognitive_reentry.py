@@ -5,6 +5,8 @@ from orchestrator.runtime.planner_reentry import (
     provider_state_relevance,
 )
 from shared.chromie_contracts.interaction import InteractionResponse
+from tests.voice_assistant_test_support import bare_voice_assistant
+from orchestrator.runtime import planner_reentry_host
 
 
 def _response() -> InteractionResponse:
@@ -161,7 +163,7 @@ def test_restart_revalidation_uses_one_fresh_catalog_before_planner_reentry():
 
     from orchestrator.orchestrator import VoiceAssistant
 
-    host = VoiceAssistant.__new__(VoiceAssistant)
+    host = bare_voice_assistant()
     host.conversation_state = _RestoredState()
     host.interaction_runtime = _FreshRuntime()
     host.session_log = lambda *_args, **_kwargs: None
@@ -177,7 +179,7 @@ def test_restart_revalidation_uses_one_fresh_catalog_before_planner_reentry():
 
     host._planner_state_reentry_response = capture_planner_reentry
     host._apply_planner_reentry_response = apply_reentry
-    asyncio.run(host._revalidate_restored_goals_from_provider_state())
+    asyncio.run(planner_reentry_host.revalidate_restored_goals_from_provider_state(host))
 
     assert host.interaction_runtime.refresh_calls == 1
     assert len(captured) == 1
@@ -209,7 +211,7 @@ def test_planner_reentry_stages_fresh_confirmation_instead_of_auto_dispatch():
         def record_interaction_response(self, *_args, **_kwargs):
             raise AssertionError("confirmation-gated Work must not be recorded as dispatched")
 
-    host = VoiceAssistant.__new__(VoiceAssistant)
+    host = bare_voice_assistant()
     host.interaction_runtime = _ConfirmationRuntime()
     host.conversation_state = _NoRecordState()
     host.session_log = lambda *_args, **_kwargs: None

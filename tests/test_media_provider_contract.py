@@ -16,13 +16,15 @@ from agent.app.planner_context import planner_provider_media_goal_operations, pr
 from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import canonical_plan_response_schema
 from agent.app.planner_validation import validate_goal_responsibility_outcomes
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.capability_runtime import (
+    CapabilityDefinitionRegistry as RuntimeCapabilityRegistry,
+    CapabilityRuntime,
+)
+from orchestrator.runtime.builtin_capability_providers import (
     LocalSpeechCapabilityProvider,
     MediaPlaybackCapabilityProvider,
-    CapabilityRegistry as RuntimeCapabilityRegistry,
-    CapabilityRuntime,
     local_speech_definition,
     media_playback_definitions,
 )

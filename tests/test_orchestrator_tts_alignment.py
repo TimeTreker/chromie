@@ -20,6 +20,7 @@ if "scipy" not in sys.modules:
     sys.modules["scipy.signal"] = scipy.signal  # type: ignore[attr-defined]
 
 from orchestrator.orchestrator import VoiceAssistant
+from tests.voice_assistant_test_support import bare_voice_assistant
 import orchestrator.orchestrator as orchestrator_module
 from orchestrator.runtime.conversation_state import ConversationStateManager
 from orchestrator.runtime.interaction_coordinator import CapabilityInteractionDispatch
@@ -32,6 +33,11 @@ from orchestrator.runtime.playback_transport import transport_for as playback_tr
 import orchestrator.runtime.playback_transport as playback_transport_module
 from shared.chromie_contracts.mind import default_mind_profile
 from shared.chromie_contracts.interaction import InteractionResponse, CapabilityResult
+from shared.chromie_contracts.reflex import CancellationDispatchReceipt
+from orchestrator.runtime import cognitive_outcome_host
+from orchestrator.runtime import routed_turn_host
+from orchestrator.runtime import runtime_ready_greeting
+from orchestrator.runtime import tts_text
 
 
 class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
@@ -43,7 +49,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_fast_first_speech_enters_current_turn_context_only_after_playback(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -70,7 +76,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             reason="playback_start",
         )
         self.assertEqual(assistant._delivered_turn_speech_events("sid-fast"), [])
-        assistant._playback_state().complete_turn_speech_order(generation=3, order=7, session_id="sid-fast", completed=True, reason="completed")
+        assistant.playback_delivery.complete_turn_speech_order(generation=3, order=7, session_id="sid-fast", completed=True, reason="completed")
         delivered = assistant._delivered_turn_speech_events("sid-fast")
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["status"], "playback_completed")
@@ -78,7 +84,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(delivered[0]["fast_activity_id"], "progress_weather")
 
     async def test_failure_experience_recovers_user_text_from_accepted_dialogue(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.conversation_state = ConversationStateManager(enabled=True)
         assistant.conversation_state.record_accepted_user_turn(
             "sid-failure",
@@ -131,74 +137,162 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
                 assistant.conversation_state.conversation_id,
             )
 
-    def test_runtime_ready_greeting_prompt_is_a_human_like_wake_up(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+    @staticmethod
+    def _configure_startup_greeting(
+        assistant: VoiceAssistant,
+        resolve: Any,
+        *,
+        enable_agent: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Wire the Host greeting path to a fake Social Cognition client."""
+        assistant.runtime_ready_greeting_text = ""
+        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
         assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
+        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
+        assistant.enable_agent = enable_agent
+        assistant.mind = types.SimpleNamespace(
+            context=lambda: {"owner_approved": True, "identity": {"name": "Chromie"}}
+        )
+        assistant.normalize_tts_candidate = MethodType(
+            lambda self, text: str(text).strip(),
             assistant,
         )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm, curious, and natural",
+        assistant.is_valid_tts_text = MethodType(
+            lambda self, text: bool(str(text).strip()),
             assistant,
+        )
+        calls: list[dict[str, Any]] = []
+
+        class AgentClient:
+            async def resolve_startup_greeting(
+                self, session: Any, *, request: Any, timeout_ms: int,
+            ) -> Any:
+                calls.append({"session": session, "request": request, "timeout_ms": timeout_ms})
+                return await resolve(request)
+
+        assistant.agent_client = AgentClient()
+
+        async def get_http_session(self: VoiceAssistant) -> str:
+            del self
+            return "session"
+
+        assistant.get_http_session = MethodType(get_http_session, assistant)
+        return calls
+
+    @staticmethod
+    def _startup_resolution(request: Any, disposition: str, text: str = "") -> Any:
+        from shared.chromie_contracts.social_cognition import SocialStartupGreetingResolution
+
+        return SocialStartupGreetingResolution(
+            request_id=request.request_id,
+            disposition=disposition,
+            text=text,
+            reason_summary="test",
+            model_call_count=1,
         )
 
-        prompt = assistant._runtime_ready_greeting_prompt(
-            local_now=datetime(
-                2026,
-                8,
-                1,
-                7,
-                30,
-                tzinfo=timezone(timedelta(hours=8)),
-            )
-        )
+    async def test_runtime_ready_greeting_is_authored_by_social_cognition(self) -> None:
+        assistant = bare_voice_assistant()
 
-        self.assertIn("has just woken up", prompt)
-        self.assertIn("naturally says after waking up", prompt)
-        self.assertIn('"local_period":"morning"', prompt)
-        self.assertIn('"utc_offset":"+08:00"', prompt)
-        self.assertIn("Do not quote the exact clock time", prompt)
-        self.assertIn("quiet grounding", prompt)
-        self.assertIn("Speak only in zh-CN", prompt)
-        self.assertIn("not a device, service agent, or adult professional", prompt)
-        self.assertIn("described by the owner-approved identity JSON", prompt)
-        self.assertIn("factory: a smart, warm twelve-year-old girl", prompt)
-        self.assertNotIn("Chromie has just woken up", prompt)
-        self.assertIn("Use no vocative, addressee noun", prompt)
-        self.assertIn("spontaneous first-person delight", prompt)
-        self.assertIn("Do not default to a formal morning, afternoon, or evening salutation", prompt)
-        self.assertIn("a cheerful first-person wake-up line is preferred", prompt)
-        self.assertNotIn("greet the room with only a general or time-of-day greeting", prompt)
-        self.assertIn("Return only a JSON object", prompt)
-        self.assertIn("Do not explain the task", prompt)
+        async def resolve(request: Any) -> Any:
+            return self._startup_resolution(request, "communicate", "早上好，我醒啦！")
 
-    def test_runtime_ready_greeting_prompt_changes_with_grounded_local_period(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
+        calls = self._configure_startup_greeting(assistant, resolve)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("早上好，我醒啦！", "social_cognition"))
+        self.assertEqual(len(calls), 1)
+        request = calls[0]["request"]
+        self.assertEqual(calls[0]["timeout_ms"], 1000)
+        self.assertEqual(request.language, "zh-CN")
+        self.assertEqual(request.max_chars, 24)
+        self.assertEqual(request.context["mind"]["identity"]["name"], "Chromie")
+        self.assertIn(
+            request.local_time["local_period"],
+            {"morning", "midday", "afternoon", "evening", "late_night"},
         )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm, curious, and natural",
-            assistant,
-        )
+        self.assertFalse(hasattr(assistant, "_runtime_ready_greeting_prompt"))
+
+    def test_runtime_ready_greeting_clock_facts_follow_the_grounded_local_period(self) -> None:
         local_tz = timezone(timedelta(hours=8))
-
-        morning = assistant._runtime_ready_greeting_prompt(
-            local_now=datetime(2026, 8, 1, 8, 0, tzinfo=local_tz)
+        morning = runtime_ready_greeting.runtime_ready_greeting_time_context(
+            datetime(2026, 8, 1, 7, 30, tzinfo=local_tz)
         )
-        evening = assistant._runtime_ready_greeting_prompt(
-            local_now=datetime(2026, 8, 1, 19, 0, tzinfo=local_tz)
+        evening = runtime_ready_greeting.runtime_ready_greeting_time_context(
+            datetime(2026, 8, 1, 19, 0, tzinfo=local_tz)
         )
 
-        self.assertIn('"local_period":"morning"', morning)
-        self.assertIn('"local_period":"evening"', evening)
-        self.assertNotEqual(morning, evening)
+        self.assertEqual(morning["local_period"], "morning")
+        self.assertEqual(morning["utc_offset"], "+08:00")
+        self.assertEqual(evening["local_period"], "evening")
 
-    async def test_runtime_ready_greeting_uses_llm_text_before_live_microphone_turns(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+    async def test_runtime_ready_greeting_respects_social_cognition_silence(self) -> None:
+        assistant = bare_voice_assistant()
+
+        async def resolve(request: Any) -> Any:
+            return self._startup_resolution(request, "silence")
+
+        self._configure_startup_greeting(assistant, resolve)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("", "social_cognition:silence"))
+
+    async def test_runtime_ready_greeting_plays_configured_owner_text_without_cognition(self) -> None:
+        assistant = bare_voice_assistant()
+
+        async def resolve(request: Any) -> Any:
+            raise AssertionError("configured text needs no Social Cognition call")
+
+        calls = self._configure_startup_greeting(assistant, resolve)
+        assistant.runtime_ready_greeting_text = "嗨，我醒啦！"
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("嗨，我醒啦！", "configured"))
+        self.assertEqual(calls, [])
+
+    async def test_runtime_ready_greeting_rejects_incomplete_social_text_and_falls_back(self) -> None:
+        assistant = bare_voice_assistant()
+
+        async def resolve(request: Any) -> Any:
+            return self._startup_resolution(request, "communicate", "六点半啦，我困了，你吃晚")
+
+        self._configure_startup_greeting(assistant, resolve)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("我醒啦，今天也一起开心吧！", "fallback"))
+
+    async def test_runtime_ready_greeting_falls_back_when_social_cognition_fails(self) -> None:
+        assistant = bare_voice_assistant()
+
+        async def resolve(request: Any) -> Any:
+            raise RuntimeError("Agent Social Cognition startup greeting HTTP 503")
+
+        self._configure_startup_greeting(assistant, resolve)
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("我醒啦，今天也一起开心吧！", "fallback"))
+
+    async def test_runtime_ready_greeting_without_agent_never_authors_words(self) -> None:
+        assistant = bare_voice_assistant()
+
+        async def resolve(request: Any) -> Any:
+            raise AssertionError("no Agent means no Social Cognition call")
+
+        calls = self._configure_startup_greeting(assistant, resolve, enable_agent=False)
+        assistant.runtime_ready_greeting_fallback_text = ""
+
+        text, source = await assistant._generate_runtime_ready_greeting()
+
+        self.assertEqual((text, source), ("", "unavailable"))
+        self.assertEqual(calls, [])
+
+    async def test_runtime_ready_greeting_plays_before_live_microphone_turns(self) -> None:
+        assistant = bare_voice_assistant()
         assistant.runtime_ready_greeting_enabled = True
         assistant.runtime_ready_greeting_speech_enabled = True
         assistant.runtime_ready_greeting_text = ""
@@ -222,7 +316,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             self: VoiceAssistant,
         ) -> tuple[str, str]:
             del self
-            return "嗨，我醒啦！", "llm:qwen3:4b"
+            return "嗨，我醒啦！", "social_cognition"
 
         assistant._generate_runtime_ready_greeting = MethodType(
             generate_runtime_ready_greeting,
@@ -262,293 +356,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(assistant.playback_delivery.next_playback_order, 1)
 
-    async def test_runtime_ready_greeting_generation_uses_python_310_compatible_timeout(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant.normalize_tts_candidate = MethodType(
-            lambda self, text: str(text).strip(),
-            assistant,
-        )
-        assistant.is_valid_tts_text = MethodType(
-            lambda self, text: bool(str(text).strip()),
-            assistant,
-        )
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        class FakeResponse:
-            status = 200
-
-            async def __aenter__(self) -> "FakeResponse":
-                return self
-
-            async def __aexit__(self, *args: Any) -> None:
-                del args
-
-            async def text(self) -> str:
-                return json.dumps({"response": json.dumps({"text": "早上好，我醒啦！"}), "done_reason": "stop"})
-
-        class FakeSession:
-            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
-                self.url = url
-                self.payload = json
-                return FakeResponse()
-
-        session = FakeSession()
-
-        async def get_http_session(self: VoiceAssistant) -> FakeSession:
-            del self
-            return session
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        original_timeout = getattr(asyncio, "timeout", None)
-        if hasattr(asyncio, "timeout"):
-            delattr(asyncio, "timeout")
-        try:
-            text, source = await assistant._generate_runtime_ready_greeting()
-        finally:
-            if original_timeout is not None:
-                asyncio.timeout = original_timeout
-
-        self.assertEqual(text, "早上好，我醒啦！")
-        self.assertEqual(source, "llm:qwen3:4b")
-        self.assertEqual(session.url, assistant.llm_url)
-        self.assertEqual(session.payload["model"], "qwen3:4b")
-        self.assertIs(session.payload["think"], False)
-        self.assertEqual(
-            session.payload["format"],
-            assistant._spoken_text_response_schema(max_chars=24),
-        )
-        self.assertEqual(session.payload["options"]["num_predict"], 32)
-
-
-    async def test_runtime_ready_greeting_rejects_reasoning_prose_and_falls_back(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        class FakeResponse:
-            status = 200
-
-            async def __aenter__(self) -> "FakeResponse":
-                return self
-
-            async def __aexit__(self, *args: Any) -> None:
-                del args
-
-            async def text(self) -> str:
-                return json.dumps(
-                    {
-                        "response": (
-                            "First, the user wants me to write a greeting. "
-                            "I need to make sure it sounds natural."
-                        ),
-                        "done_reason": "length",
-                    }
-                )
-
-        class FakeSession:
-            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
-                del url, json
-                return FakeResponse()
-
-        async def get_http_session(self: VoiceAssistant) -> FakeSession:
-            del self
-            return FakeSession()
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        text, source = await assistant._generate_runtime_ready_greeting()
-
-        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
-        self.assertEqual(source, "fallback")
-
-    async def test_runtime_ready_greeting_rejects_separate_thinking_field(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        class FakeResponse:
-            status = 200
-
-            async def __aenter__(self) -> "FakeResponse":
-                return self
-
-            async def __aexit__(self, *args: Any) -> None:
-                del args
-
-            async def text(self) -> str:
-                return json.dumps(
-                    {
-                        "thinking": "I should produce a short childlike greeting.",
-                        "response": json.dumps({"text": "早呀，我醒啦！"}),
-                        "done_reason": "stop",
-                    }
-                )
-
-        class FakeSession:
-            def post(self, url: str, json: dict[str, Any]) -> FakeResponse:
-                del url, json
-                return FakeResponse()
-
-        async def get_http_session(self: VoiceAssistant) -> FakeSession:
-            del self
-            return FakeSession()
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        with self.assertLogs(level="WARNING") as warning_logs:
-            text, source = await assistant._generate_runtime_ready_greeting()
-
-        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
-        self.assertEqual(source, "fallback")
-        self.assertTrue(
-            any("thinking/reasoning output although think=false" in line for line in warning_logs.output)
-        )
-
-    async def test_runtime_ready_greeting_generation_timeout_falls_back(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant.normalize_tts_candidate = MethodType(
-            lambda self, text: str(text).strip(),
-            assistant,
-        )
-        assistant.is_valid_tts_text = MethodType(
-            lambda self, text: bool(str(text).strip()),
-            assistant,
-        )
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        class SlowResponse:
-            status = 200
-
-            async def __aenter__(self) -> "SlowResponse":
-                return self
-
-            async def __aexit__(self, *args: Any) -> None:
-                del args
-
-            async def text(self) -> str:
-                await asyncio.sleep(1)
-                return json.dumps({"response": json.dumps({"text": "不应该返回"}), "done_reason": "stop"})
-
-        class SlowSession:
-            def post(self, url: str, json: dict[str, Any]) -> SlowResponse:
-                del url, json
-                return SlowResponse()
-
-        async def get_http_session(self: VoiceAssistant) -> SlowSession:
-            del self
-            return SlowSession()
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        text, source = await assistant._generate_runtime_ready_greeting()
-
-        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
-        self.assertEqual(source, "fallback")
-
-    async def test_runtime_ready_greeting_falls_back_when_generation_fails(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
-        self._configure_model_generation(assistant)
-        assistant.runtime_ready_greeting_text = ""
-        assistant.runtime_ready_greeting_fallback_text = "我醒啦，今天也一起开心吧！"
-        assistant.runtime_ready_greeting_model = "qwen3:4b"
-        assistant.runtime_ready_greeting_language = "zh-CN"
-        assistant.runtime_ready_greeting_num_predict = 32
-        assistant.runtime_ready_greeting_generation_timeout_ms = 1000
-        assistant.ollama_model = "gemma4:12b"
-        assistant.llm_url = "http://localhost:11434/api/generate"
-        assistant.normalize_tts_candidate = MethodType(
-            lambda self, text: str(text).strip(),
-            assistant,
-        )
-        assistant.is_valid_tts_text = MethodType(
-            lambda self, text: bool(str(text).strip()),
-            assistant,
-        )
-        assistant._owner_identity_json = MethodType(
-            lambda self: '{"name":"Chromie"}',
-            assistant,
-        )
-        assistant._owner_mind_summary = MethodType(
-            lambda self: "warm and curious",
-            assistant,
-        )
-
-        async def get_http_session(self: VoiceAssistant) -> Any:
-            del self
-            raise RuntimeError("Ollama unavailable")
-
-        assistant.get_http_session = MethodType(get_http_session, assistant)
-
-        text, source = await assistant._generate_runtime_ready_greeting()
-
-        self.assertEqual(text, "我醒啦，今天也一起开心吧！")
-        self.assertEqual(source, "fallback")
-
     async def test_runtime_ready_greeting_is_skipped_for_injected_audio(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.runtime_ready_greeting_enabled = True
         assistant.runtime_ready_greeting_speech_enabled = True
         assistant.runtime_ready_greeting_text = ""
@@ -564,7 +373,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             del self
             nonlocal generated
             generated = True
-            return "嗨，我醒啦！", "llm:qwen3:4b"
+            return "嗨，我醒啦！", "social_cognition"
 
         async def schedule_tts_text(
             self: VoiceAssistant,
@@ -588,7 +397,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(scheduled)
 
     async def test_multi_goal_confirmation_denial_closes_all_scoped_goals(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(
             ttl_s=20.0
         )
@@ -709,7 +518,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(launched), 1)
 
     async def test_multi_goal_confirmation_approval_schedules_all_scoped_goals(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.confirmation_dialogue = orchestrator_module.ConfirmationDialogue(
             ttl_s=20.0
         )
@@ -809,7 +618,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_stale_session_cannot_reserve_a_playback_order(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         stale_session_id = assistant.sessions.create()
         current_session_id = assistant.sessions.create()
@@ -878,16 +687,16 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
     def test_immediate_planner_speech_host_check_is_transport_only(self) -> None:
         self.assertEqual(
-            VoiceAssistant._safe_immediate_route_speech("I finished it."),
+            routed_turn_host.safe_immediate_route_speech("I finished it."),
             "I finished it.",
         )
         self.assertIsNone(
-            VoiceAssistant._safe_immediate_route_speech("soridormi.walk_forward")
+            routed_turn_host.safe_immediate_route_speech("soridormi.walk_forward")
         )
 
 
     async def test_interaction_speech_reuses_existing_turn_audio_without_resynthesis(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -937,7 +746,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             current_execution_start,
         )
 
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -987,7 +796,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             await body_wait
 
     async def test_same_communicative_activity_auto_reuses_audio_without_transport_identity(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -1036,7 +845,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result["orders"], [8])
 
     async def test_undelivered_fast_communicative_act_is_fulfilled_once_by_reused_stage(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -1093,7 +902,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_cognitive_core_exception_does_not_semantically_classify_embodied_text(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
 
         response = assistant._cognitive_core_exception_safe_response(
             "Please walk ahead quickly for 10 minutes.",
@@ -1112,7 +921,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_cognitive_core_exception_on_plain_text_does_not_create_second_semantic_authority(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
 
         response = assistant._cognitive_core_exception_safe_response(
             "Tell me a quick joke.",
@@ -1129,7 +938,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     def test_cognitive_core_exception_diagnostic_mode_speaks_recorded_failure(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.failure_speech_mode = "diagnostic"
 
         response = assistant._cognitive_core_exception_safe_response(
@@ -1160,7 +969,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "fast_planner_stream:stream_transport_invalid:"
             "SGLang stream ended without a finish_reason",
         )
-        self.assertNotIn("Fast planner", response.speech[0].text)
+        self.assertNotIn("planner", response.speech[0].text.lower())
         self.assertNotIn("stream transport invalid", response.speech[0].text)
         self.assertNotIn("SGLang", response.speech[0].text)
         self.assertNotIn("finish_reason", response.speech[0].text)
@@ -1170,7 +979,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(response.metadata["semantic_fallback"])
 
     def test_cognitive_failure_metadata_is_recorded_as_experience_error(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         response = assistant._cognitive_core_exception_safe_response(
             "你好。",
             failure_stage="user_meaning_interpretation",
@@ -1215,7 +1024,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_cognitive_core_exception_chinese_fallback_is_natural_and_fail_closed(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
 
         response = assistant._cognitive_core_exception_safe_response(
             "前面有一瓶水，你帮我拿过来好吗？",
@@ -1233,7 +1042,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
 
     async def test_input_barge_in_does_not_cancel_body_before_routing(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_generation = 0
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.active_synthesis_tasks = set()
@@ -1296,7 +1105,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
 
     async def test_final_deep_thought_response_can_keep_ack_playback_queue(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         reset_calls = 0
@@ -1376,7 +1185,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(done_calls, 2)
 
     async def test_session_completion_waits_for_detached_speech_delivery(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         release_delivery = asyncio.Event()
@@ -1443,7 +1252,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(assistant.sessions.state[session_id]["llm_done"])
 
     async def test_nonterminal_interaction_does_not_mark_session_done(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         done_calls = 0
@@ -1511,7 +1320,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
     async def test_scheduled_confirmation_without_playback_is_not_history(
         self,
     ) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         recorded: list[InteractionResponse] = []
 
         class _ConversationState:
@@ -1544,7 +1353,8 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             ],
         )
 
-        delivered = await assistant._record_successfully_delivered_speech(
+        delivered = await cognitive_outcome_host.record_successfully_delivered_speech(
+            assistant,
             response,
             execution,
             session_id="sid-confirmation-failed",
@@ -1555,7 +1365,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(recorded, [])
 
     async def test_interaction_speech_can_wait_until_playback_starts(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.order_lock = asyncio.Lock()
@@ -1610,7 +1420,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.playback_delivery.playback_start_waiters, {})
 
     async def test_playback_barrier_timeout_cancels_all_late_audio_chunks(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.order_lock = asyncio.Lock()
@@ -1689,7 +1499,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.playback_delivery.cancelled_playback_orders, set())
 
     async def test_interaction_speech_splits_long_text_into_ordered_chunks(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.order_lock = asyncio.Lock()
@@ -1757,7 +1567,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_interaction_speech_registers_delivered_turn_evidence(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.playback_delivery.playback_start_waiters = {}
         assistant.playback_delivery.turn_speech_events = {}
         assistant.playback_delivery.turn_speech_event_by_playback_key = {}
@@ -1816,7 +1626,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             reason="playback_start",
         )
         self.assertEqual(assistant._delivered_turn_speech_events("sid-final"), [])
-        assistant._playback_state().complete_turn_speech_order(generation=4, order=9, session_id="sid-final", completed=True, reason="completed")
+        assistant.playback_delivery.complete_turn_speech_order(generation=4, order=9, session_id="sid-final", completed=True, reason="completed")
         delivered = assistant._delivered_turn_speech_events("sid-final")
         self.assertEqual(len(delivered), 1)
         self.assertEqual(delivered[0]["text"], "The Moon reflects sunlight.")
@@ -1834,7 +1644,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(delivered[0]["must_not_claim_completion"])
 
     async def test_single_tts_worker_pipelines_next_chunk_during_playback(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.order_lock = asyncio.Lock()
@@ -1977,7 +1787,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_provider_pcm_starts_playback_before_stream_end(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.playback_generation = 0
@@ -2106,7 +1916,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_provider_error_before_pcm_uses_bounded_websocket_retry(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.sessions = SessionTracker(enabled=True)
         session_id = assistant.sessions.create()
         assistant.playback_delivery.playback_generation = 0
@@ -2184,13 +1994,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(assistant.playback_delivery.playback_queue.qsize(), 1)
 
     async def test_tts_splitter_groups_tiny_fragments_without_swallowing_long_chunk(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_chunk_chars = 80
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Too fast. Walking normally. "
             "La la, tiny steps and circuits bright, I am walking through the light."
         )
@@ -2204,14 +2015,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_preserves_fast_first_section(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 40
         assistant.tts_chunk_chars = 80
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Okay. I will check the route, then I will explain the next safe step."
         )
 
@@ -2224,14 +2036,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_allows_tiny_complete_first_sentence(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 8
         assistant.tts_chunk_chars = 40
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Hello. I am doing well and ready to help."
         )
 
@@ -2244,14 +2057,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_keeps_sentences_intact_below_service_limit(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 40
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             'I apologize, but your input "Yeah, so you guys" is incomplete. '
             "Could you please provide a full request or question so I can assist you?"
         )
@@ -2265,14 +2079,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_does_not_split_ready_sentence_by_length(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 40
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Hello! I am functioning correctly and ready to assist you. "
             "How can I help you today?"
         )
@@ -2287,14 +2102,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_keeps_substantial_followup_sentences_separate(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 120
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             "Hello! I am doing well, thank you for asking. "
             "I am ready to help you with whatever you need."
         )
@@ -2309,14 +2125,15 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_uses_clause_boundaries_for_long_sentence(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 120
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             "I can help you practice English, check simple ideas, plan small tasks, "
             "and keep you company while we work."
         )
@@ -2331,19 +2148,19 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
         )
 
     def test_tts_splitter_splits_chinese_sentences_without_spaces(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 40
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text("你好。我可以帮你。")
+        chunks = tts_text.split_tts_text(assistant, "你好。我可以帮你。")
 
         self.assertEqual(chunks, ["你好。", "我可以帮你。"])
 
     def test_tts_splitter_chunks_long_chinese_weather_reply_for_earlier_audio(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 120
@@ -2357,14 +2174,14 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "北京今天雷雨伴冰雹，当前约31℃，最高31℃、最低25℃，"
             "体感约37℃，降水概率最高约100%，风速约5公里每小时。"
         )
-        chunks = assistant.split_tts_text(text)
+        chunks = tts_text.split_tts_text(assistant, text)
 
         self.assertGreater(len(chunks), 1)
         self.assertTrue(all(len(chunk) <= 36 for chunk in chunks))
         self.assertEqual("".join(chunks), text)
 
     def test_tts_splitter_keeps_compact_chinese_weather_answer_in_one_request(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 16
         assistant.tts_chunk_chars = 120
@@ -2376,10 +2193,10 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
 
         text = "很热，重庆现在约37℃，体感42℃，最高39℃。"
 
-        self.assertEqual(assistant.split_tts_text(text), [text])
+        self.assertEqual(tts_text.split_tts_text(assistant, text), [text])
 
     def test_failure_speech_contract_rejects_incomplete_sentence(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.normalize_tts_candidate = MethodType(
             lambda self, text: " ".join(str(text).strip().split()),
             assistant,
@@ -2400,28 +2217,30 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             )
 
     def test_tts_splitter_does_not_make_tiny_fragment_without_sentence_boundary(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 8
         assistant.tts_chunk_chars = 40
         assistant.tts_min_chunk_chars = 20
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             "I am doing well and ready to help."
         )
 
         self.assertEqual(chunks, ["I am doing well and ready to help."])
 
     def test_tts_splitter_does_not_split_one_medium_sentence_for_first_chunk(self) -> None:
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.tts_text_chunking_enabled = True
         assistant.tts_first_chunk_chars = 40
         assistant.tts_chunk_chars = 80
         assistant.tts_min_chunk_chars = 40
         assistant.tts_flush_chars = 160
 
-        chunks = assistant.split_tts_text(
+        chunks = tts_text.split_tts_text(
+            assistant,
             "I will explain the route carefully without creating another section."
         )
 
@@ -2437,7 +2256,7 @@ if __name__ == "__main__":
 
 class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
     def make_assistant(self):
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.session_log = lambda *args, **kwargs: None
         assistant.normalize_tts_candidate = lambda text: " ".join(text.split())
         calls = []
@@ -2478,7 +2297,7 @@ class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
     async def test_failed_activity_wording_cannot_change_before_retry(self):
         assistant, calls = self.make_assistant()
         await assistant._schedule_interaction_speech(self.args())
-        assistant._playback_state().complete_turn_speech_order(generation=1, order=0,
+        assistant.playback_delivery.complete_turn_speech_order(generation=1, order=0,
             session_id="sid", completed=False, reason="failed")
         with self.assertRaisesRegex(ValueError, "wording"):
             await assistant._schedule_interaction_speech(self.args(text="Cancel that."))
@@ -2489,7 +2308,7 @@ class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
     async def test_interrupted_activity_is_not_automatically_replayed(self):
         assistant, calls = self.make_assistant()
         await assistant._schedule_interaction_speech(self.args())
-        lifecycle = assistant._playback_state()
+        lifecycle = assistant.playback_delivery
         lifecycle.update_turn_speech_event_for_playback(generation=1, order=0,
             session_id="sid", started=True, reason="started")
         lifecycle.complete_turn_speech_order(generation=1, order=0,
@@ -2504,10 +2323,10 @@ class SpeechIdentitySubmissionTests(unittest.IsolatedAsyncioTestCase):
         args = self.args()
         args["metadata"].update(session_id=None, origin_session_id="sid")
         result = await assistant._schedule_interaction_speech(args)
-        waiter = asyncio.create_task(assistant._playback_state().wait_for_speech_completion("sid", result))
+        waiter = asyncio.create_task(assistant.playback_delivery.wait_for_speech_completion("sid", result))
         await asyncio.sleep(0)
         self.assertFalse(waiter.done())
-        assistant._playback_state().complete_turn_speech_order(generation=1, order=0,
+        assistant.playback_delivery.complete_turn_speech_order(generation=1, order=0,
             session_id=None, completed=True, reason="completed")
         self.assertTrue(await waiter)
         repeated = await assistant._schedule_interaction_speech(args)

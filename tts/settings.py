@@ -13,8 +13,14 @@ class TTSConfigurationError(RuntimeError):
 
 
 def _raw(values: Mapping[str, str], name: str, default: str) -> str:
+    """Return the value, or ``default`` when it is unset or blank.
+
+    Every TTS parser shares this rule with the shared runtime parsers: an unset
+    or empty/whitespace-only value means "use the default".
+    """
+
     value = values.get(name)
-    return default if value is None or value == "" else str(value)
+    return default if value is None or not str(value).strip() else str(value)
 
 
 def _text(values: Mapping[str, str], name: str, default: str = "") -> str:
@@ -83,10 +89,14 @@ def required_text(
     default: str,
     environ: Mapping[str, str] | None = None,
 ) -> str:
-    """Return a non-empty provider source/model value, failing with its key."""
+    """Return a non-empty provider source/model value, failing with its key.
+
+    A blank value means "use the default", as for every other TTS setting; only
+    a blank result after that raises.
+    """
 
     values = os.environ if environ is None else environ
-    value = str(values.get(name, default)).strip()
+    value = _text(values, name, default)
     if not value:
         raise TTSConfigurationError(f"{name} is required")
     return value

@@ -12,7 +12,7 @@ from agent.app.agent_skills import (
     load_agent_skill_registry,
 )
 from agent.app.capabilities.local import build_chromie_registry
-from orchestrator.runtime.cognitive_runtime import CanonicalPlanRuntimeAdapter
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 
 from shared.chromie_contracts import (
     AgentSkillDisclosureRequest,
@@ -408,7 +408,10 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         self.assertNotIn("escalate", fast.lower())
         self.assertIn("Before evidence exists", method)
         self.assertIn("provider/network failures", method)
-        self.assertIn("exact Evidence references", method)
+        # The Planner is word-free; Social Cognition words the evidence-grounded answer.
+        self.assertIn("authors no wording", method)
+        self.assertIn("Social Cognition words the answer", method)
+        self.assertNotIn("natural\n   wording", method)
         self.assertNotIn("if user_text", "\n".join((fast, method)))
 
     def test_weather_method_preserves_planner_binding_and_typed_outcomes(self) -> None:
@@ -423,7 +426,11 @@ class AgentSkillDomainPackageTests(unittest.TestCase):
         self.assertNotIn("entity_type=day_part", fast)
         self.assertNotIn("args.date", fast)
         self.assertNotIn("args.period", fast)
-        self.assertIn("probability, not certainty", fast)
+        # Wording, including probability calibration, belongs to Social Cognition.
+        self.assertIn("you author no wording", fast)
+        self.assertNotIn("say that rain is possible", fast)
+        self.assertIn("probabilistic evidence, not certainty", method)
+        self.assertIn("a probability as a possibility rather than a certainty", method)
         self.assertIn("mismatched location", fast)
         self.assertIn("location_not_found", fast)
         self.assertIn("location_not_found", method)

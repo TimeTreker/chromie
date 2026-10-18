@@ -11,7 +11,7 @@ from .settings import (
     agent_service_settings as settings,
     user_meaning_interpreter_settings,
 )
-from .capabilities.catalog import CapabilityCatalog, CapabilitySearchRequest, CapabilitySearchResult
+from .capabilities.catalog import CapabilityCatalog
 from .capabilities.loader import build_configured_registry, parse_manifest_paths
 from .agent_skills import (
     AgentSkillDisclosureService,
@@ -29,13 +29,7 @@ from .local_tool_execution import LocalToolExecutor
 from .cognitive_gateway import AttentionReviewer
 from .cognitive_activation import CognitiveActivationResolver
 
-from shared.chromie_contracts.agent_skill import (
-    AgentSkillDisclosureRequest,
-    AgentSkillDisclosureResolution,
-    AgentSkillRegistrySnapshot,
-    AgentSkillSelectionRequest,
-    AgentSkillSelectionResolution,
-)
+from shared.chromie_contracts.agent_skill import AgentSkillRegistrySnapshot
 from shared.chromie_contracts.core_interpretation import (
     CognitiveWorkRequest,
     CoreInterpretationResult,
@@ -55,13 +49,13 @@ from shared.chromie_contracts.user_turn import (
     CoreTurnRequest,
 )
 from .goal_association import GoalAssociationResolver
-from .fast_planner import FastPlannerResolver
+from .planner import PlannerResolver
 from .social_cognition import SocialCognitionResolver
 from .reflection import ReflectionResolver
 from .value_judgment import ValueJudgmentResolver
 from shared.chromie_contracts.reflection import ReflectionRequest
 from shared.chromie_contracts.value_judgment import ValueJudgmentResult
-from shared.chromie_contracts.social_cognition import SocialCognitionRequest
+from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialStartupGreetingRequest
 from .schema import HealthResponse
 from .cognitive_core.user_meaning_interpreter import (
     UserMeaningInterpretationRequest,
@@ -71,20 +65,12 @@ from .cognitive_core.user_meaning_interpreter import (
 from .cognitive_core.user_meaning_interpreter.errors import InterpretationUnavailableError
 from .work_dag import (
     ExecutionTrace,
-    WorkDAG,
     WorkDAGCancelResponse,
-    WorkDAGConfirmationGrantRequest,
-    WorkDAGConfirmationGrantResponse,
-    WorkDAGDryRunRequest,
     WorkDAGExecuteRequest,
-    WorkDAGGuardedExecuteRequest,
     DAGEngineStatus,
     DAGEngineService,
-    WorkDAGValidationResponse,
 )
 from .tool_invocation import McpStreamableHttpInvoker
-
-from shared.chromie_contracts.semantic_authority import semantic_authority_route_matrix
 
 
 
@@ -305,36 +291,36 @@ goal_association_resolver = (
     else None
 )
 
-fast_planner_client = (
+planner_client = (
     build_model_client(
-        model=settings.fast_planner_model,
-        timeout_ms=settings.fast_planner_timeout_ms,
+        model=settings.planner_model,
+        timeout_ms=settings.planner_timeout_ms,
         purpose="fast_planner",
         service_settings=settings,
     )
-    if settings.use_llm and settings.fast_planner_enabled
+    if settings.use_llm and settings.planner_enabled
     else None
 )
-fast_planner_resolver = (
-    FastPlannerResolver(
-        fast_planner_client,
+planner_resolver = (
+    PlannerResolver(
+        planner_client,
         capability_catalog,
-        num_ctx=settings.fast_planner_num_ctx,
-        num_predict=settings.fast_planner_num_predict,
+        num_ctx=settings.planner_num_ctx,
+        num_predict=settings.planner_num_predict,
         cognitive_budget_profile=settings.cognitive_budget_profile,
-        max_capabilities=settings.fast_planner_max_capabilities,
+        max_capabilities=settings.planner_max_capabilities,
     )
-    if fast_planner_client is not None
+    if planner_client is not None
     else None
 )
 social_cognition_client = (
     build_model_client(
-        model=settings.fast_planner_model,
-        timeout_ms=settings.fast_planner_timeout_ms,
+        model=settings.planner_model,
+        timeout_ms=settings.planner_timeout_ms,
         purpose="social_cognition",
         service_settings=settings,
     )
-    if settings.use_llm and settings.fast_planner_enabled
+    if settings.use_llm and settings.planner_enabled
     else None
 )
 social_cognition_deep_client = (
@@ -351,26 +337,26 @@ social_cognition_resolver = (
     SocialCognitionResolver(
         social_cognition_client, capability_catalog,
         deep_model=social_cognition_deep_client,
-        num_ctx=max(settings.fast_planner_num_ctx, settings.deliberative_num_ctx),
+        num_ctx=max(settings.planner_num_ctx, settings.deliberative_num_ctx),
         num_predict=min(settings.deliberative_num_predict, 1024),
     )
     if social_cognition_client is not None
     else None
 )
-# Value Judgment shares the Fast Planner's model service and deadline: one short call that
+# Value Judgment shares the Planner's model service and deadline: one short call that
 # gates value-reviewed effects (owner amendment 2026-10-10).
 value_judgment_client = (
     build_model_client(
-        model=settings.fast_planner_model,
-        timeout_ms=settings.fast_planner_timeout_ms,
+        model=settings.planner_model,
+        timeout_ms=settings.planner_timeout_ms,
         purpose="value_judgment",
         service_settings=settings,
     )
-    if settings.use_llm and settings.fast_planner_enabled
+    if settings.use_llm and settings.planner_enabled
     else None
 )
 value_judgment_resolver = (
-    ValueJudgmentResolver(value_judgment_client, num_ctx=settings.fast_planner_num_ctx)
+    ValueJudgmentResolver(value_judgment_client, num_ctx=settings.planner_num_ctx)
     if value_judgment_client is not None
     else None
 )
@@ -487,19 +473,9 @@ async def health() -> HealthResponse:
         cognitive_activation_model=(
             settings.cognitive_activation_model if cognitive_activation_resolver is not None else None
         ),
-        fast_planner_enabled=fast_planner_resolver is not None,
-        fast_planner_model=(settings.fast_planner_model if fast_planner_resolver is not None else None),
+        planner_enabled=planner_resolver is not None,
+        planner_model=(settings.planner_model if planner_resolver is not None else None),
     )
-
-
-@app.get("/semantic-authority")
-async def semantic_authority() -> dict[str, object]:
-    return {
-        "matching_turn_authority_required": True,
-        "claim_is_caller_authentication": False,
-        "claim_is_single_use_replay_protection": False,
-        "route_matrix": semantic_authority_route_matrix(),
-    }
 
 
 @app.post(
@@ -581,29 +557,29 @@ async def resolve_cognitive_activation(
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-@app.post("/fast-advance")
-async def resolve_fast_advance(request: CognitiveWorkRequest):
-    if fast_planner_resolver is None:
-        raise HTTPException(status_code=503, detail="Fast planner is disabled")
-    # Fast Planner authors the first Activity Plan over UMI Responsibility refs.
+@app.post("/plan-advance")
+async def resolve_plan_advance(request: CognitiveWorkRequest):
+    if planner_resolver is None:
+        raise HTTPException(status_code=503, detail="Planner is disabled")
+    # The Planner authors the first Activity Plan over UMI Responsibility refs.
     # Agent Skill disclosure remains deferred; the endpoint may select only the
-    # bounded common Capability catalog supplied by the Fast Planner resolver.
+    # bounded common Capability catalog supplied by the Planner resolver.
     async def frames():
-        async for frame in fast_planner_resolver.stream_advance(request):
+        async for frame in planner_resolver.stream_advance(request):
             yield frame.model_dump_json(exclude_none=True) + "\n"
 
     return StreamingResponse(frames(), media_type="application/x-ndjson")
 
 
-@app.post("/fast-plan")
-async def resolve_fast_plan(request: CognitiveWorkRequest):
-    if fast_planner_resolver is None:
-        raise HTTPException(status_code=503, detail="Fast planner is disabled")
+@app.post("/plan")
+async def resolve_plan(request: CognitiveWorkRequest):
+    if planner_resolver is None:
+        raise HTTPException(status_code=503, detail="Planner is disabled")
     prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
         request,
         "fast_planner",
     )
-    result = await fast_planner_resolver.resolve(prepared)
+    result = await planner_resolver.resolve(prepared)
     return attach_planner_disclosure_metadata_fail_closed(result, disclosure)
 
 
@@ -613,6 +589,18 @@ async def resolve_social_cognition(request: SocialCognitionRequest):
         raise HTTPException(status_code=503, detail="Social Cognition is unavailable")
     try:
         return await social_cognition_resolver.resolve(request)
+    except OllamaGenerationError as exc:
+        raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.post("/social-cognition/startup-greeting")
+async def resolve_social_startup_greeting(request: SocialStartupGreetingRequest):
+    if social_cognition_resolver is None:
+        raise HTTPException(status_code=503, detail="Social Cognition is unavailable")
+    try:
+        return await social_cognition_resolver.resolve_startup_greeting(request)
     except OllamaGenerationError as exc:
         raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
     except ValueError as exc:
@@ -646,41 +634,6 @@ async def resolve_goal_association(request: CognitiveWorkRequest):
     return await goal_association_resolver.resolve(request)
 
 
-@app.post(
-    "/agent-skills/select",
-    response_model=AgentSkillSelectionResolution,
-)
-async def select_agent_skills(
-    request: AgentSkillSelectionRequest,
-) -> AgentSkillSelectionResolution:
-    """Let the declared Agent role author a typed optional Skill selection."""
-    if agent_skill_selection_service is None:
-        raise HTTPException(
-            status_code=503,
-            detail="Agent Skill model selection is disabled",
-        )
-    try:
-        return await agent_skill_selection_service.select(request)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post(
-    "/agent-skills/disclose",
-    response_model=AgentSkillDisclosureResolution,
-)
-async def disclose_agent_skills(
-    request: AgentSkillDisclosureRequest,
-) -> AgentSkillDisclosureResolution:
-    """Load only exact role projections from a validated model selection."""
-    if not settings.agent_skill_progressive_disclosure_enabled:
-        raise HTTPException(
-            status_code=503,
-            detail="Agent Skill progressive disclosure is disabled",
-        )
-    return agent_skill_disclosure_service.disclose(request)
-
-
 @app.get("/agent-skills", response_model=AgentSkillRegistrySnapshot)
 async def agent_skills() -> AgentSkillRegistrySnapshot:
     """Return bounded metadata only; no Skill body or projection is disclosed."""
@@ -700,17 +653,6 @@ async def capability_catalog_snapshot(refresh: bool = False) -> dict[str, object
     return await capability_catalog.snapshot(refresh=refresh)
 
 
-@app.post("/capabilities/search", response_model=CapabilitySearchResult)
-async def capability_search(request: CapabilitySearchRequest) -> CapabilitySearchResult:
-    return await capability_catalog.search(
-        request.text,
-        language=request.language,
-        limit=request.limit,
-        refresh=request.refresh,
-        prefer_interaction_executable=request.prefer_interaction_executable,
-    )
-
-
 @app.get("/capabilities/llm-context")
 async def capability_llm_context(
     language: str = "en",
@@ -726,71 +668,10 @@ async def capability_llm_context(
     }
 
 
-@app.post("/work-dags/validate", response_model=WorkDAGValidationResponse)
-async def validate_work_dag(dag: WorkDAG) -> WorkDAGValidationResponse:
-    return work_dag_service.validate(dag)
-
-
-@app.post("/work-dags/dry-run", response_model=ExecutionTrace)
-async def dry_run_work_dag(
-    request: WorkDAGDryRunRequest,
-    authorization: str | None = Header(default=None),
-) -> ExecutionTrace:
-    require_dag_engine_diagnostics_auth(authorization)
-    try:
-        return work_dag_service.dry_run(request.dag, auto_confirm=request.auto_confirm)
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post("/work-dags/execute-read-only", response_model=ExecutionTrace)
-async def execute_read_only_work_dag(request: WorkDAGExecuteRequest) -> ExecutionTrace:
-    try:
-        return await work_dag_service.execute_read_only(request.dag)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
 @app.post("/work-dags/execute-planning", response_model=ExecutionTrace)
 async def execute_planning_work_dag(request: WorkDAGExecuteRequest) -> ExecutionTrace:
     try:
         return await work_dag_service.execute_planning(request.dag)
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post("/work-dags/execute-guarded", response_model=ExecutionTrace)
-async def execute_guarded_work_dag(
-    request: WorkDAGGuardedExecuteRequest,
-    authorization: str | None = Header(default=None),
-) -> ExecutionTrace:
-    require_dag_engine_execution_auth(authorization)
-    try:
-        return await work_dag_service.execute_guarded(
-            request.dag,
-            request.confirmation_grant,
-        )
-    except RuntimeError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
-
-
-@app.post(
-    "/work-dags/confirmation-grants",
-    response_model=WorkDAGConfirmationGrantResponse,
-)
-async def create_work_dag_confirmation_grant(
-    request: WorkDAGConfirmationGrantRequest,
-    authorization: str | None = Header(default=None),
-) -> WorkDAGConfirmationGrantResponse:
-    require_dag_engine_execution_auth(authorization)
-    try:
-        return work_dag_service.issue_confirmation_grant(request)
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
@@ -807,18 +688,6 @@ async def cancel_work_dag(
 ) -> WorkDAGCancelResponse:
     require_dag_engine_execution_auth(authorization)
     return work_dag_service.cancel_execution(dag_id)
-
-
-@app.get("/work-dags/{dag_id}/trace", response_model=ExecutionTrace)
-async def get_work_dag_trace(
-    dag_id: str,
-    authorization: str | None = Header(default=None),
-) -> ExecutionTrace:
-    require_dag_engine_diagnostics_auth(authorization)
-    trace = work_dag_service.get_trace(dag_id)
-    if trace is None:
-        raise HTTPException(status_code=404, detail=f"No WorkDAG trace found for {dag_id!r}")
-    return trace
 
 
 @app.get("/work-dags/engine/status", response_model=DAGEngineStatus)

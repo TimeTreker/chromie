@@ -13,22 +13,22 @@ import unittest
 from agent.app.capabilities.catalog import CapabilityCatalog
 from agent.app.capabilities.local import chromie_manifests
 from agent.app.capabilities.models import CapabilityBundle, CapabilityRegistry as AgentCapabilityRegistry
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from agent.app.planner_model_contract import ABILITY_NEED_NONE
 from agent.app.planner_model_contract import PlannerModelOutput
 from agent.app.planner_schema import canonical_plan_response_schema
 from agent.app.planner_validation import validate_goal_responsibility_outcomes
 from tests.cognitive_work_test_support import cognitive_work_request
-from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
-    GoalDrivenRuntimeCoordinator,
-)
+from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.cognitive_turn_closure import CognitiveTurnClosure
 from orchestrator.runtime.interaction_coordinator import InteractionRuntimeCoordinator
 from orchestrator.runtime.capability_runtime import (
-    LocalSpeechCapabilityProvider,
-    CapabilityRegistry as RuntimeCapabilityRegistry,
+    CapabilityDefinitionRegistry as RuntimeCapabilityRegistry,
     CapabilityRuntime,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
     VocalPerformanceCapabilityProvider,
     local_speech_definition,
     vocal_performance_definition,
@@ -280,7 +280,7 @@ class VocalDeclarationAndPlannerTests(unittest.TestCase):
             history=[],
         )
 
-        plan = asyncio.run(FastPlannerResolver(model, catalog).resolve(request))
+        plan = asyncio.run(PlannerResolver(model, catalog).resolve(request))
 
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(len(plan.steps), 1)

@@ -35,25 +35,10 @@ from shared.chromie_contracts.resource import (
     resource_semantic_bindings,
 )
 from tests.goal_association_test_support import (
-    FakeOllama,
     create_goals,
     intent_goal,
 )
-
-
-class ScriptedOllama:
-    def __init__(self, payloads):
-        self.payloads = list(payloads)
-        self.prompts = []
-
-    async def generate(self, prompt, **kwargs):
-        self.prompts.append((prompt, kwargs))
-        if not self.payloads:
-            raise AssertionError("unexpected extra model call")
-        payload = self.payloads.pop(0)
-        if isinstance(payload, Exception):
-            raise payload
-        return payload
+from tests.model_fakes import FakeOllama, ScriptedOllama
 
 
 def binding(
@@ -153,7 +138,7 @@ def request(
 ) -> CognitiveWorkRequest:
     outcomes = list(responsibility_outcomes or [text])
     return CognitiveWorkRequest(
-        sid="sid-pr2",
+        sid="sid-goal-association",
         text=text,
         language=language,
         responsibilities=[

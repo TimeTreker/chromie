@@ -208,7 +208,7 @@ async def resolve_cognitive_activation(
                 int(
                     getattr(
                         getattr(host, "cognitive_runtime_policy", None),
-                        "fast_planner_timeout_ms",
+                        "planner_timeout_ms",
                         10000,
                     )
                 ),

@@ -6,13 +6,11 @@ from types import SimpleNamespace
 
 from orchestrator.runtime.capability_runtime import (
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
 )
 from orchestrator.runtime.cognitive_gateway import CognitiveGateway
-from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
-)
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from shared.chromie_contracts.core_interpretation import (
     CoreInterpretationResult,
 )
@@ -139,7 +137,7 @@ class FakeRuntime:
     def __init__(self, definitions: list[CapabilityDefinition] | None = None):
         self.definitions = {item.capability_id: item for item in (definitions or [])}
         self.ensure_calls: list[list[str]] = []
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for definition in definitions or []:
             registry.register(definition)
         self.runtime = CapabilityRuntime(registry)
@@ -193,7 +191,7 @@ def _stream_advance_from_canonical_plan(
     """Project legacy test fixtures onto the one-call streamed Fast contract.
 
     Runtime tests historically used ``unavailable`` as a sentinel that forced a
-    second ``/fast-plan`` call.  The maintained contract now treats the streamed
+    second ``/plan`` call.  The maintained contract now treats the streamed
     terminal result as authoritative unless canonical state actually changes.
     This helper keeps those fixtures about their intended Planner result instead
     of preserving the retired retry protocol.
@@ -345,10 +343,10 @@ class ScriptedClient:
         )
         self.calls: list[str] = []
 
-    async def stream_fast_advance(self, *args, **kwargs):
+    async def stream_plan_advance(self, *args, **kwargs):
         self.calls.append("stream")
         if not self.fast_advances:
-            raise AssertionError("unexpected Fast Planner stream")
+            raise AssertionError("unexpected Planner stream")
         advance = self.fast_advances.pop(0)
         request = kwargs["request"]
         advance = advance.model_copy(update={"turn_id": request.sid})
@@ -376,7 +374,7 @@ class ScriptedClient:
         self.calls.append("association")
         return self.association
 
-    async def resolve_fast_plan(self, *args, **kwargs):
+    async def resolve_plan(self, *args, **kwargs):
         self.calls.append("fast")
         return self.fast_plans.pop(0)
 

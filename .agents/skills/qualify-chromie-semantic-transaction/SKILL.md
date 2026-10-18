@@ -264,22 +264,18 @@ outcome, not a failure to optimize.
 
 When qualifying Planner:
 
-- Treat Fast and Deep as depth passes of one Planner HOW authority.
-- Permit Deep only as the declared source/context-based cognition-depth path before
-  commitment for the unresolved scope; never pass a Fast candidate Plan to Deep for
-  judgment or rewriting.
-- Qualify Fast primary/common, streaming advance, and bounded re-entry first.
-- Qualify Deep complex, blocked/degraded/unsafe, and revision paths second.
-- Rerun both Fast and Deep cohorts after Deep changes.
+- There is one Planner with no deeper pass. It is word-free: it authors Work and
+  typed communication Needs, never wording; qualify wording under Social Cognition.
+- Qualify primary/common, streaming advance, and bounded re-entry first, then
+  complex, blocked/degraded/unsafe, and revision paths.
 - Gate complete per-Goal outcomes, Capability/argument contracts, parameter
   provenance, ordering/concurrency, resources, confirmation, safety, truthful
-  response text, Evidence scope, satisfaction, unresolved material, revision
+  communication Needs, Evidence scope, satisfaction, unresolved material, revision
   scope, and absence of executable partial leakage.
 - Use semantic review for Plan completeness, appropriate Capability choices,
-  genuine clarification/limitation/refusal, grounded wording, and whether need-first
-  search loads what complex cases need without inventing Work.
+  genuine clarification/limitation, and whether need-first search loads what
+  complex cases need without inventing Work.
 - Do not let a need-first second pass erase a technical failure of the first.
-- Do not let Fast and Deep review or semantically repair each other.
 - Prefer acceptable semantic regions plus deterministic invariants over exact
   Plan equality.
 

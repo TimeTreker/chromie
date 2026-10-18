@@ -56,8 +56,9 @@ source-complete. Remaining order:
 
 1. **Everyday live-cohort root-cause repairs (active Issue).** Run the
    `scenarios/everyday/` cohort against Soridormi MuJoCo, judge every case and
-   repair each failure at its earliest responsible owner. Scope and next steps:
-   [checkpoint](DEVELOPMENT_CHECKPOINT.md).
+   repair each failure at its earliest responsible owner. Scope:
+   [checkpoint](DEVELOPMENT_CHECKPOINT.md); next steps:
+   [Status open work](docs/STATUS.md#current-open-work).
 2. **Semantic transaction simplification and generalization.** Source-span
    provenance, semantic-artifact lineage, the SC model-view diet and the
    provider-declared semantic Capability facade substrate are implemented.
@@ -109,7 +110,7 @@ cancellation, result meaning and body recovery; Planner-owned WorkDAG with a
 mechanical DAGEngine; Continuous Mind wake/re-entry, bounded Situation,
 structured time conditions and context-activated Memory; layered prompt prefixes;
 semantic authority closure (`apply` is the only authoritative semantic path);
-the need-first one-Planner contract with the Deep Planner retired; and Value
+the need-first one-Planner contract; and Value
 Judgment.
 
 These foundations are maintained only while their automated contracts remain
@@ -119,7 +120,7 @@ passing.
 
 ### Social Cognition interaction and independent Work — source implemented, qualification open
 
-`/fast-advance` emits one complete Work decision; `/social-cognition` authors
+`/plan-advance` emits one complete Work decision; `/social-cognition` authors
 interaction from the shared UMI result, canonical needs, Work/Evidence state or
 trusted Situation. GA/Work and SC proceed independently until a required
 confirmation or explicit ordering dependency must join.

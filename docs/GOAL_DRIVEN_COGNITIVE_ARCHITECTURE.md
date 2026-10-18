@@ -7,6 +7,11 @@ defines the authority for ordinary communication. Interaction is a primary
 cognitive responsibility with independent value, including substantive discussion
 when no action task exists. UMI owns WHAT, GA owns canonical continuity, Social
 Cognition owns whether/when/how to communicate, and Planner owns Work HOW.
+The Planner gives out the plan only: Work and word-free communication Needs. It
+never authors wording, Communicative Acts, progress speech, greetings, confirmation
+text or presentation. Social Cognition decides how to interact with the person from
+all the context, including Chromie's identity settings in the Mind profile, and
+authors every user-facing word, including the optional startup greeting.
 All use the same existing Mind, Memory, Situation, Goal, Work and Interaction
 truth; a separate inference task creates no separate personality or truth store.
 
@@ -122,7 +127,7 @@ Core. It receives an admitted `UserTurnEnvelope` projection and emits only
 provider-neutral Responsibility evidence with complete material meaning, bounded
 confidence, and unresolved meaning. It does not emit `route`, `intent`, response
 wording, Activity/Work/Plan contracts, Capability/provider identity, executable
-arguments, or authorization. Fast Planner is the first HOW owner; Goal Association
+arguments, or authorization. Planner is the first HOW owner; Goal Association
 alone owns canonical Goal continuity when that continuation is required.
 
 The executable state machine that carries one admitted turn through specialist
@@ -212,7 +217,7 @@ directly. Likewise, comparing a changed Goal with already queued/running/complet
 is simply one Planner operation. **`Work Reconciliation` is not a mandatory cognitive
 stage or separate semantic authority.**
 
-There is one Planner (PLANNER-AUTHORITY-001; the Deep Planner was retired 2026-10-11). It
+There is one Planner (PLANNER-AUTHORITY-001). It
 produces a complete detailed Plan whenever HOW is clear. Depth comes from what it acquires:
 library contracts through need-first search, Evidence through staged re-entry, or the
 person's input through clarification. A Responsibility it cannot fulfil now is an honest
@@ -348,14 +353,22 @@ a different Provider may expose navigation, perception, grasp, return, and
 handover separately. That changes Work composition, not Goal meaning. Provider
 internals remain private until explicitly advertised as capabilities.
 
-### Addressedness is bounded interaction policy, not recent-turn inertia
+### Addressedness is bounded interaction policy
 
 Cognitive Gateway Attention Review receives Host engagement evidence plus bounded
 recent accepted dialogue. A user-authored temporary interaction rule—such as requiring
 Chromie's wake name during a call—remains relevant addressedness context until the
-user revokes/replaces it or it falls outside the bounded conversation context. A recent
-exchange by itself does not make every nearby utterance addressed. Assistant wording
-never creates or relaxes the user's addressedness rule.
+user revokes/replaces it or it falls outside the bounded conversation context.
+Assistant wording never creates or relaxes the user's addressedness rule.
+
+The Gateway enforces such a rule only while Host engagement is inactive: Attention
+Review may then suppress confident ambient speech that does not satisfy it. While
+engagement is active (a recent exchange, active work or another in-flight turn),
+Attention Review admits every turn whatever its judgment
+([Cognitive Gateway](COGNITIVE_GATEWAY.md#43-attention-review--注意审查)), because wrongly
+ignoring a person is the worse mistake. The admitted turn carries the rule in its bounded
+conversation context, and Social Cognition, which owns whether to communicate, decides
+whether to respond.
 
 Attention suppression is a fail-open boundary and therefore has one model judgment.
 Malformed or unavailable Attention output admits the turn; it is not repaired, and a
@@ -628,7 +641,7 @@ A new engineer should be able to explain an ordinary interaction by answering a
 small set of questions:
 
 1. What did the person mean and what independent outcome was owed?
-2. Why was Fast sufficient, or why did uncertainty/consequence justify Deep?
+2. Why was UMI's primary pass sufficient, or why did uncertainty/consequence justify its deeper pass?
 3. What Goal/Responsibility was retained?
 4. Why did Planner choose the current capability composition?
 5. Which Provider executed it and what trusted Evidence resulted?
@@ -714,14 +727,14 @@ interaction act must acquire before useful progress can begin.
 
 Fast User Meaning Interpretation may establish a fully understood, low-risk Responsibility
 quickly and, in the same primary result, request which existing cognitive authorities are
-useful next. Initial Goal Association and Fast Planner activation follows those explicit
+useful next. Initial Goal Association and Planner activation follows those explicit
 `cognitive_requests[]`; initial Social Cognition starts mechanically for every fresh admitted
 addressed turn and is not a UMI request. Runtime may close a hard architectural prerequisite of an explicitly
 requested authority: an initial Planner request mechanically schedules turn-wide Goal
 Association so eventual Work can obtain canonical Goal binding. This dependency closure is
 not a second semantic activation decision and does not infer Planner readiness from
 `continuity_scope` or another semantic field. The resulting computations may overlap so SC,
-GA, and Fast can run concurrently over the same accepted WHAT while retaining separate authority.
+GA, and the Planner can run concurrently over the same accepted WHAT while retaining separate authority.
 A GA `non_goal` result ends Goal-owned task continuity without fabricated Planner Work.
 If GA later discovers additional retained-Goal relevance, GA itself may request the same
 Planner authority over the exact affected Responsibilities. Runtime validates and schedules
@@ -806,12 +819,13 @@ has not crossed an irreversible commitment boundary. The more consequential or
 irreversible the effect, the stronger the semantic, evidence, authorization,
 and safety prerequisites before progress may advance.
 
-Fast and Deep remain two cognitive/planning depths of one Mind, not a producer
-and reviewer. They are not stages that every responsibility must traverse. Deep
-receives authoritative source meaning and broader context; it does not edit Fast
-output or send a Goal back for another decomposition pass. The tiers differ in
-context breadth, latency budget, horizon, and reasoning depth—not in capability
-ownership or semantic authority.
+Where an owner has a deeper pass (UMI and SC each have one; the Planner has
+none), the two passes are depths of one Mind, not a producer and reviewer. They
+are not stages that every responsibility must traverse. The deeper pass receives
+authoritative source meaning and broader context; it does not edit the first
+pass's output or send a Goal back for another decomposition pass. The passes
+differ in context breadth, latency budget, horizon, and reasoning depth—not in
+capability ownership or semantic authority.
 
 ### 3.6 Planning when needed; authorization before effect
 
@@ -885,17 +899,20 @@ ultimately use the same named Capability.
 Likewise, response transport is not a user-task step. `Converse` is a native
 cognitive ability to complete a conversational responsibility from current Mind
 and context; `chromie.speak` is only the trusted Vocal speech transport/evidence
-boundary. When Fast Planner determines that a conversational Responsibility can be
-satisfied immediately, it may author the ready Communicative Act and start that
-Activity through the Vocal runtime without creating a persistent Goal. If the same turn
-also requires persistent work, a prospective Planner-authored progress Activity may start
-while Goal Association establishes the canonical unfinished Responsibility.
+boundary. The Planner is word-free: it never authors a Communicative Act,
+progress speech, confirmation text or presentation. When a conversational
+Responsibility can be answered at once, Social Cognition authors the words and
+starts that Activity through the Vocal runtime without creating a persistent Goal.
+If the same turn also requires persistent work, SC may author an acknowledgement
+or prospective progress Activity while Goal Association establishes the canonical
+unfinished Responsibility.
 
-Fast and Deep Planning may still identify a later conversational delta when
-planning or new Evidence makes one necessary, but Planner text never authorizes,
-executes, or proves an effect. Fast Planner receives the delivered-interaction
-delta and must not repeat a substantive act already delivered or pending for the
-same Responsibility; Host presentation only schedules the accepted delta.
+The Planner may still establish a typed communication Need (an answer, input,
+confirmation or result to report) when planning or new Evidence makes one
+necessary, but a Need carries no wording and never authorizes, executes, or proves
+an effect. SC receives the delivered-interaction delta and must not repeat a
+substantive act already delivered or pending for the same Responsibility; Host
+presentation only schedules the accepted delta.
 
 ### 3.11 Truth over guessing
 
@@ -1071,7 +1088,7 @@ A retained interaction outcome used for evaluation, scenario mining, and
 owner-reviewed improvement. Experience never silently changes safety policy or
 core principles.
 
-### 4.10 Contextual Responsibility evidence and Fast Activity Planning
+### 4.10 Contextual Responsibility evidence and Activity Planning
 
 `CognitiveResponsibilityProposal` is the provider-neutral Goal-Interpretation evidence
 for what human outcome appears to be owed. It carries a local reference, outcome,
@@ -1093,7 +1110,7 @@ the existing tea Goal; it is not interpreted as an isolated new request. This do
 make UMI the owner of why Planner asked or which source policy it chose. GA remains the
 sole authority that commits that Goal version.
 
-The same immutable UMI result starts GA, SC and Fast Work independently. Fast emits
+The same immutable UMI result starts GA, SC and Planner Work independently. The Planner emits
 one complete validated Work decision; there is no presentation prefix. SC may
 acknowledge understanding while Work is pending, but cannot predict its result.
 Capability dispatch requires the complete Work decision and applicable provenance,
@@ -1215,7 +1232,7 @@ Questions:
   depth?
 - When is full planning useful versus taking only the next meaningful,
   evidence-producing commitment and replanning incrementally?
-- How can later cognition revise, redirect, cancel, or supersede unfinished Fast
+- How can later cognition revise, redirect, cancel, or supersede unfinished
   progress while irreversible/effectful work requires stronger commitment gates?
 - How are delegation and multi-provider/multi-agent coordination represented
   without transferring user-semantic responsibility?
@@ -1250,7 +1267,7 @@ Direction:
 
 - salience filters continuous observations before expensive cognition;
 - open responsibilities reactivate from meaningful events, dependencies, time,
-  or bounded idle opportunity rather than only synchronous Fast-Planner
+  or bounded idle opportunity rather than only synchronous Planner
   escalation; and
 - metacognition should reduce useless review/repair loops instead of adding a
   mandatory review LLM after every stage.
@@ -1921,7 +1938,7 @@ flowchart TD
     CONTROL -->|"stop, cancel, emergency"| REFLEX["Deterministic reflex<br/>revoke, cancel, or E-stop"]
     CONTROL -->|"ordinary admitted turn"| UMI["User Meaning Interpretation<br/>Responsibility / WHAT"]
 
-    UMI --> PLAN["Fast Core / Planner pass<br/>smallest useful commitment"]
+    UMI --> PLAN["Planner pass<br/>smallest useful Work commitment"]
     UMI --> GA["Goal Association<br/>canonical continuity when needed"]
     PLAN --> WORK["Communicative / Capability Activities"]
     PLAN --> PROV{"Provisional conversation?"}
@@ -1963,7 +1980,7 @@ flowchart TD
     YIELD --> GATEWAY
 ```
 
-Fast communication, Goal continuity, Work, and Evidence may mature at different rates.
+SC communication, Goal continuity, Work, and Evidence may mature at different rates.
 That overlap should feel like ordinary attentive behavior rather than a visible module
 pipeline:
 
@@ -2086,13 +2103,12 @@ talk about feelings" or mutate Stable Mind/shared policy.
 The first production-neutral Goal-free source slice is implemented. Typed
 `SituationRevisionObservation`/`CognitiveOpportunity` may omit Goal IDs only with an exact
 Situation digest and trusted source provenance. The opportunity carries bounded source and
-subject refs, and replaying the same Situation digest creates no cognition. A stateless
-restricted Planner invocation can only remain silent or author one exact context-grounded
-low-commitment utterance, with existing private Memory proposals; its schema contains no
-Capability Work, Goal mutation, confirmation or effect authority. The one Planner decides
-it in one invocation (`slow` readiness is context, not another planner pass); complete
-decisions receive no second model review, and an unavailable Planner fails quiet. Every Planner scope shares
-ordinary communication authority and exact Activity/wording validation. Host checks all
+subject refs, and replaying the same Situation digest creates no cognition. The Goal-free
+Situation path invokes Social Cognition, not the Planner: SC can only remain silent or author
+one exact context-grounded low-commitment utterance; its schema contains no Capability Work,
+Goal mutation, confirmation or effect authority. Complete decisions receive no second model
+review, and an unavailable SC fails quiet. SC keeps its ordinary exact Activity/wording
+validation. Host checks all
 source/subject, identity, delivered-repair and Memory-candidate constraints before writing
 Memory or materializing speech. This Goal-free contract supplies no Responsibility and
 cannot use the separately approved UMI-before-GA safe-read permission. The first
@@ -2124,7 +2140,7 @@ Admitted User Turn + bounded Session Context
   -> Social Cognition -> author first Communicative Activity (Planner authors no words)
        -> one primary truth/provenance result -> validated Activity or silence
   -> concurrent continuation from the same UMI result
-       |-> Fast Planner -> Activity Plan + communication Needs + input resolution
+       |-> Planner -> Activity Plan + communication Needs + input resolution
        |     |-> ready Capability Activities and still-needed communication Needs for SC
        |     |-> user-resolvable clarification only when needed
        |     `-> honest unavailable outcome for what it cannot do now
@@ -2137,13 +2153,13 @@ Admitted User Turn + bounded Session Context
 ```
 
 The loop preserves one semantic authority even when work overlaps in time.
-Responsibility evidence alone does not authorize provider work. Fast Planner may author
+Responsibility evidence alone does not authorize provider work. Planner may author
 safe side-effect-free reads that Runtime validates and starts while GA completes; all
 effectful/commitment-bearing Capability work still crosses canonical Goal grounding,
 confirmation, authorization, resource, and provider-safety boundaries.
 
 Goal Association is therefore always the sole canonical Responsibility/continuity commit
-boundary. It runs concurrently rather than acting as a wall-clock gate. Fast
+boundary. It runs concurrently rather than acting as a wall-clock gate. The
 Planner is the
 exclusive intention-forming owner of Capability selection and executable arguments.
 SC owns each still-needed communicative delta and any optional expression
@@ -2152,7 +2168,7 @@ milestones do not create anchors. Decoration never independently owns response
 wording. Provider observations are cognition events, not merely terminal inputs to
 a speech formatter.
 
-The implemented Fast substrate covers provider-neutral Responsibility evidence,
+The implemented substrate covers provider-neutral Responsibility evidence,
 independent SC interaction, explicit Goal binding, Planner-owned Capability
 selection, and SC-act-anchored optional expression. Sections 4.11–4.13 retain the broader
 problem-space inventory and the compression discipline that produced Section
@@ -2235,7 +2251,7 @@ parameter table. Existing typed Goals remain supported as retained authority, no
 as a second live UMI wire.
 
 Planner performs unit conversion, defaults, capability argument mapping and new
-future readiness. Fast intent-derived arguments cite closed token spans on the immutable
+future readiness. Intent-derived Planner arguments cite closed token spans on the immutable
 `UserTurnEnvelope`; trusted code, not the model, materializes exact owned quotations into
 canonical parameter provenance. Retained typed values remain binding and cannot be
 overridden by a span or quote. These are mechanical provenance checks, not proof of
@@ -2275,9 +2291,9 @@ primary Fast User Meaning Interpretation from the authoritative admitted turn
 
 Deep User Meaning Interpretation receives authoritative source context rather than the Fast DTO and
 uses the same WHAT-only authority. It is not a repair reviewer and receives no additional
-Capability/planning authority. Fast Planner—not UMI—owns execution-input completeness,
+Capability/planning authority. Planner—not UMI—owns execution-input completeness,
 input-source/default policy, clarification selection for HOW, exact Capability identity,
-arguments, Work, timing, and communication. Deterministic validation may reject malformed
+arguments, Work, timing, and word-free communication Needs. Deterministic validation may reject malformed
 or authority-violating UMI output, but it must not manufacture user meaning. Rejected typed
 dimensions are removed from the one constrained recovery surface so Deep UMI cannot preserve
 the invalid field by moving an unrelated duration, direction, or action into it. Malformed
@@ -2616,7 +2632,7 @@ For three independently accepted UMI Responsibilities, GA's new-Goal model wire 
 One complete compound Responsibility may instead remain one Goal and require
 several Planner Activities. Goal cardinality is not action cardinality.
 
-### 7.4 Planner communication across multiple Goals
+### 7.4 Communication across multiple Goals
 
 Multiple Goals do not require multiple awkward acknowledgements. SC may author one Communicative Activity that naturally consolidates the
 still-needed user-facing delta while preserving each Goal's independent lifecycle
@@ -2652,13 +2668,13 @@ coverage, satisfaction, response, information gaps, and execution evidence.
 
 ## 8. Hierarchical planning
 
-### 8.1 Fast Planner
+### 8.1 Planner
 
-Fast Planner is the first task Work owner after UMI. Its one primary invocation
+Planner is the first task Work owner after UMI. Its one primary invocation
 establishes complete Work over accepted Responsibility references while GA commits
 canonical Goal identity and SC independently decides interaction. No early speech
 prefix or optional decoration remains in the Work model result.
-Fast Planner may use:
+Planner may use:
 
 - the complete current canonical Goal;
 - bounded summaries or projections of model-selected Agent Skills;
@@ -2667,11 +2683,11 @@ Fast Planner may use:
 - common capabilities;
 - essential provider and safety state.
 
-A pre-Association Fast terminal result already owns the complete HOW decision against
+A pre-Association Planner terminal result already owns the complete HOW decision against
 the UMI Responsibility and executable Capability catalog. When GA creates a new Goal that
 conserves that same Responsibility, Host mechanically joins the exact source ref to the
 new Goal identity, including GA's provider-neutral resource projection, and does not ask
-Fast Planner to decide the same HOW a second time. A new Fast pass is justified only when
+Planner to decide the same HOW a second time. A new Planner pass is justified only when
 GA changes retained Goal meaning, the commit intersects Work that is actually
 queued/running/completed, or later trusted Runtime/Evidence/Situation state creates a
 genuinely new planning input. The Host never chooses or substitutes a Capability.
@@ -2719,7 +2735,7 @@ runtime may dispatch that Responsibility immediately (Value Judgment gates only 
 owner-listed reviewed effects). Conversely, a contract/provenance failure stops before
 execution; no other planner repairs the same malformed Plan.
 
-For confirmation-free `safe_read` work, Fast Planner may select the exact Capability
+For confirmation-free `safe_read` work, Planner may select the exact Capability
 and executable arguments from the bounded common catalog. Trusted Runtime starts it only
 after the terminal Planner result, GA binding, canonical Plan validation, availability,
 schema, side-effect-free safety, parallel metadata, and confirmation checks all pass.
@@ -2737,7 +2753,7 @@ resolution owned by that Goal. Retained typed constraints keep their exact conse
 Goals use exact owning excerpts in Planner parameter provenance; no duplicate
 UMI argument table is required. The
 Host neither infers the argument mapping nor substitutes a default. At the
-pre-Association Fast Activity boundary, when a selected capability has an
+pre-Association Planner Activity boundary, when a selected capability has an
 identically named input and every cited Responsibility supplies one agreeing
 exact value, deterministic materialization restores an omitted direct argument
 even if the provider schema marks that input optional with a default. This is
@@ -2755,11 +2771,10 @@ against the whole Goal again, so a forecast read before a conditional action is 
 Planner decision. No candidate Plan is passed for review or semantic repair; Runtime
 retains all safety gates.
 
-### 8.2 Honest limitation (the Deep Planner is retired)
+### 8.2 Honest limitation
 
-The Deep Planner was retired on 2026-10-11 (PLANNER-AUTHORITY-001). Its only extra
-input, the full catalog, now arrives through need-first search; its original
-"should I act" intent lives in Value Judgment (VALUE-JUDGMENT-001).
+The Planner reaches the full catalog through need-first search (PLANNER-AUTHORITY-001);
+the "should I act" judgment belongs to Value Judgment (VALUE-JUDGMENT-001).
 
 A Responsibility the Planner cannot fulfil now is an `unavailable` outcome that names
 what is missing (streamed: an `unavailable` Activity with `missing` facts; canonical: a
@@ -3025,9 +3040,9 @@ enforces schema, confirmation, authorization, resource, availability, and provid
 boundaries. No later stage may invent a broader user Responsibility merely because an
 effectful Capability happens to be available.
 
-For an accepted effectful plan, executable wording from the Planner
+For an accepted effectful plan, SC-authored pre-action wording
 is not treated as execution evidence. The trusted adapter preserves that
-model-authored wording while validating the immutable plan fingerprint, goal
+SC-authored wording while validating the immutable plan fingerprint, goal
 coverage, structured speech act, commitment state, actual confirmation
 requirement, and absence of premature completion authority. It excludes
 pre-execution progress/final stages and requires playback to start before a
@@ -3043,7 +3058,7 @@ reconstructs action meaning from capability-specific phrase templates.
 Planner's `steps[]` is Goal-owned task Work. SC's `activities[]` contains exact
 communicative acts, each optionally carrying bounded social expression. They share
 read-only state and are joined by exact provenance, not by asking SC to review
-or rewrite a completed Planner response.
+or rewrite a completed Planner Plan.
 
 ### 12.2 Explicit Activity and optional social expression
 
@@ -3238,7 +3253,7 @@ consumer observes lifecycle events until terminal closure. That consumer is not 
 execution manager: it owns no request identity, scheduling, semantic routing, or completion
 truth. It converts an exact terminal Runtime result through the existing deterministic closure
 into `ExecutionEvidence`, creates an internal `CognitiveOpportunity`, and may reactivate
-Fast Planner when current Goal responsibility is still relevant. Result
+Planner when current Goal responsibility is still relevant. Result
 arrival is never encoded as a synthetic user message and never resumes the original Python
 call stack. The legacy aggregate entry points `CapabilityRuntime.execute(...)`,
 `InteractionRuntimeCoordinator.execute(...)`, and `VoiceAssistant.execute_interaction_response(...)`
@@ -3297,7 +3312,7 @@ Prospective planning output cannot contain a final completion claim.
 A clear request whose required Capability is absent takes no shortcut around Goal
 Association or the Planner: UMI stays WHAT-only, GA associates the Responsibility as usual,
 and the Planner reports the uncovered Responsibility as an `unavailable` outcome or
-Activity with no provider request (`orchestrator/runtime/cognitive_runtime.py`). SC then
+Activity with no provider request (`orchestrator/runtime/planner_advance_projection.py`). SC then
 expresses that limitation. An unavailable outcome is categorically different from an
 executed query whose trusted result is empty. Speech delivery can express the distinction but cannot
 change it, and `chromie.speak` cannot stand in for the missing substantive Capability.
@@ -3409,7 +3424,7 @@ maintained response-authoring path.
 
 One accepted UMI result may start SC, GA and Work planning independently. SC
 receives relevant history, Memory, Goal overview, Work state and delivery records
-and may acknowledge understanding or remain silent. The Fast model emits one
+and may acknowledge understanding or remain silent. The Planner model emits one
 complete Work result; it has no presentation prefix or writable speech fields.
 No partial Work crosses the Host boundary. Required Needs are joined to the exact
 Plan, while optional SC output cannot delay an otherwise eligible Work dispatch.
@@ -3533,7 +3548,7 @@ Goal updates:
 
 The individual goals remain separately tracked even when speech is consolidated.
 
-The model-facing Fast Planner contract carries one complete Work result: ordered
+The model-facing Planner contract carries one complete Work result: ordered
 Activities, exact Responsibility ownership, capability arguments, provenance,
 coverage and unresolved planning needs. It contains no wording, presentation frame
 or optional decoration. It begins with `ability_needs`; one need-first library search
@@ -3667,7 +3682,7 @@ Evolution rules:
   confidence, provider-neutral output modality, and unresolved meaning;
 - make `CognitiveWorkRequest` the typed WHAT-to-HOW handoff; do not tunnel semantic
   authority through anonymous context dictionaries;
-- keep Fast Planner as the first HOW owner, including execution-input completeness,
+- keep Planner as the first HOW owner, including execution-input completeness,
   source/default policy, and clarification selection; Capability schemas constrain
   realization but cannot turn Planner into a second User Meaning Interpreter;
 - keep Goal Association as the sole canonical Goal-continuity owner;
@@ -3696,8 +3711,7 @@ The cognitive loop should record, without exposing private model reasoning:
 - Reflection/experience-promotion events if later implemented, with the trigger
   that justified them.
 
-Current traces may still preserve direct/Fast/Deep compatibility classifications,
-but observability must report the readiness-driven reality rather than imply that
+Observability must report the readiness-driven reality rather than imply that
 all roles ran serially. Exact warm/cold, compute contention, shared-resource
 latency, cognitive reactivation, and future Reflection cost remain target-evidence
 claims and must come from retained runs.

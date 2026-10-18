@@ -32,19 +32,22 @@ from orchestrator.runtime.interaction_coordinator import (
     InteractionRuntimeCoordinator,
 )
 from orchestrator.runtime.cognitive_runtime import (
-    CanonicalPlanRuntimeAdapter,
     CognitiveRuntimePolicy,
     GoalDrivenRuntimeCoordinator,
 )
+from orchestrator.runtime.canonical_plan_adapter import CanonicalPlanRuntimeAdapter
 from orchestrator.runtime.session import SessionTracker
+from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 from orchestrator.runtime.capability_runtime import (
-    LocalSpeechCapabilityProvider,
     CapabilityDefinition,
-    CapabilityRegistry,
+    CapabilityDefinitionRegistry,
     CapabilityRuntime,
     CapabilityRuntimeResult,
     RuntimeAuthorization,
+)
+from orchestrator.runtime.builtin_capability_providers import (
+    LocalSpeechCapabilityProvider,
     local_speech_definition,
 )
 from orchestrator.runtime.soridormi_capability_provider import (
@@ -236,7 +239,7 @@ class _CognitiveScenarioRuntime:
                 },
             )
             self.definitions[definition.capability_id] = definition
-        registry = CapabilityRegistry()
+        registry = CapabilityDefinitionRegistry()
         for definition in self.definitions.values():
             registry.register(definition)
         self.runtime = CapabilityRuntime(registry)
@@ -329,7 +332,7 @@ class _CognitiveTurnScenarioRuntime:
         self.soridormi_invoker = None
         self.runtime: CapabilityRuntime | None = None
         if self.mode == "active_cancel":
-            registry = CapabilityRegistry()
+            registry = CapabilityDefinitionRegistry()
             registry.register(local_speech_definition())
             for definition in self.definitions.values():
                 registry.register(definition)
@@ -684,7 +687,7 @@ class _CognitiveScenarioClient:
             },
         )
 
-    async def stream_fast_advance(self, *args: Any, **kwargs: Any):
+    async def stream_plan_advance(self, *args: Any, **kwargs: Any):
         self.calls.append("fast_stream")
         request = kwargs["request"]
         yield FastPlannerStreamTerminal(turn_id=str(request.sid), advance=self._streamed_fast_fixture(request))
@@ -711,7 +714,7 @@ class _CognitiveScenarioClient:
             need_outcomes={need.need_id: "covered" if need.need_id in covered else "pending" for need in request.communication_needs},
             reason_summary=fixture["reason_summary"], model_call_count=1)
 
-    async def resolve_fast_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
+    async def resolve_plan(self, *args: Any, **kwargs: Any) -> CanonicalPlan:
         del args, kwargs
         self.calls.append("fast_plan")
         return CanonicalPlan.model_validate(self.stub["fast_plan"])
@@ -1594,6 +1597,8 @@ async def evaluate_cognitive_turn_loop_scenario(
     stub = scenario.stub
     if str(stub.get("execution_mode") or "") == "overlapping_turns":
         assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant.input_turn_lifecycle = InputTurnLifecycle()
+        assistant.playback_delivery = PlaybackDeliveryLifecycle()
         first_started = asyncio.Event()
         second_started = asyncio.Event()
         release_first = asyncio.Event()

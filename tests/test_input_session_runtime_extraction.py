@@ -11,12 +11,12 @@ from orchestrator.runtime.input_session_runtime import (
     input_session_runtime_for,
 )
 from orchestrator.runtime.input_turn_lifecycle import InputTurnLifecycle
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 ROOT = Path(__file__).resolve().parents[1]
 class InputSessionRuntimeExtractionTests(unittest.TestCase):
     def test_runtime_is_owned_by_input_turn_lifecycle(self) -> None:
         host = SimpleNamespace(input_turn_lifecycle=InputTurnLifecycle())
-        host._input_turn_state = lambda: host.input_turn_lifecycle
 
         first = input_session_runtime_for(host)
         second = input_session_runtime_for(host)
@@ -87,7 +87,7 @@ class InputSessionRuntimeExtractionTests(unittest.TestCase):
         self.assertNotIn("CanonicalPlan", source)
 
     def test_voice_assistant_exposes_lifecycle_state_only_through_collaborators(self) -> None:
-        host = VoiceAssistant.__new__(VoiceAssistant)
+        host = bare_voice_assistant()
         lifecycle = InputTurnLifecycle()
         host.input_turn_lifecycle = lifecycle
 

@@ -53,20 +53,29 @@ class RuntimePolicySettingsTests(unittest.TestCase):
         self.assertIsNone(settings.configured_path(None, "runtime_event_root"))
         self.assertFalse(hasattr(settings, "legacy_event_root"))
 
-    def test_invalid_values_fall_back_to_bounded_policy(self) -> None:
+    def test_unknown_mode_falls_back_to_off(self) -> None:
         settings = RuntimePolicySettings.from_env(
-            {
-                "CHROMIE_RUNTIME_TRACE_MODE": "unknown",
-                "CHROMIE_RUNTIME_TRACE_MAX_ITEMS": "bad",
-                "CHROMIE_RUNTIME_TRACE_EVENT_SAMPLE_RATE": "9",
-                "CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS": "1",
-            }
+            {"CHROMIE_RUNTIME_TRACE_MODE": "unknown"}
         )
         self.assertEqual(settings.trace_mode, "off")
-        self.assertEqual(settings.trace_max_items, 1000)
-        self.assertEqual(settings.trace_event_sample_rate, 1.0)
-        self.assertEqual(settings.accelerator_timeout_ms, 50)
 
+    def test_invalid_numeric_values_raise_instead_of_clamping(self) -> None:
+        for name, raw, message in (
+            ("CHROMIE_RUNTIME_TRACE_MAX_ITEMS", "bad", "must be an integer"),
+            ("CHROMIE_RUNTIME_TRACE_MAX_ATTRIBUTES", "999999", "must be <= 256"),
+            ("CHROMIE_RUNTIME_TRACE_EVENT_SAMPLE_RATE", "9", "must be <= 1.0"),
+            ("CHROMIE_RUNTIME_TRACE_ACCELERATOR_TIMEOUT_MS", "1", "must be >= 50"),
+        ):
+            with self.subTest(name=name), self.assertRaisesRegex(
+                ValueError, f"{name} {message}"
+            ):
+                RuntimePolicySettings.from_env({name: raw})
+
+    def test_empty_numeric_value_uses_the_default(self) -> None:
+        settings = RuntimePolicySettings.from_env(
+            {"CHROMIE_RUNTIME_TRACE_MAX_ITEMS": "  "}
+        )
+        self.assertEqual(settings.trace_max_items, 1000)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from typing import Any, AsyncIterator
 from urllib.parse import quote
 
@@ -24,7 +23,10 @@ from shared.chromie_contracts.plan import (
     FastPlannerStreamTerminal,
 )
 from shared.chromie_contracts.reflection import ReflectionRequest, ReflectionResolution
-from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
+from shared.chromie_contracts.social_cognition import (
+    SocialCognitionRequest, SocialCognitionResolution,
+    SocialStartupGreetingRequest, SocialStartupGreetingResolution,
+)
 from shared.chromie_contracts.value_judgment import ValueJudgmentResult
 from shared.chromie_contracts.tool_result import (
     ToolExecutionRequest,
@@ -41,7 +43,7 @@ from shared.chromie_runtime.runtime_trace import TraceModule, runtime_tracer
 
 logger = logging.getLogger(__name__)
 
-_FAST_PLANNER_STREAM_FRAME_ADAPTER = TypeAdapter(FastPlannerStreamFrame)
+_PLANNER_STREAM_FRAME_ADAPTER = TypeAdapter(FastPlannerStreamFrame)
 
 
 class AgentClient:
@@ -71,11 +73,8 @@ class AgentClient:
             100,
             int(effective_user_meaning_interpreter_timeout_ms),
         )
-        self.dag_engine_execution_token = (
-            str(dag_engine_execution_token).strip()
-            if dag_engine_execution_token is not None
-            else os.getenv("AGENT_DAG_ENGINE_EXECUTION_TOKEN", "").strip()
-        )
+        # Host settings own AGENT_DAG_ENGINE_EXECUTION_TOKEN and pass it in.
+        self.dag_engine_execution_token = str(dag_engine_execution_token or "").strip()
 
 
     async def review_attention(
@@ -152,22 +151,22 @@ class AgentClient:
             return await resp.json()
 
 
-    async def stream_fast_advance(
+    async def stream_plan_advance(
         self,
         session: aiohttp.ClientSession,
         *,
         request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
     ) -> AsyncIterator[FastPlannerStreamFrame]:
-        """Yield validated NDJSON frames from one Fast Planner invocation."""
+        """Yield validated NDJSON frames from one Planner invocation."""
 
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
         async with runtime_tracer.span(
             module=self.TRACE_MODULE,
-            operation="stream_fast_advance",
+            operation="stream_plan_advance",
             kind="tool_call",
             attributes={
-                "endpoint": "/fast-advance",
+                "endpoint": "/plan-advance",
                 "timeout_ms": effective_timeout_ms,
             },
         ) as span:
@@ -178,7 +177,7 @@ class AgentClient:
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
-                f"{self.base_url}/fast-advance",
+                f"{self.base_url}/plan-advance",
                 json=req.model_dump(mode="json"),
                 timeout=timeout,
             ) as resp:
@@ -198,7 +197,7 @@ class AgentClient:
                         line, pending = pending.split(b"\n", 1)
                         if not line.strip():
                             continue
-                        frame = _FAST_PLANNER_STREAM_FRAME_ADAPTER.validate_json(
+                        frame = _PLANNER_STREAM_FRAME_ADAPTER.validate_json(
                             line
                         )
                         frame_count += 1
@@ -209,7 +208,7 @@ class AgentClient:
                             )
                         yield frame
                 if pending.strip():
-                    frame = _FAST_PLANNER_STREAM_FRAME_ADAPTER.validate_json(pending)
+                    frame = _PLANNER_STREAM_FRAME_ADAPTER.validate_json(pending)
                     frame_count += 1
                     if isinstance(frame, FastPlannerStreamTerminal):
                         terminal_seen = True
@@ -220,7 +219,7 @@ class AgentClient:
                 span.set_attribute("frame_count", frame_count)
                 span.set_attribute("terminal_seen", terminal_seen)
 
-    async def resolve_fast_plan(
+    async def resolve_plan(
         self,
         session: aiohttp.ClientSession,
         *,
@@ -230,9 +229,9 @@ class AgentClient:
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
         async with runtime_tracer.span(
             module=self.TRACE_MODULE,
-            operation="resolve_fast_plan",
+            operation="resolve_plan",
             kind="tool_call",
-            attributes={"endpoint": "/fast-plan", "timeout_ms": effective_timeout_ms},
+            attributes={"endpoint": "/plan", "timeout_ms": effective_timeout_ms},
         ) as span:
             req = request.model_copy(
                 update={
@@ -241,7 +240,7 @@ class AgentClient:
             )
             timeout = aiohttp.ClientTimeout(total=effective_timeout_ms / 1000.0)
             async with session.post(
-                f"{self.base_url}/fast-plan",
+                f"{self.base_url}/plan",
                 json=req.model_dump(mode="json"),
                 timeout=timeout,
             ) as resp:
@@ -310,6 +309,32 @@ class AgentClient:
                 if response.status != 200:
                     raise RuntimeError(f"Agent Social Cognition HTTP {response.status}: {body[:500]}")
                 result = SocialCognitionResolution.model_validate_json(body)
+            result.validate_request(request)
+            span.set_attribute("disposition", result.disposition)
+            return result
+
+    async def resolve_startup_greeting(
+        self, session: aiohttp.ClientSession, *, request: SocialStartupGreetingRequest,
+        timeout_ms: int | None = None,
+    ) -> SocialStartupGreetingResolution:
+        """Ask Social Cognition whether and what to say on waking; it owns the words."""
+        timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
+        async with runtime_tracer.span(
+            module=self.TRACE_MODULE, operation="resolve_startup_greeting", kind="tool_call",
+            attributes={"endpoint": "/social-cognition/startup-greeting", "timeout_ms": timeout_ms},
+        ) as span:
+            async with session.post(
+                f"{self.base_url}/social-cognition/startup-greeting",
+                json=request.model_dump(mode="json"),
+                timeout=aiohttp.ClientTimeout(total=timeout_ms / 1000.0),
+            ) as response:
+                body = await response.text()
+                span.set_attribute("http_status", response.status)
+                if response.status != 200:
+                    raise RuntimeError(
+                        f"Agent Social Cognition startup greeting HTTP {response.status}: {body[:500]}"
+                    )
+                result = SocialStartupGreetingResolution.model_validate_json(body)
             result.validate_request(request)
             span.set_attribute("disposition", result.disposition)
             return result

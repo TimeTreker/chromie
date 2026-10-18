@@ -10,7 +10,7 @@ from jsonschema import Draft202012Validator
 
 from benchmarks.integration.model_replay import ModelReplay, ReplayMismatch
 from benchmarks.datasets.fast_planner_daily_life.qualification import ReplayModel, StaticCatalog
-from agent.app.fast_planner import FastPlannerResolver
+from agent.app.planner import PlannerResolver
 from tests.workflow_replay_support import Episode, controlled_runtime, run_case
 from benchmarks.integration.model_replay import ReplayServer
 
@@ -148,7 +148,7 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(mutation,
                 request.context['goal_association_resolution']['new_goals'][0]['object'] = {'bindings':typed}
                 request.context['active_goal_snapshots'][0]['goal']['object'] = {'bindings':copy.deepcopy(typed)}
             model = NeedFirstReplayModel(raw, unmet)
-            result = await FastPlannerResolver(model, StaticCatalog(catalog)).resolve(request)
+            result = await PlannerResolver(model, StaticCatalog(catalog)).resolve(request)
             if mutation == 'valid':
                 # The Goal filter hides the forecast read behind a body action; the Planner's
                 # own unmet need loads it, and the one Planner composes the conditional Plan.

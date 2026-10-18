@@ -67,8 +67,8 @@ The missing layer is a durable episode-level evaluator and scenario miner.
 | SID | One VAD/ASR interaction session. A single user utterance normally creates one SID. |
 | Dialogue thread | A bounded multi-turn memory thread keyed by `conversation_id`. It may contain many SIDs. |
 | Task thread | A dialogue thread with active or pending task context, action history, or confirmation state. |
-| Episode | The review unit. Usually one dialogue thread or one scenario run, ending at an idle boundary, reset, explicit task completion, or test harness boundary. |
-| Episode record | Durable JSON evidence containing inputs, outputs, routing, selected skills, execution, timings, and context summaries. |
+| Episode | The review unit. Usually one dialogue thread or one scenario run, ending at an idle boundary, explicit task completion, or test harness boundary. |
+| Episode record | Durable JSON evidence containing inputs, outputs, semantic-stage results, selected skills, execution, timings, and context summaries. |
 | Evaluation record | Deepthinking score and rationale for an episode. |
 | Scenario candidate | A generated JSON scenario proposal written outside the committed scenario tree until reviewed. |
 
@@ -153,7 +153,7 @@ uses deepthinking because the job needs slow semantic judgment over an entire
 thread:
 
 - infer the user's likely intent from the turn and prior context;
-- compare canonical Goal meaning, Planner speech/work, selected skills, and execution against that intent;
+- compare canonical Goal meaning, Planner Work, Social Cognition speech, selected skills, and execution against that intent;
 - notice when the robot used a social/body fallback for an unrelated task;
 - separate ASR, User Meaning Interpreter, Agent, Trusted Capability Runtime, TTS, and latency problems;
 - recommend whether the episode should become a regression scenario.

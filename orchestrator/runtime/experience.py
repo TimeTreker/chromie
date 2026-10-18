@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -12,6 +11,7 @@ from shared.chromie_contracts.mind import (
 )
 
 from .capability_runtime import CapabilityRuntimeResult
+from .journal_io import append_jsonl, float_or_none
 
 if TYPE_CHECKING:
     from .host_settings import ExperienceSettings
@@ -83,7 +83,7 @@ class ExperienceManager:
             sid=session_id,
             conversation_id=self._str_or_none(context.get("conversation_id")),
             user_text=str(context.get("user_text") or ""),
-            interpretation_confidence=self._float_or_none(
+            interpretation_confidence=float_or_none(
                 context.get("user_meaning_interpretation_confidence")
             ),
             meaning_uncertainties=[
@@ -105,10 +105,10 @@ class ExperienceManager:
                 **self._runtime_learning_metadata(response),
             },
         )
-        self._append_jsonl(self.log_path, record.model_dump(mode="json"))
+        append_jsonl(self.log_path, record.model_dump(mode="json"))
         proposal = self.proposal_from_experience(record)
         if proposal is not None:
-            self._append_jsonl(self.proposal_path, proposal.model_dump(mode="json"))
+            append_jsonl(self.proposal_path, proposal.model_dump(mode="json"))
         return record
 
     def proposal_from_experience(
@@ -208,23 +208,9 @@ class ExperienceManager:
             return 0
 
     @staticmethod
-    def _append_jsonl(path: Path, payload: dict[str, Any]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(payload, ensure_ascii=False, sort_keys=True) + "\n")
-
-    @staticmethod
     def _str_or_none(value: Any) -> str | None:
         if value is None:
             return None
         text = str(value).strip()
         return text or None
 
-    @staticmethod
-    def _float_or_none(value: Any) -> float | None:
-        if value is None:
-            return None
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None

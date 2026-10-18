@@ -13,6 +13,7 @@ from shared.chromie_contracts.goal import GoalAssociationResolution
 from shared.chromie_contracts.core_interpretation import CoreInterpretationResult
 from shared.chromie_contracts.user_turn import AttentionReviewResult
 from shared.chromie_contracts.interaction import InteractionResponse
+from tests.voice_assistant_test_support import bare_voice_assistant
 
 
 def _core_and_envelope(text: str, *, sid: str, language: str = "en-US"):
@@ -73,8 +74,8 @@ class _State:
 
 class _InteractionRuntime:
     def __init__(self):
-        from orchestrator.runtime.capability_runtime import CapabilityRuntime, CapabilityRegistry
-        self.runtime = CapabilityRuntime(CapabilityRegistry())
+        from orchestrator.runtime.capability_runtime import CapabilityRuntime, CapabilityDefinitionRegistry
+        self.runtime = CapabilityRuntime(CapabilityDefinitionRegistry())
         self.prepared = []
 
     def prepare_response(self, response, *, session_id):
@@ -86,7 +87,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
     def test_execution_policy_is_not_observed_robot_availability(self):
         for dry_run in (True, False):
             with self.subTest(dry_run=dry_run):
-                assistant = VoiceAssistant.__new__(VoiceAssistant)
+                assistant = bare_voice_assistant()
                 assistant.action_dry_run = dry_run
                 assistant.is_playing_audio = False
                 assistant.playback_delivery.playback_generation = 0
@@ -104,7 +105,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
 
     @staticmethod
     def _assistant(resolution: CognitiveRuntimeResolution):
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         assistant.cognitive_runtime_mode = "apply"
         assistant.enable_agent = True
         assistant.enable_interaction_response = True
@@ -292,7 +293,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertTrue(assistant._launch_interaction_calls[0][1]["reset_playback"])
 
     def test_active_named_goal_cancel_fails_closed_before_state_mutation(self):
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
 
         class State:
             max_pending_tasks = 8
@@ -467,7 +468,7 @@ class OrchestratorCognitiveRuntimeTests(unittest.TestCase):
         self.assertEqual(len(assistant.interaction_runtime.prepared), 1)
 
     def test_host_has_no_post_response_social_attention_bridge(self):
-        assistant = VoiceAssistant.__new__(VoiceAssistant)
+        assistant = bare_voice_assistant()
         self.assertFalse(hasattr(assistant, "_queue_response_social_attention"))
 
     def test_confirmation_held_primary_does_not_schedule_auxiliary_activity(self):

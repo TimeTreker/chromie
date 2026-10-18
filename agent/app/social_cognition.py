@@ -24,6 +24,7 @@ from .prompt_projection import required_json
 from shared.chromie_contracts.plan import FastProgressKind, validate_communicative_activity_identity
 from shared.chromie_contracts.social_cognition import (
     SocialCognitionOutput, SocialCognitionRequest, SocialCognitionResolution,
+    SocialStartupGreetingOutput, SocialStartupGreetingRequest, SocialStartupGreetingResolution,
     must_say_now_need_ids, value_review_responsibility_refs, value_withheld_need_ids,
 )
 from shared.chromie_contracts.text import normalize_whitespace
@@ -54,7 +55,9 @@ SOCIAL_COGNITION_AUTHORITY_PROMPT = (
     "example wording in these instructions shows the kind of reply, never its language. "
     "State a changing fact, such as the current time, date or weather, only from supplied "
     "Evidence or trusted context; without that source, say you would need to check instead "
-    "of guessing. Tell a time from a clock reading's local time; bookkeeping timestamps such as "
+    "of guessing. Keep the certainty the Evidence has: report a probability or chance, such as "
+    "a rain probability below 100%, as a possibility or as that probability, never as certainty "
+    "that it will or will not happen, and keep cited numbers exactly as supplied. Tell a time from a clock reading's local time; bookkeeping timestamps such as "
     "started_at or occurred_at record Chromie's own processing, never the time asked about. Read the supplied facts, shared Goal overview, Work and Evidence, "
     "Situation, disclosure-safe Memory, Stable Mind and delivered/pending interaction. "
     "Ground first-person sensory wording in trusted Situation or perception Evidence. "
@@ -1283,6 +1286,54 @@ def social_cognition_prompt(
     )
 
 
+SOCIAL_COGNITION_STARTUP_GREETING_PROMPT = (
+    "You are Social Cognition inside Chromie's Cognitive Core, the only owner of what Chromie "
+    "says. Chromie has just woken up at home and can now hear and talk with the people she "
+    "lives with. There is no user turn, Goal, Work or Evidence yet, and no individual person "
+    "has been identified. Decide whether a wake-up line adds social value; silence is valid. "
+    "If you speak, say exactly one complete, very short line she would naturally say on "
+    "waking, as the configured identity in the owner-approved Mind (factory: Chromie, a "
+    "smart, warm twelve-year-old girl), never as a device, service agent or adult professional. "
+    "Never call yourself a robot, AI, model, device, assistant or service, and never say that "
+    "you are not a robot or that you are human. Do not mention readiness, startup, "
+    "initialization, systems, services, models or operational status. Do not introduce "
+    "yourself, repeat your name or age, ask what help is needed, or ask any question. Use the "
+    "supplied local period only as quiet grounding: do not announce the time of day, quote the "
+    "clock time, date or weekday, or default to a formal morning, afternoon or evening "
+    "salutation. Do not invent meals, hunger, sleepiness, weather or another personal state. "
+    "Use no vocative, addressee noun, personal name, kinship term, social category or "
+    "relationship label; speak naturally into the shared room. Prefer the spontaneous "
+    "first-person delight of someone who has just opened her eyes at home. End the line with "
+    "sentence punctuation. Return only SocialStartupGreetingOutput JSON: disposition "
+    "communicate with the exact words in text, or disposition silence with empty text; keep "
+    "reason_summary brief."
+)
+
+
+def social_startup_greeting_schema(request: SocialStartupGreetingRequest) -> dict[str, Any]:
+    schema = copy.deepcopy(SocialStartupGreetingOutput.model_json_schema())
+    text = schema.get("properties", {}).get("text")
+    if isinstance(text, dict):
+        text["maxLength"] = request.max_chars
+    schema["required"] = ["disposition", "text", "reason_summary"]
+    schema["additionalProperties"] = False
+    return schema
+
+
+def social_startup_greeting_prompt(request: SocialStartupGreetingRequest) -> str:
+    packet = {
+        "language": request.language,
+        "max_chars": request.max_chars,
+        "local_time": request.local_time,
+        "mind": _social_mind_projection(request.context),
+    }
+    return (
+        f"Speak only in {request.language}, in at most {request.max_chars} characters.\n"
+        "Trusted startup context JSON:\n"
+        + json.dumps(packet, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    )
+
+
 def planner_work_capability_ids(context: dict[str, Any]) -> set[str]:
     """Capabilities the Planner selected or held for this Work (current and source Plan).
 
@@ -1371,3 +1422,27 @@ class SocialCognitionResolver:
             raise ValueError("Social Cognition deeper pass cannot recurse")
         validate_social_cognition_output(output, request, candidates)
         return output
+
+    async def resolve_startup_greeting(
+        self, request: SocialStartupGreetingRequest,
+    ) -> SocialStartupGreetingResolution:
+        """Decide the optional wake-up line from the owner-approved Mind; one model call."""
+        request = request.model_copy(deep=True)
+        schema = social_startup_greeting_schema(request)
+        raw = await self.model.generate(
+            social_startup_greeting_prompt(request),
+            system=SOCIAL_COGNITION_STARTUP_GREETING_PROMPT,
+            options={"temperature": 0.55, "top_p": 0.9, "num_ctx": self.num_ctx,
+                     "num_predict": min(self.num_predict, 256)},
+            response_format=schema, prompt_family="social_cognition.startup_greeting",
+            turn_id=request.request_id, attempt=1,
+        )
+        schema_errors = [error.message for error in Draft202012Validator(schema).iter_errors(raw)]
+        if schema_errors:
+            raise ValueError(f"Social Cognition startup greeting Schema rejected: {schema_errors}")
+        output = SocialStartupGreetingOutput.model_validate(raw)
+        result = SocialStartupGreetingResolution(
+            **output.model_dump(), request_id=request.request_id, model_call_count=1,
+        )
+        result.validate_request(request)
+        return result

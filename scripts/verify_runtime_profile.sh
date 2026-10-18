@@ -33,7 +33,9 @@ fi
 
 tts_backend="${CHROMIE_TTS_BACKEND:-cosyvoice3}"
 tts_service=chromie-tts
-tts_provider=fun-cosyvoice3-0.5b
+# The default service's provider identity is overridable (docker-compose.yml
+# forwards TTS_PROVIDER); compare against the value the containers were given.
+tts_provider="${TTS_PROVIDER:-fun-cosyvoice3-0.5b}"
 compose_args=(--env-file .env.runtime -f docker-compose.yml)
 case "${tts_backend,,}" in
   cosyvoice|cosyvoice3)
@@ -122,7 +124,7 @@ for name in \
   AGENT_COGNITIVE_GATEWAY_ATTENTION_MODEL \
   AGENT_USER_MEANING_INTERPRETER_MODEL \
   AGENT_GOAL_ASSOCIATION_MODEL \
-  AGENT_FAST_PLANNER_MODEL \
+  AGENT_PLANNER_MODEL \
   AGENT_DELIBERATIVE_MODEL; do
   check_value chromie-agent "$name"
 done
@@ -146,8 +148,8 @@ for name in \
   AGENT_USER_MEANING_INTERPRETER_LLM_NUM_PREDICT \
   AGENT_GOAL_ASSOCIATION_NUM_CTX \
   AGENT_GOAL_ASSOCIATION_NUM_PREDICT \
-  AGENT_FAST_PLANNER_NUM_CTX \
-  AGENT_FAST_PLANNER_NUM_PREDICT \
+  AGENT_PLANNER_NUM_CTX \
+  AGENT_PLANNER_NUM_PREDICT \
   AGENT_DELIBERATIVE_NUM_CTX \
   AGENT_DELIBERATIVE_NUM_PREDICT; do
   check_value chromie-agent "$name"

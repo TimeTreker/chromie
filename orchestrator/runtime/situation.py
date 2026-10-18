@@ -8,6 +8,8 @@ import json
 import time
 from typing import Any, Iterable
 
+from pydantic import ValidationError
+
 from shared.chromie_contracts.social_cognition import SocialCognitionRequest, SocialCognitionResolution
 from orchestrator.runtime.cognitive_activation import (
     activation_requested,
@@ -845,7 +847,7 @@ async def resolve_goal_free_situation_response(
         session,
         request=request,
         timeout_ms=max(
-            host.cognitive_runtime_policy.fast_planner_timeout_ms,
+            host.cognitive_runtime_policy.planner_timeout_ms,
             host.cognitive_runtime_policy.deliberative_timeout_ms,
         ),
     )
@@ -1080,5 +1082,4 @@ __all__ = [
     "drain_due_time_conditions_once",
     "resolve_goal_free_situation_response",
     "run_time_condition_wake_loop",
-    "situation_revision_cognition_mode",
 ]

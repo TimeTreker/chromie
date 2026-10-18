@@ -60,8 +60,6 @@ Soridormi 负责：
 - 机器人资源互斥、监控、停止、急停和恢复；
 - 驱动、标定、状态估计与硬件投产。
 
-`hardware/` 目录是旧的 mock 兼容服务，不是未来实体机器人的实现位置。
-
 ## 当前状态
 
 本地标准测试门禁通过；任何门禁声明都必须引用一次新的
@@ -117,7 +115,7 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 - **当前架构基线**：同一轮被接纳的含义（UMI 的 Responsibility / WHAT）同时进入
   Social Cognition、Goal Association 与 Planner：SC 决定是否、何时、如何交流；
   GA 唯一拥有 canonical Goal continuity；唯一的 Planner 负责 HOW 与 Work
-  （先声明 ability_needs，必要时检索能力库后再规划一次，Deep Planner 已退役）；
+  （先声明 ability_needs，必要时检索能力库后再规划一次）；
   Value Judgment 审查列入审查清单的效果；Trusted Capability Runtime 与 Provider
   执行并产生 Evidence，Evidence 再回流到 Planner 与 SC。UMI 的快速/深度两档只有
   认知深度差异，均不得写回复文本、创建 Work/Activity 或选择 Capability。
@@ -131,7 +129,7 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 - **开放证据**：干净的 live-text、active cancellation、MuJoCo safe-idle、
   人工语义审核和来源身份必须按目标 profile 一起判断，历史成功不能代替当前证据。
 - **已完成工程边界**：Host typed settings、playback/input lifecycle、受支持配置
-  收缩和文档表面收缩已经实现。Mypy 仍保持最后一个实际通过的四文件增量基线；未经依赖完整环境验证的 package 级扩展已撤回，并作为独立清理工作等待整个新增范围先通过。
+  收缩和文档表面收缩已经实现。Mypy 范围以 `config/mypy_scope.txt` 为准，当前覆盖完整的 `shared/chromie_contracts` 包和三个脚本，见 [静态分析](STATIC_ANALYSIS.md)。
 - **可选物理验证**：默认 profile 不要求物理语音或实体机器人。只有需要对应
   支持声明时，才运行 supervised 麦克风/扬声器或实体机器人验收。
 - **实体准备与试点**：未来选择参考机器人后，从身份、安全、网络和无动作检查，
@@ -146,17 +144,12 @@ provenance，以及 grounded external information 与 weather 两个方法包。
 
 ## 快速开始
 
-```bash
-cp .env.local.example .env.local
-./scripts/show_profile.sh
-BUILD=1 ./scripts/start_services.sh
-./scripts/setup_orchestrator.sh
-./scripts/start_orchestrator.sh
-```
+组件启动步骤见 [README 的组件启动](../README.md#quick-start)，完整的安装、
+模型预热、音频配置和恢复流程见 [运行手册](../CHROMIE_RUNBOOK.md)。
 
-Chromie 会生成 `.env.runtime`，并写入一个被 Git 忽略的根目录 `.env`，
-方便普通 `docker compose ...` 命令读取同一套变量。不要直接编辑这些
-生成文件。
+Chromie 会生成 `.env.runtime` 和被 Git 忽略的根目录 `.env`。不要直接编辑这些
+生成文件；请使用 `./scripts/compose.sh`，不要使用普通 `docker compose`，
+因为只有封装脚本会同时加入硬件 profile 的 Compose override 文件。
 
 自动测试：
 
