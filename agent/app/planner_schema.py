@@ -432,7 +432,7 @@ def fast_evidence_reentry_response_schema(
     respond_requires_commitment: bool = False,
     held_effect_goal_ids: list[str] | None = None,
 ) -> dict[str, Any]:
-    """Compact decoder contract for trusted Fast Planner Evidence re-entry.
+    """Compact decoder contract for trusted Planner Evidence re-entry.
 
     The model decides only post-execution next action and genuinely new Work. Host
     materializes the redundant Planner/CanonicalPlan envelope afterwards. Keeping this
@@ -752,7 +752,7 @@ def fast_multi_goal_response_schema(
 ) -> dict[str, Any]:
     """Return a decoder-tight, model-authored multi-goal plan schema.
 
-    The Fast Planner model authors the semantic plan itself: aggregate
+    The Planner model authors the semantic plan itself: aggregate
     disposition and coverage, executable steps, exact step ownership,
     per-goal outcomes, limitation judgments, and prospective satisfaction. It
     authors no wording: Social Cognition owns every user-facing word.  The host adds only envelope identity fields after validation.

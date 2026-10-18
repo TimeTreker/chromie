@@ -565,7 +565,7 @@ def _canonical_work_prompt(
         "provisional_safe_work",
     )})
     sections.append("Trusted Work planning facts JSON:\n" + required_json(
-        projections, None, label="fast Planner complete Work facts",
+        projections, None, label="Planner complete Work facts",
     ))
     if request.planner_reentry_scope:
         sections.append(
@@ -857,7 +857,7 @@ def fast_evidence_reentry_prompt(
     rendered = (
         contract
         + "\n\nTrusted post-execution facts JSON:\n"
-        + required_json(facts, None, label="Fast Planner Evidence re-entry facts")
+        + required_json(facts, None, label="Planner Evidence re-entry facts")
     )
     return LayeredPrompt.promote(rendered, operating_contract=(contract,))
 
@@ -1087,7 +1087,7 @@ def fast_advance_semantic_capability_projection(
 
 
 def _fast_streaming_prompt_input_schema(input_schema: dict[str, Any]) -> dict[str, Any]:
-    """Preserve the canonical Capability action template for Fast Planner.
+    """Preserve the canonical Capability action template for the Planner.
 
     Planner needs the same requiredness, types, enums, bounds and defaults that trusted
     validation uses. A declared default describes omission behavior; it is capability

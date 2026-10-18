@@ -861,7 +861,7 @@ def audit_semantic_authority_boundaries(root: Path) -> list[PolicyFinding]:
                 "fast_repair_response_schema",
                 "max_contract_repairs",
             ),
-            "Fast Planner must close semantics in one primary result rather than invoke a same-owner reviewer or repair generation",
+            "The Planner must close semantics in one primary result rather than invoke a same-owner reviewer or repair generation",
         ),
         "agent/app/planner_model_contract.py": (
             RULE_HOST_SEMANTIC_AUTHORITY,
@@ -1705,7 +1705,7 @@ def audit_canonical_capability_identity(root: Path) -> list[PolicyFinding]:
                     symbol="<retired-split-fast-presentation>",
                     message=(
                         "the retired separate Fast presentation endpoint/model/DTO "
-                        "must not return beside the single typed Fast Planner stream"
+                        "must not return beside the single typed Planner stream"
                     ),
                 )
             )

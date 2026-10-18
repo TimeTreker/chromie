@@ -95,7 +95,7 @@ class PlannerResolver(ProductionPlannerResolver):
                         else []
                     ),
                     confidence=0.0,
-                    unresolved=["Fast Planner stream failed closed."],
+                    unresolved=["Planner stream failed closed."],
                     reason_summary="Discard the invalid terminal result.",
                     metadata={
                         "semantic_authority": "deterministic_fail_safe",
@@ -107,7 +107,7 @@ class PlannerResolver(ProductionPlannerResolver):
                         "failure_domain": frame.failure_domain,
                     },
                 )
-        raise PlannerDTOContractError("Fast Planner stream ended without a terminal frame")
+        raise PlannerDTOContractError("Planner stream ended without a terminal frame")
 
 
 class FakeCatalog:

@@ -158,7 +158,7 @@ class AgentClient:
         request: CognitiveWorkRequest,
         timeout_ms: int | None = None,
     ) -> AsyncIterator[FastPlannerStreamFrame]:
-        """Yield validated NDJSON frames from one Fast Planner invocation."""
+        """Yield validated NDJSON frames from one Planner invocation."""
 
         effective_timeout_ms = max(100, int(timeout_ms or self.timeout_ms))
         async with runtime_tracer.span(

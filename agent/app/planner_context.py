@@ -1101,7 +1101,7 @@ def planner_context_capability_eligible(item: Any, context: dict[str, Any]) -> b
 
 
 def fast_capability_payload(item: Any, *, include_side_effect_free: bool = False) -> dict[str, Any]:
-    """Project one catalog entry onto Fast Planner's read-only capability surface."""
+    """Project one catalog entry onto the Planner's read-only capability surface."""
 
     payload = {
         "capability_id": item.capability_id,

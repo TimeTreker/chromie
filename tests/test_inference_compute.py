@@ -56,7 +56,7 @@ class InferenceComputePolicyTests(unittest.TestCase):
             compute_class_for_purpose("situational_deliberative_cognition"),
             CognitionComputeClass.DELIBERATIVE,
         )
-        # The retired Deep Planner purpose has no class of its own any more.
+        # The retired deep_planner purpose has no class of its own any more.
         self.assertEqual(
             compute_class_for_purpose("deep_planner"),
             CognitionComputeClass.INTERACTIVE,

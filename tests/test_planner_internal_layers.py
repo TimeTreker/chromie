@@ -83,7 +83,7 @@ def test_planner_layers_expose_no_same_tier_semantic_repair_surface() -> None:
 
 
 def test_one_planner_has_no_second_planner_modules() -> None:
-    # PLANNER-AUTHORITY-001: the Deep Planner was retired on 2026-10-11.
+    # PLANNER-AUTHORITY-001: the second planner tier was retired on 2026-10-11.
     for retired in ("agent.app.deep_planner", "agent.app.planner_deep_validation"):
         assert importlib.util.find_spec(retired) is None
     assert not hasattr(planner_prompt, "deep_plan_prompt")

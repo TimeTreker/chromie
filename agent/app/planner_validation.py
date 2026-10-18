@@ -3421,7 +3421,7 @@ def validate_planner_model_output(
         ]
         if missing_envelope_fields:
             raise ValueError(
-                "multi-goal fast planner output requires explicit fields: "
+                "multi-goal planner output requires explicit fields: "
                 + ",".join(missing_envelope_fields)
             )
     if (

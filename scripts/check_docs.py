@@ -12,6 +12,7 @@ import ast
 import json
 import re
 import sys
+import tokenize
 import unicodedata
 from pathlib import Path
 from urllib.parse import unquote
@@ -121,10 +122,10 @@ STALE_PHRASES = {
     "direct no-planner `spoken_response` branch": "Social Cognition authors every user-facing Communicative Activity; the Planner is word-free",
     "contract-defined conservative fallback": "Host may fail closed but may not author an ordinary semantic fallback",
     "schema-valid benign `chat`": "User Meaning Interpretation no longer has chat/tool/memory/robot route branches",
-    "goal interpretation can hand complex requests to `deepthinking_agent`": "there is one Planner and no downstream deepthinking agent; the Deep Planner is retired",
+    "goal interpretation can hand complex requests to `deepthinking_agent`": "there is one Planner and no downstream deepthinking agent; the deliberative Planner tier is retired",
     "`memory_agent` only validates and applies": "Memory has no maintained semantic agent or route",
     "explicit `memory` routes now carry": "Memory is not a User Meaning Interpretation route",
-    "deepthinking may use the full catalog": "the one Planner reaches library Capability contracts through need-first search; the Deep Planner is retired",
+    "deepthinking may use the full catalog": "the one Planner reaches library Capability contracts through need-first search; the deliberative Planner tier is retired",
     "deepthinking can replace an exact catalog-backed action proposal": "current downstream cognition must preserve Planner authority",
     "deterministic post-execution composer produces": "terminal Evidence re-enters the Planner for next Work and reaches Social Cognition for wording, never a status-to-sentence composer",
     "post /run` |": "the retired Agent /run endpoint must not appear in current API tables",
@@ -459,6 +460,99 @@ def check_current_runtime_terminology(errors: list[str]) -> None:
                 f"{path.relative_to(ROOT)}:{line}: canonical architecture uses "
                 "legacy Skill Runtime terminology; use Trusted Capability Runtime"
             )
+
+
+# There is one Planner. The retired tiered planner names must not come back in
+# Markdown prose or in Python comments and docstrings. Recorded wire values
+# (schema titles, role ids, prompt text, the frozen replay corpus and datasets)
+# and the CHANGELOG history are out of scope, and a line that states the
+# retirement ("retired", "removed") is a true historical note.
+RETIRED_PLANNER_NAME_RE = re.compile(r"\b(?:fast|deep)\s+planner\b", re.IGNORECASE)
+RETIRED_PLANNER_NOTE_RE = re.compile(r"\b(?:retired|removed)\b", re.IGNORECASE)
+RETIRED_PLANNER_NAME_EXCLUDED_PATHS = (
+    "CHANGELOG.md",
+    "benchmarks/integration",
+    "benchmarks/datasets",
+)
+
+
+def _retired_planner_name_scan_excluded(path: Path) -> bool:
+    relative = path.relative_to(ROOT).as_posix()
+    if "/prompts/" in f"/{relative}" and path.suffix == ".txt":
+        return True
+    return any(
+        relative == excluded or relative.startswith(excluded + "/")
+        for excluded in RETIRED_PLANNER_NAME_EXCLUDED_PATHS
+    )
+
+
+def python_files() -> list[Path]:
+    files: list[Path] = []
+    for path in ROOT.rglob("*.py"):
+        relative_parts = path.relative_to(ROOT).parts
+        if any(part in IGNORED_MARKDOWN_DIRS for part in relative_parts[:-1]):
+            continue
+        if path.is_file():
+            files.append(path)
+    return sorted(files)
+
+
+def python_comment_and_docstring_lines(path: Path) -> list[tuple[int, str]]:
+    """Return (line, text) for every comment and docstring line of one module."""
+
+    source = path.read_text(encoding="utf-8")
+    lines: list[tuple[int, str]] = []
+    try:
+        tokens = list(tokenize.generate_tokens(iter(source.splitlines(keepends=True)).__next__))
+    except (tokenize.TokenError, SyntaxError):
+        return lines
+    for token in tokens:
+        if token.type == tokenize.COMMENT:
+            lines.append((token.start[0], token.string))
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return lines
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        if not node.body:
+            continue
+        first = node.body[0]
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+        ):
+            for offset, text in enumerate(first.value.value.splitlines()):
+                lines.append((first.lineno + offset, text))
+    return lines
+
+
+def check_retired_planner_names(errors: list[str]) -> None:
+    """Keep the retired tiered planner names out of prose, comments and docstrings."""
+
+    def report(path: Path, line: int, text: str) -> None:
+        if RETIRED_PLANNER_NOTE_RE.search(text):
+            return
+        match = RETIRED_PLANNER_NAME_RE.search(text)
+        if match is None:
+            return
+        errors.append(
+            f"{path.relative_to(ROOT)}:{line}: retired planner name {match.group(0)!r}; "
+            "there is one Planner (Social Cognition owns wording)"
+        )
+
+    for path in markdown_files():
+        if _retired_planner_name_scan_excluded(path):
+            continue
+        for number, text in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            report(path, number, text)
+    for path in python_files():
+        if _retired_planner_name_scan_excluded(path):
+            continue
+        for number, text in python_comment_and_docstring_lines(path):
+            report(path, number, text)
 
 
 def check_project_direction(errors: list[str]) -> None:
@@ -987,6 +1081,7 @@ def main() -> int:
     check_current_focus(errors)
     check_current_gate_summaries(errors)
     check_current_runtime_terminology(errors)
+    check_retired_planner_names(errors)
     check_architecture_requirements(errors)
     check_project_direction(errors)
     check_api_reference(errors)
@@ -1003,7 +1098,7 @@ def main() -> int:
     print(
         "Documentation checks passed: "
         f"{len(markdown_files())} Markdown files, project direction, "
-        "local links and anchors, semantic project naming, current focus, API routes, "
+        "local links and anchors, semantic project naming, current focus, retired planner names, API routes, "
         "runtime configuration coverage and safety defaults, "
         "reproducible development artifact inputs, and documentation authority."
     )

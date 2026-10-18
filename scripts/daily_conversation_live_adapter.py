@@ -174,7 +174,7 @@ def _structural_invariants(
 
 
 def _configured_fast_model(environ: Mapping[str, str] | None = None) -> str | None:
-    """Return the fast Planner model the active runtime profile configures.
+    """Return the Planner model the active runtime profile configures.
 
     The live text path loads the generated runtime environment before each turn,
     so this reads the profile's own ``AGENT_PLANNER_MODEL`` rather than a

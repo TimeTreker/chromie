@@ -1511,7 +1511,7 @@ async def _qualify_foreground_under_deep_load(
     deep_active_at_fast_planner_start = not deep_task.done()
     if not deep_active_at_fast_planner_start and require_foreground_before_deep:
         raise QualificationFailure(
-            "deliberative request ended before Fast Planner contention could be observed"
+            "deliberative request ended before Planner contention could be observed"
         )
     fast_planner = await _observe_stream(
         client,
@@ -1797,7 +1797,7 @@ async def _qualify_foreground_under_deep_load(
     foreground_completed_before_deep = fast_planner.finished_s < deep.finished_s
     if not foreground_completed_before_deep and require_foreground_before_deep:
         raise QualificationFailure(
-            "foreground Fast UMI + Fast Planner did not complete while deliberation remained active"
+            "foreground Fast UMI + Planner did not complete while deliberation remained active"
         )
 
     if presentation_lease is not None:
@@ -2405,7 +2405,7 @@ def _parser() -> argparse.ArgumentParser:
     )
     for route, label in (
         ("fast-umi", "Fast User Meaning Interpretation canary"),
-        ("fast-planner", "Fast Planner canary"),
+        ("fast-planner", "Planner canary"),
         ("deliberative", "deliberative load"),
     ):
         dest = route.replace("-", "_")

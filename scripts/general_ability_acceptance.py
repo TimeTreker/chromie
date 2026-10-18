@@ -861,7 +861,7 @@ def validate_live_text_result(
         )
     ):
         errors.append(
-            "terminal Capability Evidence did not reactivate Fast Planner"
+            "terminal Capability Evidence did not reactivate the Planner"
         )
     if (
         case.require_work_held_until_canonical_validation
@@ -881,7 +881,7 @@ def validate_live_text_result(
         and runtime_metadata.get("work_reconciliation_required") is not True
     ):
         errors.append(
-            "canonical Fast Planner Work reconciliation did not run"
+            "canonical Planner Work reconciliation did not run"
         )
     timing_evidence = _social_response_timing_evidence(summary)
     summary["social_response_timing_evidence"] = timing_evidence
@@ -1002,7 +1002,7 @@ def validate_live_text_result(
         actual_path = str(runtime_metadata.get("fast_planner_path") or "")
         if actual_path != case.expected_fast_planner_path:
             record_internal(
-                "Fast Planner path mismatch: "
+                "Planner path mismatch: "
                 f"expected {case.expected_fast_planner_path!r}, got {actual_path!r}"
             )
     if case.expect_no_fast_contract_failure:
@@ -1017,7 +1017,7 @@ def validate_live_text_result(
             and item.get("failure_class")
         ]
         if runtime_metadata.get("fast_planner_path") == "contract_failure" or fast_failures:
-            record_internal("Fast Planner contract failure remained in retained evidence")
+            record_internal("Planner contract failure remained in retained evidence")
     summary["user_outcome"]["internal_diagnostics"] = internal_diagnostics
     summary["user_outcome"]["ok"] = not errors
     summary["diagnostic_evaluation"] = diagnostic_evaluation(
@@ -1535,7 +1535,7 @@ def validate_library(
                     and case.forbid_social_communicative_act
                 ):
                     errors.append(
-                        f"{ability.ability_id}/{case.case_id}: Fast Planner Communicative Activity "
+                        f"{ability.ability_id}/{case.case_id}: Planner Communicative Activity "
                         "cannot be both required and forbidden"
                     )
                 if (
