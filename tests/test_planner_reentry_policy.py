@@ -809,8 +809,10 @@ def test_fast_evidence_reentry_lifts_to_current_planner_contract() -> None:
     assert current.disposition == "respond"
     assert current.steps == []
     assert current.goal_outcomes["goal-weather"].follows_step_ids == ["weather-read"]
-    assert current.goal_satisfaction is not None
-    assert current.goal_satisfaction.status == "exact"
+    # The lifted DTO carries no Plan-level aggregate; Host folds it from the per-Goal judgment.
+    assert "goal_satisfaction" not in lifted
+    assert current.derived_goal_satisfaction is not None
+    assert current.derived_goal_satisfaction.status == "exact"
 
 
 def _reentry_decision_output(status="exact", score=1.0):

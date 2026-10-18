@@ -882,8 +882,9 @@ Read the diagram with these boundaries:
   the original future-tense wording does not authorize waiting for the same time
   again. Readiness grants neither execution permission nor completion Evidence.
   Owner-approved staged progress (2026-09-12, #51): complete current acquisition
-  Work may have honest partial whole-Goal satisfaction. Both per-Goal and aggregate
-  assessments retain deferred obligations; ordinary achieving siblings retain their
+  Work may have honest partial whole-Goal satisfaction. Per-Goal assessments retain
+  deferred obligations and the Host-folded aggregate conserves them (2026-10-18: the
+  aggregate is no longer model-written); ordinary achieving siblings retain their
   own admission requirements. A Goal's acquisition may carry its dependent effect in the
   same Plan only as a deferred step (owner choice B, 2026-10-12): Runtime never starts it,
   and the evidence re-entry decides it; executable steps for one Goal still either acquire
@@ -1785,7 +1786,7 @@ Gateway admission, Host authorization, execution, safety, or provider evidence.
    cancelled, not-cancelled, uncertain, or released-confirmation state without
    executing, rescheduling, or authorizing that Goal. Social Cognition can
    completely account for the control report while the original effect remains
-   unmet in per-Goal and aggregate satisfaction. A released confirmation does not
+   unmet in its per-Goal satisfaction (and so in the Host-folded aggregate). A released confirmation does not
    cancel its Goal or authorize a replacement Plan. Catalog availability remains
    visible as read-only truth even when this invocation has no executable scope;
    independent Goals retain their ordinary fulfillment and authorization checks.

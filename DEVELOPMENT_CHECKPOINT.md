@@ -41,7 +41,10 @@ reply re-authored; previous freeze 41 `a36b1ebf…`). Freeze 43 (`09813fa8…`) 
 recaptured only the Planner request formats changed by the native disposition/step
 assignment branches (4,700 cases, 5,300 steps, 5 prototypes); every verdict unchanged. Freeze 44
 (`c808be23…`) recaptured every UMI request for shared source spans (6,000 cases, 6,500
-steps, 5 prototypes); every verdict and every reply's schema validity unchanged. Gate and strict replay at the
+steps, 5 prototypes); every verdict and every reply's schema validity unchanged. Freeze 45
+(`019d7726…`) recaptured every Planner request for the Host-derived aggregate
+`goal_satisfaction` (6,000 cases, 5,600 steps, 5 prototypes) and projected the retired key out of
+stored fast replies; every verdict and every reply's schema validity unchanged. Gate and strict replay at the
 delivery revision: pytest 3,955 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
 
 ## Repairs in force from this Issue

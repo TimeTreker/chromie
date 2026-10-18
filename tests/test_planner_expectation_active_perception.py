@@ -62,7 +62,6 @@ def _active_perception_output(*, expected_outcome: str) -> PlannerModelOutput:
                     "rationale": "Fresh observation is the next required progress.",
                 }
             },
-            "goal_satisfaction": _satisfaction(goal_id),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }

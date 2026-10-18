@@ -54,8 +54,10 @@ def test_planner_model_time_condition_is_materialized_with_host_plan_identity() 
                     "reason_code": "recheck_running_work",
                 }
             ],
-            "goal_outcomes": {},
-            "goal_satisfaction": _satisfaction("goal-1").model_dump(mode="json"),
+            "goal_outcomes": {
+                "goal-1": {"disposition": "execute", "coverage": "complete", "step_ids": ["step-read"],
+                           "satisfaction": _satisfaction("goal-1").model_dump(mode="json")},
+            },
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }

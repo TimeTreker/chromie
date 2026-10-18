@@ -387,7 +387,8 @@ def scoped_reporting_response_schema(
                 conditions["maxItems"] = len(future_goal_times)
                 properties["disposition"]["enum"] = ["respond"]
         outcomes = properties["goal_outcomes"]["properties"]
-        assessments = [(properties["goal_satisfaction"], goal_ids)]
+        # Only per-Goal judgments are model-writable; Host folds the aggregate.
+        assessments: list[tuple[dict[str, Any], set[str]]] = []
         for goal_id in goal_ids:
             fields = outcomes[goal_id]["properties"]
             fields["step_ids"]["maxItems"] = 0
@@ -686,7 +687,8 @@ def fast_multi_goal_response_schema(
 
     The Planner model authors the semantic plan itself: aggregate
     disposition and coverage, executable steps, exact step ownership,
-    per-goal outcomes, limitation judgments, and prospective satisfaction. It
+    per-goal outcomes, limitation judgments, and per-Goal prospective
+    satisfaction (Host folds the Plan-level aggregate from those). It
     authors no wording: Social Cognition owns every user-facing word.  The host adds only envelope identity fields after validation.
 
     Every field needed by deterministic validation is required at the JSON
@@ -710,7 +712,6 @@ def fast_multi_goal_response_schema(
         "parameter_resolutions",
         "time_conditions",
         "goal_outcomes",
-        "goal_satisfaction",
         "plan_relation",
         "user_confirmation_required",
     ):
@@ -835,12 +836,12 @@ def fast_multi_goal_response_schema(
             }
         )
 
-    # Fast multi-goal output always carries a model-authored satisfaction
-    # judgment, including an unsatisfied/partial judgment for a limitation.
-    goal_satisfaction = properties.get("goal_satisfaction")
-    if isinstance(goal_satisfaction, dict):
-        goal_satisfaction.clear()
-        goal_satisfaction.update({"$ref": "#/$defs/PlannerGoalSatisfaction"})
+    # Every Goal outcome carries a model-authored satisfaction judgment, including
+    # an unsatisfied/partial judgment for a limitation. The Plan-level aggregate is
+    # not model-writable: Host folds it from these, and the DTO's
+    # additionalProperties=false rejects a written one.
+    if "goal_satisfaction" in properties:
+        raise ValueError("the Planner DTO must not expose a model-writable goal_satisfaction")
 
     outcome_schema = schema.get("$defs", {}).get("PlannerModelGoalOutcome")
     if isinstance(outcome_schema, dict):
@@ -1026,15 +1027,6 @@ def fast_multi_goal_response_schema(
                 "in satisfied_goal_ids and both unmet lists empty."
             ),
         }
-
-    if isinstance(goal_satisfaction, dict) and isinstance(satisfaction_schema, dict):
-        goal_satisfaction.clear()
-        goal_satisfaction.update(
-            strict_satisfaction_schema(
-                satisfaction_schema,
-                exact_satisfied_count=len(allowed_goals),
-            )
-        )
 
     # A goal_outcomes key already identifies the one goal being judged.  The
     # generic model schema cannot express that a nested satisfaction object may
@@ -1263,29 +1255,6 @@ def fast_multi_goal_response_schema(
                         "minItems": execute_count,
                         "maxItems": execute_count * 4,
                     },
-                    "goal_satisfaction": {
-                        "type": "object",
-                        "properties": {
-                            "status": {
-                                "type": "string",
-                                "enum": (
-                                    nonexact_statuses
-                                    if cancellation_goal_set
-                                    else ["exact", "substantial", "partial"]
-                                    if terminal_assignment and execute_count
-                                    else ["exact", "substantial"]
-                                    if terminal_assignment
-                                    else nonexact_statuses
-                                ),
-                            }
-                        },
-                        "required": ["status"],
-                    },
-                    **(
-                        {}
-                        if aggregate == "respond"
-                        else {}
-                    ),
                     "goal_outcomes": {
                         "type": "object",
                         "properties": outcome_properties,
@@ -1295,7 +1264,6 @@ def fast_multi_goal_response_schema(
                     "disposition",
                     "coverage",
                     "steps",
-                    "goal_satisfaction",
                     "goal_outcomes",
                 ],
             }
@@ -1321,10 +1289,9 @@ def fast_multi_goal_response_schema(
             fields["step_ids"]["minItems"] = min(choice["step_ids"].get("minItems", 0) for choice in choices)
             fields["step_ids"]["maxItems"] = max(choice["step_ids"]["maxItems"] for choice in choices)
     elif len(allowed_goals) == 1 and requires_execution:
-        # The single-Goal fast schema has no nested outcome map from which to
-        # derive its aggregate.  Encode the same mechanical invariant directly:
-        # an executable result owns exactly one simple step, while clarification
-        # or a limitation owns none and cannot claim exact satisfaction.
+        # Encode the mechanical disposition/step invariant directly: an executable
+        # result owns exactly one simple step, while clarification or a limitation
+        # owns none. Satisfaction lives only in the Goal outcome.
         schema.setdefault("allOf", []).append(
             {
                 "anyOf": [
@@ -1332,37 +1299,15 @@ def fast_multi_goal_response_schema(
                         "properties": {
                             "disposition": {"enum": ["execute"]},
                             "steps": {"minItems": 1, "maxItems": 1},
-                            "goal_satisfaction": {
-                                "properties": {"status": {"enum": ["exact", "substantial", "partial"]}}
-                            },
                         },
-                        "required": [
-                            "disposition",
-                            "steps",
-                            "goal_satisfaction",
-                        ],
+                        "required": ["disposition", "steps"],
                     },
                     {
                         "properties": {
                             "disposition": {"enum": ["clarify", "unavailable"]},
                             "steps": {"maxItems": 0},
-                            "goal_satisfaction": {
-                                "properties": {
-                                    "status": {
-                                        "enum": [
-                                            "substantial",
-                                            "partial",
-                                            "unsatisfied",
-                                        ]
-                                    }
-                                }
-                            },
                         },
-                        "required": [
-                            "disposition",
-                            "steps",
-                            "goal_satisfaction",
-                        ],
+                        "required": ["disposition", "steps"],
                     },
                 ]
             }
@@ -1388,15 +1333,11 @@ def fast_multi_goal_response_schema(
             },
             "then": {
                 "properties": {
-                    "goal_satisfaction": {
-                        "properties": {"status": {"enum": ["substantial"]}},
-                        "required": ["status"],
-                    },
                     "goal_outcomes": {
                         "properties": nonexact_goal_outcomes,
                     },
                 },
-                "required": ["goal_satisfaction", "goal_outcomes"],
+                "required": ["goal_outcomes"],
             },
         }
     )
@@ -1413,7 +1354,6 @@ def fast_multi_goal_response_schema(
         "goal_summary",
         "goal_outcomes",
         "steps",
-        "goal_satisfaction",
         "disposition",
         "coverage",
         "confidence",
@@ -1443,10 +1383,7 @@ def fast_multi_goal_response_schema(
             native_properties = native_variant["properties"]
             for field_name in ("disposition", "coverage", "steps"):
                 native_properties[field_name].update(constraints[field_name])
-            satisfaction_restrictions = [(
-                native_properties["goal_satisfaction"],
-                constraints["goal_satisfaction"]["properties"]["status"]["enum"],
-            )]
+            satisfaction_restrictions: list[tuple[dict[str, Any], list[str]]] = []
             for goal_id, goal_constraint in constraints["goal_outcomes"]["properties"].items():
                 goal_fields = native_properties["goal_outcomes"]["properties"][goal_id]["properties"]
                 constrained_fields = goal_constraint["properties"]
@@ -3035,7 +2972,6 @@ def _mixed_readiness_schema(
             "if": {"properties": {"time_conditions": timer}},
             "then": {"properties": {
                 "goal_outcomes": {"properties": {goal_id: scoped["goal_outcomes"]["properties"][goal_id]}},
-                "goal_satisfaction": scoped["goal_satisfaction"],
                 "steps": {"items": {"properties": {"source_goal_ids": {
                     "not": {"contains": {"const": goal_id}}}}}},
             }},

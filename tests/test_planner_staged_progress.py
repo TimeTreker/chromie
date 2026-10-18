@@ -116,12 +116,6 @@ def read_reply(request):
                     "satisfaction": sat,
                 }
             },
-            "goal_satisfaction": {
-                **sat,
-                "unmet_requirements": [
-                    "The reminder decision remains deferred until the forecast is known."
-                ],
-            },
         }
     ).model_dump(mode="json")
 
@@ -142,7 +136,6 @@ def next_reply(request, rain):
     raw.update(
         disposition="execute" if rain else "respond",
         response_text=text,
-        goal_satisfaction=sat,
         user_confirmation_required=rain,
     )
     raw["steps"] = (
@@ -432,10 +425,11 @@ def test_partial_acquisition_is_complete_current_work(language, tier):
             ]
         plan = await resolve(request, catalog, raw, tier)
         assert plan.disposition == "execute", plan.metadata
+        # Host folds the Plan-level satisfaction from the per-Goal judgment.
         assert plan.goal_satisfaction.score == 0.5
         assert (
             plan.goal_satisfaction.unmet_requirements
-            == raw["goal_satisfaction"]["unmet_requirements"]
+            == raw["goal_outcomes"][plan.goal_ids[0]]["satisfaction"]["unmet_requirements"]
         )
         assert (
             plan.goal_outcomes[0].satisfaction.unmet_requirements
@@ -534,7 +528,7 @@ def test_conditional_episode_read_evidence_decision_and_terminal_delivery(langua
         "relabelled_write",
         "exact_relabelled_write",
         "premature_write",
-        "erased_aggregate",
+        "model_written_aggregate",
     ],
 )
 def test_acquisition_exception_cannot_admit_incomplete_or_effectful_work(mutation):
@@ -553,12 +547,12 @@ def test_acquisition_exception_cannot_admit_incomplete_or_effectful_work(mutatio
             raw["steps"][0]["step_purpose"] = "acquire_information"
             raw["goal_outcomes"][gid]["step_ids"] = ["create-reminder"]
             if mutation == "exact_relabelled_write":
-                raw["goal_satisfaction"] = assessment(gid)
                 raw["goal_outcomes"][gid]["satisfaction"] = assessment(gid)
         elif mutation == "premature_write":
             raw["steps"] += next_reply(request, True)["steps"]
             raw["goal_outcomes"][gid]["step_ids"].append("create-reminder")
         else:
+            # The aggregate is Host-folded; a model-written one is an extra field.
             raw["goal_satisfaction"] = assessment(gid)
         for tier in ["fast"]:
             model = ReplayModel(json.dumps(raw))

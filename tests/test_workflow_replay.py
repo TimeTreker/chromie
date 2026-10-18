@@ -137,8 +137,8 @@ def test_acquisition_count_exception_requires_complete_deferred_effect(mutation,
                     if capability['capability_id'] == 'chromie.weather.lookup':
                         capability['effects'] = ['state_change']
             elif mutation == 'false_completion':
-                for sat in (raw['goal_satisfaction'], raw['goal_outcomes'][gid]['satisfaction']):
-                    sat.update(score=1.0, status='exact', unmet_goal_ids=[], satisfied_goal_ids=[gid])
+                raw['goal_outcomes'][gid]['satisfaction'].update(
+                    score=1.0, status='exact', unmet_goal_ids=[], satisfied_goal_ids=[gid])
             elif mutation == 'missing_obligation':
                 raw['goal_outcomes'][gid]['satisfaction']['unmet_requirements'] = []
             elif mutation == 'information_quantity':
@@ -321,6 +321,7 @@ def test_supplied_single_goal_outcome_map_must_match_admitted_goal(shape):
     from agent.app.planner_validation import validate_planner_model_output
     raw = copy.deepcopy(load()['model_steps'][2]['response'])
     raw.pop('ability_needs', None)  # The resolver removes the need-first prefix before DTO validation.
+    raw.pop('goal_satisfaction', None)  # Retired from stored replies: Host folds it from the per-Goal judgment.
     goal = '${goal}'
     if shape == 'empty': raw['goal_outcomes'] = {}
     if shape == 'missing': raw.pop('goal_outcomes')
@@ -328,6 +329,11 @@ def test_supplied_single_goal_outcome_map_must_match_admitted_goal(shape):
     if shape == 'complete':
         result = validate_planner_model_output(raw, expected_goal_ids_for_turn=[goal])
         assert set(result.goal_outcomes) == {goal}
-    else:
+        assert result.derived_goal_satisfaction.status == 'exact'
+    elif shape == 'foreign':
         with pytest.raises(ValueError,match='goal_outcomes keys must cover exactly'):
+            validate_planner_model_output(raw, expected_goal_ids_for_turn=[goal])
+    else:
+        # Without per-Goal outcomes there is no satisfaction judgment for Host to fold.
+        with pytest.raises(ValueError,match='requires goal_outcomes'):
             validate_planner_model_output(raw, expected_goal_ids_for_turn=[goal])

@@ -108,7 +108,6 @@ def _weather_output(
                     "rationale": "The lookup is the exact required capability.",
                 }
             },
-            "goal_satisfaction": _satisfaction(goal_id),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -237,7 +236,10 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "source_goal_ids": ["goal-walk"],
                     }
                 ],
-                "goal_satisfaction": _satisfaction("goal-walk"),
+                "goal_outcomes": {
+                    "goal-walk": {"disposition": "execute", "coverage": "complete", "step_ids": ["walk"],
+                                  "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-walk"]}},
+                },
             }
         )
         with self.assertRaisesRegex(
@@ -503,7 +505,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "rationale": "The walk capability covers the request.",
                     }
                 },
-                "goal_satisfaction": _satisfaction(goal_id),
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             }
@@ -569,7 +570,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "rationale": "The walk capability covers the request.",
                     }
                 },
-                "goal_satisfaction": _satisfaction(goal_id),
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             }
@@ -649,7 +649,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "rationale": "The exact resource contract is executable.",
                     }
                 },
-                "goal_satisfaction": _satisfaction(goal_id),
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             }
@@ -743,7 +742,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "rationale": "The walk capability covers the request.",
                     }
                 },
-                "goal_satisfaction": _satisfaction(goal_id),
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             }
@@ -805,7 +803,6 @@ class PlannerBindingRepresentationTests(unittest.TestCase):
                         "rationale": "The blink capability covers the request.",
                     }
                 },
-                "goal_satisfaction": _satisfaction(goal_id),
                 "plan_relation": "exact",
                 "user_confirmation_required": False,
             }
@@ -1265,12 +1262,13 @@ def test_communication_order_preserves_gi_relation_after_exact_ga_join():
     import pytest
     output = PlannerModelOutput.model_validate({
         "disposition": "mixed", "coverage": "complete", "confidence": 1,
-        "goal_satisfaction": {"score": 1, "status": "exact", "satisfied_goal_ids": ["g-action", "g-answer"]},
         "steps": [{"step_id": "motion", "capability_id": "soridormi.blink_eyes",
                    "args": {"count": 2}, "depends_on": [], "source_goal_ids": ["g-action"]}],
         "goal_outcomes": {
-            "g-action": {"disposition": "execute", "coverage": "complete", "step_ids": ["motion"]},
-            "g-answer": {"disposition": "respond", "coverage": "complete", "follows_step_ids": ["motion"]},
+            "g-action": {"disposition": "execute", "coverage": "complete", "step_ids": ["motion"],
+                         "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["g-action"]}},
+            "g-answer": {"disposition": "respond", "coverage": "complete", "follows_step_ids": ["motion"],
+                         "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["g-answer"]}},
         },
     })
     context = {"goal_association_resolution": {"new_goals": [

@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "023cdac235a8ae57a4c60d1a16010cbfe3bf76891c79b49cfd15626a2570a41b",
-    "workflow-conditional-dry.json": "9c1ef27cbae93b5ba89f50d31389c9fa26d1788963e125f9306d2b21d8076fbb",
-    "workflow-conditional-rain.json": "36560c8c6ce522ed37e69f881c60952b0cfcae6de810f556058f2c71c55dfc94",
-    "workflow-delayed.json": "328c95fb6be02dcf9c799661296d7ce517576cbf3b2889f144cb6234ab9219a4",
-    "workflow-normal.json": "2f74939ab45434e5050c999b47de58af5a3630e3958dd1a4dd39ed52116ac8c8"
+    "workflow-cancellation.json": "33923052b958edb96b0dee07f6f699bb34e3bd3b1d0bb9de81f2cddd9a12ae2f",
+    "workflow-conditional-dry.json": "a2ae2050a890f460074644c8a4070c1d4713cdffa6e90bb1a3a8fe9dec935a7c",
+    "workflow-conditional-rain.json": "5212c2797679a5358c0d0ec9e4fc842ca23e833601ad08164249e4b6f10922f2",
+    "workflow-delayed.json": "94dc82d792940fd21e810f37ac2ee84272db710eb7d28d280a06fb5eca2183fb",
+    "workflow-normal.json": "3648489d13cc17ae734312723a67b33f531f65ceae7ceae887e9bd6c9de007a1"
   },
-  "freeze_revision": 44,
-  "freeze_note": "UMI shared source spans (2026-10-18). Every UMI request recaptured: a Responsibility names the first and last token of the words it depends on, Responsibilities may share words, and only a repeated Responsibility over one span fails closed. Only the UMI prompt and format schema changed; no reply re-authored; inputs, provider outcomes and expectations unchanged; every episode passes; no candidate calls.",
+  "freeze_revision": 45,
+  "freeze_note": "Host-derived Planner aggregate goal_satisfaction (2026-10-18). Every fast Planner request recaptured: the Plan-level goal_satisfaction left the model contract, satisfaction is required on every Goal outcome, and Host folds the aggregate from the per-Goal judgments. Only the Planner prompt and format schema changed; the retired key is projected out of stored fast replies; no reply otherwise re-authored; inputs, provider outcomes and expectations unchanged; every episode passes; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

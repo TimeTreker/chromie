@@ -168,7 +168,7 @@ class PlannerGoalSatisfaction(GoalSatisfactionAssessment):
             "its steps and responses complete successfully. This is not a "
             "measurement of whether execution has already happened. A complete current "
             "acquisition stage may have partial whole-Goal adequacy; retain deferred "
-            "requirements in both per-Goal and aggregate satisfaction."
+            "requirements in that Goal's satisfaction (Host folds the Plan-level aggregate)."
         ),
     )
     status: GoalSatisfactionStatus = Field(
@@ -294,7 +294,9 @@ class PlannerModelOutput(BaseModel):
         default_factory=list, max_length=16
     )
     goal_outcomes: dict[str, PlannerModelGoalOutcome] = Field(default_factory=dict)
-    goal_satisfaction: PlannerGoalSatisfaction | None = None
+    # The Plan-level ``goal_satisfaction`` is not model-writable (``extra="forbid"``
+    # rejects it): Host folds it from the per-Goal ``satisfaction`` judgments with
+    # ``derive_goal_satisfaction`` when it materializes the CanonicalPlan.
     plan_relation: PlannerPlanRelation = "exact"
     user_confirmation_required: bool = False
 
@@ -302,6 +304,14 @@ class PlannerModelOutput(BaseModel):
     @classmethod
     def reject_plan_refusal(cls, value: Any) -> Any:
         return reject_planner_refusal(value)
+
+    @property
+    def derived_goal_satisfaction(self) -> PlannerGoalSatisfaction | None:
+        """The Host-derived aggregate of the model's per-Goal satisfaction judgments."""
+
+        return derive_goal_satisfaction(
+            [outcome.satisfaction for outcome in self.goal_outcomes.values()]
+        )
 
     @model_validator(mode="after")
     def validate_semantic_shape(self) -> "PlannerModelOutput":
@@ -346,9 +356,10 @@ class PlannerModelOutput(BaseModel):
                     "complete execute or respond planner output must not retain "
                     "unresolved work"
                 )
-            if self.goal_satisfaction is None:
+            if not self.goal_outcomes:
                 raise ValueError(
-                    "complete executable or response output requires goal_satisfaction"
+                    "complete executable or response output requires goal_outcomes "
+                    "with a satisfaction judgment per Goal"
                 )
         if self.plan_relation in {"safe_adjustment", "alternative"}:
             if self.disposition not in {"execute", "mixed"}:
@@ -365,6 +376,16 @@ class PlannerModelOutput(BaseModel):
                 "time conditions require live Work or an unmet future Goal acknowledgement"
             )
         if self.goal_outcomes:
+            # Every Goal outcome carries the model's satisfaction judgment: the
+            # Plan-level aggregate is derived from them, so none may be missing.
+            missing_satisfaction = [
+                goal_id for goal_id, item in self.goal_outcomes.items() if item.satisfaction is None
+            ]
+            if missing_satisfaction:
+                raise ValueError(
+                    "every goal outcome requires a model-authored satisfaction judgment: "
+                    + ",".join(sorted(missing_satisfaction))
+                )
             outcome_goal_ids = set(self.goal_outcomes)
             foreign_time_goals = {
                 item.goal_id for item in self.time_conditions
@@ -393,9 +414,12 @@ class PlannerModelOutput(BaseModel):
             validate_acquisition_stage_isolation(
                 [(step.source_goal_ids, step.step_purpose) for step in self.steps]
             )
+            # The aggregate is the fold of the per-Goal judgments, so its half of the
+            # conservation rule holds by construction; the per-Goal half (a clarify or
+            # unavailable outcome keeps its own Goal unmet) is the live check.
             validate_goal_satisfaction_conservation(
                 [(goal_id, item.disposition, item.satisfaction) for goal_id, item in self.goal_outcomes.items()],
-                self.goal_satisfaction,
+                self.derived_goal_satisfaction,
             )
         return self
 
@@ -540,12 +564,49 @@ class ResourceResponsibilityRequiresCompositionError(
 ):
     """The Goal is coverable only by composing multiple advertised capabilities."""
 
+_SATISFACTION_STATUS_ORDER = {"unsatisfied": 0, "partial": 1, "substantial": 2, "exact": 3}
+
+
+def derive_goal_satisfaction(
+    per_goal: list[PlannerGoalSatisfaction | None],
+) -> PlannerGoalSatisfaction | None:
+    """Fold per-Goal satisfaction judgments into the Plan-level aggregate.
+
+    Host-owned mechanical derivation, never a new judgment: the score is the lowest
+    per-Goal score, the status the worst per-Goal status, the satisfied/unmet Goal IDs
+    and unmet requirements the ordered unions, and the rationale the joined per-Goal
+    rationales. The same rule serves the ``/plan`` answer and Evidence re-entry. The
+    result is ``None`` when there is no per-Goal judgment to fold or one is missing.
+    """
+
+    if not per_goal or any(item is None for item in per_goal):
+        return None
+    items = [item for item in per_goal if item is not None]
+    return PlannerGoalSatisfaction(
+        score=min(item.score for item in items),
+        status=min((item.status for item in items), key=_SATISFACTION_STATUS_ORDER.__getitem__),
+        satisfied_goal_ids=list(dict.fromkeys(
+            goal_id for item in items for goal_id in item.satisfied_goal_ids
+        )),
+        unmet_goal_ids=list(dict.fromkeys(
+            goal_id for item in items for goal_id in item.unmet_goal_ids
+        )),
+        unmet_requirements=list(dict.fromkeys(
+            requirement for item in items for requirement in item.unmet_requirements
+        )),
+        rationale="; ".join(item.rationale for item in items if item.rationale)[:1200],
+    )
+
+
 def materialize_planner_metadata(output: PlannerModelOutput) -> dict[str, Any]:
     """Materialize narrow model judgments into the host canonical envelope."""
 
     return {
         "plan_relation": output.plan_relation,
         "user_confirmation_required": output.user_confirmation_required,
+        # The Plan-level goal_satisfaction is folded by Host from the per-Goal judgments.
+        "model_authored_goal_satisfaction": False,
+        "host_derived_goal_satisfaction": True,
     }
 
 def materialize_goal_outcomes(
@@ -581,8 +642,8 @@ def materialize_evidence_reentry_model_output(
 
     This is deterministic representation materialization, not semantic repair. The model
     still owns each Goal's next action, satisfaction band/score, unresolved needs, new
-    Work, and plan relation. Host owns the redundant aggregate/envelope fields required by
-    the maintained ``PlannerModelOutput`` contract.
+    Work, and plan relation. Host owns the envelope fields required by the maintained
+    ``PlannerModelOutput`` contract and later folds the Plan-level goal_satisfaction.
     """
 
     expected = list(dict.fromkeys(expected_goal_ids_for_turn))
@@ -672,37 +733,14 @@ def materialize_evidence_reentry_model_output(
     disposition: PlanDisposition = (
         next(iter(statuses)) if len(statuses) == 1 else "mixed"
     )
-    aggregate_score = min(item.score for item in per_goal_satisfaction)
-    worst_status = min(
-        (item.status for item in per_goal_satisfaction),
-        key={"unsatisfied": 0, "partial": 1, "substantial": 2, "exact": 3}.get,
-    )
-    aggregate_satisfied = list(dict.fromkeys(
-        goal_id for item in per_goal_satisfaction for goal_id in item.satisfied_goal_ids
-    ))
-    aggregate_unmet = list(dict.fromkeys(
-        goal_id for item in per_goal_satisfaction for goal_id in item.unmet_goal_ids
-    ))
-    aggregate_requirements = list(dict.fromkeys(
-        requirement
-        for item in per_goal_satisfaction
-        for requirement in item.unmet_requirements
-    ))
-    aggregate = PlannerGoalSatisfaction(
-        score=aggregate_score,
-        status=worst_status,
-        satisfied_goal_ids=aggregate_satisfied,
-        unmet_goal_ids=aggregate_unmet,
-        unmet_requirements=aggregate_requirements,
-        rationale="; ".join(
-            item.rationale for item in output.goal_decisions if item.rationale
-        )[:1200],
-    )
+    # The same Host fold materialize_planner_output applies to the lifted DTO; here it
+    # only decides the lifted coverage. The DTO itself carries no aggregate.
+    aggregate = derive_goal_satisfaction(list(per_goal_satisfaction))
     coverage: PlanCoverage = (
         "complete"
         if all(item.next_action in {"respond", "execute"} for item in output.goal_decisions)
         else "partial"
-        if aggregate_unmet or aggregate_requirements
+        if aggregate is not None and (aggregate.unmet_goal_ids or aggregate.unmet_requirements)
         else "uncertain"
     )
     unresolved = list(dict.fromkeys(
@@ -719,7 +757,6 @@ def materialize_evidence_reentry_model_output(
         "parameter_resolutions": [],
         "time_conditions": [],
         "goal_outcomes": outcomes,
-        "goal_satisfaction": aggregate.model_dump(mode="python"),
         "plan_relation": output.plan_relation,
         "user_confirmation_required": output.user_confirmation_required,
     }
@@ -774,6 +811,9 @@ def materialize_planner_output(
         model_output,
         expected_goal_ids_for_turn=expected_goal_ids_for_turn,
     )
+    # Host folds the Plan-level satisfaction from the model's per-Goal judgments.
+    aggregate = model_output.derived_goal_satisfaction
+    out["goal_satisfaction"] = aggregate.model_dump(mode="python") if aggregate is not None else None
     out["plan_id"] = plan_id
     out["planner_tier"] = planner_tier
     out["goal_ids"] = list(expected_goal_ids_for_turn)
@@ -837,7 +877,8 @@ def materialize_planner_output(
                 "model_authored_step_ids": True,
                 "model_authored_step_ownership": True,
                 "model_authored_goal_outcomes": True,
-                "model_authored_goal_satisfaction": True,
+                "model_authored_goal_satisfaction": False,
+                "host_derived_goal_satisfaction": True,
                 "host_semantic_compilation": False,
             }
         )

@@ -218,7 +218,6 @@ def retained_weather_followup_fixture() -> tuple[dict, CognitiveWorkRequest]:
                 "rationale": "The retained weather result supports the decision.",
             }
         },
-        "goal_satisfaction": exact_satisfaction([goal_id]),
     }
     planner_request = request(
         "那我出门需要带伞吗？",
@@ -305,9 +304,9 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
                         "disposition": "respond",
                         "coverage": "complete",
                         "step_ids": [],
+                        "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-vocal"]},
                     }
                 },
-                "goal_satisfaction": exact_satisfaction(["goal-vocal"]),
             }
         )
 
@@ -337,6 +336,8 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
                             "No registered provider advertises singing mode."
                         ],
                         "step_ids": [],
+                        "satisfaction": {"score": 0.0, "status": "unsatisfied", "unmet_goal_ids": ["goal-vocal"],
+                                         "unmet_requirements": ["A singing provider is required."]},
                     }
                 },
             }
@@ -362,6 +363,8 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
                         "coverage": "uncertain",
                         "unresolved": ["No singing provider is registered."],
                         "step_ids": [],
+                        "satisfaction": {"score": 0.0, "status": "unsatisfied", "unmet_goal_ids": ["goal-vocal"],
+                                         "unmet_requirements": ["A singing provider is required."]},
                     }
                 },
             }
@@ -388,9 +391,9 @@ class PlannerVocalResponsibilityTests(unittest.TestCase):
                         "disposition": "respond",
                         "coverage": "complete",
                         "step_ids": [],
+                        "satisfaction": {"score": 1.0, "status": "exact", "satisfied_goal_ids": ["goal-vocal"]},
                     }
                 },
-                "goal_satisfaction": exact_satisfaction(["goal-vocal"]),
             }
         )
 
@@ -416,9 +419,6 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
                     goal_id, "Fresh provider evidence is still required."
                 )
             },
-            goal_satisfaction=unsatisfied_satisfaction(
-                [goal_id], "Fresh provider evidence is still required."
-            ),
             unresolved=["fresh provider evidence"],
         )
 
@@ -430,7 +430,7 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
 
         self.assertEqual(output.disposition, "unavailable")
         self.assertEqual(set(output.goal_outcomes), {goal_id})
-        self.assertEqual(output.goal_satisfaction.status, "unsatisfied")
+        self.assertEqual(output.derived_goal_satisfaction.status, "unsatisfied")
 
     def test_stop_remains_a_deterministic_control_not_a_planner_step(self):
         self.assertFalse(is_planner_step_capability("soridormi.stop"))
@@ -526,7 +526,6 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
                         "The weather lookup covers the Goal.",
                     )
                 },
-                goal_satisfaction=exact_satisfaction([goal_id]),
             )
         )
         authoritative_goals = [
@@ -600,7 +599,6 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
                     reason,
                 )
             },
-            goal_satisfaction=exact_satisfaction([goal_id], reason),
             unresolved=[goal_id],
         )
 
@@ -624,7 +622,6 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-walk': respond_outcome('goal-walk', 'Done.', "Preserve the tested response claim.")},
-            "goal_satisfaction": exact_satisfaction(["goal-walk"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -661,6 +658,8 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
                         "coverage": "uncertain",
                         "unresolved": ["No available walking provider."],
                         "step_ids": [],
+                        "satisfaction": {"score": 0.0, "status": "unsatisfied", "unmet_goal_ids": ["goal-walk"],
+                                         "unmet_requirements": ["A walking provider is required."]},
                     }
                 },
             }
@@ -688,7 +687,6 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '内乡今天有雷雨。', "Preserve the tested response claim.")},
-            "goal_satisfaction": exact_satisfaction(["goal-weather"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -722,7 +720,6 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '现在有雷雨。', "Preserve the tested response claim.")},
-            "goal_satisfaction": exact_satisfaction(["goal-weather"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -765,7 +762,6 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '今晚降雨概率最高约76%。', "Preserve the tested response claim.")},
-            "goal_satisfaction": exact_satisfaction(["goal-weather"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -817,7 +813,6 @@ class FastPlannerCanonicalPlanTests(unittest.TestCase):
             "unresolved": [],
             "parameter_resolutions": [],
             "goal_outcomes": {'goal-weather': respond_outcome('goal-weather', '今晚降雨概率最高约76%。', "Preserve the tested response claim.")},
-            "goal_satisfaction": exact_satisfaction(["goal-weather"]),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -1014,14 +1009,6 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                     "rationale": "The retained execution evidence proves the blink completed.",
                 },
             },
-            "goal_satisfaction": {
-                "score": 2 / 3,
-                "status": "partial",
-                "satisfied_goal_ids": ["goal-walk", "goal-blink"],
-                "unmet_goal_ids": ["goal-blink"],
-                "unmet_requirements": ["singing"],
-                "rationale": "Stale source-plan accounting.",
-            },
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -1114,10 +1101,6 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                 "coverage": "complete",
                 "confidence": 0.95,
                 "steps": [],
-                "goal_satisfaction": {
-                    "score": 1.0,
-                    "status": "exact",
-                },
                 "goal_outcomes": {
                     "goal-weather": {
                         "step_ids": [],
@@ -1172,9 +1155,6 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                         "satisfaction": exact_satisfaction(["goal-blink"]),
                     },
                 },
-                "goal_satisfaction": exact_satisfaction(
-                    ["goal-walk", "goal-sing", "goal-blink"]
-                ),
                 "unresolved": [],
                 "parameter_resolutions": [],
                 "plan_relation": "exact",
@@ -1217,9 +1197,6 @@ class PlannerStructuralNormalizationTests(unittest.TestCase):
                             "satisfaction": exact_satisfaction(["goal-unowned"]),
                         },
                     },
-                    "goal_satisfaction": exact_satisfaction(
-                        ["goal-walk", "goal-unowned"]
-                    ),
                     "unresolved": [],
                     "parameter_resolutions": [],
                     "plan_relation": "exact",
@@ -1398,7 +1375,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "Trusted terminal weather evidence answers the Goal.",
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-weather"]),
         )
         data = {
             "location": "重庆",
@@ -1848,7 +1824,6 @@ class PlannerResolverTests(unittest.TestCase):
                         steps=[execute_step("action", capability["capability_id"], args,
                                             ["goal-action"], "Use the interval.")],
                         goal_outcomes={"goal-action": execute_outcome("goal-action", ["action"], "Covered.")},
-                        goal_satisfaction=exact_satisfaction(["goal-action"]),
                     )
                     output = PlannerModelOutput.model_validate(raw)
                     goal = {"goal_id": "goal-action", "object": {"bindings": {
@@ -3620,7 +3595,6 @@ class PlannerResolverTests(unittest.TestCase):
                         "The selected lookup covers the Goal.",
                     )
                 },
-                goal_satisfaction=exact_satisfaction(["goal-weather"]),
             )
         )
         context = {
@@ -3658,7 +3632,6 @@ class PlannerResolverTests(unittest.TestCase):
             "goal_summary": "Walk forward for fifteen seconds.",
             "steps": [],
             "goal_outcomes": {'goal-walk': respond_outcome('goal-walk', 'I did it.', "Preserve the tested response claim.")},
-            "goal_satisfaction": exact_satisfaction(["goal-walk"]),
             "unresolved": [],
             "parameter_resolutions": [],
             "plan_relation": "exact",
@@ -3715,7 +3688,6 @@ class PlannerResolverTests(unittest.TestCase):
             goal_outcomes={
                 goal_id: execute_outcome(goal_id, ["walk"], reason)
             },
-            goal_satisfaction=exact_satisfaction([goal_id], reason),
         )
         run_request = request(reason, goal_ids=[goal_id])
         context = dict(run_request.context)
@@ -3771,7 +3743,6 @@ class PlannerResolverTests(unittest.TestCase):
                 )
             ],
             goal_outcomes={goal_id: execute_outcome(goal_id, ["walk"], reason)},
-            goal_satisfaction=exact_satisfaction([goal_id], reason),
         )
         run_request = request(reason, goal_ids=[goal_id])
         context = dict(run_request.context)
@@ -3861,7 +3832,6 @@ class PlannerResolverTests(unittest.TestCase):
             goal_outcomes={
                 goal_id: execute_outcome(goal_id, ["fetch-water"], reason)
             },
-            goal_satisfaction=exact_satisfaction([goal_id], reason),
             parameter_resolutions=[],
         )
         run_request = request(
@@ -3928,7 +3898,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         repaired = {
             **invalid,
@@ -4000,7 +3969,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-walk"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
 
         plan = asyncio.run(
@@ -4017,7 +3985,7 @@ class PlannerResolverTests(unittest.TestCase):
         )
 
     def test_simple_blink_produces_complete_direct_plan(self):
-        raw = {"goal_outcomes": {'goal-blink': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['blink'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-blink'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"depends_on": [],"source_goal_ids":["goal-blink"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"goal_outcomes": {'goal-blink': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['blink'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-blink'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.94,"goal_ids":["goal-blink"],"goal_summary":"blink four times","steps":[{"step_id":"blink","capability_id":"soridormi.blink_eyes","args":{"count":4},"depends_on": [],"source_goal_ids":["goal-blink"]}]}
         plan = asyncio.run(PlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨四下眼睛。", goal_ids=["goal-blink"])))
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(plan.coverage, "complete")
@@ -4058,7 +4026,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-blink"],
                 }
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         ollama = ScriptedOllama([raw])
         plan = asyncio.run(
@@ -4092,7 +4059,6 @@ class PlannerResolverTests(unittest.TestCase):
             goal_outcomes={
                 "goal-greet": respond_outcome("goal-greet", "你好。", "Direct greeting.")
             },
-            goal_satisfaction=exact_satisfaction(["goal-greet"]),
         )
         plan = asyncio.run(PlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("你好。", goal_ids=["goal-greet"], goal_metadata={"output_mode": "speech"})))
         self.assertEqual(plan.disposition, "respond")
@@ -4125,14 +4091,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "rationale": "The location is unresolved.",
                 }
             },
-            "goal_satisfaction": {
-                "score": 0.0,
-                "status": "unsatisfied",
-                "satisfied_goal_ids": [],
-                "unmet_goal_ids": ["goal-place"],
-                "unmet_requirements": ["location"],
-                "rationale": "The location is unresolved.",
-            },
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
@@ -4144,7 +4102,7 @@ class PlannerResolverTests(unittest.TestCase):
             output.goal_outcomes["goal-place"].unresolved,
             ["location"],
         )
-        self.assertEqual(output.goal_satisfaction.status, "unsatisfied")
+        self.assertEqual(output.derived_goal_satisfaction.status, "unsatisfied")
 
     def test_unresolved_safe_read_cannot_become_direct_factual_response(self):
         output = PlannerModelOutput.model_validate(
@@ -4169,14 +4127,6 @@ class PlannerResolverTests(unittest.TestCase):
                         },
                         "rationale": "Claims a weather result.",
                     }
-                },
-                "goal_satisfaction": {
-                    "score": 1.0,
-                    "status": "exact",
-                    "satisfied_goal_ids": ["goal-weather"],
-                    "unmet_goal_ids": [],
-                    "unmet_requirements": [],
-                    "rationale": "Claims a weather result.",
                 },
             }
         )
@@ -4279,7 +4229,6 @@ class PlannerResolverTests(unittest.TestCase):
             goal_outcomes={
                 "goal-greet": respond_outcome("goal-greet", "Hello!", "Direct greeting.")
             },
-            goal_satisfaction=exact_satisfaction(["goal-greet"]),
         )
         ollama = FakeOllama(raw)
         plan = asyncio.run(
@@ -4331,7 +4280,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "source_goal_ids": ["goal-blink"],
                 },
             ],
-            "goal_satisfaction": {"score": 1.0, "status": "substantial"},
         }
         repaired = {
             **multi_goal_plan(
@@ -4350,10 +4298,6 @@ class PlannerResolverTests(unittest.TestCase):
                         "Compound request requires deeper planning.",
                     ),
                 },
-                goal_satisfaction=unsatisfied_satisfaction(
-                    ["goal-walk", "goal-blink"],
-                    "Compound request requires deep multi-goal accounting.",
-                ),
                 unresolved=["goal-walk", "goal-blink"],
             )
         }
@@ -4387,10 +4331,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-blink", "blink timing requires deeper planning"
                 ),
             },
-            goal_satisfaction=unsatisfied_satisfaction(
-                ["goal-walk", "goal-blink"],
-                "compound_goal_requires_full_planning",
-            ),
             unresolved=["concurrency feasibility", "blink count"],
         )
         plan = asyncio.run(PlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("往前走15秒，同时眨眼。", goal_ids=["goal-walk", "goal-blink"])))
@@ -4439,7 +4379,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "reason_summary": "Walk for the requested duration.",
                 }
             ],
-            "goal_satisfaction": exact_satisfaction(["goal-action"]),
         }
         run_request = request(
             "Walk for 15 seconds while blinking and singing.",
@@ -4499,7 +4438,6 @@ class PlannerResolverTests(unittest.TestCase):
                 )
                 for goal_id in goal_ids
             },
-            goal_satisfaction=exact_satisfaction(goal_ids),
             parameter_resolutions=[
                 {
                     "step_id": "walk",
@@ -4597,7 +4535,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "goal-walk": execute_outcome("goal-walk", ["walk"], "Walk."),
                 "goal-blink": execute_outcome("goal-blink", ["blink"], "Blink."),
             },
-            goal_satisfaction=exact_satisfaction(goal_ids),
         )
 
         plan = asyncio.run(
@@ -4627,9 +4564,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "goal-a": unavailable_outcome("goal-a", "Goal A needs a Capability that is not loaded."),
                 "goal-b": unavailable_outcome("goal-b", "Goal B needs a Capability that is not loaded."),
             },
-            goal_satisfaction=unsatisfied_satisfaction(
-                ["goal-a", "goal-b"], "Deep planning is required."
-            ),
             unresolved=["goal-a", "goal-b"],
         )
         ollama = FakeOllama(raw)
@@ -4687,12 +4621,8 @@ class PlannerResolverTests(unittest.TestCase):
             goal_a_satisfaction["properties"]["unmet_requirements"]["maxItems"],
             0,
         )
-        self.assertEqual(
-            schema["properties"]["goal_satisfaction"]["anyOf"][0][
-                "properties"
-            ]["satisfied_goal_ids"]["minItems"],
-            2,
-        )
+        # The Plan-level aggregate is Host-folded from the per-Goal judgments.
+        self.assertNotIn("goal_satisfaction", schema["properties"])
         self.assertLess(
             list(schema["properties"]).index("goal_outcomes"),
             list(schema["properties"]).index("steps"),
@@ -4792,9 +4722,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-blink", ["blink"], "The blink is covered."
                 ),
             },
-            goal_satisfaction=exact_satisfaction(
-                ["goal-walk", "goal-blink"]
-            ),
             parameter_resolutions=[
                 {
                     "step_id": "walk",
@@ -4859,7 +4786,6 @@ class PlannerResolverTests(unittest.TestCase):
                     goal_id, ["weather"], "The weather lookup covers the Goal."
                 )
             },
-            goal_satisfaction=exact_satisfaction([goal_id]),
         )
         repaired = {
             **initial,
@@ -5027,7 +4953,6 @@ class PlannerResolverTests(unittest.TestCase):
                     goal_id, ["weather"], "The lookup covers the Goal."
                 )
             },
-            goal_satisfaction=exact_satisfaction([goal_id]),
             parameter_resolutions=[],
         )
         catalog = FakeCatalog()
@@ -5147,7 +5072,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-walk", ["walk"], "The walk is covered."
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-walk"]),
             parameter_resolutions=[
                 {
                     "step_id": "walk",
@@ -5207,7 +5131,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-walk", ["walk"], "The walk is covered."
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-walk"]),
             parameter_resolutions=[],
         )
         ollama = FakeOllama(raw)
@@ -5268,7 +5191,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "The exact movement is covered.",
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-walk"]),
             parameter_resolutions=[
                 {
                     "step_id": "soridormi.walk_velocity",
@@ -5349,7 +5271,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-walk", ["walk"], "The walk is covered."
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-walk"]),
             parameter_resolutions=[
                 {
                     "step_id": "walk",
@@ -5408,7 +5329,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "The walk is covered.",
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-walk"]),
             parameter_resolutions=[
                 {
                     "step_id": "soridormi.walk_velocity",
@@ -5607,7 +5527,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "The exact result is retrievable.",
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-weather"]),
             parameter_resolutions=[
                 {
                     "step_id": "retrieve-weather",
@@ -5673,7 +5592,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-walk", ["walk"], "The walk is covered."
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-walk"]),
             parameter_resolutions=[
                 {
                     "step_id": "walk",
@@ -5744,10 +5662,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-blink", ["blink"], "The blink step covers this goal."
                 ),
             },
-            goal_satisfaction=exact_satisfaction(
-                ["goal-walk", "goal-blink"],
-                "Both physical goals are fully planned.",
-            ),
         )
         ollama = FakeOllama(raw)
 
@@ -5784,7 +5698,6 @@ class PlannerResolverTests(unittest.TestCase):
                 goal_summary="Blink twice; flying is unavailable.",
                 steps=[execute_step("blink", "soridormi.blink_eyes", {"count": 2}, ["goal-blink"], "Blink twice.")],
                 goal_outcomes={"goal-blink": blink, "goal-fly": fly},
-                goal_satisfaction=satisfaction,
             )
             ollama = FakeOllama(raw)
             plan = asyncio.run(PlannerResolver(ollama, FakeCatalog()).resolve(
@@ -5837,10 +5750,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "Answer the conversational goal directly.",
                 ),
             },
-            goal_satisfaction=exact_satisfaction(
-                ["goal-action", "goal-answer"],
-                "Both goals are fully planned.",
-            ),
         )
         ollama = FakeOllama(raw)
 
@@ -5883,9 +5792,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-answer", "A concise answer.", "Answer goal plan."
                 ),
             },
-            goal_satisfaction=exact_satisfaction(
-                ["goal-action", "goal-answer"]
-            ),
         )
         ollama = ScriptedOllama([initial])
 
@@ -5912,14 +5818,13 @@ class PlannerResolverTests(unittest.TestCase):
             goal_summary="Blink three times.",
             steps=[execute_step("blink", "soridormi.blink_eyes", {"count": 3}, ["goal-blink"], "Blink as requested.")],
             goal_outcomes={"goal-blink": execute_outcome("goal-blink", ["blink"], "The blink action exactly covers the Goal.")},
-            goal_satisfaction=exact_satisfaction(["goal-blink"]),
         )
         plan = asyncio.run(PlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("眨眼。", goal_ids=["goal-blink"])))
         self.assertEqual(plan.disposition, "execute")
         self.assertEqual(len(plan.steps), 1)
 
     def test_non_common_or_non_executable_skill_is_unavailable(self):
-        raw = {"goal_outcomes": {'goal-action': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['invented'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-action'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"depends_on": [],"source_goal_ids":["goal-action"]}],"goal_satisfaction":{"score":1.0,"status":"exact"}}
+        raw = {"goal_outcomes": {'goal-action': {'disposition': 'execute', 'coverage': 'complete', 'unresolved': [], 'step_ids': ['invented'], 'satisfaction': {'score': 1.0, 'status': 'exact', 'satisfied_goal_ids': ['goal-action'], 'unmet_goal_ids': [], 'unmet_requirements': []}}}, "disposition":"execute","coverage":"complete","confidence":0.95,"goal_ids":["goal-action"],"steps":[{"step_id":"invented","capability_id":"invented.skill","args":{},"depends_on": [],"source_goal_ids":["goal-action"]}]}
         plan = asyncio.run(PlannerResolver(FakeOllama(raw), FakeCatalog()).resolve(request("做点什么。", goal_ids=["goal-action"])))
         self.assertEqual(plan.disposition, "unavailable")
         self.assertEqual(plan.metadata["reason"], "step_not_in_executable_common_catalog")
@@ -5935,7 +5840,6 @@ class PlannerResolverTests(unittest.TestCase):
                 goal_outcomes={
                     "goal-greet": respond_outcome("goal-greet", "你好。", "Direct greeting.")
                 },
-                goal_satisfaction=exact_satisfaction(["goal-greet"]),
             )
         )
         planner_request = request("你好。", goal_ids=["goal-greet"], goal_metadata={"output_mode": "speech"})
@@ -5968,11 +5872,6 @@ class PlannerResolverTests(unittest.TestCase):
             "confidence": 1.0,
             "response_text": "嗯，那就快走吧，记得带伞。",
             "steps": [],
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-reaction"],
-            },
         })
         planner_request = request(
             "是得赶紧走啊。",
@@ -6014,7 +5913,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "rationale": "The retained weather result supports the decision.",
                 }
             },
-            "goal_satisfaction": exact_satisfaction([goal_id]),
         }
         ollama = ScriptedOllama([primary])
         planner_request = request(
@@ -6103,9 +6001,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-blink", ["blink"], "Blink goal covered."
                 ),
             },
-            goal_satisfaction=exact_satisfaction(
-                ["goal-walk", "goal-blink"]
-            ),
         )
         ollama = FakeOllama(raw)
 
@@ -6135,11 +6030,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "depends_on": [],
                 "source_goal_ids": ["goal-blink"],
             }],
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-blink"],
-            },
         })
 
         asyncio.run(
@@ -6154,11 +6044,12 @@ class PlannerResolverTests(unittest.TestCase):
         # Every exposed plan shape is a complete closed object; nothing outside it is required.
         for branch in plan_assignment_branches(ollama.prompts[0][1]["response_format"]):
             self.assertFalse(branch["additionalProperties"])
-            self.assertTrue({"disposition", "steps", "goal_outcomes", "goal_satisfaction"} <= set(branch["required"]))
+            self.assertTrue({"disposition", "steps", "goal_outcomes"} <= set(branch["required"]))
+            self.assertNotIn("goal_satisfaction", branch["properties"])
         self.assertNotIn("planner_tier", schema["properties"])
         self.assertNotIn("goal_ids", schema["properties"])
         self.assertIn("confidence", schema["required"])
-        self.assertIn("goal_satisfaction", schema["required"])
+        self.assertNotIn("goal_satisfaction", schema["properties"])
         step_schema = schema["$defs"]["PlannerModelStep"]
         self.assertIn("source_goal_ids", step_schema["required"])
         self.assertEqual(
@@ -6189,7 +6080,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "depends_on": [],
                 "source_goal_ids": ["goal-joke"],
             }],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         repaired = multi_goal_plan(
             disposition="respond",
@@ -6202,7 +6092,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-joke", "A short joke.", "Direct conversational response."
                 )
             },
-            goal_satisfaction=exact_satisfaction(["goal-joke"]),
         )
         ollama = ScriptedOllama([invalid, repaired])
 
@@ -6238,10 +6127,6 @@ class PlannerResolverTests(unittest.TestCase):
                     "goal-blink", "The second goal requires deeper planning."
                 ),
             },
-            goal_satisfaction=unsatisfied_satisfaction(
-                ["goal-walk", "goal-blink"],
-                "The Planner cannot safely complete the plan.",
-            ),
             unresolved=["goal-walk", "goal-blink"],
         )
         ollama = ScriptedOllama([branch_minimal, repaired])
@@ -6263,7 +6148,8 @@ class PlannerResolverTests(unittest.TestCase):
         # Every exposed plan shape is a complete closed object; nothing outside it is required.
         for branch in plan_assignment_branches(ollama.prompts[0][1]["response_format"]):
             self.assertFalse(branch["additionalProperties"])
-            self.assertTrue({"disposition", "steps", "goal_outcomes", "goal_satisfaction"} <= set(branch["required"]))
+            self.assertTrue({"disposition", "steps", "goal_outcomes"} <= set(branch["required"]))
+            self.assertNotIn("goal_satisfaction", branch["properties"])
         self.assertEqual(schema["title"], "FastPlannerMultiGoalPlanOutput")
 
     def test_same_user_text_follows_different_model_authored_plans(self):
@@ -6294,7 +6180,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "goal-a": execute_outcome("goal-a", ["s1"], "Goal A plan."),
                 "goal-b": execute_outcome("goal-b", ["s2"], "Goal B plan."),
             },
-            goal_satisfaction=exact_satisfaction(["goal-a", "goal-b"]),
         )
         second = multi_goal_plan(
             disposition="execute",
@@ -6320,7 +6205,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "goal-a": execute_outcome("goal-a", ["s1-alt"], "Goal A plan."),
                 "goal-b": execute_outcome("goal-b", ["s2-alt"], "Goal B plan."),
             },
-            goal_satisfaction=exact_satisfaction(["goal-a", "goal-b"]),
         )
 
         request_value = request(text, goal_ids=["goal-a", "goal-b"])
@@ -6374,7 +6258,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "goal-a": execute_outcome("goal-a", ["missing"], "Invalid link."),
                 "goal-b": execute_outcome("goal-b", ["valid-b"], "Valid link."),
             },
-            goal_satisfaction=exact_satisfaction(["goal-a", "goal-b"]),
         )
         ollama = FakeOllama(invalid)
         plan = asyncio.run(
@@ -6398,7 +6281,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "capability_id": "soridormi.blink_eyes",
                 "parameters": {"count": 2},
             }],
-            "goal_satisfaction": {"score": 1.0, "status": "exact"},
         }
         repaired = {
             "disposition": "execute",
@@ -6412,11 +6294,6 @@ class PlannerResolverTests(unittest.TestCase):
                 "depends_on": [],
                 "source_goal_ids": ["goal-blink"],
             }],
-            "goal_satisfaction": {
-                "score": 1.0,
-                "status": "exact",
-                "satisfied_goal_ids": ["goal-blink"],
-            },
         }
         ollama = ScriptedOllama([invalid, repaired])
 

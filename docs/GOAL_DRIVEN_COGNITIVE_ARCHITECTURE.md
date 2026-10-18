@@ -2913,6 +2913,15 @@ the aggregate diagnostic score without invalidating a fully satisfied,
 independent executable goal. Aggregate satisfaction remains useful for audit,
 but it must not silently turn all-or-nothing behavior back on.
 
+The model authors satisfaction only per Goal: every `goal_outcomes[*].satisfaction`
+is required on every `/plan` answer, for one Goal as for several. The Plan-level
+`goal_satisfaction` is Host-derived, never model-written. Host folds it
+mechanically from the per-Goal judgments (lowest score, worst status, the unions
+of satisfied/unmet Goal IDs and unmet requirements, joined rationales), the same
+rule the Evidence re-entry lift already used. Removing the redundant field from
+the model-writable schema shrinks the decoder grammar without removing a model
+judgment, and a model-written aggregate is rejected by the schema and the DTO.
+
 ## 10. Parameter resolution
 
 ### 10.1 Planning ownership

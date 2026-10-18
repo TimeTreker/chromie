@@ -225,11 +225,12 @@ def validate_goal_responsibility_outcomes(
     for goal_id, outcome in output.goal_outcomes.items():
         owned = [step for step in output.steps if goal_id in step.source_goal_ids]
         if owned and all(step.step_purpose == "acquire_information" for step in owned):
-            for assessment in (outcome.satisfaction, output.goal_satisfaction):
-                if (assessment is None or goal_id in assessment.satisfied_goal_ids
-                        or goal_id not in assessment.unmet_goal_ids
-                        or not assessment.unmet_requirements or assessment.status == "exact"):
-                    raise ValueError("Acquisition Work cannot fulfill its deferred Goal: " + goal_id)
+            # Host folds the Plan-level aggregate from these, so this is the whole check.
+            assessment = outcome.satisfaction
+            if (assessment is None or goal_id in assessment.satisfied_goal_ids
+                    or goal_id not in assessment.unmet_goal_ids
+                    or not assessment.unmet_requirements or assessment.status == "exact"):
+                raise ValueError("Acquisition Work cannot fulfill its deferred Goal: " + goal_id)
 
     cancellation_goals = goal_cancellation_evidence_reentry_goal_ids(context).intersection(
         str(goal.get("goal_id") or "") for goal in authoritative_goals
@@ -255,11 +256,11 @@ def validate_goal_responsibility_outcomes(
         matches = [condition for condition in output.time_conditions if condition.goal_id == goal_id]
         if len(matches) != 1 or matches[0].due_at_ms != due_ms:
             raise ValueError("future Goal requires its exact readiness condition: " + goal_id)
-        for assessment in (outcome.satisfaction, output.goal_satisfaction):
-            if (assessment is None or goal_id not in assessment.unmet_goal_ids
-                    or goal_id in assessment.satisfied_goal_ids
-                    or not assessment.unmet_requirements or assessment.score >= 0.95):
-                raise ValueError("waiting acknowledgement cannot fulfill future Goal: " + goal_id)
+        assessment = outcome.satisfaction
+        if (assessment is None or goal_id not in assessment.unmet_goal_ids
+                or goal_id in assessment.satisfied_goal_ids
+                or not assessment.unmet_requirements or assessment.score >= 0.95):
+            raise ValueError("waiting acknowledgement cannot fulfill future Goal: " + goal_id)
     for condition in output.time_conditions:
         outcome = output.goal_outcomes.get(condition.goal_id)
         if outcome is not None and outcome.disposition == "respond" and (
@@ -279,11 +280,11 @@ def validate_goal_responsibility_outcomes(
                 goal_id in step.source_goal_ids for step in output.steps
             ):
                 raise ValueError("cancellation reporting cannot own executable Work: " + goal_id)
-            for assessment in (outcome.satisfaction, output.goal_satisfaction):
-                if (assessment is None or goal_id not in assessment.unmet_goal_ids
-                        or goal_id in assessment.satisfied_goal_ids
-                        or not assessment.unmet_requirements or assessment.score >= 0.95):
-                    raise ValueError("cancellation reporting cannot fulfill original Goal: " + goal_id)
+            assessment = outcome.satisfaction
+            if (assessment is None or goal_id not in assessment.unmet_goal_ids
+                    or goal_id in assessment.satisfied_goal_ids
+                    or not assessment.unmet_requirements or assessment.score >= 0.95):
+                raise ValueError("cancellation reporting cannot fulfill original Goal: " + goal_id)
         if any(condition.goal_id in cancellation_goals for condition in output.time_conditions):
             raise ValueError("cancellation reporting cannot schedule original Goal")
         if cancellation_goals == {str(goal.get("goal_id") or "") for goal in authoritative_goals}:
@@ -3156,15 +3157,15 @@ def planner_contract_diagnostics(
             "execute, respond, and mixed planner output requires complete coverage",
             value=coverage,
         )
-    if disposition in {"execute", "respond", "mixed"} and not isinstance(
-        raw.get("goal_satisfaction"), dict
-    ):
+    if "goal_satisfaction" in raw:
+        # Host folds the Plan-level satisfaction from the per-Goal judgments; the
+        # decoder schema (additionalProperties=false) and the DTO both reject it.
         add(
             ["goal_satisfaction"],
-            "complete executable or response output requires goal_satisfaction",
+            "Plan-level goal_satisfaction is Host-derived and not model-writable",
             value=raw.get("goal_satisfaction"),
+            error_type="extra_forbidden",
         )
-    inspect_satisfaction(raw.get("goal_satisfaction"), ["goal_satisfaction"])
 
     outcomes = raw.get("goal_outcomes")
     expected_goal_ids = list(dict.fromkeys(expected_goal_ids_for_turn))
@@ -3185,19 +3186,6 @@ def planner_contract_diagnostics(
                 ["coverage"],
                 "an unavailable plan requires partial or uncertain coverage",
                 value=coverage,
-            )
-        satisfaction = raw.get("goal_satisfaction")
-        if not isinstance(satisfaction, dict):
-            add(
-                ["goal_satisfaction"],
-                "an unavailable plan requires model-authored goal_satisfaction",
-                value=satisfaction,
-            )
-        elif satisfaction.get("status") == "exact":
-            add(
-                ["goal_satisfaction", "status"],
-                "an unavailable plan cannot claim exact goal satisfaction",
-                value=satisfaction.get("status"),
             )
     if isinstance(outcomes, dict):
         outcome_goal_set = set(outcomes)
@@ -3236,8 +3224,22 @@ def planner_contract_diagnostics(
                     f"{planner_tier} goal outcome requires one legal explicit disposition",
                     value=outcome_disposition,
                 )
+            satisfaction = outcome.get("satisfaction")
+            if not isinstance(satisfaction, dict):
+                add(
+                    ["goal_outcomes", goal_id, "satisfaction"],
+                    "every goal outcome requires a model-authored satisfaction judgment",
+                    value=satisfaction,
+                    error_type="missing",
+                )
+            elif outcome_disposition == "unavailable" and satisfaction.get("status") == "exact":
+                add(
+                    ["goal_outcomes", goal_id, "satisfaction", "status"],
+                    "an unavailable goal outcome cannot claim exact goal satisfaction",
+                    value=satisfaction.get("status"),
+                )
             inspect_satisfaction(
-                outcome.get("satisfaction"),
+                satisfaction,
                 ["goal_outcomes", goal_id, "satisfaction"],
             )
 
@@ -3416,7 +3418,7 @@ def validate_planner_model_output(
     if planner_tier == "fast" and len(expected_goal_id_set) > 1:
         missing_envelope_fields = [
             field_name
-            for field_name in ("steps", "goal_outcomes", "goal_satisfaction")
+            for field_name in ("steps", "goal_outcomes")
             if field_name not in model_raw
         ]
         if missing_envelope_fields:
@@ -3471,9 +3473,11 @@ def validate_planner_model_output(
                 )
             if output.steps:
                 raise ValueError("an unavailable plan must not carry steps")
-            if output.goal_satisfaction is None:
-                raise ValueError("an unavailable plan requires model-authored goal_satisfaction")
-            if output.goal_satisfaction.status == "exact":
+            # Unavailable outcomes keep their Goal unmet, so the fold is never exact (free check).
+            aggregate = output.derived_goal_satisfaction
+            if aggregate is None:
+                raise ValueError("an unavailable plan requires a satisfaction judgment per Goal")
+            if aggregate.status == "exact":
                 raise ValueError("an unavailable plan cannot claim exact goal satisfaction")
         elif output.disposition == "unavailable":
             raise ValueError("an unavailable plan requires one unavailable outcome per goal")
@@ -3487,17 +3491,16 @@ def validate_planner_model_output(
                 "mixed output requires independent execute/respond, respond/clarify, or an "
                 "unavailable Goal beside executed or answered siblings"
             )
-        if "unavailable" in outcome_dispositions and output.goal_satisfaction is not None and (
-            output.goal_satisfaction.status == "exact"
-        ):
+        derived = output.derived_goal_satisfaction
+        if "unavailable" in outcome_dispositions and derived is not None and derived.status == "exact":
             raise ValueError("a plan with an unavailable Goal cannot claim exact goal satisfaction")
     for goal_id, outcome in output.goal_outcomes.items():
-        if len(expected_goal_id_set) > 1 or output.disposition == "unavailable":
-            if outcome.satisfaction is None:
-                raise ValueError("fast outcomes require model-authored satisfaction")
+        # Required on every outcome of every answer: the aggregate is folded from them.
+        if outcome.satisfaction is None:
+            raise ValueError("fast outcomes require model-authored satisfaction")
         referenced_goal_ids = {
-            *(outcome.satisfaction.satisfied_goal_ids if outcome.satisfaction else []),
-            *(outcome.satisfaction.unmet_goal_ids if outcome.satisfaction else []),
+            *outcome.satisfaction.satisfied_goal_ids,
+            *outcome.satisfaction.unmet_goal_ids,
         }
         foreign_goal_ids = referenced_goal_ids - {goal_id}
         if foreign_goal_ids:
@@ -3505,18 +3508,14 @@ def validate_planner_model_output(
                 "per-goal outcome satisfaction may reference only its enclosing "
                 f"authoritative goal ID {goal_id!r}; found " + ",".join(sorted(foreign_goal_ids))
             )
-    if planner_tier == "fast" and len(expected_goal_id_set) > 1:
-        if output.goal_satisfaction is None:
-            raise ValueError("multi-goal fast output requires model-authored goal_satisfaction")
-    if output.goal_satisfaction is not None:
-        referenced_goal_ids = {
-            *output.goal_satisfaction.satisfied_goal_ids,
-            *output.goal_satisfaction.unmet_goal_ids,
-        }
+    aggregate = output.derived_goal_satisfaction
+    if aggregate is not None:
+        # True by construction (the fold cites only the per-Goal IDs checked above); free check.
+        referenced_goal_ids = {*aggregate.satisfied_goal_ids, *aggregate.unmet_goal_ids}
         foreign_goal_ids = referenced_goal_ids - expected_goal_id_set
         if foreign_goal_ids:
             raise ValueError(
-                "top-level goal satisfaction references non-authoritative goal IDs: "
+                "derived goal satisfaction references non-authoritative goal IDs: "
                 + ",".join(sorted(foreign_goal_ids))
             )
     return output

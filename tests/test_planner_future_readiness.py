@@ -34,7 +34,6 @@ def waiting_reply(request):
         'unmet_requirements':['Wait until readiness, then acquire and deliver trusted weather evidence.'],
         'rationale':'The acknowledgement does not perform the future request.'}
     raw['goal_outcomes'][gid].update(disposition='respond',step_ids=[],response_text=raw['response_text'],satisfaction=sat)
-    raw['goal_satisfaction'] = sat
     return raw
 
 
@@ -118,7 +117,8 @@ def test_host_rejects_waiting_response_with_invalid_readiness_or_fulfillment(inv
         elif invalid=='wrong_goal':raw['time_conditions'][0]['goal_id']='unrelated-goal'
         elif invalid=='missing_condition':raw['time_conditions']=[]
         else:
-            sat=raw['goal_satisfaction']
+            gid=next(iter(raw['goal_outcomes']))
+            sat=raw['goal_outcomes'][gid]['satisfaction']
             sat.update(score=1.0,status='exact',satisfied_goal_ids=sat['unmet_goal_ids'],unmet_goal_ids=[],unmet_requirements=[])
         from agent.app.planner import PlannerResolver
         from benchmarks.datasets.fast_planner_daily_life.qualification import ReplayModel,StaticCatalog
@@ -188,8 +188,6 @@ def test_future_wait_preserves_an_independent_ready_action(tier):
         raw['goal_outcomes']['ready-blink']={'disposition':'execute','coverage':'complete','step_ids':['blink-now'],
             'satisfaction':{'score':1,'status':'exact','satisfied_goal_ids':['ready-blink'],'unmet_goal_ids':[],
                 'unmet_requirements':[],'rationale':'Successful execution satisfies the independent action.'}}
-        raw['goal_satisfaction']=copy.deepcopy(raw['goal_satisfaction'])
-        raw['goal_satisfaction'].update(score=0.5,status='partial',satisfied_goal_ids=['ready-blink'])
         from agent.app.planner_model_contract import PlannerModelOutput
         raw=PlannerModelOutput.model_validate(word_free_model_fixture(raw)).model_dump(mode='json')
         plan=await resolve(request,catalog,raw,tier)

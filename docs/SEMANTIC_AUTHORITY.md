@@ -106,7 +106,9 @@ records that Goal and materializes its identity/fields mechanically from accepte
 execution-input completeness, and
 source strategy, in one Planner decision (PLANNER-AUTHORITY-001; at most one need-first
 contract-loading call precedes it). That ownership cannot be used to reinterpret,
-widen, narrow, or invent Responsibility meaning. No maintained `RouteDecision` or
+widen, narrow, or invent Responsibility meaning. Planner judges satisfaction once per
+Goal; the Plan-level `goal_satisfaction` is a mechanical Host fold of those judgments,
+not a model-writable field and not a new semantic owner. No maintained `RouteDecision` or
 legacy Agent semantic compatibility surface remains on the Core path.
 
 WorkDAG does not add another semantic owner. Goal Association may associate/update retained

@@ -118,7 +118,6 @@ async def test_weather_goal_to_planner_preserves_information_and_temporal_scope(
         disposition="execute", coverage="complete", goal_summary=text,
         steps=[execute_step("weather", "chromie.weather.lookup", arguments, [goal_id], "Acquire the forecast.")],
         goal_outcomes={goal_id: execute_outcome(goal_id, ["weather"], "Acquire before explaining.")},
-        goal_satisfaction=exact_satisfaction([goal_id]),
         parameter_resolutions=[{"step_id": "weather", "parameter": name,
             "strategy": "semantic_realization", "value": value, "confidence": 1.0,
             "source_quote": "Check next year's Paris weather." if foreign_quote else text,
@@ -378,7 +377,6 @@ def test_canonical_literal_provenance_preserves_goal_ownership_and_explicit_bind
         disposition="execute", coverage="complete", goal_summary=description,
         steps=[execute_step("query", "chromie.weather.lookup", {"location": "Chongqing"}, ["g1"], "Acquire information.")],
         goal_outcomes={"g1": execute_outcome("g1", ["query"], "Acquire information.")},
-        goal_satisfaction=exact_satisfaction(["g1"]),
         parameter_resolutions=[{"step_id": "query", "parameter": "location", "strategy": "user_supplied",
             "value": "Chongqing", "confidence": 1.0, "source_goal_ids": [source_id]}],
     ))

@@ -967,7 +967,9 @@ and `user_confirmation_required` boolean are typed fields, not values hidden in
 an open metadata object. The host validates them, then records them in the
 canonical metadata used by the existing runtime. Goal satisfaction describes
 prospective plan adequacy if the proposed response and steps succeed, not
-already-completed execution.
+already-completed execution. The model writes it per Goal only; the Plan-level
+`goal_satisfaction` is folded by the host from those judgments and is not a
+model-writable field.
 
 The planners exclude response-transport skills such as `chromie.speak` from
 their capability schemas. Planner outcomes carry word-free communication Needs;

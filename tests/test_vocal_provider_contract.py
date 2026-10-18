@@ -144,7 +144,6 @@ def vocal_model_output(
                     "rationale": "The exact vocal provider owns completion.",
                 }
             },
-            "goal_satisfaction": exact_satisfaction("goal-vocal"),
             "plan_relation": "exact",
             "user_confirmation_required": False,
         }
