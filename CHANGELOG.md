@@ -5,6 +5,14 @@ remains available in Git history.
 
 ## Unreleased
 
+### Remote inference disclosure policy (2026-10-18)
+
+- A remote provider (`AGENT_LLM_PROVIDER=anthropic` or `openai`) now needs
+  `AGENT_REMOTE_INFERENCE_DISCLOSURE` to be set, or the Agent refuses to start.
+  `full` keeps the prompts unchanged; `public_only` withholds relational Memory
+  and any entry not marked `public` or `self_context` from every role's context at
+  the Agent ingress and logs what it withheld. Local providers are unaffected.
+
 ### Planner decoder shows each disposition/step assignment (2026-10-18)
 
 - The canonical and multi-Goal Planner schemas kept the disposition/step

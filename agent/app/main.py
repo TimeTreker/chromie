@@ -26,6 +26,7 @@ from .clients.model_client_factory import build_model_client
 from .clients.ollama_client import OllamaGenerationError, llm_failure_metadata
 from .clients.weather_client import OpenMeteoWeatherClient
 from .local_tool_execution import LocalToolExecutor
+from .remote_disclosure import apply_remote_inference_disclosure, disclose_request_context
 from .cognitive_gateway import AttentionReviewer
 from .cognitive_activation import CognitiveActivationResolver
 
@@ -81,6 +82,20 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
 )
 logger = logging.getLogger("chromie.agent")
+
+
+def _disclosed(request, purpose: str):
+    """Project a role request's context through the remote disclosure policy."""
+
+    if not settings.remote_inference:
+        return request
+    return disclose_request_context(request, policy=settings.remote_inference_disclosure, purpose=purpose)
+
+
+if settings.remote_inference:
+    logger.info(
+        "remote_inference provider=%s disclosure=%s", settings.llm_provider, settings.remote_inference_disclosure,
+    )
 
 
 ollama_client = build_model_client(
@@ -505,6 +520,10 @@ async def interpret_cognitive_turn(
         mode="json"
     )
     context["gateway_admission_complete"] = True
+    if settings.remote_inference:
+        context = apply_remote_inference_disclosure(
+            context, policy=settings.remote_inference_disclosure, purpose="user_meaning_interpreter",
+        )
     try:
         interpretation = await interpret_user_meaning(
             UserMeaningInterpretationRequest(
@@ -564,6 +583,8 @@ async def resolve_plan_advance(request: CognitiveWorkRequest):
     # The Planner authors the first Activity Plan over UMI Responsibility refs.
     # Agent Skill disclosure remains deferred; the endpoint may select only the
     # bounded common Capability catalog supplied by the Planner resolver.
+    request = _disclosed(request, "fast_planner")
+
     async def frames():
         async for frame in planner_resolver.stream_advance(request):
             yield frame.model_dump_json(exclude_none=True) + "\n"
@@ -576,7 +597,7 @@ async def resolve_plan(request: CognitiveWorkRequest):
     if planner_resolver is None:
         raise HTTPException(status_code=503, detail="Planner is disabled")
     prepared, disclosure = await agent_skill_progressive_disclosure.prepare_agent_request(
-        request,
+        _disclosed(request, "fast_planner"),
         "fast_planner",
     )
     result = await planner_resolver.resolve(prepared)
@@ -588,7 +609,7 @@ async def resolve_social_cognition(request: SocialCognitionRequest):
     if social_cognition_resolver is None:
         raise HTTPException(status_code=503, detail="Social Cognition is unavailable")
     try:
-        return await social_cognition_resolver.resolve(request)
+        return await social_cognition_resolver.resolve(_disclosed(request, "social_cognition"))
     except OllamaGenerationError as exc:
         raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
     except ValueError as exc:
@@ -600,7 +621,7 @@ async def resolve_social_startup_greeting(request: SocialStartupGreetingRequest)
     if social_cognition_resolver is None:
         raise HTTPException(status_code=503, detail="Social Cognition is unavailable")
     try:
-        return await social_cognition_resolver.resolve_startup_greeting(request)
+        return await social_cognition_resolver.resolve_startup_greeting(_disclosed(request, "social_cognition"))
     except OllamaGenerationError as exc:
         raise HTTPException(status_code=503, detail=llm_failure_metadata(exc)) from exc
     except ValueError as exc:
@@ -611,14 +632,14 @@ async def resolve_social_startup_greeting(request: SocialStartupGreetingRequest)
 async def resolve_value_judgment(request: CognitiveWorkRequest):
     if value_judgment_resolver is None:
         raise HTTPException(status_code=503, detail="Value Judgment is disabled")
-    return await value_judgment_resolver.resolve(request)
+    return await value_judgment_resolver.resolve(_disclosed(request, "value_judgment"))
 
 
 @app.post("/reflection")
 async def resolve_reflection(request: ReflectionRequest):
     if reflection_resolver is None:
         raise HTTPException(status_code=503, detail="Reflection is disabled")
-    return await reflection_resolver.resolve(request)
+    return await reflection_resolver.resolve(_disclosed(request, "reflection"))
 
 
 @app.post("/tools/execute", response_model=ToolExecutionResponse)
@@ -631,7 +652,7 @@ async def execute_local_tool(request: ToolExecutionRequest) -> ToolExecutionResp
 async def resolve_goal_association(request: CognitiveWorkRequest):
     if goal_association_resolver is None:
         raise HTTPException(status_code=503, detail="Goal association resolver is disabled")
-    return await goal_association_resolver.resolve(request)
+    return await goal_association_resolver.resolve(_disclosed(request, "goal_association"))
 
 
 @app.get("/agent-skills", response_model=AgentSkillRegistrySnapshot)
