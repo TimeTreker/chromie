@@ -87,11 +87,20 @@ class _GroupedBodyProvider(MockCapabilityProvider):
     def __init__(self, *, delay_s: float = 0.0) -> None:
         super().__init__("body", delay_s=delay_s)
         self.group_calls: list[list[str]] = []
+        self.in_flight: list[tuple[float, float]] = []
+
+    async def execute(self, request, definition, context):
+        started = time.perf_counter()
+        result = await super().execute(request, definition, context)
+        self.in_flight.append((started, time.perf_counter()))
+        return result
 
     async def execute_group(self, items):
         self.group_calls.append([request.request_id for request, _, _ in items])
+        started = time.perf_counter()
         if self.delay_s:
             await asyncio.sleep(self.delay_s)
+        self.in_flight.append((started, time.perf_counter()))
         return [
             CapabilityResult(
                 request_id=request.request_id,
@@ -103,6 +112,20 @@ class _GroupedBodyProvider(MockCapabilityProvider):
             )
             for request, definition, _ in items
         ]
+
+
+class _TimedSpeechProvider(MockCapabilityProvider):
+    """Record when each speech call is in flight so overlap is observed, not timed."""
+
+    def __init__(self, provider_id: str, *, delay_s: float = 0.0) -> None:
+        super().__init__(provider_id, delay_s=delay_s)
+        self.in_flight: list[tuple[float, float]] = []
+
+    async def execute(self, request, definition, context):
+        started = time.perf_counter()
+        result = await super().execute(request, definition, context)
+        self.in_flight.append((started, time.perf_counter()))
+        return result
 
 
 class _InteractionRuntimeView:
@@ -422,7 +445,7 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         registry.register(local_speech_definition())
         registry.register(walk)
         runtime = CapabilityRuntime(registry, max_concurrency=3)
-        speech_provider = MockCapabilityProvider(
+        speech_provider = _TimedSpeechProvider(
             local_speech_definition().provider_id,
             delay_s=0.08,
         )
@@ -430,15 +453,19 @@ class ExecutionLaneRuntimeTests(unittest.IsolatedAsyncioTestCase):
         runtime.register_provider(speech_provider)
         runtime.register_provider(body_provider)
 
-        started = time.perf_counter()
         result = await submit_and_wait_terminal(runtime,
             response,
             authorization=RuntimeAuthorization(),
         )
-        elapsed = time.perf_counter() - started
 
         self.assertEqual(result.status, "completed")
-        self.assertLess(elapsed, 0.20)
+        # The lanes overlap when each provider starts before the other finishes.
+        # Observing the in-flight windows avoids a wall-clock bound that a slow
+        # CI scheduler can miss even though the lanes did run together.
+        (speech_started, speech_finished), = speech_provider.in_flight
+        (walk_started, walk_finished), = body_provider.in_flight
+        self.assertLess(speech_started, walk_finished)
+        self.assertLess(walk_started, speech_finished)
         self.assertEqual(len(speech_provider.calls), 1)
         self.assertEqual(
             speech_provider.calls[0].metadata["execution_lane"],
