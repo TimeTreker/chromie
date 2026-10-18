@@ -13,6 +13,16 @@ remains available in Git history.
   and any entry not marked `public` or `self_context` from every role's context at
   the Agent ingress and logs what it withheld. Local providers are unaffected.
 
+### Remote OpenAI-compatible provider: model resolution and schema state (2026-10-18)
+
+- `AGENT_LLM_PROVIDER=openai` no longer reuses a role model key as the remote
+  model name: a tag without a colon (`chromie-gemma4-12b` on the RTX 5090 profile)
+  used to be sent to the remote service in place of `AGENT_OPENAI_MODEL`. Role keys
+  stay local; `AGENT_OPENAI_MODEL_<PURPOSE>` names a remote model for one role.
+- The OpenAI-compatible client re-validates each answer against the schema of its
+  own request instead of a schema stored on the shared client, so concurrent role
+  calls can no longer skip or cross validation.
+
 ### Planner decoder shows each disposition/step assignment (2026-10-18)
 
 - The canonical and multi-Goal Planner schemas kept the disposition/step

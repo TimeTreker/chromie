@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -53,6 +54,19 @@ class AnthropicProviderSettings(BaseModel):
         return candidate if candidate.startswith("claude-") else self.model
 
 
+_OPENAI_ROLE_MODEL_PREFIX = "AGENT_OPENAI_MODEL_"
+
+
+def _openai_role_models(environ: Mapping[str, str]) -> dict[str, str]:
+    """Per-purpose remote models: ``AGENT_OPENAI_MODEL_<PURPOSE>`` -> ``purpose``."""
+
+    return {
+        name[len(_OPENAI_ROLE_MODEL_PREFIX):].casefold(): value.strip()
+        for name, value in environ.items()
+        if name.startswith(_OPENAI_ROLE_MODEL_PREFIX) and name != _OPENAI_ROLE_MODEL_PREFIX and value.strip()
+    }
+
+
 class OpenAICompatibleProviderSettings(BaseModel):
     """Any remote OpenAI-compatible chat service, selected by AGENT_LLM_PROVIDER=openai.
 
@@ -75,12 +89,22 @@ class OpenAICompatibleProviderSettings(BaseModel):
         default_factory=lambda: int(os.getenv("AGENT_OPENAI_TIMEOUT_FLOOR_MS", "120000")), ge=1000
     )
 
-    def model_for_role(self, role_model: str | None) -> str:
-        """A role key that names a remote model (contains ``/`` or no local ``:tag``) is kept."""
+    role_models: dict[str, str] = Field(default_factory=lambda: _openai_role_models(os.environ))
 
-        candidate = str(role_model or "").strip()
-        if candidate and ":" not in candidate:
-            return candidate
+    def model_for_role(self, role_model: str | None, *, purpose: str | None = None) -> str:
+        """Resolve the remote model for one role by its explicit purpose key only.
+
+        Role model keys (``AGENT_PLANNER_MODEL`` and friends) name local tags for
+        the local providers, and an arbitrary remote name cannot be told from a
+        local one (``chromie-gemma4-12b`` has no ``:tag`` either), so the local key
+        is never reused here. ``AGENT_OPENAI_MODEL_<PURPOSE>`` (for example
+        ``AGENT_OPENAI_MODEL_FAST_PLANNER``) overrides ``model`` for that role.
+        """
+
+        del role_model  # a local tag by contract; see the docstring
+        key = str(purpose or "").strip().casefold()
+        if key and key in self.role_models:
+            return self.role_models[key]
         return self.model
 
     def api_key(self) -> str:
