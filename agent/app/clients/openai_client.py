@@ -81,7 +81,7 @@ class OpenAICompatibleClient(SGLangClient):
     ) -> None:
         configured = service_settings or AgentServiceSettings()
         self.openai_settings = configured.openai
-        resolved_model = configured.openai.model_for_role(model)
+        resolved_model = configured.openai.model_for_role(model, purpose=purpose)
         if not resolved_model:
             # OllamaClient would otherwise fall back to the local default tag.
             raise ValueError("AGENT_OPENAI_MODEL is required when AGENT_LLM_PROVIDER=openai")
@@ -145,28 +145,10 @@ class OpenAICompatibleClient(SGLangClient):
         ):
             self._log_budget_diagnostic(min(diagnostic.level, logging.WARNING), diagnostic.render())
 
-    def _parse_json(self, text: str) -> dict[str, Any]:
-        parsed = super()._parse_json(text)
-        schema = getattr(self, "_active_schema", None)
+    def _parse_json(self, text: str, *, schema: dict[str, Any] | None = None) -> dict[str, Any]:
+        # The schema travels with the request: this client is shared by concurrent
+        # calls, so instance state could validate one answer against another's schema.
+        parsed = super()._parse_json(text, schema=schema)
         if isinstance(schema, dict):
             check_canonical_schema(text, schema, purpose=self.purpose, model=self.model)
         return parsed
-
-    async def _generate(
-        self,
-        prompt: str,
-        *,
-        system: str | None = None,
-        options: dict[str, Any] | None = None,
-        response_format: ResponseFormat = "text",
-        prefix_probe_call_id: str | None = None,
-        evidence_context: dict[str, Any] | None = None,
-    ) -> str | dict[str, Any]:
-        self._active_schema = response_format if isinstance(response_format, dict) else None
-        try:
-            return await super()._generate(
-                prompt, system=system, options=options, response_format=response_format,
-                prefix_probe_call_id=prefix_probe_call_id, evidence_context=evidence_context,
-            )
-        finally:
-            self._active_schema = None

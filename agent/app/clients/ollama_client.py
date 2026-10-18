@@ -1278,7 +1278,8 @@ class OllamaClient:
             colorize_for_cli(rendered, level, env_var="CHROMIE_CLI_COLOR"),
         )
 
-    def _parse_json(self, text: str) -> dict[str, Any]:
+    def _parse_json(self, text: str, *, schema: dict[str, Any] | None = None) -> dict[str, Any]:
+        del schema  # the local decoder enforced it; remote clients re-check it
         cleaned = self._strip_code_fence(text)
 
         try:
