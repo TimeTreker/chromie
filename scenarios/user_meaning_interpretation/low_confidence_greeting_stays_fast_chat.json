@@ -3,7 +3,7 @@
   "id": "low_confidence_greeting_stays_fast_chat",
   "suite": "user_meaning_interpretation",
   "level": "module",
-  "description": "UMI preserves a benign greeting as conversational meaning; Fast Planner can answer it without Deep Planner.",
+  "description": "UMI preserves a benign greeting as conversational meaning; the Planner establishes the answer need and Social Cognition says it.",
   "tags": [
     "chat",
     "low-confidence",

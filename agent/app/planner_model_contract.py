@@ -110,7 +110,7 @@ def is_planner_step_capability(capability_id: str) -> bool:
         | DETERMINISTIC_CONTROL_CAPABILITY_IDS
     ):
         return False
-    # Fast Planner already receives a current provider-neutral Capability index
+    # The Planner already receives a current provider-neutral Capability index
     # and has one bounded exact-detail lookup. Executing a provider's own catalog
     # introspection or realization pipeline adds a redundant model round trip and
     # creates no user Work.

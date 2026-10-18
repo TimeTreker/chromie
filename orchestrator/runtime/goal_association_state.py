@@ -673,7 +673,7 @@ def apply_planner_information_gaps(
                     "operation": "planner_information_gap",
                     "goal_version": int(context.get("goal_version") or 1),
                     "ts_ms": now,
-                    "reason_summary": "Fast Planner selected user clarification.",
+                    "reason_summary": "The Planner selected user clarification.",
                 }
             )
             context["operation_history"] = history[-24:]

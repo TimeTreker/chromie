@@ -1582,10 +1582,10 @@ async def plan_evidence_bound_capability_result_response(
     plan: Any,
     session_id: str | None,
 ) -> InteractionResponse | None:
-    """Reactivate Fast Planner from bounded terminal Evidence.
+    """Reactivate the Planner from bounded terminal Evidence.
 
     Complete observations stay in the immutable ExecutionOutcomeBundle. The
-    Host preserves exact Goal/Plan/request binding, Fast Planner selects the
+    Host preserves exact Goal/Plan/request binding, the Planner selects the
     still-needed Communicative Activity, and Runtime validates its evidence
     provenance before delivery.
     """

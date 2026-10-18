@@ -3285,7 +3285,7 @@ class PlannerResolverTests(unittest.TestCase):
             "continuations": ["deep_planner"],
             "confidence": 0.94,
             "unresolved": [],
-            "reason_summary": "The weather lookup should continue in Deep Planner.",
+            "reason_summary": "The weather lookup should continue in a later pass.",
         }
         run_request = _work_request(
             sid="turn-weather-invalid-continuation",
@@ -4624,8 +4624,8 @@ class PlannerResolverTests(unittest.TestCase):
             goal_summary="Two independent goals.",
             steps=[],
             goal_outcomes={
-                "goal-a": unavailable_outcome("goal-a", "Goal A needs Deep Planner."),
-                "goal-b": unavailable_outcome("goal-b", "Goal B needs Deep Planner."),
+                "goal-a": unavailable_outcome("goal-a", "Goal A needs a Capability that is not loaded."),
+                "goal-b": unavailable_outcome("goal-b", "Goal B needs a Capability that is not loaded."),
             },
             goal_satisfaction=unsatisfied_satisfaction(
                 ["goal-a", "goal-b"], "Deep planning is required."
@@ -6237,7 +6237,7 @@ class PlannerResolverTests(unittest.TestCase):
             },
             goal_satisfaction=unsatisfied_satisfaction(
                 ["goal-walk", "goal-blink"],
-                "The Fast Planner cannot safely complete the plan.",
+                "The Planner cannot safely complete the plan.",
             ),
             unresolved=["goal-walk", "goal-blink"],
         )

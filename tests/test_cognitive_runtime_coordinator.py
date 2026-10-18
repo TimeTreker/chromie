@@ -2151,7 +2151,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                 activities=[],
                 confidence=0.95,
                 unresolved=["terminal bounded limitation"],
-                reason_summary="Fast Planner terminal refused decision.",
+                reason_summary="Planner terminal refused decision.",
             )
 
     def test_fast_unavailable_is_terminal_without_second_fast_call(self):
@@ -2166,7 +2166,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     activities=[],
                     confidence=0.95,
                     unresolved=["terminal bounded limitation"],
-                    reason_summary=f"Fast Planner terminal {disposition} decision.",
+                    reason_summary=f"Planner terminal {disposition} decision.",
                 )
                 client = ScriptedClient(
                     association=association,
@@ -3586,7 +3586,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     failure_domain="model_contract",
                     architecture_attribution="fast_planner",
                     retryable=False,
-                    reason="invalid Fast Planner contract",
+                    reason="invalid Planner contract",
                 )
 
         client = ContractFailureClient(
@@ -3641,7 +3641,7 @@ class GoalDrivenRuntimeTests(unittest.TestCase):
                     failure_domain="model_contract",
                     architecture_attribution="fast_planner",
                     retryable=False,
-                    reason="invalid Fast Planner contract",
+                    reason="invalid Planner contract",
                 )
 
         client = ContractFailureClient(

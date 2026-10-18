@@ -134,7 +134,7 @@ def project_responsibility_decisions(
     if not decisions:
         return output
     if set(decisions) != set(responsibility_refs):
-        raise PlannerDTOContractError("Fast Planner must decide every Responsibility exactly once")
+        raise PlannerDTOContractError("Planner must decide every Responsibility exactly once")
     roles: dict[str, set[str]] = {}
     for activity in output.activities:
         for ref in activity.source_responsibility_refs:
@@ -173,7 +173,7 @@ def project_responsibility_decisions(
     implied = next(iter(kinds)) if len(kinds) == 1 else "mixed"
     if output.disposition != implied:
         raise PlannerDTOContractError(
-            f"Fast Planner disposition {output.disposition} contradicts its Responsibility decisions ({implied})")
+            f"Planner disposition {output.disposition} contradicts its Responsibility decisions ({implied})")
     return output.model_copy(update={"activities": activities})
 
 
@@ -208,7 +208,7 @@ def normalize_fast_capability_activity_purpose(
         if declared_acquisition:
             if explicitly_authored and activity.step_purpose != "acquire_information":
                 raise PlannerDTOContractError(
-                    "Fast Planner step_purpose contradicts Capability resource contract: "
+                    "Planner step_purpose contradicts Capability resource contract: "
                     + activity.capability_id
                 )
             description = " ".join(str(definition.get("description") or "").strip().split())
@@ -226,13 +226,13 @@ def normalize_fast_capability_activity_purpose(
             changed = True
         elif explicitly_authored and activity.step_purpose == "acquire_information":
             raise PlannerDTOContractError(
-                "Fast Planner marked a Capability as information acquisition without "
+                "Planner marked a Capability as information acquisition without "
                 "a provider-declared acquisition contract: " + activity.capability_id
             )
         elif activity.deferred_requirement:
             # Only a read leaves a decision for re-entry; an effect waits on it (deferred).
             raise PlannerDTOContractError(
-                "Fast Planner put a deferred requirement on a non-acquisition Capability: "
+                "Planner put a deferred requirement on a non-acquisition Capability: "
                 + activity.capability_id
             )
         activities.append(activity)
@@ -641,7 +641,7 @@ def validate_fast_advance_output(
     responsibility_refs = [item.local_ref for item in responsibilities]
     if set(output.covered_responsibility_refs) != set(responsibility_refs):
         raise PlannerDTOContractError(
-            "Fast Planner must cover exactly the authoritative Responsibility refs"
+            "Planner must cover exactly the authoritative Responsibility refs"
         )
     by_ref = {item.local_ref: item for item in responsibilities}
     situation_observations = situation_source_observations(request.context)
@@ -662,11 +662,11 @@ def validate_fast_advance_output(
     ancestors: dict[str, set[str]] = {}
     for activity in capability_activities:
         if activity.activity_id in ancestors:
-            raise PlannerDTOContractError("Fast Planner activity_id must be unique: " + activity.activity_id)
+            raise PlannerDTOContractError("Planner activity_id must be unique: " + activity.activity_id)
         unknown = [ref for ref in activity.depends_on if ref not in ancestors]
         if unknown:
             raise FastAdvanceMechanicalSchedulingError(
-                "Fast Planner depends_on must cite earlier Capability Activities: "
+                "Planner depends_on must cite earlier Capability Activities: "
                 f"{activity.activity_id} -> {','.join(unknown)}"
             )
         ancestors[activity.activity_id] = set(activity.depends_on).union(
@@ -721,7 +721,7 @@ def validate_fast_advance_output(
                     for second in terminal_by_ref[second_ref]
                 ):
                     raise FastAdvanceMechanicalSchedulingError(
-                        "Fast Planner dependencies contradict typed Responsibility order: "
+                        "Planner dependencies contradict typed Responsibility order: "
                         f"{first_ref} must precede {second_ref}"
                     )
         for target_ref in sibling_refs(source.bindings.get("parallel_with")):
@@ -731,7 +731,7 @@ def validate_fast_advance_output(
                 for second in terminal_by_ref[target_ref]
             ):
                 raise FastAdvanceMechanicalSchedulingError(
-                    "Fast Planner dependencies or Capability contracts contradict typed "
+                    "Planner dependencies or Capability contracts contradict typed "
                     f"Responsibility concurrency: {source_ref} must run parallel with {target_ref}"
                 )
     complete_response_activities = [
@@ -777,12 +777,12 @@ def validate_fast_advance_output(
                 if not count_binding_is_realized(name, binding, owned_work):
                     if not any(_count_argument_names(definition, name) for definition, _ in owned_work):
                         raise PlannerDTOContractError(
-                            "Fast Planner cannot validate repetition through an unrelated "
+                            "Planner cannot validate repetition through an unrelated "
                             "numeric argument: Capability has no count input; "
                             f"source_ref={source_ref} binding={name}"
                         )
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner numeric Capability input contradicts UMI binding: "
+                        "Planner numeric Capability input contradicts UMI binding: "
                         "owned work omitted the exact declared repetition value; "
                         f"source_ref={source_ref} binding={name}"
                     )
@@ -792,7 +792,7 @@ def validate_fast_advance_output(
             source_ref in activity.source_responsibility_refs for activity in capability_activities
         ):
             raise PlannerDTOContractError(
-                "Fast Planner Capability args omitted explicit numeric "
+                "Planner Capability args omitted explicit numeric "
                 f"Responsibility bindings for {source_ref}: "
                 + ",".join(str(value) for value in missing_numbers)
             )
@@ -809,7 +809,7 @@ def validate_fast_advance_output(
         missing_terminal_refs = set(responsibility_refs) - terminal_refs
         if missing_terminal_refs:
             raise PlannerDTOContractError(
-                "Fast Planner must supply one terminal Activity for every "
+                "Planner must supply one terminal Activity for every "
                 "authoritative Responsibility before claiming a terminal "
                 "disposition; missing=" + ",".join(sorted(missing_terminal_refs))
             )
@@ -835,7 +835,7 @@ def validate_fast_advance_output(
         unknown_refs = set(activity.source_responsibility_refs) - set(by_ref)
         if unknown_refs:
             raise PlannerDTOContractError(
-                "Fast Planner Activity references unknown Responsibilities: "
+                "Planner Activity references unknown Responsibilities: "
                 + ",".join(sorted(unknown_refs))
             )
         if activity.role == "clarification":
@@ -909,7 +909,7 @@ def validate_fast_advance_output(
                 or activity.args.get("mode") != source.output_mode
             ):
                 raise PlannerDTOContractError(
-                    "Fast Planner must preserve a mode-specific vocal "
+                    "Planner must preserve a mode-specific vocal "
                     "Responsibility through the exact qualified vocal provider; "
                     f"source_ref={source_ref} expected_capability="
                     f"{VOCAL_PERFORMANCE_CAPABILITY_ID} expected_mode="
@@ -960,7 +960,7 @@ def validate_fast_advance_output(
                     ):
                         continue
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner sibling repetition requires its own source or Capability default: "
+                        "Planner sibling repetition requires its own source or Capability default: "
                         f"{activity.capability_id}.{parameter}"
                     )
         for source_ref in activity.source_responsibility_refs:
@@ -970,7 +970,7 @@ def validate_fast_advance_output(
             )
             if missing:
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner omitted declared argument realization: "
+                    "Planner omitted declared argument realization: "
                     f"{activity.capability_id}; source_ref={source_ref}; "
                     + ",".join(missing)
                 )
@@ -997,7 +997,7 @@ def validate_fast_advance_output(
                     or Decimal(str(actual)) != Decimal(str(expected))
                 ):
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner numeric Capability input contradicts UMI binding: "
+                        "Planner numeric Capability input contradicts UMI binding: "
                         f"{activity.capability_id}.{name}; source_ref={source_ref} "
                         f"expected={expected!r} actual={actual!r}"
                     )
@@ -1005,20 +1005,20 @@ def validate_fast_advance_output(
         for parameter, span in activity.argument_sources.items():
             if parameter not in activity.args:
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner argument source names a missing argument: "
+                    "Planner argument source names a missing argument: "
                     f"{activity.activity_id}.{parameter}"
                 )
             if isinstance(span, FastPlannerSituationArgumentSource):
                 observed = situation_observations.get(span.situation_interpretation_ref)
                 if observed is None or not provider_resolves_required_source(definition, parameter):
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner Situation source must cite a current perception "
+                        "Planner Situation source must cite a current perception "
                         f"observation for a provider-owned source: {activity.activity_id}.{parameter}"
                     )
                 # Where the resource is comes from that observation, so its numbers do.
                 if not _source_numbers(activity.args[parameter]) <= _source_numbers(observed):
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner Situation source contradicts its cited observation: "
+                        "Planner Situation source contradicts its cited observation: "
                         f"{activity.activity_id}.{parameter}"
                     )
                 continue
@@ -1027,7 +1027,7 @@ def validate_fast_advance_output(
             if contextual:
                 if span.source_responsibility_ref not in activity.source_responsibility_refs:
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner argument source must cite an owning Responsibility"
+                        "Planner argument source must cite an owning Responsibility"
                     )
                 source_text = by_ref[span.source_responsibility_ref].outcome
             try:
@@ -1035,7 +1035,7 @@ def validate_fast_advance_output(
                 cited_quotes[parameter] = quote
             except ValueError as exc:
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner argument source must cite its immutable source: "
+                    "Planner argument source must cite its immutable source: "
                     f"{activity.activity_id}.{parameter}"
                 ) from exc
             if provider_resolves_required_source(definition, parameter):
@@ -1046,7 +1046,7 @@ def validate_fast_advance_output(
                 }
                 if (_source_numbers(activity.args[parameter]) & observed_numbers) - _source_numbers(quote):
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner source attributes an observed value to the person's words; "
+                        "Planner source attributes an observed value to the person's words; "
                         f"cite its Situation observation: {activity.activity_id}.{parameter}"
                     )
             if not quote.strip() or (not contextual and not any(
@@ -1057,7 +1057,7 @@ def validate_fast_advance_output(
                 for ref in activity.source_responsibility_refs
             )):
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner argument source must stay inside an owning Responsibility source span: "
+                    "Planner argument source must stay inside an owning Responsibility source span: "
                     f"{activity.activity_id}.{parameter}"
                 )
         required_inputs = set(input_schema.get("required") or [])
@@ -1078,7 +1078,7 @@ def validate_fast_advance_output(
         falsely_cited.difference_update(scoped_count_parameters)
         if falsely_cited:
             raise AuthoritativeGroundingValidationError(
-                "Fast Planner binding-grounded argument cannot cite the current UserTurn: "
+                "Planner binding-grounded argument cannot cite the current UserTurn: "
                 f"{activity.capability_id}; arguments={','.join(sorted(falsely_cited))}"
             )
         memory_parameters: set[str] = set()
@@ -1154,7 +1154,7 @@ def validate_fast_advance_output(
                 actual_target_ref = str(activity.args.get(parameter) or "").strip()
                 if not expected_target_ref or actual_target_ref != expected_target_ref:
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner target realization must copy exact "
+                        "Planner target realization must copy exact "
                         "current trusted target evidence: "
                         f"{activity.capability_id}.{parameter}"
                     )
@@ -1187,7 +1187,7 @@ def validate_fast_advance_output(
                     ]
                     if missing_sources:
                         raise AuthoritativeGroundingValidationError(
-                            "Fast Planner structured resource realization omitted "
+                            "Planner structured resource realization omitted "
                             "exact UMI bindings: "
                             f"{activity.capability_id}.{parameter}="
                             + ",".join(sorted(missing_sources))
@@ -1198,12 +1198,12 @@ def validate_fast_advance_output(
                 unresolved = source_value in ({"status": "unknown"}, {"status": "provider_resolved"})
                 if not unresolved and parameter not in activity.argument_sources:
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner unbound provider-resolved source must contain "
+                        "Planner unbound provider-resolved source must contain "
                         f"only its unresolved status: {activity.capability_id}.{parameter}"
                     )
                 if unresolved and parameter in activity.argument_sources:
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner unresolved provider source cannot claim a source citation"
+                        "Planner unresolved provider source cannot claim a source citation"
                     )
                 continue
             derivation = _argument_derivation_contract(definition, parameter)
@@ -1215,7 +1215,7 @@ def validate_fast_advance_output(
                     or source_parameter not in activity.args
                 ):
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner derived Capability input lacks its declared source "
+                        "Planner derived Capability input lacks its declared source "
                         f"argument: {activity.capability_id}.{parameter}"
                     )
                 source_value = activity.args[source_parameter]
@@ -1241,7 +1241,7 @@ def validate_fast_advance_output(
                     )
                 if not source_is_grounded:
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner derived Capability input depends on an ungrounded "
+                        "Planner derived Capability input depends on an ungrounded "
                         f"source argument: {activity.capability_id}.{parameter}<-{source_parameter}"
                     )
                 if (
@@ -1251,7 +1251,7 @@ def validate_fast_advance_output(
                     )
                 ):
                     raise AuthoritativeGroundingValidationError(
-                        "Fast Planner derived Capability input changed canonical source "
+                        "Planner derived Capability input changed canonical source "
                         f"identity: {activity.capability_id}.{parameter}<-{source_parameter}"
                     )
                 continue
@@ -1266,7 +1266,7 @@ def validate_fast_advance_output(
                         and not _cited_span_supports_string(value, cited_quotes[parameter])
                     ):
                         raise AuthoritativeGroundingValidationError(
-                            "Fast Planner cited span does not contain its string value: "
+                            "Planner cited span does not contain its string value: "
                             f"{activity.capability_id}.{parameter}"
                         )
                     continue
@@ -1297,7 +1297,7 @@ def validate_fast_advance_output(
                     # removed above so model-authored Work stays minimal.
                     continue
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner cannot invent an unbound Capability input before "
+                    "Planner cannot invent an unbound Capability input before "
                     "canonical Goal grounding: "
                     f"{activity.capability_id}.{parameter}"
                 )
@@ -1308,7 +1308,7 @@ def validate_fast_advance_output(
             # otherwise identical bound value is admitted at the earlier stage.
             if not _material_values_equal(actual, expected):
                 raise AuthoritativeGroundingValidationError(
-                    "Fast Planner required Capability input contradicts UMI "
+                    "Planner required Capability input contradicts UMI "
                     f"binding: {activity.capability_id}.{parameter}"
                 )
 
@@ -1325,7 +1325,7 @@ def validate_fast_advance_output(
         missing_meaning = unresolved_meaning - cited_meaning
         if missing_meaning:
             raise AuthoritativeGroundingValidationError(
-                "Fast Planner terminal work omitted UMI unresolved meaning: "
+                "Planner terminal work omitted UMI unresolved meaning: "
                 + ",".join(sorted(missing_meaning))
             )
     blocked_refs = {
@@ -1338,7 +1338,7 @@ def validate_fast_advance_output(
     }
     if conflicting_refs:
         raise AuthoritativeGroundingValidationError(
-            "Fast Planner cannot complete or execute a Responsibility blocked "
+            "Planner cannot complete or execute a Responsibility blocked "
             "by its clarification: " + ",".join(sorted(conflicting_refs))
         )
 
@@ -1376,7 +1376,7 @@ def validate_work_reuse_selection(
 ) -> None:
     """Validate explicit Planner reuse references without choosing reuse.
 
-    Fast Planner owns the semantic decision by either citing a supplied
+    Planner owns the semantic decision by either citing a supplied
     provisional Activity ID or omitting it. This check is deliberately
     mechanical: cited IDs must exist and the selected step must preserve
     the Activity's immutable Capability, arguments, and timing. The Host

@@ -960,7 +960,7 @@ def reconcile_communicative_goal_completion(
 ) -> list[dict[str, Any]]:
     """Close Goals only from model-authorized communication actually delivered.
 
-    Fast Planner can complete a no-Work speech Goal before GA has canonical IDs;
+    The Planner can complete a no-Work speech Goal before GA has canonical IDs;
     SC can complete a Planner-established answer need only after playback.  For
     information Goals, delivery alone is insufficient: the delivered act must
     cite exact trusted execution Evidence already recorded on that Goal.  This

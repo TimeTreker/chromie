@@ -3,7 +3,7 @@
   "id": "ambiguous_move_there",
   "suite": "user_meaning_interpretation",
   "level": "module",
-  "description": "Fast UMI preserves the requested movement, one Deep UMI pass confirms the unresolved referent, and Fast Planner alone decides whether to create a clarification gap.",
+  "description": "Fast UMI preserves the requested movement, one Deep UMI pass confirms the unresolved referent, and the Planner alone decides whether to create a clarification gap.",
   "tags": [
     "clarify",
     "motion-safety",

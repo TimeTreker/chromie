@@ -1418,8 +1418,8 @@ class GeneralAbilityAcceptanceTests(unittest.TestCase):
         errors = validate_live_text_result(case, summary, assertion_scope="full")
 
         self.assertTrue(any("terminal planner tier mismatch" in item for item in errors))
-        self.assertTrue(any("Fast Planner path mismatch" in item for item in errors))
-        self.assertTrue(any("Fast Planner contract failure" in item for item in errors))
+        self.assertTrue(any("Planner path mismatch" in item for item in errors))
+        self.assertTrue(any("Planner contract failure" in item for item in errors))
 
     def test_user_outcome_scope_retains_internal_path_mismatch_as_diagnostic(self) -> None:
         manifest = load_scenario_library()

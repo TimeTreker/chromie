@@ -3,7 +3,7 @@
   "id": "unclear_headset_fragment_delegates_to_deep_thinking",
   "suite": "user_meaning_interpretation",
   "level": "integration",
-  "description": "Fast UMI retains the headset topic, one Deep UMI pass confirms the unresolved referent, and Fast Planner alone decides whether to ask the user.",
+  "description": "Fast UMI retains the headset topic, one Deep UMI pass confirms the unresolved referent, and the Planner alone decides whether to ask the user.",
   "tags": [
     "voice-log",
     "uncertainty",

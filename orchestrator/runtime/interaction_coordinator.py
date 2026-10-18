@@ -453,7 +453,7 @@ class InteractionRuntimeCoordinator:
     ) -> list[str]:
         """Bind delivered Fast complete-response evidence to canonical Goal IDs.
 
-        Fast Planner may start a safe Communicative Activity before Goal Association
+        The Planner may start a safe Communicative Activity before Goal Association
         has produced canonical Goal identity.  Once GA is committed, this bridge
         attaches the already-running (or already-completed) ``chromie.speak``
         execution to the exact Goals owned by the Activity's Responsibility refs.

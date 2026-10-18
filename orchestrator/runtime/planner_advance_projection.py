@@ -63,7 +63,7 @@ def goal_ids_by_responsibility(
 ) -> dict[str, list[str]]:
     """Resolve the GA-owned Goal identity for every UMI Responsibility.
 
-    Fast Planner is allowed to plan before Goal Association finishes, so its
+    The Planner is allowed to plan before Goal Association finishes, so its
     Activities carry UMI-local Responsibility references.  This is the single
     deterministic join from those references to GA's canonical Goal IDs.
     It never guesses a missing mapping.
@@ -133,7 +133,7 @@ def canonical_plan_from_fast_advance(
     retained_goals: list[dict[str, Any]] | None = None,
     responsibilities: list[CognitiveResponsibilityProposal] | None = None,
 ) -> CanonicalPlan:
-    """Bind Fast Planner's first Activity Plan to GA's canonical Goals."""
+    """Bind the Planner's first Activity Plan to GA's canonical Goals."""
 
     refs_to_goals = goal_ids_by_responsibility(association)
     missing_refs = sorted(
@@ -141,7 +141,7 @@ def canonical_plan_from_fast_advance(
     )
     if missing_refs:
         raise ValueError(
-            "Goal Association omitted Fast Planner Responsibility mappings: "
+            "Goal Association omitted Planner Responsibility mappings: "
             + ",".join(missing_refs)
         )
 
@@ -359,7 +359,7 @@ def canonical_plan_from_fast_advance(
                         "user-facing information obligation."
                     ],
                     rationale=(
-                        "Fast Planner supplied information-acquisition Work; acquisition "
+                        "The Planner supplied information-acquisition Work; acquisition "
                         "alone is not terminal Responsibility fulfillment."
                     ),
                 )
@@ -368,7 +368,7 @@ def canonical_plan_from_fast_advance(
                     score=max(0.95, advance.confidence),
                     status="exact",
                     satisfied_goal_ids=[goal_id],
-                    rationale="Fast Planner supplied executable Activities for this Goal.",
+                    rationale="The Planner supplied executable Activities for this Goal.",
                 )
             outcomes.append(
                 ExecuteGoalPlanOutcome(
@@ -401,7 +401,7 @@ def canonical_plan_from_fast_advance(
                 score=max(0.95, advance.confidence),
                 status="exact",
                 satisfied_goal_ids=[goal_id],
-                rationale="Fast Planner established an ordinary answer obligation.",
+                rationale="The Planner established an ordinary answer obligation.",
             )
             outcomes.append(
                 RespondGoalPlanOutcome(
@@ -433,13 +433,13 @@ def canonical_plan_from_fast_advance(
                     unresolved=unresolved,
                     rationale=(
                         advance.reason_summary
-                        or "Fast Planner found no currently available way to satisfy this Goal."
+                        or "The Planner found no currently available way to satisfy this Goal."
                     ),
                 )
             )
         else:
             raise ValueError(
-                f"Fast Planner supplied no terminal Activity for Goal {goal_id!r}"
+                f"The Planner supplied no terminal Activity for Goal {goal_id!r}"
             )
 
     for outcome in outcomes:
@@ -501,7 +501,7 @@ def canonical_plan_from_fast_advance(
                 score=max(0.95, advance.confidence),
                 status="exact",
                 satisfied_goal_ids=goal_ids,
-                rationale="Every canonical Goal has a complete Fast Planner outcome.",
+                rationale="Every canonical Goal has a complete Planner outcome.",
             )
     return CanonicalPlan(
         plan_id=plan_id,
@@ -541,7 +541,7 @@ def canonical_plan_reusing_fast_capability_execution(
 ) -> CanonicalPlan | None:
     """Prove exact plan-level reuse without making a semantic judgment.
 
-    Fast Planner owns whether the canonical Goal still needs the provisional
+    The Planner owns whether the canonical Goal still needs the provisional
     Work by explicitly citing stable Activity IDs. The Host may reuse
     already-started safe Work when a selected Activity's exact identity matches.
     Omitted Activities continue unchanged; cancellation must be explicit.

@@ -346,7 +346,7 @@ class ScriptedClient:
     async def stream_plan_advance(self, *args, **kwargs):
         self.calls.append("stream")
         if not self.fast_advances:
-            raise AssertionError("unexpected Fast Planner stream")
+            raise AssertionError("unexpected Planner stream")
         advance = self.fast_advances.pop(0)
         request = kwargs["request"]
         advance = advance.model_copy(update={"turn_id": request.sid})

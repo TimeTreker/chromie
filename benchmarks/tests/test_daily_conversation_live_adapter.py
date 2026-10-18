@@ -100,7 +100,7 @@ def _health_observation(tmp_path: Path, *, fast_model: str, expected_fast_model:
 
 
 def test_daily_conversation_live_adapter_uses_the_configured_fast_model(tmp_path: Path) -> None:
-    # A maintained SGLang profile serves its own fast Planner model, not qwen3:4b.
+    # A maintained SGLang profile serves its own Planner model, not qwen3:4b.
     observation = _health_observation(
         tmp_path, fast_model="chromie-gemma4-12b", expected_fast_model="chromie-gemma4-12b"
     )

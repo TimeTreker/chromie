@@ -483,7 +483,7 @@ class OpenMeteoWeatherClient:
 
     The client intentionally returns structured reports rather than choosing
     the conversational answer. Host-bound Evidence reactivates the Goal-driven
-    Fast Planner, which remains the semantic answer authority while this
+    Planner, which remains the semantic answer authority while this
     provider stays a read-only data boundary.
 
     ``timeout_s`` is the budget for one whole lookup (geocoding and forecast).

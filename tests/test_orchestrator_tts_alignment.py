@@ -969,7 +969,7 @@ class OrchestratorTtsAlignmentTests(unittest.IsolatedAsyncioTestCase):
             "fast_planner_stream:stream_transport_invalid:"
             "SGLang stream ended without a finish_reason",
         )
-        self.assertNotIn("Fast planner", response.speech[0].text)
+        self.assertNotIn("planner", response.speech[0].text.lower())
         self.assertNotIn("stream transport invalid", response.speech[0].text)
         self.assertNotIn("SGLang", response.speech[0].text)
         self.assertNotIn("finish_reason", response.speech[0].text)
