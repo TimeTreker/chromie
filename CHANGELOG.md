@@ -5,6 +5,14 @@ remains available in Git history.
 
 ## Unreleased
 
+### Remote inference disclosure policy (2026-10-18)
+
+- A remote provider (`AGENT_LLM_PROVIDER=anthropic` or `openai`) now needs
+  `AGENT_REMOTE_INFERENCE_DISCLOSURE` to be set, or the Agent refuses to start.
+  `full` keeps the prompts unchanged; `public_only` withholds relational Memory
+  and any entry not marked `public` or `self_context` from every role's context at
+  the Agent ingress and logs what it withheld. Local providers are unaffected.
+
 ### Remote OpenAI-compatible provider: model resolution and schema state (2026-10-18)
 
 - `AGENT_LLM_PROVIDER=openai` no longer reuses a role model key as the remote

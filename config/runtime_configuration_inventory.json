@@ -805,6 +805,15 @@
     {
       "boolean": false,
       "category": "service_internal",
+      "key": "AGENT_REMOTE_INFERENCE_DISCLOSURE",
+      "owners": [
+        "agent/app/settings.py",
+        "docker-compose.yml"
+      ]
+    },
+    {
+      "boolean": false,
+      "category": "service_internal",
       "key": "AGENT_SGLANG_PRIORITY_STEP",
       "owners": [
         ".env.common",
@@ -4088,10 +4097,10 @@
       "bounded_compatibility_alias": 0,
       "profile_constant": 103,
       "public_choice": 9,
-      "service_internal": 252
+      "service_internal": 253
     },
     "compatibility_aliases": 0,
     "public_boolean_choices": 1,
-    "total_keys": 394
+    "total_keys": 395
   }
 }

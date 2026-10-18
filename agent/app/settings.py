@@ -4,13 +4,16 @@ import os
 from collections.abc import Mapping
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from shared.chromie_runtime.env_values import parse_bool
 
 # The one code default for AGENT_USER_MEANING_INTERPRETER_MODEL. It matches
 # .env.common and the default hardware profile; deployed profiles set the key.
 DEFAULT_USER_MEANING_INTERPRETER_MODEL = "qwen3.5:4b"
+
+
+REMOTE_LLM_PROVIDERS = frozenset({"anthropic", "openai"})
 
 
 class AnthropicProviderSettings(BaseModel):
@@ -125,6 +128,11 @@ class Settings(BaseModel):
     )
     anthropic: AnthropicProviderSettings = Field(default_factory=AnthropicProviderSettings)
     openai: OpenAICompatibleProviderSettings = Field(default_factory=OpenAICompatibleProviderSettings)
+    # What a remote provider may be shown. Unset keeps a remote provider from
+    # starting at all; the policy is an explicit per-deployment decision.
+    remote_inference_disclosure: Literal["", "full", "public_only"] = Field(
+        default_factory=lambda: os.getenv("AGENT_REMOTE_INFERENCE_DISCLOSURE", "").strip().casefold()
+    )
     sglang_url: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_SGLANG_URL", "http://chromie-llm:30000/v1"
@@ -493,6 +501,20 @@ class Settings(BaseModel):
     weather_timeout_s: float = Field(default_factory=lambda: float(os.getenv("AGENT_WEATHER_TIMEOUT_S", "7")), gt=0.0)
     environment: dict[str, str] = Field(default_factory=lambda: dict(os.environ), exclude=True, repr=False)
     mode: Literal["runtime"] = "runtime"
+
+    @property
+    def remote_inference(self) -> bool:
+        return self.llm_provider in REMOTE_LLM_PROVIDERS
+
+    @model_validator(mode="after")
+    def require_remote_disclosure_policy(self) -> "Settings":
+        if self.remote_inference and not self.remote_inference_disclosure:
+            raise ValueError(
+                f"AGENT_LLM_PROVIDER={self.llm_provider} sends cognitive context off the device; set "
+                "AGENT_REMOTE_INFERENCE_DISCLOSURE=full or public_only to state what it may be shown"
+            )
+        return self
+
 
 class UserMeaningInterpreterSettings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
