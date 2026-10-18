@@ -41,8 +41,8 @@ from .planner_schema import (
     fast_evidence_reentry_response_schema,
     fast_multi_goal_response_schema,
     fast_streaming_advance_response_schema,
-    native_goal_outcome_branches,
 )
+from .planner_native_schema import native_goal_outcome_branches
 from .planner_context import (
     planner_provider_vocal_goal_ids,
     provider_media_goal_ids_without_capability,

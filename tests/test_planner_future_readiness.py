@@ -384,8 +384,8 @@ def test_every_exposed_waiting_shape_offers_only_outcomes_the_dto_accepts():
     """Live 2026-10-13 (multi_thirsty_yes_en, "Yes, please."): the decoder followed the
     readiness wrapper's inner waiting shape and wrote a partial respond, which the Goal
     outcome DTO rejects; the final native pass had reached only the outer shapes."""
-    from agent.app.planner_schema import (
-        canonical_plan_response_schema, native_goal_outcome_branches, planner_readiness_response_schema)
+    from agent.app.planner_native_schema import native_goal_outcome_branches
+    from agent.app.planner_schema import canonical_plan_response_schema, planner_readiness_response_schema
 
     wave = {"type": "object", "properties": {}, "additionalProperties": False}
     schema = native_goal_outcome_branches(planner_readiness_response_schema(
@@ -414,8 +414,9 @@ def test_every_exposed_plan_shape_ties_its_disposition_to_its_steps():
     """Open after live run 16 (2026-10-15): a canonical clarify with steps, which the DTO
     rejects. The aggregate assignment lived only in allOf, which native decoders ignore,
     so the visible shape offered every disposition with up to four steps."""
+    from agent.app.planner_native_schema import native_goal_outcome_branches
     from agent.app.planner_schema import (
-        canonical_plan_response_schema, native_goal_outcome_branches, need_first_response_schema,
+        canonical_plan_response_schema, need_first_response_schema,
         planner_readiness_response_schema, readiness_first_response_schema)
 
     def exposed(node):
