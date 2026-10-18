@@ -626,8 +626,8 @@ class OllamaUserMeaningInterpreter:
             deep_model = self.anthropic_settings.model_for_role(deep_model or model)
             timeout_ms = max(int(timeout_ms), self.anthropic_settings.timeout_floor_ms)
         elif self.inference_provider == "openai":
-            model = self.openai_settings.model_for_role(model)
-            deep_model = self.openai_settings.model_for_role(deep_model or model)
+            model = self.openai_settings.model_for_role(model, purpose="user_meaning_interpreter")
+            deep_model = self.openai_settings.model_for_role(deep_model, purpose="user_meaning_interpreter_deep")
             timeout_ms = max(int(timeout_ms), self.openai_settings.timeout_floor_ms)
         self.model = model
         self.deep_model = str(deep_model or model).strip() or model
