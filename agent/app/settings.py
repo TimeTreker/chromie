@@ -1,15 +1,19 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from shared.chromie_runtime.env_values import parse_bool
 
 # The one code default for AGENT_USER_MEANING_INTERPRETER_MODEL. It matches
 # .env.common and the default hardware profile; deployed profiles set the key.
 DEFAULT_USER_MEANING_INTERPRETER_MODEL = "qwen3.5:4b"
+
+
+REMOTE_LLM_PROVIDERS = frozenset({"anthropic", "openai"})
 
 
 class AnthropicProviderSettings(BaseModel):
@@ -50,6 +54,19 @@ class AnthropicProviderSettings(BaseModel):
         return candidate if candidate.startswith("claude-") else self.model
 
 
+_OPENAI_ROLE_MODEL_PREFIX = "AGENT_OPENAI_MODEL_"
+
+
+def _openai_role_models(environ: Mapping[str, str]) -> dict[str, str]:
+    """Per-purpose remote models: ``AGENT_OPENAI_MODEL_<PURPOSE>`` -> ``purpose``."""
+
+    return {
+        name[len(_OPENAI_ROLE_MODEL_PREFIX):].casefold(): value.strip()
+        for name, value in environ.items()
+        if name.startswith(_OPENAI_ROLE_MODEL_PREFIX) and name != _OPENAI_ROLE_MODEL_PREFIX and value.strip()
+    }
+
+
 class OpenAICompatibleProviderSettings(BaseModel):
     """Any remote OpenAI-compatible chat service, selected by AGENT_LLM_PROVIDER=openai.
 
@@ -72,12 +89,22 @@ class OpenAICompatibleProviderSettings(BaseModel):
         default_factory=lambda: int(os.getenv("AGENT_OPENAI_TIMEOUT_FLOOR_MS", "120000")), ge=1000
     )
 
-    def model_for_role(self, role_model: str | None) -> str:
-        """A role key that names a remote model (contains ``/`` or no local ``:tag``) is kept."""
+    role_models: dict[str, str] = Field(default_factory=lambda: _openai_role_models(os.environ))
 
-        candidate = str(role_model or "").strip()
-        if candidate and ":" not in candidate:
-            return candidate
+    def model_for_role(self, role_model: str | None, *, purpose: str | None = None) -> str:
+        """Resolve the remote model for one role by its explicit purpose key only.
+
+        Role model keys (``AGENT_PLANNER_MODEL`` and friends) name local tags for
+        the local providers, and an arbitrary remote name cannot be told from a
+        local one (``chromie-gemma4-12b`` has no ``:tag`` either), so the local key
+        is never reused here. ``AGENT_OPENAI_MODEL_<PURPOSE>`` (for example
+        ``AGENT_OPENAI_MODEL_FAST_PLANNER``) overrides ``model`` for that role.
+        """
+
+        del role_model  # a local tag by contract; see the docstring
+        key = str(purpose or "").strip().casefold()
+        if key and key in self.role_models:
+            return self.role_models[key]
         return self.model
 
     def api_key(self) -> str:
@@ -101,6 +128,11 @@ class Settings(BaseModel):
     )
     anthropic: AnthropicProviderSettings = Field(default_factory=AnthropicProviderSettings)
     openai: OpenAICompatibleProviderSettings = Field(default_factory=OpenAICompatibleProviderSettings)
+    # What a remote provider may be shown. Unset keeps a remote provider from
+    # starting at all; the policy is an explicit per-deployment decision.
+    remote_inference_disclosure: Literal["", "full", "public_only"] = Field(
+        default_factory=lambda: os.getenv("AGENT_REMOTE_INFERENCE_DISCLOSURE", "").strip().casefold()
+    )
     sglang_url: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_SGLANG_URL", "http://chromie-llm:30000/v1"
@@ -469,6 +501,20 @@ class Settings(BaseModel):
     weather_timeout_s: float = Field(default_factory=lambda: float(os.getenv("AGENT_WEATHER_TIMEOUT_S", "7")), gt=0.0)
     environment: dict[str, str] = Field(default_factory=lambda: dict(os.environ), exclude=True, repr=False)
     mode: Literal["runtime"] = "runtime"
+
+    @property
+    def remote_inference(self) -> bool:
+        return self.llm_provider in REMOTE_LLM_PROVIDERS
+
+    @model_validator(mode="after")
+    def require_remote_disclosure_policy(self) -> "Settings":
+        if self.remote_inference and not self.remote_inference_disclosure:
+            raise ValueError(
+                f"AGENT_LLM_PROVIDER={self.llm_provider} sends cognitive context off the device; set "
+                "AGENT_REMOTE_INFERENCE_DISCLOSURE=full or public_only to state what it may be shown"
+            )
+        return self
+
 
 class UserMeaningInterpreterSettings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
