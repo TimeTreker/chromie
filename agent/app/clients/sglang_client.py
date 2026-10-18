@@ -251,7 +251,9 @@ class SGLangClient(OllamaClient):
             if prefix_probe_call_id:
                 _PREFIX_CACHE_TRACKER.record_response(prefix_probe_call_id, data)
             if response_format != "text":
-                parsed = self._parse_json(text)
+                parsed = self._parse_json(
+                    text, schema=response_format if isinstance(response_format, dict) else None,
+                )
             completed = True
             return text.strip() if response_format == "text" else parsed or {}
         except asyncio.CancelledError:

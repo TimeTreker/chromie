@@ -116,18 +116,93 @@ def test_payload_drops_engine_fields_and_encodes_the_schema_both_ways() -> None:
     assert messages[0]["content"] == "be Chromie"  # caller's messages are untouched
 
 
-def test_factory_selects_the_remote_client_by_configuration_only() -> None:
+def test_factory_selects_the_remote_client_by_configuration_only(monkeypatch: pytest.MonkeyPatch) -> None:
     client = build_model_client(model="gemma4:12b", timeout_ms=5400, purpose="fast_planner",
                                 service_settings=_service_settings("http://127.0.0.1:9"))
+    # The RTX 5090 profile's role tag has no colon; it is still a local name.
+    profiled = build_model_client(model="chromie-gemma4-12b", timeout_ms=5400, purpose="fast_planner",
+                                  service_settings=_service_settings("http://127.0.0.1:9"))
     pinned = build_model_client(model="gpt-5", timeout_ms=5400, purpose="reflection",
                                 service_settings=_service_settings("http://127.0.0.1:9"))
 
     assert isinstance(client, OpenAICompatibleClient)
     assert client.model == "remote-model" and client.timeout_ms == 120000
-    assert pinned.model == "gpt-5"
+    assert profiled.model == "remote-model"
+    assert pinned.model == "remote-model"  # a role key is never a remote name
     with pytest.raises(ValueError, match="AGENT_OPENAI_MODEL"):
         build_model_client(model="gemma4:12b", timeout_ms=5400, purpose="fast_planner",
                            service_settings=_service_settings("http://127.0.0.1:9", model=""))
+
+    monkeypatch.setenv("AGENT_OPENAI_MODEL_FAST_PLANNER", "gpt-5")
+    monkeypatch.setenv("AGENT_OPENAI_MODEL_USER_MEANING_INTERPRETER_DEEP", "gpt-5-deep")
+    settings = _service_settings("http://127.0.0.1:9", role_models=OpenAICompatibleProviderSettings().role_models)
+    per_role = build_model_client(model="chromie-gemma4-12b", timeout_ms=5400, purpose="fast_planner",
+                                  service_settings=settings)
+    other = build_model_client(model="chromie-gemma4-12b", timeout_ms=5400, purpose="social_cognition",
+                               service_settings=settings)
+    assert per_role.model == "gpt-5" and other.model == "remote-model"
+    assert settings.openai.model_for_role("x", purpose="user_meaning_interpreter") == "remote-model"
+    assert settings.openai.model_for_role("x", purpose="user_meaning_interpreter_deep") == "gpt-5-deep"
+
+
+def test_concurrent_calls_validate_against_their_own_schema() -> None:
+    other_schema = {**SCHEMA, "properties": {**SCHEMA["properties"], "text": {"type": "string", "maxLength": 40}}}
+    long_text = '{"kind":"speak","text":"far longer than twelve characters"}'
+    short_text = '{"kind":"speak","text":"hello"}'
+    release = threading.Event()
+
+    def answer(body: dict[str, Any]) -> tuple[str, str]:
+        # The short request arrives first but is held until the long one has been served.
+        if body["messages"][-1]["content"] == "short":
+            release.wait(5)
+            return short_text, "stop"
+        release.set()
+        return long_text, "stop"
+
+    async def run(client: OpenAICompatibleClient) -> list[Any]:
+        return await asyncio.gather(
+            client.generate("short", response_format=SCHEMA),
+            client.generate("long", response_format=other_schema),
+            return_exceptions=True,
+        )
+
+    with RecordedChatServer(answer) as server:
+        client = OpenAICompatibleClient("gemma4:12b", timeout_ms=5000, purpose="fast_planner",
+                                        service_settings=_service_settings(server.url))
+        short, long = asyncio.run(run(client))
+
+    assert short == {"kind": "speak", "text": "hello"}
+    assert long == {"kind": "speak", "text": "far longer than twelve characters"}
+    assert not hasattr(client, "_active_schema")
+
+
+def test_shared_client_rejects_a_violation_after_a_concurrent_call_finished() -> None:
+    # Reverse case: the strict request is answered second, and must still fail.
+    loose_schema = {**SCHEMA, "properties": {**SCHEMA["properties"], "text": {"type": "string", "maxLength": 40}}}
+    release = threading.Event()
+
+    def answer(body: dict[str, Any]) -> tuple[str, str]:
+        if body["messages"][-1]["content"] == "strict":
+            release.wait(5)
+            return '{"kind":"speak","text":"far longer than twelve characters"}', "stop"
+        release.set()
+        return '{"kind":"speak","text":"ok"}', "stop"
+
+    async def run(client: OpenAICompatibleClient) -> list[Any]:
+        return await asyncio.gather(
+            client.generate("strict", response_format=SCHEMA),
+            client.generate("loose", response_format=loose_schema),
+            return_exceptions=True,
+        )
+
+    with RecordedChatServer(answer) as server:
+        client = OpenAICompatibleClient("gemma4:12b", timeout_ms=5000, purpose="fast_planner",
+                                        service_settings=_service_settings(server.url))
+        strict, loose = asyncio.run(run(client))
+
+    assert loose == {"kind": "speak", "text": "ok"}
+    assert isinstance(strict, OllamaGenerationError)
+    assert strict.failure_class == "structured_output_validation"
 
 
 def test_client_sends_bearer_auth_and_returns_validated_json() -> None:
