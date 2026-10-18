@@ -9,7 +9,7 @@ ordered open work are in [STATUS](docs/STATUS.md).
 
 - Checkout `/home/chromie/github/chromie`, branch `main`; the expected resume revision
   is the latest `origin/main` commit containing this file.
-- Soridormi `/home/chromie/github/soridormi`: check out `origin/main` `cd6c37b`, the
+- Soridormi `/home/chromie/github/soridormi`: check out `origin/main` `3766c79`, the
   revision pinned by `capabilities/soridormi.json` and `release/compatibility.json`,
   and restart the water scene from it (the last recorded running checkout was
   `33b8a13`).
