@@ -12,6 +12,9 @@ remains available in Git history.
   Local-only assumptions (context window preflight, `num_predict`, sampling options,
   warmup, GPU-tuned timeouts) are translated or skipped at the provider boundary,
   and the full request schema is re-validated before any role parser runs.
+- `AGENT_LLM_PROVIDER=openai` does the same for any other remote OpenAI-compatible
+  service (`AGENT_OPENAI_BASE_URL`, `AGENT_OPENAI_MODEL`, bearer key from
+  `OPENAI_API_KEY`), over the qualified SGLang request shape minus engine fields.
 - `scripts/run_workflow_replay.py --candidate-provider anthropic` answers one role
   of the frozen corpus with Claude; a recorded-reference Messages endpoint replays
   each role through the Claude wire path offline.

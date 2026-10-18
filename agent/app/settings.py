@@ -50,6 +50,40 @@ class AnthropicProviderSettings(BaseModel):
         return candidate if candidate.startswith("claude-") else self.model
 
 
+class OpenAICompatibleProviderSettings(BaseModel):
+    """Any remote OpenAI-compatible chat service, selected by AGENT_LLM_PROVIDER=openai.
+
+    The credential is read from the environment variable named by
+    ``api_key_env`` at request time and is never stored in settings.
+    """
+
+    base_url: str = Field(
+        default_factory=lambda: os.getenv("AGENT_OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
+    )
+    model: str = Field(default_factory=lambda: os.getenv("AGENT_OPENAI_MODEL", "").strip())
+    api_key_env: str = Field(
+        default_factory=lambda: os.getenv("AGENT_OPENAI_API_KEY_ENV", "OPENAI_API_KEY").strip() or "OPENAI_API_KEY"
+    )
+    structured_output: Literal["json_schema", "prompt"] = Field(
+        default_factory=lambda: os.getenv("AGENT_OPENAI_STRUCTURED_OUTPUT", "json_schema").strip().casefold()
+        or "json_schema"
+    )
+    timeout_floor_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_OPENAI_TIMEOUT_FLOOR_MS", "120000")), ge=1000
+    )
+
+    def model_for_role(self, role_model: str | None) -> str:
+        """A role key that names a remote model (contains ``/`` or no local ``:tag``) is kept."""
+
+        candidate = str(role_model or "").strip()
+        if candidate and ":" not in candidate:
+            return candidate
+        return self.model
+
+    def api_key(self) -> str:
+        return os.getenv(self.api_key_env, "").strip()
+
+
 class Settings(BaseModel):
     cognitive_budget_profile: str = Field(
         default_factory=lambda: os.getenv(
@@ -62,10 +96,11 @@ class Settings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_OLLAMA_URL") or os.getenv("OLLAMA_URL") or "http://chromie-llm:11434")
     model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL") or os.getenv("OLLAMA_MODEL") or "gemma4:e2b")
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS") or os.getenv("OLLAMA_TIMEOUT_MS") or "30000"))
-    llm_provider: Literal["ollama", "sglang", "anthropic"] = Field(
+    llm_provider: Literal["ollama", "sglang", "anthropic", "openai"] = Field(
         default_factory=lambda: os.getenv("AGENT_LLM_PROVIDER", "ollama").strip().casefold() or "ollama"
     )
     anthropic: AnthropicProviderSettings = Field(default_factory=AnthropicProviderSettings)
+    openai: OpenAICompatibleProviderSettings = Field(default_factory=OpenAICompatibleProviderSettings)
     sglang_url: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_SGLANG_URL", "http://chromie-llm:30000/v1"
@@ -437,10 +472,11 @@ class Settings(BaseModel):
 
 class UserMeaningInterpreterSettings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
-    inference_provider: Literal["ollama", "sglang", "anthropic"] = Field(
+    inference_provider: Literal["ollama", "sglang", "anthropic", "openai"] = Field(
         default_factory=lambda: os.getenv("AGENT_LLM_PROVIDER", "ollama").strip().casefold() or "ollama"
     )
     anthropic: AnthropicProviderSettings = Field(default_factory=AnthropicProviderSettings)
+    openai: OpenAICompatibleProviderSettings = Field(default_factory=OpenAICompatibleProviderSettings)
     sglang_url: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_SGLANG_URL", "http://chromie-llm:30000/v1"

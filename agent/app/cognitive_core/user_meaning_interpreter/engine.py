@@ -24,6 +24,7 @@ user_meaning_interpreter = OllamaUserMeaningInterpreter(
     sglang_url=settings.sglang_url,
     sglang_priority_step=settings.sglang_priority_step,
     anthropic_settings=settings.anthropic,
+    openai_settings=settings.openai,
     timeout_ms=settings.timeout_ms,
     num_ctx=settings.llm_num_ctx,
     num_predict=settings.llm_num_predict,

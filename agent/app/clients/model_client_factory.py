@@ -4,6 +4,7 @@ from ..inference_compute import CognitionComputeClass
 from ..settings import AgentServiceSettings
 from .anthropic_client import ClaudeClient
 from .ollama_client import OllamaClient
+from .openai_client import OpenAICompatibleClient
 from .sglang_client import SGLangClient
 
 
@@ -19,6 +20,14 @@ def build_model_client(
 
     if service_settings.llm_provider == "anthropic":
         return ClaudeClient(
+            model,
+            timeout_ms=timeout_ms,
+            purpose=purpose,
+            compute_class=compute_class,
+            service_settings=service_settings,
+        )
+    if service_settings.llm_provider == "openai":
+        return OpenAICompatibleClient(
             model,
             timeout_ms=timeout_ms,
             purpose=purpose,

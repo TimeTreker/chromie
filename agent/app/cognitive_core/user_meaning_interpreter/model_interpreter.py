@@ -14,13 +14,15 @@ import httpx
 from pydantic import ValidationError
 
 from ...clients.anthropic_client import claude_complete
+from ...clients.openai_client import check_canonical_schema
+from ...clients.openai_protocol import bearer_headers, build_openai_chat_payload
 from ...clients.ollama_client import OllamaGenerationError
 from ...clients.sglang_protocol import (
     build_sglang_chat_payload,
     sglang_to_completion_evidence,
 )
 from ...inference_compute import user_meaning_interpreter_compute_class
-from ...settings import AnthropicProviderSettings, agent_service_settings
+from ...settings import AnthropicProviderSettings, OpenAICompatibleProviderSettings, agent_service_settings
 
 from shared.chromie_contracts.memory import role_memory_context
 
@@ -603,6 +605,7 @@ class OllamaUserMeaningInterpreter:
         sglang_url: str | None = None,
         sglang_priority_step: int = 100,
         anthropic_settings: AnthropicProviderSettings | None = None,
+        openai_settings: OpenAICompatibleProviderSettings | None = None,
         timeout_ms: int,
         num_ctx: int = 4096,
         num_predict: int = 512,
@@ -611,16 +614,21 @@ class OllamaUserMeaningInterpreter:
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
         self.inference_provider = str(inference_provider or "ollama").strip().casefold()
-        if self.inference_provider not in {"ollama", "sglang", "anthropic"}:
+        if self.inference_provider not in {"ollama", "sglang", "anthropic", "openai"}:
             raise ValueError(f"unsupported User Meaning Interpreter provider: {self.inference_provider!r}")
         self.sglang_url = str(sglang_url or "").rstrip("/")
         self.sglang_priority_step = max(1, int(sglang_priority_step))
         self.anthropic_settings = anthropic_settings or AnthropicProviderSettings()
         self._anthropic_client: Any = None
+        self.openai_settings = openai_settings or OpenAICompatibleProviderSettings()
         if self.inference_provider == "anthropic":
             model = self.anthropic_settings.model_for_role(model)
             deep_model = self.anthropic_settings.model_for_role(deep_model or model)
             timeout_ms = max(int(timeout_ms), self.anthropic_settings.timeout_floor_ms)
+        elif self.inference_provider == "openai":
+            model = self.openai_settings.model_for_role(model)
+            deep_model = self.openai_settings.model_for_role(deep_model or model)
+            timeout_ms = max(int(timeout_ms), self.openai_settings.timeout_floor_ms)
         self.model = model
         self.deep_model = str(deep_model or model).strip() or model
         self.timeout_s = max(0.1, timeout_ms / 1000.0)
@@ -1171,7 +1179,7 @@ class OllamaUserMeaningInterpreter:
             )
 
     async def warm_model(self, *, timeout_s: float | None = None) -> dict[str, Any]:
-        if self.inference_provider == "anthropic":
+        if self.inference_provider in {"anthropic", "openai"}:
             # No local weights to load; a probe would only spend a paid request.
             return {}
         if self.inference_provider == "sglang":
@@ -1277,7 +1285,45 @@ class OllamaUserMeaningInterpreter:
         )
         return data
 
+    async def _chat_openai(self, payload: dict[str, Any], *, stage: str) -> dict[str, Any]:
+        if not self.model:
+            raise OllamaGenerationError(
+                "AGENT_OPENAI_MODEL is required when AGENT_LLM_PROVIDER=openai",
+                failure_class="provider_configuration",
+                failure_domain="inference_transport",
+                architecture_attribution="not_evaluated",
+                retryable=False,
+            )
+        response_format = payload.get("format", "text")
+        wire_payload = build_openai_chat_payload(
+            model=str(payload.get("model") or self.model),
+            messages=[dict(item) for item in payload.get("messages") or [] if isinstance(item, dict)],
+            compute_class=user_meaning_interpreter_compute_class(stage),
+            options=dict(payload.get("options") or {}),
+            response_format=response_format,
+            stream=False,
+            structured_output=self.openai_settings.structured_output,
+        )
+        async with httpx.AsyncClient(
+            timeout=self.timeout_s, trust_env=False, headers=bearer_headers(self.openai_settings.api_key()),
+        ) as client:
+            response = await client.post(f"{self.openai_settings.base_url}/chat/completions", json=wire_payload)
+            response.raise_for_status()
+            provider_data = response.json()
+        data = sglang_to_completion_evidence(provider_data)
+        self._validate_completion(payload, data, stage=stage)
+        if isinstance(response_format, dict):
+            check_canonical_schema(
+                str(data.get("message", {}).get("content") or ""), response_format,
+                purpose=f"user_meaning_interpreter:{stage}", model=str(wire_payload["model"]),
+            )
+        return data
+
     async def _chat(self, payload: dict[str, Any], *, stage: str) -> dict[str, Any]:
+        if self.inference_provider == "openai":
+            # Remote services report context overflow themselves; the local
+            # preflight describes a local num_ctx.
+            return await self._chat_openai(payload, stage=stage)
         if self.inference_provider == "anthropic":
             # The local context-window preflight and num_predict truncation checks
             # describe a local model; Claude reports truncation by stop_reason.
