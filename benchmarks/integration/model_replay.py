@@ -53,10 +53,13 @@ class ModelReplay:
         self.steps = self.case["model_steps"]
         self.candidate = copy.deepcopy(candidate)
         if candidate:
-            parsed = urllib.parse.urlsplit(candidate['url'])
+            provider = candidate.get('provider', 'ollama')
+            if provider not in {'ollama', 'anthropic'}:
+                raise ValueError('candidate provider must be ollama or anthropic')
             if candidate['role'] not in {'umi', 'ga', 'fast'} or not candidate['model']:
                 raise ValueError('select one supported candidate role and model')
-            if parsed.scheme not in {'http', 'https'} or not parsed.netloc:
+            parsed = urllib.parse.urlsplit(candidate.get('url') or '')
+            if provider == 'ollama' and (parsed.scheme not in {'http', 'https'} or not parsed.netloc):
                 raise ValueError('candidate URL must be an explicit HTTP(S) model service')
             if not 0 < candidate.get('timeout', 60) <= 600:
                 raise ValueError('candidate timeout must be within (0, 600] seconds')
@@ -78,6 +81,8 @@ class ModelReplay:
         payload = copy.deepcopy(request)
         payload['model'] = self.candidate['model']
         self.candidate_calls += 1
+        if self.candidate.get('provider', 'ollama') == 'anthropic':
+            return self.anthropic_candidate_reply(payload)
         submission = urllib.request.Request(
             self.candidate['url'].rstrip('/') + '/api/chat', data=encoded(payload),
             headers={'Content-Type': 'application/json'}, method='POST',
@@ -99,6 +104,43 @@ class ModelReplay:
         if not isinstance(envelope, dict):
             raise ReplayMismatch('candidate response envelope must be an object')
         return envelope
+
+    def anthropic_candidate_reply(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Answer the same role packet with Claude, returned in the Ollama chat envelope."""
+        import asyncio
+
+        import anthropic
+
+        from agent.app.clients.anthropic_client import claude_complete
+        from agent.app.clients.ollama_client import OllamaGenerationError
+        from agent.app.settings import AnthropicProviderSettings
+
+        settings = AnthropicProviderSettings()
+        url = self.candidate.get('url')
+
+        async def complete() -> tuple[dict[str, Any], dict[str, Any]]:
+            kwargs: dict[str, Any] = {'timeout': self.candidate.get('timeout', 60), 'max_retries': 0}
+            if url:
+                kwargs['base_url'] = url
+            async with anthropic.AsyncAnthropic(**kwargs) as client:
+                _text, evidence, _request, decision = await claude_complete(
+                    client, model=payload['model'], messages=payload.get('messages') or [],
+                    response_format=payload.get('format') or 'text', options=payload.get('options'),
+                    settings=settings, purpose='workflow_replay_candidate',
+                )
+            return evidence, decision
+
+        try:
+            evidence, decision = asyncio.run(complete())
+        except (OllamaGenerationError, anthropic.AnthropicError) as exc:
+            self.records.append({'source': 'candidate', 'provider': 'anthropic',
+                                 'submitted_request': self.normalize(payload), 'transport_error': str(exc)})
+            raise ReplayMismatch(f'candidate transport failed: {exc}') from exc
+        self.records.append({'source': 'candidate', 'provider': 'anthropic',
+                             'submitted_request': self.normalize(payload),
+                             'raw_transport_response': json.dumps(evidence, ensure_ascii=False, default=str),
+                             'structured_output': decision})
+        return evidence
 
     def bind(self, name: str, value: str) -> None:
         """Register a value from a trusted runtime result, never from a model request."""

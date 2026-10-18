@@ -12,6 +12,44 @@ from shared.chromie_runtime.env_values import parse_bool
 DEFAULT_USER_MEANING_INTERPRETER_MODEL = "qwen3.5:4b"
 
 
+class AnthropicProviderSettings(BaseModel):
+    """Claude over the Anthropic Messages API, selected by AGENT_LLM_PROVIDER=anthropic.
+
+    Role model keys keep their local tags; a role key naming a ``claude-*``
+    model is used as-is, and every other role runs on ``model``. The SDK reads
+    ANTHROPIC_API_KEY itself, so no credential is stored in settings.
+    """
+
+    model: str = Field(
+        default_factory=lambda: os.getenv("AGENT_ANTHROPIC_MODEL", "").strip() or "claude-opus-5-5"
+    )
+    base_url: str = Field(default_factory=lambda: os.getenv("AGENT_ANTHROPIC_BASE_URL", "").strip())
+    effort: Literal["low", "medium", "high", "xhigh", "max"] = Field(
+        default_factory=lambda: os.getenv("AGENT_ANTHROPIC_EFFORT", "medium").strip().casefold() or "medium"
+    )
+    structured_output: Literal["auto", "native", "prompt"] = Field(
+        default_factory=lambda: os.getenv("AGENT_ANTHROPIC_STRUCTURED_OUTPUT", "auto").strip().casefold() or "auto"
+    )
+    # num_predict budgets visible output for a non-thinking local model; Claude's
+    # max_tokens also covers adaptive thinking, so it never drops below this floor.
+    max_tokens_floor: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_ANTHROPIC_MAX_TOKENS_FLOOR", "16000")), ge=256, le=128000
+    )
+    # Role timeouts are tuned for a local GPU; a remote thinking model needs a floor.
+    timeout_floor_ms: int = Field(
+        default_factory=lambda: int(os.getenv("AGENT_ANTHROPIC_TIMEOUT_FLOOR_MS", "120000")), ge=1000
+    )
+    server_side_fallback: bool = Field(
+        default_factory=lambda: parse_bool(
+            os.getenv("AGENT_ANTHROPIC_SERVER_SIDE_FALLBACK"), name="AGENT_ANTHROPIC_SERVER_SIDE_FALLBACK", default=True
+        )
+    )
+
+    def model_for_role(self, role_model: str | None) -> str:
+        candidate = str(role_model or "").strip()
+        return candidate if candidate.startswith("claude-") else self.model
+
+
 class Settings(BaseModel):
     cognitive_budget_profile: str = Field(
         default_factory=lambda: os.getenv(
@@ -24,9 +62,10 @@ class Settings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_OLLAMA_URL") or os.getenv("OLLAMA_URL") or "http://chromie-llm:11434")
     model: str = Field(default_factory=lambda: os.getenv("AGENT_MODEL") or os.getenv("OLLAMA_MODEL") or "gemma4:e2b")
     timeout_ms: int = Field(default_factory=lambda: int(os.getenv("AGENT_TIMEOUT_MS") or os.getenv("OLLAMA_TIMEOUT_MS") or "30000"))
-    llm_provider: Literal["ollama", "sglang"] = Field(
+    llm_provider: Literal["ollama", "sglang", "anthropic"] = Field(
         default_factory=lambda: os.getenv("AGENT_LLM_PROVIDER", "ollama").strip().casefold() or "ollama"
     )
+    anthropic: AnthropicProviderSettings = Field(default_factory=AnthropicProviderSettings)
     sglang_url: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_SGLANG_URL", "http://chromie-llm:30000/v1"
@@ -398,9 +437,10 @@ class Settings(BaseModel):
 
 class UserMeaningInterpreterSettings(BaseModel):
     ollama_url: str = Field(default_factory=lambda: os.getenv("AGENT_USER_MEANING_INTERPRETER_OLLAMA_URL", "http://chromie-llm:11434"))
-    inference_provider: Literal["ollama", "sglang"] = Field(
+    inference_provider: Literal["ollama", "sglang", "anthropic"] = Field(
         default_factory=lambda: os.getenv("AGENT_LLM_PROVIDER", "ollama").strip().casefold() or "ollama"
     )
+    anthropic: AnthropicProviderSettings = Field(default_factory=AnthropicProviderSettings)
     sglang_url: str = Field(
         default_factory=lambda: os.getenv(
             "AGENT_SGLANG_URL", "http://chromie-llm:30000/v1"

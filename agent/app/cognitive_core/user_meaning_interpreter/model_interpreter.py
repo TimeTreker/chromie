@@ -13,13 +13,14 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
+from ...clients.anthropic_client import claude_complete
 from ...clients.ollama_client import OllamaGenerationError
 from ...clients.sglang_protocol import (
     build_sglang_chat_payload,
     sglang_to_completion_evidence,
 )
 from ...inference_compute import user_meaning_interpreter_compute_class
-from ...settings import agent_service_settings
+from ...settings import AnthropicProviderSettings, agent_service_settings
 
 from shared.chromie_contracts.memory import role_memory_context
 
@@ -601,6 +602,7 @@ class OllamaUserMeaningInterpreter:
         inference_provider: str = "ollama",
         sglang_url: str | None = None,
         sglang_priority_step: int = 100,
+        anthropic_settings: AnthropicProviderSettings | None = None,
         timeout_ms: int,
         num_ctx: int = 4096,
         num_predict: int = 512,
@@ -609,10 +611,16 @@ class OllamaUserMeaningInterpreter:
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
         self.inference_provider = str(inference_provider or "ollama").strip().casefold()
-        if self.inference_provider not in {"ollama", "sglang"}:
+        if self.inference_provider not in {"ollama", "sglang", "anthropic"}:
             raise ValueError(f"unsupported User Meaning Interpreter provider: {self.inference_provider!r}")
         self.sglang_url = str(sglang_url or "").rstrip("/")
         self.sglang_priority_step = max(1, int(sglang_priority_step))
+        self.anthropic_settings = anthropic_settings or AnthropicProviderSettings()
+        self._anthropic_client: Any = None
+        if self.inference_provider == "anthropic":
+            model = self.anthropic_settings.model_for_role(model)
+            deep_model = self.anthropic_settings.model_for_role(deep_model or model)
+            timeout_ms = max(int(timeout_ms), self.anthropic_settings.timeout_floor_ms)
         self.model = model
         self.deep_model = str(deep_model or model).strip() or model
         self.timeout_s = max(0.1, timeout_ms / 1000.0)
@@ -1163,6 +1171,9 @@ class OllamaUserMeaningInterpreter:
             )
 
     async def warm_model(self, *, timeout_s: float | None = None) -> dict[str, Any]:
+        if self.inference_provider == "anthropic":
+            # No local weights to load; a probe would only spend a paid request.
+            return {}
         if self.inference_provider == "sglang":
             return await self._chat_logged(
                 {
@@ -1243,7 +1254,34 @@ class OllamaUserMeaningInterpreter:
         )
         return data or {}
 
+    async def _chat_anthropic(self, payload: dict[str, Any], *, stage: str) -> dict[str, Any]:
+        if self._anthropic_client is None:
+            import anthropic
+
+            kwargs: dict[str, Any] = {"timeout": self.timeout_s, "max_retries": 0}
+            if self.anthropic_settings.base_url:
+                kwargs["base_url"] = self.anthropic_settings.base_url
+            self._anthropic_client = anthropic.AsyncAnthropic(**kwargs)
+        _text, data, _request, decision = await claude_complete(
+            self._anthropic_client,
+            model=str(payload.get("model") or self.model),
+            messages=[dict(item) for item in payload.get("messages") or [] if isinstance(item, dict)],
+            response_format=payload.get("format") or "text",
+            options=dict(payload.get("options") or {}),
+            settings=self.anthropic_settings,
+            purpose=f"user_meaning_interpreter:{stage}",
+        )
+        logger.info(
+            "user_meaning_interpreter_anthropic_call stage=%s mode=%s input_tokens=%s output_tokens=%s",
+            stage, decision["mode"], data.get("prompt_eval_count"), data.get("eval_count"),
+        )
+        return data
+
     async def _chat(self, payload: dict[str, Any], *, stage: str) -> dict[str, Any]:
+        if self.inference_provider == "anthropic":
+            # The local context-window preflight and num_predict truncation checks
+            # describe a local model; Claude reports truncation by stop_reason.
+            return await self._chat_anthropic(payload, stage=stage)
         options = dict(payload.get("options") or {})
         prompt_chars = self._payload_prompt_chars(payload)
         preflight = ollama_prompt_preflight_diagnostics(
