@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from tests.cognitive_work_test_support import goal_outcome_branch, ordinary_plan_schema
+from tests.cognitive_work_test_support import goal_outcome_branch, ordinary_plan_schema, plan_assignment_branches
 
 from agent.app import planner_schema
 from agent.app import planner_prompt as planner_prompt
@@ -6151,7 +6151,10 @@ class PlannerResolverTests(unittest.TestCase):
         schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
         self.assertIsInstance(schema, dict)
         self.assertEqual(schema["title"], "FastPlannerModelOutput")
-        self.assertNotIn("oneOf", schema)
+        # Every exposed plan shape is a complete closed object; nothing outside it is required.
+        for branch in plan_assignment_branches(ollama.prompts[0][1]["response_format"]):
+            self.assertFalse(branch["additionalProperties"])
+            self.assertTrue({"disposition", "steps", "goal_outcomes", "goal_satisfaction"} <= set(branch["required"]))
         self.assertNotIn("planner_tier", schema["properties"])
         self.assertNotIn("goal_ids", schema["properties"])
         self.assertIn("confidence", schema["required"])
@@ -6257,7 +6260,10 @@ class PlannerResolverTests(unittest.TestCase):
         self.assertEqual(len(ollama.prompts), 1)
         self.assertEqual(plan.metadata["path_classification"], "contract_failure")
         schema = ordinary_plan_schema(ollama.prompts[0][1]["response_format"])
-        self.assertNotIn("oneOf", schema)
+        # Every exposed plan shape is a complete closed object; nothing outside it is required.
+        for branch in plan_assignment_branches(ollama.prompts[0][1]["response_format"]):
+            self.assertFalse(branch["additionalProperties"])
+            self.assertTrue({"disposition", "steps", "goal_outcomes", "goal_satisfaction"} <= set(branch["required"]))
         self.assertEqual(schema["title"], "FastPlannerMultiGoalPlanOutput")
 
     def test_same_user_text_follows_different_model_authored_plans(self):

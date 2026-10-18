@@ -2478,1542 +2478,8 @@
           },
           "anyOf": [
             {
-              "additionalProperties": false,
               "description": "Flat model-facing planner DTO.\n\nCanonical envelope fields (plan ID, planner tier, schema version, and the\nauthoritative top-level goal IDs) are added by the host after this DTO is\nvalidated.  Keeping the DTO flat is deliberate: the deployed Ollama\nstructured decoder selected a top-level ``oneOf`` branch without applying\nthe surrounding CanonicalPlan requirements.",
-              "properties": {
-                "ability_needs": {
-                  "type": "array",
-                  "maxItems": 4,
-                  "items": {
-                    "type": "object",
-                    "additionalProperties": false,
-                    "required": [
-                      "need",
-                      "closest_loaded",
-                      "closest_loaded_does",
-                      "fits"
-                    ],
-                    "properties": {
-                      "need": {
-                        "type": "string",
-                        "minLength": 3,
-                        "maxLength": 100
-                      },
-                      "closest_loaded": {
-                        "type": "string",
-                        "enum": [
-                          "soridormi.blink_eyes",
-                          "none"
-                        ]
-                      },
-                      "closest_loaded_does": {
-                        "type": "string",
-                        "minLength": 3,
-                        "maxLength": 80
-                      },
-                      "fits": {
-                        "type": "boolean"
-                      }
-                    }
-                  }
-                },
-                "time_conditions": {
-                  "items": {
-                    "$ref": "#/$defs/PlannerModelTimeCondition"
-                  },
-                  "maxItems": 16,
-                  "title": "Time Conditions",
-                  "type": "array"
-                },
-                "goal_summary": {
-                  "default": "",
-                  "title": "Goal Summary",
-                  "type": "string",
-                  "maxLength": 240
-                },
-                "goal_outcomes": {
-                  "type": "object",
-                  "properties": {
-                    "${goal}": {
-                      "oneOf": [
-                        {
-                          "additionalProperties": false,
-                          "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only.",
-                          "properties": {
-                            "disposition": {
-                              "type": "string",
-                              "enum": [
-                                "execute"
-                              ]
-                            },
-                            "coverage": {
-                              "type": "string",
-                              "enum": [
-                                "complete"
-                              ]
-                            },
-                            "unresolved": {
-                              "items": {
-                                "type": "string",
-                                "maxLength": 240
-                              },
-                              "title": "Unresolved",
-                              "type": "array",
-                              "maxItems": 0
-                            },
-                            "step_ids": {
-                              "items": {
-                                "type": "string"
-                              },
-                              "title": "Step Ids",
-                              "type": "array",
-                              "maxItems": 4,
-                              "uniqueItems": true,
-                              "description": "The one simple Fast Planner step owned by this goal, or an empty list for respond/clarify/unavailable.",
-                              "minItems": 1
-                            },
-                            "satisfaction": {
-                              "anyOf": [
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 1.0,
-                                      "minimum": 0.95,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "exact"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1,
-                                      "minItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 0
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 0
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.949999,
-                                      "minimum": 0.75,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "substantial"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.749999,
-                                      "minimum": 0.01,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "partial"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.0,
-                                      "minimum": 0.0,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "unsatisfied"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                }
-                              ],
-                              "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
-                            },
-                            "rationale": {
-                              "default": "",
-                              "title": "Rationale",
-                              "type": "string",
-                              "maxLength": 200
-                            },
-                            "precedes_step_ids": {
-                              "description": "This communication must finish BEFORE each listed Work step starts.",
-                              "items": {
-                                "type": "string"
-                              },
-                              "maxItems": 0,
-                              "title": "Precedes Step Ids",
-                              "type": "array"
-                            },
-                            "follows_step_ids": {
-                              "description": "This communication waits until AFTER each listed Work step finishes.",
-                              "items": {
-                                "type": "string"
-                              },
-                              "maxItems": 0,
-                              "title": "Follows Step Ids",
-                              "type": "array"
-                            }
-                          },
-                          "required": [
-                            "disposition",
-                            "coverage",
-                            "unresolved",
-                            "step_ids",
-                            "satisfaction",
-                            "rationale"
-                          ],
-                          "title": "PlannerModelGoalOutcome",
-                          "type": "object"
-                        },
-                        {
-                          "additionalProperties": false,
-                          "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only.",
-                          "properties": {
-                            "disposition": {
-                              "type": "string",
-                              "enum": [
-                                "unavailable"
-                              ]
-                            },
-                            "coverage": {
-                              "type": "string",
-                              "enum": [
-                                "partial",
-                                "uncertain"
-                              ]
-                            },
-                            "unresolved": {
-                              "items": {
-                                "type": "string",
-                                "maxLength": 240
-                              },
-                              "title": "Unresolved",
-                              "type": "array",
-                              "maxItems": 4
-                            },
-                            "step_ids": {
-                              "items": {
-                                "type": "string"
-                              },
-                              "title": "Step Ids",
-                              "type": "array",
-                              "maxItems": 0,
-                              "uniqueItems": true,
-                              "description": "The one simple Fast Planner step owned by this goal, or an empty list for respond/clarify/unavailable.",
-                              "minItems": 0
-                            },
-                            "satisfaction": {
-                              "anyOf": [
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 1.0,
-                                      "minimum": 0.95,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "exact"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1,
-                                      "minItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 0
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 0
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.949999,
-                                      "minimum": 0.75,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "substantial"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.749999,
-                                      "minimum": 0.01,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "partial"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.0,
-                                      "minimum": 0.0,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "unsatisfied"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                }
-                              ],
-                              "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
-                            },
-                            "rationale": {
-                              "default": "",
-                              "title": "Rationale",
-                              "type": "string",
-                              "maxLength": 200
-                            },
-                            "precedes_step_ids": {
-                              "description": "This communication must finish BEFORE each listed Work step starts.",
-                              "items": {
-                                "type": "string"
-                              },
-                              "maxItems": 0,
-                              "title": "Precedes Step Ids",
-                              "type": "array"
-                            },
-                            "follows_step_ids": {
-                              "description": "This communication waits until AFTER each listed Work step finishes.",
-                              "items": {
-                                "type": "string"
-                              },
-                              "maxItems": 0,
-                              "title": "Follows Step Ids",
-                              "type": "array"
-                            }
-                          },
-                          "required": [
-                            "disposition",
-                            "coverage",
-                            "unresolved",
-                            "step_ids",
-                            "satisfaction",
-                            "rationale"
-                          ],
-                          "title": "PlannerModelGoalOutcome",
-                          "type": "object"
-                        },
-                        {
-                          "additionalProperties": false,
-                          "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only.",
-                          "properties": {
-                            "disposition": {
-                              "type": "string",
-                              "enum": [
-                                "clarify"
-                              ]
-                            },
-                            "coverage": {
-                              "type": "string",
-                              "enum": [
-                                "partial",
-                                "uncertain"
-                              ]
-                            },
-                            "unresolved": {
-                              "items": {
-                                "type": "string",
-                                "maxLength": 240
-                              },
-                              "title": "Unresolved",
-                              "type": "array",
-                              "maxItems": 4,
-                              "minItems": 1
-                            },
-                            "step_ids": {
-                              "items": {
-                                "type": "string"
-                              },
-                              "title": "Step Ids",
-                              "type": "array",
-                              "maxItems": 0,
-                              "uniqueItems": true,
-                              "description": "The one simple Fast Planner step owned by this goal, or an empty list for respond/clarify/unavailable.",
-                              "minItems": 0
-                            },
-                            "satisfaction": {
-                              "anyOf": [
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 1.0,
-                                      "minimum": 0.95,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "exact"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1,
-                                      "minItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 0
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 0
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.949999,
-                                      "minimum": 0.75,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "substantial"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.749999,
-                                      "minimum": 0.01,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "partial"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                },
-                                {
-                                  "additionalProperties": false,
-                                  "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                                  "properties": {
-                                    "score": {
-                                      "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                                      "maximum": 0.0,
-                                      "minimum": 0.0,
-                                      "title": "Score",
-                                      "type": "number"
-                                    },
-                                    "status": {
-                                      "type": "string",
-                                      "enum": [
-                                        "unsatisfied"
-                                      ]
-                                    },
-                                    "satisfied_goal_ids": {
-                                      "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Satisfied Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_goal_ids": {
-                                      "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
-                                      "items": {
-                                        "type": "string",
-                                        "enum": [
-                                          "${goal}"
-                                        ]
-                                      },
-                                      "title": "Unmet Goal Ids",
-                                      "type": "array",
-                                      "uniqueItems": true,
-                                      "maxItems": 1
-                                    },
-                                    "unmet_requirements": {
-                                      "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                                      "items": {
-                                        "type": "string",
-                                        "maxLength": 240
-                                      },
-                                      "title": "Unmet Requirements",
-                                      "type": "array",
-                                      "maxItems": 4
-                                    },
-                                    "rationale": {
-                                      "default": "",
-                                      "title": "Rationale",
-                                      "type": "string",
-                                      "maxLength": 200
-                                    }
-                                  },
-                                  "required": [
-                                    "score",
-                                    "status",
-                                    "satisfied_goal_ids",
-                                    "unmet_goal_ids",
-                                    "unmet_requirements",
-                                    "rationale"
-                                  ],
-                                  "title": "PlannerGoalSatisfaction",
-                                  "type": "object"
-                                }
-                              ],
-                              "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
-                            },
-                            "rationale": {
-                              "default": "",
-                              "title": "Rationale",
-                              "type": "string",
-                              "maxLength": 200
-                            },
-                            "precedes_step_ids": {
-                              "description": "This communication must finish BEFORE each listed Work step starts.",
-                              "items": {
-                                "type": "string"
-                              },
-                              "maxItems": 0,
-                              "title": "Precedes Step Ids",
-                              "type": "array"
-                            },
-                            "follows_step_ids": {
-                              "description": "This communication waits until AFTER each listed Work step finishes.",
-                              "items": {
-                                "type": "string"
-                              },
-                              "maxItems": 0,
-                              "title": "Follows Step Ids",
-                              "type": "array"
-                            }
-                          },
-                          "required": [
-                            "disposition",
-                            "coverage",
-                            "unresolved",
-                            "step_ids",
-                            "satisfaction",
-                            "rationale"
-                          ],
-                          "title": "PlannerModelGoalOutcome",
-                          "type": "object"
-                        }
-                      ],
-                      "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only."
-                    }
-                  },
-                  "required": [
-                    "${goal}"
-                  ],
-                  "additionalProperties": false,
-                  "minProperties": 1,
-                  "maxProperties": 1
-                },
-                "steps": {
-                  "items": {
-                    "$ref": "#/$defs/PlannerModelStep"
-                  },
-                  "title": "Steps",
-                  "type": "array",
-                  "maxItems": 4,
-                  "description": "At most four executable steps per authoritative goal. A skill's count argument represents repeated motions; never duplicate a step to implement count. Conversational respond goals have no step.",
-                  "minItems": 0
-                },
-                "goal_satisfaction": {
-                  "anyOf": [
-                    {
-                      "additionalProperties": false,
-                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                      "properties": {
-                        "score": {
-                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                          "maximum": 1.0,
-                          "minimum": 0.95,
-                          "title": "Score",
-                          "type": "number"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "exact"
-                          ]
-                        },
-                        "satisfied_goal_ids": {
-                          "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "${goal}"
-                            ]
-                          },
-                          "title": "Satisfied Goal Ids",
-                          "type": "array",
-                          "uniqueItems": true,
-                          "minItems": 1,
-                          "maxItems": 1
-                        },
-                        "unmet_goal_ids": {
-                          "description": "Canonical goals for which the proposed plan still has a planning gap.",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "${goal}"
-                            ]
-                          },
-                          "title": "Unmet Goal Ids",
-                          "type": "array",
-                          "uniqueItems": true,
-                          "maxItems": 0
-                        },
-                        "unmet_requirements": {
-                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                          "items": {
-                            "type": "string",
-                            "maxLength": 240
-                          },
-                          "title": "Unmet Requirements",
-                          "type": "array",
-                          "maxItems": 0
-                        },
-                        "rationale": {
-                          "default": "",
-                          "title": "Rationale",
-                          "type": "string",
-                          "maxLength": 200
-                        }
-                      },
-                      "required": [
-                        "score",
-                        "status",
-                        "satisfied_goal_ids",
-                        "unmet_goal_ids",
-                        "unmet_requirements",
-                        "rationale"
-                      ],
-                      "title": "PlannerGoalSatisfaction",
-                      "type": "object"
-                    },
-                    {
-                      "additionalProperties": false,
-                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                      "properties": {
-                        "score": {
-                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                          "maximum": 0.949999,
-                          "minimum": 0.75,
-                          "title": "Score",
-                          "type": "number"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "substantial"
-                          ]
-                        },
-                        "satisfied_goal_ids": {
-                          "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "${goal}"
-                            ]
-                          },
-                          "title": "Satisfied Goal Ids",
-                          "type": "array",
-                          "uniqueItems": true
-                        },
-                        "unmet_goal_ids": {
-                          "description": "Canonical goals for which the proposed plan still has a planning gap.",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "${goal}"
-                            ]
-                          },
-                          "title": "Unmet Goal Ids",
-                          "type": "array",
-                          "uniqueItems": true
-                        },
-                        "unmet_requirements": {
-                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                          "items": {
-                            "type": "string",
-                            "maxLength": 240
-                          },
-                          "title": "Unmet Requirements",
-                          "type": "array",
-                          "maxItems": 4
-                        },
-                        "rationale": {
-                          "default": "",
-                          "title": "Rationale",
-                          "type": "string",
-                          "maxLength": 200
-                        }
-                      },
-                      "required": [
-                        "score",
-                        "status",
-                        "satisfied_goal_ids",
-                        "unmet_goal_ids",
-                        "unmet_requirements",
-                        "rationale"
-                      ],
-                      "title": "PlannerGoalSatisfaction",
-                      "type": "object"
-                    },
-                    {
-                      "additionalProperties": false,
-                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                      "properties": {
-                        "score": {
-                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                          "maximum": 0.749999,
-                          "minimum": 0.01,
-                          "title": "Score",
-                          "type": "number"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "partial"
-                          ]
-                        },
-                        "satisfied_goal_ids": {
-                          "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "${goal}"
-                            ]
-                          },
-                          "title": "Satisfied Goal Ids",
-                          "type": "array",
-                          "uniqueItems": true
-                        },
-                        "unmet_goal_ids": {
-                          "description": "Canonical goals for which the proposed plan still has a planning gap.",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "${goal}"
-                            ]
-                          },
-                          "title": "Unmet Goal Ids",
-                          "type": "array",
-                          "uniqueItems": true
-                        },
-                        "unmet_requirements": {
-                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                          "items": {
-                            "type": "string",
-                            "maxLength": 240
-                          },
-                          "title": "Unmet Requirements",
-                          "type": "array",
-                          "maxItems": 4
-                        },
-                        "rationale": {
-                          "default": "",
-                          "title": "Rationale",
-                          "type": "string",
-                          "maxLength": 200
-                        }
-                      },
-                      "required": [
-                        "score",
-                        "status",
-                        "satisfied_goal_ids",
-                        "unmet_goal_ids",
-                        "unmet_requirements",
-                        "rationale"
-                      ],
-                      "title": "PlannerGoalSatisfaction",
-                      "type": "object"
-                    },
-                    {
-                      "additionalProperties": false,
-                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
-                      "properties": {
-                        "score": {
-                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
-                          "maximum": 0.0,
-                          "minimum": 0.0,
-                          "title": "Score",
-                          "type": "number"
-                        },
-                        "status": {
-                          "type": "string",
-                          "enum": [
-                            "unsatisfied"
-                          ]
-                        },
-                        "satisfied_goal_ids": {
-                          "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "${goal}"
-                            ]
-                          },
-                          "title": "Satisfied Goal Ids",
-                          "type": "array",
-                          "uniqueItems": true
-                        },
-                        "unmet_goal_ids": {
-                          "description": "Canonical goals for which the proposed plan still has a planning gap.",
-                          "items": {
-                            "type": "string",
-                            "enum": [
-                              "${goal}"
-                            ]
-                          },
-                          "title": "Unmet Goal Ids",
-                          "type": "array",
-                          "uniqueItems": true
-                        },
-                        "unmet_requirements": {
-                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
-                          "items": {
-                            "type": "string",
-                            "maxLength": 240
-                          },
-                          "title": "Unmet Requirements",
-                          "type": "array",
-                          "maxItems": 4
-                        },
-                        "rationale": {
-                          "default": "",
-                          "title": "Rationale",
-                          "type": "string",
-                          "maxLength": 200
-                        }
-                      },
-                      "required": [
-                        "score",
-                        "status",
-                        "satisfied_goal_ids",
-                        "unmet_goal_ids",
-                        "unmet_requirements",
-                        "rationale"
-                      ],
-                      "title": "PlannerGoalSatisfaction",
-                      "type": "object"
-                    }
-                  ],
-                  "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
-                },
-                "disposition": {
-                  "enum": [
-                    "execute",
-                    "unavailable",
-                    "clarify"
-                  ],
-                  "title": "Disposition",
-                  "type": "string",
-                  "description": "Aggregate the already-authored goal_outcomes: execute when all outcomes execute, respond when all respond, mixed when execute and respond are both present or independent respond and clarify outcomes coexist, clarify when all clarify, and unavailable when all are unavailable."
-                },
-                "coverage": {
-                  "enum": [
-                    "complete",
-                    "partial",
-                    "uncertain"
-                  ],
-                  "title": "Coverage",
-                  "type": "string"
-                },
-                "confidence": {
-                  "maximum": 1.0,
-                  "minimum": 0.0,
-                  "title": "Confidence",
-                  "type": "number"
-                },
-                "unresolved": {
-                  "items": {
-                    "type": "string",
-                    "maxLength": 240
-                  },
-                  "title": "Unresolved",
-                  "type": "array",
-                  "maxItems": 4
-                },
-                "parameter_resolutions": {
-                  "items": {
-                    "$ref": "#/$defs/PlanParameterResolution"
-                  },
-                  "title": "Parameter Resolutions",
-                  "type": "array",
-                  "maxItems": 4
-                },
-                "plan_relation": {
-                  "default": "exact",
-                  "enum": [
-                    "exact",
-                    "safe_adjustment",
-                    "alternative"
-                  ],
-                  "title": "Plan Relation",
-                  "type": "string"
-                },
-                "user_confirmation_required": {
-                  "default": false,
-                  "title": "User Confirmation Required",
-                  "type": "boolean"
-                },
-                "cancel_activity_ids": {
-                  "type": "array",
-                  "items": {
-                    "type": "string"
-                  },
-                  "maxItems": 0,
-                  "uniqueItems": true,
-                  "description": "Explicitly cancel these supplied Activities. Omitted Work stays unchanged."
-                }
-              },
-              "required": [
-                "ability_needs",
-                "disposition",
-                "coverage",
-                "confidence",
-                "goal_summary",
-                "steps",
-                "unresolved",
-                "parameter_resolutions",
-                "time_conditions",
-                "goal_outcomes",
-                "goal_satisfaction",
-                "plan_relation",
-                "user_confirmation_required"
-              ],
               "title": "FastPlannerModelOutput",
-              "type": "object",
               "allOf": [
                 {
                   "if": {
@@ -4466,6 +2932,2002 @@
                       "unresolved"
                     ]
                   }
+                }
+              ],
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ability_needs": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "need",
+                          "closest_loaded",
+                          "closest_loaded_does",
+                          "fits"
+                        ],
+                        "properties": {
+                          "need": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 100
+                          },
+                          "closest_loaded": {
+                            "type": "string",
+                            "enum": [
+                              "soridormi.blink_eyes",
+                              "none"
+                            ]
+                          },
+                          "closest_loaded_does": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 80
+                          },
+                          "fits": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "time_conditions": {
+                      "items": {
+                        "$ref": "#/$defs/PlannerModelTimeCondition"
+                      },
+                      "maxItems": 16,
+                      "title": "Time Conditions",
+                      "type": "array"
+                    },
+                    "goal_summary": {
+                      "default": "",
+                      "title": "Goal Summary",
+                      "type": "string",
+                      "maxLength": 240
+                    },
+                    "goal_outcomes": {
+                      "type": "object",
+                      "properties": {
+                        "${goal}": {
+                          "oneOf": [
+                            {
+                              "additionalProperties": false,
+                              "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only.",
+                              "properties": {
+                                "disposition": {
+                                  "type": "string",
+                                  "enum": [
+                                    "execute"
+                                  ]
+                                },
+                                "coverage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "complete"
+                                  ]
+                                },
+                                "unresolved": {
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 240
+                                  },
+                                  "title": "Unresolved",
+                                  "type": "array",
+                                  "maxItems": 0
+                                },
+                                "step_ids": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "title": "Step Ids",
+                                  "type": "array",
+                                  "maxItems": 4,
+                                  "uniqueItems": true,
+                                  "description": "The one simple Fast Planner step owned by this goal, or an empty list for respond/clarify/unavailable.",
+                                  "minItems": 1
+                                },
+                                "satisfaction": {
+                                  "anyOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 1.0,
+                                          "minimum": 0.95,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "exact"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1,
+                                          "minItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 0
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 0
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 0.949999,
+                                          "minimum": 0.75,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "substantial"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 4
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 0.749999,
+                                          "minimum": 0.01,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "partial"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 4
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    }
+                                  ],
+                                  "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
+                                },
+                                "rationale": {
+                                  "default": "",
+                                  "title": "Rationale",
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "precedes_step_ids": {
+                                  "description": "This communication must finish BEFORE each listed Work step starts.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 0,
+                                  "title": "Precedes Step Ids",
+                                  "type": "array"
+                                },
+                                "follows_step_ids": {
+                                  "description": "This communication waits until AFTER each listed Work step finishes.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 0,
+                                  "title": "Follows Step Ids",
+                                  "type": "array"
+                                }
+                              },
+                              "required": [
+                                "disposition",
+                                "coverage",
+                                "unresolved",
+                                "step_ids",
+                                "satisfaction",
+                                "rationale"
+                              ],
+                              "title": "PlannerModelGoalOutcome",
+                              "type": "object"
+                            }
+                          ],
+                          "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only."
+                        }
+                      },
+                      "required": [
+                        "${goal}"
+                      ],
+                      "additionalProperties": false,
+                      "minProperties": 1,
+                      "maxProperties": 1
+                    },
+                    "steps": {
+                      "items": {
+                        "$ref": "#/$defs/PlannerModelStep"
+                      },
+                      "title": "Steps",
+                      "type": "array",
+                      "maxItems": 4,
+                      "description": "At most four executable steps per authoritative goal. A skill's count argument represents repeated motions; never duplicate a step to implement count. Conversational respond goals have no step.",
+                      "minItems": 1
+                    },
+                    "goal_satisfaction": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 1.0,
+                              "minimum": 0.95,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "exact"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true,
+                              "minItems": 1,
+                              "maxItems": 1
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true,
+                              "maxItems": 0
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 0
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 0.949999,
+                              "minimum": 0.75,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "substantial"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 4
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 0.749999,
+                              "minimum": 0.01,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "partial"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 4
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        }
+                      ],
+                      "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
+                    },
+                    "disposition": {
+                      "enum": [
+                        "execute"
+                      ],
+                      "title": "Disposition",
+                      "type": "string",
+                      "description": "Aggregate the already-authored goal_outcomes: execute when all outcomes execute, respond when all respond, mixed when execute and respond are both present or independent respond and clarify outcomes coexist, clarify when all clarify, and unavailable when all are unavailable."
+                    },
+                    "coverage": {
+                      "enum": [
+                        "complete"
+                      ],
+                      "title": "Coverage",
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "unresolved": {
+                      "items": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "title": "Unresolved",
+                      "type": "array",
+                      "maxItems": 4
+                    },
+                    "parameter_resolutions": {
+                      "items": {
+                        "$ref": "#/$defs/PlanParameterResolution"
+                      },
+                      "title": "Parameter Resolutions",
+                      "type": "array",
+                      "maxItems": 4
+                    },
+                    "plan_relation": {
+                      "default": "exact",
+                      "enum": [
+                        "exact",
+                        "safe_adjustment",
+                        "alternative"
+                      ],
+                      "title": "Plan Relation",
+                      "type": "string"
+                    },
+                    "user_confirmation_required": {
+                      "default": false,
+                      "title": "User Confirmation Required",
+                      "type": "boolean"
+                    },
+                    "cancel_activity_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "uniqueItems": true,
+                      "description": "Explicitly cancel these supplied Activities. Omitted Work stays unchanged."
+                    }
+                  },
+                  "required": [
+                    "ability_needs",
+                    "disposition",
+                    "coverage",
+                    "confidence",
+                    "goal_summary",
+                    "steps",
+                    "unresolved",
+                    "parameter_resolutions",
+                    "time_conditions",
+                    "goal_outcomes",
+                    "goal_satisfaction",
+                    "plan_relation",
+                    "user_confirmation_required"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ability_needs": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "need",
+                          "closest_loaded",
+                          "closest_loaded_does",
+                          "fits"
+                        ],
+                        "properties": {
+                          "need": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 100
+                          },
+                          "closest_loaded": {
+                            "type": "string",
+                            "enum": [
+                              "soridormi.blink_eyes",
+                              "none"
+                            ]
+                          },
+                          "closest_loaded_does": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 80
+                          },
+                          "fits": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "time_conditions": {
+                      "items": {
+                        "$ref": "#/$defs/PlannerModelTimeCondition"
+                      },
+                      "maxItems": 16,
+                      "title": "Time Conditions",
+                      "type": "array"
+                    },
+                    "goal_summary": {
+                      "default": "",
+                      "title": "Goal Summary",
+                      "type": "string",
+                      "maxLength": 240
+                    },
+                    "goal_outcomes": {
+                      "type": "object",
+                      "properties": {
+                        "${goal}": {
+                          "oneOf": [
+                            {
+                              "additionalProperties": false,
+                              "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only.",
+                              "properties": {
+                                "disposition": {
+                                  "type": "string",
+                                  "enum": [
+                                    "unavailable"
+                                  ]
+                                },
+                                "coverage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "partial",
+                                    "uncertain"
+                                  ]
+                                },
+                                "unresolved": {
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 240
+                                  },
+                                  "title": "Unresolved",
+                                  "type": "array",
+                                  "maxItems": 4
+                                },
+                                "step_ids": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "title": "Step Ids",
+                                  "type": "array",
+                                  "maxItems": 0,
+                                  "uniqueItems": true,
+                                  "description": "The one simple Fast Planner step owned by this goal, or an empty list for respond/clarify/unavailable.",
+                                  "minItems": 0
+                                },
+                                "satisfaction": {
+                                  "anyOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 0.949999,
+                                          "minimum": 0.75,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "substantial"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 4
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 0.749999,
+                                          "minimum": 0.01,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "partial"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 4
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 0.0,
+                                          "minimum": 0.0,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "unsatisfied"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 4
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    }
+                                  ],
+                                  "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
+                                },
+                                "rationale": {
+                                  "default": "",
+                                  "title": "Rationale",
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "precedes_step_ids": {
+                                  "description": "This communication must finish BEFORE each listed Work step starts.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 0,
+                                  "title": "Precedes Step Ids",
+                                  "type": "array"
+                                },
+                                "follows_step_ids": {
+                                  "description": "This communication waits until AFTER each listed Work step finishes.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 0,
+                                  "title": "Follows Step Ids",
+                                  "type": "array"
+                                }
+                              },
+                              "required": [
+                                "disposition",
+                                "coverage",
+                                "unresolved",
+                                "step_ids",
+                                "satisfaction",
+                                "rationale"
+                              ],
+                              "title": "PlannerModelGoalOutcome",
+                              "type": "object"
+                            }
+                          ],
+                          "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only."
+                        }
+                      },
+                      "required": [
+                        "${goal}"
+                      ],
+                      "additionalProperties": false,
+                      "minProperties": 1,
+                      "maxProperties": 1
+                    },
+                    "steps": {
+                      "items": {
+                        "$ref": "#/$defs/PlannerModelStep"
+                      },
+                      "title": "Steps",
+                      "type": "array",
+                      "maxItems": 0,
+                      "description": "At most four executable steps per authoritative goal. A skill's count argument represents repeated motions; never duplicate a step to implement count. Conversational respond goals have no step.",
+                      "minItems": 0
+                    },
+                    "goal_satisfaction": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 0.949999,
+                              "minimum": 0.75,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "substantial"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 4
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 0.749999,
+                              "minimum": 0.01,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "partial"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 4
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 0.0,
+                              "minimum": 0.0,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "unsatisfied"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 4
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        }
+                      ],
+                      "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
+                    },
+                    "disposition": {
+                      "enum": [
+                        "unavailable"
+                      ],
+                      "title": "Disposition",
+                      "type": "string",
+                      "description": "Aggregate the already-authored goal_outcomes: execute when all outcomes execute, respond when all respond, mixed when execute and respond are both present or independent respond and clarify outcomes coexist, clarify when all clarify, and unavailable when all are unavailable."
+                    },
+                    "coverage": {
+                      "enum": [
+                        "partial",
+                        "uncertain"
+                      ],
+                      "title": "Coverage",
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "unresolved": {
+                      "items": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "title": "Unresolved",
+                      "type": "array",
+                      "maxItems": 4
+                    },
+                    "parameter_resolutions": {
+                      "items": {
+                        "$ref": "#/$defs/PlanParameterResolution"
+                      },
+                      "title": "Parameter Resolutions",
+                      "type": "array",
+                      "maxItems": 4
+                    },
+                    "plan_relation": {
+                      "default": "exact",
+                      "enum": [
+                        "exact",
+                        "safe_adjustment",
+                        "alternative"
+                      ],
+                      "title": "Plan Relation",
+                      "type": "string"
+                    },
+                    "user_confirmation_required": {
+                      "default": false,
+                      "title": "User Confirmation Required",
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "cancel_activity_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "uniqueItems": true,
+                      "description": "Explicitly cancel these supplied Activities. Omitted Work stays unchanged."
+                    }
+                  },
+                  "required": [
+                    "ability_needs",
+                    "disposition",
+                    "coverage",
+                    "confidence",
+                    "goal_summary",
+                    "steps",
+                    "unresolved",
+                    "parameter_resolutions",
+                    "time_conditions",
+                    "goal_outcomes",
+                    "goal_satisfaction",
+                    "plan_relation",
+                    "user_confirmation_required"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "ability_needs": {
+                      "type": "array",
+                      "maxItems": 4,
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "need",
+                          "closest_loaded",
+                          "closest_loaded_does",
+                          "fits"
+                        ],
+                        "properties": {
+                          "need": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 100
+                          },
+                          "closest_loaded": {
+                            "type": "string",
+                            "enum": [
+                              "soridormi.blink_eyes",
+                              "none"
+                            ]
+                          },
+                          "closest_loaded_does": {
+                            "type": "string",
+                            "minLength": 3,
+                            "maxLength": 80
+                          },
+                          "fits": {
+                            "type": "boolean"
+                          }
+                        }
+                      }
+                    },
+                    "time_conditions": {
+                      "items": {
+                        "$ref": "#/$defs/PlannerModelTimeCondition"
+                      },
+                      "maxItems": 16,
+                      "title": "Time Conditions",
+                      "type": "array"
+                    },
+                    "goal_summary": {
+                      "default": "",
+                      "title": "Goal Summary",
+                      "type": "string",
+                      "maxLength": 240
+                    },
+                    "goal_outcomes": {
+                      "type": "object",
+                      "properties": {
+                        "${goal}": {
+                          "oneOf": [
+                            {
+                              "additionalProperties": false,
+                              "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only.",
+                              "properties": {
+                                "disposition": {
+                                  "type": "string",
+                                  "enum": [
+                                    "clarify"
+                                  ]
+                                },
+                                "coverage": {
+                                  "type": "string",
+                                  "enum": [
+                                    "partial",
+                                    "uncertain"
+                                  ]
+                                },
+                                "unresolved": {
+                                  "items": {
+                                    "type": "string",
+                                    "maxLength": 240
+                                  },
+                                  "title": "Unresolved",
+                                  "type": "array",
+                                  "maxItems": 4,
+                                  "minItems": 1
+                                },
+                                "step_ids": {
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "title": "Step Ids",
+                                  "type": "array",
+                                  "maxItems": 0,
+                                  "uniqueItems": true,
+                                  "description": "The one simple Fast Planner step owned by this goal, or an empty list for respond/clarify/unavailable.",
+                                  "minItems": 0
+                                },
+                                "satisfaction": {
+                                  "anyOf": [
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 0.949999,
+                                          "minimum": 0.75,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "substantial"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 4
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 0.749999,
+                                          "minimum": 0.01,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "partial"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 4
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    },
+                                    {
+                                      "additionalProperties": false,
+                                      "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                                      "properties": {
+                                        "score": {
+                                          "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                                          "maximum": 0.0,
+                                          "minimum": 0.0,
+                                          "title": "Score",
+                                          "type": "number"
+                                        },
+                                        "status": {
+                                          "type": "string",
+                                          "enum": [
+                                            "unsatisfied"
+                                          ]
+                                        },
+                                        "satisfied_goal_ids": {
+                                          "description": "Only '${goal}' may appear here. Include it when this goal's proposed step or response would satisfy it.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Satisfied Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_goal_ids": {
+                                          "description": "Only '${goal}' may appear here, and only for an actual planning gap. Pending execution and sibling goals do not belong here; exact satisfaction requires an empty list.",
+                                          "items": {
+                                            "type": "string",
+                                            "enum": [
+                                              "${goal}"
+                                            ]
+                                          },
+                                          "title": "Unmet Goal Ids",
+                                          "type": "array",
+                                          "uniqueItems": true,
+                                          "maxItems": 1
+                                        },
+                                        "unmet_requirements": {
+                                          "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                                          "items": {
+                                            "type": "string",
+                                            "maxLength": 240
+                                          },
+                                          "title": "Unmet Requirements",
+                                          "type": "array",
+                                          "maxItems": 4
+                                        },
+                                        "rationale": {
+                                          "default": "",
+                                          "title": "Rationale",
+                                          "type": "string",
+                                          "maxLength": 200
+                                        }
+                                      },
+                                      "required": [
+                                        "score",
+                                        "status",
+                                        "satisfied_goal_ids",
+                                        "unmet_goal_ids",
+                                        "unmet_requirements",
+                                        "rationale"
+                                      ],
+                                      "title": "PlannerGoalSatisfaction",
+                                      "type": "object"
+                                    }
+                                  ],
+                                  "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
+                                },
+                                "rationale": {
+                                  "default": "",
+                                  "title": "Rationale",
+                                  "type": "string",
+                                  "maxLength": 200
+                                },
+                                "precedes_step_ids": {
+                                  "description": "This communication must finish BEFORE each listed Work step starts.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 0,
+                                  "title": "Precedes Step Ids",
+                                  "type": "array"
+                                },
+                                "follows_step_ids": {
+                                  "description": "This communication waits until AFTER each listed Work step finishes.",
+                                  "items": {
+                                    "type": "string"
+                                  },
+                                  "maxItems": 0,
+                                  "title": "Follows Step Ids",
+                                  "type": "array"
+                                }
+                              },
+                              "required": [
+                                "disposition",
+                                "coverage",
+                                "unresolved",
+                                "step_ids",
+                                "satisfaction",
+                                "rationale"
+                              ],
+                              "title": "PlannerModelGoalOutcome",
+                              "type": "object"
+                            }
+                          ],
+                          "description": "The complete model-authored outcome for authoritative goal '${goal}'. Satisfaction evaluates this goal only."
+                        }
+                      },
+                      "required": [
+                        "${goal}"
+                      ],
+                      "additionalProperties": false,
+                      "minProperties": 1,
+                      "maxProperties": 1
+                    },
+                    "steps": {
+                      "items": {
+                        "$ref": "#/$defs/PlannerModelStep"
+                      },
+                      "title": "Steps",
+                      "type": "array",
+                      "maxItems": 0,
+                      "description": "At most four executable steps per authoritative goal. A skill's count argument represents repeated motions; never duplicate a step to implement count. Conversational respond goals have no step.",
+                      "minItems": 0
+                    },
+                    "goal_satisfaction": {
+                      "anyOf": [
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 0.949999,
+                              "minimum": 0.75,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "substantial"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 4
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 0.749999,
+                              "minimum": 0.01,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "partial"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 4
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "description": "Prospective adequacy of the proposed plan, not execution progress.",
+                          "properties": {
+                            "score": {
+                              "description": "How fully the proposed plan would satisfy the canonical goals if its steps and responses complete successfully. This is not a measurement of whether execution has already happened. A complete current acquisition stage may have partial whole-Goal adequacy; retain deferred requirements in both per-Goal and aggregate satisfaction.",
+                              "maximum": 0.0,
+                              "minimum": 0.0,
+                              "title": "Score",
+                              "type": "number"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "unsatisfied"
+                              ]
+                            },
+                            "satisfied_goal_ids": {
+                              "description": "Canonical goals the proposed plan is designed to satisfy after successful execution or response.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Satisfied Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_goal_ids": {
+                              "description": "Canonical goals for which the proposed plan still has a planning gap.",
+                              "items": {
+                                "type": "string",
+                                "enum": [
+                                  "${goal}"
+                                ]
+                              },
+                              "title": "Unmet Goal Ids",
+                              "type": "array",
+                              "uniqueItems": true
+                            },
+                            "unmet_requirements": {
+                              "description": "Actual planning gaps only. Pending execution, the text of a covered goal, and sibling goals are not unmet requirements. This must be empty when status is exact.",
+                              "items": {
+                                "type": "string",
+                                "maxLength": 240
+                              },
+                              "title": "Unmet Requirements",
+                              "type": "array",
+                              "maxItems": 4
+                            },
+                            "rationale": {
+                              "default": "",
+                              "title": "Rationale",
+                              "type": "string",
+                              "maxLength": 200
+                            }
+                          },
+                          "required": [
+                            "score",
+                            "status",
+                            "satisfied_goal_ids",
+                            "unmet_goal_ids",
+                            "unmet_requirements",
+                            "rationale"
+                          ],
+                          "title": "PlannerGoalSatisfaction",
+                          "type": "object"
+                        }
+                      ],
+                      "description": "Prospective plan adequacy. The selected status branch enforces its score band; exact satisfaction requires all planned goals in satisfied_goal_ids and both unmet lists empty."
+                    },
+                    "disposition": {
+                      "enum": [
+                        "clarify"
+                      ],
+                      "title": "Disposition",
+                      "type": "string",
+                      "description": "Aggregate the already-authored goal_outcomes: execute when all outcomes execute, respond when all respond, mixed when execute and respond are both present or independent respond and clarify outcomes coexist, clarify when all clarify, and unavailable when all are unavailable."
+                    },
+                    "coverage": {
+                      "enum": [
+                        "partial",
+                        "uncertain"
+                      ],
+                      "title": "Coverage",
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "maximum": 1.0,
+                      "minimum": 0.0,
+                      "title": "Confidence",
+                      "type": "number"
+                    },
+                    "unresolved": {
+                      "items": {
+                        "type": "string",
+                        "maxLength": 240
+                      },
+                      "title": "Unresolved",
+                      "type": "array",
+                      "maxItems": 4
+                    },
+                    "parameter_resolutions": {
+                      "items": {
+                        "$ref": "#/$defs/PlanParameterResolution"
+                      },
+                      "title": "Parameter Resolutions",
+                      "type": "array",
+                      "maxItems": 4
+                    },
+                    "plan_relation": {
+                      "default": "exact",
+                      "enum": [
+                        "exact",
+                        "safe_adjustment",
+                        "alternative"
+                      ],
+                      "title": "Plan Relation",
+                      "type": "string"
+                    },
+                    "user_confirmation_required": {
+                      "default": false,
+                      "title": "User Confirmation Required",
+                      "type": "boolean",
+                      "const": false
+                    },
+                    "cancel_activity_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "maxItems": 0,
+                      "uniqueItems": true,
+                      "description": "Explicitly cancel these supplied Activities. Omitted Work stays unchanged."
+                    }
+                  },
+                  "required": [
+                    "ability_needs",
+                    "disposition",
+                    "coverage",
+                    "confidence",
+                    "goal_summary",
+                    "steps",
+                    "unresolved",
+                    "parameter_resolutions",
+                    "time_conditions",
+                    "goal_outcomes",
+                    "goal_satisfaction",
+                    "plan_relation",
+                    "user_confirmation_required"
+                  ],
+                  "type": "object"
                 }
               ]
             },

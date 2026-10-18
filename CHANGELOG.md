@@ -5,6 +5,16 @@ remains available in Git history.
 
 ## Unreleased
 
+### Planner decoder shows each disposition/step assignment (2026-10-18)
+
+- The canonical and multi-Goal Planner schemas kept the disposition/step
+  assignment only in `allOf`, which native decoders ignore, so the decoder could
+  emit clarify, respond or unavailable with steps and execute with none, all
+  rejected by the DTO. The final decoder pass now exposes each permitted
+  assignment as a native branch (repeated Goal outcomes shared as `$defs`);
+  validation is unchanged. Workflow corpus freeze 43 recaptures only the changed
+  Planner request formats.
+
 ### Claude as a selectable inference provider (2026-10-18)
 
 - `AGENT_LLM_PROVIDER=anthropic` runs every Agent role, UMI included, on Claude

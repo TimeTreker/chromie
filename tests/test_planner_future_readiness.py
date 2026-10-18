@@ -384,8 +384,8 @@ def test_every_exposed_waiting_shape_offers_only_outcomes_the_dto_accepts():
     """Live 2026-10-13 (multi_thirsty_yes_en, "Yes, please."): the decoder followed the
     readiness wrapper's inner waiting shape and wrote a partial respond, which the Goal
     outcome DTO rejects; the final native pass had reached only the outer shapes."""
-    from agent.app.planner_schema import (
-        canonical_plan_response_schema, native_goal_outcome_branches, planner_readiness_response_schema)
+    from agent.app.planner_native_schema import native_goal_outcome_branches
+    from agent.app.planner_schema import canonical_plan_response_schema, planner_readiness_response_schema
 
     wave = {"type": "object", "properties": {}, "additionalProperties": False}
     schema = native_goal_outcome_branches(planner_readiness_response_schema(
@@ -408,3 +408,52 @@ def test_every_exposed_waiting_shape_offers_only_outcomes_the_dto_accepts():
     ]
     assert len(respond_coverages) > 1 and all(coverage == ["complete"] for coverage in respond_coverages)
     assert schema["anyOf"][1]["anyOf"], "the waiting shape keeps its inner alternatives"
+
+
+def test_every_exposed_plan_shape_ties_its_disposition_to_its_steps():
+    """Open after live run 16 (2026-10-15): a canonical clarify with steps, which the DTO
+    rejects. The aggregate assignment lived only in allOf, which native decoders ignore,
+    so the visible shape offered every disposition with up to four steps."""
+    from agent.app.planner_native_schema import native_goal_outcome_branches
+    from agent.app.planner_schema import (
+        canonical_plan_response_schema, need_first_response_schema,
+        planner_readiness_response_schema, readiness_first_response_schema)
+
+    def exposed(node):
+        yield node
+        for key in ("oneOf", "anyOf"):
+            for item in node.get(key) or []:
+                yield from exposed(item)
+
+    def resolve(node, definitions):
+        while "$ref" in node:
+            node = definitions[node["$ref"].rsplit("/", 1)[-1]]
+        return node
+
+    wave = {"type": "object", "properties": {}, "additionalProperties": False}
+    checked = set()
+    for goal_ids in (["goal-water"], ["goal-water", "goal-time"]):
+        for options in ({}, {"effectful_goal_ids": goal_ids[:1]}, {"requires_execution": True}):
+            schema = canonical_plan_response_schema(expected_goal_ids=goal_ids, allowed_capability_ids=["test.wave"],
+                                                    capability_input_schemas={"test.wave": wave}, **options)
+            schema = planner_readiness_response_schema(schema, goal_ids) if len(goal_ids) == 1 else schema
+            schema = readiness_first_response_schema(need_first_response_schema(
+                native_goal_outcome_branches(schema), ["test.wave"]))
+            for shape in exposed(schema):
+                fields = shape.get("properties") or {}
+                if "steps" not in fields or "goal_outcomes" not in fields or "disposition" not in fields:
+                    continue
+                offered = fields["disposition"]["enum"]
+                assert len(offered) == 1, (goal_ids, options, offered)
+                if offered == ["mixed"]:
+                    continue
+                checked.add(offered[0])
+                steps = fields["steps"]
+                if offered == ["execute"]:
+                    assert steps["minItems"] >= 1
+                else:
+                    assert steps["maxItems"] == 0, (goal_ids, options, offered)
+                for outcome in fields["goal_outcomes"]["properties"].values():
+                    for branch in outcome.get("oneOf", [outcome]):
+                        assert resolve(branch, schema["$defs"])["properties"]["disposition"]["enum"] == offered
+    assert checked == {"execute", "respond", "clarify", "unavailable"}

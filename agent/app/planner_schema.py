@@ -419,7 +419,6 @@ def scoped_reporting_response_schema(
     return result
 
 
-
 def fast_evidence_reentry_response_schema(
     *,
     expected_goal_ids: list[str],
@@ -667,73 +666,6 @@ def readiness_first_response_schema(schema: dict[str, Any]) -> dict[str, Any]:
 
     visit(schema)
     return schema
-
-
-def native_goal_outcome_branches(schema: dict[str, Any]) -> dict[str, Any]:
-    """Final decoder pass: each Goal outcome becomes per-disposition native branches.
-
-    Applied after every canonical schema refinement, so each branch carries the final
-    per-Goal enums and bounds. Validation semantics are unchanged. Every exposed shape
-    is covered, however deeply nested: the decoder follows a nested alternative and
-    ignores its siblings (live 2026-10-13: the readiness wrapper's inner waiting shapes
-    still offered a partial respond, which the outcome DTO rejects).
-    """
-    result = copy.deepcopy(schema)
-
-    def exposed(node: dict[str, Any]) -> list[dict[str, Any]]:
-        return [node, *[shape for key in ("oneOf", "anyOf") for item in node.get(key) or []
-                        if isinstance(item, dict) for shape in exposed(item)]]
-
-    for shape in exposed(result):
-        outcomes = (shape.get("properties") or {}).get("goal_outcomes")
-        goals = outcomes.get("properties") if isinstance(outcomes, dict) else None
-        if not isinstance(goals, dict):
-            continue
-        for goal_id, outcome in list(goals.items()):
-            if isinstance(outcome, dict) and isinstance(outcome.get("properties"), dict):
-                description = outcome.get("description")
-                goals[goal_id] = _goal_outcome_disposition_branches(outcome)
-                if description:
-                    goals[goal_id]["description"] = description
-    return result
-
-
-def _goal_outcome_disposition_branches(outcome: dict[str, Any]) -> dict[str, Any]:
-    """Expose one Goal outcome's per-disposition shape natively (``validate_outcome_shape``).
-
-    Native decoders ignore the conditional ``allOf``; live 2026-10-11 an execute outcome
-    carried communication ordering and failed the DTO. Each branch fixes the disposition
-    and the fields that disposition allows; the model still chooses the disposition.
-    """
-    properties = outcome.get("properties")
-    disposition = properties.get("disposition") if isinstance(properties, dict) else None
-    choices = disposition.get("enum") if isinstance(disposition, dict) else None
-    if not isinstance(choices, list) or not choices:
-        return outcome
-    base = {key: value for key, value in outcome.items() if key not in {"allOf", "oneOf", "anyOf"}}
-    branches = []
-    for choice in choices:
-        branch = copy.deepcopy(base)
-        fields = branch["properties"]
-        fields["disposition"] = {"type": "string", "enum": [choice]}
-        terminal = choice in {"execute", "respond"}
-        fields["coverage"] = {"type": "string", "enum": ["complete"] if terminal else ["partial", "uncertain"]}
-        if isinstance(fields.get("step_ids"), dict):
-            if choice == "execute":
-                fields["step_ids"]["minItems"] = max(1, int(fields["step_ids"].get("minItems", 0)))
-            else:
-                fields["step_ids"]["maxItems"] = 0
-        if isinstance(fields.get("unresolved"), dict):
-            if terminal:
-                fields["unresolved"]["maxItems"] = 0
-            elif choice == "clarify":
-                fields["unresolved"]["minItems"] = 1
-        if choice != "respond":
-            for name in ("precedes_step_ids", "follows_step_ids"):
-                if isinstance(fields.get(name), dict):
-                    fields[name]["maxItems"] = 0
-        branches.append(branch)
-    return {"oneOf": branches} if len(branches) > 1 else branches[0]
 
 
 def fast_multi_goal_response_schema(
@@ -1731,8 +1663,6 @@ def _constrain_terminal_unresolved(schema: dict[str, Any]) -> None:
 # project an already-owned Planner contract; they do not invoke a model or choose HOW.
 
 
-
-
 def _fast_terminal_activity_contract() -> dict[str, Any]:
     """Require real Work, or for mixed any answered or clarified Responsibility.
 
@@ -2545,8 +2475,6 @@ def fast_advance_response_schema(
     return schema
 
 
-
-
 def _ollama_streaming_schema(
     schema: dict[str, Any],
     *,
@@ -3020,7 +2948,6 @@ def need_first_response_schema(schema: dict[str, Any], loaded_capability_ids: li
 
     attach(result, root=True)
     return result
-
 
 
 def planner_readiness_response_schema(
