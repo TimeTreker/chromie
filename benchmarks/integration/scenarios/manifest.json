@@ -6,13 +6,13 @@
   "independent_review": false,
   "model_ability_evaluated": false,
   "case_sha256": {
-    "workflow-cancellation.json": "5c42657687d0e300cef57cc9656d2d2f00eca1fe65525caaf35a5012b9c9d62b",
-    "workflow-conditional-dry.json": "7d30f7c9c73bebcc91749d44bb93db2ada3f5d969c613a1e8550c7441da4c838",
-    "workflow-conditional-rain.json": "e1c1ded0983af90b9a5a35c96528186bf80b9a7f296fb45d09c4b60cde3de9a1",
-    "workflow-delayed.json": "4908f5a2a2381f59ac66e6546c4f9a87885cdd3b16bb91b447d9b61f36f110ee",
-    "workflow-normal.json": "4de68121556e0bc0e0c4802912a3bb1e32726e751512d481a2b01a98687bd307"
+    "workflow-cancellation.json": "023cdac235a8ae57a4c60d1a16010cbfe3bf76891c79b49cfd15626a2570a41b",
+    "workflow-conditional-dry.json": "9c1ef27cbae93b5ba89f50d31389c9fa26d1788963e125f9306d2b21d8076fbb",
+    "workflow-conditional-rain.json": "36560c8c6ce522ed37e69f881c60952b0cfcae6de810f556058f2c71c55dfc94",
+    "workflow-delayed.json": "328c95fb6be02dcf9c799661296d7ce517576cbf3b2889f144cb6234ab9219a4",
+    "workflow-normal.json": "2f74939ab45434e5050c999b47de58af5a3630e3958dd1a4dd39ed52116ac8c8"
   },
-  "freeze_revision": 43,
-  "freeze_note": "Planner disposition/step assignment exposed to native decoders (2026-10-18). Every Planner request whose decoder schema changed is recaptured: each permitted disposition/step assignment is a native branch, so clarify, respond and unavailable carry no steps and execute carries at least one. Only the format schema changed; no reply re-authored; inputs, provider outcomes and expectations unchanged; every episode passes; no candidate calls.",
+  "freeze_revision": 44,
+  "freeze_note": "UMI shared source spans (2026-10-18). Every UMI request recaptured: a Responsibility names the first and last token of the words it depends on, Responsibilities may share words, and only a repeated Responsibility over one span fails closed. Only the UMI prompt and format schema changed; no reply re-authored; inputs, provider outcomes and expectations unchanged; every episode passes; no candidate calls.",
   "migration": "Work-only contracts and separate SC fixtures; unchanged expectations, complete request recapture."
 }

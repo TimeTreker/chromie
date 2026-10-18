@@ -1202,7 +1202,6 @@ def _evaluate_complete_intent(
         if not any(fragment.casefold() in joined for fragment in alternatives):
             errors["intent_relations"].append(f"Missing requested relation: {alternatives!r}")
     tokens = {token["ref"]: token for token in _source_tokens(case["text"])}
-    previous_end = -1
     for item in wire.get("responsibilities", []):
         if set(item) - {
             "local_ref", "outcome", "output_mode", "body_effect_family",
@@ -1212,10 +1211,8 @@ def _evaluate_complete_intent(
         evidence = item.get("source_evidence") or {}
         first = tokens.get(evidence.get("source_start_token_ref"))
         last = tokens.get(evidence.get("source_end_token_ref"))
-        if not first or not last or first["start"] < previous_end or last["end"] <= first["start"]:
-            errors["source_evidence"].append("Invalid, reversed or overlapping source span")
-        else:
-            previous_end = last["end"]
+        if not first or not last or last["end"] <= first["start"]:
+            errors["source_evidence"].append("Invalid or reversed source span")
     if bool(decision.get("meaning_uncertainties")) != case["expected"]["unresolved"]:
         errors["unresolved"].append("Unresolved presence differs from reviewed intent ambiguity")
     return errors
