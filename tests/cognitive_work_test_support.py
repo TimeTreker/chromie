@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from shared.chromie_contracts.core_interpretation import (
@@ -102,10 +103,57 @@ async def social_fixture_response(adapter, *, plan, session_id, language, contex
 
 
 def ordinary_plan_schema(schema):
-    """Inspect the ordinary branch; callers retain the original for wire validation."""
+    """Inspect the ordinary branch; callers retain the original for wire validation.
+
+    Native disposition-assignment branches are viewed as one shape: each field offers
+    what any branch offers (the bounds the decoder lifted before the branches existed).
+    """
     if "anyOf" in schema and any(name.startswith("Waiting") for name in schema.get("$defs", {})):
-        return {**schema["anyOf"][0], "$defs": schema["$defs"]}
+        schema = {**schema["anyOf"][0], "$defs": schema["$defs"]}
+    if "properties" not in schema and isinstance(schema.get("oneOf"), list):
+        definitions = schema.get("$defs", {})
+        view = _offered_by_any(schema["oneOf"])
+        for outcome in view["properties"].get("goal_outcomes", {}).get("properties", {}).values():
+            if isinstance(outcome.get("oneOf"), list):
+                outcome["oneOf"] = [definitions[item["$ref"].rsplit("/", 1)[-1]] if "$ref" in item else item
+                                    for item in outcome["oneOf"]]
+        return {**{key: value for key, value in schema.items() if key != "oneOf"}, **view}
     return schema
+
+
+def plan_assignment_branches(schema):
+    """The ordinary plan's native disposition-assignment branches (one when unbranched)."""
+    if "anyOf" in schema and any(name.startswith("Waiting") for name in schema.get("$defs", {})):
+        schema = schema["anyOf"][0]
+    return schema.get("oneOf", [schema]) if "properties" not in schema else [schema]
+
+
+def _offered_by_any(shapes):
+    first = shapes[0]
+    if not all(isinstance(shape, dict) for shape in shapes):
+        return first
+    view = dict(first)
+    for key in {key for shape in shapes for key in shape}:
+        values = [shape[key] for shape in shapes if key in shape]
+        if key == "enum":
+            view[key] = list(dict.fromkeys(value for item in values for value in item))
+        elif key == "minItems":
+            view[key] = min(values) if len(values) == len(shapes) else 0
+        elif key == "maxItems":
+            if len(values) == len(shapes):
+                view[key] = max(values)
+            else:
+                view.pop(key, None)
+        elif key in {"oneOf", "anyOf"}:
+            unique = {json.dumps(item, sort_keys=True): item for value in values for item in value}
+            view[key] = list(unique.values())
+        elif key == "properties":
+            names = list(dict.fromkeys(name for value in values for name in value))
+            view[key] = {name: _offered_by_any([value[name] for value in values if name in value])
+                         for name in names}
+        else:
+            view[key] = values[0]
+    return view
 
 
 def goal_outcome_branch(outcome, disposition=None):
