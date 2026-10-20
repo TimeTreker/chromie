@@ -15,6 +15,8 @@ from shared.chromie_contracts.plan import (
     responsibility_outcome_source_tokens,
     FastPlannerAdvanceModelOutput,
     GOAL_SATISFACTION_SCORE_BANDS,
+    OTHER_ANSWER_SOURCE,
+    PERCEIVED_ANSWER_SOURCE,
 )
 
 from .planner_validation import _capability_acquires_information
@@ -2145,11 +2147,14 @@ def fast_advance_response_schema(
             branches = ([answered] if ref in speech_only and "answer" in choices
                         else [limitation] if not choices else [answered, limitation])
             if ref in perceived_answer_refs and not (committed_communicative or suppress_new_communicative):
-                # Name the observations first; only a cited one opens answer_from_perception.
+                # Say where the answer comes from, then name the observations; only a cited
+                # observation opens answer_from_perception. An opaque observation list alone let
+                # a time question beside a fetch cite the scene (live 2026-10-20).
                 observed = {
                     "type": "object", "additionalProperties": False,
-                    "required": ["observed_refs", "decision", "missing"],
+                    "required": ["answer_source", "observed_refs", "decision", "missing"],
                     "properties": {
+                        "answer_source": {"type": "string", "const": PERCEIVED_ANSWER_SOURCE},
                         "observed_refs": {"type": "array", "minItems": 1, "uniqueItems": True,
                                           "maxItems": min(8, len(situation_source_refs or [])),
                                           "items": {"type": "string", "enum": list(situation_source_refs or [])}},
@@ -2158,9 +2163,10 @@ def fast_advance_response_schema(
                     },
                 }
                 for branch in branches:
-                    branch["properties"] = {"observed_refs": {"type": "array", "maxItems": 0},
+                    branch["properties"] = {"answer_source": {"type": "string", "const": OTHER_ANSWER_SOURCE},
+                                            "observed_refs": {"type": "array", "maxItems": 0},
                                             **branch["properties"]}
-                    branch["required"] = ["observed_refs", *branch["required"]]
+                    branch["required"] = ["answer_source", "observed_refs", *branch["required"]]
                 branches = [*branches, observed]
             per_ref[ref] = copy.deepcopy(branches[0]) if len(branches) == 1 else {"oneOf": copy.deepcopy(branches)}
         decisions_schema.clear()
@@ -2685,7 +2691,10 @@ def _exact_activity_count_states(states: list[dict[str, Any]]) -> list[dict[str,
     for state in states:
         properties = state["properties"]
         activities = properties["activities"]
-        low = int(activities.get("minItems", 0))
+        prefix = _decided_activity_prefix(properties)
+        if prefix is None:
+            continue
+        low = max(int(activities.get("minItems", 0)), len(prefix))
         high = int(activities.get("maxItems", low))
         for count in range(low, high + 1):
             ordered: dict[str, Any] = {}
@@ -2693,6 +2702,8 @@ def _exact_activity_count_states(states: list[dict[str, Any]]) -> list[dict[str,
                 if name == "activities":
                     ordered["activity_count"] = {"type": "integer", "enum": [count]}
                     value = {**value, "minItems": count, "maxItems": count}
+                    if prefix:
+                        value["prefixItems"] = prefix
                 ordered[name] = value
             required = list(state.get("required", []))
             refs = list((properties.get("responsibility_decisions") or {}).get("properties", {}))
@@ -2705,6 +2716,61 @@ def _exact_activity_count_states(states: list[dict[str, Any]]) -> list[dict[str,
             exact.append({**state, "properties": ordered,
                           "required": required if "activity_count" in required else [*required, "activity_count"]})
     return exact
+
+
+_DECIDED_ACTIVITY_ROLE = {"work": "capability", "clarify": "clarification"}
+
+
+def _decided_activity_prefix(properties: dict[str, Any]) -> list[Any] | None:
+    """Each Responsibility decided work or clarify opens the array with its own Activity.
+
+    Host requires a work decision's capability and a clarify decision's clarification,
+    but native decoders ignore ``contains``, so another Responsibility's Activity could
+    fill the counted array (live 2026-10-20: "我考了满分！快跟我一起庆祝一下！" decided r1
+    answer and r2 work, counted one Activity, spent it on r1's response and left the
+    celebration without one; Host rejected the turn). Those mandatory members come
+    first, in Responsibility order. Several Responsibilities with the same decision may
+    share one Activity (one read serving two questions), so they get no prefix. Returns
+    None when a decided Responsibility has no Activity alternative: the state is
+    unreachable.
+    """
+    per_ref = properties.get("responsibility_decisions", {}).get("properties", {})
+    required = []
+    for ref, choice in per_ref.items():
+        decision = choice.get("properties", {}).get("decision", {}).get("enum") or []
+        if "oneOf" not in choice and len(decision) == 1 and decision[0] in _DECIDED_ACTIVITY_ROLE:
+            required.append((ref, _DECIDED_ACTIVITY_ROLE[decision[0]]))
+    roles = [role for _, role in required]
+    if len(set(roles)) != len(roles):
+        return []
+    items = properties["activities"].get("items")
+    alternatives = items.get("oneOf", [items]) if isinstance(items, dict) else []
+    prefix = []
+    for ref, role in required:
+        own = [_citing(branch, ref) for branch in alternatives
+               if (branch.get("properties", {}).get("role", {}).get("enum") or [""])[0] == role
+               and ref in _cited_refs(branch)]
+        if not own:
+            return None
+        prefix.append(own[0] if len(own) == 1 else {"oneOf": own})
+    return prefix
+
+
+def _cited_refs(branch: dict[str, Any]) -> list[str]:
+    return branch.get("properties", {}).get("source_responsibility_refs", {}).get("items", {}).get("enum") or []
+
+
+def _citing(branch: dict[str, Any], ref: str) -> dict[str, Any]:
+    """The Activity alternative, citing ``ref`` first."""
+    others = [value for value in _cited_refs(branch) if value != ref]
+    if not others:
+        return branch
+    narrowed = copy.deepcopy(branch)
+    narrowed["properties"]["source_responsibility_refs"] = {
+        "type": "array", "prefixItems": [{"type": "string", "const": ref}],
+        "items": {"type": "string", "enum": others}, "minItems": 1, "maxItems": 1 + len(others),
+    }
+    return narrowed
 
 
 def _serving_every_responsibility(items: Any, refs: list[str]) -> Any:

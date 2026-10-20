@@ -16,7 +16,9 @@ from agent.app.planner_context import fast_capability_context
 from agent.app.goal_association import GoalAssociationResolver
 from orchestrator.runtime.cognitive_runtime import GoalDrivenRuntimeCoordinator
 from shared.chromie_contracts.core_interpretation import CognitiveWorkRequest
-from shared.chromie_contracts.plan import FastPlannerStreamFailure, FastPlannerStreamTerminal
+from shared.chromie_contracts.plan import (
+    OTHER_ANSWER_SOURCE, PERCEIVED_ANSWER_SOURCE, FastPlannerStreamFailure, FastPlannerStreamTerminal,
+)
 from benchmarks.datasets.fast_planner_daily_life.qualification import declared_ability_needs, declared_activity_count, declared_ability_needs_text
 from orchestrator.runtime import planner_advance_projection
 
@@ -1255,9 +1257,11 @@ def test_host_rejects_observed_values_cited_to_the_persons_words():
     validate({"status": "known", "bindings": {"distance": 50}}, "fifty meters away")
 
 
-def perceived_answer(observed, decision="answer_from_perception", authored=False):
-    """Evidence before the decision; Host writes the cited response itself."""
-    return {"responsibility_decisions": {"r1": {"observed_refs": observed, "decision": decision, "missing": []}},
+def perceived_answer(observed, decision="answer_from_perception", authored=False, source=None):
+    """Answer source and evidence before the decision; Host writes the cited response itself."""
+    basis = {"answer_source": source} if source else {}
+    return {"responsibility_decisions": {"r1": {**basis, "observed_refs": observed, "decision": decision,
+                                                "missing": []}},
         "disposition": "respond", "coverage": "complete", "covered_responsibility_refs": ["r1"],
         "activities": [{"role": "complete_response", "activity_id": "answer_water",
                         "source_responsibility_refs": ["r1"],
@@ -1266,17 +1270,22 @@ def perceived_answer(observed, decision="answer_from_perception", authored=False
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("seen, observed, decision, authored, decoder_ok, host_ok", [
-    (True, [SEEN_WATER], "answer_from_perception", False, True, True),
-    (True, [], "answer_from_perception", False, False, False),  # an information answer cites what Chromie sees
-    (True, [SEEN_JUICE], "answer_from_perception", False, False, False),  # provisional: not citable
-    (False, [SEEN_WATER], "answer_from_perception", False, False, False),  # nothing perceived: no path
+@pytest.mark.parametrize("seen, source, observed, decision, authored, decoder_ok, host_ok", [
+    (True, PERCEIVED_ANSWER_SOURCE, [SEEN_WATER], "answer_from_perception", False, True, True),
+    # an information answer cites what Chromie sees
+    (True, PERCEIVED_ANSWER_SOURCE, [], "answer_from_perception", False, False, False),
+    (True, PERCEIVED_ANSWER_SOURCE, [SEEN_JUICE], "answer_from_perception", False, False, False),  # provisional
+    (False, None, [SEEN_WATER], "answer_from_perception", False, False, False),  # nothing perceived: no path
     # The basis comes before the decision: a bare answer let "what time is it?" cite a milk bottle.
-    (True, [], "answer", False, False, False),
-    (True, [SEEN_WATER], "answer_from_perception", True, False, False),  # Host writes the response
+    (True, OTHER_ANSWER_SOURCE, [], "answer", False, False, False),
+    (True, PERCEIVED_ANSWER_SOURCE, [SEEN_WATER], "answer_from_perception", True, False, False),  # Host writes it
+    # Live 2026-10-20: a time question beside a fetch cited the scene; an answer whose source is not
+    # an observation cannot cite one, and the source is always said before any observation.
+    (True, OTHER_ANSWER_SOURCE, [SEEN_WATER], "answer_from_perception", False, False, False),
+    (True, None, [SEEN_WATER], "answer_from_perception", False, False, False),
 ])
 async def test_information_already_perceived_is_answered_from_the_cited_observation(
-    seen, observed, decision, authored, decoder_ok, host_ok,
+    seen, source, observed, decision, authored, decoder_ok, host_ok,
 ):
     # Live 2026-10-16: "家里还有水吗？" had no answer path, so the Planner fetched the water.
     text = "Is there any water at home?"
@@ -1287,7 +1296,7 @@ async def test_information_already_perceived_is_answered_from_the_cited_observat
         responsibilities=meaning.responsibilities, interpretation_confidence=1.0)
     if seen:
         request.context["situation"] = observed_scene()
-    raw = perceived_answer(observed, decision, authored)
+    raw = perceived_answer(observed, decision, authored, source)
     model = Model([raw])
     frames = [frame async for frame in PlannerResolver(
         model, Catalog([provider_source_capability()])).stream_advance(request)]

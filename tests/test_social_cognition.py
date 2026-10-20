@@ -498,6 +498,47 @@ def test_an_act_binds_its_needs_before_its_words():
             assert order.index("delivery_phase") < order.index("text")
 
 
+def test_the_first_act_names_the_limitation_that_must_be_said():
+    """Live 2026-10-20 (body_backflip_zh): "我不会后空翻，因为我没有那个能力。" said the
+    limitation, but its act named only the answer need; the limitation had to be said, so
+    Host rejected the reply (422). The first act now names it before its words."""
+    from agent.app.social_cognition import _downgrade_unsupported_need_coverage, validate_social_cognition_output
+    from shared.chromie_contracts.json_schema import expose_intersection_shapes
+    from shared.chromie_contracts.plan import SocialCommunicationNeed
+    from shared.chromie_contracts.social_cognition import SocialCognitionOutput
+
+    answer = SocialCommunicationNeed(
+        need_id="need:answer", owner="planner", kind="answer", source_goal_ids=["goal:1"],
+        reference_id="plan:1", facts={"role": "complete_response"}, delivery_phase="immediate",
+    )
+    limitation = SocialCommunicationNeed(
+        need_id="need:limit", owner="planner", kind="result", source_goal_ids=["goal:1"],
+        reference_id="plan:1", facts={"disposition": "unavailable", "unresolved": ["backflip"]},
+    )
+    current = request(communication_needs=[answer, limitation])
+    schema = social_cognition_response_schema(current, [])
+    native = copy.deepcopy(schema)
+    expose_intersection_shapes(native)
+
+    def reply(*addressed):
+        said = response(activity_id="no-backflip", text="我不会后空翻。", function="respond",
+                        addressed_need_ids=list(addressed), delivery_phase="immediate")
+        said["need_outcomes"] = {"need:answer": "covered", "need:limit": "covered"}
+        return said
+
+    for validator in (Draft202012Validator(schema), Draft202012Validator(native)):
+        assert not validator.is_valid(reply("need:answer"))
+        assert validator.is_valid(reply("need:limit", "need:answer"))
+
+    def host(raw):  # coverage without a naming act is downgraded first, as on the live path
+        validate_social_cognition_output(
+            _downgrade_unsupported_need_coverage(SocialCognitionOutput.model_validate(raw)), current, [])
+
+    with pytest.raises(ValueError, match="limitation result need"):
+        host(reply("need:answer"))
+    host(reply("need:limit", "need:answer"))
+
+
 def test_prior_acknowledgement_cannot_cover_later_terminal_failure():
     from agent.app.social_cognition import social_cognition_prompt, validate_social_cognition_output
     from shared.chromie_contracts.core_interpretation import CognitiveResponsibilityProposal

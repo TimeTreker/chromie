@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from unittest import mock
 
 from orchestrator.runtime.playback_delivery import PlaybackDeliveryLifecycle
 
@@ -181,6 +182,26 @@ class PlaybackDeliveryLifecycleTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(started)
         self.assertFalse(waiter.cancelled())
         self.assertFalse(waiter.done())
+
+    async def test_playback_started_at_the_deadline_counts_as_started(self) -> None:
+        # Live 2026-10-20 (info_time_zh): playback started 7 ms before the 3.5 s deadline, the
+        # timeout still fired, and the played answer was reported undelivered.
+        lifecycle = PlaybackDeliveryLifecycle()
+        lifecycle.create_playback_start_waiter(generation=1, order=0, session_id="sid")
+
+        async def deadline_passes_as_playback_starts(_awaitable: object, timeout: float) -> bool:
+            lifecycle.resolve_playback_start_waiter(
+                generation=1, order=0, session_id="sid", started=True, reason="playback_start",
+            )
+            raise TimeoutError
+
+        with mock.patch(
+            "orchestrator.runtime.playback_delivery.asyncio.wait_for", deadline_passes_as_playback_starts,
+        ):
+            started = await lifecycle.wait_for_playback_start(
+                generation=1, order=0, session_id="sid", timeout_s=3.5,
+            )
+        self.assertTrue(started)
 
     async def test_cancelled_order_is_typed_and_resolves_barrier(self) -> None:
         lifecycle = PlaybackDeliveryLifecycle()

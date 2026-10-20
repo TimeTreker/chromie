@@ -19,6 +19,19 @@ PlaybackKey = tuple[int, int, str | None]
 PendingAudio = tuple[int, Any, int, str | None, str | None]
 
 
+async def _settled_waiter(waiter: asyncio.Future[bool], timeout_s: float) -> bool:
+    """A playback waiter's result, or False when it is not settled by the deadline.
+
+    The waiter can be resolved inside the deadline while the shielded result is still
+    being handed over (live 2026-10-20: playback started 7 ms before a 3.5 s timeout
+    fired, and speech that played was reported undelivered), so the waiter is the fact.
+    """
+    try:
+        return await asyncio.wait_for(asyncio.shield(waiter), timeout=timeout_s)
+    except TimeoutError:
+        return waiter.done() and not waiter.cancelled() and bool(waiter.result())
+
+
 @dataclass
 class PlaybackDeliveryLifecycle:
     """Mutable lifecycle state for one VoiceAssistant runtime."""
@@ -548,10 +561,7 @@ class PlaybackDeliveryLifecycle:
         )
         if waiter is None:
             return False
-        try:
-            return await asyncio.wait_for(asyncio.shield(waiter), timeout=timeout_s)
-        except TimeoutError:
-            return False
+        return await _settled_waiter(waiter, timeout_s)
 
     def create_playback_release_waiter(
         self,
@@ -608,10 +618,7 @@ class PlaybackDeliveryLifecycle:
         waiter = self.playback_release_waiters.get(key)
         if waiter is None:
             return False
-        try:
-            return await asyncio.wait_for(asyncio.shield(waiter), timeout=timeout_s)
-        except TimeoutError:
-            return False
+        return await _settled_waiter(waiter, timeout_s)
 
     def cancel_order_before_start(
         self,
