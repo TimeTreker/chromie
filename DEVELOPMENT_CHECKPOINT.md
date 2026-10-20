@@ -17,22 +17,24 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/everyday-20261016/` (README.md).
+Evidence and per-run judgments: `.chromie/acceptance/main-03974435e-20261020/` and
+`.chromie/acceptance/everyday-20261016/` (README.md in each).
 
-## Resume point — 2026-10-17
+## Resume point — 2026-10-20
 
-- Since the last live run, the 2026-10-17 audit fix PRs (#70, #71) and their
-  follow-up changed Agent, Orchestrator and shared-contract source. No built image
-  matches `main`; `rootcause19-20261016` predates these changes, so rebuild the
-  Agent image from `main` before the next live run.
+- The Agent image `main-03974435e-20261020` (= `chromie-agent:latest`) is built from
+  `main` `03974435e` and deployed; source identity verified. Rollback:
+  `pre-main-20261020` (= `rootcause19-20261016`).
+- Smoke on it (2026-10-20): 15/15 hard-pass and every case judged correct by review
+  (evidence `.chromie/acceptance/main-03974435e-20261020/`). Next: `core` and
+  `challenge` on the same image.
 - Latest live-relevant repair (UMI spans): the UMI prompt lists Responsibilities in word
   order, each ending at a later token, and says a reply to news or feelings ends where
   the sharing ends (one aside example; placed inside the rule it retyped a time
   request as speech). Cause: in run 7, "我考了满分！快跟我一起庆祝一下！" ended both the
   celebration and the reply at the last token, so Host rejected overlapping spans (503).
-- Last recorded live Agent: `chromie-agent:latest` = `rootcause18-20261016`.
-- Run 6 smoke on `rootcause18`: 15/15 mechanical ("把那个拿给我" → "你是说牛奶瓶还是水瓶呀？").
-  Run 7 core stopped at 4/55 on the UMI 503 above.
+- Run 7 (on `rootcause18`) core stopped at 4/55 on the UMI 503 above; core has not
+  rerun since that repair.
 
 Verification of the UMI span repair: recorded UMI replays (the celebrate case 4/4,
 eight compound and information controls unchanged or better); workflow corpus freeze
@@ -44,8 +46,8 @@ assignment branches (4,700 cases, 5,300 steps, 5 prototypes); every verdict unch
 steps, 5 prototypes); every verdict and every reply's schema validity unchanged. Freeze 45
 (`019d7726…`) recaptured every Planner request for the Host-derived aggregate
 `goal_satisfaction` (6,000 cases, 5,600 steps, 5 prototypes) and projected the retired key out of
-stored fast replies; every verdict and every reply's schema validity unchanged. Gate and strict replay at the
-delivery revision: pytest 3,955 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `tests/test_workflow_replay.py` 94 passed over 6,046 restored fixtures.
+stored fast replies; every verdict and every reply's schema validity unchanged. Gate and strict replay at
+`03974435e` on the GPU host: pytest 3,985 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `scripts/run_workflow_replay.py` 6,000 cases passed.
 
 ## Repairs in force from this Issue
 
