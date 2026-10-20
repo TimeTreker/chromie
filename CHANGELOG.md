@@ -5,6 +5,12 @@ remains available in Git history.
 
 ## Unreleased
 
+### Live smoke of main on the GPU host (2026-10-20)
+
+- An Agent built from `main` `03974435e` is deployed; the everyday `must_pass` smoke
+  passed 15/15 on Soridormi MuJoCo, GPU smoke 17/17, gate and strict replay green.
+  Status, checkpoint and handoff record the new image and evidence.
+
 ### Host derives the Planner's aggregate goal_satisfaction (freeze 45, 2026-10-18)
 
 - The `/plan` model contract no longer has a model-writable Plan-level
