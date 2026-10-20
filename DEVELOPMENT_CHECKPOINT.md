@@ -17,37 +17,36 @@ Run the everyday live-text cohort (`scenarios/everyday/`, 70 cases) against
 Soridormi MuJoCo, judge every case, and repair each failure at its earliest
 responsible owner. One invocation and one debug bundle per run; a hard failure in
 the 15-case `must_pass` smoke stage stops `core` and `challenge` (owner rule).
-Evidence and per-run judgments: `.chromie/acceptance/main-03974435e-20261020/` and
-`.chromie/acceptance/everyday-20261016/` (README.md in each).
+Evidence and per-run judgments: `.chromie/acceptance/playback-race-20261020/` (latest),
+`answer-source-20261020/`, `gaze-turn-20261020/`, `said-now-20261020/`, `decided-activity-20261020/`,
+`main-03974435e-20261020/` and `everyday-20261016/` (README.md in each).
 
 ## Resume point — 2026-10-20
 
-- The Agent image `main-03974435e-20261020` (= `chromie-agent:latest`) is built from
-  `main` `03974435e` and deployed; source identity verified. Rollback:
-  `pre-main-20261020` (= `rootcause19-20261016`).
-- Smoke on it (2026-10-20): 15/15 hard-pass and every case judged correct by review
-  (evidence `.chromie/acceptance/main-03974435e-20261020/`). Next: `core` and
-  `challenge` on the same image.
-- Latest live-relevant repair (UMI spans): the UMI prompt lists Responsibilities in word
-  order, each ending at a later token, and says a reply to news or feelings ends where
-  the sharing ends (one aside example; placed inside the rule it retyped a time
-  request as speech). Cause: in run 7, "我考了满分！快跟我一起庆祝一下！" ended both the
-  celebration and the reply at the last token, so Host rejected overlapping spans (503).
-- Run 7 (on `rootcause18`) core stopped at 4/55 on the UMI 503 above; core has not
-  rerun since that repair.
+- Agent `answer-source-20261020` (= `chromie-agent:latest`) is built from the source this
+  delivery records and deployed; the Host playback fix runs in the host Orchestrator.
+  Soridormi `51a2afa` (branch `claude/gaze-body-turn`, pinned) runs in the MCP container.
+  Rollback: `main-03974435e-20261020` and Soridormi `3766c79`.
+- Seven live runs on the local gemma4 12B (owner: Claude deferred for cost). Each stop
+  kept one bundle, and the earliest boundary was repaired:
+  1. celebrate: Planner Activity crowded out (repair 1);
+  2. backflip: SC limitation unbound, 422 (repair 2);
+  3. look: requester beyond the head range (owner: Soridormi turns the body first);
+  4. water + time: the time question cited the scene (repair 3);
+  5. time: Host playback-start race (repair 4);
+  6. weather timeout at core case 18 (transient egress, not a defect; smoke 15/15, core 12/18);
+  7. a rerun stopped by the owner after 9 smoke passes.
+- Next: rerun the complete cohort on this revision, then repair the semantic failures in
+  STATUS open work 2 by earliest boundary.
 
-Verification of the UMI span repair: recorded UMI replays (the celebrate case 4/4,
-eight compound and information controls unchanged or better); workflow corpus freeze
-42 (`de7c4de6…`, every UMI request recaptured for the widened `value_review` mark, no
-reply re-authored; previous freeze 41 `a36b1ebf…`). Freeze 43 (`09813fa8…`) then
-recaptured only the Planner request formats changed by the native disposition/step
-assignment branches (4,700 cases, 5,300 steps, 5 prototypes); every verdict unchanged. Freeze 44
-(`c808be23…`) recaptured every UMI request for shared source spans (6,000 cases, 6,500
-steps, 5 prototypes); every verdict and every reply's schema validity unchanged. Freeze 45
-(`019d7726…`) recaptured every Planner request for the Host-derived aggregate
-`goal_satisfaction` (6,000 cases, 5,600 steps, 5 prototypes) and projected the retired key out of
-stored fast replies; every verdict and every reply's schema validity unchanged. Gate and strict replay at
-`03974435e` on the GPU host: pytest 3,985 passed + 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies, docs, test ownership, ruff, mypy and runtime-structure ratchets pass; `scripts/run_workflow_replay.py` 6,000 cases passed.
+Verification: each repaired request was recorded and replayed on the live LLM before and
+after (celebrate 3/3, backflip SC 3/3, water + time 2/2 fixed; solo time, weather,
+weekday and two perception answers unchanged). Gate on the GPU host: pytest 3,990 passed
++ 5 skipped (`xgrammar` not installed), benchmarks 172, legacy Agent tests 20; policies,
+docs, test ownership, ruff, mypy and runtime-structure ratchets pass;
+`scripts/run_workflow_replay.py` 6,000 cases passed with freeze 45 unchanged (`019d7726…`).
+Soridormi: 91 gaze/body/runtime tests, governance and compileall pass; the full suite shows
+only its 15 pre-existing container-environment failures.
 
 ## Repairs in force from this Issue
 
@@ -74,6 +73,18 @@ stored fast replies; every verdict and every reply's schema validity unchanged. 
   in news; it no longer says "好的。" before a limitation.
 - The local clock provider declares `prompt_tier: common` (a provider declaration wins
   over the owner preset).
+- Mandatory members are serialized first for native decoders, which ignore `contains`.
+  Each Responsibility decided work or clarify opens the Planner's counted Activities with
+  its own Activity (live: "我考了满分！快跟我一起庆祝一下！" spent its one Activity on the
+  sibling answer). Social Cognition's first act names every result need that must be
+  said now (live: "我不会后空翻" said the limitation but named only the answer need).
+- An information Responsibility that perception could answer first states `answer_source`
+  ("a current observation shows it" or "a Capability or what Chromie knows answers it"),
+  then `observed_refs`, then its decision (live: "帮我拿瓶水，顺便告诉我现在几点。" cited the
+  scene for the time). Observations-first alone failed that; decision-first let "现在几点了？"
+  cite the scene.
+- Host playback waits take a waiter settled at the deadline as settled (live: playback
+  started 7 ms before the 3.5 s timeout fired and played speech was reported undelivered).
 
 ## Owner decisions in force
 
@@ -93,6 +104,10 @@ stored fast replies; every verdict and every reply's schema validity unchanged. 
   decoration may use expressive gestures Soridormi declares low-risk; locomotion stays
   excluded (owner decision 2026-10-17).
 - UMI never authors `bindings`; Planner alone extracts Capability parameters.
+- A person beyond the head's turning range is looked at by turning the body first, inside
+  Soridormi (owner decision 2026-10-20). A standalone `look_at_person` turns on a walking
+  arc at the slowest gait pace, because pure in-place yaw barely turns this gait. It keeps
+  0.5 m clearance and never turns during a locomotion overlay.
 
 ## Next work
 

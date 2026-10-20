@@ -1636,6 +1636,46 @@ def test_a_decided_answer_without_its_response_is_projected():
         project_responsibility_decisions(unasked, responsibility_refs=["r1", "r2"], speech_refs={"r2"})
 
 
+def test_a_decided_work_gets_its_own_activity_before_a_sibling_answer():
+    """Live 2026-10-20 ("我考了满分！快跟我一起庆祝一下！"): r1 was decided answer and r2
+    work; the model counted one Activity, spent it on r1's response and left the
+    celebration without one, so Host rejected the turn. The decided work now opens the
+    array, on the wire as in the canonical schema."""
+    from agent.app.clients.sglang_protocol import _openai_response_format
+
+    responsibilities = [
+        CognitiveResponsibilityProposal(local_ref="r1", outcome="share in the news", output_mode="speech",
+                                        confidence=1.0),
+        CognitiveResponsibilityProposal(local_ref="r2", outcome="celebrate with me", output_mode="body_action",
+                                        confidence=1.0),
+    ]
+    celebrate = {"capability_id": "test.celebrate", "effects": ["physical_motion"],
+                 "input_schema": {"type": "object", "properties": {}, "additionalProperties": False}}
+    schema = fast_streaming_advance_response_schema(["r1", "r2"], responsibilities=responsibilities,
+                                                    capabilities=[celebrate])
+    wire = _openai_response_format(schema)["json_schema"]["schema"]
+    celebrating = {"role": "capability", "source_responsibility_refs": ["r2"], "capability_id": "test.celebrate",
+                   "activity_id": "act_celebrate", "args": {}, "depends_on": []}
+    responding = {"role": "complete_response", "source_responsibility_refs": ["r1"], "activity_id": "act_r1",
+                  "rationale": "Share in the news."}
+
+    def output(decision, activities):
+        missing = ["a way to celebrate"] if decision == "unavailable" else []
+        return _counted({"responsibility_decisions": {"r1": {"decision": "answer", "missing": []},
+                                                      "r2": {"decision": decision, "missing": missing}},
+                         "activities": activities, "disposition": "mixed", "coverage": "complete",
+                         "covered_responsibility_refs": ["r1", "r2"], "confidence": 1.0, "unresolved": [],
+                         "reason_summary": "x"})
+
+    for validator in (Draft202012Validator(schema), Draft202012Validator(wire)):
+        assert not validator.is_valid(output("work", [responding]))
+        assert not validator.is_valid(output("work", [responding, celebrating]))
+        assert validator.is_valid(output("work", [celebrating]))
+        assert validator.is_valid(output("work", [celebrating, responding]))
+        # A sibling answer still needs no authored Activity beside a limitation.
+        assert validator.is_valid(output("unavailable", [responding]))
+
+
 def test_decision_states_share_each_activity_branch_on_the_wire():
     """Two-Responsibility decision states repeat Activity branches; compiled inline they
     took 2.7 s of grammar compilation instead of 1.1 s. Sharing keeps the language."""

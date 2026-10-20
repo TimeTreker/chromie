@@ -753,6 +753,7 @@ def social_cognition_response_schema(
         **{name: properties[name] for name in first},
         **{name: value for name, value in properties.items() if name not in first},
     }
+    said_now = _said_now_act_prefix(schema, request)
     decisions = []
     for disposition in schema["properties"]["disposition"]["enum"]:
         branch = copy.deepcopy(schema)
@@ -761,7 +762,9 @@ def social_cognition_response_schema(
         properties = branch["properties"]
         properties["disposition"] = {"type": "string", "const": disposition}
         if disposition == "communicate":
-            properties["activities"]["minItems"] = 1
+            properties["activities"]["minItems"] = max(1, len(said_now))
+            if said_now:
+                properties["activities"]["prefixItems"] = said_now
         else:
             properties["activities"]["maxItems"] = 0
         if disposition == "deliberate":
@@ -779,6 +782,49 @@ def social_cognition_response_schema(
         decisions.append(branch)
     schema["oneOf"] = decisions
     return schema
+
+
+def _said_now_act_prefix(schema: dict[str, Any], request: SocialCognitionRequest) -> list[dict[str, Any]]:
+    """A result need that must be said now is named by the first act, before its words.
+
+    Host requires each such need covered by a verbal act, but native decoders cannot tie
+    ``need_outcomes`` to the acts' ``addressed_need_ids`` (live 2026-10-20,
+    body_backflip_zh: "我不会后空翻，因为我没有那个能力。" said the limitation, but its act
+    named only the answer need; Host rejected the reply, 422). The first act binds every
+    such need, or, when no single act may (different delivery phases), one act each. The
+    act's function, timing and wording stay the model's.
+    """
+    required = sorted(_result_needs_said_now(request) - value_withheld_need_ids(request))
+    if not required:
+        return []
+    existing = schema["$defs"]["SocialCommunicativeAct"]
+    branches = existing.get("oneOf", [existing])
+
+    def saying(need_ids: list[str]) -> list[dict[str, Any]]:
+        found = []
+        for branch in branches:
+            properties = branch["properties"]
+            addressed = properties["addressed_need_ids"]
+            offered = addressed.get("items", {}).get("enum") or []
+            if (properties["function"].get("const") == "nonverbal" or addressed.get("maxItems") == 0
+                    or not set(need_ids) <= set(offered)):
+                continue
+            others = [need_id for need_id in offered if need_id not in need_ids]
+            variant = copy.deepcopy(branch)
+            variant["properties"]["addressed_need_ids"] = {
+                "type": "array", "prefixItems": [{"type": "string", "const": need_id} for need_id in need_ids],
+                **({"items": {"type": "string", "enum": others}} if others else {}),
+                "minItems": len(need_ids), "maxItems": len(need_ids) + len(others),
+            }
+            variant["properties"]["text"] = {**variant["properties"]["text"], "minLength": 1}
+            found.append(variant)
+        return found
+
+    together = saying(required)
+    if together:
+        return [{"oneOf": together}]
+    each = [saying([need_id]) for need_id in required]
+    return [{"oneOf": found} for found in each] if all(each) else []
 
 
 def _downgrade_unsupported_need_coverage(

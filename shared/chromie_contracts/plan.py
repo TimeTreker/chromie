@@ -840,6 +840,11 @@ class FastPlannerAdvance(BaseModel):
         return self
 
 
+AnswerSource = Literal["a current observation shows it", "a Capability or what Chromie knows answers it"]
+PERCEIVED_ANSWER_SOURCE: AnswerSource = "a current observation shows it"
+OTHER_ANSWER_SOURCE: AnswerSource = "a Capability or what Chromie knows answers it"
+
+
 class FastPlannerResponsibilityDecision(BaseModel):
     """The Planner's decision for one Responsibility, made before its Activities.
 
@@ -849,9 +854,11 @@ class FastPlannerResponsibilityDecision(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    # Evidence before the decision: an information Responsibility is answered from current
-    # perception only after naming the observations that answer it (live 2026-10-16: a bare
-    # answer let "what time is it?" cite a milk bottle).
+    # An information Responsibility that perception could answer first says where its answer
+    # comes from (live 2026-10-20: "帮我拿瓶水，顺便告诉我现在几点。" listed the scene objects as
+    # the time's observations), then names the observations that answer it, then decides
+    # (live 2026-10-16: a bare answer let "what time is it?" cite a milk bottle).
+    answer_source: AnswerSource | None = None
     observed_refs: list[str] = Field(default_factory=list, max_length=8)
     decision: Literal["work", "answer", "answer_from_perception", "clarify", "unavailable"]
     missing: list[str] = Field(default_factory=list, max_length=4)
@@ -868,6 +875,10 @@ class FastPlannerResponsibilityDecision(BaseModel):
             raise ValueError("only an unavailable decision names what is missing, and it must")
         if (self.decision == "answer_from_perception") != bool(self.observed_refs):
             raise ValueError("only an answer_from_perception decision cites observed_refs, and it must")
+        if self.answer_source is not None and (
+            (self.answer_source == PERCEIVED_ANSWER_SOURCE) != (self.decision == "answer_from_perception")
+        ):
+            raise ValueError("only an answer a current observation shows is answered from perception")
         return self
 
 

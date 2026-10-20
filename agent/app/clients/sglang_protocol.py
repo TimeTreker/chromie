@@ -118,24 +118,33 @@ def _share_stream_activity_branches(schema: dict[str, Any]) -> None:
     """
     definitions = schema.setdefault("$defs", {})
     known: dict[str, str] = {}
+
+    def share(branch: Any) -> Any:
+        if not isinstance(branch, dict) or "$ref" in branch:
+            return branch
+        encoded = json.dumps(branch, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        if encoded not in known:
+            key = f"FastActivityBranch{len(known)}"
+            while key in definitions:
+                key += "_"
+            definitions[key] = branch
+            known[encoded] = key
+        return {"$ref": f"#/$defs/{known[encoded]}"}
+
     for state in schema.get("oneOf") or []:
-        items = state.get("properties", {}).get("activities", {}).get("items") if isinstance(state, dict) else None
+        activities = state.get("properties", {}).get("activities", {}) if isinstance(state, dict) else {}
+        items = activities.get("items")
         if not isinstance(items, dict) or not isinstance(items.get("oneOf"), list):
             continue
-        shared = []
-        for branch in items["oneOf"]:
-            if not isinstance(branch, dict) or "$ref" in branch:
-                shared.append(branch)
-                continue
-            encoded = json.dumps(branch, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-            if encoded not in known:
-                key = f"FastActivityBranch{len(known)}"
-                while key in definitions:
-                    key += "_"
-                definitions[key] = branch
-                known[encoded] = key
-            shared.append({"$ref": f"#/$defs/{known[encoded]}"})
-        items["oneOf"] = shared
+        items["oneOf"] = [share(branch) for branch in items["oneOf"]]
+        # A decided Responsibility's own Activity offers the same branches.
+        prefix = activities.get("prefixItems")
+        if isinstance(prefix, list):
+            activities["prefixItems"] = [
+                {**member, "oneOf": [share(branch) for branch in member["oneOf"]]}
+                if isinstance(member, dict) and isinstance(member.get("oneOf"), list) else share(member)
+                for member in prefix
+            ]
 
 
 def _bound_ga_ownership_rows(schema: dict[str, Any]) -> None:

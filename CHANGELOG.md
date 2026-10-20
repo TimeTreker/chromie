@@ -5,6 +5,26 @@ remains available in Git history.
 
 ## Unreleased
 
+### Everyday live repairs: mandatory members, answer source, playback race (2026-10-20)
+
+- Native decoders ignore `contains`, so a required member could be crowded out. The
+  streaming Planner now opens its counted Activities with each work or clarify
+  decision's own Activity: "我考了满分！快跟我一起庆祝一下！" had decided the
+  celebration as work, counted one Activity and spent it on the sibling answer, and
+  Host rejected the turn. Social Cognition's first act now names every result need
+  that must be said now: "我不会后空翻" said the limitation but bound only the answer
+  need, and Host rejected the reply (422). Validation is unchanged, and so is
+  workflow corpus freeze 45, which does not store these request formats.
+- An information Responsibility that current perception could answer first states
+  its `answer_source`, then its observations, then its decision: "帮我拿瓶水，顺便告诉我
+  现在几点。" had cited the scene objects for the time, and Host rejected the turn.
+- Host playback waits take a waiter settled at the deadline as settled: speech that
+  started playing 7 ms before the 3.5 s timeout was reported undelivered.
+- Soridormi is pinned at `51a2afa`. A standalone `look_at_person` turns the body
+  toward a person beyond the head's turning range (owner decision), and "转过来看着我"
+  now passes. Live everyday runs on the local gemma4 12B: smoke 15/15 four times;
+  the latest core run reached 12/18 before a transient weather-provider timeout.
+
 ### Live smoke of main on the GPU host (2026-10-20)
 
 - An Agent built from `main` `03974435e` is deployed; the everyday `must_pass` smoke
