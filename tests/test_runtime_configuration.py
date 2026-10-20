@@ -317,16 +317,28 @@ class RuntimeConfigurationTests(unittest.TestCase):
         self.assertIn("./scripts/compose.sh logs -f chromie-llm", source)
         self.assertNotIn("docker compose --env-file .env.runtime logs -f chromie-llm", source)
 
-    def test_start_services_recreates_owned_containers_after_build(self) -> None:
+    def test_start_services_recreates_only_containers_whose_image_changed(self) -> None:
         source = (ROOT / "scripts" / "start_services.sh").read_text(
             encoding="utf-8"
         )
         self.assertIn('if [[ "${BUILD:-0}" == "1" ]]', source)
-        self.assertIn("UP_ARGS+=(--force-recreate)", source)
         self.assertIn(
             'docker compose "${COMPOSE_ARGS[@]}" up "${UP_ARGS[@]}" "${SERVICES[@]}"',
             source,
         )
+        # A build recreates exactly the containers left on a replaced image ID; an
+        # unchanged service such as the model server keeps running.
+        self.assertNotIn("UP_ARGS+=(--force-recreate)", source)
+        self.assertIn('running_image="$(docker inspect -f \'{{.Image}}\' "$container"', source)
+        self.assertIn(
+            'up "${UP_ARGS[@]}" --no-deps --force-recreate "${STALE_SERVICES[@]}"',
+            source,
+        )
+        build = source.index('build "${BUILD_SERVICES[@]}"')
+        recreate = source.index('--force-recreate "${STALE_SERVICES[@]}"')
+        verify = source.index("./scripts/verify_runtime_profile.sh")
+        self.assertLess(build, recreate)
+        self.assertLess(recreate, verify)
 
     def test_start_chromie_supports_service_only_attachment(self) -> None:
         source = (ROOT / "scripts" / "start_chromie.sh").read_text(

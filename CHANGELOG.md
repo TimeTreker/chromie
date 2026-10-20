@@ -5,6 +5,19 @@ remains available in Git history.
 
 ## Unreleased
 
+### Incremental image builds (2026-10-20)
+
+- `--build` (`BUILD=1 ./scripts/start_services.sh`) now recreates only the
+  containers whose image ID changed, instead of force-recreating every service; an
+  unchanged model server keeps running.
+- The Agent, ASR and TTS Dockerfiles install packages through BuildKit pip/uv
+  cache mounts, so a changed dependency layer reinstalls from the local cache
+  instead of downloading every package again.
+- The ASR and TTS Dockerfiles no longer declare the proxy variables. As Docker's
+  predefined build args, they still reach `RUN` but no longer invalidate the
+  layer cache when a build runs with or without a proxy.
+- The first build after this change reruns those layers once.
+
 ### Everyday live repairs: mandatory members, answer source, playback race (2026-10-20)
 
 - Native decoders ignore `contains`, so a required member could be crowded out. The

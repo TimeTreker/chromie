@@ -6,19 +6,15 @@ ARG QWEN3_TTS_SOURCE_REVISION
 ARG PYTORCH_INDEX_URL=https://download.pytorch.org/whl/cu128
 ARG TTS_CUDA_ARCH=89
 ARG CHROMIE_BUILD_PROFILE=unknown
-ARG HTTP_PROXY
-ARG HTTPS_PROXY
-ARG http_proxy
-ARG https_proxy
-ARG NO_PROXY
-ARG no_proxy
+# Proxies arrive as Docker's predefined build args (HTTP_PROXY, NO_PROXY, ...): RUN sees
+# them without an ARG line, and undeclared they stay out of the layer cache key and
+# the image history, so building with or without a proxy reuses the same layers.
 
 LABEL org.chromie.hardware-profile="${CHROMIE_BUILD_PROFILE}" \
       org.chromie.tts-cuda-arch="${TTS_CUDA_ARCH}"
 
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
-    PIP_NO_CACHE_DIR=1 \
     HF_HUB_DISABLE_TELEMETRY=1 \
     TOKENIZERS_PARALLELISM=false
 
@@ -38,14 +34,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # newest 3.11 build in uv 0.12.20's embedded download list, so changing either
 # pin is a deliberate image change.
 ENV UV_PYTHON_INSTALL_DIR=/opt/uv-python
-RUN python3 -m pip install --no-cache-dir uv==0.12.20 && \
+# Package downloads live in BuildKit cache mounts outside the image: a changed
+# dependency layer reinstalls from them instead of downloading every package again.
+RUN --mount=type=cache,target=/root/.cache/pip --mount=type=cache,target=/root/.cache/uv \
+    python3 -m pip install uv==0.12.20 && \
     uv python install 3.11.16 && \
     uv venv --seed --python 3.11.16 /opt/venv && \
     /opt/venv/bin/python -c "import sys; assert sys.version_info[:3] == (3, 11, 16), sys.version"
 ENV PATH=/opt/venv/bin:$PATH
-RUN pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1
+RUN --mount=type=cache,target=/root/.cache/pip pip install pip==25.1.1 setuptools==80.9.0 wheel==0.45.1
 
-RUN pip install --index-url "${PYTORCH_INDEX_URL}" \
+RUN --mount=type=cache,target=/root/.cache/pip pip install --index-url "${PYTORCH_INDEX_URL}" \
     torch==2.10.0 torchaudio==2.10.0
 
 RUN git init /opt/Qwen3-TTS && \
@@ -53,7 +52,7 @@ RUN git init /opt/Qwen3-TTS && \
     git -C /opt/Qwen3-TTS fetch --depth 1 origin "${QWEN3_TTS_SOURCE_REVISION}" && \
     git -C /opt/Qwen3-TTS checkout --detach FETCH_HEAD
 
-RUN pip install --no-deps /opt/Qwen3-TTS && \
+RUN --mount=type=cache,target=/root/.cache/pip pip install --no-deps /opt/Qwen3-TTS && \
     pip install \
       accelerate==1.12.0 \
       einops==0.8.1 \
